@@ -1,19 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
-import { createApiClient } from "../api/client.ts";
-import type { SafeSpendingSettings } from "../api/contracts.ts";
+import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
+import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
 	type ResourceScope,
-} from "../auth/resourceScope.ts";
+} from "@/auth/resourceScope.ts";
 import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
-} from "../domain/safeSpending.ts";
-import { readSafeSpendingSettings } from "./safeSpendingStorage.ts";
-import { serverQueryClient } from "./serverQuery.ts";
-import { notifyError, dismissKey } from "./notifications.ts";
+} from "@/domain/safeSpending.ts";
+import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
+import { notifyError, dismissKey } from "@/state/notifications.ts";
 
 export type TotalCycleSettings = SafeSpendingSettings;
 
@@ -162,15 +162,14 @@ export function updateSettingsForScope(
 			scope: { id: JSON.stringify(key) },
 			mutationFn: async () => {
 				if (scope !== getResourceScope()) return;
-				const result = await createApiClient({
-					baseUrl: scope.apiBaseUrl,
-				}).setSafeSpendingSettings(snapshot);
+				const data = (await setSafeSpendingSettings(snapshot as never)).data;
 				if (scope !== getResourceScope()) return;
-				if (result instanceof Error) throw result;
 				if (cache.getQueryData(key) === optimistic)
 					cache.setQueryData(
 						key,
-						sanitizeSafeSpendingSettings(result.settings),
+						sanitizeSafeSpendingSettings(
+							(data.settings ?? snapshot) as SafeSpendingSettings,
+						),
 					);
 				dismissKey("safe-spending-settings");
 			},

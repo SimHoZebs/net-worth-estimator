@@ -1,21 +1,26 @@
 import { useIsMutating, useMutationState } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
+import {
+	createAmountPreset,
+	deleteAmountPreset,
+	moveAmountPreset,
+	updateAmountPreset,
+} from "@/api/generated/endpoints.ts";
 import {
 	applyRowOperations,
 	diffFinancialModelDocuments,
-} from "../api/rowSync.ts";
+} from "@/api/rowSync.ts";
 import {
 	ApiHttpError,
 	type AmountPreset,
 	type FinancialModelDocument,
 	READ_ONLY_IMPORT_MESSAGE,
-} from "../api/index.ts";
+} from "@/api/index.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
-} from "../auth/resourceScope.ts";
-import { serverQueryClient } from "./serverQuery.ts";
+} from "@/auth/resourceScope.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
 	getServerModel,
 	getServerStatus,
@@ -23,13 +28,16 @@ import {
 	presetsOptions,
 	reloadWorkspace,
 	workspaceResourceKey,
-} from "./workspaceResources.ts";
+} from "@/state/workspaceResources.ts";
 import {
 	draftDocumentForSave,
 	useWorkspaceStore,
-	type RemoteApiClient,
-} from "./workspaceStore.ts";
-import { dismissKey, notifyError, notifySuccess } from "./notifications.ts";
+} from "@/state/workspaceStore.ts";
+import {
+	dismissKey,
+	notifyError,
+	notifySuccess,
+} from "@/state/notifications.ts";
 
 export function workspaceWriteKey(kind: "model" | "presets") {
 	return ["workspace-write", getResourceScope().key, kind] as const;
@@ -37,8 +45,7 @@ export function workspaceWriteKey(kind: "model" | "presets") {
 
 async function write<T>(
 	kind: "model" | "presets",
-	perform: (client: RemoteApiClient) => Promise<T>,
-	client: RemoteApiClient = defaultScopedApiClient(),
+	perform: () => Promise<T>,
 ): Promise<T | false> {
 	const scope = getResourceScope();
 	const cache = serverQueryClient();
@@ -54,7 +61,7 @@ async function write<T>(
 		mutationFn: async () => {
 			if (scope !== getResourceScope())
 				throw new Error("The active resource changed.");
-			const result = await perform(client);
+			const result = await perform();
 			if (scope !== getResourceScope())
 				throw new Error("The active resource changed.");
 			return result;
@@ -66,7 +73,7 @@ async function write<T>(
 					error instanceof Error ? error.message : "The server write failed.",
 					{
 						label: "Retry server request",
-						onAction: () => void reloadWorkspace(client),
+						onAction: () => void reloadWorkspace(),
 					},
 				);
 		},
@@ -101,9 +108,7 @@ export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
 	return errors.at(-1) ?? null;
 }
 
-export async function saveWorkspace(
-	client?: RemoteApiClient,
-): Promise<boolean> {
+export async function saveWorkspace(): Promise<boolean> {
 	const scope = getResourceScope();
 	if (
 		serverQueryClient().isFetching({ queryKey: workspaceResourceKey("model") })
@@ -115,56 +120,50 @@ export async function saveWorkspace(
 		return false;
 	}
 	return (
-		(await write(
-			"model",
-			async (api) => {
-				const document = draftDocumentForSave();
-				const draft = useWorkspaceStore.getState().draft!;
-				const response = await applyRowOperations(
-					api,
-					diffFinancialModelDocuments(
-						getServerModel()?.document ?? null,
-						document,
-					),
+		(await write("model", async () => {
+			const document = draftDocumentForSave();
+			const draft = useWorkspaceStore.getState().draft!;
+			const response = await applyRowOperations(
+				diffFinancialModelDocuments(
+					getServerModel()?.document ?? null,
+					document,
+				),
+			);
+			if (scope !== getResourceScope()) return false;
+			if (response instanceof Error) throw response;
+			if (!response.ok)
+				throw new Error(
+					response.issues.map((issue) => issue.message).join(" ") ||
+						"The server rejected the save. Your temporary plan remains unsaved.",
 				);
-				if (scope !== getResourceScope()) return false;
-				if (response instanceof Error) throw response;
-				if (!response.ok)
-					throw new Error(
-						response.issues.map((issue) => issue.message).join(" ") ||
-							"The server rejected the save. Your temporary plan remains unsaved.",
-					);
-				const errors = response.issues.filter(
-					(issue) => issue.severity === "error",
+			const errors = response.issues.filter(
+				(issue) => issue.severity === "error",
+			);
+			if (errors.length)
+				throw new Error(errors.map((issue) => issue.message).join(" "));
+			const cache = serverQueryClient();
+			await cache.invalidateQueries({
+				queryKey: workspaceResourceKey("model", scope),
+				refetchType: "none",
+			});
+			const authoritative = await cache.fetchQuery(modelOptions(scope));
+			if (scope !== getResourceScope()) return false;
+			if (!authoritative.document)
+				throw new Error(
+					"The save completed, but the server returned no authoritative model. Your temporary plan remains available locally.",
 				);
-				if (errors.length)
-					throw new Error(errors.map((issue) => issue.message).join(" "));
-				const cache = serverQueryClient();
-				await cache.invalidateQueries({
-					queryKey: workspaceResourceKey("model", scope),
-					refetchType: "none",
-				});
-				const authoritative = await cache.fetchQuery(modelOptions(api, scope));
-				if (scope !== getResourceScope()) return false;
-				if (!authoritative.document)
-					throw new Error(
-						"The save completed, but the server returned no authoritative model. Your temporary plan remains available locally.",
-					);
-				const saved = useWorkspaceStore.getState().acknowledgeSave(draft);
-				if (saved) {
-					dismissKey("workspace");
-					notifySuccess("workspace-notice", "Plan saved on the server.");
-				}
-				return saved;
-			},
-			client,
-		)) === true
+			const saved = useWorkspaceStore.getState().acknowledgeSave(draft);
+			if (saved) {
+				dismissKey("workspace");
+				notifySuccess("workspace-notice", "Plan saved on the server.");
+			}
+			return saved;
+		})) === true
 	);
 }
 
 export async function importServerDocument(
 	document: FinancialModelDocument,
-	client?: RemoteApiClient,
 ): Promise<boolean> {
 	const scope = getResourceScope();
 	if (
@@ -177,89 +176,74 @@ export async function importServerDocument(
 		return false;
 	}
 	return (
-		(await write(
-			"model",
-			async (api) => {
-				if (getServerModel()?.document)
-					throw new Error(
-						"A server model is already loaded. Use the reviewed import action in Configs.",
-					);
-				if (getServerStatus()?.readOnly)
-					throw new ApiHttpError({
-						status: 403,
-						message: READ_ONLY_IMPORT_MESSAGE,
-					});
-				const result = await applyRowOperations(
-					api,
-					diffFinancialModelDocuments(null, document),
+		(await write("model", async () => {
+			if (getServerModel()?.document)
+				throw new Error(
+					"A server model is already loaded. Use the reviewed import action in Configs.",
 				);
-				if (scope !== getResourceScope()) return false;
-				if (result instanceof Error) throw result;
-				if (!result.ok)
-					throw new Error(
-						result.issues.map((issue) => issue.message).join(" "),
-					);
-				const cache = serverQueryClient();
-				await cache.invalidateQueries({
-					queryKey: workspaceResourceKey("model", scope),
-					refetchType: "none",
+			if (getServerStatus()?.readOnly)
+				throw new ApiHttpError({
+					status: 403,
+					message: READ_ONLY_IMPORT_MESSAGE,
 				});
-				const model = await cache.fetchQuery(modelOptions(api, scope));
-				return scope === getResourceScope() && Boolean(model.document);
-			},
-			client,
-		)) === true
+			const result = await applyRowOperations(
+				diffFinancialModelDocuments(null, document),
+			);
+			if (scope !== getResourceScope()) return false;
+			if (result instanceof Error) throw result;
+			if (!result.ok)
+				throw new Error(result.issues.map((issue) => issue.message).join(" "));
+			const cache = serverQueryClient();
+			await cache.invalidateQueries({
+				queryKey: workspaceResourceKey("model", scope),
+				refetchType: "none",
+			});
+			const model = await cache.fetchQuery(modelOptions(scope));
+			return scope === getResourceScope() && Boolean(model.document);
+		})) === true
 	);
 }
 
-export async function reloadDraft(client?: RemoteApiClient) {
+export async function reloadDraft() {
 	if (!useWorkspaceStore.getState().discard(true)) return false;
-	await reloadWorkspace(client);
+	await reloadWorkspace();
 	return Boolean(getServerModel()?.document);
 }
 
-async function changePreset(
-	action: (api: RemoteApiClient) => Promise<unknown>,
-	client?: RemoteApiClient,
-) {
+async function changePreset(action: () => Promise<{ persisted: boolean }>) {
 	const scope = getResourceScope();
 	return (
-		(await write(
-			"presets",
-			async (api) => {
-				await serverQueryClient().cancelQueries({
-					queryKey: workspaceResourceKey("presets", scope),
-				});
-				const response = await action(api);
-				if (response instanceof Error) throw response;
-				if (
-					response &&
-					typeof response === "object" &&
-					"persisted" in response &&
-					!response.persisted
-				)
-					throw new Error("The recipe was rejected by the server.");
-				if (scope !== getResourceScope()) return false;
-				await serverQueryClient().invalidateQueries({
-					queryKey: workspaceResourceKey("presets", scope),
-					refetchType: "none",
-				});
-				await serverQueryClient().fetchQuery(presetsOptions(api, scope));
-				dismissKey("amount-presets");
-				return true;
-			},
-			client,
-		)) === true
+		(await write("presets", async () => {
+			await serverQueryClient().cancelQueries({
+				queryKey: workspaceResourceKey("presets", scope),
+			});
+			const response = await action();
+			if (!response.persisted)
+				throw new Error("The recipe was rejected by the server.");
+			if (scope !== getResourceScope()) return false;
+			await serverQueryClient().invalidateQueries({
+				queryKey: workspaceResourceKey("presets", scope),
+				refetchType: "none",
+			});
+			await serverQueryClient().fetchQuery(presetsOptions(scope));
+			dismissKey("amount-presets");
+			return true;
+		})) === true
 	);
 }
-export const createPreset = (preset: AmountPreset, client?: RemoteApiClient) =>
-	changePreset((api) => api.createAmountPreset(preset), client);
-export const updatePreset = (preset: AmountPreset, client?: RemoteApiClient) =>
-	changePreset((api) => api.updateAmountPreset(preset.id, preset), client);
-export const deletePreset = (id: string, client?: RemoteApiClient) =>
-	changePreset((api) => api.deleteAmountPreset(id), client);
-export const movePreset = (
-	id: string,
-	beforeId: string | null,
-	client?: RemoteApiClient,
-) => changePreset((api) => api.moveAmountPreset(id, beforeId), client);
+export const createPreset = (preset: AmountPreset) =>
+	changePreset(async () => (await createAmountPreset(preset as never)).data);
+export const updatePreset = (preset: AmountPreset) =>
+	changePreset(
+		async () => (await updateAmountPreset(preset.id, preset as never)).data,
+	);
+export const deletePreset = (id: string) =>
+	changePreset(async () => {
+		await deleteAmountPreset(id);
+		return { persisted: true };
+	});
+export const movePreset = (id: string, beforeId: string | null) =>
+	changePreset(async () => {
+		await moveAmountPreset({ id, beforeId: beforeId ?? undefined });
+		return { persisted: true };
+	});

@@ -1,6 +1,4 @@
-import { useMemo } from "react";
 import type { FinancialModelDocument } from "../api/contracts.ts";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import { responseScopeError } from "../api/scopedRequest.ts";
 import {
 	getResourceScope,
@@ -12,8 +10,6 @@ import {
 } from "../api/serverModelImport.ts";
 import { useUiStore } from "./uiStore.ts";
 
-const defaultClient = defaultScopedApiClient;
-
 // A scope transition orphans any in-flight import on the old scope (its
 // guarded requests abort and its finally skips the clear by design), so the
 // shared flag resets on publish instead of sticking until reload. This does
@@ -23,16 +19,8 @@ subscribeResourceScope(() => {
 	useUiStore.getState().setImporting(false);
 });
 
-export function useServerModelImport(
-	options: Omit<ServerModelImportOptions, "client"> & {
-		client?: ServerModelImportOptions["client"];
-	},
-) {
+export function useServerModelImport(options: ServerModelImportOptions) {
 	const scope = getResourceScope();
-	const api = useMemo(
-		() => options.client ?? defaultClient(),
-		[options.client],
-	);
 	// Single source of truth: the shared uiStore flag. The hook no longer
 	// keeps a local copy that can drift or clear the global on unmount while
 	// another importer runs. The flag clears in `importDocument`'s finally,
@@ -48,7 +36,6 @@ export function useServerModelImport(
 		try {
 			const result = await importServerModel({
 				...options,
-				client: api,
 				document,
 			});
 			// Workspace callbacks expose failures as rejected promises to their views.

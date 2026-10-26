@@ -1,11 +1,7 @@
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ApiRequestOptions } from "../api/client.ts";
-import type {
-	CurrentPositionRequest,
-	CurrentPositionResponse,
-} from "../api/position.ts";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
+import { resolveCurrentPosition } from "../api/generated/endpoints.ts";
+import type { PositionRequestBody } from "../api/generated/model/index.ts";
+import type { CurrentPositionResponse } from "../api/position.ts";
 import { currentPositionQueryKey } from "./serverQuery.ts";
 import {
 	useProjectionDocument,
@@ -13,22 +9,12 @@ import {
 } from "./useProjectionDocument.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
 
-interface PositionClient {
-	getCurrentPosition(
-		request: CurrentPositionRequest,
-		options?: ApiRequestOptions,
-	): Promise<Error | CurrentPositionResponse>;
-}
-
 export function useCurrentPosition({
-	client,
 	enabled = true,
 	...options
 }: ProjectionDocumentOptions & {
-	client?: PositionClient;
 	enabled?: boolean;
 } = {}) {
-	const api = useMemo(() => client ?? defaultScopedApiClient(), [client]);
 	const { activeDocument, documentKey } = useProjectionDocument(options);
 	const asOfDate = activeDocument ? projectionStartDate(activeDocument) : "";
 	const query = useQuery({
@@ -36,11 +22,17 @@ export function useCurrentPosition({
 		enabled: enabled && activeDocument !== null,
 		queryFn: async ({ signal }) => {
 			if (!activeDocument) throw new Error("No financial model is available.");
-			const response = await api.getCurrentPosition(
-				{ document: activeDocument, asOfDate },
-				{ signal },
-			);
-			if (response instanceof Error) throw response;
+			// The generated client takes the request body first and request
+			// options second; keep that order so the document is sent.
+			const response = (
+				await resolveCurrentPosition(
+					{
+						document: activeDocument,
+						asOfDate,
+					} as unknown as PositionRequestBody,
+					{ signal },
+				)
+			).data as unknown as CurrentPositionResponse;
 			const issues = response.issues?.filter(
 				(issue) => issue.severity === "error",
 			);

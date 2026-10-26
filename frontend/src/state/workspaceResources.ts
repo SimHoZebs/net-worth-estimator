@@ -1,22 +1,26 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import {
-	ApiHttpError,
+	getFinancialModel,
+	getServerStatus as fetchServerStatus,
+	listAmountPresets,
+} from "@/api/generated/endpoints.ts";
+import { ApiHttpError } from "@/api/http.ts";
+import {
 	backendToDisplayPlan,
+	type AmountPreset,
 	type FinancialModelResponse,
 	type PlanConversion,
 	type ServerStatus,
-} from "../api/index.ts";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
+} from "@/api/index.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
 	type ResourceScope,
-} from "../auth/resourceScope.ts";
-import { serverQueryClient } from "./serverQuery.ts";
-import { serverDocumentFingerprint } from "./remoteStorage.ts";
-import type { RemoteApiClient } from "./workspaceStore.ts";
-import { notifyError } from "./notifications.ts";
+} from "@/auth/resourceScope.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
+import { serverDocumentFingerprint } from "@/state/remoteStorage.ts";
+import { notifyError } from "@/state/notifications.ts";
 
 export interface ServerModel extends FinancialModelResponse {
 	conversion: PlanConversion | null;
@@ -45,18 +49,14 @@ const defaults = {
 	retry: false as const,
 };
 
-export function statusOptions(
-	client: RemoteApiClient = defaultScopedApiClient(),
-	scope = getResourceScope(),
-) {
+export function statusOptions(scope = getResourceScope()) {
 	return queryOptions({
 		...defaults,
 		queryKey: workspaceResourceKey("status", scope),
 		queryFn: async ({ signal }) => {
 			const previousStatus = getServerStatus(scope);
-			const result = await client.getStatus({ signal });
+			const result: ServerStatus = (await fetchServerStatus({ signal })).data;
 			current(scope, signal);
-			if (result instanceof Error) throw result;
 			if (previousStatus?.readOnly !== result.readOnly)
 				serverQueryClient().setQueryData<ServerModel>(
 					workspaceResourceKey("model", scope),
@@ -76,23 +76,21 @@ export function statusOptions(
 	});
 }
 
-export function modelOptions(
-	client: RemoteApiClient = defaultScopedApiClient(),
-	scope = getResourceScope(),
-) {
+export function modelOptions(scope = getResourceScope()) {
 	return queryOptions({
 		...defaults,
 		queryKey: workspaceResourceKey("model", scope),
 		queryFn: async ({ signal }): Promise<ServerModel> => {
 			try {
 				const [result, status] = await Promise.all([
-					client.getModel({
-						signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-					}),
-					serverQueryClient().fetchQuery(statusOptions(client, scope)),
+					(
+						await getFinancialModel({
+							signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
+						})
+					).data as unknown as FinancialModelResponse,
+					serverQueryClient().fetchQuery(statusOptions(scope)),
 				]);
 				current(scope, signal);
-				if (result instanceof Error) throw result;
 				return {
 					...result,
 					conversion: result.document
@@ -111,7 +109,7 @@ export function modelOptions(
 							: "The server model could not be loaded.",
 						{
 							label: "Retry server request",
-							onAction: () => void reloadWorkspace(client),
+							onAction: () => void reloadWorkspace(),
 						},
 					);
 				throw error;
@@ -120,21 +118,25 @@ export function modelOptions(
 	});
 }
 
-export function presetsOptions(
-	client: RemoteApiClient = defaultScopedApiClient(),
-	scope = getResourceScope(),
-) {
+export function presetsOptions(scope = getResourceScope()) {
 	return queryOptions({
 		...defaults,
 		queryKey: workspaceResourceKey("presets", scope),
 		queryFn: async ({ signal }) => {
-			const result = await client.listAmountPresets({ signal });
-			current(scope, signal);
-			if (result instanceof Error) {
-				notifyError("amount-presets", result.message);
-				throw result;
+			try {
+				const result = (await listAmountPresets({ signal })).data;
+				current(scope, signal);
+				return (result.presets ?? []) as unknown as AmountPreset[];
+			} catch (error) {
+				if (scope === getResourceScope() && !signal.aborted)
+					notifyError(
+						"amount-presets",
+						error instanceof Error
+							? error.message
+							: "The amount presets could not be loaded.",
+					);
+				throw error;
 			}
-			return result.presets;
 		},
 	});
 }
@@ -153,39 +155,33 @@ export function getServerStatus(scope = getResourceScope()) {
 			)
 		: undefined;
 }
-export function useServerModel(
-	options: { client?: RemoteApiClient; enabled?: boolean } = {},
-) {
+export function useServerModel(options: { enabled?: boolean } = {}) {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	return useQuery(
 		{
-			...modelOptions(options.client, scope),
+			...modelOptions(scope),
 			refetchOnMount: "always",
 			enabled: scope.status === "ready" && (options.enabled ?? false),
 		},
 		serverQueryClient(),
 	);
 }
-export function useServerStatus(
-	options: { client?: RemoteApiClient; enabled?: boolean } = {},
-) {
+export function useServerStatus(options: { enabled?: boolean } = {}) {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	return useQuery(
 		{
-			...statusOptions(options.client, scope),
+			...statusOptions(scope),
 			refetchOnMount: "always",
 			enabled: scope.status === "ready" && (options.enabled ?? false),
 		},
 		serverQueryClient(),
 	);
 }
-export function useAmountPresets(
-	options: { client?: RemoteApiClient; enabled?: boolean } = {},
-) {
+export function useAmountPresets(options: { enabled?: boolean } = {}) {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	return useQuery(
 		{
-			...presetsOptions(options.client, scope),
+			...presetsOptions(scope),
 			refetchOnMount: "always",
 			enabled: scope.status === "ready" && (options.enabled ?? false),
 		},
@@ -204,9 +200,7 @@ export function workspaceIsBusy() {
 }
 
 /** Explicit refreshes retain Query's last good data. A save completes before a refresh starts. */
-export async function reloadWorkspace(
-	client: RemoteApiClient = defaultScopedApiClient(),
-) {
+export async function reloadWorkspace() {
 	const scope = getResourceScope();
 	const cache = serverQueryClient();
 	const mutationKey = ["workspace-write", scope.key, "model"];
@@ -225,9 +219,9 @@ export async function reloadWorkspace(
 		refetchType: "none",
 	});
 	const results = await Promise.allSettled([
-		cache.fetchQuery(statusOptions(client, scope)),
-		cache.fetchQuery(modelOptions(client, scope)),
-		cache.fetchQuery(presetsOptions(client, scope)),
+		cache.fetchQuery(statusOptions(scope)),
+		cache.fetchQuery(modelOptions(scope)),
+		cache.fetchQuery(presetsOptions(scope)),
 	]);
 	if (scope === getResourceScope() && results[1]?.status === "fulfilled") {
 		// A successful explicit reload resets a temporary permission guard. Other save failures stay visible.

@@ -5,7 +5,7 @@ import {
 	subscribeResourceScope,
 	type ResourceScope,
 } from "../auth/resourceScope.ts";
-import type { ApiHttpError, FetchLike } from "./client.ts";
+import type { ApiHttpError, FetchLike } from "./http.ts";
 
 export class ResourceScopeError extends Error {
 	readonly status = 409;
@@ -20,16 +20,6 @@ export class ResourceScopeError extends Error {
 export interface ScopedResponse {
 	response: Response;
 	scope: ResourceScope;
-}
-
-/** Renew shared clients after verification without retargeting existing references. */
-export function resourceScopedFactory<T>(create: () => T): () => T {
-	let cached: { scope: ResourceScope; value: T } | undefined;
-	return () => {
-		const scope = getResourceScope();
-		if (cached?.scope !== scope) cached = { scope, value: create() };
-		return cached.value;
-	};
 }
 
 export function responseScopeError(

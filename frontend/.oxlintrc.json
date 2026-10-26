@@ -19,6 +19,7 @@
 		"browser": true,
 		"builtin": true
 	},
+	"ignorePatterns": ["src/api/generated/**"],
 	"categories": {
 		"correctness": "error"
 	},

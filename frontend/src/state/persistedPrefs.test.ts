@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiClient, ApiHttpError } from "../api/client.ts";
+import { ApiNetworkError } from "../api/http.ts";
 import { useNotifications } from "./notifications.ts";
 import type { SafeSpendingSettings } from "../api/contracts.ts";
 import {
@@ -96,6 +96,56 @@ function financialKey(scope = getResourceScope()) {
 	return key;
 }
 
+function ok(body: unknown, resource: string | null = A) {
+	const headers = new Headers({ "content-type": "application/json" });
+	if (resource) headers.set("Waypoint-Resource", resource);
+	return new Response(JSON.stringify(body), { headers });
+}
+
+function err(status: number, resource: string | null = A) {
+	return new Response(JSON.stringify({ title: "Server error" }), {
+		status,
+		headers: {
+			"content-type": "application/json",
+			...(resource ? { "Waypoint-Resource": resource } : {}),
+		},
+	});
+}
+
+const server = {
+	backend: new Map<string, SafeSpendingSettings>(),
+	putStatus: 0,
+	putErrors: [] as Error[],
+	getError: null as Error | null,
+	puts: [] as unknown[],
+};
+
+function backendKey() {
+	return `${getResourceScope().apiBaseUrl}:${getResourceScope().resource?.id}`;
+}
+
+function stubSettingsFetch() {
+	const resource = () => getResourceScope().resource?.id ?? null;
+	return vi.fn(async (url: unknown, init?: RequestInit) => {
+		if (!String(url).endsWith("/v1/safe-spending-settings"))
+			return ok({}, resource());
+		if ((init?.method ?? "GET") !== "GET") {
+			server.puts.push(JSON.parse(String(init?.body ?? "{}")));
+			const failure = server.putErrors.shift();
+			if (failure) throw failure;
+			if (server.putStatus) return err(server.putStatus, resource());
+			const body = JSON.parse(String(init?.body ?? "{}"));
+			server.backend.set(backendKey(), body);
+			return ok({ settings: body }, resource());
+		}
+		if (server.getError) throw server.getError;
+		return ok(
+			{ settings: server.backend.get(backendKey()) ?? null },
+			resource(),
+		);
+	});
+}
+
 beforeEach(async () => {
 	vi.unstubAllGlobals();
 	suspendResourceScope();
@@ -107,18 +157,12 @@ beforeEach(async () => {
 	resetUiStore();
 	useThemeStore.setState({ preference: "system" });
 	resetSafeSpendingSettings();
-	const backend = new Map<string, SafeSpendingSettings>();
-	const key = () =>
-		`${getResourceScope().apiBaseUrl}:${getResourceScope().resource?.id}`;
-	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockImplementation(
-		async () => ({ settings: backend.get(key()) ?? null }),
-	);
-	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
-		async (settings) => {
-			backend.set(key(), structuredClone(settings));
-			return { settings };
-		},
-	);
+	server.backend.clear();
+	server.putStatus = 0;
+	server.putErrors = [];
+	server.getError = null;
+	server.puts = [];
+	vi.stubGlobal("fetch", stubSettingsFetch());
 	try {
 		window.localStorage.clear();
 	} catch {
@@ -140,9 +184,7 @@ describe("unified persisted prefs", () => {
 			financialKey(),
 			JSON.stringify({ reserve: 999 }),
 		);
-		vi.mocked(ApiClient.prototype.setSafeSpendingSettings).mockResolvedValue(
-			new ApiHttpError({ status: 403, message: "Read-only" }),
-		);
+		server.putStatus = 403;
 		await verifyOwner();
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
@@ -151,8 +193,7 @@ describe("unified persisted prefs", () => {
 	});
 
 	it("reports a failed save and retries the latest settings", async () => {
-		const save = vi.mocked(ApiClient.prototype.setSafeSpendingSettings);
-		save.mockResolvedValueOnce(new Error("Offline"));
+		server.putErrors.push(new Error("Offline"));
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
 		await vi.waitFor(() =>
 			expect(useNotifications.getState().items[0]?.message).toContain(
@@ -163,34 +204,36 @@ describe("unified persisted prefs", () => {
 		await vi.waitFor(() =>
 			expect(useNotifications.getState().items).toHaveLength(0),
 		);
-		expect(save.mock.lastCall?.[0].reserve).toBe(123);
+		expect((server.puts.at(-1) as { reserve?: number }).reserve).toBe(123);
 	});
 	it("prefers backend settings over an old browser record", async () => {
 		window.localStorage.setItem(
 			financialKey(),
 			JSON.stringify({ reserve: 999 }),
 		);
-		vi.mocked(ApiClient.prototype.getSafeSpendingSettings).mockResolvedValue({
-			settings: { ...defaultSafeSpendingSettings(), reserve: 123 },
+		server.backend.set(backendKey(), {
+			...defaultSafeSpendingSettings(),
+			reserve: 123,
 		});
 		await refreshSafeSpendingSettings();
 		expect(useSafeSpendingSettings.getState().reserve).toBe(123);
-		expect(ApiClient.prototype.setSafeSpendingSettings).not.toHaveBeenCalled();
+		expect(server.puts).toHaveLength(0);
 	});
 
 	it("does not mount financial preferences when the backend read fails", async () => {
-		vi.mocked(ApiClient.prototype.getSafeSpendingSettings).mockResolvedValue(
-			new Error("Settings unavailable"),
-		);
+		const transport = new Error("Settings unavailable");
+		server.getError = transport;
 		const scope = acceptOwner(B);
-		await expect(hydrateFinancialPreferences(scope)).rejects.toThrow(
-			"Settings unavailable",
+		const failure = await hydrateFinancialPreferences(scope).catch(
+			(cause: unknown) => cause,
 		);
+		expect(failure).toBeInstanceOf(ApiNetworkError);
+		expect((failure as Error).cause).toBe(transport);
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 999 });
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);
-		expect(ApiClient.prototype.setSafeSpendingSettings).not.toHaveBeenCalled();
+		expect(server.puts).toHaveLength(0);
 	});
 
 	it("serializes rapid edits and stores them only in the backend", async () => {
@@ -198,9 +241,7 @@ describe("unified persisted prefs", () => {
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 456 });
 		await refreshSafeSpendingSettings();
 		expect(
-			vi
-				.mocked(ApiClient.prototype.setSafeSpendingSettings)
-				.mock.calls.map(([settings]) => settings.reserve),
+			server.puts.map((body) => (body as { reserve?: number }).reserve),
 		).toEqual([123, 456]);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(456);
 		expect(window.localStorage.getItem(financialKey())).toBeNull();
@@ -298,9 +339,7 @@ describe("unified persisted prefs", () => {
 		state.updateSettings({ reserve: 200 });
 		expect(window.localStorage.getItem(financialKey())).toBeNull();
 		await refreshSafeSpendingSettings();
-		expect(
-			vi.mocked(ApiClient.prototype.setSafeSpendingSettings).mock.lastCall?.[0],
-		).not.toHaveProperty("checkingOverride");
+		expect(server.puts.at(-1)).not.toHaveProperty("checkingOverride");
 	});
 
 	it("sanitizes income rule IDs without an automatic fallback", () => {
@@ -435,7 +474,12 @@ describe("financial preference owner isolation", () => {
 		useUiStore.getState().setRanges(false);
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 100 });
 		await refreshSafeSpendingSettings();
-		await verifyOwner(A, "https://different-api.example");
+		const foreign = acceptOwner(A, "https://different-api.example");
+		// A foreign API origin cannot reach the network: the scope boundary
+		// blocks the request instead of sending workspace credentials there.
+		await expect(hydrateFinancialPreferences(foreign)).rejects.toThrow(
+			/The API address does not match/,
+		);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);

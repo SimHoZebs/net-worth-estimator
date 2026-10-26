@@ -6,12 +6,12 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthBoundary } from "./AuthBoundary.tsx";
-import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { resetNotifications } from "../state/notifications.ts";
-import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { redirectToSignIn } from "./navigation.ts";
-import { SessionAccountControl } from "./SessionAccountControl.tsx";
+import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
+import { NotificationCenter } from "@/components/NotificationCenter.tsx";
+import { resetNotifications } from "@/state/notifications.ts";
+import { resetServerQueryCache } from "@/state/serverQuery.ts";
+import { redirectToSignIn } from "@/auth/navigation.ts";
+import { SessionAccountControl } from "@/auth/SessionAccountControl.tsx";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
 
@@ -277,6 +277,52 @@ describe("provider-independent authentication boundary", () => {
 		await waitFor(() =>
 			expect(screen.getByText("Private workspace")).toBeTruthy(),
 		);
+	});
+	it("names a down server with a retry action instead of idling on the loading state", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => status({ error: "Bad Gateway" }, 502)),
+		);
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		expect(
+			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+		).toBeTruthy();
+		expect(screen.getByRole("alert").textContent).toBe(
+			"The Waypoint server is unavailable (HTTP 502). It may be restarting; retry shortly.",
+		);
+		expect(screen.getByText("Retry the access check below.")).toBeTruthy();
+		expect(
+			screen.getByRole("button", { name: "Retry access check" }),
+		).toBeTruthy();
+		expect(
+			screen.queryByRole("button", { name: "Continue to sign in" }),
+		).toBeNull();
+		expect(screen.queryByText("Private workspace")).toBeNull();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
+	});
+	it("names a refused connection the same way", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new TypeError("Failed to fetch");
+			}),
+		);
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		expect(
+			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+		).toBeTruthy();
+		expect(screen.getByRole("alert").textContent).toBe(
+			"Cannot reach the Waypoint server. It may be down or restarting.",
+		);
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 	it("keeps a verified workspace mounted with a retry toast on a transient outage", async () => {
 		const fetcher = vi.fn(async () =>

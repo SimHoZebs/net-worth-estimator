@@ -1,19 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	BackendAccount,
 	BackendCheckpoint,
 	BackendPosting,
-	BackendRecurrenceRule,
-	EvaluationInstance,
 	FinancialModelDocument,
-	RowWriteResponse,
-} from "./contracts.ts";
+} from "@/api/contracts.ts";
+import {
+	acceptResourceScope,
+	canonicalApiBaseUrl,
+	suspendResourceScope,
+} from "@/auth/resourceScope.ts";
 import {
 	applyRowOperations,
 	diffFinancialModelDocuments,
 	type RowOperation,
-	type RowWriter,
-} from "./rowSync.ts";
+} from "@/api/rowSync.ts";
+import { ok } from "@/test/fetch.ts";
+import { ApiNetworkError } from "@/api/http.ts";
 
 const account = (id: string, name = id): BackendAccount => ({
 	id,
@@ -190,146 +193,113 @@ describe("diffFinancialModelDocuments", () => {
 });
 
 describe("applyRowOperations", () => {
-	function writer() {
-		const calls: RowOperation[] = [];
-		const failWith: { error: Error | null } = { error: null };
-		const record = <T>(
-			operation: RowOperation,
-			row: T = {} as T,
-		): Error | RowWriteResponse<T> => {
-			calls.push(operation);
-			if (failWith.error) return failWith.error;
-			return { row, issues: [], persisted: true, revision: "r1" };
-		};
-		const client = {
-			createAccount: vi.fn(async (row: BackendAccount) =>
-				record({ kind: "account", action: "create", row }, row),
-			),
-			updateAccount: vi.fn(async (id: string, row: BackendAccount) =>
-				record({ kind: "account", action: "update", id, row }, row),
-			),
-			deleteAccount: vi.fn(async (id: string) =>
-				record({ kind: "account", action: "delete", id }),
-			),
-			moveAccount: vi.fn(async (id: string, beforeId: string | null) =>
-				record({ kind: "account", action: "move", id, beforeId }),
-			),
-			createPosting: vi.fn(async (row: BackendPosting) =>
-				record({ kind: "posting", action: "create", row }, row),
-			),
-			updatePosting: vi.fn(async (id: string, row: BackendPosting) =>
-				record({ kind: "posting", action: "update", id, row }, row),
-			),
-			deletePosting: vi.fn(async (id: string) =>
-				record({ kind: "posting", action: "delete", id }),
-			),
-			movePosting: vi.fn(async (id: string, beforeId: string | null) =>
-				record({ kind: "posting", action: "move", id, beforeId }),
-			),
-			createRule: vi.fn(async (row: BackendRecurrenceRule) =>
-				record({ kind: "rule", action: "create", row }, row),
-			),
-			updateRule: vi.fn(async (id: string, row: BackendRecurrenceRule) =>
-				record({ kind: "rule", action: "update", id, row }, row),
-			),
-			deleteRule: vi.fn(async (id: string) =>
-				record({ kind: "rule", action: "delete", id }),
-			),
-			moveRule: vi.fn(async (id: string, beforeId: string | null) =>
-				record({ kind: "rule", action: "move", id, beforeId }),
-			),
-			saveCheckpoint: vi.fn(async (row: BackendCheckpoint) =>
-				record({ kind: "checkpoint", action: "save", row }, row),
-			),
-			deleteCheckpoint: vi.fn(async (accountId: string, date: string) =>
-				record({ kind: "checkpoint", action: "delete", accountId, date }),
-			),
-			createEvaluation: vi.fn(
-				async (row: EvaluationInstance, evaluationType: string) =>
-					record(
-						{ kind: "evaluation", action: "create", evaluationType, row },
-						row,
-					),
-			),
-			updateEvaluation: vi.fn(
-				async (
-					instanceId: string,
-					row: EvaluationInstance,
-					evaluationType: string,
-				) =>
-					record(
-						{
-							kind: "evaluation",
-							action: "update",
-							evaluationType,
-							instanceId,
-							row,
-						},
-						row,
-					),
-			),
-			deleteEvaluation: vi.fn(async (instanceId: string) =>
-				record({ kind: "evaluation", action: "delete", instanceId }),
-			),
-			moveEvaluation: vi.fn(
-				async (
-					evaluationType: string,
-					instanceId: string,
-					beforeId: string | null,
-				) =>
-					record({
-						kind: "evaluation",
-						action: "move",
-						evaluationType,
-						instanceId,
-						beforeId,
-					}),
-			),
-		} satisfies RowWriter;
-		return { client, calls, failWith };
+	const scopeId = `plans/${"a".repeat(64)}`;
+	beforeEach(() => {
+		acceptResourceScope(
+			{
+				apiBaseUrl: canonicalApiBaseUrl(""),
+				resource: {
+					id: scopeId,
+					kind: "private",
+					permissions: ["plan:read", "plan:project", "plan:write"],
+				},
+				subject: scopeId,
+			},
+			suspendResourceScope(),
+		);
+	});
+	afterEach(() => {
+		suspendResourceScope();
+		vi.unstubAllGlobals();
+	});
+
+	function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
+		const seen: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown, init?: RequestInit) => {
+				seen.push({ url: String(url), init });
+				return handler(String(url), init);
+			}),
+		);
+		return seen;
 	}
 
 	it("applies operations in order and reports success", async () => {
-		const { client, calls } = writer();
+		const seen = stubFetch(() =>
+			ok({
+				row: account("a"),
+				issues: [],
+				persisted: true,
+				revision: "r1",
+			}),
+		);
 		const operations: RowOperation[] = [
 			{ kind: "account", action: "create", row: account("a") },
 			{ kind: "account", action: "move", id: "a", beforeId: null },
 		];
-		const result = await applyRowOperations(client, operations);
+		const result = await applyRowOperations(operations);
 		expect(result).toEqual({ ok: true, issues: [] });
-		expect(calls).toEqual(operations);
-		expect(client.createAccount).toHaveBeenCalledOnce();
+		expect(seen.map((call) => call.url)).toEqual([
+			"/v1/accounts",
+			"/v1/accounts/reorder",
+		]);
+		expect(seen[0]?.init?.method).toBe("POST");
+		expect(seen[1]?.init?.method).toBe("POST");
+		expect(JSON.parse(String(seen[1]?.init?.body))).toEqual({
+			id: "a",
+			beforeId: "",
+		});
+		expect(new Headers(seen[0]?.init?.headers).get("Waypoint-Resource")).toBe(
+			scopeId,
+		);
 	});
 
 	it("stops at the first transport error", async () => {
-		const { client, calls, failWith } = writer();
-		failWith.error = new Error("boom");
-		const operations: RowOperation[] = [
-			{ kind: "account", action: "create", row: account("a") },
-			{ kind: "account", action: "create", row: account("b") },
-		];
-		const result = await applyRowOperations(client, operations);
-		expect(result).toBe(failWith.error);
-		expect(calls).toHaveLength(1);
-	});
-
-	it("stops at the first rejected write and returns issues", async () => {
-		const { client } = writer();
-		client.createAccount.mockResolvedValueOnce({
-			row: account("a"),
-			issues: [{ severity: "error", code: "x", message: "bad", path: [] }],
-			persisted: false,
-			revision: "r0",
+		const seen = stubFetch(() => {
+			throw new TypeError("Failed to fetch");
 		});
 		const operations: RowOperation[] = [
 			{ kind: "account", action: "create", row: account("a") },
 			{ kind: "account", action: "create", row: account("b") },
 		];
-		const result = await applyRowOperations(client, operations);
+		const result = await applyRowOperations(operations);
+		expect(result).toBeInstanceOf(ApiNetworkError);
+		expect(seen).toHaveLength(1);
+	});
+
+	it("stops at the first rejected write and returns issues", async () => {
+		const seen = stubFetch(() =>
+			ok({
+				row: account("a"),
+				issues: [{ severity: "error", code: "x", message: "bad", path: [] }],
+				persisted: false,
+				revision: "r0",
+			}),
+		);
+		const operations: RowOperation[] = [
+			{ kind: "account", action: "create", row: account("a") },
+			{ kind: "account", action: "create", row: account("b") },
+		];
+		const result = await applyRowOperations(operations);
 		expect(result).toEqual({
 			ok: false,
 			issues: [{ severity: "error", code: "x", message: "bad", path: [] }],
 		});
-		expect(client.createAccount).toHaveBeenCalledTimes(1);
+		expect(seen).toHaveLength(1);
+	});
+
+	it("skips network access for an aborted save", async () => {
+		const seen = stubFetch(() => ok({}));
+		const operations: RowOperation[] = [
+			{ kind: "account", action: "create", row: account("a") },
+		];
+		const controller = new AbortController();
+		controller.abort();
+		const result = await applyRowOperations(operations, {
+			signal: controller.signal,
+		});
+		expect(result).toEqual({ ok: true, issues: [] });
+		expect(seen).toHaveLength(0);
 	});
 });

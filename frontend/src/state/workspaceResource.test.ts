@@ -1,15 +1,14 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
 	acceptResourceScope,
+	canonicalApiBaseUrl,
 	getResourceScope,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
-import type { FinancialModelResponse } from "../api/index.ts";
 import {
 	resetWorkspaceForResource,
 	resetWorkspaceStore,
 	useWorkspaceStore,
-	type RemoteApiClient,
 } from "./workspaceStore.ts";
 import {
 	getServerModel,
@@ -27,7 +26,7 @@ import { testPlan } from "../test/plan.ts";
 function owner(id: string) {
 	acceptResourceScope(
 		{
-			apiBaseUrl: "http://localhost",
+			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id,
 				kind: "private",
@@ -42,11 +41,13 @@ beforeEach(() => {
 	owner("plans/a");
 	resetWorkspaceStore();
 	resetServerQueryCache();
+	vi.unstubAllGlobals();
 });
 afterEach(() => {
 	resetWorkspaceStore();
 	resetServerQueryCache();
 	suspendResourceScope();
+	vi.unstubAllGlobals();
 });
 
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
@@ -63,23 +64,42 @@ it("retains completed Query data during verification without exposing it under p
 });
 
 it("does not publish a retired account's late model result", async () => {
-	let finish!: (response: FinancialModelResponse) => void;
-	const api = {
-		getStatus: vi.fn(async () => ({ readOnly: false })),
-		getModel: vi.fn(
-			() =>
-				new Promise<FinancialModelResponse>((resolve) => {
-					finish = resolve;
-				}),
-		),
-	} as unknown as RemoteApiClient;
+	let finish!: (value: Response) => void;
+	const pending = new Promise<Response>((resolve) => {
+		finish = resolve;
+	});
+	const headers = () => {
+		const responseHeaders = new Headers({ "content-type": "application/json" });
+		const resource = getResourceScope().resource?.id;
+		if (resource) responseHeaders.set("Waypoint-Resource", resource);
+		return responseHeaders;
+	};
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (url: unknown) => {
+			const path = String(url);
+			if (path.endsWith("/v1/status"))
+				return new Response(JSON.stringify({ readOnly: false }), {
+					headers: headers(),
+				});
+			if (path.endsWith("/v1/financial-model")) return pending;
+			return new Response(JSON.stringify({ document: null, issues: [] }), {
+				headers: headers(),
+			});
+		}),
+	);
 	const old = serverQueryClient()
-		.fetchQuery(modelOptions(api))
+		.fetchQuery(modelOptions())
 		.catch(() => {});
 	owner("plans/b");
 	resetWorkspaceForResource();
 	const current = setServerModelFixture(undefined, { revision: "b" });
-	finish({ document: null, revision: "private-a", issues: [] });
+	finish(
+		new Response(
+			JSON.stringify({ document: null, revision: "private-a", issues: [] }),
+			{ headers: headers() },
+		),
+	);
 	await old;
 	expect(getServerModel()).toEqual(current);
 });

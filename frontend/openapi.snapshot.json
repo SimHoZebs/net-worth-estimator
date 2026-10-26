@@ -1,0 +1,3879 @@
+{
+	"components": {
+		"schemas": {
+			"Account": {
+				"additionalProperties": false,
+				"properties": {
+					"color": {
+						"type": ["string", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"maxBalance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"minBalance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"kind",
+					"minBalance",
+					"maxBalance",
+					"color",
+					"enabled"
+				],
+				"type": "object"
+			},
+			"AccountBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/AccountBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"color": {
+						"type": "string"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"maxBalance": {
+						"format": "double",
+						"type": "number"
+					},
+					"minBalance": {
+						"format": "double",
+						"type": "number"
+					},
+					"name": {
+						"type": "string"
+					},
+					"source": {
+						"type": "string"
+					}
+				},
+				"required": ["name", "kind", "enabled"],
+				"type": "object"
+			},
+			"AccountDelta": {
+				"additionalProperties": false,
+				"properties": {
+					"delta": {
+						"format": "double",
+						"type": "number"
+					},
+					"postingId": {
+						"type": "string"
+					}
+				},
+				"required": ["postingId", "delta"],
+				"type": "object"
+			},
+			"AccountLink": {
+				"additionalProperties": false,
+				"properties": {
+					"bridgeAccountId": {
+						"type": "string"
+					},
+					"bridgeName": {
+						"type": "string"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"lastSeenAt": {
+						"type": "string"
+					},
+					"modelAccountId": {
+						"type": "string"
+					},
+					"origin": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"bridgeAccountId",
+					"modelAccountId",
+					"bridgeName",
+					"currency",
+					"origin",
+					"lastSeenAt"
+				],
+				"type": "object"
+			},
+			"AccountSnapshot": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"date": {
+						"type": "string"
+					},
+					"impacts": {
+						"items": {
+							"$ref": "#/components/schemas/AccountDelta"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["accountId", "date", "balance", "impacts"],
+				"type": "object"
+			},
+			"AmountFieldSpec": {
+				"additionalProperties": false,
+				"properties": {
+					"key": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"required": {
+						"type": "boolean"
+					}
+				},
+				"required": ["key", "kind", "required"],
+				"type": "object"
+			},
+			"AmountInputBinding": {
+				"additionalProperties": false,
+				"properties": {
+					"arguments": {
+						"additionalProperties": {},
+						"type": "object"
+					},
+					"provider": {
+						"type": "string"
+					},
+					"source": {
+						"type": "string"
+					},
+					"value": {}
+				},
+				"required": ["source"],
+				"type": "object"
+			},
+			"AmountPreset": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/AmountPreset.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					},
+					"label": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"summary": {
+						"type": "string"
+					},
+					"whenUse": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "name", "label", "amount", "enabled"],
+				"type": "object"
+			},
+			"AmountProviderInfo": {
+				"additionalProperties": false,
+				"properties": {
+					"argFields": {
+						"items": {
+							"$ref": "#/components/schemas/AmountFieldSpec"
+						},
+						"type": ["array", "null"]
+					},
+					"description": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"volatile": {
+						"type": "boolean"
+					}
+				},
+				"required": ["name", "description"],
+				"type": "object"
+			},
+			"AmountResolverInfo": {
+				"additionalProperties": false,
+				"properties": {
+					"configFields": {
+						"items": {
+							"$ref": "#/components/schemas/AmountFieldSpec"
+						},
+						"type": ["array", "null"]
+					},
+					"description": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": ["name", "description"],
+				"type": "object"
+			},
+			"AmountResolversOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AmountResolversOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"providers": {
+						"items": {
+							"$ref": "#/components/schemas/AmountProviderInfo"
+						},
+						"type": ["array", "null"]
+					},
+					"resolvers": {
+						"items": {
+							"$ref": "#/components/schemas/AmountResolverInfo"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["resolvers", "providers"],
+				"type": "object"
+			},
+			"Checkpoint": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/Checkpoint.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"AccountId": {
+						"type": "string"
+					},
+					"Balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"Date": {
+						"type": "string"
+					},
+					"source": {
+						"type": "string"
+					}
+				},
+				"required": ["Date", "AccountId", "Balance"],
+				"type": "object"
+			},
+			"CheckpointCorrection": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"adjustment": {
+						"format": "double",
+						"type": "number"
+					},
+					"modeledBalance": {
+						"format": "double",
+						"type": "number"
+					},
+					"observedBalance": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": [
+					"accountId",
+					"observedBalance",
+					"modeledBalance",
+					"adjustment"
+				],
+				"type": "object"
+			},
+			"CurrentPosition": {
+				"additionalProperties": false,
+				"properties": {
+					"accounts": {
+						"items": {
+							"$ref": "#/components/schemas/PositionAccount"
+						},
+						"type": ["array", "null"]
+					},
+					"asOfDate": {
+						"type": "string"
+					},
+					"netWorth": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["asOfDate", "netWorth", "accounts"],
+				"type": "object"
+			},
+			"Delete-accountResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Delete-accountResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"deletedId": {
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["deletedId", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"Delete-amount-presetResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Delete-amount-presetResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"deletedId": {
+						"type": "string"
+					}
+				},
+				"required": ["deletedId"],
+				"type": "object"
+			},
+			"DeterministicOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/DeterministicOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"error": {
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"result": {
+						"$ref": "#/components/schemas/ProjectionResult"
+					}
+				},
+				"type": "object"
+			},
+			"ErrorDetail": {
+				"additionalProperties": false,
+				"properties": {
+					"location": {
+						"description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+						"type": "string"
+					},
+					"message": {
+						"description": "Error message text",
+						"type": "string"
+					},
+					"value": {
+						"description": "The value at the given location"
+					}
+				},
+				"type": "object"
+			},
+			"ErrorModel": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ErrorModel.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"detail": {
+						"description": "A human-readable explanation specific to this occurrence of the problem.",
+						"examples": ["Property foo is required but is missing."],
+						"type": "string"
+					},
+					"errors": {
+						"description": "Optional list of individual error details",
+						"items": {
+							"$ref": "#/components/schemas/ErrorDetail"
+						},
+						"type": ["array", "null"]
+					},
+					"instance": {
+						"description": "A URI reference that identifies the specific occurrence of the problem.",
+						"examples": ["https://example.com/error-log/abc123"],
+						"format": "uri",
+						"type": "string"
+					},
+					"status": {
+						"description": "HTTP status code",
+						"examples": [400],
+						"format": "int64",
+						"type": "integer"
+					},
+					"title": {
+						"description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
+						"examples": ["Bad Request"],
+						"type": "string"
+					},
+					"type": {
+						"default": "about:blank",
+						"description": "A URI reference to human-readable documentation for the error.",
+						"examples": ["https://example.com/errors/example"],
+						"format": "uri",
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
+			"EvaluationDiagnostic": {
+				"additionalProperties": false,
+				"properties": {
+					"code": {
+						"type": "string"
+					},
+					"date": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"relatedAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"relatedPostingIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"severity": {
+						"type": "string"
+					}
+				},
+				"required": ["code", "severity", "message"],
+				"type": "object"
+			},
+			"EvaluationResultEnvelope": {
+				"additionalProperties": false,
+				"properties": {
+					"deterministic": {},
+					"diagnostics": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationDiagnostic"
+						},
+						"type": ["array", "null"]
+					},
+					"instanceId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"probabilistic": {},
+					"status": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"instanceId",
+					"name",
+					"status",
+					"deterministic",
+					"probabilistic",
+					"diagnostics"
+				],
+				"type": "object"
+			},
+			"EvaluationResultTables": {
+				"additionalProperties": false,
+				"properties": {
+					"accountBalance": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
+					},
+					"cycleFulfillment": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
+					},
+					"financialIndependence": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
+					},
+					"netWorthThreshold": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
+					},
+					"plannedPurchases": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
+					},
+					"postingFulfillment": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"financialIndependence",
+					"netWorthThreshold",
+					"accountBalance",
+					"postingFulfillment",
+					"cycleFulfillment"
+				],
+				"type": "object"
+			},
+			"EvaluationTables": {
+				"additionalProperties": false,
+				"properties": {
+					"accountBalance": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					},
+					"cycleFulfillment": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					},
+					"financialIndependence": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					},
+					"netWorthThreshold": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					},
+					"plannedPurchases": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					},
+					"postingFulfillment": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"financialIndependence",
+					"netWorthThreshold",
+					"accountBalance",
+					"postingFulfillment",
+					"cycleFulfillment"
+				],
+				"type": "object"
+			},
+			"EvaluationUpdate": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/EvaluationUpdate.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"config": {
+						"additionalProperties": {},
+						"type": "object"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"instanceId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					}
+				},
+				"required": ["type", "name", "enabled"],
+				"type": "object"
+			},
+			"FinancialModelDocument": {
+				"additionalProperties": false,
+				"properties": {
+					"accounts": {
+						"items": {
+							"$ref": "#/components/schemas/Account"
+						},
+						"type": ["array", "null"]
+					},
+					"checkpoints": {
+						"items": {
+							"$ref": "#/components/schemas/Checkpoint"
+						},
+						"type": ["array", "null"]
+					},
+					"evaluations": {
+						"$ref": "#/components/schemas/EvaluationTables"
+					},
+					"paymentTerms": {
+						"items": {
+							"$ref": "#/components/schemas/PaymentTerms"
+						},
+						"type": ["array", "null"]
+					},
+					"postings": {
+						"items": {
+							"$ref": "#/components/schemas/Posting"
+						},
+						"type": ["array", "null"]
+					},
+					"recurrenceRules": {
+						"items": {
+							"$ref": "#/components/schemas/RecurrenceRule"
+						},
+						"type": ["array", "null"]
+					},
+					"sourcePath": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"sourcePath",
+					"accounts",
+					"checkpoints",
+					"evaluations",
+					"postings",
+					"recurrenceRules",
+					"paymentTerms"
+				],
+				"type": "object"
+			},
+			"Item": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"delta": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["accountId", "delta"],
+				"type": "object"
+			},
+			"LinkListOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/LinkListOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"links": {
+						"items": {
+							"$ref": "#/components/schemas/AccountLink"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["links"],
+				"type": "object"
+			},
+			"LinkOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/LinkOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"link": {
+						"$ref": "#/components/schemas/AccountLink"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["link", "revision"],
+				"type": "object"
+			},
+			"LinkPutInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/LinkPutInputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"modelAccountId": {
+						"type": "string"
+					}
+				},
+				"required": ["modelAccountId"],
+				"type": "object"
+			},
+			"ModelOverrides": {
+				"additionalProperties": false,
+				"properties": {
+					"addedAccounts": {
+						"items": {
+							"$ref": "#/components/schemas/Account"
+						},
+						"type": ["array", "null"]
+					},
+					"addedPostings": {
+						"items": {
+							"$ref": "#/components/schemas/Posting"
+						},
+						"type": ["array", "null"]
+					},
+					"addedRules": {
+						"items": {
+							"$ref": "#/components/schemas/RecurrenceRule"
+						},
+						"type": ["array", "null"]
+					},
+					"disabledAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"disabledPostingIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"disabledRuleIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"addedAccounts",
+					"addedPostings",
+					"addedRules",
+					"disabledAccountIds",
+					"disabledPostingIds",
+					"disabledRuleIds"
+				],
+				"type": "object"
+			},
+			"ModelValidationIssue": {
+				"additionalProperties": false,
+				"properties": {
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"path": {
+						"items": {},
+						"type": ["array", "null"]
+					},
+					"severity": {
+						"type": "string"
+					}
+				},
+				"required": ["severity", "code", "message", "path"],
+				"type": "object"
+			},
+			"Move-amount-presetRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Move-amount-presetRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"beforeId": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": ["id"],
+				"type": "object"
+			},
+			"Move-amount-presetResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Move-amount-presetResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"movedId": {
+						"type": "string"
+					}
+				},
+				"required": ["movedId"],
+				"type": "object"
+			},
+			"Move-evaluationRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Move-evaluationRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"beforeId": {
+						"type": "string"
+					},
+					"instanceId": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					}
+				},
+				"required": ["type", "instanceId"],
+				"type": "object"
+			},
+			"MovementEvent": {
+				"additionalProperties": false,
+				"properties": {
+					"accountDeltas": {
+						"items": {
+							"$ref": "#/components/schemas/Item"
+						},
+						"type": ["array", "null"]
+					},
+					"availableAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"bindingConstraints": {
+						"items": {},
+						"type": ["array", "null"]
+					},
+					"date": {
+						"type": "string"
+					},
+					"fulfillment": {
+						"$ref": "#/components/schemas/MovementFulfillment"
+					},
+					"origin": {
+						"$ref": "#/components/schemas/MovementOrigin"
+					},
+					"realizedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"requestedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"sequence": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"date",
+					"sequence",
+					"origin",
+					"requestedAmount",
+					"realizedAmount",
+					"accountDeltas"
+				],
+				"type": "object"
+			},
+			"MovementFulfillment": {
+				"additionalProperties": false,
+				"properties": {
+					"destinationLimitedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"unfulfilledAmount": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["unfulfilledAmount", "destinationLimitedAmount"],
+				"type": "object"
+			},
+			"MovementOrigin": {
+				"additionalProperties": false,
+				"properties": {
+					"postingId": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					}
+				},
+				"required": ["type", "postingId"],
+				"type": "object"
+			},
+			"ParseResultBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ParseResultBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"document": {
+						"$ref": "#/components/schemas/FinancialModelDocument"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["document", "issues"],
+				"type": "object"
+			},
+			"PaymentTerms": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"dueDay": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"minimumFixed": {
+						"format": "double",
+						"type": "number"
+					},
+					"minimumPercent": {
+						"format": "double",
+						"type": "number"
+					},
+					"statementDay": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": ["accountId", "minimumFixed", "dueDay"],
+				"type": "object"
+			},
+			"PinnedEvaluationsInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PinnedEvaluationsInputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"instanceIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["instanceIds"],
+				"type": "object"
+			},
+			"PinnedEvaluationsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PinnedEvaluationsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"instanceIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["instanceIds"],
+				"type": "object"
+			},
+			"PositionAccount": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["accountId", "balance"],
+				"type": "object"
+			},
+			"PositionOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/PositionOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"error": {
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"result": {
+						"$ref": "#/components/schemas/CurrentPosition"
+					}
+				},
+				"type": "object"
+			},
+			"PositionRequestBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PositionRequestBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"asOfDate": {
+						"type": "string"
+					},
+					"document": {
+						"$ref": "#/components/schemas/FinancialModelDocument"
+					}
+				},
+				"required": ["asOfDate"],
+				"type": "object"
+			},
+			"Posting": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"claim": {
+						"$ref": "#/components/schemas/PostingClaim"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"executionOrder": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"pending": {
+						"type": "boolean"
+					},
+					"postedTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"purchase": {
+						"$ref": "#/components/schemas/PurchasePolicy"
+					},
+					"source": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"transactionTime": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"sourceAccountId",
+					"destinations",
+					"amount",
+					"postedTime",
+					"transactionTime",
+					"enabled"
+				],
+				"type": "object"
+			},
+			"PostingAmountResolution": {
+				"additionalProperties": false,
+				"properties": {
+					"config": {
+						"additionalProperties": {},
+						"type": "object"
+					},
+					"inputs": {
+						"additionalProperties": {
+							"$ref": "#/components/schemas/AmountInputBinding"
+						},
+						"type": "object"
+					},
+					"resolver": {
+						"type": "string"
+					}
+				},
+				"required": ["resolver", "config", "inputs"],
+				"type": "object"
+			},
+			"PostingBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/PostingBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"claim": {
+						"$ref": "#/components/schemas/PostingClaim"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"executionOrder": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"format": "uuid",
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"pending": {
+						"type": "boolean"
+					},
+					"postedTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"purchase": {
+						"$ref": "#/components/schemas/PurchasePolicy"
+					},
+					"source": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": "string"
+					},
+					"transactionTime": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"name",
+					"amount",
+					"postedTime",
+					"transactionTime",
+					"enabled"
+				],
+				"type": "object"
+			},
+			"PostingClaim": {
+				"additionalProperties": false,
+				"properties": {
+					"occurrenceDate": {
+						"type": "string"
+					},
+					"ruleId": {
+						"type": "string"
+					}
+				},
+				"required": ["ruleId", "occurrenceDate"],
+				"type": "object"
+			},
+			"PresetListOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PresetListOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"presets": {
+						"items": {
+							"$ref": "#/components/schemas/AmountPreset"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["presets"],
+				"type": "object"
+			},
+			"PresetResultBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/PresetResultBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"row": {
+						"$ref": "#/components/schemas/AmountPreset"
+					}
+				},
+				"required": ["row", "issues", "persisted"],
+				"type": "object"
+			},
+			"ProjectionAccountSummary": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"color": {
+						"type": ["string", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"endingBalance": {
+						"format": "double",
+						"type": "number"
+					},
+					"name": {
+						"type": "string"
+					},
+					"startingBalance": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": [
+					"accountId",
+					"name",
+					"color",
+					"enabled",
+					"startingBalance",
+					"endingBalance"
+				],
+				"type": "object"
+			},
+			"ProjectionRange": {
+				"additionalProperties": false,
+				"properties": {
+					"endDate": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
+			"ProjectionRequestBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ProjectionRequestBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"document": {
+						"$ref": "#/components/schemas/FinancialModelDocument"
+					},
+					"overrides": {
+						"$ref": "#/components/schemas/ModelOverrides"
+					},
+					"range": {
+						"$ref": "#/components/schemas/ProjectionRange"
+					},
+					"settings": {
+						"$ref": "#/components/schemas/ProjectionRuntimeSettings"
+					}
+				},
+				"required": ["settings", "range"],
+				"type": "object"
+			},
+			"ProjectionResult": {
+				"additionalProperties": false,
+				"properties": {
+					"accountSummaries": {
+						"items": {
+							"$ref": "#/components/schemas/ProjectionAccountSummary"
+						},
+						"type": ["array", "null"]
+					},
+					"evaluations": {
+						"$ref": "#/components/schemas/EvaluationResultTables"
+					},
+					"milestones": {
+						"$ref": "#/components/schemas/ProjectionResultMilestonesStruct"
+					},
+					"movementEvents": {
+						"items": {
+							"$ref": "#/components/schemas/MovementEvent"
+						},
+						"type": ["array", "null"]
+					},
+					"summary": {
+						"$ref": "#/components/schemas/ProjectionResultSummaryStruct"
+					},
+					"timeline": {
+						"$ref": "#/components/schemas/ProjectionResultTimelineStruct"
+					},
+					"totals": {
+						"$ref": "#/components/schemas/ProjectionResultTotalsStruct"
+					}
+				},
+				"required": [
+					"timeline",
+					"accountSummaries",
+					"totals",
+					"milestones",
+					"summary",
+					"evaluations"
+				],
+				"type": "object"
+			},
+			"ProjectionResultMilestonesStruct": {
+				"additionalProperties": false,
+				"properties": {
+					"latestHistoricalDate": {
+						"type": ["string", "null"]
+					},
+					"projectionStartDate": {
+						"type": "string"
+					}
+				},
+				"required": ["latestHistoricalDate", "projectionStartDate"],
+				"type": "object"
+			},
+			"ProjectionResultSummaryStruct": {
+				"additionalProperties": false,
+				"properties": {
+					"currentNetWorth": {
+						"format": "double",
+						"type": "number"
+					},
+					"finalNetWorth": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["currentNetWorth", "finalNetWorth"],
+				"type": "object"
+			},
+			"ProjectionResultTimelineStruct": {
+				"additionalProperties": false,
+				"properties": {
+					"rows": {
+						"items": {
+							"$ref": "#/components/schemas/ProjectionRow"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["rows"],
+				"type": "object"
+			},
+			"ProjectionResultTotalsStruct": {
+				"additionalProperties": false,
+				"properties": {
+					"externalInflowAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"externalOutflowAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"internalTransferAmount": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": [
+					"externalInflowAmount",
+					"externalOutflowAmount",
+					"internalTransferAmount"
+				],
+				"type": "object"
+			},
+			"ProjectionRow": {
+				"additionalProperties": false,
+				"properties": {
+					"accountSnapshots": {
+						"items": {
+							"$ref": "#/components/schemas/AccountSnapshot"
+						},
+						"type": ["array", "null"]
+					},
+					"checkpointCorrections": {
+						"items": {
+							"$ref": "#/components/schemas/CheckpointCorrection"
+						},
+						"type": ["array", "null"]
+					},
+					"date": {
+						"type": "string"
+					},
+					"externalInflowAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"externalOutflowAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"internalTransferAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"isHistorical": {
+						"type": "boolean"
+					},
+					"netWorth": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": [
+					"date",
+					"isHistorical",
+					"netWorth",
+					"accountSnapshots",
+					"externalInflowAmount",
+					"externalOutflowAmount",
+					"internalTransferAmount",
+					"checkpointCorrections"
+				],
+				"type": "object"
+			},
+			"ProjectionRuntimeSettings": {
+				"additionalProperties": false,
+				"properties": {
+					"evaluations": {
+						"$ref": "#/components/schemas/EvaluationTables"
+					},
+					"fallbackProjectionStartDate": {
+						"type": "string"
+					},
+					"horizonYears": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"fallbackProjectionStartDate",
+					"horizonYears",
+					"evaluations"
+				],
+				"type": "object"
+			},
+			"PurchasePolicy": {
+				"additionalProperties": false,
+				"properties": {
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": ["priority"],
+				"type": "object"
+			},
+			"RecurrenceRule": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"annualCap": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"endDate": {
+						"type": ["string", "null"]
+					},
+					"frequency": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"sourceAccountId",
+					"destinations",
+					"amount",
+					"frequency",
+					"startDate",
+					"endDate",
+					"annualCap",
+					"priority",
+					"enabled"
+				],
+				"type": "object"
+			},
+			"ReorderInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ReorderInputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"beforeId": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": ["id"],
+				"type": "object"
+			},
+			"ReorderOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ReorderOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["revision"],
+				"type": "object"
+			},
+			"RowResultBodyAccount": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/RowResultBodyAccount.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/Account"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"RowResultBodyCheckpoint": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/RowResultBodyCheckpoint.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/Checkpoint"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"RowResultBodyEvaluationUpdate": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/RowResultBodyEvaluationUpdate.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/EvaluationUpdate"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"RowResultBodyPaymentTerms": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/RowResultBodyPaymentTerms.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/PaymentTerms"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"RowResultBodyPosting": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/RowResultBodyPosting.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/Posting"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"RowResultBodyRecurrenceRule": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/RowResultBodyRecurrenceRule.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/RecurrenceRule"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision"],
+				"type": "object"
+			},
+			"RuleBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/RuleBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"annualCap": {
+						"format": "double",
+						"type": "number"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"endDate": {
+						"type": "string"
+					},
+					"frequency": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"sourceAccountId": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"name",
+					"amount",
+					"frequency",
+					"startDate",
+					"priority",
+					"enabled"
+				],
+				"type": "object"
+			},
+			"SafeSpendingOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SafeSpendingOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"settings": {
+						"$ref": "#/components/schemas/SafeSpendingSettings"
+					}
+				},
+				"required": ["settings"],
+				"type": "object"
+			},
+			"SafeSpendingSettings": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SafeSpendingSettings.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"incomeRuleIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"movementIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"reserve": {
+						"format": "double",
+						"minimum": 0,
+						"type": "number"
+					},
+					"spendingAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"statementDay": {
+						"format": "int64",
+						"maximum": 28,
+						"minimum": 1,
+						"type": "integer"
+					},
+					"statementDaySet": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"statementDay",
+					"reserve",
+					"accountIds",
+					"spendingAccountIds",
+					"incomeRuleIds",
+					"movementIds",
+					"statementDaySet"
+				],
+				"type": "object"
+			},
+			"StatusOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/StatusOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"lastSyncAt": {
+						"type": "string"
+					},
+					"readOnly": {
+						"type": "boolean"
+					},
+					"syncConfigured": {
+						"type": "boolean"
+					},
+					"syncHost": {
+						"type": "string"
+					}
+				},
+				"required": ["readOnly", "syncConfigured"],
+				"type": "object"
+			},
+			"Summary": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/Summary.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountsProvisioned": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"checkpointsInserted": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"checkpointsSkipped": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"checkpointsUpdated": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"pendingDeleted": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"pendingInserted": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"pendingUpdated": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"skipped": {
+						"additionalProperties": {
+							"format": "int64",
+							"type": "integer"
+						},
+						"type": "object"
+					}
+				},
+				"required": [
+					"checkpointsInserted",
+					"checkpointsUpdated",
+					"checkpointsSkipped",
+					"pendingDeleted",
+					"pendingInserted",
+					"pendingUpdated",
+					"accountsProvisioned",
+					"skipped"
+				],
+				"type": "object"
+			},
+			"SyncCardsInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/SyncCardsInputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"cards": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["cards"],
+				"type": "object"
+			},
+			"SyncCardsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SyncCardsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"cards": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["cards"],
+				"type": "object"
+			},
+			"SyncCredentialBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/SyncCredentialBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"bridgeHost": {
+						"type": "string"
+					},
+					"configured": {
+						"type": "boolean"
+					},
+					"updatedAt": {
+						"type": "string"
+					}
+				},
+				"required": ["configured"],
+				"type": "object"
+			},
+			"SyncCredentialInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SyncCredentialInputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accessUrl": {
+						"type": "string"
+					},
+					"setupToken": {
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
+			"TermsBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/TermsBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountId": {
+						"type": "string"
+					},
+					"dueDay": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"minimumFixed": {
+						"format": "double",
+						"type": "number"
+					},
+					"minimumPercent": {
+						"format": "double",
+						"type": "number"
+					},
+					"statementDay": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": ["accountId", "minimumFixed", "dueDay"],
+				"type": "object"
+			},
+			"EvaluationInstanceInterface": {
+				"additionalProperties": false,
+				"properties": {
+					"config": {},
+					"enabled": {
+						"type": "boolean"
+					},
+					"instanceId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": ["instanceId", "name", "enabled", "config"],
+				"type": "object"
+			}
+		}
+	},
+	"info": {
+		"title": "Net Worth Estimator API",
+		"version": "1.0.0"
+	},
+	"openapi": "3.1.0",
+	"paths": {
+		"/v1/accounts": {
+			"post": {
+				"operationId": "create-account",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AccountBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyAccount"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one account"
+			}
+		},
+		"/v1/accounts/reorder": {
+			"post": {
+				"operationId": "move-account",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ReorderInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one account"
+			}
+		},
+		"/v1/accounts/{id}": {
+			"delete": {
+				"operationId": "delete-account",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Delete-accountResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one account"
+			},
+			"patch": {
+				"operationId": "update-account",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AccountBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyAccount"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace one account"
+			}
+		},
+		"/v1/amount-presets": {
+			"get": {
+				"operationId": "list-amount-presets",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PresetListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List saved amount recipes"
+			},
+			"post": {
+				"operationId": "create-amount-preset",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AmountPreset"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PresetResultBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one amount recipe"
+			}
+		},
+		"/v1/amount-presets/reorder": {
+			"post": {
+				"operationId": "move-amount-preset",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Move-amount-presetRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Move-amount-presetResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one amount recipe"
+			}
+		},
+		"/v1/amount-presets/{id}": {
+			"delete": {
+				"operationId": "delete-amount-preset",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Delete-amount-presetResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one amount recipe"
+			},
+			"patch": {
+				"operationId": "update-amount-preset",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AmountPreset"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PresetResultBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace one amount recipe"
+			}
+		},
+		"/v1/amount-resolvers": {
+			"get": {
+				"operationId": "get-amount-resolvers",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AmountResolversOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List registered amount resolvers and providers"
+			}
+		},
+		"/v1/checkpoints": {
+			"delete": {
+				"operationId": "delete-checkpoint",
+				"parameters": [
+					{
+						"explode": false,
+						"in": "query",
+						"name": "accountId",
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "date",
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one balance checkpoint"
+			},
+			"post": {
+				"operationId": "save-checkpoint",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Checkpoint"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyCheckpoint"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Upsert one balance checkpoint"
+			}
+		},
+		"/v1/evaluations": {
+			"post": {
+				"operationId": "create-evaluation",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/EvaluationUpdate"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyEvaluationUpdate"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one evaluation"
+			}
+		},
+		"/v1/evaluations/reorder": {
+			"post": {
+				"operationId": "move-evaluation",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Move-evaluationRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one evaluation"
+			}
+		},
+		"/v1/evaluations/{instanceId}": {
+			"delete": {
+				"operationId": "delete-evaluation",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "instanceId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one evaluation"
+			},
+			"patch": {
+				"operationId": "update-evaluation",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "instanceId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/EvaluationUpdate"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyEvaluationUpdate"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace one evaluation"
+			}
+		},
+		"/v1/financial-model": {
+			"get": {
+				"operationId": "get-financial-model",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ParseResultBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Load the canonical financial model with diagnostics"
+			}
+		},
+		"/v1/payment-terms": {
+			"post": {
+				"operationId": "save-payment-terms",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TermsBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyPaymentTerms"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Upsert payment terms for one account"
+			}
+		},
+		"/v1/payment-terms/{accountId}": {
+			"delete": {
+				"operationId": "delete-payment-terms",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "accountId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete payment terms for one account"
+			}
+		},
+		"/v1/pinned-evaluations": {
+			"get": {
+				"operationId": "get-pinned-evaluations",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PinnedEvaluationsOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List pinned evaluation instance IDs"
+			},
+			"put": {
+				"operationId": "set-pinned-evaluations",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PinnedEvaluationsInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PinnedEvaluationsOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace pinned evaluation instance IDs"
+			}
+		},
+		"/v1/position": {
+			"post": {
+				"operationId": "resolve-current-position",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PositionRequestBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PositionOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Resolve current balances without a forecast"
+			}
+		},
+		"/v1/postings": {
+			"post": {
+				"operationId": "create-posting",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PostingBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyPosting"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one posting"
+			}
+		},
+		"/v1/postings/reorder": {
+			"post": {
+				"operationId": "move-posting",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ReorderInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one posting"
+			}
+		},
+		"/v1/postings/{id}": {
+			"delete": {
+				"operationId": "delete-posting",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one posting"
+			},
+			"patch": {
+				"operationId": "update-posting",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PostingBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyPosting"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace one posting"
+			}
+		},
+		"/v1/projections/deterministic": {
+			"post": {
+				"operationId": "project-deterministic",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ProjectionRequestBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DeterministicOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Projection-Source": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Run a deterministic projection"
+			}
+		},
+		"/v1/recurrence-rules": {
+			"post": {
+				"operationId": "create-rule",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/RuleBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyRecurrenceRule"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one recurrence rule"
+			}
+		},
+		"/v1/recurrence-rules/reorder": {
+			"post": {
+				"operationId": "move-rule",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ReorderInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one recurrence rule"
+			}
+		},
+		"/v1/recurrence-rules/{id}": {
+			"delete": {
+				"operationId": "delete-rule",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one recurrence rule"
+			},
+			"patch": {
+				"operationId": "update-rule",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/RuleBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RowResultBodyRecurrenceRule"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace one recurrence rule"
+			}
+		},
+		"/v1/safe-spending-settings": {
+			"get": {
+				"operationId": "get-safe-spending-settings",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SafeSpendingOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Load safe card spending settings"
+			},
+			"put": {
+				"operationId": "set-safe-spending-settings",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SafeSpendingSettings"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SafeSpendingOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Save safe card spending settings"
+			}
+		},
+		"/v1/status": {
+			"get": {
+				"operationId": "get-server-status",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/StatusOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Report server write availability and auth state"
+			}
+		},
+		"/v1/sync/simplefin": {
+			"post": {
+				"operationId": "trigger-simplefin-sync",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Summary"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Run the SimpleFIN sync (balances and pending seed)"
+			}
+		},
+		"/v1/sync/simplefin/accounts": {
+			"get": {
+				"operationId": "list-account-links",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LinkListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List bridge-to-model account links"
+			}
+		},
+		"/v1/sync/simplefin/accounts/{bridgeAccountId}": {
+			"delete": {
+				"operationId": "delete-account-link",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "bridgeAccountId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Unlink one bridge account"
+			},
+			"put": {
+				"operationId": "save-account-link",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "bridgeAccountId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LinkPutInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LinkOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Link one bridge account"
+			}
+		},
+		"/v1/sync/simplefin/cards": {
+			"get": {
+				"operationId": "get-sync-cards",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SyncCardsOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List per-plan SimpleFIN card accounts"
+			},
+			"put": {
+				"operationId": "set-sync-cards",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SyncCardsInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SyncCardsOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace per-plan SimpleFIN card accounts"
+			}
+		},
+		"/v1/sync/simplefin/credential": {
+			"delete": {
+				"operationId": "disconnect-sync-credential",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SyncCredentialBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Disconnect the SimpleFIN key"
+			},
+			"get": {
+				"operationId": "get-sync-credential",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SyncCredentialBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Report SimpleFIN connection state (never the secret)"
+			},
+			"post": {
+				"operationId": "connect-sync-credential",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SyncCredentialInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SyncCredentialBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Connect a SimpleFIN key from a setup token or access URL"
+			}
+		}
+	}
+}

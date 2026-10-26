@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { defaultScopedApiClient } from "../../api/scopedClients.ts";
+import { getAmountResolvers } from "../../api/generated/endpoints.ts";
 import type { PostingAmountResolution } from "../../api/contracts.ts";
 import {
 	BUILT_IN_TEMPLATE_IDS,
@@ -29,16 +29,18 @@ function useRemoteNames() {
 	} | null>(null);
 	useEffect(() => {
 		let cancelled = false;
-		defaultScopedApiClient()
-			.getAmountCatalog()
-			.then((result) => {
-				if (cancelled || result instanceof Error) return;
+		void (async () => {
+			try {
+				const result = (await getAmountResolvers()).data;
+				if (cancelled) return;
 				setRemote({
 					resolvers: result.resolvers ?? [],
 					providers: result.providers ?? [],
 				});
-			})
-			.catch(() => {});
+			} catch {
+				/* The catalog keeps built-in templates when offline. */
+			}
+		})();
 		return () => {
 			cancelled = true;
 		};

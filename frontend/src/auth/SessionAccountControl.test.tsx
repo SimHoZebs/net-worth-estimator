@@ -7,7 +7,6 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiClient } from "../api/client.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { resetNotifications } from "../state/notifications.ts";
@@ -64,12 +63,6 @@ function renderAccount() {
 
 beforeEach(() => {
 	vi.stubGlobal("BroadcastChannel", undefined);
-	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
-		settings: null,
-	});
-	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
-		async (settings) => ({ settings }),
-	);
 });
 
 afterEach(() => {
@@ -188,7 +181,7 @@ describe("session account controls", () => {
 	});
 
 	it("blocks logout before the POST while draft recovery data is volatile", async () => {
-		const fetcher = vi.fn(async () => response(signedInSession));
+		const fetcher = vi.fn(async (_input: unknown) => response(signedInSession));
 		vi.stubGlobal("fetch", fetcher);
 		renderAccount();
 		const logoutButton = await screen.findByRole("button", {
@@ -212,7 +205,11 @@ describe("session account controls", () => {
 		expect((await screen.findByRole("alert")).textContent).toBe(
 			"Your draft has recovery data. Discard the draft before signing out.",
 		);
-		expect(fetcher).toHaveBeenCalledTimes(1);
+		expect(
+			fetcher.mock.calls.filter((call) =>
+				String(call[0]).endsWith("/v1/auth/logout"),
+			),
+		).toHaveLength(0);
 		expect(useWorkspaceStore.getState().volatile).toBe(true);
 		expect(useWorkspaceStore.getState().scope).toBe(draftScope);
 		expect(useWorkspaceStore.getState().baseRevision).toBe(
@@ -254,7 +251,11 @@ describe("session account controls", () => {
 		act(() => useWorkspaceStore.setState({ volatile: false }));
 		fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
-		expect(fetcher).toHaveBeenCalledTimes(2);
+		expect(
+			fetcher.mock.calls.filter((call) =>
+				String(call[0]).endsWith("/v1/auth/logout"),
+			),
+		).toHaveLength(1);
 		expect(values.get(key)).toBe(persisted);
 	});
 

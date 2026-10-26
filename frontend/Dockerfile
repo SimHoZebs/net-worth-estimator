@@ -8,6 +8,10 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+# `npm run build` regenerates the API client from the checked-in snapshot
+# via `prebuild`, so the image never uses a stale generated tree. Refresh
+# the snapshot itself with `npm run openapi:pull` whenever the backend API
+# changes.
 RUN npm run build
 
 FROM nginx:alpine

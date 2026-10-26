@@ -1,4 +1,4 @@
-import type { ApiRequestOptions } from "./client.ts";
+import type { ApiRequestOptions } from "@/api/http.ts";
 import type {
 	BackendAccount,
 	BackendCheckpoint,
@@ -7,97 +7,72 @@ import type {
 	EvaluationInstance,
 	FinancialModelDocument,
 	ModelValidationIssue,
-	RowDeleteResponse,
-	RowWriteResponse,
-} from "./contracts.ts";
+} from "@/api/contracts.ts";
+import {
+	createAccount,
+	createEvaluation,
+	createPosting,
+	createRule,
+	deleteAccount,
+	deleteCheckpoint,
+	deleteEvaluation,
+	deletePosting,
+	deleteRule,
+	moveAccount,
+	moveEvaluation,
+	movePosting,
+	moveRule,
+	saveCheckpoint,
+	updateAccount,
+	updateEvaluation,
+	updatePosting,
+	updateRule,
+} from "@/api/generated/endpoints.ts";
+import type {
+	AccountBody,
+	Checkpoint,
+	EvaluationUpdate,
+	ModelValidationIssue as GeneratedIssue,
+	PostingBody,
+	RuleBody,
+} from "@/api/generated/model/index.ts";
+import { ApiRequestError } from "@/api/http.ts";
+import { getResourceScope } from "@/auth/resourceScope.ts";
+import { ResourceScopeError } from "@/api/scopedRequest.ts";
 
-// RowWriter is the row-operation surface a document save needs. ApiClient
-// implements it; tests substitute fakes.
-export interface RowWriter {
-	createAccount(
-		account: BackendAccount,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendAccount>>;
-	updateAccount(
-		id: string,
-		account: BackendAccount,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendAccount>>;
-	deleteAccount(
-		id: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	moveAccount(
-		id: string,
-		beforeId: string | null,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	createPosting(
-		posting: BackendPosting,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendPosting>>;
-	updatePosting(
-		id: string,
-		posting: BackendPosting,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendPosting>>;
-	deletePosting(
-		id: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	movePosting(
-		id: string,
-		beforeId: string | null,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	createRule(
-		rule: BackendRecurrenceRule,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendRecurrenceRule>>;
-	updateRule(
-		id: string,
-		rule: BackendRecurrenceRule,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendRecurrenceRule>>;
-	deleteRule(
-		id: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	moveRule(
-		id: string,
-		beforeId: string | null,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	saveCheckpoint(
-		checkpoint: BackendCheckpoint,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<BackendCheckpoint>>;
-	deleteCheckpoint(
-		accountId: string,
-		date: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	createEvaluation(
-		item: EvaluationInstance,
-		evaluationType: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<EvaluationInstance>>;
-	updateEvaluation(
-		instanceId: string,
-		item: EvaluationInstance,
-		evaluationType: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowWriteResponse<EvaluationInstance>>;
-	deleteEvaluation(
-		instanceId: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
-	moveEvaluation(
-		evaluationType: string,
-		instanceId: string,
-		beforeId: string | null,
-		options?: ApiRequestOptions,
-	): Promise<Error | RowDeleteResponse>;
+// Row operations run through generated endpoints. Wire payloads pass through
+// untouched; only the envelope is normalized onto the domain shape.
+function toIssue(issue: GeneratedIssue): ModelValidationIssue {
+	return {
+		severity: issue.severity,
+		code: issue.code,
+		message: issue.message,
+		path: (issue.path ?? []) as ModelValidationIssue["path"],
+	};
+}
+
+async function runWrite(
+	issues: ModelValidationIssue[],
+	task: () => Promise<{ status: number; data: unknown }>,
+): Promise<Error | ModelValidationIssue[] | null> {
+	let data: {
+		issues?: GeneratedIssue[] | null;
+		persisted?: boolean;
+		revision: string;
+	};
+	try {
+		data = (await task()).data as {
+			issues?: GeneratedIssue[] | null;
+			persisted?: boolean;
+			revision: string;
+		};
+	} catch (cause) {
+		return cause instanceof Error ? cause : new ApiRequestError(cause);
+	}
+	// The server can send null issues; callers below always expect an array.
+	issues.push(...(data.issues ?? []).map(toIssue));
+	if (data.persisted === false) return issues;
+	return null;
 }
 
 export type RowOperation =
@@ -342,227 +317,144 @@ export type RowApplyResult =
 	| { ok: false; issues: ModelValidationIssue[] }
 	| Error;
 
-async function collectIssues(
-	response: Error | { issues: ModelValidationIssue[]; persisted: boolean },
-	issues: ModelValidationIssue[],
-): Promise<Error | ModelValidationIssue[] | null> {
-	if (response instanceof Error) return response;
-	issues.push(...response.issues);
-	if (!response.persisted) return issues;
-	return null;
-}
-
 export async function applyRowOperations(
-	client: RowWriter,
 	operations: RowOperation[],
 	options: ApiRequestOptions = {},
 ): Promise<RowApplyResult> {
+	const scope = getResourceScope();
 	const issues: ModelValidationIssue[] = [];
 	for (const operation of operations) {
 		if (options.signal?.aborted)
 			return issues.length ? { ok: false, issues } : { ok: true, issues };
+		// A scope change retires the remaining writes instead of sending a
+		// request computed for one plan against another plan's workspace.
+		if (scope !== getResourceScope()) return new ResourceScopeError();
 		let outcome: Error | ModelValidationIssue[] | null;
 		switch (operation.kind) {
 			case "account":
 				if (operation.action === "create")
-					outcome = await collectIssues(
-						await client.createAccount(operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						createAccount(operation.row as unknown as AccountBody, options),
 					);
 				else if (operation.action === "update")
-					outcome = await collectIssues(
-						await client.updateAccount(operation.id, operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						updateAccount(
+							operation.id,
+							operation.row as unknown as AccountBody,
+							options,
+						),
 					);
 				else if (operation.action === "delete")
-					outcome = await collectIssues(
-						await client
-							.deleteAccount(operation.id, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						deleteAccount(operation.id, options),
 					);
 				else
-					outcome = await collectIssues(
-						await client
-							.moveAccount(operation.id, operation.beforeId, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						moveAccount(
+							{ id: operation.id, beforeId: operation.beforeId ?? "" },
+							options,
+						),
 					);
 				break;
 			case "posting":
 				if (operation.action === "create")
-					outcome = await collectIssues(
-						await client.createPosting(operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						createPosting(operation.row as unknown as PostingBody, options),
 					);
 				else if (operation.action === "update")
-					outcome = await collectIssues(
-						await client.updatePosting(operation.id, operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						updatePosting(
+							operation.id,
+							operation.row as unknown as PostingBody,
+							options,
+						),
 					);
 				else if (operation.action === "delete")
-					outcome = await collectIssues(
-						await client
-							.deletePosting(operation.id, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						deletePosting(operation.id, options),
 					);
 				else
-					outcome = await collectIssues(
-						await client
-							.movePosting(operation.id, operation.beforeId, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						movePosting(
+							{ id: operation.id, beforeId: operation.beforeId ?? "" },
+							options,
+						),
 					);
 				break;
 			case "rule":
 				if (operation.action === "create")
-					outcome = await collectIssues(
-						await client.createRule(operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						createRule(operation.row as unknown as RuleBody, options),
 					);
 				else if (operation.action === "update")
-					outcome = await collectIssues(
-						await client.updateRule(operation.id, operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						updateRule(
+							operation.id,
+							operation.row as unknown as RuleBody,
+							options,
+						),
 					);
 				else if (operation.action === "delete")
-					outcome = await collectIssues(
-						await client.deleteRule(operation.id, options).then((response) =>
-							response instanceof Error
-								? response
-								: {
-										issues: [],
-										persisted: true,
-										revision: response.revision,
-									},
-						),
-						issues,
+					outcome = await runWrite(issues, () =>
+						deleteRule(operation.id, options),
 					);
 				else
-					outcome = await collectIssues(
-						await client
-							.moveRule(operation.id, operation.beforeId, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						moveRule(
+							{ id: operation.id, beforeId: operation.beforeId ?? "" },
+							options,
+						),
 					);
 				break;
 			case "checkpoint":
 				if (operation.action === "save")
-					outcome = await collectIssues(
-						await client.saveCheckpoint(operation.row, options),
-						issues,
+					outcome = await runWrite(issues, () =>
+						saveCheckpoint(operation.row as unknown as Checkpoint, options),
 					);
 				else
-					outcome = await collectIssues(
-						await client
-							.deleteCheckpoint(operation.accountId, operation.date, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						deleteCheckpoint(
+							{ accountId: operation.accountId, date: operation.date },
+							options,
+						),
 					);
 				break;
 			case "evaluation":
 				if (operation.action === "create")
-					outcome = await collectIssues(
-						await client.createEvaluation(
-							operation.row,
-							operation.evaluationType,
+					outcome = await runWrite(issues, () =>
+						createEvaluation(
+							{
+								...operation.row,
+								type: operation.evaluationType,
+							} as EvaluationUpdate,
 							options,
 						),
-						issues,
 					);
 				else if (operation.action === "update")
-					outcome = await collectIssues(
-						await client.updateEvaluation(
+					outcome = await runWrite(issues, () =>
+						updateEvaluation(
 							operation.instanceId,
-							operation.row,
-							operation.evaluationType,
+							{
+								...operation.row,
+								type: operation.evaluationType,
+							} as EvaluationUpdate,
 							options,
 						),
-						issues,
 					);
 				else if (operation.action === "delete")
-					outcome = await collectIssues(
-						await client
-							.deleteEvaluation(operation.instanceId, options)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						deleteEvaluation(operation.instanceId, options),
 					);
 				else
-					outcome = await collectIssues(
-						await client
-							.moveEvaluation(
-								operation.evaluationType,
-								operation.instanceId,
-								operation.beforeId,
-								options,
-							)
-							.then((response) =>
-								response instanceof Error
-									? response
-									: {
-											issues: [],
-											persisted: true,
-											revision: response.revision,
-										},
-							),
-						issues,
+					outcome = await runWrite(issues, () =>
+						moveEvaluation(
+							{
+								type: operation.evaluationType,
+								instanceId: operation.instanceId,
+								beforeId: operation.beforeId ?? "",
+							},
+							options,
+						),
 					);
 				break;
 		}

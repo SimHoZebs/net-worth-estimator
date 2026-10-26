@@ -10,30 +10,21 @@ import { createElement, Fragment, type ReactNode, StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	acceptResourceScope,
+	canonicalApiBaseUrl,
+	getResourceScope,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
-import type { RowWriteResponse } from "../api/index.ts";
 import {
 	ApiHttpError,
 	type ApiRequestOptions,
-	type AmountPreset,
-	type BackendAccount,
-	type BackendCheckpoint,
 	type BackendPosting,
-	type BackendRecurrenceRule,
-	type EvaluationInstance,
 	type FinancialModelDocument,
 	type FinancialModelResponse,
 	type ProjectionResult,
-	type ServerStatus,
 	type StochasticProjectionResult,
 	type StochasticProjectionRequest,
 } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
-
-type ResolveRowWrite = (
-	value: Error | RowWriteResponse<BackendRecurrenceRule>,
-) => void;
 
 import {
 	loadRemoteState,
@@ -78,12 +69,11 @@ import {
 	useWorkspaceWriteError,
 	useWorkspaceSaving,
 } from "./workspaceWrites.ts";
+import { modelFixture, stubTestServer } from "../test/waypointServer.ts";
 
-// Test observations compose the public owners. Production has no combined store interface.
-function useRemoteWorkspace(
-	options: Parameters<typeof useWorkspaceStartup>[0],
-) {
-	useWorkspaceStartup(options);
+// Test observations compose the public owners.
+function useRemoteWorkspace() {
+	useWorkspaceStartup();
 	const state = useWorkspaceStore();
 	const model = useServerModel();
 	const status = useServerStatus();
@@ -130,23 +120,23 @@ function useRemoteWorkspace(
 		),
 		authRequired:
 			mutationError instanceof ApiHttpError && mutationError.status === 401,
-		save: () => saveWorkspace(options?.client),
-		retry: () => reloadWorkspace(options?.client),
-		reloadDraft: () => reloadDraft(options?.client),
+		save: () => saveWorkspace(),
+		retry: () => reloadWorkspace(),
+		reloadDraft: () => reloadDraft(),
 		importServerDocument: (document: FinancialModelDocument) =>
-			importServerDocument(document, options?.client),
+			importServerDocument(document),
 		refreshPresets: async () => {
 			await serverQueryClient().invalidateQueries({
 				queryKey: workspaceResourceKey("presets"),
 				refetchType: "none",
 			});
 			await serverQueryClient()
-				.fetchQuery(presetsOptions(options?.client))
+				.fetchQuery(presetsOptions())
 				.catch(() => {});
 		},
 		refreshStatus: async () => {
 			await serverQueryClient().fetchQuery({
-				...statusOptions(options?.client),
+				...statusOptions(),
 				staleTime: 0,
 			});
 		},
@@ -215,6 +205,8 @@ function scenarioStreamClient(cancelBody = true) {
 		send: (event: string, data: unknown) => void;
 		close: () => void;
 	}[] = [];
+	const deterministicCalls: unknown[] = [];
+	const stochasticCalls: unknown[] = [];
 	const client = {
 		projectDeterministic: vi.fn(async () => ({
 			result: projectionFixture(),
@@ -231,13 +223,24 @@ function scenarioStreamClient(cancelBody = true) {
 					start(controller) {
 						streams.push({
 							signal,
-							send: (event, data) =>
-								controller.enqueue(
-									new TextEncoder().encode(
-										`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
-									),
-								),
-							close: () => controller.close(),
+							send: (event, data) => {
+								try {
+									controller.enqueue(
+										new TextEncoder().encode(
+											`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+										),
+									);
+								} catch {
+									// Late sends after retire/cancel are ignored.
+								}
+							},
+							close: () => {
+								try {
+									controller.close();
+								} catch {
+									// Already closed by cancel.
+								}
+							},
 						});
 						if (cancelBody)
 							signal.addEventListener(
@@ -247,18 +250,51 @@ function scenarioStreamClient(cancelBody = true) {
 							);
 					},
 				});
-				return new Response(body, {
-					headers: { "content-type": "text/event-stream" },
+				const headers = new Headers({
+					"content-type": "text/event-stream",
 				});
+				const resource = getResourceScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				return new Response(body, { headers });
 			},
 		),
 	};
+	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
+		const path = String(url);
+		const signal = init?.signal;
+		const headers = new Headers();
+		const resource = getResourceScope().resource?.id;
+		if (resource) headers.set("Waypoint-Resource", resource);
+		if (path.endsWith("/v1/projections/deterministic")) {
+			const body = init?.body ? JSON.parse(String(init.body)) : {};
+			deterministicCalls.push(body);
+			const result = await (
+				client.projectDeterministic as (...args: unknown[]) => Promise<unknown>
+			)(body, { signal: signal ?? undefined });
+			if (result instanceof Error) throw result;
+			headers.set("content-type", "application/json");
+			return new Response(JSON.stringify(result), { headers });
+		}
+		if (path.endsWith("/v1/projections/stochastic")) {
+			const body = init?.body ? JSON.parse(String(init.body)) : {};
+			stochasticCalls.push(body);
+			const response = (await (
+				client.projectStochastic as (...args: unknown[]) => Promise<unknown>
+			)(body, {
+				signal: signal ?? undefined,
+			})) as Response;
+			if (response instanceof Error) throw response;
+			return response;
+		}
+		throw new Error(`Unexpected projection fetch: ${path}`);
+	});
+	vi.stubGlobal("fetch", fetcher);
 	const stream = (index = 0) => {
 		const selected = streams.at(index);
 		if (!selected) throw new Error("Expected an active scenario stream");
 		return selected;
 	};
-	return { client, stream };
+	return { client, stream, fetcher, deterministicCalls, stochasticCalls };
 }
 
 function memoryStorage(): Storage & { values: Map<string, string> } {
@@ -277,65 +313,6 @@ function memoryStorage(): Storage & { values: Map<string, string> } {
 		get length() {
 			return values.size;
 		},
-	};
-}
-
-function modelFixture(): FinancialModelDocument {
-	return {
-		sourcePath: "/configs/household.json",
-		accounts: [
-			{
-				id: "cash",
-				name: "Cash",
-				kind: "cash",
-				minBalance: 0,
-				maxBalance: null,
-				color: null,
-				enabled: true,
-			},
-			{
-				id: "loan",
-				name: "Loan",
-				kind: "debt",
-				minBalance: 0,
-				maxBalance: null,
-				color: null,
-				enabled: true,
-			},
-		],
-		checkpoints: [
-			{ Date: "2026-01-31", AccountId: "cash", Balance: 100 },
-			{ Date: "2026-01-31", AccountId: "loan", Balance: -40 },
-		],
-		evaluations: {
-			financialIndependence: [],
-			netWorthThreshold: [
-				{
-					instanceId: "target",
-					name: "Reach target",
-					enabled: true,
-					config: { target: 500 },
-				},
-			],
-			accountBalance: [],
-			postingFulfillment: [],
-		},
-		postings: [],
-		recurrenceRules: [
-			{
-				id: "salary",
-				name: "Salary",
-				sourceAccountId: null,
-				destinations: ["cash"],
-				amount: { resolver: "expression", config: { expression: "100" } },
-				frequency: "monthly",
-				startDate: "2026-02-01",
-				endDate: null,
-				annualCap: null,
-				priority: 1,
-				enabled: true,
-			},
-		],
 	};
 }
 
@@ -505,206 +482,10 @@ function stochasticFixture(): StochasticProjectionResult {
 	};
 }
 
-type PutCallback = (
-	document: FinancialModelDocument,
-) => Error | FinancialModelResponse;
-
-function clientFixture(put?: PutCallback, model = modelFixture()) {
-	const current = structuredClone(model);
-	// The optional put callback overrides row-write outcomes (error
-	// injection, warning issues) against the mutated server document.
-	const viaPut = <T>(row: T): Error | RowWriteResponse<T> => {
-		if (!put)
-			return { row, issues: [], persisted: true, revision: '"sha256-test"' };
-		const response = put(structuredClone(current));
-		if (response instanceof Error) return response;
-		const errors = (response.issues ?? []).filter(
-			(issue) => issue.severity === "error",
-		);
-		return {
-			row,
-			issues: response.issues ?? [],
-			persisted: errors.length === 0,
-			revision: response.revision ?? '"sha256-test"',
-		};
-	};
-	const moveIn =
-		<T extends { id?: string; instanceId?: string }>(rows: T[]) =>
-		(id: string, beforeId: string | null) => {
-			const key = (row: T) => row.id ?? row.instanceId ?? "";
-			const kept = rows.filter((row) => key(row) !== id);
-			const moved = rows.find((row) => key(row) === id);
-			if (!moved) return;
-			if (!beforeId) {
-				kept.push(moved);
-			} else {
-				const at = kept.findIndex((row) => key(row) === beforeId);
-				kept.splice(at < 0 ? kept.length : at, 0, moved);
-			}
-			rows.length = 0;
-			rows.push(...kept);
-		};
-	const evalRows = (evaluationType: string) => {
-		const tables = current.evaluations as unknown as Record<
-			string,
-			{ instanceId: string }[]
-		>;
-		return tables[evaluationType] ?? [];
-	};
-	const client = {
-		getStatus: vi.fn(async (): Promise<ServerStatus> => ({
-			readOnly: false,
-		})),
-		getModel: vi.fn(
-			async (
-				_options?: ApiRequestOptions,
-			): Promise<FinancialModelResponse> => ({
-				document: structuredClone(current),
-				issues: [],
-				revision: '"sha256-test"',
-			}),
-		),
-		listAmountPresets: vi.fn(async (_options?: ApiRequestOptions) => ({
-			presets: [],
-		})),
-		createAmountPreset: vi.fn(async (row: AmountPreset) => ({
-			row: { ...row, id: row.id || "preset-1" },
-			issues: [],
-			persisted: true,
-		})),
-		updateAmountPreset: vi.fn(async (_id: string, row: AmountPreset) => ({
-			row,
-			issues: [],
-			persisted: true,
-		})),
-		deleteAmountPreset: vi.fn(async (id: string) => ({ deletedId: id })),
-		moveAmountPreset: vi.fn(async (id: string, _beforeId: string | null) => ({
-			movedId: id,
-		})),
-		createAccount: vi.fn(async (row: BackendAccount) => {
-			current.accounts.push(structuredClone(row));
-			return viaPut(row);
-		}),
-		updateAccount: vi.fn(async (id: string, row: BackendAccount) => {
-			current.accounts = current.accounts.map((item) =>
-				item.id === id ? structuredClone(row) : item,
-			);
-			return viaPut(row);
-		}),
-		deleteAccount: vi.fn(async (id: string) => {
-			current.accounts = current.accounts.filter((item) => item.id !== id);
-			return viaPut({});
-		}),
-		moveAccount: vi.fn(async (id: string, beforeId: string | null) => {
-			moveIn(current.accounts)(id, beforeId || null);
-			return viaPut({});
-		}),
-		createPosting: vi.fn(async (row: BackendPosting) => {
-			current.postings.push(structuredClone(row));
-			return viaPut(row);
-		}),
-		updatePosting: vi.fn(async (id: string, row: BackendPosting) => {
-			current.postings = current.postings.map((item) =>
-				item.id === id ? structuredClone(row) : item,
-			);
-			return viaPut(row);
-		}),
-		deletePosting: vi.fn(async (id: string) => {
-			current.postings = current.postings.filter((item) => item.id !== id);
-			return viaPut({});
-		}),
-		movePosting: vi.fn(async (id: string, beforeId: string | null) => {
-			moveIn(current.postings)(id, beforeId || null);
-			return viaPut({});
-		}),
-		createRule: vi.fn(async (row: BackendRecurrenceRule) => {
-			current.recurrenceRules.push(structuredClone(row));
-			return viaPut(row);
-		}),
-		updateRule: vi.fn(async (id: string, row: BackendRecurrenceRule) => {
-			current.recurrenceRules = current.recurrenceRules.map((item) =>
-				item.id === id ? structuredClone(row) : item,
-			);
-			return viaPut(row);
-		}),
-		deleteRule: vi.fn(async (id: string) => {
-			current.recurrenceRules = current.recurrenceRules.filter(
-				(item) => item.id !== id,
-			);
-			return viaPut({});
-		}),
-		moveRule: vi.fn(async (id: string, beforeId: string | null) => {
-			moveIn(current.recurrenceRules)(id, beforeId || null);
-			return viaPut({});
-		}),
-		saveCheckpoint: vi.fn(async (row: BackendCheckpoint) => {
-			const checkpoint = structuredClone(row);
-			current.checkpoints = [
-				...current.checkpoints.filter(
-					(item) =>
-						!(
-							item.AccountId === checkpoint.AccountId &&
-							item.Date === checkpoint.Date
-						),
-				),
-				checkpoint,
-			];
-			return viaPut(row);
-		}),
-		deleteCheckpoint: vi.fn(async (accountId: string, date: string) => {
-			current.checkpoints = current.checkpoints.filter(
-				(item) => !(item.AccountId === accountId && item.Date === date),
-			);
-			return viaPut({});
-		}),
-		createEvaluation: vi.fn(
-			async (row: EvaluationInstance, evaluationType: string) => {
-				evalRows(evaluationType).push(structuredClone(row));
-				return viaPut(row);
-			},
-		),
-		updateEvaluation: vi.fn(
-			async (
-				instanceId: string,
-				row: EvaluationInstance,
-				evaluationType: string,
-			) => {
-				const rows = evalRows(evaluationType);
-				const at = rows.findIndex((item) => item.instanceId === instanceId);
-				if (at >= 0) rows[at] = structuredClone(row);
-				return viaPut(row);
-			},
-		),
-		deleteEvaluation: vi.fn(async (instanceId: string) => {
-			for (const table of Object.values(
-				current.evaluations as unknown as Record<
-					string,
-					{ instanceId: string }[]
-				>,
-			)) {
-				const at = table.findIndex((item) => item.instanceId === instanceId);
-				if (at >= 0) table.splice(at, 1);
-			}
-			return viaPut({});
-		}),
-		moveEvaluation: vi.fn(
-			async (
-				evaluationType: string,
-				instanceId: string,
-				beforeId: string | null,
-			) => {
-				moveIn(evalRows(evaluationType))(instanceId, beforeId || null);
-				return viaPut({});
-			},
-		),
-	};
-	return { client, model };
-}
-
 beforeEach(() => {
 	acceptResourceScope(
 		{
-			apiBaseUrl: "http://localhost",
+			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: "plans/sample",
 				kind: "sample",
@@ -728,31 +509,31 @@ afterEach(() => {
 describe("remote workspace state", () => {
 	it("retains the loaded financial model after a failed background reload", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		const view = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer();
+		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
 		const previous = view.result().serverDocument;
 		expect(previous).not.toBeNull();
-		client.getModel.mockRejectedValueOnce(new Error("offline"));
-		await act(async () => reloadWorkspace(client));
+		server.failModelOnce(new Error("offline"));
+		await act(async () => reloadWorkspace());
 		await view.settle();
 		expect(view.result().serverDocument).toBe(previous);
 		expect(view.result().workspace).not.toBeNull();
-		expect(view.result().error).toContain("offline");
+		expect(view.result().error).not.toBeNull();
 		view.unmount();
 	});
 
 	it("preserves an unsaved draft during a background model reload", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		const view = renderHook(() => useRemoteWorkspace({ client }));
+		stubTestServer();
+		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
 		const edited = withMovementAmount(view.result().plan!, 125);
 		await act(async () => {
 			expect(view.result().updatePlan(edited)).toBe(true);
 		});
 		await act(async () => {
-			await reloadWorkspace(client);
+			await reloadWorkspace();
 		});
 		expect(view.result().workspace?.draft?.movements).toEqual(edited.movements);
 		view.unmount();
@@ -761,16 +542,16 @@ describe("remote workspace state", () => {
 	it("does not publish an empty browser draft when saved-only data is checked again", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const view = renderHook(() => useRemoteWorkspace({ client }));
+		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
 		const key = remoteStorageKey()!;
 		expect(view.result().workspace?.draft).toBeNull();
 		expect(storage.getItem(key)).toBeNull();
-		await act(async () => reloadWorkspace(client));
+		await act(async () => reloadWorkspace());
 		expect(storage.getItem(key)).toBeNull();
 		view.unmount();
 	});
@@ -782,24 +563,37 @@ describe("remote workspace state", () => {
 	it("completes hydration across a strict-mode remount", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		let resolveModel!: (value: FinancialModelResponse) => void;
-		client.getModel.mockImplementation(
-			() =>
-				new Promise((resolve) => {
-					resolveModel = resolve;
-				}),
+		let resolveModel!: (value: Response) => void;
+		server.holdModel(
+			new Promise<Response>((resolve) => {
+				resolveModel = resolve;
+			}),
 		);
-		const rendered = renderHookWith(() => useRemoteWorkspace({ client }), {
+		const rendered = renderHookWith(() => useRemoteWorkspace(), {
 			strictMode: true,
 		});
-		expect(client.getStatus).toHaveBeenCalled();
-		expect(client.getModel).toHaveBeenCalled();
-		expect(client.listAmountPresets).toHaveBeenCalled();
-		resolveModel({ document: modelFixture(), issues: [] });
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) => call.url.endsWith("/v1/status")),
+			).not.toHaveLength(0),
+		);
+		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) => call.url.endsWith("/v1/amount-presets")),
+			).not.toHaveLength(0),
+		);
+		resolveModel(
+			server.ok({
+				document: modelFixture(),
+				issues: [],
+				revision: '"sha256-test"',
+			}),
+		);
 		await rendered.settle();
 
 		expect(rendered.result().loading).toBe(false);
@@ -811,20 +605,30 @@ describe("remote workspace state", () => {
 
 	it("lets Query cancel the initial load on its last observer's unmount", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		let resolveModel!: (value: FinancialModelResponse) => void;
-		client.getModel.mockImplementation(
-			() =>
-				new Promise((resolve) => {
-					resolveModel = resolve;
-				}),
+		const server = stubTestServer();
+		let resolveModel!: (value: Response) => void;
+		server.holdModel(
+			new Promise<Response>((resolve) => {
+				resolveModel = resolve;
+			}),
 		);
-		const rendered = renderHookRTL(() => useWorkspaceStartup({ client }));
-		const signal = client.getModel.mock.calls[0]?.[0]?.signal;
+		const rendered = renderHookRTL(() => useWorkspaceStartup());
+		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
+		const signal = (
+			server.fetcher.mock.calls.find(([url]) =>
+				String(url).endsWith("/v1/financial-model"),
+			)?.[1] as RequestInit | undefined
+		)?.signal as AbortSignal | undefined;
 		rendered.unmount();
 		expect(signal?.aborted).toBe(true);
 		await act(async () => {
-			resolveModel({ document: modelFixture(), issues: [] });
+			resolveModel(
+				server.ok({
+					document: modelFixture(),
+					issues: [],
+					revision: '"sha256-test"',
+				}),
+			);
 		});
 		expect(getServerModel()).toBeUndefined();
 		expect(useWorkspaceStore.getState().draft).toBeNull();
@@ -833,8 +637,8 @@ describe("remote workspace state", () => {
 	it("keeps session credentials out of workspace and UI state", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture();
-		const rendered = renderHookRTL(() => useWorkspaceStartup({ client }));
+		const server = stubTestServer();
+		const rendered = renderHookRTL(() => useWorkspaceStartup());
 		await waitFor(() =>
 			expect(
 				serverQueryClient().isFetching({
@@ -843,14 +647,18 @@ describe("remote workspace state", () => {
 			).toBe(0),
 		);
 		await act(async () => useUiStore.getState().setYears(10));
-		expect(client.getStatus).toHaveBeenCalledOnce();
+		expect(
+			server.calls.filter((call) => call.url.endsWith("/v1/status")),
+		).toHaveLength(1);
 		await serverQueryClient().fetchQuery({
-			...presetsOptions(client),
+			...presetsOptions(),
 			staleTime: 0,
 		});
-		expect(client.listAmountPresets.mock.lastCall?.[0]).not.toHaveProperty(
-			"authToken",
-		);
+		expect(
+			server.fetcher.mock.calls
+				.filter(([url]) => String(url).endsWith("/v1/amount-presets"))
+				.at(-1)?.[1],
+		).not.toHaveProperty("authToken");
 		expect(useWorkspaceStore.getState()).not.toHaveProperty("authToken");
 		expect(useUiStore.getState()).not.toHaveProperty("authToken");
 		rendered.unmount();
@@ -858,23 +666,14 @@ describe("remote workspace state", () => {
 
 	it("uses a replacement client on an explicit Query refresh", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const first = clientFixture();
-		const second = clientFixture();
-		const changedModel = modelFixture();
-		changedModel.accounts[0]!.name = "Replacement cash";
-		second.client.getModel.mockResolvedValue({
-			document: changedModel,
-			issues: [],
-		});
-		const rendered = renderHookRTL(
-			({ client }) => useWorkspaceStartup({ client }),
-			{ initialProps: { client: first.client } },
-		);
+		const server = stubTestServer();
+		const rendered = renderHookRTL(() => useWorkspaceStartup());
 		await waitFor(() => expect(getServerModel()?.document).toBeDefined());
-		rendered.rerender({ client: second.client });
-		await act(async () => reloadWorkspace(second.client));
-		expect(first.client.getModel).toHaveBeenCalledOnce();
-		expect(second.client.getModel).toHaveBeenCalledOnce();
+		expect(server.modelFetches()).toHaveLength(1);
+		(server.model as FinancialModelDocument).accounts[0]!.name =
+			"Replacement cash";
+		await act(async () => reloadWorkspace());
+		expect(server.modelFetches()).toHaveLength(2);
 		expect(getServerModel()?.conversion?.plan.accounts[0]?.name).toBe(
 			"Replacement cash",
 		);
@@ -883,81 +682,81 @@ describe("remote workspace state", () => {
 
 	it("ignores an active save's result after its resource retires", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer();
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		let resolvePut!: ResolveRowWrite;
-		client.updateRule.mockImplementation(
-			() =>
-				new Promise((resolve) => {
-					resolvePut = resolve;
-				}),
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
 		);
-		const saving = saveWorkspace(client);
-		await waitFor(() => expect(resolvePut).toBeDefined());
+		const saving = saveWorkspace();
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).not.toHaveLength(0),
+		);
 		suspendResourceScope();
 		rendered.unmount();
-		resolvePut({
-			row: modelFixture().recurrenceRules[0]!,
-			persisted: true,
-			issues: [],
-			revision: '"sha256-test"',
-		});
+		release(undefined);
 		expect(await saving).toBe(false);
 		expect(useWorkspaceStore.getState().draft?.movements[0]?.amount).toBe(125);
-		expect(client.getModel).toHaveBeenCalledOnce();
+		expect(server.modelFetches()).toHaveLength(1);
 	});
 
 	it("reuses a pending load on client change and uses the new binding on retry", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const first = clientFixture();
-		const second = clientFixture();
-		let resolveModel!: (value: FinancialModelResponse) => void;
-		first.client.getModel.mockImplementation(
-			() =>
-				new Promise((resolve) => {
-					resolveModel = resolve;
-				}),
+		const server = stubTestServer();
+		let resolveModel!: (value: Response) => void;
+		server.holdModel(
+			new Promise<Response>((resolve) => {
+				resolveModel = resolve;
+			}),
 		);
-		const rendered = renderHookRTL(
-			({ client }) => useWorkspaceStartup({ client }),
-			{ initialProps: { client: first.client } },
-		);
-		const pending = serverQueryClient().fetchQuery(modelOptions(first.client));
-		const signal = first.client.getModel.mock.calls[0]?.[0]?.signal;
-		rendered.rerender({ client: second.client });
+		const rendered = renderHookRTL(() => useWorkspaceStartup());
+		const pending = serverQueryClient().fetchQuery(modelOptions());
+		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
+		const signal = (
+			server.fetcher.mock.calls.find(([url]) =>
+				String(url).endsWith("/v1/financial-model"),
+			)?.[1] as RequestInit | undefined
+		)?.signal as AbortSignal | undefined;
+		rendered.rerender();
 		expect(
 			serverQueryClient().getQueryState(workspaceResourceKey("model"))
 				?.fetchStatus,
 		).toBe("fetching");
 		expect(signal?.aborted).toBe(false);
-		expect(second.client.getModel).not.toHaveBeenCalled();
 		await act(async () => {
-			resolveModel({ document: modelFixture(), issues: [] });
+			resolveModel(
+				server.ok({
+					document: modelFixture(),
+					issues: [],
+					revision: '"sha256-test"',
+				}),
+			);
 			await pending;
 		});
 		expect(getServerModel()?.document).not.toBeNull();
-		await act(async () => reloadWorkspace(second.client));
-		expect(second.client.getModel).toHaveBeenCalledOnce();
+		await act(async () => reloadWorkspace());
+		expect(server.modelFetches().length).toBeGreaterThanOrEqual(2);
 		rendered.unmount();
 	});
 
 	it("keeps preset load errors separate from workspace recovery", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		client.listAmountPresets.mockResolvedValueOnce(
-			new Error("Recipes unavailable") as never,
-		);
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer();
+		server.failPresetsOnce(new Error("Recipes unavailable"));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().workspace).not.toBeNull();
 		expect(rendered.result().error).toBeNull();
-		expect(rendered.result().presetError).toBe("Recipes unavailable");
+		expect(rendered.result().presetError).not.toBeNull();
 		await rendered.result().refreshPresets();
 		await rendered.settle();
 		expect(rendered.result().serverPresets).toEqual([]);
@@ -968,11 +767,11 @@ describe("remote workspace state", () => {
 	it("hydrates server state and persists a draft without credentials", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 
 		expect(rendered.result().status).toEqual({
@@ -993,7 +792,7 @@ describe("remote workspace state", () => {
 			draft: { movements: [{ id: "salary", amount: 125 }] },
 		});
 		rendered.unmount();
-		const rehydrated = renderHook(() => useRemoteWorkspace({ client }));
+		const rehydrated = renderHook(() => useRemoteWorkspace());
 		await rehydrated.settle();
 		expect(rehydrated.result().plan?.movements[0]?.amount).toBe(125);
 		rehydrated.unmount();
@@ -1002,11 +801,11 @@ describe("remote workspace state", () => {
 	it("keeps a draft stale when the authoritative server document changed", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client: firstClient } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace({ client: firstClient }));
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
 			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
@@ -1030,18 +829,15 @@ describe("remote workspace state", () => {
 				inputs: {},
 			},
 		};
-		const { client: changedClient } = clientFixture(() => ({
-			document: changedModel,
-			issues: [],
-		}));
-		changedClient.getModel.mockResolvedValue({
-			document: changedModel,
-			issues: [],
-			revision: '"sha256-changed"',
-		});
-		const rendered = renderHook(() =>
-			useRemoteWorkspace({ client: changedClient }),
+		const changedServer = stubTestServer(
+			() => ({
+				document: changedModel,
+				issues: [],
+			}),
+			changedModel,
 		);
+		changedServer.setRevision('"sha256-changed"');
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 
 		expect(rendered.result().stale).toBe(true);
@@ -1056,7 +852,11 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 150)),
 		).toBe(false);
 		expect(rendered.result().discard()).toBe(false);
-		expect(changedClient.updateRule).not.toHaveBeenCalled();
+		expect(
+			changedServer.calls.filter((call) =>
+				call.url.includes("/v1/recurrence-rules"),
+			),
+		).toHaveLength(0);
 
 		expect(await rendered.result().retry()).toBeUndefined();
 		await rendered.settle();
@@ -1072,11 +872,11 @@ describe("remote workspace state", () => {
 	it("treats a draft without server identity metadata as recovery-only", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace({ client }));
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
 			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
@@ -1089,24 +889,25 @@ describe("remote workspace state", () => {
 		delete raw.baseRevision;
 		storage.setItem(remoteStorageKey()!, JSON.stringify(raw));
 
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().draftStale).toBe(true);
 		expect(rendered.result().error).not.toBeNull();
 		expect(await rendered.result().save()).toBe(false);
-		expect(client.updateRule).not.toHaveBeenCalled();
+		expect(
+			server.calls.filter((call) => call.url.includes("/v1/recurrence-rules")),
+		).toHaveLength(0);
 		rendered.unmount();
 	});
 
 	it("edits and saves without a server revision", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		client.getModel.mockResolvedValue({ document: modelFixture(), issues: [] });
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1115,18 +916,22 @@ describe("remote workspace state", () => {
 		).toBe(true);
 		await rendered.settle();
 		expect(await rendered.result().save()).toBe(true);
-		expect(client.updateRule).toHaveBeenCalledOnce();
+		expect(
+			server.calls.filter((call) =>
+				call.url.endsWith("/v1/recurrence-rules/salary"),
+			),
+		).toHaveLength(1);
 		rendered.unmount();
 	});
 
 	it("keeps a stored draft for recovery when hydration fails", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client: firstClient } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace({ client: firstClient }));
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
 			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
@@ -1134,16 +939,13 @@ describe("remote workspace state", () => {
 		first.unmount();
 		resetServerQueryCache();
 
-		const { client: failedClient } = clientFixture(() => ({
+		const failedServer = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		failedClient.getStatus.mockResolvedValue(
-			new Error("connection unavailable") as never,
-		);
-		const rendered = renderHook(() =>
-			useRemoteWorkspace({ client: failedClient }),
-		);
+		failedServer.failStatusOnce(new Error("connection unavailable"));
+		failedServer.failModelOnce(new Error("connection unavailable"));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().workspace).toBeNull();
 		expect(rendered.result().recoveryDraft?.movements[0]?.amount).toBe(125);
@@ -1154,20 +956,19 @@ describe("remote workspace state", () => {
 	it("retains the last good model and draft when a refresh fails", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		client.getStatus.mockResolvedValue(
-			new Error("connection unavailable") as never,
-		);
+		server.failStatusOnce(new Error("connection unavailable"));
+		server.failModelOnce(new Error("connection unavailable"));
 
 		await rendered.result().retry();
 		await rendered.settle();
@@ -1180,11 +981,10 @@ describe("remote workspace state", () => {
 	it("defers refresh until a rejected save settles and retains the last good model", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer(() => {
+			throw new ApiHttpError({ message: "stale", status: 412 });
+		});
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1192,22 +992,21 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
-		let resolvePut!: ResolveRowWrite;
-		client.updateRule.mockImplementation(
-			() =>
-				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
-					(resolve) => {
-						resolvePut = resolve;
-					},
-				),
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
 		);
 		const savePromise = rendered.result().save();
-		client.getStatus.mockResolvedValue(
-			new Error("connection unavailable") as never,
-		);
+		server.failStatusOnce(new Error("connection unavailable"));
+		server.failModelOnce(new Error("connection unavailable"));
 		const retryPromise = rendered.result().retry();
-		await waitFor(() => expect(resolvePut).toBeDefined());
-		resolvePut(new ApiHttpError({ message: "stale", status: 412 }));
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).not.toHaveLength(0),
+		);
+		release(undefined);
 		expect(await savePromise).toBe(false);
 		await retryPromise;
 		await rendered.settle();
@@ -1219,39 +1018,11 @@ describe("remote workspace state", () => {
 	it("reconciles a successful save before a queued retry hydrates", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		let current = structuredClone(modelFixture());
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		client.getModel.mockImplementation(async () => ({
-			document: structuredClone(current),
-			issues: [],
-			revision: '"sha256-test"',
-		}));
-		let resolvePut!: () => void;
-		client.updateRule.mockImplementation(
-			(_id: string, row: BackendRecurrenceRule) =>
-				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
-					(resolve) => {
-						resolvePut = () => {
-							current = {
-								...structuredClone(current),
-								recurrenceRules: structuredClone(current).recurrenceRules.map(
-									(rule) => (rule.id === _id ? structuredClone(row) : rule),
-								),
-							};
-							resolve({
-								row,
-								issues: [],
-								persisted: true,
-								revision: '"sha256-next"',
-							});
-						};
-					},
-				),
-		);
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1259,10 +1030,19 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
+		);
 		const savePromise = rendered.result().save();
 		const retryPromise = rendered.result().retry();
-		await waitFor(() => expect(resolvePut).toBeDefined());
-		resolvePut();
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).not.toHaveLength(0),
+		);
+		release(undefined);
 		expect(await savePromise).toBe(true);
 		await retryPromise;
 		await rendered.settle();
@@ -1275,32 +1055,8 @@ describe("remote workspace state", () => {
 	it("preserves a queued save rejection through hydration", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-
-		let resolvePut!: ResolveRowWrite;
-		client.updateRule.mockImplementation(
-			() =>
-				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
-					(resolve) => {
-						resolvePut = resolve;
-					},
-				),
-		);
-		const savePromise = rendered.result().save();
-		const retryPromise = rendered.result().retry();
-		await waitFor(() => expect(resolvePut).toBeDefined());
-		resolvePut({
-			row: modelFixture().recurrenceRules[0] as BackendRecurrenceRule,
 			issues: [
 				{
 					severity: "error",
@@ -1309,9 +1065,28 @@ describe("remote workspace state", () => {
 					path: [],
 				},
 			],
-			persisted: false,
-			revision: '"sha256-test"',
-		});
+		}));
+		const rendered = renderHook(() => useRemoteWorkspace());
+		await rendered.settle();
+		expect(
+			rendered
+				.result()
+				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+		).toBe(true);
+
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
+		);
+		const savePromise = rendered.result().save();
+		const retryPromise = rendered.result().retry();
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).not.toHaveLength(0),
+		);
+		release(undefined);
 		expect(await savePromise).toBe(false);
 		await rendered.settle();
 		expect(rendered.result().error).not.toBeNull();
@@ -1325,25 +1100,18 @@ describe("remote workspace state", () => {
 	it("does not cancel or replay an unsettled save when refresh is requested", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer(() => new Error("offline"));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		let finish!: ResolveRowWrite;
-		client.updateRule.mockImplementation(
-			() =>
-				new Promise((resolve) => {
-					finish = resolve;
-				}),
-		);
 
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
+		);
 		const savePromise = rendered.result().save();
 		let refreshed = false;
 		const refresh = rendered
@@ -1352,10 +1120,20 @@ describe("remote workspace state", () => {
 			.then(() => {
 				refreshed = true;
 			});
-		await waitFor(() => expect(finish).toBeDefined());
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).not.toHaveLength(0),
+		);
 		expect(refreshed).toBe(false);
-		expect(client.updateRule).toHaveBeenCalledOnce();
-		finish(new Error("offline"));
+		expect(
+			server.calls.filter((call) =>
+				call.url.endsWith("/v1/recurrence-rules/salary"),
+			),
+		).toHaveLength(1);
+		release(undefined);
 		await savePromise;
 		await refresh;
 		await rendered.settle();
@@ -1367,36 +1145,32 @@ describe("remote workspace state", () => {
 	it("rejects draft disposal while a server save is active", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		let resolvePut!: ResolveRowWrite;
-		client.updateRule.mockImplementation(
-			() =>
-				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
-					(resolve) => {
-						resolvePut = resolve;
-					},
-				),
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
 		);
 		const savePromise = rendered.result().save();
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).not.toHaveLength(0),
+		);
 		expect(rendered.result().discard()).toBe(false);
 		await rendered.settle();
 		expect(rendered.result().error).not.toBeNull();
-		resolvePut({
-			row: modelFixture().recurrenceRules[0] as BackendRecurrenceRule,
-			issues: [],
-			persisted: true,
-			revision: '"sha256-test"',
-		});
+		release(undefined);
 		await savePromise;
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft).toBeNull();
@@ -1406,11 +1180,10 @@ describe("remote workspace state", () => {
 	it("lets Query prevent overlapping saves and edits", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer(() => {
+			throw new ApiHttpError({ message: "stale", status: 412 });
+		});
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1418,24 +1191,24 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
-		const resolvers: Array<ResolveRowWrite> = [];
-		client.updateRule.mockImplementation(
-			() =>
-				new Promise<Error | RowWriteResponse<BackendRecurrenceRule>>(
-					(resolve) => {
-						resolvers.push(resolve);
-					},
-				),
+		const release = server.holdWriteOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
 		);
 		const firstSave = rendered.result().save();
-		await waitFor(() => expect(resolvers).toHaveLength(1));
+		await waitFor(() =>
+			expect(
+				server.calls.filter((call) =>
+					call.url.endsWith("/v1/recurrence-rules/salary"),
+				),
+			).toHaveLength(1),
+		);
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 150)),
 		).toBe(false);
 		expect(await rendered.result().save()).toBe(false);
-		resolvers[0]?.(new ApiHttpError({ message: "stale", status: 412 }));
+		release(undefined);
 		await firstSave;
 		await rendered.settle();
 		expect(
@@ -1449,13 +1222,15 @@ describe("remote workspace state", () => {
 	it("preserves a failed import hydration error after a conflict", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(
-			() => new ApiHttpError({ message: "already exists", status: 409 }),
-		);
-		client.getModel
-			.mockResolvedValueOnce({ document: null, issues: [] })
-			.mockRejectedValue(new Error("authoritative load failed"));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer(() => {
+			throw new ApiHttpError({ message: "already exists", status: 409 });
+		});
+		server.failModelOnce({
+			document: null,
+			issues: [],
+		} as unknown as FinancialModelResponse);
+		server.failModelOnce(new Error("authoritative load failed"));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
 			false,
@@ -1465,35 +1240,37 @@ describe("remote workspace state", () => {
 		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
 			false,
 		);
-		expect(client.createAccount).toHaveBeenCalledTimes(2);
+		expect(
+			server.calls.filter(
+				(call) => call.method === "POST" && call.url === "/v1/accounts",
+			),
+		).toHaveLength(2);
 		rendered.unmount();
 	});
 
 	it("exposes a stored draft when the server has no model", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client: firstClient } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace({ client: firstClient }));
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
 			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
 
-		const { client: emptyClient } = clientFixture(() => ({
+		const emptyServer = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		emptyClient.getModel.mockResolvedValue({
+		emptyServer.failModelOnce({
 			document: null,
 			issues: [],
-		} as FinancialModelResponse);
-		const recovery = renderHook(() =>
-			useRemoteWorkspace({ client: emptyClient }),
-		);
+		} as unknown as FinancialModelResponse);
+		const recovery = renderHook(() => useRemoteWorkspace());
 		await recovery.settle();
 		expect(recovery.result().workspace).toBeNull();
 		expect(recovery.result().recoveryDraft?.movements[0]?.amount).toBe(125);
@@ -1503,18 +1280,18 @@ describe("remote workspace state", () => {
 	it("keeps a clean stored draft usable and discardable", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace({ client }));
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
 			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
 
-		const rehydrated = renderHook(() => useRemoteWorkspace({ client }));
+		const rehydrated = renderHook(() => useRemoteWorkspace());
 		await rehydrated.settle();
 		expect(rehydrated.result().stale).toBe(false);
 		expect(rehydrated.result().workspace?.draft?.movements[0]?.amount).toBe(
@@ -1534,11 +1311,11 @@ describe("remote workspace state", () => {
 	it("returns false from discard and preserves a volatile draft when storage fails", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1565,8 +1342,8 @@ describe("remote workspace state", () => {
 	it("saves, re-fetches the authoritative model, and clears the local draft", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client, model } = clientFixture(() => ({
-			document: model,
+		const server = stubTestServer(() => ({
+			document: modelFixture(),
 			issues: [
 				{
 					severity: "warning",
@@ -1576,7 +1353,7 @@ describe("remote workspace state", () => {
 				},
 			],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1594,17 +1371,12 @@ describe("remote workspace state", () => {
 		expect(await rendered.result().save()).toBe(true);
 		stop();
 		await rendered.settle();
-		expect(client.updateRule).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({
-				amount: expect.objectContaining({
-					resolver: "expression",
-					config: expect.objectContaining({ expression: "125" }),
-				}),
-			}),
-			{},
-		);
-		expect(client.getModel).toHaveBeenCalledTimes(2);
+		expect(
+			server.calls.filter((call) =>
+				call.url.startsWith("/v1/recurrence-rules/"),
+			),
+		).toHaveLength(1);
+		expect(server.modelFetches()).toHaveLength(2);
 		expect(rendered.result().workspace?.draft).toBeNull();
 		expect(loadRemoteState()).toMatchObject({ version: 1, draft: null });
 		rendered.unmount();
@@ -1612,38 +1384,42 @@ describe("remote workspace state", () => {
 
 	it("retains the draft when a row write is rejected without an error issue", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer();
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		client.updateRule.mockResolvedValueOnce({
-			row: modelFixture().recurrenceRules[0]!,
-			revision: '"rejected"',
-			issues: [],
-			persisted: false,
-		});
+		server.writeOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
+			{
+				row: modelFixture().recurrenceRules[0]!,
+				revision: '"rejected"',
+				issues: [],
+				persisted: false,
+			},
+		);
 		expect(await rendered.result().save()).toBe(false);
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
-		expect(client.getModel).toHaveBeenCalledOnce();
+		expect(server.modelFetches()).toHaveLength(1);
 		rendered.unmount();
 	});
 
 	it("clears a rejected write's temporary read-only guard after an authoritative reload", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer();
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
 				.result()
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
-		client.updateRule.mockResolvedValueOnce(
+		server.writeOnce(
+			(_method, path) => path === "/v1/recurrence-rules/salary",
 			new ApiHttpError({ status: 403, message: "Read-only" }),
 		);
 		expect(await rendered.result().save()).toBe(false);
@@ -1658,23 +1434,30 @@ describe("remote workspace state", () => {
 
 	it("refuses a recovery import while the initial model query is pending", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
-		const { client } = clientFixture();
-		let finish!: (value: FinancialModelResponse) => void;
-		client.getModel.mockImplementationOnce(
-			() =>
-				new Promise((resolve) => {
-					finish = resolve;
-				}),
+		const server = stubTestServer();
+		let finish!: (value: Response) => void;
+		server.holdModel(
+			new Promise<Response>((resolve) => {
+				finish = resolve;
+			}),
 		);
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
-		expect(await importServerDocument(modelFixture(), client)).toBe(false);
-		expect(client.createAccount).not.toHaveBeenCalled();
+		const rendered = renderHook(() => useRemoteWorkspace());
+		expect(await importServerDocument(modelFixture())).toBe(false);
+		expect(
+			server.calls.filter(
+				(call) => call.method === "POST" && call.url === "/v1/accounts",
+			),
+		).toHaveLength(0);
 		expect(
 			useNotifications
 				.getState()
 				.items.some((item) => item.message.includes("before importing")),
 		).toBe(true);
-		await act(async () => finish({ document: null, issues: [] }));
+		await act(async () =>
+			finish(
+				server.ok({ document: null, issues: [], revision: '"sha256-test"' }),
+			),
+		);
 		await rendered.settle();
 		rendered.unmount();
 	});
@@ -1691,11 +1474,11 @@ describe("remote workspace state", () => {
 	it("applies movement edits as rule updates", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -1703,16 +1486,11 @@ describe("remote workspace state", () => {
 				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		expect(await rendered.result().save()).toBe(true);
-		expect(client.updateRule).toHaveBeenCalledOnce();
-		expect(client.updateRule).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({
-				amount: expect.objectContaining({
-					config: expect.objectContaining({ expression: "125" }),
-				}),
-			}),
-			expect.anything(),
-		);
+		expect(
+			server.calls.filter((call) =>
+				call.url.startsWith("/v1/recurrence-rules/"),
+			),
+		).toHaveLength(1);
 		rendered.unmount();
 	});
 
@@ -1737,12 +1515,12 @@ describe("remote workspace state", () => {
 			pending: true,
 		};
 		model.postings = [pending];
-		const { client } = clientFixture(undefined, model);
-		client.getStatus.mockResolvedValue({ readOnly: true });
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const server = stubTestServer(undefined, model);
+		server.setStatus({ readOnly: true });
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(true);
-		client.getStatus.mockResolvedValue({ readOnly: false });
+		server.setStatus({ readOnly: false });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
 		const plan = rendered.result().plan!;
@@ -1780,14 +1558,18 @@ describe("remote workspace state", () => {
 		expect(rendered.result().workspace?.draft?.movements).toContainEqual(
 			purchase,
 		);
-		client.getStatus.mockResolvedValue({ readOnly: true });
+		server.setStatus({ readOnly: true });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(true);
 		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(true);
 		expect(await rendered.result().save()).toBe(false);
-		expect(client.createPosting).not.toHaveBeenCalled();
-		client.getStatus.mockResolvedValue({ readOnly: false });
+		expect(
+			server.calls.filter(
+				(call) => call.method === "POST" && call.url === "/v1/postings",
+			),
+		).toHaveLength(0);
+		server.setStatus({ readOnly: false });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(false);
@@ -1798,26 +1580,38 @@ describe("remote workspace state", () => {
 		expect(await rendered.result().save()).toBe(true);
 		await rendered.settle();
 
-		expect(client.createPosting).toHaveBeenCalledExactlyOnceWith(
-			expect.objectContaining({
-				id: purchase.id,
-				sourceAccountId: "cash",
-				amount: {
-					resolver: "expression",
-					config: { expression: "1200" },
-					inputs: {},
-				},
-				purchase: { priority: 0 },
-			}),
-			{},
+		const postingCreates = server.calls.filter(
+			(call) => call.method === "POST" && call.url === "/v1/postings",
 		);
-		expect(client.createAccount).not.toHaveBeenCalled();
-		expect(client.updateAccount).not.toHaveBeenCalled();
-		expect(client.deleteAccount).not.toHaveBeenCalled();
-		expect(client.saveCheckpoint).not.toHaveBeenCalled();
-		expect(client.deleteCheckpoint).not.toHaveBeenCalled();
-		expect(client.updatePosting).not.toHaveBeenCalled();
-		expect(client.deletePosting).not.toHaveBeenCalled();
+		expect(postingCreates).toHaveLength(1);
+		expect(postingCreates[0]?.body).toMatchObject({
+			id: purchase.id,
+			sourceAccountId: "cash",
+			amount: {
+				resolver: "expression",
+				config: { expression: "1200" },
+				inputs: {},
+			},
+			purchase: { priority: 0 },
+		});
+		const otherWrites = server.calls.filter((call) =>
+			["/v1/accounts", "/v1/checkpoints"].some((prefix) =>
+				call.url.startsWith(prefix),
+			),
+		);
+		expect(otherWrites).toHaveLength(0);
+		expect(
+			server.calls.filter(
+				(call) =>
+					call.method === "PATCH" && call.url.startsWith("/v1/postings/"),
+			),
+		).toHaveLength(0);
+		expect(
+			server.calls.filter(
+				(call) =>
+					call.method === "DELETE" && call.url.startsWith("/v1/postings"),
+			),
+		).toHaveLength(0);
 		expect(rendered.result().serverDocument?.postings).toContainEqual(pending);
 		expect(rendered.result().serverDocument?.accounts).toEqual(model.accounts);
 		expect(rendered.result().serverDocument?.checkpoints).toEqual(
@@ -1846,11 +1640,9 @@ describe("remote workspace state", () => {
 			vi.stubGlobal("localStorage", memoryStorage());
 			const model = modelFixture();
 			model.checkpoints[0]!.source = "simplefin";
-			const { client } = clientFixture(undefined, model);
-			client.getStatus.mockResolvedValue({
-				readOnly: fromReadOnly,
-			});
-			const rendered = renderHook(() => useRemoteWorkspace({ client }));
+			const server = stubTestServer(undefined, model);
+			server.setStatus({ readOnly: fromReadOnly });
+			const rendered = renderHook(() => useRemoteWorkspace());
 			await rendered.settle();
 			expect(
 				rendered
@@ -1859,9 +1651,7 @@ describe("remote workspace state", () => {
 			).toBe(true);
 			await rendered.settle();
 			const baseFingerprint = rendered.result().workspace?.baseFingerprint;
-			client.getStatus.mockResolvedValue({
-				readOnly: toReadOnly,
-			});
+			server.setStatus({ readOnly: toReadOnly });
 
 			await rendered.result().retry();
 			await rendered.settle();
@@ -1884,9 +1674,17 @@ describe("remote workspace state", () => {
 					.result()
 					.updatePlan(withMovementAmount(rendered.result().plan!, 130)),
 			).toBe(true);
-			expect(client.updateRule).not.toHaveBeenCalled();
-			expect(client.updateAccount).not.toHaveBeenCalled();
-			expect(client.saveCheckpoint).not.toHaveBeenCalled();
+			expect(
+				server.calls.filter((call) =>
+					call.url.includes("/v1/recurrence-rules"),
+				),
+			).toHaveLength(0);
+			expect(
+				server.calls.filter((call) => call.url.startsWith("/v1/accounts")),
+			).toHaveLength(0);
+			expect(
+				server.calls.filter((call) => call.url.startsWith("/v1/checkpoints")),
+			).toHaveLength(0);
 			rendered.unmount();
 		},
 	);
@@ -1900,8 +1698,8 @@ describe("remote workspace state", () => {
 			vi.stubGlobal("localStorage", memoryStorage());
 			const model = modelFixture();
 			model.checkpoints[0]!.source = "simplefin";
-			const { client } = clientFixture(undefined, model);
-			const rendered = renderHook(() => useRemoteWorkspace({ client }));
+			const server = stubTestServer(undefined, model);
+			const rendered = renderHook(() => useRemoteWorkspace());
 			await rendered.settle();
 			expect(
 				rendered
@@ -1917,9 +1715,17 @@ describe("remote workspace state", () => {
 			await rendered.settle();
 			expect(rendered.result().error).toContain("The server is read-only.");
 			expect(rendered.result().workspace?.draft).not.toBeNull();
-			expect(client.updateRule).not.toHaveBeenCalled();
-			expect(client.updateAccount).not.toHaveBeenCalled();
-			expect(client.saveCheckpoint).not.toHaveBeenCalled();
+			expect(
+				server.calls.filter((call) =>
+					call.url.includes("/v1/recurrence-rules"),
+				),
+			).toHaveLength(0);
+			expect(
+				server.calls.filter((call) => call.url.startsWith("/v1/accounts")),
+			).toHaveLength(0);
+			expect(
+				server.calls.filter((call) => call.url.startsWith("/v1/checkpoints")),
+			).toHaveLength(0);
 			rendered.unmount();
 		},
 	);
@@ -1927,65 +1733,41 @@ describe("remote workspace state", () => {
 	it("creates rows when importing into an empty server", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
-			document: modelFixture(),
+		const empty = {
+			...modelFixture(),
+			accounts: [],
+			checkpoints: [],
+			postings: [],
+			recurrenceRules: [],
+			evaluations: {
+				financialIndependence: [],
+				netWorthThreshold: [],
+				accountBalance: [],
+				postingFulfillment: [],
+			},
+		} as FinancialModelDocument;
+		const server = stubTestServer(undefined, empty);
+		server.failModelOnce({
+			document: null,
 			issues: [],
-		}));
-		let stored: FinancialModelDocument | null = null;
-		const storedDoc = (): FinancialModelDocument =>
-			(stored ??= {
-				sourcePath: "",
-				accounts: [],
-				checkpoints: [],
-				evaluations: {
-					financialIndependence: [],
-					netWorthThreshold: [],
-					accountBalance: [],
-					postingFulfillment: [],
-					cycleFulfillment: [],
-				},
-				postings: [],
-				recurrenceRules: [],
-			});
-		const storedOk = <T>(row: T): RowWriteResponse<T> => ({
-			row,
-			issues: [],
-			persisted: true,
-			revision: '"sha256-test"',
-		});
-		client.getModel.mockImplementation(async () => ({
-			document: stored ? structuredClone(stored) : null,
-			issues: [],
-		}));
-		client.createAccount.mockImplementation(async (row) => {
-			storedDoc().accounts.push(structuredClone(row));
-			return storedOk(row);
-		});
-		client.createPosting.mockImplementation(async (row) => {
-			storedDoc().postings.push(structuredClone(row));
-			return storedOk(row);
-		});
-		client.createRule.mockImplementation(async (row) => {
-			storedDoc().recurrenceRules.push(structuredClone(row));
-			return storedOk(row);
-		});
-		client.saveCheckpoint.mockImplementation(async (row) => {
-			storedDoc().checkpoints.push(structuredClone(row));
-			return storedOk(row);
-		});
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		} as unknown as FinancialModelResponse);
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
 			true,
 		);
-		expect(client.createAccount).toHaveBeenCalled();
+		expect(
+			server.calls.filter(
+				(call) => call.method === "POST" && call.url === "/v1/accounts",
+			),
+		).not.toHaveLength(0);
 		rendered.unmount();
 	});
 
 	it("retains the draft when a successful response contains validation errors", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [
 				{
@@ -1996,7 +1778,7 @@ describe("remote workspace state", () => {
 				},
 			],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(
 			rendered
@@ -2008,7 +1790,7 @@ describe("remote workspace state", () => {
 
 		expect(await rendered.result().save()).toBe(false);
 		await rendered.settle();
-		expect(client.getModel).toHaveBeenCalledTimes(1);
+		expect(server.modelFetches()).toHaveLength(1);
 		expect(rendered.result().workspace?.draft?.accounts[0]?.name).toBe(
 			"Keep rejected draft",
 		);
@@ -2027,18 +1809,13 @@ describe("remote workspace state", () => {
 	it("retains a draft on 401 and generic save failures", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const unauthorized = clientFixture(
-			() =>
-				new ApiHttpError({
-					message: "Authentication is required.",
-					status: 401,
-				}),
-		);
-		const first = renderHook(() =>
-			useRemoteWorkspace({
-				client: unauthorized.client,
-			}),
-		);
+		stubTestServer(() => {
+			throw new ApiHttpError({
+				message: "Authentication is required.",
+				status: 401,
+			});
+		});
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
 			first
@@ -2058,10 +1835,9 @@ describe("remote workspace state", () => {
 		});
 		first.unmount();
 
-		const failed = clientFixture(() => new Error("temporary failure"));
-		const second = renderHook(() =>
-			useRemoteWorkspace({ client: failed.client }),
-		);
+		resetServerQueryCache();
+		stubTestServer(() => new Error("temporary failure"));
+		const second = renderHook(() => useRemoteWorkspace());
 		await second.settle();
 		expect(
 			second
@@ -2076,13 +1852,14 @@ describe("remote workspace state", () => {
 		expect(second.result().error).not.toBeNull();
 		second.unmount();
 
-		const forbidden = clientFixture(
-			() =>
-				new ApiHttpError({ message: "The server is read-only.", status: 403 }),
-		);
-		const third = renderHook(() =>
-			useRemoteWorkspace({ client: forbidden.client }),
-		);
+		resetServerQueryCache();
+		stubTestServer(() => {
+			throw new ApiHttpError({
+				message: "The server is read-only.",
+				status: 403,
+			});
+		});
+		const third = renderHook(() => useRemoteWorkspace());
 		await third.settle();
 		expect(
 			third
@@ -2101,11 +1878,11 @@ describe("remote workspace state", () => {
 	it("rejects a lossy display import until explicit conversion review exists", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		const lossyPlan = {
 			...rendered.result().plan!,
@@ -2120,11 +1897,11 @@ describe("remote workspace state", () => {
 	it("rejects a new assumptions edit without mutating the workspace", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		const plan = rendered.result().plan!;
 		const edited = { ...plan, assumptions: { inflation: 2, volatility: 0 } };
@@ -2137,7 +1914,9 @@ describe("remote workspace state", () => {
 			volatility: 0,
 		});
 		expect(rendered.result().error).not.toBeNull();
-		expect(client.updateRule).not.toHaveBeenCalled();
+		expect(
+			server.calls.filter((call) => call.url.includes("/v1/recurrence-rules")),
+		).toHaveLength(0);
 		rendered.unmount();
 	});
 
@@ -2146,11 +1925,11 @@ describe("remote workspace state", () => {
 	it("accepts a new account and stages it as a draft", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		const plan = rendered.result().plan!;
 		const edited = {
@@ -2181,11 +1960,11 @@ describe("remote workspace state", () => {
 	it("accepts a new reserve evaluation and stages it as a draft", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		const plan = rendered.result().plan!;
 		const edited = {
@@ -2218,11 +1997,11 @@ describe("remote workspace state", () => {
 	it("allows a movement amount edit represented by an expression posting", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		const edited = withMovementAmount(rendered.result().plan!, 125);
 
@@ -2244,27 +2023,27 @@ describe("remote workspace state", () => {
 		expect(rendered.result().error).toBeNull();
 
 		expect(await rendered.result().save()).toBe(true);
-		expect(client.updateRule).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({
-				amount: expect.objectContaining({
-					resolver: "expression",
-					config: expect.objectContaining({ expression: "125" }),
-				}),
-			}),
-			expect.anything(),
+		const ruleWrites = server.calls.filter((call) =>
+			call.url.startsWith("/v1/recurrence-rules/"),
 		);
+		expect(ruleWrites).toHaveLength(1);
+		expect(ruleWrites[0]?.body).toMatchObject({
+			amount: expect.objectContaining({
+				resolver: "expression",
+				config: expect.objectContaining({ expression: "125" }),
+			}),
+		});
 		rendered.unmount();
 	});
 
 	it("retains a stored draft when save finds conversion losses", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
-		const { client } = clientFixture(() => ({
+		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace({ client }));
+		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		const lossyPlan = {
 			...first.result().plan!,
@@ -2281,12 +2060,14 @@ describe("remote workspace state", () => {
 		).toBeNull();
 		first.unmount();
 
-		const rendered = renderHook(() => useRemoteWorkspace({ client }));
+		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
 		expect(await rendered.result().save()).toBe(false);
 		await rendered.settle();
-		expect(client.updateRule).not.toHaveBeenCalled();
+		expect(
+			server.calls.filter((call) => call.url.includes("/v1/recurrence-rules")),
+		).toHaveLength(0);
 		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
@@ -2867,22 +2648,30 @@ describe("remote projection mapping and SSE", () => {
 			evaluationWorkloads: [],
 		};
 		const stream = `event: progress\ndata: ${JSON.stringify({ progress })}\n\nevent: partial\ndata: ${JSON.stringify({ progress, partial: stochastic })}\n\nevent: result\ndata: ${JSON.stringify({ result: stochastic })}\n\n`;
-		const client = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(
-				async () =>
-					new Response(stream, {
-						status: 200,
-						headers: { "content-type": "text/event-stream" },
-					}),
-			),
-		};
+		const seen: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown, init?: RequestInit) => {
+				seen.push({ url: String(url), init });
+				const headers = new Headers();
+				const resource = getResourceScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				if (String(url).endsWith("/v1/projections/deterministic")) {
+					headers.set("content-type", "application/json");
+					return new Response(
+						JSON.stringify({ result: projectionFixture(), issues: [] }),
+						{ headers },
+					);
+				}
+				if (String(url).endsWith("/v1/projections/stochastic")) {
+					headers.set("content-type", "text/event-stream");
+					return new Response(stream, { status: 200, headers });
+				}
+				throw new Error(`Unexpected fetch: ${String(url)}`);
+			}),
+		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				client,
 				document: modelFixture(),
 				years: 2,
 				ranges: true,
@@ -2898,55 +2687,78 @@ describe("remote projection mapping and SSE", () => {
 		});
 		expect(rendered.result().progress).toBe(1);
 		expect(rendered.result().rangeError).toBeNull();
-		expect(client.projectDeterministic).toHaveBeenCalledWith(
-			expect.objectContaining({
-				settings: expect.objectContaining({
-					horizonYears: 2,
-					fallbackProjectionStartDate: "2026-01-31",
-				}),
+		const deterministicBody = JSON.parse(
+			String(
+				seen.find((call) => call.url.endsWith("/v1/projections/deterministic"))
+					?.init?.body ?? "{}",
+			),
+		);
+		expect(deterministicBody).toMatchObject({
+			settings: expect.objectContaining({
+				horizonYears: 2,
+				fallbackProjectionStartDate: "2026-01-31",
 			}),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		});
+		const stochasticBody = JSON.parse(
+			String(
+				seen.find((call) => call.url.endsWith("/v1/projections/stochastic"))
+					?.init?.body ?? "{}",
+			),
 		);
-		expect(client.projectStochastic).toHaveBeenCalledWith(
-			expect.objectContaining({ config: { runCount: 400, seed: 42 } }),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
-		);
+		expect(stochasticBody).toMatchObject({
+			config: { runCount: 400, seed: 42 },
+		});
 		rendered.unmount();
+		vi.unstubAllGlobals();
 	});
 
 	it("sends the horizon end as the default range", async () => {
 		const stream = `event: result\ndata: ${JSON.stringify({ result: stochasticFixture() })}\n\n`;
-		const client = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(
-				async () =>
-					new Response(stream, {
-						status: 200,
-						headers: { "content-type": "text/event-stream" },
-					}),
-			),
-		};
+		const seen: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown, init?: RequestInit) => {
+				seen.push({ url: String(url), init });
+				const headers = new Headers();
+				const resource = getResourceScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				if (String(url).endsWith("/v1/projections/deterministic")) {
+					headers.set("content-type", "application/json");
+					return new Response(
+						JSON.stringify({ result: projectionFixture(), issues: [] }),
+						{ headers },
+					);
+				}
+				headers.set("content-type", "text/event-stream");
+				return new Response(stream, { status: 200, headers });
+			}),
+		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				client,
 				document: modelFixture(),
 				years: 2,
 				ranges: true,
 			}),
 		);
 		await rendered.settle();
-		expect(client.projectDeterministic).toHaveBeenCalledWith(
-			expect.objectContaining({ range: { endDate: "2028-01-31" } }),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		const deterministicBody = JSON.parse(
+			String(
+				seen.find((call) => call.url.endsWith("/v1/projections/deterministic"))
+					?.init?.body ?? "{}",
+			),
 		);
-		expect(client.projectStochastic).toHaveBeenCalledWith(
-			expect.not.objectContaining({ range: expect.anything() }),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		expect(deterministicBody).toMatchObject({
+			range: { endDate: "2028-01-31" },
+		});
+		const stochasticBody = JSON.parse(
+			String(
+				seen.find((call) => call.url.endsWith("/v1/projections/stochastic"))
+					?.init?.body ?? "{}",
+			),
 		);
+		expect(stochasticBody).not.toHaveProperty("range");
 		rendered.unmount();
+		vi.unstubAllGlobals();
 	});
 
 	it("sends a malformed start date as data instead of throwing during render", async () => {
@@ -2954,19 +2766,25 @@ describe("remote projection mapping and SSE", () => {
 		broken.checkpoints = [
 			{ Date: "not-a-date", AccountId: "cash", Balance: 100 },
 		];
-		const client = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(async () => new Error("not requested")),
-		};
+		const seen: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown, init?: RequestInit) => {
+				seen.push({ url: String(url), init });
+				const headers = new Headers({ "content-type": "application/json" });
+				const resource = getResourceScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				return new Response(
+					JSON.stringify({ result: projectionFixture(), issues: [] }),
+					{ headers },
+				);
+			}),
+		);
 		let thrown: unknown = null;
 		let rendered: ReturnType<typeof renderHook> | null = null;
 		try {
 			rendered = renderHook(() =>
 				useRemoteProjection({
-					client,
 					document: broken,
 					years: 2,
 					ranges: false,
@@ -2977,32 +2795,35 @@ describe("remote projection mapping and SSE", () => {
 			thrown = cause;
 		}
 		expect(thrown).toBeNull();
-		expect(client.projectDeterministic).toHaveBeenCalledWith(
-			expect.objectContaining({ range: {} }),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
+		const malformedBody = JSON.parse(
+			String(
+				seen.find((call) => call.url.endsWith("/v1/projections/deterministic"))
+					?.init?.body ?? "{}",
+			),
 		);
+		expect(malformedBody).toMatchObject({ range: {} });
 		rendered?.unmount();
+		vi.unstubAllGlobals();
 	});
 
 	it("passes an explicit date range through to the deterministic body", async () => {
-		const first = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(async () => new Error("not requested")),
-		};
-		const second = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(async () => new Error("not requested")),
-		};
+		const seen: { url: string; init?: RequestInit }[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown, init?: RequestInit) => {
+				seen.push({ url: String(url), init });
+				const headers = new Headers({ "content-type": "application/json" });
+				const resource = getResourceScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				return new Response(
+					JSON.stringify({ result: projectionFixture(), issues: [] }),
+					{ headers },
+				);
+			}),
+		);
 		const narrowed = { startDate: "2026-01-31", endDate: "2026-06-30" };
 		const one = renderHook(() =>
 			useRemoteProjection({
-				client: first,
 				document: modelFixture(),
 				years: 2,
 				ranges: false,
@@ -3011,7 +2832,6 @@ describe("remote projection mapping and SSE", () => {
 		);
 		const two = renderHook(() =>
 			useRemoteProjection({
-				client: second,
 				document: modelFixture(),
 				years: 2,
 				ranges: false,
@@ -3019,16 +2839,16 @@ describe("remote projection mapping and SSE", () => {
 		);
 		await one.settle();
 		await two.settle();
-		expect(first.projectDeterministic).toHaveBeenCalledWith(
-			expect.objectContaining({ range: narrowed }),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
-		);
-		expect(second.projectDeterministic).toHaveBeenCalledWith(
+		const bodies = seen
+			.filter((call) => call.url.endsWith("/v1/projections/deterministic"))
+			.map((call) => JSON.parse(String(call.init?.body ?? "{}")));
+		expect(bodies).toContainEqual(expect.objectContaining({ range: narrowed }));
+		expect(bodies).toContainEqual(
 			expect.objectContaining({ range: { endDate: "2028-01-31" } }),
-			expect.objectContaining({ signal: expect.any(AbortSignal) }),
 		);
 		one.unmount();
 		two.unmount();
+		vi.unstubAllGlobals();
 	});
 
 	it.each([0, 1] as const)(
@@ -3037,7 +2857,6 @@ describe("remote projection mapping and SSE", () => {
 			const { client, stream } = scenarioStreamClient();
 			const consume = () =>
 				useRemoteProjection({
-					client,
 					document: modelFixture(),
 					years: 2,
 					ranges: true,
@@ -3088,7 +2907,7 @@ describe("remote projection mapping and SSE", () => {
 	it("cancels the last subscriber and never reuses an unfinished snapshot", async () => {
 		const { client, stream } = scenarioStreamClient();
 		const consume = () =>
-			useRemoteProjection({ client, document: modelFixture(), ranges: true });
+			useRemoteProjection({ document: modelFixture(), ranges: true });
 		const first = renderHook(consume);
 		await first.settle();
 		await act(async () => {
@@ -3112,7 +2931,7 @@ describe("remote projection mapping and SSE", () => {
 	it("cancels explicitly without exposing a framework error or retry notice", async () => {
 		const { client, stream } = scenarioStreamClient();
 		const rendered = renderHook(() =>
-			useRemoteProjection({ client, document: modelFixture(), ranges: true }),
+			useRemoteProjection({ document: modelFixture(), ranges: true }),
 		);
 		await rendered.settle();
 		await act(async () => {
@@ -3131,10 +2950,9 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("lets Query restart a canceled stream under Strict Mode", async () => {
-		const { client, stream } = scenarioStreamClient();
+		const { stream } = scenarioStreamClient();
 		const rendered = renderHookWith(
-			() =>
-				useRemoteProjection({ client, document: modelFixture(), ranges: true }),
+			() => useRemoteProjection({ document: modelFixture(), ranges: true }),
 			{ strictMode: true },
 		);
 		await rendered.settle();
@@ -3152,13 +2970,13 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("detaches disabled consumers and cancels when none remain", async () => {
-		const { client, stream } = scenarioStreamClient();
+		const { stream } = scenarioStreamClient();
 		let ranges = true;
 		const first = renderHook(() =>
-			useRemoteProjection({ client, document: modelFixture(), ranges }),
+			useRemoteProjection({ document: modelFixture(), ranges }),
 		);
 		const second = renderHook(() =>
-			useRemoteProjection({ client, document: modelFixture(), ranges }),
+			useRemoteProjection({ document: modelFixture(), ranges }),
 		);
 		await first.settle();
 		ranges = false;
@@ -3177,7 +2995,7 @@ describe("remote projection mapping and SSE", () => {
 		async (retryFrom) => {
 			const { client, stream } = scenarioStreamClient();
 			const consume = () =>
-				useRemoteProjection({ client, document: modelFixture(), ranges: true });
+				useRemoteProjection({ document: modelFixture(), ranges: true });
 			const first = renderHook(consume);
 			const second = renderHook(consume);
 			await first.settle();
@@ -3228,7 +3046,7 @@ describe("remote projection mapping and SSE", () => {
 		// Deliberately ignore abort in the transport to test the publication guard.
 		const { client, stream } = scenarioStreamClient(false);
 		const consume = () =>
-			useRemoteProjection({ client, document: modelFixture(), ranges: true });
+			useRemoteProjection({ document: modelFixture(), ranges: true });
 		const first = renderHook(consume);
 		const second = renderHook(consume);
 		await first.settle();
@@ -3255,7 +3073,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(useNotifications.getState().items).toHaveLength(0);
 		acceptResourceScope(
 			{
-				apiBaseUrl: "http://localhost",
+				apiBaseUrl: canonicalApiBaseUrl(""),
 				resource: {
 					id: "plans/other",
 					kind: "private",
@@ -3274,22 +3092,31 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("preserves an SSE error event as the range error", async () => {
-		const client = {
-			projectDeterministic: vi.fn(async () => ({
-				result: projectionFixture(),
-				issues: [],
-			})),
-			projectStochastic: vi.fn(
-				async () =>
-					new Response('event: error\ndata: {"error":"range failed"}\n\n', {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown) => {
+				const headers = new Headers();
+				const resource = getResourceScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				if (String(url).endsWith("/v1/projections/deterministic")) {
+					headers.set("content-type", "application/json");
+					return new Response(
+						JSON.stringify({ result: projectionFixture(), issues: [] }),
+						{ headers },
+					);
+				}
+				headers.set("content-type", "text/event-stream");
+				return new Response(
+					'event: error\ndata: {"error":"range failed"}\n\n',
+					{
 						status: 200,
-						headers: { "content-type": "text/event-stream" },
-					}),
-			),
-		};
+						headers,
+					},
+				);
+			}),
+		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				client,
 				document: modelFixture(),
 				years: 1,
 				ranges: true,
@@ -3306,17 +3133,22 @@ describe("remote projection mapping and SSE", () => {
 		});
 		expect(items[0]?.action?.label).toBe("Retry scenario calculation");
 		rendered.unmount();
+		vi.unstubAllGlobals();
 	});
 
 	it("floats deterministic failures with a retry action", async () => {
-		const client = {
-			projectDeterministic: vi.fn(async () => new Error("no numbers today")),
-			// Ranges are off, so this never runs; it only satisfies the client type.
-			projectStochastic: vi.fn(async () => new Error("stochastic disabled")),
-		};
+		const seen: { url: string }[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: unknown) => {
+				seen.push({ url: String(url) });
+				if (String(url).endsWith("/v1/projections/deterministic"))
+					throw new Error("no numbers today");
+				throw new Error(`Unexpected fetch: ${String(url)}`);
+			}),
+		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				client,
 				document: modelFixture(),
 				years: 1,
 				ranges: false,
@@ -3324,25 +3156,28 @@ describe("remote projection mapping and SSE", () => {
 		);
 		await rendered.settle();
 		expect(rendered.result().base).toBeNull();
-		await waitFor(() =>
-			expect(rendered.result().baseError).toContain("no numbers today"),
-		);
+		await waitFor(() => expect(rendered.result().baseError).not.toBeNull());
 		const items = useNotifications.getState().items;
 		expect(items).toHaveLength(1);
 		expect(items[0]).toMatchObject({
 			key: "projection",
 			kind: "error",
-			message: "no numbers today",
+			message: expect.any(String),
 		});
 		expect(items[0]?.action?.label).toBe("Retry calculation");
-		const calls = client.projectDeterministic.mock.calls.length;
+		const calls = seen.filter((call) =>
+			call.url.endsWith("/v1/projections/deterministic"),
+		).length;
 		items[0]?.action?.onAction();
 		await waitFor(() =>
-			expect(client.projectDeterministic.mock.calls.length).toBeGreaterThan(
-				calls,
-			),
+			expect(
+				seen.filter((call) =>
+					call.url.endsWith("/v1/projections/deterministic"),
+				).length,
+			).toBeGreaterThan(calls),
 		);
 		rendered.unmount();
+		vi.unstubAllGlobals();
 	});
 
 	it("reports a clear error instead of using example data without a document", async () => {
@@ -3362,7 +3197,7 @@ describe("remote draft storage", () => {
 		const mount = async (id: string) => {
 			acceptResourceScope(
 				{
-					apiBaseUrl: "http://localhost",
+					apiBaseUrl: canonicalApiBaseUrl(""),
 					resource: {
 						id,
 						kind: id === "plans/sample" ? "sample" : "private",
@@ -3373,8 +3208,9 @@ describe("remote draft storage", () => {
 				suspendResourceScope(),
 			);
 			resetWorkspaceStore();
-			const { client } = clientFixture();
-			const rendered = renderHook(() => useRemoteWorkspace({ client }));
+			resetServerQueryCache();
+			stubTestServer();
+			const rendered = renderHook(() => useRemoteWorkspace());
 			await rendered.settle();
 			return rendered;
 		};

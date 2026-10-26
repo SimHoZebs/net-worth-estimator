@@ -1,35 +1,27 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
+import { useEffect, useSyncExternalStore } from "react";
 import {
 	getResourceScope,
 	subscribeResourceScope,
-} from "../auth/resourceScope.ts";
-import { useSession } from "../auth/sessionContext.ts";
-import { type RemoteApiClient, useWorkspaceStore } from "./workspaceStore.ts";
+} from "@/auth/resourceScope.ts";
+import { useSession } from "@/auth/sessionContext.ts";
+import { useWorkspaceStore } from "@/state/workspaceStore.ts";
 import {
 	useAmountPresets,
 	useServerModel,
 	useServerStatus,
-} from "./workspaceResources.ts";
-import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
+} from "@/state/workspaceResources.ts";
+import { useWorkspaceSyncMonitor } from "@/state/useWorkspaceSyncMonitor.ts";
 
-export function useWorkspaceStartup({
-	client,
-}: { client?: RemoteApiClient } = {}): void {
+export function useWorkspaceStartup(): void {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	const resourceId = useSession()?.session.resource.id;
 	const enabled =
 		scope.status === "ready" &&
 		(!resourceId || resourceId === scope.resource?.id);
-	const api = useMemo(
-		() =>
-			scope.status === "ready" ? (client ?? defaultScopedApiClient()) : null,
-		[client, scope],
-	);
-	const model = useServerModel({ client: api ?? undefined, enabled });
-	useServerStatus({ client: api ?? undefined, enabled });
-	useAmountPresets({ client: api ?? undefined, enabled });
-	useWorkspaceSyncMonitor(enabled ? api : null);
+	const model = useServerModel({ enabled });
+	useServerStatus({ enabled });
+	useAmountPresets({ enabled });
+	useWorkspaceSyncMonitor(enabled);
 	useEffect(() => {
 		if (enabled) useWorkspaceStore.getState().restore(scope);
 	}, [enabled, scope]);

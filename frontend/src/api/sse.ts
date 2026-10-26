@@ -1,4 +1,8 @@
 import { isRecord } from "../domain/guards.ts";
+import { getResourceScope } from "../auth/resourceScope.ts";
+import { ApiNetworkError, parseErrorResponse } from "./http.ts";
+import { getApiBaseUrl } from "./runtime.ts";
+import { scopedRequest, scopedResponseError } from "./scopedRequest.ts";
 import type {
 	ErrorSSEData,
 	PartialSSEData,
@@ -297,3 +301,43 @@ export const parsePostSSE = parseSSE;
 export const parsePostSse = parseSSE;
 export const createPostSSEParser = createSSEParser;
 export type { StochasticProgress, StochasticProjectionResult };
+
+export type StochasticRequestOptions = {
+	signal?: AbortSignal;
+};
+
+/** POST the stochastic projection and return the SSE stream. The streaming
+ * response bypasses the JSON envelope handling: callers consume events. */
+export async function requestStochasticProjection(
+	request: unknown,
+	options: StochasticRequestOptions = {},
+): Promise<Response> {
+	const scope = getResourceScope();
+	const baseUrl = getApiBaseUrl();
+	const scoped = await scopedRequest(
+		baseUrl,
+		`${baseUrl.replace(/\/+$/, "")}/v1/projections/stochastic`,
+		{
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				accept: "text/event-stream",
+			},
+			credentials: "same-origin",
+			redirect: "error",
+			body: JSON.stringify(request),
+			signal: options.signal,
+		},
+		globalThis.fetch.bind(globalThis),
+		scope,
+	).catch((cause: unknown) => {
+		throw new ApiNetworkError(cause);
+	});
+	if (scoped instanceof Error) throw scoped;
+	const { response, scope: verified } = scoped;
+	if (!response.ok) {
+		const failure = await parseErrorResponse(response);
+		throw scopedResponseError(verified, failure);
+	}
+	return response;
+}

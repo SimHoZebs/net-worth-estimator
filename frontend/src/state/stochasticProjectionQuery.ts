@@ -1,13 +1,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import {
 	parseSSE,
+	requestStochasticProjection,
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { ResourceScopeError } from "../api/scopedRequest.ts";
 import { getResourceScope } from "../auth/resourceScope.ts";
 import type { RangeResult } from "../domain/result.ts";
-import type { RemoteProjectionClient } from "./useRemoteProjection.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
 
 interface StreamSnapshot {
@@ -19,12 +19,10 @@ interface StreamSnapshot {
 /** The query owns the stream and every published snapshot, not its first observer. */
 export function stochasticProjectionOptions({
 	queryKey,
-	api,
 	request,
 	mapResult,
 }: {
 	queryKey: readonly unknown[];
-	api: RemoteProjectionClient;
 	request: StochasticProjectionRequest | null;
 	mapResult: (result: StochasticProjectionResult) => RangeResult;
 }) {
@@ -55,9 +53,10 @@ export function stochasticProjectionOptions({
 				Number.isFinite(fraction) ? Math.max(0, Math.min(1, fraction)) : 0;
 			try {
 				publish(snapshot);
-				const response = await api.projectStochastic(request, { signal });
+				const response = await requestStochasticProjection(request, {
+					signal,
+				});
 				assertCurrent();
-				if (response instanceof Error) throw response;
 				let finalRange: RangeResult | null = null;
 				let streamError: string | null = null;
 				const parseError = await parseSSE(

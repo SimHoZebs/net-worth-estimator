@@ -3,6 +3,7 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../test/resource.ts";
+import { getResourceScope } from "../auth/resourceScope.ts";
 import { displayPlanToBackendDocument } from "../api/adapter.ts";
 import type {
 	DeterministicProjectionRequest,
@@ -21,7 +22,10 @@ import {
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.unstubAllGlobals();
+});
 beforeEach(acceptTestResource);
 
 function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
@@ -135,55 +139,63 @@ describe("isolated purchase evaluation", () => {
 			purchase: { priority: 0 },
 		});
 		const before = JSON.stringify(document);
-		const client = {
-			projectDeterministic: vi.fn(
-				async (request: DeterministicProjectionRequest) => {
-					const evaluations: EvaluationResultTables = {
-						financialIndependence: [],
-						netWorthThreshold: [],
-						accountBalance: [],
-						postingFulfillment: [],
-					};
-					if (request.settings.evaluations.plannedPurchases?.length)
-						evaluations.plannedPurchases = [
-							{
-								instanceId: PURCHASE_EVALUATION_ID,
-								name: "Purchases",
-								status: "satisfied",
-								probabilistic: null,
-								diagnostics: [],
-								deterministic: {
-									purchases: [
-										{
-											postingId: "laptop",
-											date:
-												request.document?.postings.find(
-													(item) => item.id === "laptop",
-												)?.purchase?.priority === 0
-													? "2026-02-01"
-													: "2026-03-01",
-											amount: 500,
-										},
-									],
-								},
+		const deterministicCalls: unknown[] = [];
+		const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
+			const headers = new Headers({ "content-type": "application/json" });
+			const resource = getResourceScope().resource?.id;
+			if (resource) headers.set("Waypoint-Resource", resource);
+			if (String(url).endsWith("/v1/projections/deterministic")) {
+				const request = JSON.parse(
+					String(init?.body ?? "{}"),
+				) as DeterministicProjectionRequest;
+				deterministicCalls.push(request);
+				const evaluations: EvaluationResultTables = {
+					financialIndependence: [],
+					netWorthThreshold: [],
+					accountBalance: [],
+					postingFulfillment: [],
+				};
+				if (request.settings.evaluations.plannedPurchases?.length)
+					evaluations.plannedPurchases = [
+						{
+							instanceId: PURCHASE_EVALUATION_ID,
+							name: "Purchases",
+							status: "satisfied",
+							probabilistic: null,
+							diagnostics: [],
+							deterministic: {
+								purchases: [
+									{
+										postingId: "laptop",
+										date:
+											request.document?.postings.find(
+												(item) => item.id === "laptop",
+											)?.purchase?.priority === 0
+												? "2026-02-01"
+												: "2026-03-01",
+										amount: 500,
+									},
+								],
 							},
-						];
-					return { result: resultFixture(evaluations), issues: [] };
-				},
-			),
-			projectStochastic: vi.fn(async () => new Error("not requested")),
-		};
+						},
+					];
+				return new Response(
+					JSON.stringify({ result: resultFixture(evaluations), issues: [] }),
+					{ headers },
+				);
+			}
+			throw new Error(`Unexpected fetch: ${String(url)}`);
+		});
+		vi.stubGlobal("fetch", fetcher);
 		const rendered = renderHook(
 			({ active }) => ({
 				baseline: useRemoteProjection({
-					client,
 					document: active,
 					draftDocument: null,
 					years: 1,
 					ranges: false,
 				}),
 				purchases: useRemoteProjection({
-					client,
 					document: active,
 					draftDocument: null,
 					years: 1,
@@ -193,9 +205,7 @@ describe("isolated purchase evaluation", () => {
 			}),
 			{ wrapper, initialProps: { active: document } },
 		);
-		await waitFor(() =>
-			expect(client.projectDeterministic).toHaveBeenCalledTimes(2),
-		);
+		await waitFor(() => expect(deterministicCalls).toHaveLength(2));
 		await waitFor(() =>
 			expect(rendered.result.current.purchases.base).toMatchObject({
 				plannedPurchases: { purchases: [{ date: "2026-02-01" }] },
@@ -214,7 +224,11 @@ describe("isolated purchase evaluation", () => {
 				plannedPurchases: { purchases: [{ date: "2026-03-01" }] },
 			}),
 		);
-		expect(client.projectStochastic).not.toHaveBeenCalled();
+		expect(
+			fetcher.mock.calls.filter(([url]) =>
+				String(url).endsWith("/v1/projections/stochastic"),
+			),
+		).toHaveLength(0);
 		rendered.unmount();
 		queryClient.clear();
 	});

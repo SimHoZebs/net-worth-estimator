@@ -1,13 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { ApiClient } from "../api/client.ts";
 import { acceptTestResource } from "../test/resource.ts";
+import { ok } from "../test/fetch.ts";
 import {
 	hydrateFinancialPreferences,
 	resolveEffectiveIds,
 	useSafeSpendingSettings,
 } from "./useSafeSpendingSettings.ts";
+
+function stubSafeSpending() {
+	const seen: { url: string; init?: RequestInit }[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (url: unknown, init?: RequestInit) => {
+			seen.push({ url: String(url), init });
+			const settings =
+				(init?.method ?? "GET") === "GET"
+					? null
+					: JSON.parse(String(init?.body ?? "{}"));
+			return ok({ settings });
+		}),
+	);
+	return seen;
+}
 
 afterEach(() => {
 	cleanup();
@@ -15,12 +31,7 @@ afterEach(() => {
 });
 
 it("updates a controlled checkbox synchronously from the optimistic query value", async () => {
-	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
-		settings: null,
-	});
-	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
-		async (settings) => ({ settings }),
-	);
+	stubSafeSpending();
 	const scope = acceptTestResource()!;
 	await hydrateFinancialPreferences(scope);
 	function Control() {

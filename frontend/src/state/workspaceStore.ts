@@ -3,15 +3,9 @@ import {
 	ApiHttpError,
 	displayPlanToBackendDocument,
 	refreshDisplayPlanAccess,
-	type AmountPreset,
-	type AmountPresetWriteResponse,
-	type ApiRequestOptions,
 	type FinancialModelDocument,
-	type FinancialModelResponse,
 	type PlanPresentation,
-	type ServerStatus,
 } from "../api/index.ts";
-import type { RowWriter } from "../api/rowSync.ts";
 import { getResourceScope, type ResourceScope } from "../auth/resourceScope.ts";
 import { changesBetween, type Plan, validatePlan } from "../domain/model.ts";
 import {
@@ -28,34 +22,6 @@ import {
 } from "./workspaceResources.ts";
 import { notifyError, notifySuccess } from "./notifications.ts";
 import { reloadDraft } from "./workspaceWrites.ts";
-
-export interface RemoteApiClient extends RowWriter {
-	getStatus(options?: ApiRequestOptions): Promise<Error | ServerStatus>;
-	getModel(
-		options?: ApiRequestOptions,
-	): Promise<Error | FinancialModelResponse>;
-	listAmountPresets(
-		options?: ApiRequestOptions,
-	): Promise<Error | { presets: AmountPreset[] }>;
-	createAmountPreset(
-		preset: AmountPreset,
-		options?: ApiRequestOptions,
-	): Promise<Error | AmountPresetWriteResponse>;
-	updateAmountPreset(
-		id: string,
-		preset: AmountPreset,
-		options?: ApiRequestOptions,
-	): Promise<Error | AmountPresetWriteResponse>;
-	deleteAmountPreset(
-		id: string,
-		options?: ApiRequestOptions,
-	): Promise<Error | { deletedId: string }>;
-	moveAmountPreset(
-		id: string,
-		beforeId: string | null,
-		options?: ApiRequestOptions,
-	): Promise<Error | { movedId: string }>;
-}
 
 export interface DraftState {
 	draft: Plan | null;
