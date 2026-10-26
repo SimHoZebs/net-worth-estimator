@@ -102,7 +102,7 @@ function EvaluationsContent({
 				</p>
 			)}
 			<div
-				className="grid grid-cols-2 gap-6 max-lg:gap-4 max-sm:grid-cols-1"
+				className="grid grid-cols-2 items-stretch gap-6 max-lg:gap-4 max-sm:grid-cols-1"
 				aria-busy={pending}
 			>
 				{evaluations.map((evaluation) => (

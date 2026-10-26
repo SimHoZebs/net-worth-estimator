@@ -45,7 +45,7 @@ describe("pinned evaluation cards", () => {
 	it("changes the selected pin and removes it when unpinned", () => {
 		const input = props();
 		const view = render(<PinnedEvaluations {...input} />);
-		const region = view.getByRole("region");
+		const region = view.getByRole("region", { name: funding.name });
 		const button = within(region).getByRole("button", { pressed: true });
 		expect(button.getAttribute("aria-pressed")).toBe("true");
 		fireEvent.click(button);

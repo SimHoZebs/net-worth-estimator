@@ -2,7 +2,6 @@ import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
 import { IconButton } from "../../components/Button.tsx";
 import type { EvaluationPin } from "../../components/evaluationCard.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
 import { Progress } from "../../components/Progress.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
@@ -40,10 +39,7 @@ export function EvaluationCard({
 	const StateIcon = evaluation.enabled && met ? Check : Flag;
 	return (
 		<section
-			className={mergeStyles(
-				evaluationCard({ enabled: evaluation.enabled }),
-				"flex min-w-0 flex-col gap-4 self-start p-5",
-			)}
+			className={evaluationCard({ enabled: evaluation.enabled })}
 			aria-labelledby={headingId}
 			aria-busy={outcomePending}
 		>
@@ -110,7 +106,7 @@ export function EvaluationCard({
 						"Beyond this horizon"
 					)}
 				</div>
-				<p className="text-sm leading-relaxed text-muted">
+				<p className="m-0 text-sm leading-relaxed text-muted">
 					{outcomePending ? (
 						<Skeleton className="h-4 w-44" />
 					) : !evaluation.enabled ? (
@@ -124,29 +120,31 @@ export function EvaluationCard({
 					)}
 				</p>
 			</div>
-			{evaluation.enabled &&
-				(outcomePending ? (
-					<Skeleton className="h-8 w-full" />
-				) : (
-					result && (
-						<div className="m-0">
-							<div className="mb-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-								<span>{money(result.current)} today</span>
-								<span>{money(evaluation.target)} target</span>
+			<div className="mt-auto flex flex-col gap-4">
+				{evaluation.enabled &&
+					(outcomePending ? (
+						<Skeleton className="h-8 w-full" />
+					) : (
+						result && (
+							<div className="m-0">
+								<div className="mb-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
+									<span>{money(result.current)} today</span>
+									<span>{money(evaluation.target)} target</span>
+								</div>
+								<Progress
+									value={(result.current / evaluation.target) * 100}
+									label={evaluation.name}
+								/>
 							</div>
-							<Progress
-								value={(result.current / evaluation.target) * 100}
-								label={evaluation.name}
-							/>
-						</div>
-					)
-				))}
-			{probability !== null && evaluation.enabled && !outcomePending && (
-				<p className="m-0 text-xs">
-					Reached in <strong>{percent(probability)}</strong> of modeled
-					scenarios.
-				</p>
-			)}
+						)
+					))}
+				{probability !== null && evaluation.enabled && !outcomePending && (
+					<p className="m-0 text-xs">
+						Reached in <strong>{percent(probability)}</strong> of modeled
+						scenarios.
+					</p>
+				)}
+			</div>
 		</section>
 	);
 }
