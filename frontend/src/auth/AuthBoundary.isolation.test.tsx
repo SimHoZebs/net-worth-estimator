@@ -1,34 +1,36 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { ApiClient } from "../api/client.ts";
-import type { SafeSpendingSettingsResponse } from "../api/contracts.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	deterministicQueryKey,
 	resetServerQueryCache,
 	serverQueryClient,
-} from "../state/serverQuery.ts";
+} from "@/state/serverQuery.ts";
 import {
 	resetWorkspaceStore,
 	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
-import { AuthBoundary } from "./AuthBoundary.tsx";
+} from "@/state/workspaceStore.ts";
+import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
 import {
 	useServerModel,
 	workspaceResourceKey,
-} from "../state/workspaceResources.ts";
-import { setServerRevisionFixture } from "../test/workspace.ts";
-import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { resetNotifications } from "../state/notifications.ts";
-import { getResourceScope, suspendResourceScope } from "./resourceScope.ts";
-import { useSession } from "./sessionContext.ts";
-import { clearPersistedMemory } from "../state/persisted.ts";
+} from "@/state/workspaceResources.ts";
+import { setServerRevisionFixture } from "@/test/workspace.ts";
+import { NotificationCenter } from "@/components/NotificationCenter.tsx";
+import { resetNotifications } from "@/state/notifications.ts";
+import {
+	getResourceScope,
+	suspendResourceScope,
+} from "@/auth/resourceScope.ts";
+import { ok } from "@/test/fetch.ts";
+import { useSession } from "@/auth/sessionContext.ts";
+import { clearPersistedMemory } from "@/state/persisted.ts";
 import {
 	defaultSafeSpendingSettings,
 	useSafeSpendingSettings,
-} from "../state/useSafeSpendingSettings.ts";
-import { safeSpendingSettingsObserver } from "../test/safeSpendingSettings.ts";
-import { canonicalApiBaseUrl } from "./resourceScope.ts";
+} from "@/state/useSafeSpendingSettings.ts";
+import { safeSpendingSettingsObserver } from "@/test/safeSpendingSettings.ts";
+import { canonicalApiBaseUrl } from "@/auth/resourceScope.ts";
 
 const A = `plans/${"a".repeat(64)}`;
 const B = `plans/${"b".repeat(64)}`;
@@ -60,6 +62,33 @@ function response(body: unknown, resource: string | null = A) {
 	return new Response(JSON.stringify(body), { headers });
 }
 
+const settingsByResource = new Map<string, unknown>();
+
+function route(input: RequestInfo | URL, init?: RequestInit) {
+	const url = String(input);
+	// Echo the request assertion like the backend: the requesting scope is
+	// captured before the network round-trip, while the current scope may
+	// already have moved on (suspend during adoption).
+	const requested = init?.headers
+		? new Headers(init.headers).get("Waypoint-Resource")
+		: null;
+	const resource = requested ?? getResourceScope().resource?.id ?? "";
+	if (url.endsWith("/v1/safe-spending-settings")) {
+		if ((init?.method ?? "GET") !== "GET") {
+			const body = JSON.parse(String(init?.body ?? "{}")) as {
+				settings?: unknown;
+			};
+			settingsByResource.set(resource, body.settings ?? null);
+		}
+		return ok({ settings: settingsByResource.get(resource) ?? null });
+	}
+	if (url.endsWith("/v1/financial-model"))
+		return ok({ document: null, issues: [] });
+	if (url.endsWith("/v1/amount-presets")) return ok({ presets: [] });
+	if (url.endsWith("/v1/status")) return ok({ readOnly: false });
+	return response(session());
+}
+
 function WorkspaceProbe() {
 	const account = useSession();
 	const revision = useServerModel().data?.revision;
@@ -89,13 +118,8 @@ function renderWorkspace() {
 }
 
 beforeEach(() => {
-	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
-		settings: null,
-	});
-	vi.spyOn(ApiClient.prototype, "setSafeSpendingSettings").mockImplementation(
-		async (settings) => ({ settings }),
-	);
 	vi.stubGlobal("BroadcastChannel", undefined);
+	settingsByResource.clear();
 	suspendResourceScope();
 	clearPersistedMemory();
 	resetWorkspaceStore();
@@ -113,34 +137,38 @@ afterEach(() => {
 
 describe("authentication resource isolation", () => {
 	it("waits for resource-owned financial preferences before mounting children", async () => {
-		let finish: (value: SafeSpendingSettingsResponse) => void = () => {};
-		const read = vi
-			.mocked(ApiClient.prototype.getSafeSpendingSettings)
-			.mockImplementationOnce(
-				() =>
-					new Promise((resolve) => {
-						finish = resolve;
-					}),
-			);
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(async () => response(session())),
-		);
+		let finish: (value: Response) => void = () => {};
+		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+			if (String(input).endsWith("/v1/safe-spending-settings"))
+				return new Promise<Response>((resolve) => {
+					finish = resolve;
+				});
+			return response(session());
+		});
+		vi.stubGlobal("fetch", fetchMock);
 		render(
 			<AuthBoundary>
 				<FinancialPreferencesProbe />
 			</AuthBoundary>,
 		);
-		await waitFor(() => expect(read).toHaveBeenCalledOnce());
+		await waitFor(() =>
+			expect(
+				fetchMock.mock.calls.some(([input]) =>
+					String(input).endsWith("/v1/safe-spending-settings"),
+				),
+			).toBe(true),
+		);
 		expect(screen.queryByTestId("financial-preferences")).toBeNull();
 		await act(async () =>
-			finish({
-				settings: {
-					...defaultSafeSpendingSettings(),
-					reserve: 123,
-					incomeRuleIds: ["private-a-income"],
-				},
-			}),
+			finish(
+				response({
+					settings: {
+						...defaultSafeSpendingSettings(),
+						reserve: 123,
+						incomeRuleIds: ["private-a-income"],
+					},
+				}),
+			),
 		);
 		expect(
 			(await screen.findByTestId("financial-preferences")).textContent,
@@ -148,7 +176,10 @@ describe("authentication resource isolation", () => {
 	});
 
 	it("resets financial preferences during a cross-tab identity check before the next owner's children mount", async () => {
-		const fetcher = vi.fn(async () => response(session()));
+		const fetcher = vi.fn(
+			async (input: RequestInfo | URL, init?: RequestInit) =>
+				route(input, init),
+		);
 		vi.stubGlobal("fetch", fetcher);
 		render(
 			<AuthBoundary>
@@ -163,11 +194,17 @@ describe("authentication resource isolation", () => {
 			}),
 		);
 		let finish: (value: Response) => void = () => {};
-		fetcher.mockImplementationOnce(
-			() =>
-				new Promise<Response>((resolve) => {
-					finish = resolve;
-				}),
+		let gated = false;
+		fetcher.mockImplementation(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				if (!gated && String(input).endsWith("/v1/auth/session")) {
+					gated = true;
+					return new Promise<Response>((resolve) => {
+						finish = resolve;
+					});
+				}
+				return route(input, init);
+			},
 		);
 		act(() =>
 			window.dispatchEvent(
@@ -184,7 +221,13 @@ describe("authentication resource isolation", () => {
 				"123456:private-a-income",
 			),
 		);
-		await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+		await waitFor(() =>
+			expect(
+				fetcher.mock.calls.filter((call) =>
+					String(call[0]).endsWith("/v1/auth/session"),
+				),
+			).toHaveLength(2),
+		);
 		expect(screen.getByTestId("financial-preferences").textContent).toBe(
 			"123456:private-a-income",
 		);
@@ -238,7 +281,10 @@ describe("authentication resource isolation", () => {
 	it.each([B, "plans/sample"])(
 		"keeps the old workspace during a cross-tab check and clears it before resource %s mounts",
 		async (nextId) => {
-			const fetcher = vi.fn(async () => response(session()));
+			const fetcher = vi.fn(
+				async (input: RequestInfo | URL, init?: RequestInit) =>
+					route(input, init),
+			);
 			vi.stubGlobal("fetch", fetcher);
 			renderWorkspace();
 			await screen.findByTestId("active-workspace");
@@ -247,10 +293,13 @@ describe("authentication resource isolation", () => {
 			serverQueryClient().setQueryData(oldKey, "private-a-result");
 			let finish: (value: Response) => void = () => {};
 			fetcher.mockImplementation(
-				() =>
-					new Promise<Response>((resolve) => {
-						finish = resolve;
-					}),
+				async (input: RequestInfo | URL, init?: RequestInit) => {
+					if (String(input).endsWith("/v1/auth/session"))
+						return new Promise<Response>((resolve) => {
+							finish = resolve;
+						});
+					return route(input, init);
+				},
 			);
 			act(() =>
 				window.dispatchEvent(
@@ -268,7 +317,13 @@ describe("authentication resource isolation", () => {
 					`${A}:account-a-private-revision`,
 				),
 			);
-			await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+			await waitFor(() =>
+				expect(
+					fetcher.mock.calls.filter((call) =>
+						String(call[0]).endsWith("/v1/auth/session"),
+					),
+				).toHaveLength(2),
+			);
 			expect(screen.getByTestId("active-workspace").textContent).toBe(
 				`${A}:account-a-private-revision`,
 			);
@@ -281,7 +336,7 @@ describe("authentication resource isolation", () => {
 	);
 
 	it("does not accept an old session response after a newer account check completes", async () => {
-		const fetcher = vi.fn(async () => response(session()));
+		const fetcher = vi.fn(async (_input: unknown) => response(session()));
 		vi.stubGlobal("fetch", fetcher);
 		renderWorkspace();
 		await screen.findByTestId("active-workspace");
@@ -295,7 +350,13 @@ describe("authentication resource isolation", () => {
 		act(() =>
 			window.dispatchEvent(new Event("waypoint:authentication-required")),
 		);
-		await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+		await waitFor(() =>
+			expect(
+				fetcher.mock.calls.filter((call) =>
+					String(call[0]).endsWith("/v1/auth/session"),
+				),
+			).toHaveLength(2),
+		);
 		fetcher.mockImplementation(async () => response(session(B), B));
 		act(() =>
 			window.dispatchEvent(new Event("waypoint:authentication-required")),

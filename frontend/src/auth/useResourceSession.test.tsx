@@ -1,10 +1,11 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ApiClient } from "../api/client.ts";
-import { ResourceScopeError } from "../api/scopedRequest.ts";
-import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { getResourceScope } from "./resourceScope.ts";
-import { useResourceSession } from "./useResourceSession.ts";
+import { createAccount } from "@/api/generated/endpoints.ts";
+import { getServerStatus } from "@/api/generated/endpoints.ts";
+import { ResourceScopeError } from "@/api/scopedRequest.ts";
+import { resetServerQueryCache } from "@/state/serverQuery.ts";
+import { getResourceScope } from "@/auth/resourceScope.ts";
+import { useResourceSession } from "@/auth/useResourceSession.ts";
 
 const session = {
 	enabled: true,
@@ -30,9 +31,6 @@ function response(body: unknown, status = 200) {
 
 beforeEach(() => {
 	vi.stubGlobal("BroadcastChannel", undefined);
-	vi.spyOn(ApiClient.prototype, "getSafeSpendingSettings").mockResolvedValue({
-		settings: null,
-	});
 });
 afterEach(() => {
 	cleanup();
@@ -58,7 +56,11 @@ it("keeps failed logout after a discovery outage closed without an implicit retr
 	await act(async () => result.current.logout());
 	expect(result.current.phase).toBe("unavailable");
 	expect(result.current.error).toBe("Sign-out failed. Please retry.");
-	expect(fetcher).toHaveBeenCalledTimes(3);
+	expect(
+		fetcher.mock.calls.filter((call) =>
+			String(call[0]).endsWith("/v1/auth/logout"),
+		),
+	).toHaveLength(1);
 });
 
 it("restores requests when resource-change discovery returns to the same plan", async () => {
@@ -72,9 +74,8 @@ it("restores requests when resource-change discovery returns to the same plan", 
 	const { result } = renderHook(useResourceSession);
 	await waitFor(() => expect(result.current.phase).toBe("ready"));
 	const oldScope = getResourceScope();
-	const oldClient = new ApiClient();
 	await act(async () => {
-		expect(await oldClient.createAccount({} as never)).toBeInstanceOf(
+		await expect(createAccount({} as never)).rejects.toBeInstanceOf(
 			ResourceScopeError,
 		);
 	});
@@ -82,9 +83,10 @@ it("restores requests when resource-change discovery returns to the same plan", 
 	expect(result.current.phase).toBe("ready");
 	expect(getResourceScope()).not.toBe(oldScope);
 	expect(getResourceScope().resource?.id).toBe(session.resource.id);
-	expect(await new ApiClient().getStatus()).toEqual({ readOnly: false });
-	expect(await oldClient.getStatus()).toBeInstanceOf(ResourceScopeError);
-	expect(fetcher).toHaveBeenCalledTimes(4);
+	expect((await getServerStatus()).data).toEqual({
+		readOnly: false,
+	});
+	expect(fetcher).toHaveBeenCalledTimes(6);
 });
 
 it("blocks an unverified logout redirect and recovers to the guest through an explicit check", async () => {
@@ -118,7 +120,9 @@ it("blocks an unverified logout redirect and recovers to the guest through an ex
 	});
 	expect(window.location.hash).toBe("");
 	expect(result.current.phase).toBe("unavailable");
-	expect(result.current.error).toBe("Authentication status is unavailable.");
+	expect(result.current.error).toBe(
+		"The Waypoint server is unavailable (HTTP 503). It may be restarting; retry shortly.",
+	);
 	expect(result.current.logoutPending).toBe(false);
 	expect(getResourceScope().status).toBe("pending");
 	discovery = new Response(
@@ -140,6 +144,21 @@ it("blocks an unverified logout redirect and recovers to the guest through an ex
 	expect(getResourceScope().resource?.id).toBe("plans/sample");
 });
 
+it("names an unreachable server instead of reporting a generic status failure", async () => {
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => {
+			throw new TypeError("Failed to fetch");
+		}),
+	);
+	const { result } = renderHook(useResourceSession);
+	await waitFor(() => expect(result.current.phase).toBe("unavailable"));
+	expect(result.current.session).toBeNull();
+	expect(result.current.error).toBe(
+		"Cannot reach the Waypoint server. It may be down or restarting.",
+	);
+});
+
 it("rejects duplicate logout calls before React renders the pending state", async () => {
 	let finish: (value: Response) => void = () => {};
 	const fetcher = vi.fn(async (input: RequestInfo | URL) =>
@@ -157,7 +176,11 @@ it("rejects duplicate logout calls before React renders the pending state", asyn
 		logout = result.current.logout();
 		void result.current.logout();
 	});
-	expect(fetcher).toHaveBeenCalledTimes(2);
+	expect(
+		fetcher.mock.calls.filter((call) =>
+			String(call[0]).endsWith("/v1/auth/logout"),
+		),
+	).toHaveLength(1);
 	expect(result.current.logoutPending).toBe(true);
 	await act(async () => {
 		finish(response({ logoutURL: "#signed-out" }));

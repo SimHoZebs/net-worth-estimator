@@ -1,13 +1,12 @@
 import * as errore from "errore";
-import type { ApiClient } from "./client.ts";
-import type { FinancialModelDocument } from "./contracts.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
-import { responseScopeError } from "./scopedRequest.ts";
+import type { FinancialModelDocument } from "@/api/contracts.ts";
+import { getResourceScope } from "@/auth/resourceScope.ts";
+import { responseScopeError } from "@/api/scopedRequest.ts";
+import { getFinancialModel } from "@/api/generated/endpoints.ts";
 import {
 	applyRowOperations,
 	diffFinancialModelDocuments,
-	type RowWriter,
-} from "./rowSync.ts";
+} from "@/api/rowSync.ts";
 
 export const READ_ONLY_IMPORT_MESSAGE =
 	"The server is read-only. The selected model was not uploaded.";
@@ -18,7 +17,6 @@ export class ServerModelImportError extends errore.createTaggedError({
 }) {}
 
 export type ServerModelImportOptions = {
-	client: Pick<ApiClient, "getModel"> & RowWriter;
 	preconditions: {
 		hasWorkspace: boolean;
 		readOnly: boolean;
@@ -34,13 +32,12 @@ export type ServerModelImportOptions = {
 // operations, then reloads authoritative state.
 export async function importServerModel({
 	document,
-	client,
 	preconditions,
 	recover,
 	reload,
-}: ServerModelImportOptions & { document: FinancialModelDocument }): Promise<
-	boolean | Error
-> {
+}: ServerModelImportOptions & {
+	document: FinancialModelDocument;
+}): Promise<boolean | Error> {
 	const scope = getResourceScope();
 	if (!preconditions.hasWorkspace) return recover(document);
 	if (preconditions.readOnly)
@@ -57,12 +54,17 @@ export async function importServerModel({
 			detail:
 				"Wait for the current server operation to finish before importing a model.",
 		});
-	const current = await client.getModel();
+	let current: FinancialModelDocument | null;
+	try {
+		current = (await getFinancialModel()).data
+			.document as FinancialModelDocument | null;
+	} catch (cause) {
+		return cause instanceof Error ? cause : new Error(String(cause));
+	}
 	const stale = responseScopeError(scope);
 	if (stale) return stale;
-	if (current instanceof Error) return current;
-	const operations = diffFinancialModelDocuments(current.document, document);
-	const applied = await applyRowOperations(client, operations);
+	const operations = diffFinancialModelDocuments(current, document);
+	const applied = await applyRowOperations(operations);
 	const changed = responseScopeError(scope);
 	if (changed) return changed;
 	if (applied instanceof Error) return applied;

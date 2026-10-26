@@ -1,18 +1,25 @@
 import { useEffect } from "react";
-import { getResourceScope } from "../auth/resourceScope.ts";
-import { financialQueryFilter, serverQueryClient } from "./serverQuery.ts";
-import type { RemoteApiClient } from "./workspaceStore.ts";
+import { getResourceScope } from "@/auth/resourceScope.ts";
+import {
+	financialQueryFilter,
+	serverQueryClient,
+} from "@/state/serverQuery.ts";
 import {
 	getServerStatus,
 	reloadWorkspace,
 	statusOptions,
 	workspaceIsBusy,
 	workspaceResourceKey,
-} from "./workspaceResources.ts";
+} from "@/state/workspaceResources.ts";
 
-export function useWorkspaceSyncMonitor(api: RemoteApiClient | null): void {
+export function useWorkspaceSyncMonitor(enabled: boolean): void {
+	// Keyed on the scope epoch: the caller re-renders on scope change, so a
+	// ready-to-ready plan switch re-runs the effect and recaptures scope.
+	// Keying on `enabled` alone left a stale capture whose guard bailed on
+	// every poll after a plan switch.
+	const scopeKey = getResourceScope().key;
 	useEffect(() => {
-		if (!api) return;
+		if (!enabled) return;
 		const scope = getResourceScope();
 		const cache = serverQueryClient();
 		const check = async () => {
@@ -26,7 +33,7 @@ export function useWorkspaceSyncMonitor(api: RemoteApiClient | null): void {
 			const before = getServerStatus(scope)?.lastSyncAt ?? "";
 			try {
 				const status = await cache.fetchQuery({
-					...statusOptions(api, scope),
+					...statusOptions(scope),
 					staleTime: 0,
 				});
 				if (
@@ -37,7 +44,7 @@ export function useWorkspaceSyncMonitor(api: RemoteApiClient | null): void {
 					return;
 				const filter = financialQueryFilter(scope.key);
 				await cache.invalidateQueries({ ...filter, refetchType: "none" });
-				await reloadWorkspace(api);
+				await reloadWorkspace();
 				if (scope === getResourceScope())
 					await cache.refetchQueries({
 						...filter,
@@ -57,5 +64,5 @@ export function useWorkspaceSyncMonitor(api: RemoteApiClient | null): void {
 			window.removeEventListener("online", onResume);
 			document.removeEventListener("visibilitychange", onResume);
 		};
-	}, [api]);
+	}, [enabled, scopeKey]);
 }

@@ -3,19 +3,20 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FinancialModelDocument } from "../api/contracts.ts";
-import type { CurrentPositionResponse } from "../api/position.ts";
 import {
 	acceptResourceScope,
+	canonicalApiBaseUrl,
+	getResourceScope,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
 import { useCurrentPosition } from "./useCurrentPosition.ts";
 import { resetWorkspaceStore } from "./workspaceStore.ts";
-import { acceptTestResource } from "../test/resource.ts";
 
 afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
 	suspendResourceScope();
+	vi.unstubAllGlobals();
 });
 
 function model(balance = 100): FinancialModelDocument {
@@ -39,57 +40,83 @@ function wrapper({ children }: { children: ReactNode }) {
 	return <QueryClientProvider client={cache}>{children}</QueryClientProvider>;
 }
 let cache: QueryClient;
+
 function setup() {
-	acceptTestResource();
+	acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(""),
+			resource: {
+				id: `plans/${"a".repeat(64)}`,
+				kind: "private",
+				permissions: ["plan:read"],
+			},
+			subject: `plans/${"a".repeat(64)}`,
+		},
+		suspendResourceScope(),
+	)!;
 	cache = new QueryClient({
 		defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
 	});
 }
+
 const result = {
 	asOfDate: "2026-01-01",
 	netWorth: 100,
 	accounts: [{ accountId: "cash", balance: 100 }],
 };
 
+function stubPosition(respond: (url: string, init?: RequestInit) => unknown) {
+	const calls: { url: string; init?: RequestInit }[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (url: unknown, init?: RequestInit) => {
+			calls.push({ url: String(url), init });
+			const headers = new Headers({ "content-type": "application/json" });
+			const resource = getResourceScope().resource?.id;
+			if (resource) headers.set("Waypoint-Resource", resource);
+			const body = await respond(String(url), init);
+			return new Response(JSON.stringify(body), { headers });
+		}),
+	);
+	return calls;
+}
+
 it("exposes pending then success without any forecast request", async () => {
 	setup();
-	let resolve!: (response: CurrentPositionResponse) => void;
-	const client = {
-		getCurrentPosition: vi.fn(
-			() =>
-				new Promise<CurrentPositionResponse>((done) => {
-					resolve = done;
-				}),
-		),
-	};
+	let finish!: (value: unknown) => void;
+	const pending = new Promise<unknown>((resolve) => {
+		finish = resolve;
+	});
+	let calls = 0;
+	stubPosition(() => {
+		calls += 1;
+		return calls === 1 ? pending : { result };
+	});
 	const hook = renderHook(
-		() =>
-			useCurrentPosition({ client, document: model(), draftDocument: null }),
+		() => useCurrentPosition({ document: model(), draftDocument: null }),
 		{ wrapper },
 	);
 	expect(hook.result.current.status).toBe("pending");
 	await act(async () => {
-		resolve({ result });
+		finish({ result });
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(hook.result.current.data).toEqual(result);
-	expect(client.getCurrentPosition).toHaveBeenCalledOnce();
 });
 
 it("clears previous-input data while the new position is pending", async () => {
 	setup();
-	const client = {
-		getCurrentPosition: vi
-			.fn()
-			.mockResolvedValueOnce({ result })
-			.mockImplementation(() => new Promise(() => {})),
-	};
+	let gate = false;
+	stubPosition(() => {
+		if (!gate) return { result };
+		return new Promise(() => {});
+	});
 	const hook = renderHook(
-		({ document }) =>
-			useCurrentPosition({ client, document, draftDocument: null }),
+		({ document }) => useCurrentPosition({ document, draftDocument: null }),
 		{ wrapper, initialProps: { document: model() } },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
+	gate = true;
 	hook.rerender({ document: model(200) });
 	expect(hook.result.current.status).toBe("pending");
 	expect(hook.result.current.data).toBeNull();
@@ -97,17 +124,15 @@ it("clears previous-input data while the new position is pending", async () => {
 
 it("exposes errors and retries explicitly", async () => {
 	setup();
-	const client = {
-		getCurrentPosition: vi
-			.fn()
-			.mockResolvedValueOnce({
-				issues: [{ severity: "error", message: "Invalid history" }],
-			})
-			.mockResolvedValue({ result }),
-	};
+	let attempts = 0;
+	stubPosition(() => {
+		attempts += 1;
+		if (attempts === 1)
+			return { issues: [{ severity: "error", message: "Invalid history" }] };
+		return { result };
+	});
 	const hook = renderHook(
-		() =>
-			useCurrentPosition({ client, document: model(), draftDocument: null }),
+		() => useCurrentPosition({ document: model(), draftDocument: null }),
 		{ wrapper },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("error"));
@@ -118,11 +143,17 @@ it("exposes errors and retries explicitly", async () => {
 
 it("does not request a disabled position", () => {
 	setup();
-	const client = { getCurrentPosition: vi.fn() };
+	const calls: unknown[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (...args: unknown[]) => {
+			calls.push(args);
+			throw new Error("unexpected fetch");
+		}),
+	);
 	const hook = renderHook(
 		() =>
 			useCurrentPosition({
-				client,
 				document: model(),
 				draftDocument: null,
 				enabled: false,
@@ -130,31 +161,53 @@ it("does not request a disabled position", () => {
 		{ wrapper },
 	);
 	expect(hook.result.current.status).toBe("disabled");
-	expect(client.getCurrentPosition).not.toHaveBeenCalled();
+	expect(calls).toHaveLength(0);
 });
 
 it("requests the draft model in preference to the saved model", async () => {
 	setup();
+	const bodies: unknown[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body ?? "{}")));
+			const headers = new Headers({ "content-type": "application/json" });
+			const resource = getResourceScope().resource?.id;
+			if (resource) headers.set("Waypoint-Resource", resource);
+			return new Response(JSON.stringify({ result }), { headers });
+		}),
+	);
 	const saved = model(100);
 	const draft = model(200);
-	const client = { getCurrentPosition: vi.fn().mockResolvedValue({ result }) };
 	const hook = renderHook(
-		() => useCurrentPosition({ client, document: saved, draftDocument: draft }),
+		() => useCurrentPosition({ document: saved, draftDocument: draft }),
 		{ wrapper },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	expect(client.getCurrentPosition.mock.calls[0]?.[0]).toEqual({
-		document: draft,
-		asOfDate: "2026-01-01",
-	});
+	expect(bodies).toHaveLength(1);
+	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
+	expect(
+		(bodies[0] as { document?: { checkpoints?: unknown[] } }).document,
+	).toEqual(draft);
 });
 
 it("separates identical models by resource identity", async () => {
 	setup();
+	const seen: string[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async () => {
+			seen.push(getResourceScope().resource?.id ?? "");
+			const headers = new Headers({ "content-type": "application/json" });
+			const resource = getResourceScope().resource?.id;
+			if (resource) headers.set("Waypoint-Resource", resource);
+			return new Response(JSON.stringify({ result }), { headers });
+		}),
+	);
 	const selectScope = (id: string) =>
 		acceptResourceScope(
 			{
-				apiBaseUrl: "http://localhost",
+				apiBaseUrl: canonicalApiBaseUrl(""),
 				subject: null,
 				resource: {
 					id,
@@ -165,10 +218,8 @@ it("separates identical models by resource identity", async () => {
 			suspendResourceScope(),
 		);
 	selectScope("plans/one");
-	const client = { getCurrentPosition: vi.fn().mockResolvedValue({ result }) };
 	const hook = renderHook(
-		() =>
-			useCurrentPosition({ client, document: model(), draftDocument: null }),
+		() => useCurrentPosition({ document: model(), draftDocument: null }),
 		{ wrapper },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
@@ -176,5 +227,5 @@ it("separates identical models by resource identity", async () => {
 	hook.rerender();
 	expect(hook.result.current.data).toBeNull();
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	expect(client.getCurrentPosition).toHaveBeenCalledTimes(2);
+	expect(seen).toEqual(["plans/one", "plans/two"]);
 });

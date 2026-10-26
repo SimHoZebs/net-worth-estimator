@@ -1,10 +1,10 @@
-import { getApiBaseUrl } from "../api/runtime.ts";
-import { isRecord } from "../domain/guards.ts";
-import type { Session } from "./sessionContext.ts";
+import { getApiBaseUrl } from "@/api/runtime.ts";
+import { isRecord } from "@/domain/guards.ts";
+import type { Session } from "@/auth/sessionContext.ts";
 import {
 	canonicalApiBaseUrl,
 	type ResourceScopeInput,
-} from "./resourceScope.ts";
+} from "@/auth/resourceScope.ts";
 
 export function sessionScopeInput(
 	session: Session,
@@ -21,13 +21,31 @@ export async function discoverSession(
 	signal: AbortSignal,
 	baseUrl = getApiBaseUrl(),
 ): Promise<Session> {
-	const response = await fetch(`${baseUrl}/v1/auth/session`, {
-		credentials: "same-origin",
-		cache: "no-store",
-		redirect: "error",
-		signal,
-	});
-	if (!response.ok) throw new Error("Authentication status is unavailable.");
+	let response: Response;
+	try {
+		response = await fetch(`${baseUrl}/v1/auth/session`, {
+			credentials: "same-origin",
+			cache: "no-store",
+			redirect: "error",
+			signal,
+		});
+	} catch (cause) {
+		if (signal.aborted) throw cause;
+		throw new Error(
+			"Cannot reach the Waypoint server. It may be down or restarting.",
+		);
+	}
+	if (!response.ok) {
+		if (
+			response.status === 502 ||
+			response.status === 503 ||
+			response.status === 504
+		)
+			throw new Error(
+				`The Waypoint server is unavailable (HTTP ${response.status}). It may be restarting; retry shortly.`,
+			);
+		throw new Error("Authentication status is unavailable.");
+	}
 	const next: unknown = await response.json();
 	if (!isRecord(next) || next.enabled !== true)
 		throw new Error("Invalid authentication status.");

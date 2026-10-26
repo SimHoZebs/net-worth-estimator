@@ -5,13 +5,15 @@ import {
 	getResourceScope,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
-import { ApiClient, ApiHttpError, type FetchLike } from "./client.ts";
+import { ApiHttpError } from "./http.ts";
 import { applyRowOperations } from "./rowSync.ts";
+import { requestStochasticProjection } from "./sse.ts";
 import {
 	ResourceScopeError,
-	resourceScopedFactory,
+	scopedRequest,
 	scopedResponseError,
 } from "./scopedRequest.ts";
+import { waypointFetch } from "./waypoint-fetch.ts";
 
 const A = `plans/${"a".repeat(64)}`;
 const B = `plans/${"b".repeat(64)}`;
@@ -41,43 +43,38 @@ function response(
 	return new Response(body, { status, headers });
 }
 
-function request(client: ApiClient, kind: "json" | "sse") {
+function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
+	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
+		const result = await handler(String(url), init);
+		if (result instanceof Error) throw result;
+		return result as Response;
+	});
+	vi.stubGlobal("fetch", fetcher);
+	return fetcher;
+}
+
+function request(kind: "json" | "sse") {
 	return kind === "json"
-		? client.getModel()
-		: client.projectStochastic({} as never);
+		? waypointFetch<unknown>("/v1/financial-model", { method: "GET" })
+		: requestStochasticProjection({ years: 1 });
 }
 
 beforeEach(() => owner());
 afterEach(() => {
 	suspendResourceScope();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe("resource assertion at the API boundary", () => {
-	it("renews cached clients for a new verification epoch", () => {
-		const create = vi.fn(() => new ApiClient());
-		const cached = resourceScopedFactory(create);
-		const first = cached();
-		expect(cached()).toBe(first);
-		owner();
-		expect(cached()).not.toBe(first);
-		expect(create).toHaveBeenCalledTimes(2);
-	});
-
 	it("stops a multi-row save after its resource changes between writes", async () => {
-		const fetcher = vi.fn<FetchLike>(async () =>
-			response(JSON.stringify({ persisted: true, issues: [] })),
-		);
-		const client = new ApiClient({ fetch: fetcher });
-		const createAccount = client.createAccount.bind(client);
-		vi.spyOn(client, "createAccount").mockImplementation(
-			async (row, options) => {
-				const result = await createAccount(row, options);
-				owner(B);
-				return result;
-			},
-		);
-		const result = await applyRowOperations(client, [
+		const fetcher = stubFetch(async () => {
+			owner(B);
+			return response(
+				JSON.stringify({ persisted: true, issues: [], revision: "r1" }),
+			);
+		});
+		const result = await applyRowOperations([
 			{
 				kind: "account",
 				action: "create",
@@ -106,56 +103,50 @@ describe("resource assertion at the API boundary", () => {
 			},
 		]);
 		expect(result).toBeInstanceOf(ResourceScopeError);
-		// First write sends while scope A is current; the retired second
-		// write sends with pinned A after the switch to B, then the
-		// post-response guard rejects it without touching workspace B.
-		expect(fetcher).toHaveBeenCalledTimes(2);
+		// The first write sends while scope A is current. The scope switch
+		// retires the second write before it sends, so nothing computed for
+		// plan A can land in plan B's workspace.
+		expect(fetcher).toHaveBeenCalledTimes(1);
 	});
 
 	it.each(["json", "sse"] as const)(
-		"does not retarget an old %s client to a different account",
+		"does not retarget an old %s request to a different account",
 		async (kind) => {
-			const fetcher = vi.fn<FetchLike>(async () => response("{}", B));
-			const client = new ApiClient({ fetch: fetcher });
+			let finish!: (value: Response) => void;
+			const pending = new Promise<Response>((resolve) => {
+				finish = resolve;
+			});
+			const fetcher = stubFetch(() => pending);
+			const awaiting = request(kind);
 			owner(B);
-			expect(await request(client, kind)).toBeInstanceOf(ResourceScopeError);
-			// Server-led: the pinned original ID goes out, the server cannot
-			// accept it, and the stale post-response guard rejects it.
-			expect(fetcher).toHaveBeenCalledOnce();
-			const init = fetcher.mock.calls[0]![1]!;
-			expect(new Headers(init.headers).get("Waypoint-Resource")).toBe(A);
+			finish(response("{}", B));
+			await expect(awaiting).rejects.toBeInstanceOf(ResourceScopeError);
+			expect(getResourceScope().resource?.id).toBe(B);
+			const init = (
+				fetcher as unknown as { mock: { calls: [string, RequestInit][] } }
+			).mock.calls[0]?.[1];
+			expect(new Headers(init?.headers).get("Waypoint-Resource")).toBe(A);
 		},
 	);
-
-	it("does not send a canceled save after the same plan is verified again", async () => {
-		const fetcher = vi.fn<FetchLike>(async () => response("{}"));
-		const client = new ApiClient({ fetch: fetcher });
-		owner(A);
-		expect(await client.createAccount({} as never)).toBeInstanceOf(
-			ResourceScopeError,
-		);
-		expect(fetcher).not.toHaveBeenCalled();
-	});
 
 	it.each(["json", "sse"] as const)(
 		"blocks %s before network access while discovery is pending",
 		async (kind) => {
 			suspendResourceScope();
-			const fetcher = vi.fn<FetchLike>();
-			expect(
-				await request(new ApiClient({ fetch: fetcher }), kind),
-			).toBeInstanceOf(ResourceScopeError);
+			const fetcher = stubFetch(async () => response("{}"));
+			await expect(request(kind)).rejects.toBeInstanceOf(ResourceScopeError);
 			expect(fetcher).not.toHaveBeenCalled();
 		},
 	);
 
 	it("sends the verified assertion, credentials, and redirect policy instead of caller assertions", async () => {
-		const fetcher = vi.fn<FetchLike>(async () => response());
-		const result = await new ApiClient({ fetch: fetcher }).getModel({
+		const fetcher = stubFetch(async () => response());
+		const envelope = (await waypointFetch("/v1/status", {
+			method: "GET",
 			headers: { "Waypoint-Resource": B },
-		});
-		expect(result).toEqual({ private: "account-a" });
-		const init = fetcher.mock.calls[0]![1]!;
+		})) as unknown as { data: unknown };
+		expect(envelope.data).toEqual({ private: "account-a" });
+		const init = fetcher.mock.calls[0]?.[1] as RequestInit;
 		expect(new Headers(init.headers).get("Waypoint-Resource")).toBe(A);
 		expect(init).toMatchObject({
 			credentials: "same-origin",
@@ -167,38 +158,33 @@ describe("resource assertion at the API boundary", () => {
 	it.each(["https://unrelated.example", "/unverified-proxy"])(
 		"does not attach scoped credentials to %s",
 		async (baseUrl) => {
-			const fetcher = vi.fn<FetchLike>();
-			expect(
-				await new ApiClient({ baseUrl, fetch: fetcher }).getModel(),
-			).toBeInstanceOf(ResourceScopeError);
+			const fetcher = vi.fn(async () => response());
+			const outcome = await scopedRequest(
+				baseUrl,
+				`${baseUrl}/v1/financial-model`,
+				{ method: "GET" },
+				fetcher,
+				getResourceScope(),
+			);
+			expect(outcome).toBeInstanceOf(ResourceScopeError);
 			expect(fetcher).not.toHaveBeenCalled();
 			expect(getResourceScope().status).toBe("ready");
 		},
 	);
-
-	it("accepts equivalent relative and absolute API bases", async () => {
-		owner(A, "/proxy/");
-		const fetcher = vi.fn<FetchLike>(async () => response());
-		expect(
-			await new ApiClient({
-				baseUrl: canonicalApiBaseUrl("/proxy"),
-				fetch: fetcher,
-			}).getModel(),
-		).toEqual({ private: "account-a" });
-	});
 
 	it.each([null, B])(
 		"rejects a successful response with resource header %s and requests verification",
 		async (resource) => {
 			const check = vi.fn();
 			window.addEventListener("waypoint:authentication-required", check);
+			const fetcher = stubFetch(async () => response(undefined, resource));
 			try {
-				const result = await new ApiClient({
-					fetch: async () => response(undefined, resource),
-				}).getModel();
-				expect(result).toBeInstanceOf(ResourceScopeError);
+				await expect(
+					waypointFetch("/v1/financial-model", { method: "GET" }),
+				).rejects.toBeInstanceOf(ResourceScopeError);
 				expect(getResourceScope().status).toBe("pending");
 				expect(check).toHaveBeenCalledOnce();
+				expect(fetcher).toHaveBeenCalledOnce();
 			} finally {
 				window.removeEventListener("waypoint:authentication-required", check);
 			}
@@ -210,13 +196,13 @@ describe("resource assertion at the API boundary", () => {
 		async (kind) => {
 			let finish: (value: Response) => void = () => {};
 			let signal: AbortSignal | null | undefined;
-			const fetcher = vi.fn<FetchLike>(async (_url, init) => {
-				signal = init?.signal;
+			stubFetch(async (_url, init) => {
+				signal = init?.signal ?? null;
 				return new Promise<Response>((resolve) => {
 					finish = resolve;
 				});
 			});
-			const pending = request(new ApiClient({ fetch: fetcher }), kind);
+			const pending = request(kind);
 			owner(B);
 			expect(signal?.aborted).toBe(true);
 			const cancel = vi.fn();
@@ -225,7 +211,7 @@ describe("resource assertion at the API boundary", () => {
 					headers: { "Waypoint-Resource": A },
 				}),
 			);
-			expect(await pending).toBeInstanceOf(ResourceScopeError);
+			await expect(pending).rejects.toBeInstanceOf(ResourceScopeError);
 			expect(cancel).toHaveBeenCalledOnce();
 			expect(getResourceScope().resource?.id).toBe(B);
 		},
@@ -243,38 +229,38 @@ describe("resource assertion at the API boundary", () => {
 			},
 			cancel,
 		});
-		const client = new ApiClient({
-			fetch: async () =>
+		stubFetch(
+			async () =>
 				new Response(body, {
 					headers: {
 						"Waypoint-Resource": A,
 						"content-type": "application/json",
 					},
 				}),
-		});
-		const pending = client.getModel();
+		);
+		const pending = waypointFetch("/v1/financial-model", { method: "GET" });
 		await reading;
 		// Let the fetch continuation attach the guarded body before changing identity.
 		await Promise.resolve();
 		owner(B);
-		expect(await pending).toBeInstanceOf(ResourceScopeError);
+		await expect(pending).rejects.toBeInstanceOf(ResourceScopeError);
 		expect(cancel).toHaveBeenCalledOnce();
 	});
 
 	it("terminates an already-returned SSE stream when the resource changes", async () => {
 		const cancel = vi.fn();
 		const body = new ReadableStream<Uint8Array>({ cancel });
-		const result = await new ApiClient({
-			fetch: async () =>
+		stubFetch(
+			async () =>
 				new Response(body, {
 					headers: {
 						"Waypoint-Resource": A,
 						"content-type": "text/event-stream",
 					},
 				}),
-		}).projectStochastic({} as never);
+		);
+		const result = await requestStochasticProjection({});
 		expect(result).toBeInstanceOf(Response);
-		if (!(result instanceof Response)) throw result;
 		const reader = result.body!.getReader();
 		const pending = reader.read();
 		owner(B);
@@ -286,18 +272,16 @@ describe("resource assertion at the API boundary", () => {
 		const caller = new AbortController();
 		const cancel = vi.fn();
 		let signal: AbortSignal | null | undefined;
-		const client = new ApiClient({
-			fetch: async (_url, init) => {
-				signal = init?.signal;
-				return new Response(new ReadableStream({ cancel }), {
-					headers: { "Waypoint-Resource": A },
-				});
-			},
+		stubFetch(async (_url, init) => {
+			signal = init?.signal ?? null;
+			return new Response(new ReadableStream({ cancel }), {
+				headers: { "Waypoint-Resource": A },
+			});
 		});
-		const result = await client.projectStochastic({} as never, {
-			signal: caller.signal,
-		});
-		if (!(result instanceof Response)) throw result;
+		const result = await requestStochasticProjection(
+			{},
+			{ signal: caller.signal },
+		);
 		const pending = result.body!.getReader().read();
 		caller.abort();
 		await expect(pending).rejects.toMatchObject({ name: "AbortError" });
@@ -311,12 +295,10 @@ describe("resource assertion at the API boundary", () => {
 		async (kind) => {
 			for (const status of [401, 403, 409, 503]) {
 				const scope = getResourceScope();
-				const result = await request(
-					new ApiClient({ fetch: async () => response("{}", A, status) }),
-					kind,
-				);
-				expect(result).toBeInstanceOf(ApiHttpError);
-				expect(result).toMatchObject({ status });
+				stubFetch(async () => response("{}", A, status));
+				const failure = await request(kind).catch((cause: unknown) => cause);
+				expect(failure).toBeInstanceOf(ApiHttpError);
+				expect(failure).toMatchObject({ status });
 				expect(getResourceScope()).toBe(scope);
 			}
 		},
@@ -325,7 +307,7 @@ describe("resource assertion at the API boundary", () => {
 	it.each(["json", "sse"] as const)(
 		"rechecks %s only after the server reports RESOURCE_CHANGED",
 		async (kind) => {
-			const fetcher = vi.fn<FetchLike>(async (_url, init) => {
+			const fetcher = stubFetch(async (_url, init) => {
 				expect(new Headers(init?.headers).get("Waypoint-Resource")).toBe(A);
 				return response(
 					JSON.stringify({ status: 409, code: "RESOURCE_CHANGED" }),
@@ -333,8 +315,7 @@ describe("resource assertion at the API boundary", () => {
 					409,
 				);
 			});
-			const result = await request(new ApiClient({ fetch: fetcher }), kind);
-			expect(result).toBeInstanceOf(ResourceScopeError);
+			await expect(request(kind)).rejects.toBeInstanceOf(ResourceScopeError);
 			expect(getResourceScope().status).toBe("pending");
 			expect(fetcher).toHaveBeenCalledOnce();
 		},
@@ -345,12 +326,14 @@ describe("resource assertion at the API boundary", () => {
 		async (resource) => {
 			const scope = getResourceScope();
 			const problem = { status: 409, detail: "That account already exists." };
-			const result = await new ApiClient({
-				fetch: async () => response(JSON.stringify(problem), resource, 409),
-			}).createAccount({} as never);
-			expect(result).toBeInstanceOf(ApiHttpError);
-			expect(result).toMatchObject({ status: 409, problem });
-			expect((result as ApiHttpError).message).toBe(
+			stubFetch(async () => response(JSON.stringify(problem), resource, 409));
+			const failure = await waypointFetch("/v1/accounts", {
+				method: "POST",
+				body: "{}",
+			}).catch((cause: unknown) => cause);
+			expect(failure).toBeInstanceOf(ApiHttpError);
+			expect(failure).toMatchObject({ status: 409, problem });
+			expect((failure as ApiHttpError).message).toBe(
 				"The request conflicts with the current server data. That account already exists.",
 			);
 			expect(getResourceScope()).toBe(scope);
@@ -359,27 +342,31 @@ describe("resource assertion at the API boundary", () => {
 
 	it("preserves a non-409 failure even with a resource-change code", async () => {
 		const scope = getResourceScope();
-		const result = await new ApiClient({
-			fetch: async () =>
-				response(
-					JSON.stringify({ status: 503, code: "RESOURCE_CHANGED" }),
-					A,
-					503,
-				),
-		}).getModel();
-		expect(result).toBeInstanceOf(ApiHttpError);
-		expect(result).toMatchObject({ status: 503 });
+		stubFetch(async () =>
+			response(
+				JSON.stringify({ status: 503, code: "RESOURCE_CHANGED" }),
+				A,
+				503,
+			),
+		);
+		const failure = await waypointFetch("/v1/financial-model", {
+			method: "GET",
+		}).catch((cause: unknown) => cause);
+		expect(failure).toBeInstanceOf(ApiHttpError);
+		expect(failure).toMatchObject({ status: 503 });
 		expect(getResourceScope()).toBe(scope);
 	});
 
 	it("preserves an operation conflict with another problem code", async () => {
 		const scope = getResourceScope();
 		const problem = { status: 409, code: "ID_CONFLICT" };
-		const result = await new ApiClient({
-			fetch: async () => response(JSON.stringify(problem), A, 409),
-		}).createAccount({} as never);
-		expect(result).toBeInstanceOf(ApiHttpError);
-		expect(result).toMatchObject({ status: 409, problem });
+		stubFetch(async () => response(JSON.stringify(problem), A, 409));
+		const failure = await waypointFetch("/v1/accounts", {
+			method: "POST",
+			body: "{}",
+		}).catch((cause: unknown) => cause);
+		expect(failure).toBeInstanceOf(ApiHttpError);
+		expect(failure).toMatchObject({ status: 409, problem });
 		expect(getResourceScope()).toBe(scope);
 	});
 

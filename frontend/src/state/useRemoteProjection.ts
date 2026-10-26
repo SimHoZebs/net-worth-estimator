@@ -4,8 +4,8 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { useMemo, useRef } from "react";
+import { projectDeterministic } from "../api/generated/endpoints.ts";
 import {
-	type ApiRequestOptions,
 	type DeterministicProjectionRequest,
 	type DeterministicProjectionResponse,
 	type EvaluationResultEnvelope,
@@ -18,7 +18,6 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { projectionMovements } from "../api/projectionMovements.ts";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
 import { ResourceScopeError } from "../api/scopedRequest.ts";
 import { dateLabel, money, percent } from "../domain/format.ts";
 import {
@@ -45,24 +44,12 @@ export { projectionStartDate } from "./projectionStartDate.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
 import { stochasticProjectionOptions } from "./stochasticProjectionQuery.ts";
 
-export interface RemoteProjectionClient {
-	projectDeterministic(
-		request: DeterministicProjectionRequest,
-		options?: ApiRequestOptions,
-	): Promise<Error | DeterministicProjectionResponse>;
-	projectStochastic(
-		request: StochasticProjectionRequest,
-		options?: ApiRequestOptions,
-	): Promise<Error | Response>;
-}
-
 export interface ProjectionDateRange {
 	startDate?: string;
 	endDate?: string;
 }
 
 export interface UseRemoteProjectionOptions {
-	client?: RemoteProjectionClient;
 	document?: FinancialModelDocument | null;
 	draftDocument?: FinancialModelDocument | null;
 	years?: number;
@@ -81,10 +68,7 @@ export interface UseRemoteProjectionOptions {
 const MISSING_DOCUMENT_MESSAGE =
 	"No server financial model is available for projection. Load or replace a model before calculating.";
 
-const defaultApiClient = defaultScopedApiClient;
-
 async function runDeterministic(
-	api: RemoteProjectionClient,
 	document: FinancialModelDocument,
 	years: number,
 	range: ProjectionDateRange,
@@ -94,10 +78,8 @@ async function runDeterministic(
 		...projectionRequest(document, years),
 		range,
 	};
-	const response = await api.projectDeterministic(request, {
-		signal,
-	});
-	if (response instanceof Error) throw response;
+	const response = (await projectDeterministic(request as never, { signal }))
+		.data as unknown as DeterministicProjectionResponse;
 	const responseError = projectionResponseError(response);
 	if (responseError) throw responseError;
 	if (!response.result)
@@ -659,7 +641,6 @@ function isAbortError(cause: unknown): boolean {
 }
 
 export function useRemoteProjection({
-	client,
 	document: documentOverride,
 	draftDocument: draftOverride,
 	years: yearsOverride,
@@ -668,7 +649,6 @@ export function useRemoteProjection({
 	dateRange: dateRangeOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
-	const api = useMemo(() => client ?? defaultApiClient(), [client]);
 	const { activeDocument, documentKey } = useProjectionDocument({
 		document: documentOverride,
 		draftDocument: draftOverride,
@@ -705,7 +685,7 @@ export function useRemoteProjection({
 			const current = activeDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
 			const range = effectiveRange ?? resolveProjectionRange(current, years);
-			return runDeterministic(api, current, years, range, signal)
+			return runDeterministic(current, years, range, signal)
 				.then((result) => {
 					dismissKey("projection");
 					return result;
@@ -758,7 +738,6 @@ export function useRemoteProjection({
 	const rangeQuery = useQuery(
 		stochasticProjectionOptions({
 			queryKey: rangeQueryKey,
-			api,
 			request: rangeRequest,
 			mapResult: stochasticResultToLocal,
 		}),

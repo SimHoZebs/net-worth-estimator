@@ -13,6 +13,7 @@ import {
 	resetWorkspaceStore,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
+import type { FinancialModelResponse } from "../api/index.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
 import { testPlan } from "../test/plan.ts";
 import { acceptTestResource } from "../test/resource.ts";
@@ -21,14 +22,16 @@ import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { usePlan } from "../state/useWorkspacePlan.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
+import { stubTestServer } from "../test/waypointServer.ts";
 
-vi.mock("../api/scopedClients.ts", () => ({
-	defaultScopedApiClient: () => ({
-		getStatus: async () => ({ readOnly: false }),
-		getModel: async () => ({ document: null, issues: [] }),
-		listAmountPresets: async () => ({ presets: [] }),
-	}),
-}));
+function stubWorkspaceFetch() {
+	const server = stubTestServer();
+	server.failModelOnce({
+		document: null,
+		issues: [],
+		revision: "r1",
+	} as unknown as FinancialModelResponse);
+}
 vi.mock("../workspace/useWorkspaceNavigation.ts", () => ({
 	useWorkspaceNavigation: vi.fn(() => ({})),
 }));
@@ -54,6 +57,7 @@ function Readout() {
 beforeEach(() => {
 	vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
 	acceptTestResource();
+	stubWorkspaceFetch();
 	resetServerQueryCache();
 	resetWorkspaceStore();
 	vi.clearAllMocks();

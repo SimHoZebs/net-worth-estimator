@@ -7,12 +7,49 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "./serverQuery.ts";
-import type { RemoteApiClient } from "./workspaceStore.ts";
+import {
+	acceptResourceScope,
+	canonicalApiBaseUrl,
+	getResourceScope,
+	suspendResourceScope,
+} from "../auth/resourceScope.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
+
+function stubSync(lastSyncAt = "after") {
+	const fetcher = vi.fn(async (url: unknown, _init?: RequestInit) => {
+		const headers = new Headers({ "content-type": "application/json" });
+		const resource = getResourceScope().resource?.id;
+		if (resource) headers.set("Waypoint-Resource", resource);
+		const path = String(url);
+		if (path.endsWith("/v1/status"))
+			return new Response(JSON.stringify({ readOnly: false, lastSyncAt }), {
+				headers,
+			});
+		return new Response(
+			JSON.stringify({ document: null, issues: [], revision: "r1" }),
+			{ headers },
+		);
+	});
+	vi.stubGlobal("fetch", fetcher);
+	return fetcher;
+}
+
+function statusFetches(fetcher: ReturnType<typeof vi.fn>) {
+	return fetcher.mock.calls.filter(([url]) =>
+		String(url).endsWith("/v1/status"),
+	);
+}
+
+function modelFetches(fetcher: ReturnType<typeof vi.fn>) {
+	return fetcher.mock.calls.filter(([url]) =>
+		String(url).endsWith("/v1/financial-model"),
+	);
+}
 
 beforeEach(() => {
 	acceptTestResource();
 	resetServerQueryCache();
+	vi.unstubAllGlobals();
 	Object.defineProperty(document, "visibilityState", {
 		configurable: true,
 		value: "visible",
@@ -23,43 +60,69 @@ afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 });
-function client(lastSyncAt = "after") {
-	return {
-		getStatus: vi.fn(async () => ({ readOnly: false, lastSyncAt })),
-		getModel: vi.fn(async () => ({ document: null, issues: [] })),
-		listAmountPresets: vi.fn(async () => ({ presets: [] })),
-	};
-}
 
 it("refreshes the model and invalidates only the current resource's financial calculations", async () => {
-	const api = client();
+	const fetcher = stubSync();
 	const key = deterministicQueryKey("document", 10);
 	serverQueryClient().setQueryData(key, "result");
 	serverQueryClient().setQueryData(["unrelated"], "keep");
-	renderHook(() => useWorkspaceSyncMonitor(api as unknown as RemoteApiClient));
+	renderHook(() => useWorkspaceSyncMonitor(true));
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	await waitFor(() => expect(api.getModel).toHaveBeenCalledOnce());
+	await waitFor(() => expect(modelFetches(fetcher)).toHaveLength(1));
 	expect(serverQueryClient().getQueryState(key)?.isInvalidated).toBe(true);
 	expect(serverQueryClient().getQueryState(["unrelated"])?.isInvalidated).toBe(
 		false,
 	);
 });
 
-it("does not reload an unchanged model", async () => {
-	const api = client("before");
-	renderHook(() => useWorkspaceSyncMonitor(api as unknown as RemoteApiClient));
+it("re-arms the poll after a plan switch", async () => {
+	const fetcher = stubSync();
+	const nextId = `plans/${"b".repeat(64)}`;
+	const rendered = renderHook(() => useWorkspaceSyncMonitor(true));
+	acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(""),
+			resource: {
+				id: nextId,
+				kind: "private",
+				permissions: ["plan:read", "plan:write", "plan:project"],
+			},
+			subject: nextId,
+		},
+		suspendResourceScope(),
+	);
+	rendered.rerender();
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	await waitFor(() => expect(api.getStatus).toHaveBeenCalledOnce());
-	expect(api.getModel).not.toHaveBeenCalled();
+	await waitFor(() =>
+		expect(
+			fetcher.mock.calls.filter(
+				([url, init]) =>
+					String(url).endsWith("/v1/status") &&
+					new Headers(init?.headers).get("Waypoint-Resource") === nextId,
+			),
+		).toHaveLength(1),
+	);
+	rendered.unmount();
+});
+
+it("does not reload an unchanged model", async () => {
+	const fetcher = stubSync("before");
+	renderHook(() => useWorkspaceSyncMonitor(true));
+	act(() => {
+		window.dispatchEvent(new Event("online"));
+	});
+	await waitFor(() => expect(statusFetches(fetcher)).toHaveLength(1));
+	expect(modelFetches(fetcher)).toHaveLength(0);
 });
 
 it("does not poll while Query owns a pending model mutation", async () => {
-	const api = client();
+	const fetcher = stubSync();
 	const cache = serverQueryClient();
 	let finish!: () => void;
 	const scope = acceptTestResource()!;
@@ -72,11 +135,13 @@ it("does not poll while Query owns a pending model mutation", async () => {
 	});
 	const pending = mutation.execute(undefined);
 	await waitFor(() => expect(finish).toBeDefined());
-	renderHook(() => useWorkspaceSyncMonitor(api as unknown as RemoteApiClient));
+	renderHook(() => useWorkspaceSyncMonitor(true));
 	act(() => {
 		window.dispatchEvent(new Event("online"));
 	});
-	expect(api.getStatus).not.toHaveBeenCalled();
+	await Promise.resolve();
+	await Promise.resolve();
+	expect(statusFetches(fetcher)).toHaveLength(0);
 	finish();
 	await pending;
 });

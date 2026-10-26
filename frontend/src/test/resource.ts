@@ -1,12 +1,13 @@
 import {
 	acceptResourceScope,
+	canonicalApiBaseUrl,
 	suspendResourceScope,
 } from "../auth/resourceScope.ts";
 
 export function acceptTestResource() {
 	return acceptResourceScope(
 		{
-			apiBaseUrl: "http://localhost",
+			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: "plans/test",
 				kind: "private",

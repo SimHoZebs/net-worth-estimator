@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useRef } from "react";
-import { Brand } from "../components/Brand.tsx";
-import { Button } from "../components/Button.tsx";
-import { redirectToSignIn } from "./navigation.ts";
-import { SessionContext } from "./sessionContext.ts";
-import { useResourceSession } from "./useResourceSession.ts";
+import { Brand } from "@/components/Brand.tsx";
+import { Button } from "@/components/Button.tsx";
+import { redirectToSignIn } from "@/auth/navigation.ts";
+import { SessionContext } from "@/auth/sessionContext.ts";
+import { useResourceSession } from "@/auth/useResourceSession.ts";
 
 export function AuthBoundary({ children }: { children: ReactNode }) {
 	const { session, error, refresh, phase, logout, logoutPending } =
@@ -32,20 +32,29 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 				{children}
 			</SessionContext>
 		);
+	// A first load with no verified session and a failed check names the
+	// failure instead of idling on the loading state. Retry is the action;
+	// sign-in stays hidden because it cannot succeed while the server is
+	// unreachable.
+	const failed = !session && error;
 	return (
 		<main className="mx-auto my-[12vh] max-w-2xl px-6">
 			<Brand />
 			<h1 className="mt-12 mb-4">
 				{session?.authenticated
 					? "Session access is unavailable"
-					: "Your plan. Your access."}
+					: failed
+						? "Cannot reach your plan"
+						: "Your plan. Your access."}
 			</h1>
 			<p className="mb-6 text-muted">
 				{session?.authenticated
 					? "Retry the access check, or sign out and sign in again."
 					: session
 						? "Redirecting for sign-in or account creation…"
-						: "Checking your session…"}
+						: error
+							? "Retry the access check below."
+							: "Checking your session…"}
 			</p>
 			{error && (
 				<p role="alert" className="mb-4 text-danger-text">

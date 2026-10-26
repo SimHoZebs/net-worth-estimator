@@ -1,33 +1,32 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
-import type { ApiClient } from "../api/index.ts";
-import { defaultScopedApiClient } from "../api/scopedClients.ts";
+import {
+	getPinnedEvaluations,
+	setPinnedEvaluations,
+} from "@/api/generated/endpoints.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
-} from "../auth/resourceScope.ts";
-import { dismissKey, notifyError } from "./notifications.ts";
-import { serverQueryClient } from "./serverQuery.ts";
+} from "@/auth/resourceScope.ts";
+import { dismissKey, notifyError } from "@/state/notifications.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
 
 export function pinnedEvaluationsKey() {
 	return ["pinned-evaluations", getResourceScope().key] as const;
 }
 
-function pinsOptions(client?: ApiClient) {
+function pinsOptions() {
 	const scope = getResourceScope();
 	return {
 		queryKey: pinnedEvaluationsKey(),
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
 			try {
-				const result = await (
-					client ?? defaultScopedApiClient()
-				).getPinnedEvaluations({ signal });
+				const data = (await getPinnedEvaluations({ signal })).data;
 				if (scope !== getResourceScope())
 					throw new Error("The active resource changed.");
-				if (result instanceof Error) throw result;
 				dismissKey("evaluation-pins");
-				return result.instanceIds;
+				return data.instanceIds ?? [];
 			} catch (error) {
 				if (scope === getResourceScope() && !signal.aborted)
 					notifyError(
@@ -37,7 +36,7 @@ function pinsOptions(client?: ApiClient) {
 							: "Pins could not be loaded.",
 						{
 							label: "Reload pins",
-							onAction: () => void refreshPins(client, true),
+							onAction: () => void refreshPins(true),
 						},
 					);
 				throw error;
@@ -46,12 +45,9 @@ function pinsOptions(client?: ApiClient) {
 	};
 }
 
-export async function refreshPins(
-	client?: ApiClient,
-	force = false,
-): Promise<void> {
+export async function refreshPins(force = false): Promise<void> {
 	if (getResourceScope().status === "pending") return;
-	const options = pinsOptions(client);
+	const options = pinsOptions();
 	try {
 		if (force)
 			await serverQueryClient().invalidateQueries({
@@ -64,10 +60,7 @@ export async function refreshPins(
 	}
 }
 
-export async function togglePin(
-	id: string,
-	client?: ApiClient,
-): Promise<boolean> {
+export async function togglePin(id: string): Promise<boolean> {
 	const scope = getResourceScope();
 	if (scope.status === "pending") return false;
 	const cache = serverQueryClient();
@@ -79,7 +72,7 @@ export async function togglePin(
 			if (scope !== getResourceScope())
 				throw new Error("The active resource changed.");
 			if (cache.getQueryData(key) === undefined)
-				await cache.fetchQuery(pinsOptions(client));
+				await cache.fetchQuery(pinsOptions());
 			if (scope !== getResourceScope())
 				throw new Error("The active resource changed.");
 			await cache.cancelQueries({ queryKey: key });
@@ -91,12 +84,9 @@ export async function togglePin(
 				: [...previous, id];
 			cache.setQueryData(key, next);
 			try {
-				const result = await (
-					client ?? defaultScopedApiClient()
-				).setPinnedEvaluations(next);
-				if (result instanceof Error) throw result;
+				const data = (await setPinnedEvaluations({ instanceIds: next })).data;
 				if (scope === getResourceScope())
-					cache.setQueryData(key, result.instanceIds);
+					cache.setQueryData(key, data.instanceIds ?? []);
 			} catch (error) {
 				if (scope === getResourceScope()) cache.setQueryData(key, previous);
 				throw error;
@@ -116,7 +106,7 @@ export async function togglePin(
 				error instanceof Error ? error.message : "Pins could not be saved.",
 				{
 					label: "Reload pins",
-					onAction: () => void refreshPins(client, true),
+					onAction: () => void refreshPins(true),
 				},
 			);
 		}

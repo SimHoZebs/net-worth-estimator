@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../test/resource.ts";
 import { testPlan } from "../test/plan.ts";
 import {
@@ -7,40 +7,36 @@ import {
 	workspaceResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
-import {
-	resetWorkspaceStore,
-	useWorkspaceStore,
-	type RemoteApiClient,
-} from "./workspaceStore.ts";
+import { resetWorkspaceStore, useWorkspaceStore } from "./workspaceStore.ts";
 import { setServerModelFixture } from "../test/workspace.ts";
-import type { FinancialModelResponse } from "../api/index.ts";
+import { stubTestServer } from "../test/waypointServer.ts";
 
 beforeEach(() => {
 	acceptTestResource();
 	resetWorkspaceStore();
 	resetServerQueryCache();
+	vi.unstubAllGlobals();
 });
 
-function client() {
-	return {
-		getModel: vi.fn(async (): Promise<FinancialModelResponse> => ({
-			document: null,
-			revision: "current",
-			issues: [],
-		})),
-		getStatus: vi.fn(async () => ({ readOnly: false })),
-	};
-}
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 describe("direct Query ownership", () => {
 	it("deduplicates reads without a workspace request engine", async () => {
-		const api = client();
-		const options = modelOptions(api as unknown as RemoteApiClient);
+		const server = stubTestServer();
+		server.setRevision("current");
+		const fetcher = server.fetcher;
+		const options = modelOptions();
 		await Promise.all([
 			serverQueryClient().fetchQuery(options),
 			serverQueryClient().fetchQuery(options),
 		]);
-		expect(api.getModel).toHaveBeenCalledOnce();
+		expect(
+			fetcher.mock.calls.filter(([url]) =>
+				String(url).endsWith("/v1/financial-model"),
+			),
+		).toHaveLength(1);
 		expect(getServerModel()?.revision).toBe("current");
 		expect(useWorkspaceStore.getState()).not.toHaveProperty("engine");
 		expect(useWorkspaceStore.getState()).not.toHaveProperty("loading");
@@ -62,22 +58,21 @@ describe("direct Query ownership", () => {
 		expect(useWorkspaceStore.getState().baseRevision).toBe("base");
 	});
 	it("does not let a canceled request overwrite a newer same-resource result", async () => {
-		const api = client();
-		let finish!: (response: FinancialModelResponse) => void;
-		api.getModel.mockImplementationOnce(
-			() =>
-				new Promise((resolve) => {
-					finish = resolve;
-				}),
-		);
-		const options = modelOptions(api as unknown as RemoteApiClient);
+		let finish!: (value: Response) => void;
+		const pending = new Promise<Response>((resolve) => {
+			finish = resolve;
+		});
+		const server = stubTestServer();
+		server.setRevision("current");
+		server.holdModel(pending);
+		const options = modelOptions();
 		const old = serverQueryClient()
 			.fetchQuery(options)
 			.catch((error: unknown) => error);
 		await serverQueryClient().cancelQueries({ queryKey: options.queryKey });
 		expect(await old).toBeInstanceOf(Error);
 		await serverQueryClient().fetchQuery(options);
-		finish({ document: null, revision: "retired", issues: [] });
+		finish(server.ok({ document: null, issues: [], revision: "retired" }));
 		await Promise.resolve();
 		expect(getServerModel()?.revision).toBe("current");
 	});

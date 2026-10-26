@@ -1,15 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
-import type { ApiRequestOptions } from "./client.ts";
-import { ApiHttpError } from "./client.ts";
-import { suspendResourceScope } from "../auth/resourceScope.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+	acceptResourceScope,
+	canonicalApiBaseUrl,
+	suspendResourceScope,
+} from "../auth/resourceScope.ts";
+import { ok } from "../test/fetch.ts";
+import { ApiHttpError, ApiNetworkError } from "./http.ts";
 import { ResourceScopeError } from "./scopedRequest.ts";
-import type {
-	BackendAccount,
-	FinancialModelDocument,
-	FinancialModelResponse,
-	RowWriteResponse,
-} from "./contracts.ts";
-import type { RowWriter } from "./rowSync.ts";
+import type { BackendAccount, FinancialModelDocument } from "./contracts.ts";
 import {
 	importServerModel,
 	ServerModelImportError,
@@ -46,54 +44,38 @@ const document: FinancialModelDocument = {
 	accounts: [account],
 };
 
-type FakeClient = {
-	getModel: (
-		options?: ApiRequestOptions,
-	) => Promise<Error | FinancialModelResponse>;
-} & { [K in keyof RowWriter]: RowWriter[K] };
-
-function rowResponse<T>(row: T): RowWriteResponse<T> {
+function rowResponse(row: unknown) {
 	return { row, issues: [], persisted: true, revision: "r1" };
 }
 
 function setup(
 	preconditions: Partial<ServerModelImportOptions["preconditions"]> = {},
 ) {
-	const getModel = vi.fn(async (): Promise<Error | FinancialModelResponse> => ({
-		document: emptyDocument,
-		issues: [],
-	}));
-	const echoRow = (row: unknown) => rowResponse(row);
-	const mocks = {
-		getModel,
-		createAccount: vi.fn(async (account: BackendAccount) => echoRow(account)),
-		updateAccount: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		deleteAccount: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		moveAccount: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		createPosting: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		updatePosting: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		deletePosting: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		movePosting: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		createRule: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		updateRule: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		deleteRule: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		moveRule: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		saveCheckpoint: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		deleteCheckpoint: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		createEvaluation: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		updateEvaluation: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		deleteEvaluation: vi.fn(async (..._args: unknown[]) => echoRow({})),
-		moveEvaluation: vi.fn(async (..._args: unknown[]) => echoRow({})),
-	};
-	const client = mocks as unknown as FakeClient;
-	const recover = vi
-		.fn<ServerModelImportOptions["recover"]>()
-		.mockResolvedValue(true);
-	const reload = vi
-		.fn<ServerModelImportOptions["reload"]>()
-		.mockResolvedValue(undefined);
+	acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(""),
+			resource: {
+				id: `plans/${"a".repeat(64)}`,
+				kind: "private",
+				permissions: ["plan:read", "plan:write", "plan:project"],
+			},
+			subject: "account-a",
+		},
+		suspendResourceScope(),
+	);
+	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
+		const path = String(url);
+		const method = init?.method ?? "GET";
+		if (path.endsWith("/v1/financial-model"))
+			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
+		if (method === "DELETE" || path.endsWith("/reorder"))
+			return ok({ revision: "r1" });
+		return ok(rowResponse(JSON.parse(String(init?.body ?? "{}"))));
+	});
+	vi.stubGlobal("fetch", fetcher);
+	const recover = vi.fn(async () => true);
+	const reload = vi.fn(async () => {});
 	const options: ServerModelImportOptions = {
-		client,
 		preconditions: {
 			hasWorkspace: true,
 			readOnly: false,
@@ -105,30 +87,44 @@ function setup(
 		reload,
 	};
 	return {
-		mocks,
+		fetcher,
 		recover,
 		reload,
 		run: () => importServerModel({ ...options, document }),
 	};
 }
 
+afterEach(() => {
+	suspendResourceScope();
+	vi.unstubAllGlobals();
+	vi.restoreAllMocks();
+});
+
 describe("server model replacement", () => {
 	it("does not start writes if the resource changes after the initial read", async () => {
-		const { run, mocks, reload } = setup();
-		mocks.getModel.mockImplementation(async () => {
+		const { run, fetcher, reload } = setup();
+		fetcher.mockImplementationOnce(async () => {
 			suspendResourceScope();
-			return { document: emptyDocument, issues: [] };
+			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
 		expect(await run()).toBeInstanceOf(ResourceScopeError);
-		expect(mocks.createAccount).not.toHaveBeenCalled();
+		expect(
+			fetcher.mock.calls.filter(([, init]) => init?.method === "POST"),
+		).toHaveLength(0);
 		expect(reload).not.toHaveBeenCalled();
 	});
 
 	it("does not reload a different resource after the last write", async () => {
-		const { run, mocks, reload } = setup();
-		mocks.createAccount.mockImplementation(async () => {
-			suspendResourceScope();
-			return rowResponse(account);
+		const { run, fetcher, reload } = setup();
+		fetcher.mockImplementation(async (url, init) => {
+			if (
+				String(url).endsWith("/v1/accounts") &&
+				(init?.method ?? "GET") === "POST"
+			) {
+				suspendResourceScope();
+				return ok(rowResponse(account));
+			}
+			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
 		expect(await run()).toBeInstanceOf(ResourceScopeError);
 		expect(reload).not.toHaveBeenCalled();
@@ -147,21 +143,26 @@ describe("server model replacement", () => {
 	])(
 		"returns a precondition error without uploading: %j",
 		async ({ preconditions }) => {
-			const { run, mocks: client, recover, reload } = setup(preconditions);
+			const { run, fetcher, recover, reload } = setup(preconditions);
 			const result = await run();
 			expect(result).toBeInstanceOf(ServerModelImportError);
-			expect(client.getModel).not.toHaveBeenCalled();
-			expect(client.createAccount).not.toHaveBeenCalled();
+			expect(fetcher).not.toHaveBeenCalled();
 			expect(recover).not.toHaveBeenCalled();
 			expect(reload).not.toHaveBeenCalled();
 		},
 	);
 
-	it("creates reviewed rows through the scoped session client, then reloads", async () => {
-		const { run, mocks: client, recover, reload } = setup();
+	it("creates reviewed rows through generated endpoints, then reloads", async () => {
+		const { run, fetcher, recover, reload } = setup();
 		expect(await run()).toBe(true);
-		expect(client.getModel).toHaveBeenCalledOnce();
-		expect(client.createAccount).toHaveBeenCalledExactlyOnceWith(account, {});
+		const posts = fetcher.mock.calls.filter(
+			([, init]) => (init?.method ?? "GET") === "POST",
+		);
+		expect(posts).toHaveLength(1);
+		expect(posts[0]?.[0]).toBe("/v1/accounts");
+		expect(JSON.parse(String(posts[0]?.[1]?.body))).toMatchObject({
+			id: "checking",
+		});
 		expect(reload).toHaveBeenCalledOnce();
 		expect(recover).not.toHaveBeenCalled();
 	});
@@ -183,44 +184,56 @@ describe("server model replacement", () => {
 	});
 
 	it.each([401, 403, 500])(
-		"propagates HTTP %i errors as values without a reload",
+		"propagates HTTP %i errors without a reload",
 		async (status) => {
-			const { run, mocks: client, reload } = setup();
-			const error = new ApiHttpError({ status, message: "Server response" });
-			client.getModel.mockResolvedValue(error);
-			expect(await run()).toBe(error);
+			const { run, fetcher, reload } = setup();
+			fetcher.mockImplementationOnce(async () =>
+				ok({ title: "Server response" }, status),
+			);
+			const result = await run();
+			expect(result).toBeInstanceOf(ApiHttpError);
+			expect(result).toMatchObject({ status });
 			expect(reload).not.toHaveBeenCalled();
 		},
 	);
 
-	it("propagates a network error without changing its message or identity", async () => {
-		const { run, mocks: client, reload } = setup();
+	it("wraps a network error in the shared taxonomy, preserving the cause", async () => {
+		const { run, fetcher, reload } = setup();
 		const error = new Error("Network unavailable");
-		client.getModel.mockResolvedValue(error);
-		expect(await run()).toBe(error);
+		fetcher.mockRejectedValueOnce(error);
+		const result = await run();
+		expect(result).toBeInstanceOf(ApiNetworkError);
+		expect((result as Error).cause).toBe(error);
 		expect(reload).not.toHaveBeenCalled();
 	});
 
 	it("reports only validation errors and keeps the existing model without reloading", async () => {
-		const { run, mocks: client, reload } = setup();
-		client.createAccount.mockResolvedValue({
-			row: account,
-			issues: [
-				{
-					severity: "error",
-					code: "account",
-					path: [],
-					message: "Account is missing.",
-				},
-				{
-					severity: "warning",
-					code: "age",
-					path: [],
-					message: "Checkpoint is old.",
-				},
-			],
-			persisted: false,
-			revision: "r1",
+		const { run, fetcher, reload } = setup();
+		fetcher.mockImplementation(async (url, init) => {
+			if (
+				String(url).endsWith("/v1/accounts") &&
+				(init?.method ?? "GET") === "POST"
+			)
+				return ok({
+					row: account,
+					issues: [
+						{
+							severity: "error",
+							code: "account",
+							path: [],
+							message: "Account is missing.",
+						},
+						{
+							severity: "warning",
+							code: "age",
+							path: [],
+							message: "Checkpoint is old.",
+						},
+					],
+					persisted: false,
+					revision: "r1",
+				});
+			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
 		const result = await run();
 		expect(result).toBeInstanceOf(ServerModelImportError);
@@ -229,19 +242,26 @@ describe("server model replacement", () => {
 	});
 
 	it("accepts warning-only rows and reloads", async () => {
-		const { run, mocks: client, reload } = setup();
-		client.createAccount.mockResolvedValue({
-			row: account,
-			issues: [
-				{
-					severity: "warning",
-					code: "age",
-					path: [],
-					message: "Checkpoint is old.",
-				},
-			],
-			persisted: true,
-			revision: "r1",
+		const { run, fetcher, reload } = setup();
+		fetcher.mockImplementation(async (url, init) => {
+			if (
+				String(url).endsWith("/v1/accounts") &&
+				(init?.method ?? "GET") === "POST"
+			)
+				return ok({
+					row: account,
+					issues: [
+						{
+							severity: "warning",
+							code: "age",
+							path: [],
+							message: "Checkpoint is old.",
+						},
+					],
+					persisted: true,
+					revision: "r1",
+				});
+			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
 		expect(await run()).toBe(true);
 		expect(reload).toHaveBeenCalledOnce();
@@ -259,7 +279,7 @@ describe("initial server model recovery", () => {
 	it.each([true, false])(
 		"delegates activation and returns %s without applying replacement guards",
 		async (activated) => {
-			const { run, recover, mocks, reload } = setup({
+			const { run, recover, fetcher, reload } = setup({
 				hasWorkspace: false,
 				readOnly: true,
 				hasDraft: true,
@@ -268,7 +288,7 @@ describe("initial server model recovery", () => {
 			recover.mockResolvedValue(activated);
 			expect(await run()).toBe(activated);
 			expect(recover).toHaveBeenCalledExactlyOnceWith(document);
-			expect(mocks.getModel).not.toHaveBeenCalled();
+			expect(fetcher).not.toHaveBeenCalled();
 			expect(reload).not.toHaveBeenCalled();
 		},
 	);
