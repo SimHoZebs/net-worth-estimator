@@ -37,7 +37,7 @@ func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization
 
 // Every unknown state-changing route requires write permission by default.
 func requestAction(r *http.Request) string {
-	if r.Method == http.MethodPost && (r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic") {
+	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic") {
 		return "plan:project"
 	}
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
