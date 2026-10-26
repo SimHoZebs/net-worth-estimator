@@ -166,6 +166,13 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	// streams pass through uncompressed with flushing intact.
 	router.Use(middleware.Compress(5, "application/json"))
 	config := huma.DefaultConfig("Net Worth Estimator API", "1.0.0")
+	// Registry naming must satisfy the OpenAPI Components key rule or code
+	// generators reject the served spec. Name at registration so every $ref
+	// stays consistent; wire schemas are unchanged.
+	if config.Components == nil {
+		config.Components = &huma.Components{}
+	}
+	config.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", waypointSchemaNamer)
 	api := humachi.New(router, config)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/v1/safe-spending-settings", Summary: "Load safe card spending settings"}, server.getSafeSpendingSettings)
 	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/v1/safe-spending-settings", Summary: "Save safe card spending settings"}, server.setSafeSpendingSettings)
