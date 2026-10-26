@@ -1,4 +1,8 @@
 import { useMemo, useState } from "react";
+import {
+	patchTemplateAmount,
+	templateFieldsFromAmount,
+} from "./amountDraft.ts";
 import type {
 	AmountTemplate,
 	JsonValue,
@@ -382,6 +386,7 @@ export function AmountBuilder({
 	initialTemplateId,
 	hidePicker,
 	fixedAmount,
+	initialAmount,
 	onChange,
 }: {
 	accounts: Option[];
@@ -390,16 +395,29 @@ export function AmountBuilder({
 	initialTemplateId?: string;
 	hidePicker?: boolean;
 	fixedAmount?: PostingAmountResolution;
+	initialAmount?: PostingAmountResolution;
 	onChange?: (amount: PostingAmountResolution) => void;
 }) {
 	const list = templates?.length ? templates : FALLBACK_TEMPLATES;
 	const [templateId, setTemplateId] = useState(initialTemplateId ?? "fixed");
 	const [fields, setFields] = useState<Record<string, string>>({});
 	const template = list.find((item) => item.id === templateId) ?? list[0]!;
-	const amount = useMemo(
-		() => fixedAmount ?? buildTemplateAmount(template.id, fields, accounts),
-		[fixedAmount, template.id, fields, accounts],
-	);
+	const source = initialAmount ?? template.amount ?? undefined;
+	const currentFields = {
+		...templateFieldsFromAmount(template.id, source),
+		...fields,
+	};
+	const amount = useMemo(() => {
+		if (fixedAmount) return fixedAmount;
+		const built = buildTemplateAmount(
+			template.id,
+			{ ...templateFieldsFromAmount(template.id, source), ...fields },
+			accounts,
+		);
+		return source
+			? patchTemplateAmount(template.id, source, built, fields)
+			: built;
+	}, [fixedAmount, source, template.id, fields, accounts]);
 	const plain = plainLanguageForAmount(amount);
 	const wire = JSON.stringify(amount, null, 2);
 	return (
@@ -435,7 +453,7 @@ export function AmountBuilder({
 						templateId={template.id}
 						accounts={accounts}
 						postings={postings}
-						fields={fields}
+						fields={currentFields}
 						onField={(key, value) =>
 							setFields((previous) => ({ ...previous, [key]: value }))
 						}

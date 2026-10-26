@@ -1,5 +1,6 @@
 import { LockKeyhole } from "lucide-react";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, type FormEvent } from "react";
+import { useEditDraft } from "../editors/useEditDraft.ts";
 import { money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { type Account, type Plan, validatePlan } from "../../domain/model.ts";
@@ -35,15 +36,24 @@ export function AccountDetails({
 	onApply: (plan: Plan) => boolean;
 }) {
 	const id = useId();
-	const [name, setName] = useState(account.name);
-	const [kind, setKind] = useState<Account["kind"]>(account.kind);
-	const [enabled, setEnabled] = useState(account.enabled);
-	const [balance, setBalance] = useState(String(account.balance));
-	const [minBalance, setMinBalance] = useState(String(account.minBalance));
-	const [maxBalance, setMaxBalance] = useState(
-		toAmountInput(account.maxBalance),
-	);
-	const [noCeiling, setNoCeiling] = useState(account.maxBalance === null);
+	const edit = useEditDraft(account.id, {
+		name: account.name,
+		kind: account.kind,
+		enabled: account.enabled,
+		balance: String(account.balance),
+		minBalance: String(account.minBalance),
+		maxBalance: toAmountInput(account.maxBalance),
+		noCeiling: account.maxBalance === null,
+	});
+	const { name, kind, enabled, balance, minBalance, maxBalance, noCeiling } =
+		edit.value;
+	const setName = (name: string) => edit.update({ name });
+	const setKind = (kind: Account["kind"]) => edit.update({ kind });
+	const setEnabled = (enabled: boolean) => edit.update({ enabled });
+	const setBalance = (balance: string) => edit.update({ balance });
+	const setMinBalance = (minBalance: string) => edit.update({ minBalance });
+	const setMaxBalance = (maxBalance: string) => edit.update({ maxBalance });
+	const setNoCeiling = (noCeiling: boolean) => edit.update({ noCeiling });
 
 	const readOnly = account.readOnly;
 
@@ -72,18 +82,18 @@ export function AccountDetails({
 			? `Balance limits from ${money(numbers.minValue)}, no upper limit`
 			: `Balance limits from ${money(numbers.minValue)} to ${money(numbers.maxValue)}`;
 
-	const dirty =
-		name !== account.name ||
-		kind !== account.kind ||
-		enabled !== account.enabled ||
-		balance !== String(account.balance) ||
-		minBalance !== String(account.minBalance) ||
-		toAmountInput(account.maxBalance) !== (noCeiling ? "" : maxBalance) ||
-		noCeiling !== (account.maxBalance === null);
+	const dirty = edit.dirty;
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
 		if (readOnly) return;
+		if (edit.conflict) {
+			notifyError(
+				"account-details",
+				"This account changed during your edit. Discard your edits before applying new changes.",
+			);
+			return;
+		}
 		dismissKey("account-details");
 		const trimmedName = name.trim();
 		const balanceValue = parseDisplayNumber(balance) ?? 0;
@@ -112,11 +122,19 @@ export function AccountDetails({
 			notifyError("account-details", validated.message);
 			return;
 		}
-		onApply(validated);
+		if (onApply(validated)) edit.reset();
 	};
 
 	return (
 		<form className="flex flex-col gap-4" onSubmit={submit}>
+			{edit.conflict && (
+				<Notice tone="danger">
+					This account changed during your edit.{" "}
+					<button type="button" onClick={edit.reset}>
+						Discard edits and use current values
+					</button>
+				</Notice>
+			)}
 			{readOnly && (
 				<Notice>
 					<LockKeyhole size={18} className="mt-px" aria-hidden="true" />

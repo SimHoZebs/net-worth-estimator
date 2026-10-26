@@ -1,8 +1,8 @@
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
-import type { AccountTransaction } from "../../../domain/accountActivity.ts";
-import type { Movement, Plan } from "../../../domain/model.ts";
+import type { Plan } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
 import {
 	TransactionSectionView,
 	SafeSpendingSectionHeader,
@@ -27,12 +27,10 @@ export function SafeSpendingCyclePanel({
 		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
 		[plan.movements],
 	);
-	const [selected, setSelected] = useState<{
-		transaction: AccountTransaction;
-		movement: Movement;
-	} | null>(null);
-	const inspect = (transaction: AccountTransaction, movement: Movement) =>
-		setSelected({ transaction, movement });
+	const { selected, inspect, close } = useTransactionSelection(
+		cycle.transactions,
+		movements,
+	);
 	return (
 		<div className="grid content-start gap-4">
 			<SafeSpendingSectionHeader
@@ -77,7 +75,7 @@ export function SafeSpendingCyclePanel({
 								)?.name ?? null)
 							: null
 					}
-					onClose={() => setSelected(null)}
+					onClose={close}
 				/>
 			)}
 		</div>

@@ -6,11 +6,10 @@ import {
 	defaultAccountViewFilters,
 	filterTransactions,
 } from "../../domain/accountActivity.ts";
-import type { Movement } from "../../domain/model.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { TablePagination } from "../DataTable.tsx";
-import { useSelectedEntry } from "../entrySelection.ts";
+import { useTransactionSelection } from "./useTransactionSelection.ts";
 import { EmptyState } from "../EmptyState.tsx";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
@@ -34,10 +33,6 @@ export function Transactions({
 		defaultAccountViewFilters,
 	);
 	const [page, setPage] = useState(0);
-	const [selected, setSelected] = useSelectedEntry<{
-		transaction: AccountTransaction;
-		movement: Movement;
-	}>(plan);
 	const id = useId();
 	const filtered = useMemo(
 		() =>
@@ -52,6 +47,10 @@ export function Transactions({
 	);
 	const movements = new Map(
 		plan.movements.map((movement) => [movement.id, movement]),
+	);
+	const { selected, inspect, close } = useTransactionSelection(
+		transactions,
+		movements,
 	);
 	const update = (change: Partial<ActivityFilters>) => {
 		setFilters((previous) => ({ ...previous, ...change }));
@@ -98,7 +97,7 @@ export function Transactions({
 								movement={movements.get(transaction.movementId) ?? null}
 								onEdit={() => {
 									const movement = movements.get(transaction.movementId);
-									if (movement) setSelected({ transaction, movement });
+									if (movement) inspect(transaction);
 								}}
 							/>
 						))}
@@ -123,7 +122,7 @@ export function Transactions({
 										)?.name ?? null)
 									: null
 							}
-							onClose={() => setSelected(null)}
+							onClose={close}
 						/>
 					)}
 				</>

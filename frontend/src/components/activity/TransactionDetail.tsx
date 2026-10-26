@@ -1,3 +1,4 @@
+import { useEditDraft } from "../editors/useEditDraft.ts";
 import {
 	ArrowDown,
 	ArrowDownLeft,
@@ -495,24 +496,14 @@ function useMovementEdit({
 	const [touched, setTouched] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [draft, setDraft] = useState<MovementDraft>(() =>
-		draftFromMovement(movement),
-	);
-	// The movement this draft was taken from. Switching to another
-	// transaction refreshes the draft on first edit instead of going stale.
-	const [draftForId, setDraftForId] = useState(movement.id);
+	const edit = useEditDraft(movement.id, draftFromMovement(movement));
+	const draft = edit.value;
 	const formId = useId();
 	const readOnlyReason = readOnlyReasonFor(movement);
 	useBeforeUnload(activeField !== null && touched);
 	const updateDraft = (patch: Partial<MovementDraft>, field: EditField) => {
 		if (readOnlyReason) return;
-		if (draftForId !== movement.id) {
-			const fresh = draftFromMovement(movement);
-			setDraft({ ...fresh, ...patch });
-			setDraftForId(movement.id);
-		} else {
-			setDraft((previous) => ({ ...previous, ...patch }));
-		}
+		edit.update(patch);
 		if (activeField !== field) setActiveField(field);
 		setTouched(true);
 		setError(null);
@@ -521,8 +512,7 @@ function useMovementEdit({
 	// Discard restores the read view with the movement's own values.
 	const exitEdit = () => {
 		const field = activeField;
-		setDraft(draftFromMovement(movement));
-		setDraftForId(movement.id);
+		edit.reset();
 		setActiveField(null);
 		setTouched(false);
 		setError(null);
@@ -546,6 +536,12 @@ function useMovementEdit({
 		event.preventDefault();
 		if (readOnlyReason) return;
 		const data = new FormData();
+		if (edit.conflict) {
+			setError(
+				"This transaction changed during your edit. Discard your edits and try again.",
+			);
+			return;
+		}
 		data.append("name", draft.name);
 		data.append("amount", draft.amount);
 		data.append("fromId", draft.fromId);
