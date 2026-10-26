@@ -39,23 +39,47 @@ export function stochasticQueryKey(
 	];
 }
 
+export function currentPositionQueryKey(
+	documentKey: string,
+	asOfDate: string,
+): readonly unknown[] {
+	return ["current-position", getResourceScope().key, documentKey, asOfDate];
+}
+
+const FINANCIAL_QUERY_KINDS = [
+	"deterministic-projection",
+	"stochastic-projection",
+	"current-position",
+] as const;
+
 let shared: QueryClient | null = null;
 
 export function serverQueryClient(): QueryClient {
-	if (!shared)
+	if (!shared) {
 		shared = new QueryClient({
 			defaultOptions: {
 				queries: {
 					// Failures surface immediately through hook error state;
 					// framework retries would only delay the notices.
 					retry: false,
-					staleTime: 60_000,
 					gcTime: 600_000,
 					refetchOnWindowFocus: false,
 				},
 			},
 		});
+		// Calculations change with their keyed inputs, not elapsed time.
+		for (const kind of FINANCIAL_QUERY_KINDS)
+			shared.setQueryDefaults([kind], { staleTime: Infinity });
+	}
 	return shared;
+}
+
+export function financialQueryFilter(scopeKey: string) {
+	return {
+		predicate: (query: { queryKey: readonly unknown[] }) =>
+			query.queryKey[1] === scopeKey &&
+			FINANCIAL_QUERY_KINDS.some((kind) => kind === query.queryKey[0]),
+	};
 }
 
 /** Test hook: keeps cached server state from leaking between cases. */

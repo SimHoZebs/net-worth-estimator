@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	acceptResourceScope,
 	suspendResourceScope,
@@ -10,6 +10,8 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 	stochasticQueryKey,
+	currentPositionQueryKey,
+	financialQueryFilter,
 } from "./serverQuery.ts";
 
 function owner(id: string) {
@@ -33,6 +35,48 @@ afterEach(() => {
 });
 
 describe("resource-scoped projection cache", () => {
+	it("filters calculations by resource without matching session data", () => {
+		owner("plans/a");
+		const keys = [
+			deterministicQueryKey("doc", 10),
+			stochasticQueryKey("doc", 10, 100, 42, 0),
+			currentPositionQueryKey("doc", "2026-01-01"),
+		];
+		const filter = financialQueryFilter(keys[0]![1] as string);
+		for (const queryKey of keys)
+			expect(filter.predicate({ queryKey })).toBe(true);
+		expect(filter.predicate({ queryKey: ["session"] })).toBe(false);
+		owner("plans/b");
+		for (const queryKey of [
+			deterministicQueryKey("doc", 10),
+			stochasticQueryKey("doc", 10, 100, 42, 0),
+			currentPositionQueryKey("doc", "2026-01-01"),
+		])
+			expect(filter.predicate({ queryKey })).toBe(false);
+	});
+	it("keeps calculations fresh beyond a minute but supports explicit invalidation", async () => {
+		owner("plans/a");
+		const client = serverQueryClient();
+		for (const queryKey of [
+			deterministicQueryKey("doc", 10),
+			stochasticQueryKey("doc", 10, 100, 42, 0),
+			currentPositionQueryKey("doc", "2026-01-01"),
+		]) {
+			client.setQueryData(queryKey, "cached", {
+				updatedAt: Date.now() - 120_000,
+			});
+			const queryFn = vi.fn().mockResolvedValue("fresh");
+			expect(await client.fetchQuery({ queryKey, queryFn })).toBe("cached");
+			expect(queryFn).not.toHaveBeenCalled();
+			await client.invalidateQueries({
+				queryKey,
+				exact: true,
+				refetchType: "none",
+			});
+			expect(await client.fetchQuery({ queryKey, queryFn })).toBe("fresh");
+			expect(queryFn).toHaveBeenCalledOnce();
+		}
+	});
 	it("never reuses identical deterministic or stochastic inputs across accounts", () => {
 		owner("plans/a");
 		const deterministicA = deterministicQueryKey("same-document", 10);
