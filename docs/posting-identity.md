@@ -17,7 +17,7 @@ creation and preserves it on owner edits and display moves. The upgrade captures
 the previous execution sequence before it changes IDs. Historical replay,
 deterministic projections, and financial-independence branches share this order.
 
-`posting_sync_keys` maps an exact `(provider, account_id, transaction_id)` tuple
+Within one plan, `posting_sync_keys` maps an exact `(provider, account_id, transaction_id)` tuple
 to a local posting UUID. `account_id` is the provider account key, not a sanitized
 model identifier. A primary-key constraint makes repeated deliveries idempotent.
 Different raw keys such as `a/b`, `a b`, and `a_b` remain distinct. These private
@@ -34,8 +34,10 @@ Published guest snapshots omit the private keys and migration audit history.
 
 ## One-way schema upgrade
 
-`store.Open` applies `posting-uuid-and-pending-v1` once, inside its schema
-transaction. The upgrade supports the immediately preceding postings schema.
+The legacy single-plan schema upgrade applies `posting-uuid-and-pending-v1`
+once. It supports the immediately preceding postings schema. Current runtime
+storage is plan-scoped in one shared database. Legacy files require the
+[offline migration procedure](shared-database.md), not a runtime file merge.
 
 It performs these operations before it records completion:
 

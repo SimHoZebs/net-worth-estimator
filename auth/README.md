@@ -23,6 +23,9 @@ export NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT="$(
   node --input-type=module -e \
     'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).subject)'
 )"
+docker compose --env-file auth/casdoor/.env build backend
+docker compose --env-file auth/casdoor/.env run --rm --no-deps \
+  --entrypoint /app/setupdb backend --db /data/net-worth-estimator.db
 docker compose --env-file auth/casdoor/.env up -d --build
 ```
 
@@ -31,6 +34,10 @@ Never run two Casdoor processes against one SQLite directory. Keep the verified
 primary-data owner in private deployment configuration. Remove the retired
 `NET_WORTH_ESTIMATOR_AUTH_TOKEN` setting. Both dev and production require Casdoor;
 the server rejects token-only and unauthenticated configurations.
+
+`setupdb` is an explicit deployment step. Existing legacy per-plan data requires
+[offline migration](../docs/shared-database.md) before startup. The API never
+creates or repairs its application database. Repeat setup preserves current data.
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
 public issuer and Host. The browser uses the public Casdoor URL. The frontend and
@@ -47,6 +54,7 @@ Override its name or use a separate bind mount for disposable tests.
 - Each verified account automatically owns its own private plan. Signup has no
   role choice or subject-grant step. Existing primary data needs an explicit owner.
 - Casdoor's built-in Casbin API checks roles, actions, and plan resources.
+- One application SQLite database holds all plans and application sessions.
 - Account data, artifacts, sync state, and browser drafts remain plan-scoped.
 - Provider administrator status never grants access to another account's plan.
 - Application sessions persist across browser and API restarts, with a seven-day
@@ -99,8 +107,8 @@ node auth/test-integration.mjs
 ```
 
 The script requires `CASDOOR_TEST_MUTATIONS=1` and a marked disposable identity
-fixture. It owns separate temporary owner, sample, and second-user financial
-stores. It verifies Casdoor permissions, CSRF, restart persistence, projections,
+fixture. It owns one temporary database with owner, sample, and second-user
+plans. It verifies Casdoor permissions, CSRF, restart persistence, projections,
 cross-account isolation, logout, and captured-cookie rejection. It refuses an
 occupied application port. Retained browser profiles contain credentials.
 

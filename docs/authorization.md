@@ -25,8 +25,8 @@ The resource ID derives from the exact OIDC issuer and immutable subject, not
 the display name, username, email, or browser input. A new account starts with
 an editable blank private plan with no import or administrator approval step.
 The plan router activates the empty model on first access. Initialization never
-replaces existing financial rows. An explicitly assigned existing owner retains
-the primary financial database. There is no first-login claim of existing data.
+replaces existing financial rows. Offline migration assigns existing data to its
+verified owner. There is no first-login claim of existing data.
 
 Casdoor stores the model, roles, and action/resource rules in its SQLite state.
 The backend submits server-derived identity, resource, ownership, and action
@@ -35,17 +35,21 @@ fail closed. Positive permission decisions do not have an application cache.
 
 ## Data isolation
 
-Each private plan uses a separate SQLite store under `NET_WORTH_ESTIMATOR_PLANS_DIR`.
-The existing `NET_WORTH_ESTIMATOR_DB` remains the primary owner's store. Its owner
-must be assigned with `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` before an
-authenticated server can serve existing financial data.
+`NET_WORTH_ESTIMATOR_DB` names one shared application database. `app_accounts`
+records verified issuer/subject identities. Each private `plans` row references
+its owning application account. Financial `accounts` are separate model entities.
 
-The public sample uses a separate `NET_WORTH_ESTIMATOR_SAMPLE_DB`. It must not
-alias the primary database. Private plan paths use validated opaque IDs, not
-user-controlled path segments. New files use `0600` inside a `0700` directory.
+Every financial table carries `plan_id`. Keys, uniqueness rules, foreign keys,
+ordering, bulk replacement, sync, and artifact retention stay inside that plan.
+The database owns the connection. A scoped store holds one immutable plan ID.
+No plan-facing operation has an unscoped fallback.
+
+The public sample is the explicitly published `plans/sample` row in that same
+database. Its ownership is absent and its API is read-only. An absent sample
+grants guests no financial access. Private data never becomes a fallback sample.
 
 All API operations receive the store for the authorized resource. A guessed row
-ID in another plan cannot select another store. Projection artifact identities
+ID in another plan cannot select another plan. Projection artifact identities
 and seeded in-flight runs also include the resource ID. Server-level SimpleFIN
 credentials remain attached only to the explicitly assigned primary owner.
 Other accounts and the sample never inherit that integration.
@@ -92,12 +96,16 @@ unauthenticated server configurations fail closed at startup.
 
 Before an existing authenticated deployment starts the new code:
 
-1. Back up financial data and the whole Casdoor identity state.
-2. Assign the existing financial database to its verified owner subject.
-3. Install the reviewed Casdoor model, roles, and permissions.
-4. Publish a separate sample snapshot only after approval of its contents.
-5. Configure the sample path and private-plan directory.
+1. Stop API writes and sync. Back up every legacy database and Casdoor state.
+2. Map each source database to its verified owner or approved sample resource.
+3. Run the explicit offline migration into a new shared application database.
+4. Validate the migration report before switching `NET_WORTH_ESTIMATOR_DB`.
+5. Retain the existing Casdoor issuer, subjects, model, roles, and permissions.
 6. Verify guest, owner, second-account, denial, and provider-outage cases.
+
+See [the shared database migration guide](shared-database.md) for the manifest,
+validation, backup, and rollback procedure. Runtime startup rejects legacy
+unscoped financial databases. It never merges files or guesses an owner.
 
 No source update automatically publishes private data or changes live Casdoor
 permissions. Existing reader/editor environment lists no longer define access.

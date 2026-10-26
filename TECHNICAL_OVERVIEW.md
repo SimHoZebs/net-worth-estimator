@@ -1,6 +1,6 @@
 # Technical Overview: Net Worth Estimator Backend
 
-The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract and stores canonical data, sync-owned rows, completed projection artifacts, and saved amount presets in SQLite.
+The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds plan-scoped financial data and application identity state.
 
 `PRODUCT_INTENT.md` defines the product experience. This document defines only the current Go contracts and domain behavior.
 
@@ -24,6 +24,23 @@ Store interface backed by SQLite
 - `internal/types` defines the JSON and domain values shared across those layers.
 
 The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ordinary recurrence rules chained by priority and model-value references: gross pay, pre-tax contributions, employer match, and progressive-bracket tax are separate rules, not a separate income pipeline.
+
+### Shared persistence and ownership
+
+`store.Database` owns the shared connection. Each financial store holds one
+immutable plan ID. The plan router creates that scope only after Casdoor verifies
+access. `app_accounts` identifies users by immutable issuer and subject. Private
+`plans` rows reference their owner. Financial `accounts` remain model entities.
+
+Every financial table includes `plan_id`. Entity IDs and unique names can repeat
+between plans. Relational references use composite plan/entity keys. JSON model
+references validate against the scoped document. Imports, deletes, ordering,
+sync state, default presets, and artifact eviction operate within one plan.
+
+Application sessions, provider grants, and logout records use global identity
+tables in the same database. Financial operations never clear those tables.
+Casdoor retains its own external provider database. Legacy per-plan files require
+[explicit offline migration](docs/shared-database.md).
 
 ## 2. HTTP Contracts
 
@@ -178,34 +195,53 @@ The kill switch rejects those writes with 403. Guests can read and project only 
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`store.Open` returns the interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior.
+`Database.Plan` returns the scoped interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior. `store.Open` remains an isolated fixture helper, not the runtime constructor.
 
 ### SQLite setup
 
-`store.Open(path)` opens the pure-Go SQLite driver and sets:
+`store.SetupDatabase(path)` owns explicit deployment schema setup. `cmd/setupdb`
+creates its private parent directory. Migration and fixture provisioning also call
+this setup constructor explicitly. Setup includes every identity table and index
+and selects WAL journal mode.
 
-- WAL journal mode;
+`store.OpenDatabase(path)` requires an existing complete schema. It opens the
+pure-Go SQLite driver with `mode=rw` and sets:
+
 - foreign keys;
 - a 5-second busy timeout;
 - one open connection.
 
-The posting identity upgrade is transactional and forward-only. Completed upgrades
-are recorded in `schema_migrations`. Restore a database backup before a downgrade.
+Runtime startup creates no database directories, database files, tables, or
+indexes. It validates schema compatibility and fails closed if setup is absent.
+Identity initialization also validates its tables without DDL. SQLite can create
+normal WAL/SHM sidecars during operation.
+
+Schema changes are transactional and forward-only. Completed upgrades are recorded
+in `schema_migrations`. Legacy unscoped databases require explicit offline migration.
+Restore a database backup before a downgrade.
 
 The current schema stores:
 
 | Table                  | Purpose                                                                                                       |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `sessions`             | global application sessions with hashed tokens, opaque data, and expiry                                       |
+| `identity_grants`      | global provider grants and token credentials, bound to issuer and subject                                     |
+| `identity_logout_marks` | global revocation markers that block delayed callbacks and stale grants                                      |
+| `identity_logout_tokens` | global signed logout token replay records                                                                  |
+| `app_accounts`         | verified application account identities, unique by issuer and subject                                        |
+| `plans`                | private owner relationship or explicitly published guest sample                                             |
 | `model_metadata`       | source path and document-present flag                                                                         |
 | `accounts`             | ordered account definitions                                                                                   |
 | `checkpoints`          | ordered balance observations, unique by account/date, with owner                                              |
 | `postings`             | ordered UUID posting definitions with owner and explicit pending state                                         |
+| `purchase_policies`    | plan-scoped purchase priorities attached to posting identities                                                |
 | `recurrence_rules`     | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`        | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
-| `evaluations`          | type, globally keyed instance ID, order, label, enablement, and JSON config                                   |
+| `evaluations`          | type, plan-scoped instance ID, order, label, enablement, and JSON config                                      |
 | `entity_ids`           | shared ID registry across accounts, postings, rules, and evaluations                                          |
 | `account_links`        | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
 | `pinned_evaluations`   | ordered pinned evaluation instance IDs                                                                        |
+| `safe_spending_settings` | plan-scoped safe-spending preferences                                                                      |
 | `sync_state`           | last successful sync completion time                                                                          |
 | `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`       | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
@@ -215,9 +251,9 @@ The current schema stores:
 
 ### First boot and import
 
-`cmd/server` calls `DocumentExists` and logs a notice when no model is stored; onboarding is an explicit import through Configs or `cmd/importcsv`. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces model state in one transaction.
+The authenticated plan router initializes a blank private plan on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected plan's model state in one transaction.
 
-`cmd/importcsv` deliberately invokes the same import path for operator-controlled replacement of an existing database.
+`cmd/importcsv` requires both an existing shared database and an explicit existing plan resource ID. It invokes the same import path for operator-controlled replacement within that plan.
 
 ### Row writes and ownership
 
@@ -235,14 +271,16 @@ Amount presets are saved amount recipes managed through `GET /v1/amount-presets`
 
 ### Posting identity upgrade
 
-`store.Open` upgrades the preceding schema in one transaction. It converts every
+The previous release's single-plan upgrade converts every
 non-UUID posting ID, rewrites amount/evaluation/preset references, preserves row
 display order, equal-time execution order, and purchase policies, and removes derived simulation results. Account
-and recurrence-rule IDs remain unchanged. See [the migration contract](docs/posting-identity.md).
+and recurrence-rule IDs remain unchanged. The shared database importer requires
+that compatible source schema. Upgrade older backups with the previous release
+before the offline shared migration. See [the migration contract](docs/posting-identity.md).
 
 ### Artifact durability
 
-Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. The table is bounded to 256 rows across both kinds; the oldest rows are evicted after insertion.
+Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. Each plan retains at most 256 rows across both kinds. Insertion evicts only that plan's oldest rows.
 
 Result writes are best-effort. A malformed stored payload is unavailable for retrieval. A storage failure does not prevent the requested simulation from execution.
 
@@ -518,7 +556,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and result storage |
 | `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization       |
 | `backend/internal/api/artifacts.go`                 | simulation result identity and storage helpers   |
-| `backend/internal/store/store.go`                   | `Store`, `store.Open`, migrations                |
+| `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle |
 | `backend/internal/store/model.go`                   | seed/import replacement and ordered reload       |
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning       |
 | `backend/internal/store/sync.go`                    | sync application and pending snapshot            |

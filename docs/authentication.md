@@ -11,10 +11,14 @@ The Go API verifies OIDC signature, issuer, audience, nonce, state, PKCE, and an
 access-token hash binding. It uses SCS for durable application sessions. Cookies
 are HttpOnly and SameSite=Lax. HTTPS adds Secure and the `__Host-` prefix.
 
-The private identity database defaults to `<financial-db>.sessions`. It stores
-hashed application-session IDs, provider grants, and logout replay records.
+The shared application database stores hashed application-session IDs, provider
+grants, and logout replay records alongside plan-scoped financial data.
 Provider grants contain access, refresh, and ID tokens. SCS sessions hold only
-opaque grant references. Protect this database as a credential store.
+opaque grant references. Protect the whole application database as a credential store.
+
+Deployment `setupdb` creates all application identity tables before the API starts.
+Identity initialization never creates tables or opens a new session database.
+Missing schema stops startup. See [database setup](shared-database.md#initial-deployment-and-schema-setup).
 
 Casdoor's built-in Casbin system grants actions on plan resources. Guests can
 read and project only a separate published sample. Each signed-in account can
@@ -39,12 +43,10 @@ The default signup form does not collect email or require a mail service.
 | `NET_WORTH_ESTIMATOR_PUBLIC_URL` | Frontend origin, without a path |
 | `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL` | Optional account/passkey page on the issuer origin |
 | `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/plan-access` |
-| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` | Verified owner of the existing primary financial database |
-| `NET_WORTH_ESTIMATOR_PLANS_DIR` | Private per-account database directory, default `<financial-db>.plans` |
-| `NET_WORTH_ESTIMATOR_SAMPLE_DB` | Separate, explicitly published read-only guest sample database |
+| `NET_WORTH_ESTIMATOR_DB` | Shared application database for financial plans and application identity state |
+| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` | Verified account whose plan may use server-level SimpleFIN credentials |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h` |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m` |
-| `NET_WORTH_ESTIMATOR_AUTH_SESSION_DB` | Optional identity/session database path |
 
 Register the callback `<PUBLIC_URL>/v1/auth/callback` and post-logout redirect
 `<PUBLIC_URL>/`. Configure Casdoor for code plus refresh grants, PKCE S256,
@@ -68,7 +70,7 @@ session cookies and strips caller-supplied Authorization headers.
 The isolated `cmd/fixtureapi` browser-test harness intentionally omits identity.
 That executable is not a supported deployment or manual-development entry point.
 
-Assign existing primary data to its verified owner before migration. New
+Assign every legacy private database to its verified owner during offline migration. New
 accounts receive their own empty private plan. Casdoor owns action/resource
 policies. Retired `AUTH_READERS`/`AUTH_EDITORS` lists do not grant plan access.
 
@@ -200,11 +202,13 @@ secret if that secret leaks. Restore service only after both sides use it.
 
 ## Backups and restore
 
-Back up financial SQLite data, Casdoor's whole state directory, and private
+Back up the shared application database, Casdoor's whole state directory, and private
 deployment configuration. Casdoor state includes signing keys and persistent
 file sessions. Use a stopped service or SQLite-safe backup method. Copying only
-an active database file can omit WAL data. Keep the identity/session database
-separate from financial imports and public assets.
+an active database file can omit WAL data. The application backup contains
+provider credentials and private data for all accounts. Never publish it as a sample.
+Financial imports and dev refresh replace one plan only. They preserve application
+sessions, grants, logout records, and every other plan.
 
 Restore to the same issuer hostname and preserve generated subjects. Passkeys
 bind to that hostname. A new identity database or issuer needs an explicit plan
