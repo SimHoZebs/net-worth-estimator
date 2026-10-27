@@ -21,8 +21,8 @@ import { useSelectedId } from "../entrySelection.ts";
 
 type StatusFilter = "all" | "pending" | "posted";
 
-/** Rows per transaction page. Matches the previous 60-row cap. */
-const PAGE_SIZE = 60;
+/** Rows per transaction page. */
+const PAGE_SIZE = 20;
 
 const postingFilter = cva(
 	"rounded-control border-0 px-2 py-1 text-xs whitespace-nowrap capitalize",
