@@ -75,7 +75,7 @@ export function FundingGapsCard({
 		<>
 			<section
 				className={mergeStyles(
-					"relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border p-5 text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm print:break-inside-avoid",
+					"relative flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 rounded-surface border p-5 text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm print:break-inside-avoid",
 					stateContainer,
 				)}
 				aria-labelledby={headingId}
