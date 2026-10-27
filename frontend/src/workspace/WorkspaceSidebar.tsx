@@ -1,17 +1,61 @@
-import { LockKeyhole, PanelLeftClose, Settings } from "lucide-react";
+import { PanelLeftClose, Settings } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import type { ReactNode } from "react";
 import { SessionAccountControl } from "../auth/SessionAccountControl.tsx";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton } from "../components/Button.tsx";
 import { Skeleton } from "../components/Skeleton.tsx";
-import { useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import { mergeStyles } from "../components/mergeStyles.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
-import { navigationLinkClassName } from "./navigationStyles.ts";
+import {
+	navigationActiveSquareClassName,
+	navigationLinkClassName,
+} from "./navigationStyles.ts";
 
-function workspaceStatusLabel({ readOnly }: { readOnly: boolean }) {
-	return readOnly ? "Read-only" : "Workspace";
+function SidebarNavLink({
+	href,
+	active,
+	onClose,
+	children,
+}: {
+	href: string;
+	active: boolean;
+	onClose: () => void;
+	children: ReactNode;
+}) {
+	const reduceMotion = useReducedMotion();
+	return (
+		<a
+			className={mergeStyles(
+				navigationLinkClassName,
+				reduceMotion && active ? "bg-active" : undefined,
+			)}
+			href={href}
+			onClick={onClose}
+			aria-current={active ? "page" : undefined}
+		>
+			{active && !reduceMotion && (
+				<motion.span
+					layoutId="workspace-nav-active"
+					aria-hidden="true"
+					className={navigationActiveSquareClassName}
+					initial={false}
+					transition={{ type: "spring", stiffness: 550, damping: 40 }}
+				/>
+			)}
+			{/* Content stays above the pill: the pill is owned by the newly
+				active link, so while it travels it overlaps sibling rows. A
+				positive z-index keeps every row's text above it for the whole
+				flight; without this the pill covers the previous tab's text on
+				its way out. */}
+			<span className="relative z-10 flex min-w-0 items-center gap-3">
+				{children}
+			</span>
+		</a>
+	);
 }
 
 export function WorkspaceSidebar({
@@ -25,8 +69,6 @@ export function WorkspaceSidebar({
 }) {
 	// Plan display values subscribe here so navigation never waits on props.
 	const status = useServerStatus().data;
-	const readOnly = useWorkspaceReadOnly();
-	const statusLabel = workspaceStatusLabel({ readOnly });
 	return (
 		<>
 			<div className="flex items-center justify-between px-2">
@@ -46,42 +88,30 @@ export function WorkspaceSidebar({
 							.filter((item) => item.id !== "sources" && item.id !== "account")
 							.map((item) => (
 								<li key={item.id}>
-									<a
-										className={navigationLinkClassName}
+									<SidebarNavLink
 										href={`#${item.id}`}
-										onClick={onClose}
-										aria-current={page === item.id ? "page" : undefined}
+										onClose={onClose}
+										active={page === item.id}
 									>
 										<item.icon size={19} strokeWidth={1.7} />
 										<span>{item.label}</span>
-									</a>
+									</SidebarNavLink>
 								</li>
 							))}
 					</ul>
 				</nav>
 			</div>
 			<div className="mt-auto pt-12 max-md:pt-8">
-				<a
-					className={navigationLinkClassName}
+				<SidebarNavLink
 					href="#sources"
-					onClick={onClose}
-					aria-current={page === "sources" ? "page" : undefined}
+					onClose={onClose}
+					active={page === "sources"}
 				>
 					<Settings size={19} strokeWidth={1.7} />
 					<span>Configs</span>
-				</a>
+				</SidebarNavLink>
 				<ThemeToggle />
-				<div className="mt-4 flex items-center gap-2 border-0 border-t border-solid border-line px-2 pt-5 pb-1 text-xs text-muted">
-					<span className="size-1.5 rounded-full bg-primary" />
-					{pending ? (
-						<Skeleton className="h-3 w-20" />
-					) : (
-						<>
-							{statusLabel} <LockKeyhole size={12} className="ml-auto" />
-						</>
-					)}
-				</div>
-				<div className="px-2 pb-5 text-xs leading-relaxed text-muted">
+				<div className="mt-4 border-0 border-t border-solid border-line pt-3 pb-4 text-xs leading-relaxed text-muted">
 					{pending ? (
 						<Skeleton className="h-3 w-28" />
 					) : (
