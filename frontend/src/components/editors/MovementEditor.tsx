@@ -172,8 +172,8 @@ export function MovementFormFields({
 							{templates.some((template) => template.id === amountKind) ? (
 								<>
 									<strong>{templateForKind.label}.</strong>{" "}
-									{templateForKind.summary} Builds exact values in Configs → How
-									amounts are calculated. This entry stays as Varies.
+									{templateForKind.summary} Builds exact values in Configs →
+									Amounts. This entry stays as Varies.
 								</>
 							) : (
 								<>

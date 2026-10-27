@@ -7,13 +7,47 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
+import { redirectToSignIn } from "@/auth/navigation.ts";
+import { useSession } from "@/auth/sessionContext.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
 import { resetServerQueryCache } from "@/state/serverQuery.ts";
-import { redirectToSignIn } from "@/auth/navigation.ts";
-import { SessionAccountControl } from "@/auth/SessionAccountControl.tsx";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
+
+function SessionProbe() {
+	const account = useSession();
+	if (!account?.session.allowed) return null;
+	const { session, logout, logoutPending } = account;
+	if (!session.authenticated)
+		return (
+			<div>
+				<p>Guest</p>
+				<button
+					type="button"
+					onClick={() => {
+						redirectToSignIn();
+					}}
+				>
+					Sign in
+				</button>
+			</div>
+		);
+	return (
+		<div>
+			<p>{session.user?.name || session.user?.subject}</p>
+			<button
+				type="button"
+				disabled={logoutPending}
+				onClick={() => {
+					void logout();
+				}}
+			>
+				Sign out
+			</button>
+		</div>
+	);
+}
 
 const sampleResource = {
 	id: "plans/sample",
@@ -233,7 +267,7 @@ describe("provider-independent authentication boundary", () => {
 		vi.stubGlobal("fetch", fetcher);
 		render(
 			<AuthBoundary>
-				<SessionAccountControl />
+				<SessionProbe />
 				<p>Public workspace</p>
 			</AuthBoundary>,
 		);

@@ -37,6 +37,11 @@ async function accountRequest<T>(
 	} catch (cause) {
 		if (cause instanceof ApiHttpError && cause.status === 401)
 			throw new Error("Sign in to manage your account.");
+		// A missing endpoint means the account service is not serving the
+		// request. The raw transport body ("404 page not found") names a
+		// route, not the account, so it never reaches the UI.
+		if (cause instanceof ApiHttpError && cause.status === 404)
+			throw new Error(fallback);
 		if (cause instanceof ApiHttpError)
 			throw new Error(cause.detail ?? fallback);
 		throw cause;

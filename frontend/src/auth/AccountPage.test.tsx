@@ -118,8 +118,9 @@ describe("account page", () => {
 			suspendResourceScope();
 		});
 		await waitFor(() =>
-			expect(screen.queryByLabelText("Display name")).toBeNull(),
+			expect(screen.getByLabelText("Display name")).toBeTruthy(),
 		);
+		// The form stays rendered with its loaded values; only fetching stops.
 		expect(serverQueryClient().isFetching({ queryKey: ["account"] })).toBe(0);
 		expect(fetcher).toHaveBeenCalledTimes(2);
 	});
@@ -160,6 +161,38 @@ describe("account page", () => {
 				.getAttribute("href"),
 		).toBe("https://identity.example/account");
 		expect(screen.getByRole("button", { name: "Revoke" })).toBeTruthy();
+	});
+
+	it("signs out from the account header", async () => {
+		const logout = vi.fn(async () => {});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url = String(input);
+				if (url.endsWith("/v1/auth/profile"))
+					return json({
+						owner: "waypoint",
+						name: "editor",
+						displayName: "Sam Lee",
+						avatar: "",
+					});
+				if (url.endsWith("/v1/auth/sessions"))
+					return json({ sessions: [] });
+				throw new Error(`unexpected ${url}`);
+			}),
+		);
+		acceptResourceScope(sessionScopeInput(session), suspendResourceScope());
+		render(
+			<SessionContext
+				value={{ session, logout, logoutPending: false }}
+			>
+				<AccountPage />
+				<NotificationCenter />
+			</SessionContext>,
+		);
+		await screen.findByText("Signed in as editor.");
+		fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+		expect(logout).toHaveBeenCalledOnce();
 	});
 
 	it("saves the display name through the proxy", async () => {
@@ -255,6 +288,29 @@ describe("account page", () => {
 		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
 	});
 
+	it("hides the transport body when the account endpoint is missing", async () => {
+		renderPage(async (input) => {
+			const url = String(input);
+			if (url.endsWith("/v1/auth/profile"))
+				return new Response("404 page not found", {
+					status: 404,
+					headers: { "Content-Type": "text/plain" },
+				});
+			if (url.endsWith("/v1/auth/sessions")) return json({ sessions: [] });
+			throw new Error(`unexpected ${url}`);
+		});
+		await screen.findByText("Account details are unavailable.");
+		expect(screen.queryByText("404 page not found")).toBeNull();
+		expect(screen.queryByText("No other signed-in devices.")).toBeNull();
+		expect(screen.getByText("The session list is unavailable.")).toBeTruthy();
+		expect(screen.getByLabelText("Display name")).toBeTruthy();
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", {
+				name: "Save display name",
+			}).disabled,
+		).toBe(true);
+	});
+
 	it("shows the provider password detail without signing out on rejection", async () => {
 		renderPage(async (input, init) => {
 			const url = String(input);
@@ -289,7 +345,7 @@ describe("account page", () => {
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 
-	it("retries loading instead of rendering empty forms", async () => {
+	it("renders blocked forms with a retry instead of hiding the UI on load failure", async () => {
 		let attempts = 0;
 		renderPage(async (input) => {
 			const url = String(input);
@@ -306,11 +362,25 @@ describe("account page", () => {
 			if (url.endsWith("/v1/auth/sessions")) return json({ sessions: [] });
 			throw new Error(`unexpected ${url}`);
 		});
-		await screen.findByText("Account details could not be loaded.");
-		expect(screen.queryByLabelText("Display name")).toBeNull();
+		await screen.findByText("Account details are unavailable.");
+		// The forms stay rendered; only saving is blocked until data loads.
+		const nameField = screen.getByLabelText<HTMLInputElement>("Display name");
+		expect(nameField.value).toBe("");
+		expect(nameField.disabled).toBe(true);
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", {
+				name: "Save display name",
+			}).disabled,
+		).toBe(true);
 		fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 		await screen.findByText("Signed in as editor.");
 		expect(screen.getByLabelText("Display name")).toBeTruthy();
+		expect(screen.getByText("No other signed-in devices.")).toBeTruthy();
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", {
+				name: "Save display name",
+			}).disabled,
+		).toBe(false);
 		// The reload clears the floating load failure.
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
@@ -333,7 +403,7 @@ describe("account page", () => {
 		);
 		await screen.findByText("Signed in as editor.");
 		expect(
-			screen.getByText(/Provider passkey management is unavailable/),
+			screen.getByText("Passkey management is unavailable in this session."),
 		).toBeTruthy();
 		expect(
 			screen.queryByRole("link", {

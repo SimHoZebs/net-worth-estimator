@@ -92,6 +92,7 @@ describe("parseHash", () => {
 			page: "evaluations",
 			overlay: null,
 		});
+		expect(parseHash("#account")).toEqual({ page: "sources", overlay: null });
 	});
 
 	test("planned purchases has a direct page route", () => {

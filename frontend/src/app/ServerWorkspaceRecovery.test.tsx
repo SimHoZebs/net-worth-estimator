@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
@@ -34,7 +34,7 @@ afterEach(() => {
 	resetWorkspaceStore();
 });
 
-it("keeps account controls above navigation when the private plan is empty", () => {
+it("keeps navigation usable without account controls when the private plan is empty", () => {
 	setServerStatusFixture({ readOnly: false });
 	setServerModelFixture(undefined, { document: null, conversion: null });
 	const logout = vi.fn(async () => {});
@@ -70,15 +70,14 @@ it("keeps account controls above navigation when the private plan is empty", () 
 			.getByRole("button", { name: "Choose server model JSON" })
 			.hasAttribute("disabled"),
 	).toBe(false);
-	const controls = screen.getByRole("button", { name: "Sign out" });
-	const navigation = screen.getByRole("navigation", {
-		name: "Main navigation",
-	});
-	expect(controls.closest("aside")).toBeTruthy();
+	// Account controls live in Configs → Account, so the recovery sidebar
+	// stays navigation-only.
 	expect(
-		controls.compareDocumentPosition(navigation) &
-			Node.DOCUMENT_POSITION_FOLLOWING,
+		screen.getByRole("navigation", {
+			name: "Main navigation",
+		}),
 	).toBeTruthy();
-	fireEvent.click(controls);
-	expect(logout).toHaveBeenCalledOnce();
+	expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+	expect(screen.queryByText("New account owner")).toBeNull();
+	expect(logout).not.toHaveBeenCalled();
 });
