@@ -127,7 +127,6 @@ export function useCardCycleActivity({
 				emptyMessage: "No recorded card charges in last cycle.",
 				showTotal: true,
 				transactions: sort(perAccount.flatMap((item) => item.lastCycle)),
-				note: "Recorded charges can be incomplete. Bank sync updates balances without importing posted transactions. This list does not determine the saved card balances above.",
 			},
 		};
 	}, [cycle, closedCycle, perAccount, transactionOrder]);

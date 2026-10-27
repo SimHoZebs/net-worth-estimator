@@ -40,11 +40,7 @@ describe("SafeSpendingCyclePanel", () => {
 			...current,
 			title: "Recorded card charges",
 			emptyMessage: "No recorded charges in last cycle.",
-			note: "Recorded charges can be incomplete.",
 		});
-		expect(
-			screen.getByText("Recorded charges can be incomplete."),
-		).toBeTruthy();
 		expect(screen.getByText("No recorded charges in last cycle.")).toBeTruthy();
 		expect(
 			screen.queryByRole("list", { name: "Closed card balances" }),
