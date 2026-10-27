@@ -369,26 +369,30 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	page,
 }) => {
 	// Server mode streams the range over SSE, so failing the stream is the
-	// equivalent of a worker that cannot start.
+	// equivalent of a worker that cannot start. The history graph draws no
+	// range, so recovery surfaces through the notification action while the
+	// deterministic cards stay visible.
 	await page.route("**/v1/projections/stochastic", (route) => route.abort());
 	await page.goto("/");
 	await expect(page.getByRole("alert")).toContainText("The API request failed");
 	await expect(
 		page.getByRole("button", { name: "Retry scenario calculation" }),
 	).toBeVisible();
+	await expect(page.getByText("$361,200")).toBeVisible();
+	// The history graph draws no range, so a failed stream must not add one.
 	await expect(
-		page.getByText("Range unavailable · base case shown"),
-	).toBeVisible();
-	await expect(page.getByText("$1.02M")).toBeVisible();
-	await expect(
-		page.getByText("Modeling scenarios", { exact: false }),
-	).not.toBeVisible();
+		page.getByRole("region", { name: "Net worth over the trailing 30 days" }),
+	).not.toContainText("80%");
 });
 
 test("read-only plans can be explored but not saved", async ({ page }) => {
 	await resetFixture({ readOnly: true });
 	await page.goto("/#sources");
-	await expect(page.getByText(/read-only|read only/i).first()).toBeVisible();
+	// The saved-model banner is gone; the sync tab's launcher carries the
+	// read-only state now.
+	await expect(
+		page.getByRole("button", { name: "Connect SimpleFIN" }),
+	).toBeDisabled();
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
