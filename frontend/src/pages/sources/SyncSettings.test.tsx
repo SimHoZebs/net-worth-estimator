@@ -137,7 +137,9 @@ afterEach(() => {
 it("shows the bank sync button as not connected", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	const button = await screen.findByRole("button", { name: "Bank sync" });
+	const button = await screen.findByRole("button", {
+		name: /Update bank providers/,
+	});
 	expect(button).toBeTruthy();
 	expect(screen.getByText("Not connected")).toBeTruthy();
 	const describedBy = button.getAttribute("aria-describedby");
@@ -145,12 +147,17 @@ it("shows the bank sync button as not connected", async () => {
 	expect(document.getElementById(describedBy!)?.textContent).toBe(
 		"Not connected",
 	);
+	expect(button.textContent?.replace(/\s+/g, " ").trim()).toBe(
+		"Update bank providers - Not connected",
+	);
 });
 
 it("opens the provider chooser with SimpleFIN as the option", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
 	expect(
 		screen.getByRole("button", { name: "Connect SimpleFIN" }),
@@ -160,7 +167,9 @@ it("opens the provider chooser with SimpleFIN as the option", async () => {
 it("connects through the token modal and reports one provider", async () => {
 	const requests = stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
@@ -170,13 +179,13 @@ it("connects through the token modal and reports one provider", async () => {
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect bank" }));
 	await waitFor(() => {
-		expect(screen.getByText("1 provider connected")).toBeTruthy();
+		expect(screen.getByText("1 connected")).toBeTruthy();
 	});
-	const card = screen.getByRole("button", { name: "Bank sync" });
+	const card = screen.getByRole("button", { name: /Update bank providers/ });
 	expect(
 		document.getElementById(card.getAttribute("aria-describedby")!)
 			?.textContent,
-	).toBe("1 provider connected");
+	).toBe("1 connected");
 	expect(
 		requests.some(
 			(request) =>
@@ -189,7 +198,9 @@ it("connects through the token modal and reports one provider", async () => {
 it("connects with an already-claimed access URL", async () => {
 	const requests = stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	fireEvent.click(await screen.findByText("Already have an access URL?"));
 	const urlField = screen.getByPlaceholderText(
@@ -200,7 +211,7 @@ it("connects with an already-claimed access URL", async () => {
 	});
 	fireEvent.click(screen.getByRole("button", { name: "Connect with URL" }));
 	await waitFor(() => {
-		expect(screen.getByText("1 provider connected")).toBeTruthy();
+		expect(screen.getByText("1 connected")).toBeTruthy();
 	});
 	expect(
 		requests.some(
@@ -215,7 +226,9 @@ it("connects with an already-claimed access URL", async () => {
 it("disables each connect button while the other field is filled", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
@@ -256,7 +269,9 @@ it("refreshes status and links after connecting", async () => {
 			readOnly: false,
 		},
 	);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
@@ -269,7 +284,7 @@ it("refreshes status and links after connecting", async () => {
 			.length;
 	const before = accountFetches();
 	fireEvent.click(screen.getByRole("button", { name: "Connect bank" }));
-	await screen.findByText("1 provider connected");
+	await screen.findByText("1 connected");
 	await waitFor(() => {
 		expect(
 			serverQueryClient().getQueryState(
@@ -291,7 +306,9 @@ it("lists every synced account", async () => {
 		],
 	});
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(await screen.findByText("Synced accounts")).toBeTruthy();
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	expect(screen.getByText("Prime Card")).toBeTruthy();
@@ -307,7 +324,9 @@ it("falls back to the bridge name when the model account is gone", async () => {
 		links: [{ modelAccountId: "deleted", bridgeName: "Old Bridge Name" }],
 	});
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(await screen.findByText("Synced accounts")).toBeTruthy();
 	expect(await screen.findByText("Old Bridge Name")).toBeTruthy();
 });
@@ -315,14 +334,18 @@ it("falls back to the bridge name when the model account is gone", async () => {
 it("shows an empty state when no accounts are synced", async () => {
 	stubApi({ configured: true, links: [] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(await screen.findByText("No synced accounts yet.")).toBeTruthy();
 });
 
 it("shows an inline error when synced accounts fail to load", async () => {
 	stubApi({ configured: true, failLinks: true });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(
 		await screen.findByText("The synced accounts could not be loaded."),
 	).toBeTruthy();
@@ -332,7 +355,9 @@ it("shows an inline error when synced accounts fail to load", async () => {
 it("shows an error when the token is rejected", async () => {
 	stubApi({ configured: false, failConnect: true });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
@@ -354,7 +379,9 @@ it("disconnects after confirmation", async () => {
 		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
 	});
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	const confirms = await screen.findAllByRole("button", {
@@ -376,7 +403,9 @@ it("disables writes when read-only", async () => {
 		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
 	});
 	render(<SyncSettings accounts={accounts} readOnly={true} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	expect(
 		screen.queryByRole("button", { name: /Checking|Prime Card/ }),
@@ -393,7 +422,9 @@ it("disables writes when read-only", async () => {
 it("keeps the setup token in a single-line input", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(
+		await screen.findByRole("button", { name: /Update bank providers/ }),
+	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	expect(screen.getByPlaceholderText("Paste your setup token").tagName).toBe(
 		"INPUT",
