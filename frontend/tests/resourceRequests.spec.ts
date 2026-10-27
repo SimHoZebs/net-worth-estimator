@@ -9,6 +9,7 @@ test.beforeEach(async () => resetFixture());
 
 async function editInvestingAmount(page: Page) {
 	await page.goto("/#transactions");
+	await page.getByRole("tab", { name: /Recurring/ }).click();
 	await page.getByRole("button", { name: "Monthly investing" }).click();
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("900");
