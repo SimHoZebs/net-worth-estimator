@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Landmark } from "lucide-react";
+import { Button } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import type { Account } from "../../domain/model.ts";
@@ -35,7 +36,7 @@ export function SyncSettings({
 						<Landmark size={25} />
 					</span>
 					<div className="flex-1">
-						<h2 className="text-base max-sm:text-sm">Bank sync.</h2>
+						<h2 className="text-base max-sm:text-sm">Bank sync</h2>
 					</div>
 				</div>
 
@@ -50,21 +51,18 @@ export function SyncSettings({
 
 	return (
 		<>
-			<button
-				type="button"
+			<Button
 				aria-label="Bank sync"
 				aria-describedby="bank-sync-status"
 				onClick={() => setChooserOpen(true)}
-				className="mb-6 flex w-full cursor-pointer items-center gap-4 rounded-surface border border-line bg-surface p-6 text-left transition-colors hover:border-line-strong max-sm:p-5"
+				className="mb-6"
 			>
-				<span className="text-primary-text">
-					<Landmark size={25} />
-				</span>
-				<span className="flex-1 text-base max-sm:text-sm">Bank sync.</span>
-				<span id="bank-sync-status" className="text-sm text-muted">
+				<Landmark size={18} aria-hidden="true" />
+				Bank sync
+				<span id="bank-sync-status" className="text-xs font-normal text-muted">
 					{status}
 				</span>
-			</button>
+			</Button>
 
 			{chooserOpen && (
 				<SyncProviderModal
