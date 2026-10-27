@@ -1,4 +1,7 @@
 import { getApiBaseUrl } from "@/api/runtime.ts";
+import { getAuthSession } from "@/api/generated/endpoints.ts";
+import { ApiHttpError, ApiNetworkError } from "@/api/http.ts";
+import { sessionQueryClient } from "./sessionQuery.ts";
 import { isRecord } from "@/domain/guards.ts";
 import type { Session } from "@/auth/sessionContext.ts";
 import {
@@ -21,32 +24,43 @@ export async function discoverSession(
 	signal: AbortSignal,
 	baseUrl = getApiBaseUrl(),
 ): Promise<Session> {
-	let response: Response;
+	const queryKey = ["auth-session", canonicalApiBaseUrl(baseUrl)] as const;
+	const cancel = () => {
+		void sessionQueryClient.cancelQueries({ queryKey, exact: true });
+	};
+	signal.throwIfAborted();
+	signal.addEventListener("abort", cancel, { once: true });
 	try {
-		response = await fetch(`${baseUrl}/v1/auth/session`, {
-			credentials: "same-origin",
-			cache: "no-store",
-			redirect: "error",
-			signal,
+		return await sessionQueryClient.fetchQuery({
+			queryKey,
+			queryFn: ({ signal: querySignal }) =>
+				readSession(AbortSignal.any([signal, querySignal]), baseUrl),
 		});
+	} finally {
+		signal.removeEventListener("abort", cancel);
+	}
+}
+
+async function readSession(
+	signal: AbortSignal,
+	baseUrl: string,
+): Promise<Session> {
+	let response: Awaited<ReturnType<typeof getAuthSession>>;
+	try {
+		response = await getAuthSession({ signal, baseUrl });
 	} catch (cause) {
 		if (signal.aborted) throw cause;
-		throw new Error(
-			"Cannot reach the Waypoint server. It may be down or restarting.",
-		);
-	}
-	if (!response.ok) {
-		if (
-			response.status === 502 ||
-			response.status === 503 ||
-			response.status === 504
-		)
+		if (cause instanceof ApiNetworkError)
 			throw new Error(
-				`The Waypoint server is unavailable (HTTP ${response.status}). It may be restarting; retry shortly.`,
+				"Cannot reach the Waypoint server. It may be down or restarting.",
+			);
+		if (cause instanceof ApiHttpError && [502, 503, 504].includes(cause.status))
+			throw new Error(
+				`The Waypoint server is unavailable (HTTP ${cause.status}). It may be restarting; retry shortly.`,
 			);
 		throw new Error("Authentication status is unavailable.");
 	}
-	const next: unknown = await response.json();
+	const next: unknown = response.data;
 	if (!isRecord(next) || next.enabled !== true)
 		throw new Error("Invalid authentication status.");
 	if (baseUrl && new URL(baseUrl, location.href).origin !== location.origin)

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -12,6 +13,12 @@ import { NotificationCenter } from "../components/NotificationCenter.tsx";
 import { resetNotifications } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { SessionContext, type Session } from "./sessionContext.ts";
+import {
+	resetServerQueryCache,
+	serverQueryClient,
+} from "../state/serverQuery.ts";
+import { acceptResourceScope, suspendResourceScope } from "./resourceScope.ts";
+import { sessionScopeInput } from "./sessionDiscovery.ts";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
 
@@ -33,6 +40,7 @@ function renderPage(
 	next: Session = session,
 ) {
 	vi.stubGlobal("fetch", vi.fn(fetcher));
+	acceptResourceScope(sessionScopeInput(next), suspendResourceScope());
 	return render(
 		<SessionContext
 			value={{
@@ -56,12 +64,66 @@ function json(body: unknown, status = 200) {
 
 afterEach(() => {
 	cleanup();
+	resetServerQueryCache();
+	suspendResourceScope();
 	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
 });
 
 describe("account page", () => {
+	it("retires an unsaved display name when the loaded profile changes", async () => {
+		let displayName = "Sam Lee";
+		renderPage(async (input) =>
+			String(input).endsWith("/v1/auth/profile")
+				? json({ owner: "waypoint", name: "editor", displayName, avatar: "" })
+				: json({ sessions: [] }),
+		);
+		await screen.findByText("Signed in as editor.");
+		fireEvent.change(screen.getByLabelText("Display name"), {
+			target: { value: "Unsaved name" },
+		});
+		await act(async () => {
+			await serverQueryClient().refetchQueries({ queryKey: ["account"] });
+		});
+		expect(screen.getByLabelText<HTMLInputElement>("Display name").value).toBe(
+			"Unsaved name",
+		);
+		displayName = "Fresh server name";
+		await act(async () => {
+			await serverQueryClient().refetchQueries({ queryKey: ["account"] });
+		});
+		await waitFor(() =>
+			expect(
+				screen.getByLabelText<HTMLInputElement>("Display name").value,
+			).toBe("Fresh server name"),
+		);
+	});
+
+	it("does not fetch account details after the resource scope is suspended", async () => {
+		const fetcher = vi.fn(async (input: RequestInfo | URL) =>
+			String(input).endsWith("/v1/auth/profile")
+				? json({
+						owner: "waypoint",
+						name: "editor",
+						displayName: "Sam Lee",
+						avatar: "",
+					})
+				: json({ sessions: [] }),
+		);
+		renderPage(fetcher);
+		await screen.findByText("Signed in as editor.");
+		expect(fetcher).toHaveBeenCalledTimes(2);
+		act(() => {
+			suspendResourceScope();
+		});
+		await waitFor(() =>
+			expect(screen.queryByLabelText("Display name")).toBeNull(),
+		);
+		expect(serverQueryClient().isFetching({ queryKey: ["account"] })).toBe(0);
+		expect(fetcher).toHaveBeenCalledTimes(2);
+	});
+
 	it("loads the profile and sessions and links passkeys to the provider", async () => {
 		renderPage(async (input) => {
 			const url = String(input);
@@ -104,7 +166,7 @@ describe("account page", () => {
 		const seen: string[] = [];
 		renderPage(async (input, init) => {
 			const url = String(input);
-			if (url.endsWith("/v1/auth/profile") && (!init || !init.method))
+			if (url.endsWith("/v1/auth/profile") && init?.method === "GET")
 				return json({
 					owner: "waypoint",
 					name: "editor",
@@ -144,7 +206,7 @@ describe("account page", () => {
 					displayName: "Sam Lee",
 					avatar: "",
 				});
-			if (url.endsWith("/v1/auth/sessions") && (!init || !init.method))
+			if (url.endsWith("/v1/auth/sessions") && init?.method === "GET")
 				return json({
 					sessions: [
 						{
@@ -308,7 +370,7 @@ describe("account page", () => {
 					displayName: "Sam Lee",
 					avatar: "",
 				});
-			if (url.endsWith("/v1/auth/sessions") && (!init || !init.method)) {
+			if (url.endsWith("/v1/auth/sessions") && init?.method === "GET") {
 				lists += 1;
 				if (lists > 1) return json({}, 503);
 				return json({

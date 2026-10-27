@@ -171,6 +171,8 @@ describe("session account controls", () => {
 		expect(fetcher).toHaveBeenCalledWith("/v1/auth/logout", {
 			method: "POST",
 			credentials: "same-origin",
+			cache: "no-store",
+			redirect: "error",
 			headers: { "Waypoint-Resource": signedInSession.resource.id },
 		});
 		expect(screen.getByText("Sam Lee")).toBeTruthy();
@@ -291,7 +293,7 @@ describe("session account controls", () => {
 		expect(pending.disabled).toBe(true);
 		expect(screen.queryByRole("alert")).toBeNull();
 		fireEvent.click(pending);
-		expect(attempts).toBe(2);
+		await waitFor(() => expect(attempts).toBe(2));
 		await act(async () => finishLogout(response({ logoutURL: "#signed-out" })));
 		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
@@ -311,7 +313,7 @@ describe("session account controls", () => {
 		renderAccount();
 		fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 		expect((await screen.findByRole("alert")).textContent).toBe(
-			"Network unavailable.",
+			"The API request failed. Check the server connection and retry.",
 		);
 		expect(
 			screen.getByRole<HTMLButtonElement>("button", { name: "Sign out" })
@@ -369,7 +371,13 @@ describe("session account controls", () => {
 		renderAccount();
 		fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 		act(() => window.dispatchEvent(new Event("focus")));
-		await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
+		await waitFor(() =>
+			expect(
+				fetcher.mock.calls.filter(([input]) =>
+					String(input).endsWith("/v1/auth/session"),
+				),
+			).toHaveLength(2),
+		);
 		await act(async () => finish(response({ logoutURL: "#signed-out" })));
 		await waitFor(() => expect(window.location.hash).toBe("#signed-out"));
 	});

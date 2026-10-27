@@ -1,8 +1,6 @@
 import { isRecord } from "../domain/guards.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
-import { ApiNetworkError, parseErrorResponse } from "./http.ts";
-import { getApiBaseUrl } from "./runtime.ts";
-import { scopedRequest, scopedResponseError } from "./scopedRequest.ts";
+import { projectStochastic } from "./generated/endpoints.ts";
+import type { StochasticRequest } from "./generated/model/stochasticRequest.ts";
 import type {
 	ErrorSSEData,
 	PartialSSEData,
@@ -312,32 +310,8 @@ export async function requestStochasticProjection(
 	request: unknown,
 	options: StochasticRequestOptions = {},
 ): Promise<Response> {
-	const scope = getResourceScope();
-	const baseUrl = getApiBaseUrl();
-	const scoped = await scopedRequest(
-		baseUrl,
-		`${baseUrl.replace(/\/+$/, "")}/v1/projections/stochastic`,
-		{
-			method: "POST",
-			headers: {
-				"content-type": "application/json",
-				accept: "text/event-stream",
-			},
-			credentials: "same-origin",
-			redirect: "error",
-			body: JSON.stringify(request),
-			signal: options.signal,
-		},
-		globalThis.fetch.bind(globalThis),
-		scope,
-	).catch((cause: unknown) => {
-		throw new ApiNetworkError(cause);
+	return projectStochastic(request as StochasticRequest, {
+		signal: options.signal,
+		headers: { accept: "text/event-stream" },
 	});
-	if (scoped instanceof Error) throw scoped;
-	const { response, scope: verified } = scoped;
-	if (!response.ok) {
-		const failure = await parseErrorResponse(response);
-		throw scopedResponseError(verified, failure);
-	}
-	return response;
 }

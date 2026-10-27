@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import type { FinancialModelDocument } from "../api/contracts.ts";
 import { responseScopeError } from "../api/scopedRequest.ts";
 import {
@@ -9,6 +10,7 @@ import {
 	type ServerModelImportOptions,
 } from "../api/serverModelImport.ts";
 import { useUiStore } from "./uiStore.ts";
+import { serverQueryClient } from "./serverQuery.ts";
 
 // A scope transition orphans any in-flight import on the old scope (its
 // guarded requests abort and its finally skips the clear by design), so the
@@ -21,6 +23,21 @@ subscribeResourceScope(() => {
 
 export function useServerModelImport(options: ServerModelImportOptions) {
 	const scope = getResourceScope();
+	const mutation = useMutation(
+		{
+			mutationKey: ["server-model-import", scope.key],
+			retry: false,
+			gcTime: 0,
+			mutationFn: async (document: FinancialModelDocument) => {
+				const stale = responseScopeError(scope);
+				if (stale) throw stale;
+				const result = await importServerModel({ ...options, document });
+				if (result instanceof Error) throw result;
+				return result;
+			},
+		},
+		serverQueryClient(),
+	);
 	// Single source of truth: the shared uiStore flag. The hook no longer
 	// keeps a local copy that can drift or clear the global on unmount while
 	// another importer runs. The flag clears in `importDocument`'s finally,
@@ -34,13 +51,7 @@ export function useServerModelImport(options: ServerModelImportOptions) {
 		if (stale) throw stale;
 		setSharedImporting(true);
 		try {
-			const result = await importServerModel({
-				...options,
-				document,
-			});
-			// Workspace callbacks expose failures as rejected promises to their views.
-			if (result instanceof Error) throw result;
-			return result;
+			return await mutation.mutateAsync(document);
 		} finally {
 			if (!responseScopeError(scope)) {
 				setSharedImporting(false);

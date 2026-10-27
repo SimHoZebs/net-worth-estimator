@@ -13,6 +13,57 @@ import {
 	responseScopeError,
 } from "@/api/scopedRequest.ts";
 
+export interface WaypointRequestOptions extends RequestInit {
+	baseUrl?: string;
+}
+
+/** Identity requests precede resource verification and do not assert a plan. */
+export async function waypointAuthFetch<T>(
+	url: string,
+	options?: WaypointRequestOptions,
+): Promise<T> {
+	const response = await identityRequest(url, options);
+	if (!response.ok) throw await parseErrorResponse(response);
+	return {
+		data: await response.json(),
+		status: response.status,
+		headers: response.headers,
+	} as T;
+}
+
+async function identityRequest(
+	url: string,
+	options: WaypointRequestOptions = {},
+): Promise<Response> {
+	const { baseUrl = getApiBaseUrl(), ...init } = options;
+	return globalThis
+		.fetch(`${baseUrl.replace(/\/+$/, "")}${url}`, {
+			...init,
+			credentials: "same-origin",
+			redirect: "error",
+			cache: "no-store",
+		})
+		.catch((cause: unknown) => {
+			throw new ApiNetworkError(cause);
+		});
+}
+
+/** Logout must retire local state before the redirect body is consumed. */
+export async function waypointLogoutFetch<_T>(
+	url: string,
+	options?: WaypointRequestOptions,
+): Promise<Response> {
+	return identityRequest(url, options);
+}
+
+/** Preserve the response stream, including its resource-scoped lifetime. */
+export async function waypointStreamFetch<_T>(
+	url: string,
+	options?: RequestInit,
+): Promise<Response> {
+	return resourceRequest(url, options);
+}
+
 /**
  * Orval mutator. Generated endpoints delegate transport here so scope
  * capture, the Waypoint-Resource assertion, abort-on-scope-change, and the
@@ -24,6 +75,26 @@ export async function waypointFetch<T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<T> {
+	const response = await resourceRequest(url, options);
+	const headers = response.headers;
+	const status = response.status;
+	if (status === 204) return { data: undefined, status, headers } as T;
+	const text = await response.text().catch((cause: unknown) => {
+		if (cause instanceof ResourceScopeError) throw cause;
+		throw new ApiNetworkError(cause);
+	});
+	if (!text.trim()) return { data: undefined, status, headers } as T;
+	try {
+		return { data: JSON.parse(text), status, headers } as T;
+	} catch (cause) {
+		throw new ApiParseError(cause);
+	}
+}
+
+async function resourceRequest(
+	url: string,
+	options?: RequestInit,
+): Promise<Response> {
 	const scope = getResourceScope();
 	const baseUrl = getApiBaseUrl();
 	const outcome = await scopedRequest(
@@ -49,17 +120,5 @@ export async function waypointFetch<T>(
 	}
 	const stale = responseScopeError(verified);
 	if (stale) throw stale;
-	const headers = response.headers;
-	const status = response.status;
-	if (status === 204) return { data: undefined, status, headers } as T;
-	const text = await response.text().catch((cause: unknown) => {
-		if (cause instanceof ResourceScopeError) throw cause;
-		throw new ApiNetworkError(cause);
-	});
-	if (!text.trim()) return { data: undefined, status, headers } as T;
-	try {
-		return { data: JSON.parse(text), status, headers } as T;
-	} catch (cause) {
-		throw new ApiParseError(cause);
-	}
+	return response;
 }

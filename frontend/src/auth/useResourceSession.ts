@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../api/runtime.ts";
+import { logout as logoutRequest } from "../api/generated/endpoints.ts";
+import { sessionQueryClient } from "./sessionQuery.ts";
 import { isRecord } from "../domain/guards.ts";
 import {
 	cancelResourceQueries,
@@ -240,11 +242,24 @@ export function useResourceSession() {
 		setStatus((previous) => ({ ...previous, error: "" }));
 		dismissKey("session-logout");
 		try {
-			const response = await fetch(`${attempt.apiBaseUrl}/v1/auth/logout`, {
-				method: "POST",
-				credentials: "same-origin",
-				headers: { "Waypoint-Resource": attempt.session.resource.id },
-			});
+			const response = await sessionQueryClient
+				.getMutationCache()
+				.build(sessionQueryClient, {
+					mutationKey: [
+						"auth-logout",
+						attempt.apiBaseUrl,
+						attempt.session.user?.subject,
+					],
+					mutationFn: () => {
+						if (signingOut.current !== attempt)
+							throw new Error("The active session changed.");
+						return logoutRequest({
+							baseUrl: attempt.apiBaseUrl,
+							headers: { "Waypoint-Resource": attempt.session.resource.id },
+						});
+					},
+				})
+				.execute(undefined);
 			if (signingOut.current !== attempt) return;
 			if (!response.ok) {
 				if (response.status === 409) await refresh();
