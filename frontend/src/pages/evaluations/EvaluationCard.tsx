@@ -2,12 +2,12 @@ import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
 import { IconButton } from "../../components/Button.tsx";
 import type { EvaluationPin } from "../../components/evaluationCard.ts";
+import { mergeStyles } from "../../components/mergeStyles.ts";
 import { Progress } from "../../components/Progress.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
-import { cardStyles } from "../../components/cardStyles.ts";
 
 export type { EvaluationPin } from "../../components/evaluationCard.ts";
 
@@ -39,9 +39,10 @@ export function EvaluationCard({
 	const StateIcon = evaluation.enabled && met ? Check : Flag;
 	return (
 		<section
-			className={cardStyles({
-				tone: evaluation.enabled ? "default" : "subtle",
-			})}
+			className={mergeStyles(
+				"flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line p-5 print:break-inside-avoid",
+				evaluation.enabled ? "bg-surface" : "bg-surface-2",
+			)}
 			aria-labelledby={headingId}
 			aria-busy={outcomePending}
 		>
