@@ -258,6 +258,15 @@ export function SafeSpendingBillsPanel({
 						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
 					</div>
 				) : null}
+				{(cashNow.directSpentSinceStart ?? 0) > 0 ? (
+					<div className="flex items-center justify-between gap-3 pl-4 text-sm text-ink">
+						<span className="flex items-center gap-2 text-muted">
+							<span aria-hidden="true">↳</span> {labels.directCashPayments} ·{" "}
+							{monthDay(cashNow.since)}
+						</span>
+						<strong>{exactMoney(cashNow.directSpentSinceStart ?? 0)}</strong>
+					</div>
+				) : null}
 				<div className="h-px w-full bg-line" />
 				<div className="flex flex-wrap items-center justify-end gap-3">
 					<TransactionSortButton

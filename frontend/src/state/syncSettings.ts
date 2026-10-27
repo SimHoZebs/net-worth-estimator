@@ -5,6 +5,7 @@ import {
 	disconnectSyncCredential,
 	getSyncCredential,
 	listAccountLinks,
+	triggerSimplefinSync,
 } from "@/api/generated/endpoints.ts";
 import type {
 	SyncCredentialBody,
@@ -25,6 +26,10 @@ export function syncCredentialKey(scope = getResourceScope()) {
 
 export function syncLinksKey(scope = getResourceScope()) {
 	return ["sync-links", scope.key] as const;
+}
+
+function syncTriggerKey(scope = getResourceScope()) {
+	return ["sync-trigger", scope.key] as const;
 }
 
 function current(scope: ResourceScope, signal?: AbortSignal) {
@@ -205,6 +210,26 @@ export async function disconnectSyncKey(): Promise<boolean> {
 	await settleMutation(syncCredentialKey(scope), updated);
 	void refreshSyncData(scope);
 	dismissKey("sync-credential");
+	return true;
+}
+
+// triggerSyncNow runs one manual Bridge sync. Server guards apply: a recent
+// trigger or post-429 blackout returns 429, a concurrent run returns 409,
+// and a missing credential returns 503. Failures surface the server message
+// through the shared error notice; success refreshes links and status so
+// the new lastSyncAt and quota propagate (the sync monitor reloads the
+// workspace once the stamp flips).
+export async function triggerSyncNow(): Promise<boolean> {
+	const scope = getResourceScope();
+	const result = await runMutation<unknown>(
+		syncTriggerKey(scope),
+		async () => (await triggerSimplefinSync()).data,
+		"sync-trigger",
+	);
+	if (!result) return false;
+	if (scope !== getResourceScope()) return false;
+	await refreshSyncData(scope);
+	dismissKey("sync-trigger");
 	return true;
 }
 

@@ -229,7 +229,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	).toBeVisible();
 	await expect(page).toHaveURL(/safe-spending-detail\/cycle$/);
 	const currentCharges = page.getByRole("table", {
-		name: new RegExp(labels.recordedCharges),
+		name: new RegExp(labels.cycleSpending),
 	});
 	await expect(currentCharges).toContainText("Current cycle purchase");
 	await expect(currentCharges).not.toContainText("Prior cycle purchase");
@@ -351,7 +351,7 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 	await expect(metric(labels.cashAfterBills)).toHaveText("$19,200");
 	await expect(metric(labels.allowance)).toHaveText("$4,050");
 	await expect(
-		page.getByText("No recorded card charges in this cycle yet.", {
+		page.getByText("No spending this cycle yet.", {
 			exact: true,
 		}),
 	).toBeVisible();

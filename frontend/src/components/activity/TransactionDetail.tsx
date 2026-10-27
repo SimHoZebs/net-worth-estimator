@@ -26,7 +26,6 @@ import {
 	type ReactNode,
 } from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { dateLabel, money } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { markAsSubscription } from "../../domain/subscriptions.ts";
 import {
@@ -411,15 +410,6 @@ function ScheduleCapsule({
 }
 
 function ReadOnlyNotice({ movement }: { movement: Movement }) {
-	if (movement.amountKnown === false) {
-		return (
-			<Notice className="my-4">
-				<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
-				This amount is calculated each time. See the transaction list for the
-				resolved amounts.
-			</Notice>
-		);
-	}
 	if (movement.readOnly) {
 		return (
 			<Notice className="my-4">
@@ -716,6 +706,7 @@ export function TransactionDetail({
 		transaction.source === "historical" ||
 		showExcluded ||
 		showShortfall ||
+		movement.amountKnown === false ||
 		(!movement.enabled && !transaction.pending && !showExcluded);
 	const editHeading = (
 		<>
@@ -745,13 +736,13 @@ export function TransactionDetail({
 			<Modal
 				title={editHeading}
 				titleSize="plain"
-				headerClassName="border-b-0 pb-2 max-sm:pb-5"
+				headerClassName="border-b-0 pb-0"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={edit.submit}>
-					<div className="mt-4 flex items-center gap-3">
+					<div className="flex items-center gap-3">
 						<input
 							id={`${edit.formId}-name`}
 							aria-label="Transaction name"
@@ -799,7 +790,11 @@ export function TransactionDetail({
 									min="0.01"
 									max="10000000000"
 									step="0.01"
-									value={edit.draft.amount}
+									value={
+										movement.amountKnown
+											? edit.draft.amount
+											: String(transaction.amount)
+									}
 									onChange={(event) =>
 										edit.updateDraft({ amount: event.target.value }, "amount")
 									}
@@ -833,6 +828,9 @@ export function TransactionDetail({
 						)}
 						{!movement.enabled && !transaction.pending && !showExcluded && (
 							<Badge tone="warning">Excluded</Badge>
+						)}
+						{movement.amountKnown === false && (
+							<Badge tone="neutral">Calculated</Badge>
 						)}
 						{hasStatusPill && (
 							<span className="text-muted" aria-hidden="true">
@@ -1022,7 +1020,6 @@ export function MovementDetail({
 	accounts,
 	plan,
 	resolvedAmount,
-	resolvedDate,
 	claimRuleName,
 	onClose,
 }: {
@@ -1071,13 +1068,13 @@ export function MovementDetail({
 			<Modal
 				title={editHeading}
 				titleSize="plain"
-				headerClassName="border-b-0 pb-2 max-sm:pb-5"
+				headerClassName="border-b-0 pb-0"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={edit.submit}>
-					<div className="mt-4 flex items-center gap-3">
+					<div className="flex items-center gap-3">
 						<input
 							id={`${edit.formId}-name`}
 							aria-label="Transaction name"
@@ -1103,87 +1100,97 @@ export function MovementDetail({
 							</span>
 						)}
 					</div>
-					<div className="flex items-center gap-4 pt-1 pb-2">
-						<div className="flex min-w-0 flex-1 flex-col gap-1">
-							<span className="type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap">
-								<span
-									className="flex-none whitespace-nowrap"
-									aria-hidden="true"
-								>
-									$
-								</span>
-								<input
-									id={`${edit.formId}-amount`}
-									aria-label="Amount (USD)"
-									name="amount"
-									type="number"
-									required
-									min="0.01"
-									max="10000000000"
-									step="0.01"
-									value={edit.draft.amount}
-									onChange={(event) =>
-										edit.updateDraft({ amount: event.target.value }, "amount")
-									}
-									readOnly={!canEdit}
-									className={transactionControlStyles({ shape: "amount" })}
-								/>
-							</span>
-							<span className="text-xs text-muted">
-								{movement.amountKnown
-									? "Per occurrence"
-									: resolvedAmount !== undefined && resolvedDate
-										? `Calculated · ${money(resolvedAmount)} on ${dateLabel(resolvedDate, true)}`
-										: "Calculated each occurrence"}
-							</span>
+					{(movement.amountKnown ||
+						resolvedAmount !== undefined ||
+						once ||
+						postedDiffers) && (
+						<div className="flex items-center gap-4 pt-1 pb-2">
+							{(movement.amountKnown || resolvedAmount !== undefined) && (
+								<div className="flex min-w-0 flex-1 flex-col gap-1">
+									<span className="type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap">
+										<span
+											className="flex-none whitespace-nowrap"
+											aria-hidden="true"
+										>
+											$
+										</span>
+										<input
+											id={`${edit.formId}-amount`}
+											aria-label="Amount (USD)"
+											name="amount"
+											type="number"
+											required
+											min="0.01"
+											max="10000000000"
+											step="0.01"
+											value={
+												movement.amountKnown
+													? edit.draft.amount
+													: String(resolvedAmount)
+											}
+											onChange={(event) =>
+												edit.updateDraft(
+													{ amount: event.target.value },
+													"amount",
+												)
+											}
+											readOnly={!canEdit}
+											className={transactionControlStyles({ shape: "amount" })}
+										/>
+									</span>
+									{movement.amountKnown && (
+										<span className="text-xs text-muted">Per occurrence</span>
+									)}
+								</div>
+							)}
+							{(once || postedDiffers) && (
+								<div className="mt-5 flex min-w-0 flex-1 flex-col gap-1 border-t border-line pt-2">
+									{once && (
+										<MetaRow icon={CalendarDays} label="Transaction date">
+											<input
+												className={transactionControlStyles({ shape: "date" })}
+												id={`${edit.formId}-date`}
+												type="date"
+												name="startDate"
+												required
+												value={edit.draft.startDate}
+												onChange={(event) =>
+													edit.updateDraft(
+														{ startDate: event.target.value },
+														"schedule",
+													)
+												}
+												readOnly={!canEdit}
+											/>
+										</MetaRow>
+									)}
+									{postedDiffers && (
+										<MetaRow icon={CalendarCheck2} label="Date posted">
+											<input
+												className={transactionControlStyles({ shape: "date" })}
+												id={`${edit.formId}-posted`}
+												type="date"
+												name="postedDate"
+												required
+												value={edit.draft.postedDate}
+												onChange={(event) =>
+													edit.updateDraft(
+														{ postedDate: event.target.value },
+														"posted",
+													)
+												}
+												readOnly={!canEdit}
+											/>
+										</MetaRow>
+									)}
+								</div>
+							)}
 						</div>
-						{(once || postedDiffers) && (
-							<div className="mt-5 flex min-w-0 flex-1 flex-col gap-1 border-t border-line pt-2">
-								{once && (
-									<MetaRow icon={CalendarDays} label="Transaction date">
-										<input
-											className={transactionControlStyles({ shape: "date" })}
-											id={`${edit.formId}-date`}
-											type="date"
-											name="startDate"
-											required
-											value={edit.draft.startDate}
-											onChange={(event) =>
-												edit.updateDraft(
-													{ startDate: event.target.value },
-													"schedule",
-												)
-											}
-											readOnly={!canEdit}
-										/>
-									</MetaRow>
-								)}
-								{postedDiffers && (
-									<MetaRow icon={CalendarCheck2} label="Date posted">
-										<input
-											className={transactionControlStyles({ shape: "date" })}
-											id={`${edit.formId}-posted`}
-											type="date"
-											name="postedDate"
-											required
-											value={edit.draft.postedDate}
-											onChange={(event) =>
-												edit.updateDraft(
-													{ postedDate: event.target.value },
-													"posted",
-												)
-											}
-											readOnly={!canEdit}
-										/>
-									</MetaRow>
-								)}
-							</div>
-						)}
-					</div>
+					)}
 					<div className="mt-3 flex flex-wrap items-center gap-2">
 						{movement.readOnly && <Badge tone="neutral">Synced</Badge>}
 						{movement.amountKnown === false && (
-							<Badge tone="neutral">Varies</Badge>
+							<Badge tone="neutral">Calculated</Badge>
 						)}
 						{!movement.enabled && <Badge tone="warning">Excluded</Badge>}
 						{(movement.readOnly ||

@@ -159,6 +159,17 @@ func parseRetryAfter(header http.Header, now time.Time) time.Duration {
 	return 0
 }
 
+// StatusError reports a non-200 Bridge fetch that is not a quota signal.
+// 5xx values are transient; 4xx values are permanent (bad key, bad request).
+type StatusError struct {
+	Host       string
+	StatusCode int
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("simplefin fetch from %s: status %d", e.Host, e.StatusCode)
+}
+
 // Client fetches SimpleFIN account sets. The access URL is a secret. Protocol
 // errors carry only the host, but transport errors can wrap the request URL;
 // callers must redact those errors before external logging or API responses.
@@ -211,7 +222,7 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 				Message:    fmt.Sprintf("simplefin bridge rate limited (status %d from %s)", response.StatusCode, endpoint.Host),
 			}
 		}
-		return nil, fmt.Errorf("simplefin fetch from %s: status %d", endpoint.Host, response.StatusCode)
+		return nil, &StatusError{Host: endpoint.Host, StatusCode: response.StatusCode}
 	}
 	var set AccountSet
 	if err := json.Unmarshal(body, &set); err != nil {

@@ -8,9 +8,11 @@ import type { Account } from "../../domain/model.ts";
 import {
 	disconnectSyncKey,
 	refreshSyncSettings,
+	triggerSyncNow,
 	useSyncCredential,
 	useSyncLinks,
 } from "../../state/syncSettings.ts";
+import { useServerStatus } from "../../state/workspaceResources.ts";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
 
 const PROVIDERS = [{ id: "simplefin", name: "SimpleFIN" }] as const;
@@ -39,7 +41,9 @@ export function SyncProviderPanel({
 	const credential = useSyncCredential();
 	const configured = credential.data?.configured === true;
 	const links = useSyncLinks(configured);
+	const status = useServerStatus({ enabled: configured });
 	const [busy, setBusy] = useState(false);
+	const [syncing, setSyncing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [connectOpen, setConnectOpen] = useState(false);
@@ -58,6 +62,20 @@ export function SyncProviderPanel({
 	const since = configured
 		? formatConnectedAt(credential.data?.updatedAt)
 		: null;
+	const quota =
+		configured &&
+		typeof status.data?.syncQuotaUsed === "number" &&
+		typeof status.data?.syncQuotaLimit === "number"
+			? `${status.data.syncQuotaUsed} of ${status.data.syncQuotaLimit} used in the last 24 hours`
+			: null;
+
+	async function handleSyncNow() {
+		setSyncing(true);
+		setError(null);
+		const ok = await triggerSyncNow();
+		setSyncing(false);
+		if (!ok) setError("Could not sync now. Try again later.");
+	}
 
 	async function handleDisconnect() {
 		setBusy(true);
@@ -83,6 +101,9 @@ export function SyncProviderPanel({
 									Connected since {since}.
 								</p>
 							)}
+							{quota && (
+								<p className="m-0 text-xs text-muted">Bridge quota: {quota}.</p>
+							)}
 						</div>
 						{configured ? (
 							confirmingDisconnect ? (
@@ -105,14 +126,24 @@ export function SyncProviderPanel({
 									</TextButton>
 								</div>
 							) : (
-								<TextButton
-									type="button"
-									tone="danger"
-									disabled={readOnly || busy}
-									onClick={() => setConfirmingDisconnect(true)}
-								>
-									Disconnect
-								</TextButton>
+								<div className="flex items-center gap-3">
+									<Button
+										type="button"
+										variant="secondary"
+										disabled={readOnly || busy || syncing}
+										onClick={() => void handleSyncNow()}
+									>
+										{syncing ? "Syncing…" : "Sync now"}
+									</Button>
+									<TextButton
+										type="button"
+										tone="danger"
+										disabled={readOnly || busy || syncing}
+										onClick={() => setConfirmingDisconnect(true)}
+									>
+										Disconnect
+									</TextButton>
+								</div>
 							)
 						) : (
 							<Badge tone="neutral">Not connected</Badge>

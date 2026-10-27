@@ -214,12 +214,15 @@ function TransactionsView({
 	const recurringCount = visible.filter(
 		(movement) => movement.frequency !== "once",
 	).length;
+	const transactionsCount = visible.filter(
+		(movement) =>
+			movement.frequency === "once" && movement.purchasePriority == null,
+	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
 			id: "all",
 			label: "All transactions",
-			count: visible.filter((movement) => movement.purchasePriority == null)
-				.length,
+			count: transactionsCount,
 		},
 		{ id: "recurring", label: "Recurring", count: recurringCount },
 	];
@@ -230,7 +233,9 @@ function TransactionsView({
 					(movement) =>
 						movement.purchasePriority == null &&
 						movement.name.toLowerCase().includes(query.toLowerCase()) &&
-						(schedule === "all" || movement.frequency !== "once"),
+						(schedule === "all"
+							? movement.frequency === "once"
+							: movement.frequency !== "once"),
 				),
 				getDate: (movement) => movement.startDate,
 				getId: (movement) => movement.id,

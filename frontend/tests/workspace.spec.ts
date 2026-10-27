@@ -17,6 +17,7 @@ test.beforeEach(async () => {
 /** Open the movement editor for the fixture's investing transfer. */
 async function openInvestingMovementEditor(page: Page) {
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
+	await page.getByRole("tab", { name: /Recurring/ }).click();
 	await page.getByRole("button", { name: "Monthly investing" }).click();
 	await page.getByLabel("Amount (USD)").click();
 }
