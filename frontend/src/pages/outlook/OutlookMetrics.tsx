@@ -1,10 +1,10 @@
 import { CircleHelp, TrendingUp } from "lucide-react";
-import { IconButton, TextButton } from "../../components/Button.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
-import { compactMoney, dateLabel, money } from "../../domain/format.ts";
-import type { Plan } from "../../domain/model.ts";
-import { currentNetWorth, type Projection } from "../../domain/result.ts";
-import type { useCurrentPosition } from "../../state/useCurrentPosition.ts";
+import { IconButton, TextButton } from "@/components/Button.tsx";
+import { Skeleton } from "@/components/Skeleton.tsx";
+import { compactMoney, dateLabel, money } from "@/domain/format.ts";
+import type { Plan } from "@/domain/model.ts";
+import { currentNetWorth, type Projection } from "@/domain/result.ts";
+import type { useCurrentPosition } from "@/state/useCurrentPosition.ts";
 
 export function OutlookMetrics({
 	plan,

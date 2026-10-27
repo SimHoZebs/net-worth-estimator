@@ -1,21 +1,18 @@
 import { Flag, Plus } from "lucide-react";
 import { useMemo } from "react";
-import { Button } from "../components/Button.tsx";
-import { EmptyState } from "../components/EmptyState.tsx";
-import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
-import type { Evaluation, Plan } from "../domain/model.ts";
-import { removeEvaluation } from "../domain/planEdits.ts";
-import type { Projection, RangeResult } from "../domain/result.ts";
-import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
-import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
-import { usePlan } from "../state/useWorkspacePlan.ts";
-import {
-	useServerModel,
-	useServerStatus,
-} from "../state/workspaceResources.ts";
-import { EvaluationCard } from "./evaluations/EvaluationCard.tsx";
-import { OtherEvaluationCard } from "./evaluations/OtherEvaluationCard.tsx";
+import { Button } from "@/components/Button.tsx";
+import { EmptyState } from "@/components/EmptyState.tsx";
+import { ProjectionUpdating } from "@/components/ProjectionUpdating.tsx";
+import type { Evaluation, Plan } from "@/domain/model.ts";
+import { removeEvaluation } from "@/domain/planEdits.ts";
+import type { Projection, RangeResult } from "@/domain/result.ts";
+import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
+import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
+import { useWorkspaceStore } from "@/state/workspaceStore.ts";
+import { usePlan } from "@/state/useWorkspacePlan.ts";
+import { useServerModel, useServerStatus } from "@/state/workspaceResources.ts";
+import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
+import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
 
 export function EvaluationsPage({
 	onEdit,

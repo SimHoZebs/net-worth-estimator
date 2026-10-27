@@ -7,20 +7,20 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import { useId, useMemo } from "react";
-import { dateLabel, money } from "../../domain/format.ts";
+import { dateLabel, money } from "@/domain/format.ts";
 import {
 	deriveFundingGaps,
 	orderedFundingGaps,
 	summarizeFundingGap,
-} from "../../domain/fundingGaps.ts";
-import { fundingLabels } from "../../domain/fundingTerminology.ts";
-import type { OtherEvaluationCardProps } from "../evaluationCard.ts";
-import { SegmentedBar } from "../SegmentedBar.tsx";
-import { IconButton } from "../Button.tsx";
-import { Badge } from "../Badge.tsx";
-import { mergeStyles } from "../mergeStyles.ts";
-import { FundingGapsModal } from "./FundingGapsModal.tsx";
-import { useSelectedId } from "../entrySelection.ts";
+} from "@/domain/fundingGaps.ts";
+import { fundingLabels } from "@/domain/fundingTerminology.ts";
+import type { OtherEvaluationCardProps } from "@/components/evaluationCard.ts";
+import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import { IconButton } from "@/components/Button.tsx";
+import { Badge } from "@/components/Badge.tsx";
+import { mergeStyles } from "@/components/mergeStyles.ts";
+import { FundingGapsModal } from "@/components/funding/FundingGapsModal.tsx";
+import { useSelectedId } from "@/components/entrySelection.ts";
 
 /** The same configured funding-gap preview and inspector on both pages. */
 export function FundingGapsCard({

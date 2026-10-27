@@ -1,12 +1,9 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { OtherEvaluation } from "../../domain/result.ts";
-import { testPlan } from "../../mocks/plan.ts";
-import {
-	evaluationFixture,
-	projectionFixture,
-} from "../../mocks/projection.ts";
-import { PinnedEvaluations } from "./PinnedEvaluations.tsx";
+import type { OtherEvaluation } from "@/domain/result.ts";
+import { testPlan } from "@/mocks/plan.ts";
+import { evaluationFixture, projectionFixture } from "@/mocks/projection.ts";
+import { PinnedEvaluations } from "@/pages/outlook/PinnedEvaluations.tsx";
 
 afterEach(cleanup);
 
