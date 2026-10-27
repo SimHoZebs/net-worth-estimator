@@ -18,11 +18,9 @@ import type { OtherEvaluationCardProps } from "../evaluationCard.ts";
 import { SegmentedBar } from "../SegmentedBar.tsx";
 import { IconButton } from "../Button.tsx";
 import { Badge } from "../Badge.tsx";
-import { cardStyles } from "../cardStyles.ts";
 import { mergeStyles } from "../mergeStyles.ts";
 import { FundingGapsModal } from "./FundingGapsModal.tsx";
 import { useSelectedId } from "../entrySelection.ts";
-import { fundingCardTitleStyles } from "./fundingCardTitleStyles.ts";
 
 /** The same configured funding-gap preview and inspector on both pages. */
 export function FundingGapsCard({
@@ -48,8 +46,18 @@ export function FundingGapsCard({
 		item.enabled && item.status === "satisfied" && projection !== null;
 	const StateIcon = first ? TriangleAlert : clear ? ShieldCheck : Flag;
 	const state = first ? "gap" : clear ? "clear" : "unavailable";
-	const tone =
-		state === "gap" ? "warning" : state === "clear" ? "success" : "default";
+	const stateContainer =
+		state === "gap"
+			? "border-warning-border bg-warning-bg"
+			: state === "clear"
+				? "border-success-border bg-success-bg"
+				: "border-line bg-surface";
+	const stateTitle =
+		state === "gap"
+			? "text-warning-text"
+			: state === "clear"
+				? "text-success-text"
+				: "text-muted";
 	const statusTitle = !item.enabled
 		? "Paused"
 		: !projection
@@ -67,13 +75,19 @@ export function FundingGapsCard({
 		<>
 			<section
 				className={mergeStyles(
-					cardStyles({ tone }),
-					"relative text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm",
+					"relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border p-5 text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm print:break-inside-avoid",
+					stateContainer,
 				)}
 				aria-labelledby={headingId}
 			>
 				<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-					<h2 id={headingId} className={fundingCardTitleStyles({ state })}>
+					<h2
+						id={headingId}
+						className={mergeStyles(
+							"m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]",
+							stateTitle,
+						)}
+					>
 						<StateIcon size={16} aria-hidden="true" className="shrink-0" />
 						<span className="[overflow-wrap:anywhere]">{item.name}</span>
 					</h2>

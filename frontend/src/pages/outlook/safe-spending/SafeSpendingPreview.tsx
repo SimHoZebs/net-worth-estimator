@@ -15,8 +15,6 @@ import {
 	todayIso,
 } from "../../../domain/format.ts";
 import { Skeleton } from "../../../components/Skeleton.tsx";
-import { cardStyles } from "../../../components/cardStyles.ts";
-import { mergeStyles } from "../../../components/mergeStyles.ts";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -252,7 +250,7 @@ export function SafeSpendingPreview({
 	if (!cards.length) {
 		return (
 			<section
-				className={mergeStyles(cardStyles(), "relative")}
+				className="relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
 				aria-label="Safe card spending"
 			>
 				<div className="flex items-center justify-between gap-4">
@@ -391,7 +389,7 @@ export function SafeSpendingPreview({
 	if (pending)
 		return (
 			<section
-				className={mergeStyles(cardStyles(), "relative")}
+				className="relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
 				aria-label="Safe card spending"
 			>
 				<div className="flex items-center justify-between gap-4">
@@ -413,7 +411,7 @@ export function SafeSpendingPreview({
 
 	return (
 		<section
-			className={mergeStyles(cardStyles(), "relative")}
+			className="relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
 			aria-label="Safe card spending"
 		>
 			<button

@@ -4,7 +4,6 @@ import { Skeleton } from "../../components/Skeleton.tsx";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
-import { cardStyles } from "../../components/cardStyles.ts";
 import type { useCurrentPosition } from "../../state/useCurrentPosition.ts";
 
 export function OutlookMetrics({
@@ -31,7 +30,7 @@ export function OutlookMetrics({
 	return (
 		<div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
 			<section
-				className={cardStyles()}
+				className="flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
 				aria-busy={position.status === "pending"}
 			>
 				<div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted">
@@ -68,7 +67,10 @@ export function OutlookMetrics({
 					As of {dateLabel(position.data?.asOfDate ?? plan.startDate, true)}
 				</div>
 			</section>
-			<section className={cardStyles({ tone: "success" })} aria-busy={pending}>
+			<section
+				className="flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-success-border bg-success-bg p-5 print:break-inside-avoid"
+				aria-busy={pending}
+			>
 				<div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted">
 					<span>Base case in {finalYear}</span>
 					<TrendingUp size={19} className="max-sm:w-4" aria-hidden="true" />
