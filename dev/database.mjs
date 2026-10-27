@@ -1,29 +1,35 @@
-import { DatabaseSync, backup } from 'node:sqlite';
-import { open, chmod, unlink } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { createReadStream } from 'node:fs';
-import { pipeline } from 'node:stream/promises';
+import { DatabaseSync, backup } from "node:sqlite";
+import { open, chmod, unlink } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { createReadStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 
-export const databaseName = 'net-worth-estimator.db';
+export const databaseName = "net-worth-estimator.db";
 
 export function validateSnapshot(path) {
   const db = new DatabaseSync(path, { readOnly: true });
   try {
-    if (db.prepare('PRAGMA quick_check').get().quick_check !== 'ok') {
-      throw new Error('SQLite snapshot failed its integrity check');
+    if (db.prepare("PRAGMA quick_check").get().quick_check !== "ok") {
+      throw new Error("SQLite snapshot failed its integrity check");
     }
-    const scoped = db.prepare('PRAGMA table_info(model_metadata)').all().some((column) => column.name === 'plan_id');
+    const scoped = db
+      .prepare("PRAGMA table_info(model_metadata)")
+      .all()
+      .some((column) => column.name === "plan_id");
     if (scoped) {
       // An empty application database is valid. Plan ownership is separate from
       // financial document presence, and identity tables share this backup.
-      db.prepare('SELECT id FROM plans LIMIT 1').all();
-      return 'application';
+      db.prepare("SELECT id FROM plans LIMIT 1").all();
+      return "application";
     }
-    if (db.prepare('SELECT document_present FROM model_metadata WHERE id=1').get()?.document_present !== 1) {
-      throw new Error('The source database has no financial model');
+    if (
+      db.prepare("SELECT document_present FROM model_metadata WHERE id=1").get()
+        ?.document_present !== 1
+    ) {
+      throw new Error("The source database has no financial model");
     }
-    return 'legacy';
+    return "legacy";
   } finally {
     db.close();
   }
@@ -31,8 +37,9 @@ export function validateSnapshot(path) {
 
 // SQLite's backup API includes committed WAL pages without pausing the source.
 export async function snapshotFile(source, destination) {
-  if (resolve(source) === resolve(destination)) throw new Error('Snapshot source and destination must differ');
-  const file = await open(destination, 'wx', 0o600);
+  if (resolve(source) === resolve(destination))
+    throw new Error("Snapshot source and destination must differ");
+  const file = await open(destination, "wx", 0o600);
   await file.close();
   let db;
   try {
@@ -51,8 +58,8 @@ export async function snapshotFile(source, destination) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   process.umask(0o077);
   const [source, destination] = process.argv.slice(2);
-  if (!source || !destination) throw new Error('Usage: snapshot.mjs SOURCE_DB DESTINATION_DB');
-  const target = destination === '--stdout' ? '/tmp/snapshot.db' : destination;
+  if (!source || !destination) throw new Error("Usage: snapshot.mjs SOURCE_DB DESTINATION_DB");
+  const target = destination === "--stdout" ? "/tmp/snapshot.db" : destination;
   await snapshotFile(source, target);
-  if (destination === '--stdout') await pipeline(createReadStream(target), process.stdout);
+  if (destination === "--stdout") await pipeline(createReadStream(target), process.stdout);
 }

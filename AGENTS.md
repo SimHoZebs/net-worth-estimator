@@ -11,8 +11,7 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
 Use the frontend URL printed by setup. The local profile uses
-`http://localhost:5178`. Casdoor is on 8000, and the private API debug port is
-8788. Use the same API, Nginx frontend, and Casdoor images as production.
+`http://localhost:5178`. Casdoor is on 8000, and the private API debug port is 8788. Use the same API, Nginx frontend, and Casdoor images as production.
 Daily lifecycle commands use the dedicated `docker-compose.dev.yml`, not a wrapper.
 Dev state persists in gitignored `.env.dev` and `tmp/dev/`.
 Setup takes a SQLite-safe, read-only production database snapshot.
@@ -40,12 +39,12 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `backend/cmd/server/`         | configuration, startup, graceful shutdown, SimpleFIN scheduler                                          |
 | `backend/cmd/importcsv/`      | offline CSV replacement into an existing SQLite database                                                |
-| `backend/internal/api/`       | HTTP routes, CORS, read-only kill switch, deterministic API, stochastic SSE, artifact identity            |
+| `backend/internal/api/`       | HTTP routes, CORS, read-only kill switch, deterministic API, stochastic SSE, artifact identity          |
 | `backend/internal/types/`     | persisted model (postings, recurrence rules, claims), request, result, evaluation, and validation types |
 | `backend/internal/store/`     | `Store`, SQLite schema, model persistence, sync ownership, bounded artifacts                            |
 | `backend/internal/domain/`    | validation, request preparation, shared transitions, simulation, evaluations, stochastic kernels        |
 | `backend/internal/csvio/`     | canonical model CSV import                                                                              |
-| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner                                                          |
+| `backend/internal/simplefin/` | Bridge client, mapping, scheduler-safe runner                                                           |
 | `backend/scripts/`            | verification and benchmark entry points                                                                 |
 | `scripts/`                    | backend smoke and container smoke                                                                       |
 | `backend/Dockerfile`          | API-only container image                                                                                |
@@ -63,7 +62,7 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 | `NET_WORTH_ESTIMATOR_FRONTEND_PATH`                  | empty                                                          | optional built frontend directory for binary-only same-origin static serving                                 |
 | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`                | empty                                                          | comma-separated exact HTTP/S origins for direct cross-origin API access                                      |
 | `NET_WORTH_ESTIMATOR_READ_ONLY`                      | writable                                                       | `1`, `true`, or `yes` rejects guarded writes with 403                                                        |
-| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`                  | `casdoor`                                                      | required OIDC sessions and plan permissions; token-only and unauthenticated startup are unsupported            |
+| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`                  | `casdoor`                                                      | required OIDC sessions and plan permissions; token-only and unauthenticated startup are unsupported          |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL` | `6h`                                                           | Go duration spacing successful manual sync triggers; Bridge expects 24 requests or fewer per day             |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN`  | `1h`                                                           | Go duration Bridge-fetch blackout after an upstream 429; excess triggers return local 429 with `Retry-After` |
 

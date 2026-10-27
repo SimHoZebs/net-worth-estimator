@@ -33,20 +33,20 @@ The default signup form does not collect email or require a mail service.
 
 ## Configuration
 
-| Setting | Meaning |
-| --- | --- |
-| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER` | `casdoor` (default and only supported provider) |
-| `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | Exact public issuer from OIDC discovery |
-| `NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL` | Optional private container origin. Public issuer verification remains unchanged |
-| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID` | Confidential OIDC client |
-| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET` | Private client credential |
-| `NET_WORTH_ESTIMATOR_PUBLIC_URL` | Frontend origin, without a path |
-| `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL` | Optional account/passkey page on the issuer origin |
-| `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/plan-access` |
-| `NET_WORTH_ESTIMATOR_DB` | Shared application database for financial plans and application identity state |
-| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` | Verified account whose plan may use server-level SimpleFIN credentials |
-| `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h` |
-| `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m` |
+| Setting                                     | Meaning                                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------- |
+| `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`         | `casdoor` (default and only supported provider)                                 |
+| `NET_WORTH_ESTIMATOR_AUTH_ISSUER`           | Exact public issuer from OIDC discovery                                         |
+| `NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL`     | Optional private container origin. Public issuer verification remains unchanged |
+| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID`        | Confidential OIDC client                                                        |
+| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET`    | Private client credential                                                       |
+| `NET_WORTH_ESTIMATOR_PUBLIC_URL`            | Frontend origin, without a path                                                 |
+| `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL`      | Optional account/passkey page on the issuer origin                              |
+| `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/plan-access`                                |
+| `NET_WORTH_ESTIMATOR_DB`                    | Shared application database for financial plans and application identity state  |
+| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT`    | Verified account whose plan may use server-level SimpleFIN credentials          |
+| `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h`                                   |
+| `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m`                       |
 
 Register the callback `<PUBLIC_URL>/v1/auth/callback` and post-logout redirect
 `<PUBLIC_URL>/`. Configure Casdoor for code plus refresh grants, PKCE S256,
@@ -83,7 +83,7 @@ address. `NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS` maps additional app origins
 to browser-facing Casdoor origins. For example:
 
 ```json
-{"https://node.example.ts.net:18081":"https://node.example.ts.net:18083"}
+{ "https://node.example.ts.net:18081": "https://node.example.ts.net:18083" }
 ```
 
 `PUBLIC_URL` and the issuer remain the primary addresses. Register each additional
