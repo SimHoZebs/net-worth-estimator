@@ -491,6 +491,10 @@ export interface ServerStatus extends HumaMetadata {
 	syncHost?: string;
 	/** Last successful sync completion (RFC3339 UTC). Omitted before the first sync. */
 	lastSyncAt?: string;
+	/** Bridge hits in the trailing 24 hours. Absent from older backends. */
+	syncQuotaUsed?: number;
+	/** Bridge daily allowance. Absent from older backends. */
+	syncQuotaLimit?: number;
 }
 
 export interface SyncCredentialStatus extends HumaMetadata {

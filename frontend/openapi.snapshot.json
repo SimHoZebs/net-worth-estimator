@@ -2358,9 +2358,17 @@
 					},
 					"syncHost": {
 						"type": "string"
+					},
+					"syncQuotaLimit": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"syncQuotaUsed": {
+						"format": "int64",
+						"type": "integer"
 					}
 				},
-				"required": ["readOnly", "syncConfigured"],
+				"required": ["readOnly", "syncConfigured", "syncQuotaUsed", "syncQuotaLimit"],
 				"type": "object"
 			},
 			"StochasticConfig": {

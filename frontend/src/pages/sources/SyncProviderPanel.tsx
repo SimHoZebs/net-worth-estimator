@@ -11,6 +11,7 @@ import {
 	useSyncCredential,
 	useSyncLinks,
 } from "../../state/syncSettings.ts";
+import { useServerStatus } from "../../state/workspaceResources.ts";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
 
 const PROVIDERS = [{ id: "simplefin", name: "SimpleFIN" }] as const;
@@ -39,6 +40,7 @@ export function SyncProviderPanel({
 	const credential = useSyncCredential();
 	const configured = credential.data?.configured === true;
 	const links = useSyncLinks(configured);
+	const status = useServerStatus({ enabled: configured });
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
@@ -58,6 +60,12 @@ export function SyncProviderPanel({
 	const since = configured
 		? formatConnectedAt(credential.data?.updatedAt)
 		: null;
+	const quota =
+		configured &&
+		typeof status.data?.syncQuotaUsed === "number" &&
+		typeof status.data?.syncQuotaLimit === "number"
+			? `${status.data.syncQuotaUsed} of ${status.data.syncQuotaLimit} used in the last 24 hours`
+			: null;
 
 	async function handleDisconnect() {
 		setBusy(true);
@@ -82,6 +90,9 @@ export function SyncProviderPanel({
 								<p className="m-0 text-xs text-muted">
 									Connected since {since}.
 								</p>
+							)}
+							{quota && (
+								<p className="m-0 text-xs text-muted">Bridge quota: {quota}.</p>
 							)}
 						</div>
 						{configured ? (
