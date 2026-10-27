@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Landmark } from "lucide-react";
-import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
@@ -14,8 +13,6 @@ import {
 	useSyncCards,
 	useSyncCredential,
 } from "../../state/syncSettings.ts";
-
-const BRIDGE_CREATE_URL = "https://bridge.simplefin.org/simplefin/create";
 
 type Busy = "connect" | "disconnect" | "cards" | null;
 
@@ -48,7 +45,6 @@ export function SyncSettings({
 	const [selected, setSelected] = useState<string[] | null>(null);
 
 	const info = credential.data;
-	const configured = info?.configured === true;
 	const storedCards = cards.data ?? [];
 	const checked = selected ?? storedCards;
 	const dirty =
@@ -118,20 +114,13 @@ export function SyncSettings({
 			) : (
 				<ul className="grid list-none gap-4 p-0">
 					<li className="rounded-control border border-line p-4">
-						<div className="flex items-center gap-4">
+						<div className="mb-2 flex items-center gap-4">
 							<div className="flex-1">
 								<h3 className="m-0 text-sm">SimpleFIN</h3>
-								<p className="m-0 text-xs text-muted">
-									Bank balances and pending card charges via the SimpleFIN
-									Bridge.
-								</p>
 							</div>
-							<Badge tone={configured ? "outline" : "neutral"}>
-								{configured ? "Connected" : "Not connected"}
-							</Badge>
 						</div>
 
-						{configured && info ? (
+						{info?.configured === true ? (
 							<>
 								<p className="text-sm text-muted">
 									{info.bridgeHost ?? "Bridge"}
@@ -234,12 +223,6 @@ export function SyncSettings({
 							</>
 						) : (
 							<>
-								<p className="text-sm text-muted">
-									<a href={BRIDGE_CREATE_URL} target="_blank" rel="noreferrer">
-										Get a setup token from the SimpleFIN Bridge
-									</a>
-									, then paste it below.
-								</p>
 								{error && <ErrorNotice message={error} />}
 								<InputField
 									label="Setup token"

@@ -114,14 +114,11 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-it("shows the bridge link and keeps connect disabled until a token is pasted", async () => {
+it("keeps connect disabled until a token is pasted", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	expect(await screen.findByText("Not connected")).toBeTruthy();
 	expect(
-		screen.getByRole("link", {
-			name: /setup token from the SimpleFIN Bridge/i,
-		}),
+		await screen.findByPlaceholderText("Paste your setup token"),
 	).toBeTruthy();
 	expect(screen.getByPlaceholderText("Paste your setup token").tagName).toBe(
 		"INPUT",
@@ -144,8 +141,7 @@ it("connects with a setup token and shows the bridge host", async () => {
 		},
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect bank" }));
-	expect(await screen.findByText("Connected")).toBeTruthy();
-	expect(screen.getByText(/bridge\.example/)).toBeTruthy();
+	expect(await screen.findByText(/bridge\.example/)).toBeTruthy();
 	expect(
 		requests.some(
 			(request) =>
@@ -171,13 +167,13 @@ it("shows an error when the token is rejected", async () => {
 			"Could not connect. Check the token and try again.",
 		),
 	).toBeTruthy();
-	expect(screen.queryByText("Connected")).toBeNull();
+	expect(screen.queryByPlaceholderText("Paste your setup token")).toBeTruthy();
 });
 
 it("saves the card selection", async () => {
 	const requests = stubApi({ configured: true, cards: [] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	await screen.findByText("Connected");
+	await screen.findByText(/bridge\.example/);
 	fireEvent.click(screen.getByLabelText("Prime Card"));
 	fireEvent.click(screen.getByRole("button", { name: "Save cards" }));
 	await waitFor(() => {
@@ -203,7 +199,7 @@ it("connects with an already-claimed access URL", async () => {
 		target: { value: "https://user:pass@bridge.example/simplefin" },
 	});
 	fireEvent.click(screen.getByRole("button", { name: "Connect with URL" }));
-	expect(await screen.findByText("Connected")).toBeTruthy();
+	expect(await screen.findByText(/bridge\.example/)).toBeTruthy();
 	expect(
 		requests.some(
 			(request) =>
@@ -233,7 +229,7 @@ it("disables each connect button while the other field is filled", async () => {
 it("shows an inline error when cards fail to load", async () => {
 	stubApi({ configured: true, cards: [], failCards: true });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	await screen.findByText("Connected");
+	await screen.findByText(/bridge\.example/);
 	expect(
 		await screen.findByText("The card selection could not be loaded."),
 	).toBeTruthy();
@@ -247,7 +243,7 @@ it("shows an inline error when cards fail to load", async () => {
 it("keeps save disabled until the selection changes", async () => {
 	stubApi({ configured: true, cards: ["prime_card"] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	await screen.findByText("Connected");
+	await screen.findByText(/bridge\.example/);
 	expect(
 		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
 			.disabled,
@@ -277,7 +273,7 @@ it("invalidates server status after connecting", async () => {
 		},
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Connect bank" }));
-	await screen.findByText("Connected");
+	await screen.findByText(/bridge\.example/);
 	await waitFor(() => {
 		expect(
 			serverQueryClient().getQueryState(
@@ -289,19 +285,19 @@ it("invalidates server status after connecting", async () => {
 it("disconnects after confirmation", async () => {
 	const requests = stubApi({ configured: true, cards: ["prime_card"] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	await screen.findByText("Connected");
+	await screen.findByText(/bridge\.example/);
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	const confirms = await screen.findAllByRole("button", { name: "Disconnect" });
 	expect(confirms.length).toBeGreaterThan(1);
 	fireEvent.click(confirms[confirms.length - 1]!);
-	await screen.findByText("Not connected");
+	await screen.findByPlaceholderText("Paste your setup token");
 	expect(requests.some((request) => request.method === "DELETE")).toBe(true);
 });
 
 it("disables writes when read-only", async () => {
 	stubApi({ configured: true, cards: [] });
 	render(<SyncSettings accounts={accounts} readOnly={true} />);
-	await screen.findByText("Connected");
+	await screen.findByText(/bridge\.example/);
 	expect(
 		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
 			.disabled,
