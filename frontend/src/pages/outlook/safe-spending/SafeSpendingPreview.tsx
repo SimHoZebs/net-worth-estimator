@@ -24,6 +24,7 @@ import {
 	cycleAllowance,
 	filterMovementsById,
 	mandatoryTransactions,
+	monthEndIso,
 	nextMonthObligations,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
@@ -152,7 +153,7 @@ export function SafeSpendingPreview({
 	);
 	const remainingDerived = useMemo(() => {
 		if (!spendingIds.length)
-			return { total: 0, monthEnd: displayToday.slice(0, 10) };
+			return { total: 0, monthEnd: monthEndIso(displayToday) };
 		return remainingMonthlyObligations({
 			movements: obligationMovements,
 			checkingIds: spendingIds,

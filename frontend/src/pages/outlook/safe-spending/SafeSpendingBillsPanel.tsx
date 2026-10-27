@@ -110,9 +110,15 @@ export function SafeSpendingBillsPanel({
 			: `${money(-heroes.dailySafe)} a day over · ${heroes.fullDaysLeft} full ${dayUnit} left`;
 	// The next paycheck arrives inside this statement cycle, so name its
 	// date here. This cycle funds spending from it; Last cycle shows the
-	// full allocation against the closed balance.
+	// full allocation against the closed balance. Mirror the Last-cycle
+	// date range when several income sources span many days.
 	const incomingDate =
-		heroes.paycheckDate !== null ? ` · ${monthDay(heroes.paycheckDate)}` : "";
+		heroes.paycheckDate === null
+			? ""
+			: heroes.paycheckEndDate !== null &&
+				  heroes.paycheckEndDate !== heroes.paycheckDate
+				? ` · ${monthDay(heroes.paycheckDate)} – ${monthDay(heroes.paycheckEndDate)}`
+				: ` · ${monthDay(heroes.paycheckDate)}`;
 	return (
 		<div className="grid content-start gap-4">
 			<div className="grid grid-cols-2 gap-3">
