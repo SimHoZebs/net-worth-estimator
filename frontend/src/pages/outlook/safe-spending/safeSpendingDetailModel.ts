@@ -48,6 +48,8 @@ export interface CashNowDecomposition {
 	cushion: number;
 	/** Projection-start date anchoring spentSinceStart, for caption context. */
 	since: string;
+	/** Last day of the calendar-month bills window, for caption context. */
+	monthEnd: string;
 	/** Simulated unpaid bills in the due window (fulfillment gaps). */
 	short: number;
 	/** First date the simulation leaves a bill unpaid, if any. */

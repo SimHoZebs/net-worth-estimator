@@ -15,6 +15,7 @@ import {
 	SegmentedBar,
 } from "../../../components/SegmentedBar.tsx";
 import { exactMoney, money, monthDay } from "../../../domain/format.ts";
+import { paycheckBeforeReserve } from "../../../domain/safeSpending.ts";
 import type { Plan } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
@@ -97,6 +98,21 @@ export function SafeSpendingBillsPanel({
 		section.transactions,
 		movements,
 	);
+	const incoming = paycheckBeforeReserve({
+		paycheck: paycheck.paycheck,
+		fixedObligations: paycheck.fixed,
+		closedTotal: heroes.closedCycle.total,
+	});
+	const dayUnit = heroes.fullDaysLeft === 1 ? "day" : "days";
+	const dailyFoot =
+		paycheck.allowance >= 0
+			? `${money(heroes.dailySafe)} a day · ${heroes.fullDaysLeft} full ${dayUnit} left`
+			: `${money(-heroes.dailySafe)} a day over · ${heroes.fullDaysLeft} full ${dayUnit} left`;
+	// The next paycheck arrives inside this statement cycle, so name its
+	// date here. This cycle funds spending from it; Last cycle shows the
+	// full allocation against the closed balance.
+	const incomingDate =
+		heroes.paycheckDate !== null ? ` · ${monthDay(heroes.paycheckDate)}` : "";
 	return (
 		<div className="grid content-start gap-4">
 			<div className="grid grid-cols-2 gap-3">
@@ -104,14 +120,20 @@ export function SafeSpendingBillsPanel({
 					label={labels.cashAfterBills}
 					icon={<Landmark size={16} aria-hidden="true" />}
 					value={money(cashNow.cushion)}
-					foot="After cash payments and bills before month-end"
+					foot={
+						incoming === null
+							? paycheck.paycheck
+								? `${exactMoney(paycheck.paycheck)} incoming${incomingDate}`
+								: "No incoming paycheck"
+							: `${exactMoney(incoming)} incoming before reserve${incomingDate}`
+					}
 				/>
 				<HouseholdMetricCard
 					label={labels.allowance}
 					icon={<CreditCard size={16} aria-hidden="true" />}
 					value={money(paycheck.allowance)}
 					tone={paycheck.allowance < 0 ? "normal" : "positive"}
-					foot="After protected reserve"
+					foot={dailyFoot}
 				/>
 			</div>
 			<section className={householdPanelStyles()}>
@@ -217,7 +239,8 @@ export function SafeSpendingBillsPanel({
 				/>
 				<div className="flex items-center justify-between gap-3 text-sm text-ink">
 					<span className="flex items-center gap-2">
-						<Clock3 size={16} aria-hidden="true" /> {labels.remainingBills}
+						<Clock3 size={16} aria-hidden="true" /> {labels.remainingBills} ·{" "}
+						through {monthDay(cashNow.monthEnd)}
 					</span>
 					<strong>−{exactMoney(cashNow.bills)}</strong>
 				</div>
@@ -250,21 +273,6 @@ export function SafeSpendingBillsPanel({
 					order={transactionOrder}
 					showHeaders={showHeaders}
 				/>
-			</section>
-			<section className={householdPanelStyles()}>
-				<div className="flex items-center justify-between">
-					<strong className="text-sm text-ink">{labels.dailyAllowance}</strong>
-				</div>
-				<div className="flex items-center justify-between gap-3 text-sm text-ink">
-					<span className="flex items-center gap-2 text-muted">
-						{heroes.fullDaysLeft} full{" "}
-						{heroes.fullDaysLeft === 1 ? "day" : "days"} left
-					</span>
-					<strong>
-						{heroes.fullDaysLeft > 0 ? money(heroes.dailySafe) : "N/A"}{" "}
-						<span className="text-xs text-muted">per day</span>
-					</strong>
-				</div>
 			</section>
 			{selected && (
 				<TransactionDetail

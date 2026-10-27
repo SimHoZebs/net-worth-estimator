@@ -7,7 +7,14 @@ import {
 	sortTransactionsByDate,
 	type TransactionOrder,
 } from "@/domain/transactionSort.ts";
-import { dateLabel, money, shiftDate, sum, todayIso } from "@/domain/format.ts";
+import {
+	dateLabel,
+	money,
+	monthDay,
+	shiftDate,
+	sum,
+	todayIso,
+} from "@/domain/format.ts";
 import { Skeleton } from "@/components/Skeleton.tsx";
 import { Card } from "@/components/Card.tsx";
 import {
@@ -220,13 +227,14 @@ export function SafeSpendingPreview({
 		return resolveEffectiveIds(settings.movementIds, knownIds);
 	}, [settings.movementIds, billCandidates]);
 
+	const billsStart = shiftDate({ date: displayToday, days: 1 });
 	const billTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return sortTransactionsByDate({
 			items: mandatoryTransactions({
 				movements: obligationMovements,
 				checkingIds: spendingIds,
-				start: shiftDate({ date: displayToday, days: 1 }),
+				start: billsStart,
 				end: cycle.cycleEnd,
 				plan,
 			}),
@@ -238,7 +246,7 @@ export function SafeSpendingPreview({
 		obligationMovements,
 		spendingIds,
 		plan,
-		displayToday,
+		billsStart,
 		cycle.cycleEnd,
 		transactionOrder,
 	]);
@@ -372,7 +380,7 @@ export function SafeSpendingPreview({
 
 	const billsSection = {
 		title: labels.scheduledBills,
-		subtitle: "Scheduled amounts",
+		subtitle: `Scheduled amounts · ${monthDay(billsStart)} – ${monthDay(cycle.cycleEnd)}`,
 		total: sum(billTransactions.map((transaction) => transaction.requested)),
 		transactions: billTransactions,
 	};
@@ -500,6 +508,7 @@ export function SafeSpendingPreview({
 										bills: remainingObligations,
 										cushion,
 										since: plan.startDate.slice(0, 10),
+										monthEnd: remainingDerived.monthEnd,
 										short: shortWindow.total,
 										firstShort: shortWindow.firstDate,
 									}}
