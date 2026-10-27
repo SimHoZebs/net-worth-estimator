@@ -127,11 +127,11 @@ describe("AccountDetailsModal", () => {
 			/>,
 		);
 		expect(view.getByRole("status").textContent).toMatch(
-			/Showing 1–60 of \d+ transactions/,
+			/Showing 1–20 of \d+ transactions/,
 		);
 		fireEvent.click(
 			view.getByRole("button", { name: "Next transaction page" }),
 		);
-		expect(view.getByRole("status").textContent).toMatch(/Showing 61–120 of/);
+		expect(view.getByRole("status").textContent).toMatch(/Showing 21–40 of/);
 	});
 });
