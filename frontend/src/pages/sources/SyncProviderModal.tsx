@@ -93,95 +93,88 @@ export function SyncProviderModal({
 										</p>
 									)}
 								</div>
-								<Badge tone={configured ? "outline" : "neutral"}>
-									{configured ? "Connected" : "Not connected"}
-								</Badge>
+								{configured ? (
+									confirmingDisconnect ? (
+										<div className="flex items-center gap-3">
+											<Button
+												type="button"
+												variant="secondary"
+												disabled={busy}
+												onClick={() => setConfirmingDisconnect(false)}
+											>
+												Keep connected
+											</Button>
+											<TextButton
+												type="button"
+												tone="danger"
+												disabled={readOnly || busy}
+												onClick={() => void handleDisconnect()}
+											>
+												{busy ? "Disconnecting…" : "Confirm disconnect"}
+											</TextButton>
+										</div>
+									) : (
+										<TextButton
+											type="button"
+											tone="danger"
+											disabled={readOnly || busy}
+											onClick={() => setConfirmingDisconnect(true)}
+										>
+											Disconnect
+										</TextButton>
+									)
+								) : (
+									<Badge tone="neutral">Not connected</Badge>
+								)}
 							</div>
 
 							{error && <ErrorNotice message={error} />}
 
 							{configured ? (
-								<>
-									<div className="mt-4">
-										<span
-											id="sync-accounts-label"
-											className="text-sm font-semibold text-muted"
+								<div className="mt-4">
+									<span
+										id="sync-accounts-label"
+										className="text-sm font-semibold text-muted"
+									>
+										Synced accounts
+									</span>
+									{links.isPending ? (
+										<Skeleton className="mt-2 h-10 w-full" />
+									) : links.isError ? (
+										<ErrorNotice
+											message="The synced accounts could not be loaded."
+											action="Reload"
+											onAction={() => void refreshSyncSettings(true)}
+										/>
+									) : (
+										<ul
+											aria-labelledby="sync-accounts-label"
+											className="mt-2 grid list-none gap-2 p-0"
 										>
-											Synced accounts
-										</span>
-										{links.isPending ? (
-											<Skeleton className="mt-2 h-10 w-full" />
-										) : links.isError ? (
-											<ErrorNotice
-												message="The synced accounts could not be loaded."
-												action="Reload"
-												onAction={() => void refreshSyncSettings(true)}
-											/>
-										) : (
-											<ul
-												aria-labelledby="sync-accounts-label"
-												className="mt-2 grid list-none gap-2 p-0"
-											>
-												{synced.map((account) => (
-													<li
-														key={account.id}
-														className="flex items-center gap-2 text-sm"
-													>
-														<AccountLabel account={account} />
-													</li>
-												))}
-												{orphaned.map((orphan) => (
-													<li
-														key={`bridge-${orphan.id}`}
-														className="text-sm text-muted"
-													>
-														{orphan.name}
-													</li>
-												))}
-												{synced.length === 0 && orphaned.length === 0 && (
-													<li className="text-sm text-muted">
-														No synced accounts yet.
-													</li>
-												)}
-											</ul>
-										)}
-									</div>
-									<div className="mt-3">
-										{confirmingDisconnect ? (
-											<div className="flex items-center gap-3">
-												<Button
-													type="button"
-													variant="secondary"
-													disabled={busy}
-													onClick={() => setConfirmingDisconnect(false)}
+											{synced.map((account) => (
+												<li
+													key={account.id}
+													className="flex items-center gap-2 text-sm"
 												>
-													Keep connected
-												</Button>
-												<TextButton
-													type="button"
-													tone="danger"
-													disabled={readOnly || busy}
-													onClick={() => void handleDisconnect()}
+													<AccountLabel account={account} />
+												</li>
+											))}
+											{orphaned.map((orphan) => (
+												<li
+													key={`bridge-${orphan.id}`}
+													className="text-sm text-muted"
 												>
-													{busy ? "Disconnecting…" : "Confirm disconnect"}
-												</TextButton>
-											</div>
-										) : (
-											<TextButton
-												type="button"
-												tone="danger"
-												disabled={readOnly || busy}
-												onClick={() => setConfirmingDisconnect(true)}
-											>
-												Disconnect
-											</TextButton>
-										)}
-										<p className="m-0 mt-2 text-xs text-muted">
-											Synced rows stay. Future syncs stop until you connect a
-											new key.
-										</p>
-									</div>
-								</>
+													{orphan.name}
+												</li>
+											))}
+											{synced.length === 0 && orphaned.length === 0 && (
+												<li className="text-sm text-muted">
+													No synced accounts yet.
+												</li>
+											)}
+										</ul>
+									)}
+								</div>
 							) : (
 								<div className="mt-3">
 									<Button type="button" disabled={readOnly} onClick={onConnect}>
