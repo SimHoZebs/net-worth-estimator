@@ -125,6 +125,152 @@
 				],
 				"type": "object"
 			},
+			"AccountPasswordChange": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AccountPasswordChange.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"newPassword": {
+						"type": "string"
+					},
+					"oldPassword": {
+						"type": "string"
+					}
+				},
+				"required": ["oldPassword", "newPassword"],
+				"type": "object"
+			},
+			"AccountPasswordChanged": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AccountPasswordChanged.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"reauth": {
+						"type": "boolean"
+					}
+				},
+				"required": ["reauth"],
+				"type": "object"
+			},
+			"AccountProfile": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/AccountProfile.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"avatar": {
+						"type": "string"
+					},
+					"displayName": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"owner": {
+						"type": "string"
+					}
+				},
+				"required": ["owner", "name", "displayName", "avatar"],
+				"type": "object"
+			},
+			"AccountProfileUpdate": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AccountProfileUpdate.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"avatar": {
+						"type": "string"
+					},
+					"displayName": {
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
+			"AccountSession": {
+				"additionalProperties": false,
+				"properties": {
+					"current": {
+						"type": "boolean"
+					},
+					"expiresAt": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"loginStartedAt": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "current", "loginStartedAt", "expiresAt"],
+				"type": "object"
+			},
+			"AccountSessionRevoked": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AccountSessionRevoked.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"revoked": {
+						"type": "boolean"
+					}
+				},
+				"required": ["revoked"],
+				"type": "object"
+			},
+			"AccountSessions": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/AccountSessions.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"sessions": {
+						"items": {
+							"$ref": "#/components/schemas/AccountSession"
+						},
+						"type": "array"
+					}
+				},
+				"required": ["sessions"],
+				"type": "object"
+			},
 			"AccountSnapshot": {
 				"additionalProperties": false,
 				"properties": {
@@ -534,6 +680,23 @@
 				"required": ["code", "severity", "message"],
 				"type": "object"
 			},
+			"EvaluationInstanceInterface": {
+				"additionalProperties": false,
+				"properties": {
+					"config": {},
+					"enabled": {
+						"type": "boolean"
+					},
+					"instanceId": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": ["instanceId", "name", "enabled", "config"],
+				"type": "object"
+			},
 			"EvaluationResultEnvelope": {
 				"additionalProperties": false,
 				"properties": {
@@ -813,6 +976,23 @@
 					}
 				},
 				"required": ["modelAccountId"],
+				"type": "object"
+			},
+			"LogoutResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/LogoutResponse.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"logoutURL": {
+						"type": "string"
+					}
+				},
+				"required": ["logoutURL"],
 				"type": "object"
 			},
 			"ModelOverrides": {
@@ -1391,6 +1571,19 @@
 					}
 				},
 				"required": ["row", "issues", "persisted"],
+				"type": "object"
+			},
+			"Principal": {
+				"additionalProperties": false,
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"subject": {
+						"type": "string"
+					}
+				},
+				"required": ["subject", "name"],
 				"type": "object"
 			},
 			"ProjectionAccountSummary": {
@@ -2030,13 +2223,13 @@
 						},
 						"type": ["array", "null"]
 					},
-					"incomeRuleIds": {
+					"incomeAccountIds": {
 						"items": {
 							"type": "string"
 						},
 						"type": ["array", "null"]
 					},
-					"incomeAccountIds": {
+					"incomeRuleIds": {
 						"items": {
 							"type": "string"
 						},
@@ -2081,6 +2274,69 @@
 				],
 				"type": "object"
 			},
+			"SessionResource": {
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"enum": ["private", "sample"],
+						"type": "string"
+					},
+					"permissions": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": ["id", "kind", "permissions"],
+				"type": "object"
+			},
+			"SessionResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/SessionResponse.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountURL": {
+						"type": "string"
+					},
+					"allowed": {
+						"type": "boolean"
+					},
+					"authenticated": {
+						"type": "boolean"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"provider": {
+						"type": "string"
+					},
+					"resource": {
+						"$ref": "#/components/schemas/SessionResource"
+					},
+					"user": {
+						"$ref": "#/components/schemas/Principal"
+					}
+				},
+				"required": [
+					"enabled",
+					"provider",
+					"authenticated",
+					"allowed",
+					"accountURL",
+					"resource",
+					"user"
+				],
+				"type": "object"
+			},
 			"StatusOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2105,6 +2361,47 @@
 					}
 				},
 				"required": ["readOnly", "syncConfigured"],
+				"type": "object"
+			},
+			"StochasticConfig": {
+				"additionalProperties": false,
+				"properties": {
+					"runCount": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"seed": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					}
+				},
+				"required": ["runCount", "seed"],
+				"type": "object"
+			},
+			"StochasticRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/StochasticRequest.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"config": {
+						"$ref": "#/components/schemas/StochasticConfig"
+					},
+					"document": {
+						"$ref": "#/components/schemas/FinancialModelDocument"
+					},
+					"overrides": {
+						"$ref": "#/components/schemas/ModelOverrides"
+					},
+					"settings": {
+						"$ref": "#/components/schemas/ProjectionRuntimeSettings"
+					}
+				},
+				"required": ["settings", "config"],
 				"type": "object"
 			},
 			"Summary": {
@@ -2282,23 +2579,6 @@
 					}
 				},
 				"required": ["accountId", "minimumFixed", "dueDay"],
-				"type": "object"
-			},
-			"EvaluationInstanceInterface": {
-				"additionalProperties": false,
-				"properties": {
-					"config": {},
-					"enabled": {
-						"type": "boolean"
-					},
-					"instanceId": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					}
-				},
-				"required": ["instanceId", "name", "enabled", "config"],
 				"type": "object"
 			}
 		}
@@ -2681,6 +2961,151 @@
 					}
 				},
 				"summary": "List registered amount resolvers and providers"
+			}
+		},
+		"/v1/auth/change-password": {
+			"post": {
+				"operationId": "change-account-password",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AccountPasswordChange"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountPasswordChanged"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
+			}
+		},
+		"/v1/auth/logout": {
+			"post": {
+				"operationId": "logout",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LogoutResponse"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
+			}
+		},
+		"/v1/auth/profile": {
+			"get": {
+				"operationId": "get-account-profile",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountProfile"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
+			},
+			"patch": {
+				"operationId": "update-account-profile",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AccountProfileUpdate"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountProfile"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
+			}
+		},
+		"/v1/auth/session": {
+			"get": {
+				"operationId": "get-auth-session",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SessionResponse"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
+			}
+		},
+		"/v1/auth/sessions": {
+			"delete": {
+				"operationId": "revoke-account-session",
+				"parameters": [
+					{
+						"in": "query",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountSessionRevoked"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
+			},
+			"get": {
+				"operationId": "list-account-sessions",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountSessions"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
 			}
 		},
 		"/v1/checkpoints": {
@@ -3334,6 +3759,33 @@
 					}
 				},
 				"summary": "Run a deterministic projection"
+			}
+		},
+		"/v1/projections/stochastic": {
+			"post": {
+				"operationId": "project-stochastic",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/StochasticRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"text/event-stream": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						},
+						"description": "Success"
+					}
+				}
 			}
 		},
 		"/v1/recurrence-rules": {

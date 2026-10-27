@@ -174,6 +174,7 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	}
 	config.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", waypointSchemaNamer)
 	api := humachi.New(router, config)
+	documentRawRoutes(api)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/v1/safe-spending-settings", Summary: "Load safe card spending settings"}, server.getSafeSpendingSettings)
 	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/v1/safe-spending-settings", Summary: "Save safe card spending settings"}, server.setSafeSpendingSettings)
 

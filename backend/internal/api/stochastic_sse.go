@@ -248,12 +248,7 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body struct {
-		Document  *types.FinancialModelDocument   `json:"document,omitempty"`
-		Overrides types.ModelOverrides            `json:"overrides,omitempty"`
-		Settings  types.ProjectionRuntimeSettings `json:"settings"`
-		Config    types.StochasticConfig          `json:"config"`
-	}
+	var body stochasticRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 		return

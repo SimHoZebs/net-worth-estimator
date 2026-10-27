@@ -13,6 +13,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 )
 
 func (s *Service) login(w http.ResponseWriter, r *http.Request) {
@@ -191,5 +192,5 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 			destination = u.String()
 		}
 	}
-	respond(w, map[string]string{"logoutURL": destination})
+	respond(w, authcontract.LogoutResponse{LogoutURL: destination})
 }
