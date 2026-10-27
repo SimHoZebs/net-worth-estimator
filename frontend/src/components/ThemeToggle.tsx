@@ -21,7 +21,12 @@ export function ThemeToggle() {
 			aria-label={`Theme: ${LABEL[preference]}. Activate to switch theme.`}
 		>
 			<Icon size={19} strokeWidth={1.7} aria-hidden="true" />
-			<span>Theme · {LABEL[preference]}</span>
+			<span className="flex flex-col items-start leading-tight">
+				<span className="text-sm font-semibold text-ink">Theme</span>
+				<span className="text-xs font-normal text-muted">
+					{LABEL[preference]}
+				</span>
+			</span>
 		</button>
 	);
 }
