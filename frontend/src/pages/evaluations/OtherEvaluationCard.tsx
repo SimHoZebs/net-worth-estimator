@@ -1,7 +1,7 @@
-import type { OtherEvaluationCardProps } from "../../components/evaluationCard.ts";
-import { FundingGapsCard } from "../../components/funding/FundingGapsCard.tsx";
-import { CycleFulfillmentCard } from "./CycleFulfillmentCard.tsx";
-import { FinancialIndependenceCard } from "./FinancialIndependenceCard.tsx";
+import type { OtherEvaluationCardProps } from "@/components/evaluationCard.ts";
+import { FundingGapsCard } from "@/components/funding/FundingGapsCard.tsx";
+import { CycleFulfillmentCard } from "@/pages/evaluations/CycleFulfillmentCard.tsx";
+import { FinancialIndependenceCard } from "@/pages/evaluations/FinancialIndependenceCard.tsx";
 
 export function OtherEvaluationCard(props: OtherEvaluationCardProps) {
 	switch (props.item.type) {

@@ -1,9 +1,9 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { dateLabel } from "../../domain/format.ts";
-import type { OtherEvaluation } from "../../domain/result.ts";
-import { testPlan } from "../../mocks/plan.ts";
-import { OtherEvaluationCard } from "./OtherEvaluationCard.tsx";
+import { dateLabel } from "@/domain/format.ts";
+import type { OtherEvaluation } from "@/domain/result.ts";
+import { testPlan } from "@/mocks/plan.ts";
+import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
 
 afterEach(cleanup);
 

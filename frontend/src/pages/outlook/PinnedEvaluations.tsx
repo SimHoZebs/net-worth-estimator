@@ -1,14 +1,14 @@
 import { Pin } from "lucide-react";
 import { useId } from "react";
-import type { Plan } from "../../domain/model.ts";
+import type { Plan } from "@/domain/model.ts";
 import type {
 	EvaluationResult,
 	OtherEvaluation,
 	Projection,
 	RangeResult,
-} from "../../domain/result.ts";
-import { EvaluationCard } from "../evaluations/EvaluationCard.tsx";
-import { OtherEvaluationCard } from "../evaluations/OtherEvaluationCard.tsx";
+} from "@/domain/result.ts";
+import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
+import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
 
 type PinnedItem =
 	| { kind: "evaluation"; result: EvaluationResult }

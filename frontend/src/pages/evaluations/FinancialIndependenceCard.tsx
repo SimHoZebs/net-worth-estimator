@@ -1,12 +1,12 @@
 import { Check, Flag, Pin } from "lucide-react";
 import { useId } from "react";
-import { Badge } from "../../components/Badge.tsx";
-import { IconButton } from "../../components/Button.tsx";
-import type { EvaluationPin } from "../../components/evaluationCard.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
-import { Progress } from "../../components/Progress.tsx";
-import { dateLabel } from "../../domain/format.ts";
-import type { OtherEvaluation } from "../../domain/result.ts";
+import { Badge } from "@/components/Badge.tsx";
+import { IconButton } from "@/components/Button.tsx";
+import type { EvaluationPin } from "@/components/evaluationCard.ts";
+import { mergeStyles } from "@/components/mergeStyles.ts";
+import { Progress } from "@/components/Progress.tsx";
+import { dateLabel } from "@/domain/format.ts";
+import type { OtherEvaluation } from "@/domain/result.ts";
 
 export function FinancialIndependenceCard({
 	item,

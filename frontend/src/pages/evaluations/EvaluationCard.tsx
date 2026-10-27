@@ -1,15 +1,15 @@
 import { Check, Flag, Pencil, Pin, Trash2 } from "lucide-react";
 import { useId } from "react";
-import { IconButton } from "../../components/Button.tsx";
-import type { EvaluationPin } from "../../components/evaluationCard.ts";
-import { mergeStyles } from "../../components/mergeStyles.ts";
-import { Progress } from "../../components/Progress.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
-import { dateLabel, money, percent } from "../../domain/format.ts";
-import type { Evaluation } from "../../domain/model.ts";
-import type { EvaluationResult } from "../../domain/result.ts";
+import { IconButton } from "@/components/Button.tsx";
+import type { EvaluationPin } from "@/components/evaluationCard.ts";
+import { mergeStyles } from "@/components/mergeStyles.ts";
+import { Progress } from "@/components/Progress.tsx";
+import { Skeleton } from "@/components/Skeleton.tsx";
+import { dateLabel, money, percent } from "@/domain/format.ts";
+import type { Evaluation } from "@/domain/model.ts";
+import type { EvaluationResult } from "@/domain/result.ts";
 
-export type { EvaluationPin } from "../../components/evaluationCard.ts";
+export type { EvaluationPin } from "@/components/evaluationCard.ts";
 
 export function EvaluationCard({
 	evaluation,

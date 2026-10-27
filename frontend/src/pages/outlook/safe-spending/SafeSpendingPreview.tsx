@@ -1,20 +1,14 @@
 import { CalendarDays } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { BackendCheckpoint } from "../../../api/contracts.ts";
-import { TextButton } from "../../../components/Button.tsx";
+import type { BackendCheckpoint } from "@/api/contracts.ts";
+import { TextButton } from "@/components/Button.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
 	type TransactionOrder,
-} from "../../../domain/transactionSort.ts";
-import {
-	dateLabel,
-	money,
-	shiftDate,
-	sum,
-	todayIso,
-} from "../../../domain/format.ts";
-import { Skeleton } from "../../../components/Skeleton.tsx";
+} from "@/domain/transactionSort.ts";
+import { dateLabel, money, shiftDate, sum, todayIso } from "@/domain/format.ts";
+import { Skeleton } from "@/components/Skeleton.tsx";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -26,26 +20,26 @@ import {
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
-} from "../../../domain/safeSpending.ts";
-import { safeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
-import type { Plan } from "../../../domain/model.ts";
-import { visibleAccounts } from "../../../domain/model.ts";
-import type { Projection } from "../../../domain/result.ts";
-import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
-import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
-import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
-import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
+} from "@/domain/safeSpending.ts";
+import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
+import type { Plan } from "@/domain/model.ts";
+import { visibleAccounts } from "@/domain/model.ts";
+import type { Projection } from "@/domain/result.ts";
+import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
+import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx";
+import { SafeSpendingCyclePanel } from "@/pages/outlook/safe-spending/SafeSpendingCyclePanel.tsx";
+import { SafeSpendingDetailShell } from "@/pages/outlook/safe-spending/SafeSpendingDetailShell.tsx";
 import {
 	isSafeSpendingCycleTab,
 	type SafeSpendingDetailTab,
-} from "./safeSpendingDetailModel.ts";
+} from "@/pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import {
 	resolveEffectiveIds,
 	useSafeSpendingSettings,
-} from "../../../state/useSafeSpendingSettings.ts";
-import { useCardCycleActivity } from "./useCardCycleActivity.ts";
-import { HouseholdBudgetSummary } from "./HouseholdBudgetSummary.tsx";
-import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
+} from "@/state/useSafeSpendingSettings.ts";
+import { useCardCycleActivity } from "@/pages/outlook/safe-spending/useCardCycleActivity.ts";
+import { HouseholdBudgetSummary } from "@/pages/outlook/safe-spending/HouseholdBudgetSummary.tsx";
+import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
