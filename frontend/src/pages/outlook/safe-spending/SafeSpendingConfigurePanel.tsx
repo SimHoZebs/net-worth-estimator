@@ -141,10 +141,7 @@ export function SafeSpendingConfigurePanel({
 							<RuleTogglePill
 								key={bill.id}
 								name={bill.name}
-								detail={formatRuleDetail({
-									frequency: bill.frequency,
-									amount: bill.amount,
-								})}
+								detail={formatRuleDetail({ amount: bill.amount })}
 								checked={trackedBillIds.includes(bill.id)}
 								onToggle={() => onToggleBill(bill.id)}
 							/>

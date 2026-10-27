@@ -21,10 +21,7 @@ export function IncomeSourcesFieldset({
 							<RuleTogglePill
 								key={rule.id}
 								name={rule.name}
-								detail={formatRuleDetail({
-									frequency: rule.frequency,
-									amount: rule.amount,
-								})}
+								detail={formatRuleDetail({ amount: rule.amount })}
 								checked={checked}
 								onToggle={() =>
 									onChange(

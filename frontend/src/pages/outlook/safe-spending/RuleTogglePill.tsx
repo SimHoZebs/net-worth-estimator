@@ -1,18 +1,11 @@
 import { exactMoney } from "../../../domain/format.ts";
 
 /**
- * One-line detail shared by income sources and included bills:
- * `frequency · amount`. Both lists render through RuleTogglePill with
- * different data.
+ * One-line detail shared by income sources and included bills: the amount.
+ * Both lists render through RuleTogglePill with different data.
  */
-export function formatRuleDetail({
-	frequency,
-	amount,
-}: {
-	frequency: string;
-	amount: number;
-}): string {
-	return `${frequency} · ${exactMoney(amount)}`;
+export function formatRuleDetail({ amount }: { amount: number }): string {
+	return exactMoney(amount);
 }
 
 // Identity layout stays separate from the toggle button, mirroring
