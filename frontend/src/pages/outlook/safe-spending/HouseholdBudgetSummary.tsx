@@ -1,7 +1,7 @@
 import { CalendarDays, CheckCircle2 } from "lucide-react";
 import { SegmentedBar } from "../../../components/SegmentedBar.tsx";
 import { exactMoney, monthDay } from "../../../domain/format.ts";
-import { cycleAllowance } from "../../../domain/safeSpending.ts";
+import { paycheckBeforeReserve } from "../../../domain/safeSpending.ts";
 import {
 	householdPanelStyles,
 	householdValueStyles,
@@ -24,15 +24,11 @@ export function HouseholdBudgetSummary({
 }) {
 	// The next paycheck covers the closed statement. New-cycle charges remain
 	// separate from this allocation and from the existing cycle allowance.
-	const remainder =
-		heroes.closedCycle.total === null
-			? null
-			: cycleAllowance({
-					paycheck: paycheck.paycheck,
-					fixedObligations: paycheck.fixed,
-					spent: heroes.closedCycle.total,
-					reserve: 0,
-				});
+	const remainder = paycheckBeforeReserve({
+		paycheck: paycheck.paycheck,
+		fixedObligations: paycheck.fixed,
+		closedTotal: heroes.closedCycle.total,
+	});
 	const unallocated = remainder === null ? null : remainder - paycheck.reserve;
 	return (
 		<section
