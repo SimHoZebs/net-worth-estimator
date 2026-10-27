@@ -3,7 +3,6 @@ import { useWorkspaceStore } from "../state/workspaceStore.ts";
 import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
 import { useServerModel } from "../state/workspaceResources.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
-import { SourceBanner } from "./sources/SourceHealth.tsx";
 import { SyncSettings } from "./sources/SyncSettings.tsx";
 
 export function SourcesPage() {
@@ -13,10 +12,8 @@ export function SourcesPage() {
 	const readOnly = useWorkspaceReadOnly();
 	const onUpdatePlan = useWorkspaceStore((state) => state.updatePlan);
 	if (!plan) return null;
-	const sourceAccess = readOnly ? "Read-only" : "Writable";
 	return (
 		<>
-			<SourceBanner sourceAccess={sourceAccess} />
 			<SyncSettings
 				accounts={plan.accounts.map((account) => ({
 					id: account.id,
