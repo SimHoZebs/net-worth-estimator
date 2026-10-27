@@ -7,6 +7,8 @@ import {
 	nearestPointIndex,
 	projectionChartModel,
 	projectionCsv,
+	trailingDailyPoints,
+	TRAILING_NET_WORTH_DAYS,
 } from "./chart.ts";
 
 const projection = projectionFixture();
@@ -156,6 +158,41 @@ describe("chart presentation data", () => {
 			expect(geometry.indexAt(2)).toBe(1);
 			expect(geometry.line([10])).toMatch(/^M/);
 			expect(geometry.line([10])).not.toMatch(/NaN|Infinity/);
+		});
+	});
+	describe("trailingDailyPoints", () => {
+		// Fixture rows: 2026-01-01 $1,000, 2026-07-01 $1,400, 2027-01-01
+		// $1,800. The 30-day window ending 2026-07-01 runs 2026-06-02 to
+		// 2026-07-01.
+		const today = "2026-07-01";
+		it("expands sparse rows into one daily point per day", () => {
+			const daily = trailingDailyPoints(projection.points, today);
+			expect(daily).toHaveLength(TRAILING_NET_WORTH_DAYS);
+			expect(daily[0]?.date).toBe("2026-06-02");
+			expect(daily.at(-1)?.date).toBe("2026-07-01");
+			expect(daily.at(-1)?.total).toBe(1400);
+			for (const point of daily.slice(0, -1)) {
+				expect(point.total).toBe(1000);
+			}
+		});
+		it("sorts its input and ignores future rows", () => {
+			const shuffled = [...projection.points].reverse();
+			const daily = trailingDailyPoints(shuffled, today);
+			expect(daily).toHaveLength(TRAILING_NET_WORTH_DAYS);
+			expect(daily.at(-1)?.total).toBe(1400);
+		});
+		it("backfills days before the first row with the earliest total", () => {
+			const daily = trailingDailyPoints(
+				[{ date: "2027-01-01", total: 1800, balances: {} }],
+				today,
+			);
+			expect(daily).toHaveLength(TRAILING_NET_WORTH_DAYS);
+			for (const point of daily) {
+				expect(point.total).toBe(1800);
+			}
+		});
+		it("returns no points for empty input", () => {
+			expect(trailingDailyPoints([], today)).toEqual([]);
 		});
 	});
 	describe("nearestPointIndex", () => {

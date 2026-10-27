@@ -32,9 +32,7 @@ const issues = (
 		})),
 	}));
 
-test("outlook renders real calculations, scenario ranges and evidence", async ({
-	page,
-}) => {
+test("outlook renders real calculations and evidence", async ({ page }) => {
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
 	await page.goto("/");
@@ -45,10 +43,9 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 		page.getByRole("button", { name: "Open navigation" }),
 	).not.toBeVisible();
 	// Values come from the Go engine over HTTP, not a client-side projection.
-	await expect(page.getByText("$1.02M")).toBeVisible();
-	await expect(page.getByText(/80% of (400 )?scenarios/)).toBeVisible({
-		timeout: 30_000,
-	});
+	await expect(page.getByText("$361,200")).toBeVisible();
+	// The trailing graph draws the last 30 days of that same calculation.
+	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
 	await page.getByRole("button", { name: "Inspect cash flow" }).click();
 	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
 	await expect(page.getByRole("dialog")).toContainText("Mar 6, 2026");
@@ -56,8 +53,6 @@ test("outlook renders real calculations, scenario ranges and evidence", async ({
 	await expect(
 		page.getByRole("button", { name: "Inspect cash flow" }),
 	).toBeFocused();
-	await page.getByRole("button", { name: "10 years", exact: true }).click();
-	await expect(page.getByText("Base case in 2036")).toBeVisible();
 	expect(errors).toEqual([]);
 });
 
@@ -354,7 +349,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 	expect(issues(results.violations)).toEqual([]);
 	await page.keyboard.press("Escape");
 	await page.goto("/");
-	await page.getByText(/80% of (400 )?scenarios/).waitFor({ timeout: 30_000 });
+	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
 	await page.screenshot({
 		path: "test-results/waypoint-mobile.png",
 		fullPage: true,
@@ -363,8 +358,7 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 
 test("capture the completed desktop outlook", async ({ page }) => {
 	await page.goto("/");
-	await page.getByText(/80% of (400 )?scenarios/).waitFor({ timeout: 30_000 });
-	await page.getByRole("slider", { name: "Inspect projection date" }).waitFor();
+	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
 	await page.screenshot({
 		path: "test-results/waypoint-desktop.png",
 		fullPage: true,

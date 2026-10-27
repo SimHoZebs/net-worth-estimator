@@ -7,7 +7,6 @@ import { Notice } from "../components/Notice.tsx";
 import { TextButton } from "../components/Button.tsx";
 import { useCurrentPosition } from "../state/useCurrentPosition.ts";
 import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
-import { useUiStore } from "../state/uiStore.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
 import {
@@ -67,12 +66,13 @@ function OutlookContent({
 	const checkpoints =
 		useServerModel().data?.document?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const plan = usePlan();
-	const years = useUiStore((state) => state.years);
-	const setYears = useUiStore((state) => state.setYears);
-	const ranges = useUiStore((state) => state.ranges);
-	const setRanges = useUiStore((state) => state.setRanges);
 	const projection = useRemoteProjection({
 		enabled: (plan?.accounts.length ?? 0) > 0,
+		// The chart no longer offers horizon or range switches, so Outlook
+		// pins the request to the defaults instead of inheriting possibly
+		// stale persisted preferences. Pinned cards still need the range.
+		years: 20,
+		ranges: true,
 	});
 	const position = useCurrentPosition({
 		enabled: (plan?.accounts.length ?? 0) > 0,
@@ -122,26 +122,12 @@ function OutlookContent({
 				</Notice>
 			)}
 			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_var(--container-3xs)] xl:grid-cols-[minmax(0,1fr)_var(--container-2xs)] xl:gap-6 print:grid-cols-1!">
-				<ProjectionChart
-					plan={plan}
-					projection={base}
-					range={projection.range}
-					ranges={ranges}
-					setRanges={setRanges}
-					years={years}
-					setYears={setYears}
-					progress={projection.progress}
-					rangeError={projection.rangeError}
-					pending={pending}
-				/>
+				<ProjectionChart projection={base} pending={pending} />
 				<div className="sticky top-5 flex min-w-0 flex-col gap-4 max-lg:static">
 					<OutlookMetrics
 						plan={plan}
-						projection={base}
 						position={position}
-						years={years}
 						onEvidence={onEvidence}
-						pending={pending}
 					/>
 				</div>
 			</div>

@@ -28,7 +28,7 @@ test("navigation remains usable after a phone-to-desktop resize", async ({
 	await expect(
 		page.getByRole("dialog", { name: "Workspace navigation" }),
 	).toHaveCount(0);
-	await page.getByRole("heading", { name: "Net worth over time" }).hover();
+	await page.getByRole("slider", { name: "Inspect net worth date" }).hover();
 	const initialScroll = await page.evaluate(() => window.scrollY);
 	await page.mouse.wheel(0, 400);
 	await expect
@@ -44,17 +44,22 @@ test("projection inspection remains keyboard-accessible after resize", async ({
 	page,
 }) => {
 	await page.goto("/");
-	const slider = page.getByRole("slider", { name: "Inspect projection date" });
+	const slider = page.getByRole("slider", { name: "Inspect net worth date" });
 	await expect(slider).toBeAttached();
 	for (const width of [320, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
 		const initialValue = await slider.getAttribute("aria-valuetext");
 		const maximum = await slider.getAttribute("max");
+		const minimum = await slider.getAttribute("min");
 		expect(initialValue).not.toBeNull();
 		expect(maximum).not.toBeNull();
+		expect(minimum).not.toBeNull();
 		await slider.focus();
-		await slider.press("End");
+		// The trailing graph defaults to today, the last point, so keyboard
+		// inspection moves toward the start of the window.
 		await expect(slider).toHaveValue(maximum!);
+		await slider.press("Home");
+		await expect(slider).toHaveValue(minimum!);
 		await expect(slider).not.toHaveAttribute("aria-valuetext", initialValue!);
 		await slider.press("Tab");
 		await expect(slider).not.toBeFocused();
