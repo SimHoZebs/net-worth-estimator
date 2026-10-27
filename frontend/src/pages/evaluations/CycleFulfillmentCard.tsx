@@ -31,7 +31,7 @@ export function CycleFulfillmentCard({
 	return (
 		<section
 			className={mergeStyles(
-				"flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line p-5 print:break-inside-avoid",
+				"flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 rounded-surface border border-line p-5 print:break-inside-avoid",
 				item.enabled ? "bg-surface" : "bg-surface-2",
 			)}
 			aria-labelledby={headingId}
