@@ -82,9 +82,11 @@ test("sidebar flags a stale sync and explains the fix", async ({ page }) => {
 	const toast = page.getByRole("alert");
 	await expect(toast).toHaveText(/Bank sync is stale\./);
 	await toast.getByRole("button", { name: "Open bank sync" }).click();
-	await expect(
-		page.getByRole("button", { name: /Update bank providers/ }),
-	).toBeVisible();
+	await expect(page.getByRole("tab", { name: "Bank sync" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+	await expect(page.getByText("SimpleFIN")).toBeVisible();
 });
 
 test("sidebar reports unconfigured sync from the real status endpoint", async ({

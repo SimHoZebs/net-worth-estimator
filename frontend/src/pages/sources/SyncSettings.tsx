@@ -1,12 +1,8 @@
-import { useState } from "react";
-import { Landmark } from "lucide-react";
-import { Button } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import type { Account } from "../../domain/model.ts";
 import { useSyncCredential } from "../../state/syncSettings.ts";
-import { SyncConnectModal } from "./SyncConnectModal.tsx";
-import { SyncProviderModal } from "./SyncProviderModal.tsx";
+import { SyncProviderPanel } from "./SyncProviderPanel.tsx";
 
 type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
 
@@ -18,29 +14,15 @@ export function SyncSettings({
 	readOnly: boolean;
 }) {
 	const credential = useSyncCredential();
-	const [chooserOpen, setChooserOpen] = useState(false);
-	const [connectOpen, setConnectOpen] = useState(false);
-
-	const connectedCount = credential.data?.configured === true ? 1 : 0;
-	const status = connectedCount === 1 ? "1 connected" : "Not connected";
 
 	if (credential.isPending || credential.isError) {
 		return (
 			<section
-				aria-label="Update bank providers"
-				className="mb-6 rounded-surface border border-line bg-surface p-6 max-sm:p-5"
+				aria-label="Bank sync"
+				className="rounded-control border border-line bg-surface p-4"
 			>
-				<div className="flex items-center gap-4">
-					<span className="text-primary-text">
-						<Landmark size={25} />
-					</span>
-					<div className="flex-1">
-						<h2 className="text-base max-sm:text-sm">Update bank providers</h2>
-					</div>
-				</div>
-
 				{credential.isPending ? (
-					<Skeleton className="mt-3 h-10 w-full" />
+					<Skeleton className="h-10 w-full" />
 				) : (
 					<ErrorNotice message="The sync connection could not be loaded." />
 				)}
@@ -49,34 +31,8 @@ export function SyncSettings({
 	}
 
 	return (
-		<>
-			<Button
-				aria-describedby="bank-sync-status"
-				onClick={() => setChooserOpen(true)}
-				className="mb-6"
-			>
-				<Landmark size={18} aria-hidden="true" />
-				Update bank providers -{` `}
-				<span id="bank-sync-status" className="text-xs font-normal text-muted">
-					{status}
-				</span>
-			</Button>
-
-			{chooserOpen && (
-				<SyncProviderModal
-					accounts={accounts}
-					readOnly={readOnly}
-					onClose={() => setChooserOpen(false)}
-					onConnect={() => setConnectOpen(true)}
-				/>
-			)}
-			{connectOpen && (
-				<SyncConnectModal
-					readOnly={readOnly}
-					onClose={() => setConnectOpen(false)}
-					onConnected={() => setConnectOpen(false)}
-				/>
-			)}
-		</>
+		<section aria-label="Bank sync">
+			<SyncProviderPanel accounts={accounts} readOnly={readOnly} />
+		</section>
 	);
 }
