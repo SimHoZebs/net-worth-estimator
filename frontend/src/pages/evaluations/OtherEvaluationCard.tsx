@@ -8,7 +8,7 @@ import { Badge } from "../../components/Badge.tsx";
 import { Progress } from "../../components/Progress.tsx";
 import { dateLabel } from "../../domain/format.ts";
 import type { OtherEvaluationType } from "../../domain/result.ts";
-import { evaluationCard } from "./evaluationStyles.ts";
+import { cardStyles } from "../../components/cardStyles.ts";
 
 const cardViews: Partial<
 	Record<OtherEvaluationType, ComponentType<OtherEvaluationCardProps>>
@@ -38,7 +38,7 @@ function EvaluationSummaryCard({ item, pin = null }: OtherEvaluationCardProps) {
 					: "neutral";
 	return (
 		<section
-			className={evaluationCard({ enabled: item.enabled })}
+			className={cardStyles({ tone: item.enabled ? "default" : "subtle" })}
 			aria-labelledby={headingId}
 		>
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
