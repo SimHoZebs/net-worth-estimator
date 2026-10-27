@@ -5,6 +5,7 @@ import { compactMoney, dateLabel, money } from "@/domain/format.ts";
 import type { Plan } from "@/domain/model.ts";
 import { currentNetWorth, type Projection } from "@/domain/result.ts";
 import type { useCurrentPosition } from "@/state/useCurrentPosition.ts";
+import { Card } from "@/components/Card.tsx";
 
 export function OutlookMetrics({
 	plan,
@@ -29,10 +30,7 @@ export function OutlookMetrics({
 		Number.parseInt(plan.startDate.slice(0, 4), 10) + years;
 	return (
 		<div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-			<section
-				className="flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
-				aria-busy={position.status === "pending"}
-			>
+			<Card aria-busy={position.status === "pending"}>
 				<div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted">
 					<span>Current net worth</span>
 					<IconButton
@@ -66,11 +64,8 @@ export function OutlookMetrics({
 					/>
 					As of {dateLabel(position.data?.asOfDate ?? plan.startDate, true)}
 				</div>
-			</section>
-			<section
-				className="flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-success-border bg-success-bg p-5 print:break-inside-avoid"
-				aria-busy={pending}
-			>
+			</Card>
+			<Card tone="success" aria-busy={pending}>
 				<div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted">
 					<span>Base case in {finalYear}</span>
 					<TrendingUp size={19} className="max-sm:w-4" aria-hidden="true" />
@@ -96,7 +91,7 @@ export function OutlookMetrics({
 				<div className="flex items-center gap-2 text-xs text-muted">
 					{years}-year projection
 				</div>
-			</section>
+			</Card>
 		</div>
 	);
 }
