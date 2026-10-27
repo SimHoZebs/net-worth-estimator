@@ -2,16 +2,15 @@ import { useState } from "react";
 import { Button } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { InputField } from "../../components/Field.tsx";
-import { Modal } from "../../components/Modal.tsx";
 import { connectSyncKey } from "../../state/syncSettings.ts";
 
-export function SyncConnectModal({
+export function SyncConnectForm({
 	readOnly,
-	onClose,
+	onCancel,
 	onConnected,
 }: {
 	readOnly: boolean;
-	onClose: () => void;
+	onCancel: () => void;
 	onConnected: () => void;
 }) {
 	const [token, setToken] = useState("");
@@ -35,12 +34,7 @@ export function SyncConnectModal({
 	}
 
 	return (
-		<Modal
-			title="Connect SimpleFIN"
-			eyebrow="Bank sync"
-			onClose={onClose}
-			titleSize="plain"
-		>
+		<div className="mt-3">
 			{error && <ErrorNotice message={error} />}
 			<InputField
 				label="Setup token"
@@ -54,7 +48,7 @@ export function SyncConnectModal({
 				onChange={(event) => setToken(event.currentTarget.value)}
 				placeholder="Paste your setup token"
 			/>
-			<div className="mt-3">
+			<div className="mt-3 flex flex-wrap gap-3">
 				<Button
 					type="button"
 					disabled={
@@ -63,6 +57,9 @@ export function SyncConnectModal({
 					onClick={() => void handleConnect({ setupToken: token.trim() })}
 				>
 					{busy ? "Connecting…" : "Connect bank"}
+				</Button>
+				<Button type="button" variant="secondary" onClick={onCancel}>
+					Cancel
 				</Button>
 			</div>
 			<details className="mt-4 text-sm">
@@ -98,6 +95,6 @@ export function SyncConnectModal({
 					</div>
 				</div>
 			</details>
-		</Modal>
+		</div>
 	);
 }
