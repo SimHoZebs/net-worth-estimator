@@ -103,7 +103,7 @@ export function AccountDetailsModal({
 							{exactMoney(card.balance)}
 						</strong>
 						<div className="text-sm leading-relaxed text-muted">
-							{card.balanceLabel} · {card.summary}
+							{card.balanceLabel}
 						</div>
 					</div>
 				</div>
@@ -196,7 +196,7 @@ export function AccountDetailsModal({
 				</p>
 			)}
 			<p className="py-2 text-sm leading-relaxed text-muted">
-				{card.transactions.length > 0 && selected == null ? (
+				{transactions.length > 0 && selected == null ? (
 					<span>
 						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
 						Recurring movements show in the plan with their schedule. Dates
