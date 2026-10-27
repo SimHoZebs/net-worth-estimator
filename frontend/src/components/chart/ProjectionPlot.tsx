@@ -52,7 +52,8 @@ export function ProjectionPlot({
 			<desc id={`${id}-description`}>
 				Trailing {points.length}-day net worth ends at {money(last.total)} on{" "}
 				{dateLabel(last.date, true)}, starting at {money(start.total)} on{" "}
-				{dateLabel(start.date, true)}. The solid $0 line marks no debt.
+				{dateLabel(start.date, true)}.
+				{low <= 0 && 0 <= high ? " The solid $0 line marks no debt." : ""}
 			</desc>
 			<defs>
 				<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
@@ -100,24 +101,26 @@ export function ProjectionPlot({
 				strokeLinejoin="round"
 				strokeLinecap="round"
 			/>
-			<g>
-				<line
-					x1={left}
-					x2={width - right}
-					y1={y(0)}
-					y2={y(0)}
-					className="stroke-muted"
-					strokeWidth="1.5"
-				/>
-				<text
-					x={width - right - 6}
-					y={y(0) - 6}
-					textAnchor="end"
-					className="fill-muted text-xs max-sm:text-sm"
-				>
-					No debt · $0
-				</text>
-			</g>
+			{low <= 0 && 0 <= high && (
+				<g>
+					<line
+						x1={left}
+						x2={width - right}
+						y1={y(0)}
+						y2={y(0)}
+						className="stroke-muted"
+						strokeWidth="1.5"
+					/>
+					<text
+						x={width - right - 6}
+						y={y(0) - 6}
+						textAnchor="end"
+						className="fill-muted text-xs max-sm:text-sm"
+					>
+						No debt · $0
+					</text>
+				</g>
+			)}
 			{[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
 				const index = Math.round(fraction * (points.length - 1));
 				return (

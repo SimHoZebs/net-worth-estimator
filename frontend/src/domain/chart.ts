@@ -112,8 +112,21 @@ export function projectionChartModel({
 		range?.points.map((point) => adjust(point.upper, point.date)) ?? values;
 	const lower =
 		range?.points.map((point) => adjust(point.lower, point.date)) ?? values;
-	const high = Math.max(...upper, ...values, 1) * 1.08;
-	const low = Math.min(0, ...lower, ...values);
+	// The domain adapts to the data's sign. Positive wealth keeps the $0
+	// floor and 8% headroom; all-debt windows pin both bounds near the data
+	// instead of wasting the chart on the unreachable $0 ceiling.
+	const peak = Math.max(...upper, ...values);
+	const trough = Math.min(...lower, ...values);
+	const span = Math.max(1, peak - trough);
+	// Minimum zoom: a dormant window would otherwise collapse to a pennies
+	// domain with five identical gridlines.
+	const pad = Math.max(
+		span * 0.08,
+		Math.abs(peak) * 0.01,
+		Math.abs(trough) * 0.01,
+	);
+	const high = peak >= 0 ? Math.max(...upper, ...values, 1) * 1.08 : peak + pad;
+	const low = trough >= 0 ? Math.min(0, ...lower, ...values) : trough - pad;
 	const width = narrow ? 440 : 820;
 	const height = narrow ? 260 : 280;
 	const left = 63,

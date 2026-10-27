@@ -25,6 +25,7 @@ afterEach(() => {
 // per day: 2026-06-02 holds $1,000 through 2026-06-19, $1,400 from 2026-06-20,
 // and $1,800 on 2026-07-01.
 function show() {
+	const onEvidence = vi.fn();
 	render(
 		<ProjectionChart
 			projection={projectionFixture({
@@ -34,8 +35,10 @@ function show() {
 					{ date: "2026-07-01", total: 1800, balances: {} },
 				],
 			})}
+			onEvidence={onEvidence}
 		/>,
 	);
+	return { onEvidence };
 }
 
 describe("projection chart inspection", () => {
@@ -67,5 +70,35 @@ describe("projection chart inspection", () => {
 		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
 		fireEvent.pointerLeave(plot);
 		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
+	});
+
+	it("opens the evidence action from the graph", () => {
+		const { onEvidence } = show();
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Inspect current net worth evidence",
+			}),
+		);
+		expect(onEvidence).toHaveBeenCalledOnce();
+	});
+
+	it("hides the $0 line for an all-debt window", () => {
+		render(
+			<ProjectionChart
+				projection={projectionFixture({
+					points: [
+						{ date: "2026-06-10", total: -66200, balances: {} },
+						{ date: "2026-07-01", total: -65800, balances: {} },
+					],
+				})}
+				onEvidence={vi.fn()}
+			/>,
+		);
+		expect(screen.queryByText(/No debt/)).toBeNull();
+		expect(
+			screen
+				.getByRole("slider", { name: "Inspect net worth date" })
+				.getAttribute("aria-valuetext"),
+		).toBe("Jul 2026: -$65,800");
 	});
 });

@@ -44,7 +44,6 @@ test("outlook renders real calculations and evidence", async ({ page }) => {
 		page.getByRole("button", { name: "Open navigation" }),
 	).not.toBeVisible();
 	// Values come from the Go engine over HTTP, not a client-side projection.
-	await expect(page.getByText("$361,200")).toBeVisible();
 	// The trailing graph draws the last 30 days of that same calculation.
 	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
 	await page.getByRole("button", { name: "Inspect cash flow" }).click();
@@ -226,10 +225,10 @@ test("corrupt persisted data never silently falls back to example content", asyn
 	await expect(storageNotice).toContainText(
 		"Your saved plan has not been replaced",
 	);
-	// The canonical server model is still shown, not example content.
-	await expect(
-		page.getByText("$361,200", { exact: true }).first(),
-	).toBeVisible();
+	// The canonical server model is still shown, not example content: the
+	// cash-flow evidence comes from the engine running on the fixture plan.
+	await page.getByRole("button", { name: "Inspect cash flow" }).click();
+	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
 });
 
 test("desktop pages and edit dialogs meet automated accessibility checks", async ({
@@ -408,9 +407,9 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	await expect(page.getByRole("alert")).toContainText("The API request failed");
 	await expect(page.getByRole("button", { name: "Retry scenario calculation" }),
 	).toBeVisible();
-	// Exact match: the pinned threshold card also shows the current value
-	// with a "today" qualifier.
-	await expect(page.getByText("$361,200", { exact: true })).toBeVisible();
+	// The pinned threshold card shows the current value with a "today"
+	// qualifier.
+	await expect(page.getByText("$361,200 today")).toBeVisible();
 	// The history graph draws no range, so a failed stream must not add one.
 	await expect(
 		page.getByRole("region", { name: "Net worth over the trailing 30 days" }),

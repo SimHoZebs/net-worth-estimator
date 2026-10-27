@@ -5,7 +5,6 @@ import { EmptyState } from "../components/EmptyState.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { TextButton } from "../components/Button.tsx";
-import { useCurrentPosition } from "../state/useCurrentPosition.ts";
 import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
@@ -14,7 +13,6 @@ import {
 	useServerStatus,
 } from "../state/workspaceResources.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
-import { OutlookMetrics } from "./outlook/OutlookMetrics.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
 import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
 
@@ -83,9 +81,6 @@ function OutlookContent({
 				(pinnedIds ?? []).includes(evaluation.id),
 			) ?? false,
 	});
-	const position = useCurrentPosition({
-		enabled: (plan?.accounts.length ?? 0) > 0,
-	});
 	const status = useServerStatus().data;
 	const writeBlocked = useWorkspaceReadOnly();
 	// Previous-input placeholders are not forecasts for the active model.
@@ -125,16 +120,11 @@ function OutlookContent({
 					</TextButton>
 				</Notice>
 			)}
-			<div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_var(--container-3xs)] xl:grid-cols-[minmax(0,1fr)_var(--container-2xs)] xl:gap-6 print:grid-cols-1!">
-				<ProjectionChart projection={base} pending={pending} />
-				<div className="sticky top-5 flex min-w-0 flex-col gap-4 max-lg:static">
-					<OutlookMetrics
-						plan={plan}
-						position={position}
-						onEvidence={onEvidence}
-					/>
-				</div>
-			</div>
+			<ProjectionChart
+				projection={base}
+				onEvidence={onEvidence}
+				pending={pending}
+			/>
 			<PinnedEvaluations
 				plan={plan}
 				projection={base}

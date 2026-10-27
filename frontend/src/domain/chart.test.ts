@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { projectionFixture } from "../mocks/projection.ts";
+import { compactMoney } from "./format.ts";
 import type { FundingGap } from "./fundingGaps.ts";
 import {
 	fundingGapChartModel,
@@ -193,6 +194,61 @@ describe("chart presentation data", () => {
 		});
 		it("returns no points for empty input", () => {
 			expect(trailingDailyPoints([], today)).toEqual([]);
+		});
+	});
+	describe("adaptive domain", () => {
+		it("keeps the $0 floor and 8% headroom for positive wealth", () => {
+			const model = projectionChartModel(options);
+			if (!model) throw new Error("Expected chart");
+			expect(model.low).toBe(0);
+			expect(model.high).toBeCloseTo(1800 * 1.08, 6);
+		});
+		it("pins an all-debt window near the data instead of the $0 ceiling", () => {
+			const debt = {
+				...projection,
+				points: [
+					{ date: "2026-06-02", total: -66200, balances: {} },
+					{ date: "2026-07-01", total: -65800, balances: {} },
+				],
+			};
+			const model = projectionChartModel({ ...options, projection: debt });
+			if (!model) throw new Error("Expected chart");
+			// Span 400, but the 1% minimum zoom sets padding 662.
+			expect(model.high).toBeLessThan(0);
+			expect(model.high).toBeCloseTo(-65138, 6);
+			expect(model.low).toBeCloseTo(-66862, 6);
+		});
+		it("keeps a flat all-debt window legible", () => {
+			const flat = {
+				...projection,
+				points: [
+					{ date: "2026-06-02", total: -66000, balances: {} },
+					{ date: "2026-07-01", total: -66000, balances: {} },
+				],
+			};
+			const model = projectionChartModel({ ...options, projection: flat });
+			if (!model) throw new Error("Expected chart");
+			expect(model.high).toBeCloseTo(-65340, 6);
+			expect(model.low).toBeCloseTo(-66660, 6);
+			expect(model.high - model.low).toBeGreaterThanOrEqual(1000);
+			const labels = new Set(model.grid.map((value) => compactMoney(value)));
+			expect(labels.size).toBeGreaterThan(1);
+		});
+		it("pads below a window that straddles $0", () => {
+			const crossing = {
+				...projection,
+				points: [
+					{ date: "2026-06-02", total: -100, balances: {} },
+					{ date: "2026-07-01", total: 200, balances: {} },
+				],
+			};
+			const model = projectionChartModel({
+				...options,
+				projection: crossing,
+			});
+			if (!model) throw new Error("Expected chart");
+			expect(model.high).toBeCloseTo(200 * 1.08, 6);
+			expect(model.low).toBeCloseTo(-124, 6);
 		});
 	});
 	describe("nearestPointIndex", () => {
