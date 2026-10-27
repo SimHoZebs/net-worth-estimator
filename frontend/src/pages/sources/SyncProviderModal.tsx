@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AccountToggle } from "../../components/AccountToggle.tsx";
+import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
@@ -9,8 +9,6 @@ import type { Account } from "../../domain/model.ts";
 import {
 	disconnectSyncKey,
 	refreshSyncSettings,
-	saveSyncCards,
-	useSyncCards,
 	useSyncCredential,
 	useSyncLinks,
 } from "../../state/syncSettings.ts";
@@ -18,10 +16,6 @@ import {
 const PROVIDERS = [{ id: "simplefin", name: "SimpleFIN" }] as const;
 
 type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
-
-// Only debt accounts can be cards: pending-charge seeds model card
-// charges, so checking-as-a-card is not offered.
-const isCardEligible = (account: SyncAccount) => account.kind === "debt";
 
 function formatConnectedAt(value?: string): string | null {
 	if (!value) return null;
@@ -47,55 +41,34 @@ export function SyncProviderModal({
 	onConnect: () => void;
 }) {
 	const credential = useSyncCredential();
-	const cards = useSyncCards();
 	const configured = credential.data?.configured === true;
 	const links = useSyncLinks(configured);
-	const [busy, setBusy] = useState<"disconnect" | "cards" | null>(null);
+	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-	const [selected, setSelected] = useState<string[] | null>(null);
 
-	const storedCards = cards.data ?? [];
-	const checked = selected ?? storedCards;
-	// Stored cards stay removable even when they are no longer offered as a
-	// choice (e.g. connected before the debt-only rule): union them into the
-	// list so unticking persists the removal instead of stranding the id.
-	const listed = accounts.filter(isCardEligible);
-	for (const id of storedCards) {
-		if (!listed.some((account) => account.id === id)) {
-			const existing = accounts.find((account) => account.id === id);
-			if (existing) listed.push(existing);
-		}
-	}
-	const dirty =
-		selected !== null &&
-		(selected.length !== storedCards.length ||
-			selected.some((id) => !storedCards.includes(id)));
-	const names = new Map(accounts.map((account) => [account.id, account.name]));
-	const linked = (links.data ?? []).map(
-		(link) => names.get(link.modelAccountId) ?? link.bridgeName,
-	);
+	const byId = new Map(accounts.map((account) => [account.id, account]));
+	const synced = (links.data ?? []).flatMap((link) => {
+		const account = byId.get(link.modelAccountId);
+		return account ? [account] : [];
+	});
+	const orphaned = (links.data ?? [])
+		.filter((link) => !byId.has(link.modelAccountId))
+		.map((link) => ({
+			id: link.bridgeAccountId || link.modelAccountId,
+			name: link.bridgeName || link.modelAccountId,
+		}));
+	const since = configured
+		? formatConnectedAt(credential.data?.updatedAt)
+		: null;
 
 	async function handleDisconnect() {
-		setBusy("disconnect");
+		setBusy(true);
 		setError(null);
 		const ok = await disconnectSyncKey();
-		setBusy(null);
+		setBusy(false);
 		setConfirmingDisconnect(false);
 		if (!ok) setError("Could not disconnect. Try again.");
-	}
-
-	async function handleSaveCards() {
-		if (selected === null) return;
-		setBusy("cards");
-		setError(null);
-		const ok = await saveSyncCards(selected);
-		setBusy(null);
-		if (ok) {
-			setSelected(null);
-		} else {
-			setError("Could not save the card selection. Try again.");
-		}
 	}
 
 	return (
@@ -114,16 +87,9 @@ export function SyncProviderModal({
 							<div className="flex items-center gap-4">
 								<div className="flex-1">
 									<h3 className="m-0 text-sm">{provider.name}</h3>
-									{configured && (
+									{since && (
 										<p className="m-0 text-xs text-muted">
-											{credential.data?.bridgeHost ?? "Bridge"}
-											{formatConnectedAt(credential.data?.updatedAt)
-												? ` · since ${formatConnectedAt(credential.data?.updatedAt)}`
-												: ""}
-											{links.data !== undefined &&
-												(linked.length > 0
-													? ` · syncs ${linked.join(", ")}`
-													: " · no linked accounts yet")}
+											Connected since {since}.
 										</p>
 									)}
 								</div>
@@ -138,64 +104,46 @@ export function SyncProviderModal({
 								<>
 									<div className="mt-4">
 										<span
-											id="sync-cards-label"
+											id="sync-accounts-label"
 											className="text-sm font-semibold text-muted"
 										>
-											Card accounts
+											Synced accounts
 										</span>
-										<p className="m-0 text-xs leading-relaxed text-muted">
-											Only these accounts receive pending-charge seeds.
-										</p>
-										{cards.isPending || links.isPending ? (
+										{links.isPending ? (
 											<Skeleton className="mt-2 h-10 w-full" />
-										) : cards.isError || links.isError ? (
+										) : links.isError ? (
 											<ErrorNotice
-												message="The sync details could not be loaded."
+												message="The synced accounts could not be loaded."
 												action="Reload"
 												onAction={() => void refreshSyncSettings(true)}
 											/>
 										) : (
-											<>
-												<ul
-													aria-labelledby="sync-cards-label"
-													className="mt-2 grid list-none gap-2 p-0"
-												>
-													{listed.map((account) => (
-														<li key={account.id}>
-															<AccountToggle
-																className="w-full text-left text-sm"
-																account={account}
-																checked={checked.includes(account.id)}
-																disabled={readOnly || busy !== null}
-																onToggle={() =>
-																	setSelected(
-																		checked.includes(account.id)
-																			? checked.filter(
-																					(id) => id !== account.id,
-																				)
-																			: [...checked, account.id],
-																	)
-																}
-															/>
-														</li>
-													))}
-													{listed.length === 0 && (
-														<li className="text-sm text-muted">
-															No card accounts yet.
-														</li>
-													)}
-												</ul>
-												<div className="mt-3">
-													<Button
-														type="button"
-														variant="secondary"
-														disabled={readOnly || busy !== null || !dirty}
-														onClick={() => void handleSaveCards()}
+											<ul
+												aria-labelledby="sync-accounts-label"
+												className="mt-2 grid list-none gap-2 p-0"
+											>
+												{synced.map((account) => (
+													<li
+														key={account.id}
+														className="flex items-center gap-2 text-sm"
 													>
-														{busy === "cards" ? "Saving…" : "Save cards"}
-													</Button>
-												</div>
-											</>
+														<AccountLabel account={account} />
+													</li>
+												))}
+												{orphaned.map((orphan) => (
+													<li
+														key={`bridge-${orphan.id}`}
+														className="text-sm text-muted"
+													>
+														{orphan.name}
+													</li>
+												))}
+												{synced.length === 0 && orphaned.length === 0 && (
+													<li className="text-sm text-muted">
+														No synced accounts yet.
+													</li>
+												)}
+											</ul>
 										)}
 									</div>
 									<div className="mt-3">
@@ -204,7 +152,7 @@ export function SyncProviderModal({
 												<Button
 													type="button"
 													variant="secondary"
-													disabled={busy !== null}
+													disabled={busy}
 													onClick={() => setConfirmingDisconnect(false)}
 												>
 													Keep connected
@@ -212,19 +160,17 @@ export function SyncProviderModal({
 												<TextButton
 													type="button"
 													tone="danger"
-													disabled={readOnly || busy !== null}
+													disabled={readOnly || busy}
 													onClick={() => void handleDisconnect()}
 												>
-													{busy === "disconnect"
-														? "Disconnecting…"
-														: "Confirm disconnect"}
+													{busy ? "Disconnecting…" : "Confirm disconnect"}
 												</TextButton>
 											</div>
 										) : (
 											<TextButton
 												type="button"
 												tone="danger"
-												disabled={readOnly || busy !== null}
+												disabled={readOnly || busy}
 												onClick={() => setConfirmingDisconnect(true)}
 											>
 												Disconnect

@@ -2,8 +2,8 @@ import { Check, Flag, Pin } from "lucide-react";
 import { useId } from "react";
 import { Badge } from "@/components/Badge.tsx";
 import { IconButton } from "@/components/Button.tsx";
+import { Card } from "@/components/Card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
-import { mergeStyles } from "@/components/mergeStyles.ts";
 import { Progress } from "@/components/Progress.tsx";
 import { dateLabel } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
@@ -30,11 +30,8 @@ export function FinancialIndependenceCard({
 					? "warning"
 					: "neutral";
 	return (
-		<section
-			className={mergeStyles(
-				"flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 rounded-surface border border-line p-5 print:break-inside-avoid",
-				item.enabled ? "bg-surface" : "bg-surface-2",
-			)}
+		<Card
+			tone={item.enabled ? "default" : "subtle"}
 			aria-labelledby={headingId}
 		>
 			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
@@ -109,6 +106,6 @@ export function FinancialIndependenceCard({
 					</div>
 				)}
 			</div>
-		</section>
+		</Card>
 	);
 }

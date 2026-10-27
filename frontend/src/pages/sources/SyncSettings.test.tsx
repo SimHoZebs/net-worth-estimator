@@ -31,10 +31,9 @@ const accounts = [
 
 function stubApi(state: {
 	configured: boolean;
-	cards?: string[];
 	links?: { modelAccountId: string; bridgeName: string }[];
 	failConnect?: boolean;
-	failCards?: boolean;
+	failLinks?: boolean;
 }) {
 	const jsonHeaders = () => {
 		const headers = new Headers({ "content-type": "application/json" });
@@ -88,24 +87,15 @@ function stubApi(state: {
 			);
 		}
 		if (path === "/v1/sync/simplefin/cards") {
-			if (state.failCards)
+			throw new Error("cards endpoint must not be called");
+		}
+		if (path === "/v1/sync/simplefin/accounts") {
+			record();
+			if (state.failLinks)
 				return new Response(JSON.stringify({ detail: "boom" }), {
 					status: 500,
 					headers: jsonHeaders(),
 				});
-			if (method === "PUT") {
-				const body = JSON.parse(String(init?.body)) as { cards: string[] };
-				record(body);
-				state.cards = body.cards;
-			} else {
-				record();
-			}
-			return new Response(JSON.stringify({ cards: state.cards ?? [] }), {
-				headers: jsonHeaders(),
-			});
-		}
-		if (path === "/v1/sync/simplefin/accounts") {
-			record();
 			return new Response(
 				JSON.stringify({
 					links: (state.links ?? []).map((link, index) => ({
@@ -281,34 +271,51 @@ it("refreshes status and links after connecting", async () => {
 	});
 });
 
-it("shows which accounts each provider syncs", async () => {
+it("lists every synced account", async () => {
 	stubApi({
 		configured: true,
-		links: [{ modelAccountId: "prime_card", bridgeName: "Old Bridge Name" }],
+		links: [
+			{ modelAccountId: "checking", bridgeName: "Old Bridge Name" },
+			{ modelAccountId: "prime_card", bridgeName: "Old Card Name" },
+		],
 	});
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	expect(await screen.findByText("Connected")).toBeTruthy();
-	expect(await screen.findByText(/syncs Prime Card/)).toBeTruthy();
+	expect(await screen.findByText("Synced accounts")).toBeTruthy();
+	expect(await screen.findByText("Checking")).toBeTruthy();
+	expect(screen.getByText("Prime Card")).toBeTruthy();
+	expect(
+		screen.queryByRole("button", { name: /Checking|Prime Card/ }),
+	).toBeNull();
+	expect(screen.queryByRole("button", { name: /Save cards/ })).toBeNull();
 });
 
 it("falls back to the bridge name when the model account is gone", async () => {
 	stubApi({
 		configured: true,
-		links: [{ modelAccountId: "deleted_card", bridgeName: "Old Bridge Name" }],
+		links: [{ modelAccountId: "deleted", bridgeName: "Old Bridge Name" }],
 	});
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	expect(await screen.findByText("Connected")).toBeTruthy();
-	expect(await screen.findByText(/syncs Old Bridge Name/)).toBeTruthy();
+	expect(await screen.findByText("Synced accounts")).toBeTruthy();
+	expect(await screen.findByText("Old Bridge Name")).toBeTruthy();
 });
 
-it("shows an empty state when no accounts are linked", async () => {
+it("shows an empty state when no accounts are synced", async () => {
 	stubApi({ configured: true, links: [] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	expect(await screen.findByText("Connected")).toBeTruthy();
-	expect(await screen.findByText(/no linked accounts yet/)).toBeTruthy();
+	expect(await screen.findByText("No synced accounts yet.")).toBeTruthy();
+});
+
+it("shows an inline error when synced accounts fail to load", async () => {
+	stubApi({ configured: true, failLinks: true });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	expect(
+		await screen.findByText("The synced accounts could not be loaded."),
+	).toBeTruthy();
+	expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy();
 });
 
 it("shows an error when the token is rejected", async () => {
@@ -330,59 +337,14 @@ it("shows an error when the token is rejected", async () => {
 	).toBeTruthy();
 });
 
-it("saves the card selection", async () => {
-	const requests = stubApi({ configured: true, cards: [] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	fireEvent.click(await screen.findByRole("button", { name: /Prime Card/ }));
-	fireEvent.click(screen.getByRole("button", { name: "Save cards" }));
-	await waitFor(() => {
-		expect(
-			requests.some(
-				(request) =>
-					request.method === "PUT" &&
-					JSON.stringify((request.body as { cards: string[] }).cards) ===
-						JSON.stringify(["prime_card"]),
-			),
-		).toBe(true);
-	});
-});
-
-it("keeps save disabled until the selection changes", async () => {
-	stubApi({ configured: true, cards: ["prime_card"] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByRole("button", { name: /Prime Card/ });
-	expect(
-		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
-			.disabled,
-	).toBe(true);
-	expect(
-		(
-			screen.getByRole("button", { name: /Prime Card/ }) as HTMLButtonElement
-		).getAttribute("aria-pressed"),
-	).toBe("true");
-});
-
-it("shows an inline error when cards fail to load", async () => {
-	stubApi({ configured: true, cards: [], failCards: true });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	expect(
-		await screen.findByText("The sync details could not be loaded."),
-	).toBeTruthy();
-	expect(screen.queryByRole("button", { name: /Prime Card/ })).toBeNull();
-	expect(
-		(screen.getByRole("button", { name: "Disconnect" }) as HTMLButtonElement)
-			.disabled,
-	).toBe(false);
-});
-
 it("disconnects after confirmation", async () => {
-	const requests = stubApi({ configured: true, cards: ["prime_card"] });
+	const requests = stubApi({
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+	});
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByRole("button", { name: /Prime Card/ });
+	expect(await screen.findByText("Checking")).toBeTruthy();
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	const confirms = await screen.findAllByRole("button", {
 		name: "Confirm disconnect",
@@ -392,50 +354,25 @@ it("disconnects after confirmation", async () => {
 	expect(
 		await screen.findByRole("button", { name: "Connect SimpleFIN" }),
 	).toBeTruthy();
-	expect(screen.queryByRole("button", { name: /Prime Card/ })).toBeNull();
+	expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Disconnect" })).toBeNull();
 	expect(requests.some((request) => request.method === "DELETE")).toBe(true);
 });
 
-it("only offers debt accounts as cards", async () => {
-	stubApi({ configured: true, cards: [] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	expect(
-		await screen.findByRole("button", { name: /Prime Card/ }),
-	).toBeTruthy();
-	expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
-	expect(screen.queryByRole("button", { name: /Brokerage/ })).toBeNull();
-	expect(screen.queryByRole("button", { name: /Home/ })).toBeNull();
-});
-
-it("keeps stored non-debt cards removable", async () => {
-	const requests = stubApi({ configured: true, cards: ["checking"] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	fireEvent.click(await screen.findByRole("button", { name: /Checking/ }));
-	fireEvent.click(screen.getByRole("button", { name: "Save cards" }));
-	await waitFor(() => {
-		expect(
-			requests.some(
-				(request) =>
-					request.method === "PUT" &&
-					JSON.stringify((request.body as { cards: string[] }).cards) ===
-						JSON.stringify([]),
-			),
-		).toBe(true);
-	});
-});
-
 it("disables writes when read-only", async () => {
-	stubApi({ configured: true, cards: [] });
+	stubApi({
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+	});
 	render(<SyncSettings accounts={accounts} readOnly={true} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByRole("button", { name: /Prime Card/ });
-	expect(screen.queryByRole("button", { name: "Checking cash" })).toBeNull();
+	expect(await screen.findByText("Checking")).toBeTruthy();
 	expect(
-		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
-			.disabled,
-	).toBe(true);
+		screen.queryByRole("button", { name: /Checking|Prime Card/ }),
+	).toBeNull();
+	expect(
+		screen.queryByRole("button", { name: "Connect SimpleFIN" }),
+	).toBeNull();
 	expect(
 		(screen.getByRole("button", { name: "Disconnect" }) as HTMLButtonElement)
 			.disabled,

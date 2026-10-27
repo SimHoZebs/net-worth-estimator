@@ -18,6 +18,7 @@ import type { OtherEvaluationCardProps } from "@/components/evaluationCard.ts";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
 import { IconButton } from "@/components/Button.tsx";
 import { Badge } from "@/components/Badge.tsx";
+import { Card } from "@/components/Card.tsx";
 import { mergeStyles } from "@/components/mergeStyles.ts";
 import { FundingGapsModal } from "@/components/funding/FundingGapsModal.tsx";
 import { useSelectedId } from "@/components/entrySelection.ts";
@@ -46,12 +47,8 @@ export function FundingGapsCard({
 		item.enabled && item.status === "satisfied" && projection !== null;
 	const StateIcon = first ? TriangleAlert : clear ? ShieldCheck : Flag;
 	const state = first ? "gap" : clear ? "clear" : "unavailable";
-	const stateContainer =
-		state === "gap"
-			? "border-warning-border bg-warning-bg"
-			: state === "clear"
-				? "border-success-border bg-success-bg"
-				: "border-line bg-surface";
+	const tone =
+		state === "gap" ? "warning" : state === "clear" ? "success" : "default";
 	const stateTitle =
 		state === "gap"
 			? "text-warning-text"
@@ -73,12 +70,10 @@ export function FundingGapsCard({
 				: null));
 	return (
 		<>
-			<section
-				className={mergeStyles(
-					"relative flex h-full w-full min-w-0 max-w-2xl flex-col gap-4 rounded-surface border p-5 text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm print:break-inside-avoid",
-					stateContainer,
-				)}
+			<Card
+				tone={tone}
 				aria-labelledby={headingId}
+				className="relative text-left text-inherit has-[>button:hover]:border-warning-text has-[>button:hover]:shadow-sm"
 			>
 				<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
 					<h2
@@ -211,7 +206,7 @@ export function FundingGapsCard({
 						)}
 					</div>
 				)}
-			</section>
+			</Card>
 			{selectedId !== null && first && (
 				<FundingGapsModal
 					gaps={gaps}

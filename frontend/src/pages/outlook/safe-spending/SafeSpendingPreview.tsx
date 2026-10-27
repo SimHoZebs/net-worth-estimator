@@ -9,6 +9,7 @@ import {
 } from "@/domain/transactionSort.ts";
 import { dateLabel, money, shiftDate, sum, todayIso } from "@/domain/format.ts";
 import { Skeleton } from "@/components/Skeleton.tsx";
+import { Card } from "@/components/Card.tsx";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -243,10 +244,7 @@ export function SafeSpendingPreview({
 	]);
 	if (!cards.length) {
 		return (
-			<section
-				className="relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
-				aria-label="Safe card spending"
-			>
+			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
 					<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
 						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
@@ -256,7 +254,7 @@ export function SafeSpendingPreview({
 				<p className="m-0 text-sm leading-relaxed text-muted">
 					Add a debt account to track a card statement cycle here.
 				</p>
-			</section>
+			</Card>
 		);
 	}
 
@@ -382,10 +380,7 @@ export function SafeSpendingPreview({
 	// computed safe spending body skeletonizes while the projection is absent.
 	if (pending)
 		return (
-			<section
-				className="relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
-				aria-label="Safe card spending"
-			>
+			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
 					<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
 						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
@@ -400,14 +395,11 @@ export function SafeSpendingPreview({
 				<div aria-busy="true">
 					<Skeleton className="h-32 w-full" />
 				</div>
-			</section>
+			</Card>
 		);
 
 	return (
-		<section
-			className="relative flex h-full w-full min-w-0 flex-col gap-4 rounded-surface border border-line bg-surface p-5 print:break-inside-avoid"
-			aria-label="Safe card spending"
-		>
+		<Card aria-label="Safe card spending" className="relative">
 			<button
 				type="button"
 				className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0"
@@ -563,6 +555,6 @@ export function SafeSpendingPreview({
 					)}
 				</SafeSpendingDetailShell>
 			)}
-		</section>
+		</Card>
 	);
 }

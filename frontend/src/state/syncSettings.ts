@@ -3,14 +3,11 @@ import { useSyncExternalStore } from "react";
 import {
 	connectSyncCredential,
 	disconnectSyncCredential,
-	getSyncCards,
 	getSyncCredential,
 	listAccountLinks,
-	setSyncCards,
 } from "@/api/generated/endpoints.ts";
 import type {
 	SyncCredentialBody,
-	SyncCardsOutputBody,
 	AccountLink,
 } from "@/api/generated/model/index.ts";
 import {
@@ -24,10 +21,6 @@ import { workspaceResourceKey } from "@/state/workspaceResources.ts";
 
 export function syncCredentialKey(scope = getResourceScope()) {
 	return ["sync-credential", scope.key] as const;
-}
-
-export function syncCardsKey(scope = getResourceScope()) {
-	return ["sync-cards", scope.key] as const;
 }
 
 export function syncLinksKey(scope = getResourceScope()) {
@@ -63,34 +56,6 @@ function credentialOptions(scope = getResourceScope()) {
 							: "The sync connection could not be loaded.",
 						{
 							label: "Reload sync",
-							onAction: () => void refreshSyncSettings(true),
-						},
-					);
-				throw error;
-			}
-		},
-	};
-}
-
-function cardsOptions(scope = getResourceScope()) {
-	return {
-		queryKey: syncCardsKey(scope),
-		staleTime: 30_000,
-		queryFn: async ({ signal }: { signal: AbortSignal }) => {
-			try {
-				const data: SyncCardsOutputBody = (await getSyncCards({ signal })).data;
-				current(scope, signal);
-				dismissKey("sync-cards");
-				return data.cards ?? [];
-			} catch (error) {
-				if (scope === getResourceScope() && !signal.aborted)
-					notifyError(
-						"sync-cards",
-						error instanceof Error
-							? error.message
-							: "The card selection could not be loaded.",
-						{
-							label: "Reload cards",
 							onAction: () => void refreshSyncSettings(true),
 						},
 					);
@@ -150,17 +115,6 @@ export async function refreshSyncSettings(force = false): Promise<void> {
 	if (scope.status === "pending") return;
 	try {
 		const options = credentialOptions(scope);
-		if (force)
-			await serverQueryClient().invalidateQueries({
-				queryKey: options.queryKey,
-				refetchType: "none",
-			});
-		await serverQueryClient().fetchQuery(options);
-	} catch {
-		/* The query reports its current-resource failure. */
-	}
-	try {
-		const options = cardsOptions(scope);
 		if (force)
 			await serverQueryClient().invalidateQueries({
 				queryKey: options.queryKey,
@@ -254,29 +208,8 @@ export async function disconnectSyncKey(): Promise<boolean> {
 	return true;
 }
 
-export async function saveSyncCards(cards: string[]): Promise<boolean> {
-	const scope = getResourceScope();
-	const key = syncCardsKey(scope);
-	const cache = serverQueryClient();
-	const previous = cache.getQueryData<string[]>(key) ?? [];
-	const updated = await runMutation<string[]>(
-		key,
-		async () => (await setSyncCards({ cards })).data.cards ?? [],
-		"sync-cards",
-	);
-	if (!updated) {
-		await cache.cancelQueries({ queryKey: key });
-		cache.setQueryData(key, previous);
-		return false;
-	}
-	await settleMutation(key, updated);
-	dismissKey("sync-cards");
-	return true;
-}
-
 export function resetSyncSettingsClient(): void {
 	serverQueryClient().removeQueries({ queryKey: ["sync-credential"] });
-	serverQueryClient().removeQueries({ queryKey: ["sync-cards"] });
 	serverQueryClient().removeQueries({ queryKey: ["sync-links"] });
 }
 
@@ -286,14 +219,6 @@ export function useSyncCredential() {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	return useQuery(
 		{ ...credentialOptions(scope), enabled: scope.status === "ready" },
-		serverQueryClient(),
-	);
-}
-
-export function useSyncCards() {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
-	return useQuery(
-		{ ...cardsOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
 	);
 }
