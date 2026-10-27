@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AccountLabel } from "../../../components/AccountIcon.tsx";
+import { AccountToggle } from "../../../components/AccountToggle.tsx";
 import { InputField } from "../../../components/Field.tsx";
 import type { Plan } from "../../../domain/model.ts";
 import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
@@ -12,30 +12,6 @@ import type {
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { IncomeSourcesFieldset } from "./IncomeSourcesFieldset.tsx";
 import { formatRuleDetail, RuleTogglePill } from "./RuleTogglePill.tsx";
-
-function AccountToggle({
-	account,
-	checked,
-	onToggle,
-}: {
-	account: Pick<Plan["accounts"][number], "id" | "kind" | "color" | "name">;
-	checked: boolean;
-	onToggle: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			className="group cursor-pointer rounded-control border border-line-strong bg-surface py-2 pr-3 pl-2 text-left text-xs transition-[border-color,background] duration-150 hover:bg-hover aria-pressed:border-primary aria-pressed:bg-success-bg motion-reduce:transition-none"
-			aria-pressed={checked}
-			onClick={onToggle}
-		>
-			<AccountLabel
-				account={account}
-				nameClassName="group-aria-[pressed=false]:text-muted"
-			/>
-		</button>
-	);
-}
 
 export function SafeSpendingConfigurePanel({
 	config,

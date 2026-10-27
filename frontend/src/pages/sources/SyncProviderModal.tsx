@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AccountLabel } from "../../components/AccountIcon.tsx";
+import { AccountToggle } from "../../components/AccountToggle.tsx";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
@@ -19,32 +19,9 @@ const PROVIDERS = [{ id: "simplefin", name: "SimpleFIN" }] as const;
 
 type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
 
-function AccountToggle({
-	account,
-	checked,
-	disabled,
-	onToggle,
-}: {
-	account: SyncAccount;
-	checked: boolean;
-	disabled: boolean;
-	onToggle: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			className="group flex w-full cursor-pointer items-center gap-2 rounded-control border border-line-strong bg-surface px-3 py-2 text-left text-sm transition-[border-color,background] duration-150 hover:bg-hover aria-pressed:border-primary aria-pressed:bg-success-bg motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-50"
-			aria-pressed={checked}
-			disabled={disabled}
-			onClick={onToggle}
-		>
-			<AccountLabel
-				account={account}
-				nameClassName="group-aria-[pressed=false]:text-muted"
-			/>
-		</button>
-	);
-}
+// Only debt accounts can be cards: pending-charge seeds model card
+// charges, so checking-as-a-card is not offered.
+const isCardEligible = (account: SyncAccount) => account.kind === "debt";
 
 function formatConnectedAt(value?: string): string | null {
 	if (!value) return null;
@@ -80,6 +57,16 @@ export function SyncProviderModal({
 
 	const storedCards = cards.data ?? [];
 	const checked = selected ?? storedCards;
+	// Stored cards stay removable even when they are no longer offered as a
+	// choice (e.g. connected before the debt-only rule): union them into the
+	// list so unticking persists the removal instead of stranding the id.
+	const listed = accounts.filter(isCardEligible);
+	for (const id of storedCards) {
+		if (!listed.some((account) => account.id === id)) {
+			const existing = accounts.find((account) => account.id === id);
+			if (existing) listed.push(existing);
+		}
+	}
 	const dirty =
 		selected !== null &&
 		(selected.length !== storedCards.length ||
@@ -173,9 +160,10 @@ export function SyncProviderModal({
 													aria-labelledby="sync-cards-label"
 													className="mt-2 grid list-none gap-2 p-0"
 												>
-													{accounts.map((account) => (
+													{listed.map((account) => (
 														<li key={account.id}>
 															<AccountToggle
+																className="w-full text-left text-sm"
 																account={account}
 																checked={checked.includes(account.id)}
 																disabled={readOnly || busy !== null}
@@ -191,9 +179,9 @@ export function SyncProviderModal({
 															/>
 														</li>
 													))}
-													{accounts.length === 0 && (
+													{listed.length === 0 && (
 														<li className="text-sm text-muted">
-															No accounts yet.
+															No card accounts yet.
 														</li>
 													)}
 												</ul>

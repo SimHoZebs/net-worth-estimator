@@ -19,7 +19,14 @@ vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
 
 const accounts = [
 	{ id: "checking", name: "Checking", kind: "cash" as const, color: null },
+	{
+		id: "brokerage",
+		name: "Brokerage",
+		kind: "investment" as const,
+		color: null,
+	},
 	{ id: "prime_card", name: "Prime Card", kind: "debt" as const, color: null },
+	{ id: "home", name: "Home", kind: "property" as const, color: null },
 ];
 
 function stubApi(state: {
@@ -389,11 +396,42 @@ it("disconnects after confirmation", async () => {
 	expect(requests.some((request) => request.method === "DELETE")).toBe(true);
 });
 
+it("only offers debt accounts as cards", async () => {
+	stubApi({ configured: true, cards: [] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	expect(
+		await screen.findByRole("button", { name: /Prime Card/ }),
+	).toBeTruthy();
+	expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
+	expect(screen.queryByRole("button", { name: /Brokerage/ })).toBeNull();
+	expect(screen.queryByRole("button", { name: /Home/ })).toBeNull();
+});
+
+it("keeps stored non-debt cards removable", async () => {
+	const requests = stubApi({ configured: true, cards: ["checking"] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
+	fireEvent.click(await screen.findByRole("button", { name: /Checking/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Save cards" }));
+	await waitFor(() => {
+		expect(
+			requests.some(
+				(request) =>
+					request.method === "PUT" &&
+					JSON.stringify((request.body as { cards: string[] }).cards) ===
+						JSON.stringify([]),
+			),
+		).toBe(true);
+	});
+});
+
 it("disables writes when read-only", async () => {
 	stubApi({ configured: true, cards: [] });
 	render(<SyncSettings accounts={accounts} readOnly={true} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByRole("button", { name: /Checking/ });
+	await screen.findByRole("button", { name: /Prime Card/ });
+	expect(screen.queryByRole("button", { name: "Checking cash" })).toBeNull();
 	expect(
 		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
 			.disabled,
