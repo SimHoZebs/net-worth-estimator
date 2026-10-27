@@ -1,7 +1,3 @@
-import {
-	accountTransactions,
-	type AccountTransaction,
-} from "./accountActivity.ts";
 import { dateLabel, money } from "./format.ts";
 import type { Account, Plan } from "./model.ts";
 import type { Projection } from "./result.ts";
@@ -32,10 +28,8 @@ export interface AccountCardModel {
 	/** Positive magnitude: debt shows amount owed, assets show value. */
 	balance: number;
 	balanceLabel: string;
-	summary: string;
 	currency: string;
 	metrics: CardMetric[];
-	transactions: AccountTransaction[];
 	creditUtilization?: number;
 	/** Never fabricated: omitted unless genuinely known. */
 	syncedAt?: undefined;
@@ -86,32 +80,18 @@ function balanceLabelFor(account: Account, kind: CardKind): string {
  */
 export function toAccountCard({
 	account,
-	plan,
 	projection,
 }: {
 	account: Account;
-	plan: Plan;
 	projection: Projection | null;
 }): AccountCardModel {
 	const kind = cardKindFor(account);
 	const roles = rolesFor(account);
 	const magnitude = Math.abs(account.balance);
-	const transactions = projection
-		? accountTransactions({ accountId: account.id, plan, projection })
-		: [];
 	const last = projection?.points.at(-1);
 	const ending = last?.balances[account.id] ?? account.balance;
-	const withdrawable = Math.max(0, account.balance - account.minBalance);
-	const summary =
-		account.kind === "debt"
-			? `${money(Math.abs(ending))} projected · Protected ${money(account.minBalance)}`
-			: `${money(withdrawable)} available · As of ${dateLabel(account.observedOn, true)}`;
 	const metrics: CardMetric[] = [
 		{ label: "Protected balance", value: money(account.minBalance) },
-		{
-			label: account.kind === "debt" ? "Amount owed" : "Starting balance",
-			value: money(magnitude),
-		},
 		{ label: "Projected ending", value: money(Math.abs(ending)) },
 		{ label: "Observed on", value: dateLabel(account.observedOn, true) },
 	];
@@ -141,10 +121,8 @@ export function toAccountCard({
 		roles,
 		balance: magnitude,
 		balanceLabel: balanceLabelFor(account, kind),
-		summary,
 		currency: "USD",
 		metrics,
-		transactions,
 		...(creditUtilization !== undefined ? { creditUtilization } : {}),
 		account,
 	};
@@ -159,5 +137,5 @@ export function toAccountCards({
 }): AccountCardModel[] {
 	return plan.accounts
 		.filter((account) => !account.archived)
-		.map((account) => toAccountCard({ account, plan, projection }));
+		.map((account) => toAccountCard({ account, projection }));
 }

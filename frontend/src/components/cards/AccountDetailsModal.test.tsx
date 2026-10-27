@@ -32,7 +32,6 @@ describe("AccountDetailsModal", () => {
 		});
 		const card = toAccountCard({
 			account: testPlan.accounts[0]!,
-			plan: testPlan,
 			projection,
 		});
 		const view = render(
@@ -72,7 +71,6 @@ describe("AccountDetailsModal", () => {
 		});
 		const card = toAccountCard({
 			account: testPlan.accounts[0]!,
-			plan: testPlan,
 			projection,
 		});
 		const view = render(

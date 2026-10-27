@@ -44,10 +44,6 @@ export function AccountCard({
 					</Badge>
 				))}
 			</span>
-			<span className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
-				<span className="truncate">{card.summary}</span>
-				<span aria-hidden="true">›</span>
-			</span>
 		</button>
 	);
 }
