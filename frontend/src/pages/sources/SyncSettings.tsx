@@ -22,13 +22,12 @@ export function SyncSettings({
 	const [connectOpen, setConnectOpen] = useState(false);
 
 	const connectedCount = credential.data?.configured === true ? 1 : 0;
-	const status =
-		connectedCount === 1 ? "1 provider connected" : "Not connected";
+	const status = connectedCount === 1 ? "1 connected" : "Not connected";
 
 	if (credential.isPending || credential.isError) {
 		return (
 			<section
-				aria-label="Bank sync"
+				aria-label="Update bank providers"
 				className="mb-6 rounded-surface border border-line bg-surface p-6 max-sm:p-5"
 			>
 				<div className="flex items-center gap-4">
@@ -36,7 +35,7 @@ export function SyncSettings({
 						<Landmark size={25} />
 					</span>
 					<div className="flex-1">
-						<h2 className="text-base max-sm:text-sm">Bank sync</h2>
+						<h2 className="text-base max-sm:text-sm">Update bank providers</h2>
 					</div>
 				</div>
 
@@ -52,13 +51,12 @@ export function SyncSettings({
 	return (
 		<>
 			<Button
-				aria-label="Bank sync"
 				aria-describedby="bank-sync-status"
 				onClick={() => setChooserOpen(true)}
 				className="mb-6"
 			>
 				<Landmark size={18} aria-hidden="true" />
-				Bank sync
+				Update bank providers -{` `}
 				<span id="bank-sync-status" className="text-xs font-normal text-muted">
 					{status}
 				</span>
