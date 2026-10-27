@@ -105,9 +105,19 @@ function stubApi(state: {
 			);
 		}
 		if (path === "/v1/status")
-			return new Response(JSON.stringify({ readOnly: false }), {
-				headers: jsonHeaders(),
-			});
+			return new Response(
+				JSON.stringify(
+					state.configured
+						? {
+								readOnly: false,
+								syncConfigured: true,
+								syncQuotaUsed: 5,
+								syncQuotaLimit: 24,
+							}
+						: { readOnly: false },
+				),
+				{ headers: jsonHeaders() },
+			);
 		throw new Error(`unexpected request ${init?.method ?? "GET"} ${path}`);
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -248,17 +258,7 @@ it("collapses the inline connect form on cancel", async () => {
 
 it("refreshes status and links after connecting", async () => {
 	const requests = stubApi({ configured: false });
-	const { getResourceScope } = await import("../../auth/resourceScope.ts");
-	const { serverQueryClient } = await import("../../state/serverQuery.ts");
-	const { workspaceResourceKey } =
-		await import("../../state/workspaceResources.ts");
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	serverQueryClient().setQueryData(
-		workspaceResourceKey("status", getResourceScope()),
-		{
-			readOnly: false,
-		},
-	);
 	fireEvent.click(
 		await screen.findByRole("button", { name: "Connect SimpleFIN" }),
 	);
@@ -274,13 +274,8 @@ it("refreshes status and links after connecting", async () => {
 	const before = accountFetches();
 	fireEvent.click(screen.getByRole("button", { name: "Connect bank" }));
 	await screen.findByText(/Connected since/);
-	await waitFor(() => {
-		expect(
-			serverQueryClient().getQueryState(
-				workspaceResourceKey("status", getResourceScope()),
-			)?.isInvalidated,
-		).toBe(true);
-	});
+	// The panel reads quota from /v1/status once the connection is stored.
+	await screen.findByText(/Bridge quota: 5 of 24 used in the last 24 hours\./);
 	await waitFor(() => {
 		expect(accountFetches()).toBeGreaterThan(before);
 	});
@@ -410,4 +405,29 @@ it("keeps the setup token in a single-line input", async () => {
 	expect(screen.getByPlaceholderText("Paste your setup token").tagName).toBe(
 		"INPUT",
 	);
+});
+
+it("shows bridge quota usage when connected", async () => {
+	stubApi({ configured: true, links: [] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	expect(
+		await screen.findByText("Bridge quota: 5 of 24 used in the last 24 hours."),
+	).toBeTruthy();
+});
+
+it("hides bridge quota when the backend omits it", async () => {
+	stubApi({ configured: true, links: [] });
+	const { serverQueryClient } = await import("../../state/serverQuery.ts");
+	const { getResourceScope } = await import("../../auth/resourceScope.ts");
+	const { workspaceResourceKey } =
+		await import("../../state/workspaceResources.ts");
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	await screen.findByText(/Connected since/);
+	serverQueryClient().setQueryData(
+		workspaceResourceKey("status", getResourceScope()),
+		{ readOnly: false, syncConfigured: true },
+	);
+	await waitFor(() => {
+		expect(screen.queryByText(/Bridge quota:/)).toBeNull();
+	});
 });
