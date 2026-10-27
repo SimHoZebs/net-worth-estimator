@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Landmark } from "lucide-react";
-import { Button } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import type { Account } from "../../domain/model.ts";
@@ -25,32 +24,47 @@ export function SyncSettings({
 	const status =
 		connectedCount === 1 ? "1 provider connected" : "Not connected";
 
+	if (credential.isPending || credential.isError) {
+		return (
+			<section
+				aria-label="Bank sync"
+				className="mb-6 rounded-surface border border-line bg-surface p-6 max-sm:p-5"
+			>
+				<div className="flex items-center gap-4">
+					<span className="text-primary-text">
+						<Landmark size={25} />
+					</span>
+					<div className="flex-1">
+						<h2 className="text-base max-sm:text-sm">Bank sync.</h2>
+					</div>
+				</div>
+
+				{credential.isPending ? (
+					<Skeleton className="mt-3 h-10 w-full" />
+				) : (
+					<ErrorNotice message="The sync connection could not be loaded." />
+				)}
+			</section>
+		);
+	}
+
 	return (
-		<section
-			aria-label="Bank sync"
-			className="mb-6 rounded-surface border border-line bg-surface p-6 max-sm:p-5"
-		>
-			<div className="mb-2 flex items-center gap-4">
+		<>
+			<button
+				type="button"
+				aria-label="Bank sync"
+				aria-describedby="bank-sync-status"
+				onClick={() => setChooserOpen(true)}
+				className="mb-6 flex w-full cursor-pointer items-center gap-4 rounded-surface border border-line bg-surface p-6 text-left transition-colors hover:border-line-strong max-sm:p-5"
+			>
 				<span className="text-primary-text">
 					<Landmark size={25} />
 				</span>
-				<div className="flex-1">
-					<h2 className="text-base max-sm:text-sm">Bank sync.</h2>
-				</div>
-			</div>
-
-			{credential.isPending ? (
-				<Skeleton className="h-10 w-full" />
-			) : credential.isError ? (
-				<ErrorNotice message="The sync connection could not be loaded." />
-			) : (
-				<div className="flex items-center gap-3">
-					<Button type="button" onClick={() => setChooserOpen(true)}>
-						Bank sync
-					</Button>
-					<span className="text-sm text-muted">{status}</span>
-				</div>
-			)}
+				<span className="flex-1 text-base max-sm:text-sm">Bank sync.</span>
+				<span id="bank-sync-status" className="text-sm text-muted">
+					{status}
+				</span>
+			</button>
 
 			{chooserOpen && (
 				<SyncProviderModal
@@ -67,6 +81,6 @@ export function SyncSettings({
 					onConnected={() => setConnectOpen(false)}
 				/>
 			)}
-		</section>
+		</>
 	);
 }
