@@ -5,11 +5,13 @@ import {
 	disconnectSyncCredential,
 	getSyncCards,
 	getSyncCredential,
+	listAccountLinks,
 	setSyncCards,
 } from "@/api/generated/endpoints.ts";
 import type {
 	SyncCredentialBody,
 	SyncCardsOutputBody,
+	AccountLink,
 } from "@/api/generated/model/index.ts";
 import {
 	getResourceScope,
@@ -26,6 +28,10 @@ export function syncCredentialKey(scope = getResourceScope()) {
 
 export function syncCardsKey(scope = getResourceScope()) {
 	return ["sync-cards", scope.key] as const;
+}
+
+export function syncLinksKey(scope = getResourceScope()) {
+	return ["sync-links", scope.key] as const;
 }
 
 function current(scope: ResourceScope, signal?: AbortSignal) {
@@ -94,12 +100,49 @@ function cardsOptions(scope = getResourceScope()) {
 	};
 }
 
+function linksOptions(scope = getResourceScope()) {
+	return {
+		queryKey: syncLinksKey(scope),
+		staleTime: 30_000,
+		queryFn: async ({ signal }: { signal: AbortSignal }) => {
+			try {
+				const data = (await listAccountLinks({ signal })).data;
+				current(scope, signal);
+				dismissKey("sync-links");
+				return (data.links ?? []) as AccountLink[];
+			} catch (error) {
+				if (scope === getResourceScope() && !signal.aborted)
+					notifyError(
+						"sync-links",
+						error instanceof Error
+							? error.message
+							: "The linked accounts could not be loaded.",
+						{
+							label: "Reload links",
+							onAction: () => void refreshSyncSettings(true),
+						},
+					);
+				throw error;
+			}
+		},
+	};
+}
+
 async function refreshStatus(scope: ResourceScope) {
 	if (scope.status === "pending" || scope !== getResourceScope()) return;
 	await serverQueryClient().invalidateQueries({
 		queryKey: workspaceResourceKey("status", scope),
 		refetchType: "active",
 	});
+}
+
+async function refreshSyncData(scope: ResourceScope) {
+	if (scope.status === "pending" || scope !== getResourceScope()) return;
+	await serverQueryClient().invalidateQueries({
+		queryKey: syncLinksKey(scope),
+		refetchType: "active",
+	});
+	void refreshStatus(scope);
 }
 
 export async function refreshSyncSettings(force = false): Promise<void> {
@@ -118,6 +161,17 @@ export async function refreshSyncSettings(force = false): Promise<void> {
 	}
 	try {
 		const options = cardsOptions(scope);
+		if (force)
+			await serverQueryClient().invalidateQueries({
+				queryKey: options.queryKey,
+				refetchType: "none",
+			});
+		await serverQueryClient().fetchQuery(options);
+	} catch {
+		/* The query reports its current-resource failure. */
+	}
+	try {
+		const options = linksOptions(scope);
 		if (force)
 			await serverQueryClient().invalidateQueries({
 				queryKey: options.queryKey,
@@ -181,7 +235,7 @@ export async function connectSyncKey(input: {
 	);
 	if (!updated) return false;
 	await settleMutation(syncCredentialKey(scope), updated);
-	void refreshStatus(scope);
+	void refreshSyncData(scope);
 	dismissKey("sync-credential");
 	return true;
 }
@@ -195,7 +249,7 @@ export async function disconnectSyncKey(): Promise<boolean> {
 	);
 	if (!updated) return false;
 	await settleMutation(syncCredentialKey(scope), updated);
-	void refreshStatus(scope);
+	void refreshSyncData(scope);
 	dismissKey("sync-credential");
 	return true;
 }
@@ -223,6 +277,7 @@ export async function saveSyncCards(cards: string[]): Promise<boolean> {
 export function resetSyncSettingsClient(): void {
 	serverQueryClient().removeQueries({ queryKey: ["sync-credential"] });
 	serverQueryClient().removeQueries({ queryKey: ["sync-cards"] });
+	serverQueryClient().removeQueries({ queryKey: ["sync-links"] });
 }
 
 subscribeResourceScope(resetSyncSettingsClient);
@@ -239,6 +294,14 @@ export function useSyncCards() {
 	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
 	return useQuery(
 		{ ...cardsOptions(scope), enabled: scope.status === "ready" },
+		serverQueryClient(),
+	);
+}
+
+export function useSyncLinks(enabled = true) {
+	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	return useQuery(
+		{ ...linksOptions(scope), enabled: scope.status === "ready" && enabled },
 		serverQueryClient(),
 	);
 }
