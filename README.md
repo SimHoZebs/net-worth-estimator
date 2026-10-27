@@ -122,17 +122,17 @@ Any frontend host must proxy `/v1` to the backend under the same public origin f
 
 Configure a backend service with this durable contract:
 
-| Setting                | Value                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------- |
-| Build                  | `backend/Dockerfile` with repository root context                                     |
-| Port                   | `8787`                                                                                |
-| Health check           | `GET /healthz` on port `8787`                                                         |
-| Instances              | `1`                                                                                   |
-| Persistent volume      | `/data`                                                                               |
-| Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`                                 |
-| Public exposure        | only behind suitable access control                                                   |
-| Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`                                |
-| Authentication         | Casdoor OIDC, durable sessions, and account-owned plan permissions                     |
-| Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1`                                                     |
+| Setting                | Value                                                              |
+| ---------------------- | ------------------------------------------------------------------ |
+| Build                  | `backend/Dockerfile` with repository root context                  |
+| Port                   | `8787`                                                             |
+| Health check           | `GET /healthz` on port `8787`                                      |
+| Instances              | `1`                                                                |
+| Persistent volume      | `/data`                                                            |
+| Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`              |
+| Public exposure        | only behind suitable access control                                |
+| Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`             |
+| Authentication         | Casdoor OIDC, durable sessions, and account-owned plan permissions |
+| Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1`                                  |
 
 Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.

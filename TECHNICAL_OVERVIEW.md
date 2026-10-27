@@ -143,11 +143,11 @@ A `partial` result is a cumulative snapshot. A slow attached stream may skip int
 
 `Projection-Source` identifies where the result originates:
 
-| Value           | Meaning                                                                        |
-| --------------- | ------------------------------------------------------------------------------ |
-| `stored` | completed seeded result retrieved from SQLite; stream contains one `result` event |
-| `computed` | this request owns a new seeded run or an unseeded request-bound run |
-| `shared` | this request attaches to an identical seeded run in the shared-run registry |
+| Value      | Meaning                                                                           |
+| ---------- | --------------------------------------------------------------------------------- |
+| `stored`   | completed seeded result retrieved from SQLite; stream contains one `result` event |
+| `computed` | this request owns a new seeded run or an unseeded request-bound run               |
+| `shared`   | this request attaches to an identical seeded run in the shared-run registry       |
 
 `computed` and `shared` streams may end with an `error` event. These values describe execution origin, not successful completion or storage. `Projection-Source` replaces the former `Cache-Status` header for both projection endpoints.
 
@@ -159,14 +159,14 @@ An unseeded run does not use the shared registry or result storage. Its context 
 
 `POST /v1/sync/simplefin` calls `simplefin.Runner.Trigger` and returns `simplefin.Summary` counts.
 
-| Condition                                       | Status                        |
-| ----------------------------------------------- | ----------------------------- |
-| guest write                                     | 401                           |
-| denied plan permission or read-only mode         | 403                           |
-| sync unconfigured                               | 503                           |
-| another run is active                           | 409                           |
-| successful manual run was less than 6 hours ago | 429                           |
-| success                                         | 200                           |
+| Condition                                       | Status |
+| ----------------------------------------------- | ------ |
+| guest write                                     | 401    |
+| denied plan permission or read-only mode        | 403    |
+| sync unconfigured                               | 503    |
+| another run is active                           | 409    |
+| successful manual run was less than 6 hours ago | 429    |
+| success                                         | 200    |
 
 ### Origin and write policy
 
@@ -222,32 +222,32 @@ Restore a database backup before a downgrade.
 
 The current schema stores:
 
-| Table                  | Purpose                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `sessions`             | global application sessions with hashed tokens, opaque data, and expiry                                       |
-| `identity_grants`      | global provider grants and token credentials, bound to issuer and subject                                     |
-| `identity_logout_marks` | global revocation markers that block delayed callbacks and stale grants                                      |
-| `identity_logout_tokens` | global signed logout token replay records                                                                  |
-| `app_accounts`         | verified application account identities, unique by issuer and subject                                        |
-| `plans`                | private owner relationship or explicitly published guest sample                                             |
-| `model_metadata`       | source path and document-present flag                                                                         |
-| `accounts`             | ordered account definitions                                                                                   |
-| `checkpoints`          | ordered balance observations, unique by account/date, with owner                                              |
-| `postings`             | ordered UUID posting definitions with owner and explicit pending state                                         |
-| `purchase_policies`    | plan-scoped purchase priorities attached to posting identities                                                |
-| `recurrence_rules`     | ordered repetition templates with schedule, priority, and optional annual cap                                 |
-| `payment_terms`        | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
-| `evaluations`          | type, plan-scoped instance ID, order, label, enablement, and JSON config                                      |
-| `entity_ids`           | shared ID registry across accounts, postings, rules, and evaluations                                          |
-| `account_links`        | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
-| `pinned_evaluations`   | ordered pinned evaluation instance IDs                                                                        |
-| `safe_spending_settings` | plan-scoped safe-spending preferences                                                                      |
-| `sync_state`           | last successful sync completion time                                                                          |
-| `projection_artifacts` | versioned content identity, kind, creation time, and JSON payload                                             |
-| `amount_presets`       | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
-| `posting_sync_keys`    | exact provider/account/transaction identity mapped to a local posting UUID                                     |
-| `posting_id_migrations` | private old-to-new posting identity audit for the one-way UUID migration                                      |
-| `schema_migrations`    | completed transactional schema upgrades                                                                       |
+| Table                    | Purpose                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `sessions`               | global application sessions with hashed tokens, opaque data, and expiry                                       |
+| `identity_grants`        | global provider grants and token credentials, bound to issuer and subject                                     |
+| `identity_logout_marks`  | global revocation markers that block delayed callbacks and stale grants                                       |
+| `identity_logout_tokens` | global signed logout token replay records                                                                     |
+| `app_accounts`           | verified application account identities, unique by issuer and subject                                         |
+| `plans`                  | private owner relationship or explicitly published guest sample                                               |
+| `model_metadata`         | source path and document-present flag                                                                         |
+| `accounts`               | ordered account definitions                                                                                   |
+| `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |
+| `postings`               | ordered UUID posting definitions with owner and explicit pending state                                        |
+| `purchase_policies`      | plan-scoped purchase priorities attached to posting identities                                                |
+| `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
+| `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
+| `evaluations`            | type, plan-scoped instance ID, order, label, enablement, and JSON config                                      |
+| `entity_ids`             | shared ID registry across accounts, postings, rules, and evaluations                                          |
+| `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
+| `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
+| `safe_spending_settings` | plan-scoped safe-spending preferences                                                                         |
+| `sync_state`             | last successful sync completion time                                                                          |
+| `projection_artifacts`   | versioned content identity, kind, creation time, and JSON payload                                             |
+| `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
+| `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
+| `posting_id_migrations`  | private old-to-new posting identity audit for the one-way UUID migration                                      |
+| `schema_migrations`      | completed transactional schema upgrades                                                                       |
 
 ### First boot and import
 
@@ -543,36 +543,36 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 
 ## 12. Backend Key Files
 
-| File                                                | Responsibility                                   |
-| --------------------------------------------------- | ------------------------------------------------ |
-| `backend/cmd/server/main.go`                        | environment, first-boot seed, HTTP lifecycle     |
-| `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler     |
-| `backend/cmd/importcsv/main.go`                     | offline seed replacement                         |
-| `backend/internal/api/server.go`                    | router and operation registration                |
-| `backend/internal/api/auth.go`                      | read-only write kill switch                      |
-| `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement         |
-| `backend/internal/api/model_handlers.go`            | model and status handlers                        |
-| `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers  |
+| File                                                | Responsibility                                          |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| `backend/cmd/server/main.go`                        | environment, first-boot seed, HTTP lifecycle            |
+| `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler            |
+| `backend/cmd/importcsv/main.go`                     | offline seed replacement                                |
+| `backend/internal/api/server.go`                    | router and operation registration                       |
+| `backend/internal/api/auth.go`                      | read-only write kill switch                             |
+| `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement                |
+| `backend/internal/api/model_handlers.go`            | model and status handlers                               |
+| `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers         |
 | `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and result storage |
-| `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization       |
-| `backend/internal/api/artifacts.go`                 | simulation result identity and storage helpers   |
-| `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle |
-| `backend/internal/store/model.go`                   | seed/import replacement and ordered reload       |
-| `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning       |
-| `backend/internal/store/sync.go`                    | sync application and pending snapshot            |
-| `backend/internal/store/artifacts.go`               | bounded artifact storage                         |
-| `backend/internal/csvio/import.go`                  | canonical model CSV parsing                      |
-| `backend/internal/domain/validation.go`             | authoritative model validation                   |
-| `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state         |
-| `backend/internal/domain/transitions.go`            | shared movement execution                        |
-| `backend/internal/domain/simulate.go`               | deterministic kernel                             |
-| `backend/internal/domain/path.go`                   | path and public-result adaptation                |
-| `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                 |
-| `backend/internal/domain/evaluation_fi.go`          | financial-independence branch evaluation         |
-| `backend/internal/domain/evaluation_threshold.go`   | net-worth threshold evaluation                   |
-| `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation                   |
-| `backend/internal/domain/stochastic.go`             | worker execution and progress                    |
-| `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators     |
-| `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers           |
-| `backend/internal/simplefin/runner.go`              | fetch/map/apply orchestration and trigger guards |
-| `backend/internal/simplefin/map.go`                 | checkpoint and pending-charge mapping            |
+| `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization              |
+| `backend/internal/api/artifacts.go`                 | simulation result identity and storage helpers          |
+| `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle     |
+| `backend/internal/store/model.go`                   | seed/import replacement and ordered reload              |
+| `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning              |
+| `backend/internal/store/sync.go`                    | sync application and pending snapshot                   |
+| `backend/internal/store/artifacts.go`               | bounded artifact storage                                |
+| `backend/internal/csvio/import.go`                  | canonical model CSV parsing                             |
+| `backend/internal/domain/validation.go`             | authoritative model validation                          |
+| `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state                |
+| `backend/internal/domain/transitions.go`            | shared movement execution                               |
+| `backend/internal/domain/simulate.go`               | deterministic kernel                                    |
+| `backend/internal/domain/path.go`                   | path and public-result adaptation                       |
+| `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                        |
+| `backend/internal/domain/evaluation_fi.go`          | financial-independence branch evaluation                |
+| `backend/internal/domain/evaluation_threshold.go`   | net-worth threshold evaluation                          |
+| `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation                          |
+| `backend/internal/domain/stochastic.go`             | worker execution and progress                           |
+| `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators            |
+| `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers                  |
+| `backend/internal/simplefin/runner.go`              | fetch/map/apply orchestration and trigger guards        |
+| `backend/internal/simplefin/map.go`                 | checkpoint and pending-charge mapping                   |

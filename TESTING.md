@@ -325,14 +325,14 @@ A small seeded run should terminate with one `result` event. It may include `pro
 
 Exercise each row through the real identity boundary against disposable state.
 
-| Access | Plan reads/projections | Canonical writes and manual sync |
-| --- | --- | --- |
-| Guest, sample resource | allowed | 401 |
-| Signed-in owner, own resource | allowed | allowed, subject to validation/sync configuration |
-| Signed-in owner, another resource | 409 for stale resource assertion | rejected |
-| Owner without write permission | allowed when read/project permissions exist | 403 |
-| Owner with global read-only enabled | allowed | 403 |
-| Provider unavailable when verification is due | 503 | 503 |
+| Access                                        | Plan reads/projections                      | Canonical writes and manual sync                  |
+| --------------------------------------------- | ------------------------------------------- | ------------------------------------------------- |
+| Guest, sample resource                        | allowed                                     | 401                                               |
+| Signed-in owner, own resource                 | allowed                                     | allowed, subject to validation/sync configuration |
+| Signed-in owner, another resource             | 409 for stale resource assertion            | rejected                                          |
+| Owner without write permission                | allowed when read/project permissions exist | 403                                               |
+| Owner with global read-only enabled           | allowed                                     | 403                                               |
+| Provider unavailable when verification is due | 503                                         | 503                                               |
 
 A shared Authorization bearer header cannot replace a session or bypass a denied
 permission. `AUTH_TOKEN` and `AUTH_PROVIDER=none` cause server startup to fail.

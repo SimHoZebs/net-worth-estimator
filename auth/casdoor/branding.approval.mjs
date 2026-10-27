@@ -1,17 +1,26 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
-import { brandingPlan, brandingTarget, digest, serializePlan } from './apply-branding.mjs';
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { parseArgs } from "node:util";
+import { brandingPlan, brandingTarget, digest, serializePlan } from "./apply-branding.mjs";
 
-const escapeHtml = (text) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+const escapeHtml = (text) =>
+  text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 
 export async function writeBrandingApproval(target, directory) {
   const plan = brandingPlan(target);
   const bytes = serializePlan(plan);
   const sha256 = digest(bytes);
-  const details = Object.entries(plan.fields).map(([key, value]) =>
-    `<details><summary>${key}</summary><pre>${escapeHtml(typeof value === 'string' ? value : JSON.stringify(value, null, 2))}</pre></details>`).join('\n');
+  const details = Object.entries(plan.fields)
+    .map(
+      ([key, value]) =>
+        `<details><summary>${key}</summary><pre>${escapeHtml(typeof value === "string" ? value : JSON.stringify(value, null, 2))}</pre></details>`,
+    )
+    .join("\n");
   const html = `<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Waypoint branding approval</title>
@@ -46,15 +55,19 @@ ${details}
 <p>Profile, password, and app-session management are native Waypoint screens backed by a thin Casdoor proxy. Passkey enrollment and removal remain Casdoor screens. Device passkey prompts remain browser and operating-system screens.</p>
 </main></html>\n`;
   await mkdir(directory, { mode: 0o700 });
-  for (const [name, value] of Object.entries({ 'plan.json': bytes, 'plan.sha256': `${sha256}  plan.json\n`, 'review.html': html })) {
-    await writeFile(resolve(directory, name), value, { flag: 'wx', mode: 0o600 });
+  for (const [name, value] of Object.entries({
+    "plan.json": bytes,
+    "plan.sha256": `${sha256}  plan.json\n`,
+    "review.html": html,
+  })) {
+    await writeFile(resolve(directory, name), value, { flag: "wx", mode: 0o600 });
   }
   return { directory: resolve(directory), sha256 };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const { values } = parseArgs({ options: { output: { type: 'string' } } });
-  if (!values.output) throw new Error('Use --output <new-local-directory>');
+  const { values } = parseArgs({ options: { output: { type: "string" } } });
+  if (!values.output) throw new Error("Use --output <new-local-directory>");
   const result = await writeBrandingApproval(brandingTarget(process.env), resolve(values.output));
   console.log(`Offline approval artifact: ${result.directory}/review.html`);
   console.log(`Branding SHA-256: ${result.sha256}`);

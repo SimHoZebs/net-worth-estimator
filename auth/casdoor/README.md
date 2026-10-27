@@ -53,13 +53,13 @@ loopback. For remote use, provide an HTTPS reverse proxy.
 
 ## State and client settings
 
-| State path | Purpose |
-| --- | --- |
-| `conf/app.conf` | Private runtime configuration and initial administrator secret |
-| `conf/init_data.json` | Initial client and user seed, including bootstrap credentials |
-| `bootstrap.json` | Verified generated subject, issuer, client ID, and callback. No passwords |
-| `db/` | SQLite identities, signing keys, passkeys, tokens, and session metadata |
-| `sessions/` | Durable browser sessions for Casdoor's hard-coded file provider |
+| State path            | Purpose                                                                   |
+| --------------------- | ------------------------------------------------------------------------- |
+| `conf/app.conf`       | Private runtime configuration and initial administrator secret            |
+| `conf/init_data.json` | Initial client and user seed, including bootstrap credentials             |
+| `bootstrap.json`      | Verified generated subject, issuer, client ID, and callback. No passwords |
+| `db/`                 | SQLite identities, signing keys, passkeys, tokens, and session metadata   |
+| `sessions/`           | Durable browser sessions for Casdoor's hard-coded file provider           |
 
 Files use `0600`. Directories use `0700`. Config mounts read-only. SQLite uses
 WAL with a five-second busy timeout. Preserve the whole private state directory

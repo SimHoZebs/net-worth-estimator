@@ -10,11 +10,11 @@ A plan is the permission boundary. Its accounts, postings, recurrence rules,
 checkpoints, evaluations, presets, pinned results, sync links, and projection
 artifacts stay inside that boundary.
 
-| Principal | Resource | Default capabilities |
-| --- | --- | --- |
-| Guest | `plans/sample` | `plan:read`, `plan:project` |
-| Verified account | Its own `plans/<opaque-id>` | `plan:read`, `plan:project`, `plan:write` |
-| Any other combination | Another account's plan | Denied |
+| Principal             | Resource                    | Default capabilities                      |
+| --------------------- | --------------------------- | ----------------------------------------- |
+| Guest                 | `plans/sample`              | `plan:read`, `plan:project`               |
+| Verified account      | Its own `plans/<opaque-id>` | `plan:read`, `plan:project`, `plan:write` |
+| Any other combination | Another account's plan      | Denied                                    |
 
 Signed-in accounts use their private plan, not the sample. Signup does not ask
 for a role. The owner relationship automatically supplies the plan-owner role.
@@ -128,6 +128,7 @@ storage remains local to the same browser profile, not an encrypted user vault.
 People who share a browser profile can inspect that profile's local data.
 
 Controlling sources:
+
 - [Casdoor permission API](https://casdoor.ai/docs/permission/exposed-casbin-apis/)
 - [Permission configuration](https://casdoor.ai/docs/permission/permission-configuration/)
 - [Pinned permission model and role policy handling](https://github.com/casdoor/casdoor/blob/v4.23.0/object/permission_enforcer.go)
