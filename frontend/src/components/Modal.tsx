@@ -94,7 +94,7 @@ export function Modal({
 			<motion.div
 				ref={panelRef}
 				tabIndex={focusPanelOnOpen ? -1 : undefined}
-				className="focus:outline-none"
+				className="flex flex-col gap-4 focus:outline-none"
 				initial={initial}
 				animate={closing ? exit : enter}
 				transition={{
@@ -128,7 +128,13 @@ export function Modal({
 						<IconButton icon={X} label="Close dialog" onClick={requestClose} />
 					</div>
 				</div>
-				<div className={mergeStyles(dialogBodyStyles, bodyClassName)}>
+				<div
+					className={mergeStyles(
+						dialogBodyStyles,
+						"pt-0 max-sm:pt-0",
+						bodyClassName,
+					)}
+				>
 					{children}
 				</div>
 			</motion.div>
