@@ -214,7 +214,6 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	});
 	await expect(lastCharges).toContainText("Prior cycle purchase");
 	await expect(lastCharges).not.toContainText("Current cycle purchase");
-	await expect(last).toContainText("Recorded charges can be incomplete.");
 	await page.getByRole("tab", { name: /Last cycle/ }).press("ArrowLeft");
 	const currentTab = page.getByRole("tab", { name: /This cycle/ });
 	await expect(currentTab).toBeFocused();

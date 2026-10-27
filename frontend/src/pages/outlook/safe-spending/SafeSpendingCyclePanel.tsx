@@ -44,9 +44,6 @@ export function SafeSpendingCyclePanel({
 						: undefined
 				}
 			/>
-			{cycle.note && (
-				<p className="text-sm leading-relaxed text-muted">{cycle.note}</p>
-			)}
 			<div className="flex justify-end">
 				<TransactionSortButton
 					order={transactionOrder}

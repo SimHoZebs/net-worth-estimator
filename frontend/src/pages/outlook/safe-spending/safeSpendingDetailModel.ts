@@ -32,7 +32,6 @@ export interface SafeSpendingChargeCycle {
 	title: string;
 	emptyMessage: string;
 	transactions: AccountTransaction[];
-	note?: string;
 	showTotal?: boolean;
 }
 
