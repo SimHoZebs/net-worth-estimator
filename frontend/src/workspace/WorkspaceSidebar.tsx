@@ -94,7 +94,22 @@ export function WorkspaceSidebar({
 										active={page === item.id}
 									>
 										<item.icon size={19} strokeWidth={1.7} />
-										<span>{item.label}</span>
+										<span>
+											{item.id === "purchases" ? (
+												// Always two lines: the bold active weight is wider and
+												// would otherwise reflow this row on selection. The
+												// break keeps its accessible name ("Planned purchases")
+												// so document title, header, and link queries are
+												// unchanged.
+												<>
+													Planned
+													<br />
+													purchases
+												</>
+											) : (
+												item.label
+											)}
+										</span>
 									</SidebarNavLink>
 								</li>
 							))}
