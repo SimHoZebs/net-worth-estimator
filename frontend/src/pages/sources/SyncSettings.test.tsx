@@ -137,8 +137,14 @@ afterEach(() => {
 it("shows the bank sync button as not connected", async () => {
 	stubApi({ configured: false });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
-	expect(await screen.findByRole("button", { name: "Bank sync" })).toBeTruthy();
+	const button = await screen.findByRole("button", { name: "Bank sync" });
+	expect(button).toBeTruthy();
 	expect(screen.getByText("Not connected")).toBeTruthy();
+	const describedBy = button.getAttribute("aria-describedby");
+	expect(describedBy).toBeTruthy();
+	expect(document.getElementById(describedBy!)?.textContent).toBe(
+		"Not connected",
+	);
 });
 
 it("opens the provider chooser with SimpleFIN as the option", async () => {
@@ -166,6 +172,11 @@ it("connects through the token modal and reports one provider", async () => {
 	await waitFor(() => {
 		expect(screen.getByText("1 provider connected")).toBeTruthy();
 	});
+	const card = screen.getByRole("button", { name: "Bank sync" });
+	expect(
+		document.getElementById(card.getAttribute("aria-describedby")!)
+			?.textContent,
+	).toBe("1 provider connected");
 	expect(
 		requests.some(
 			(request) =>
