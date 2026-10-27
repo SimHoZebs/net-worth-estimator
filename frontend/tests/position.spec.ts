@@ -3,9 +3,7 @@ import { resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
 
-test("current position and evidence load before the forecast", async ({
-	page,
-}) => {
+test("evidence loads before the forecast", async ({ page }) => {
 	let release!: () => void;
 	const gate = new Promise<void>((resolve) => {
 		release = resolve;
@@ -16,22 +14,21 @@ test("current position and evidence load before the forecast", async ({
 	});
 	try {
 		await page.goto("/");
-		const current = page
-			.locator("section")
-			.filter({ has: page.getByText("Current net worth", { exact: true }) });
-		await expect(current).toContainText("$361,200");
-		await expect(current).toHaveAttribute("aria-busy", "false");
-		// The history graph stays empty while the forecast is gated.
+		// The history graph stays empty while the forecast is gated, but the
+		// evidence action does not depend on it.
 		await expect(
 			page.getByRole("slider", { name: "Inspect net worth date" }),
 		).toHaveCount(0);
-		await page
-			.getByRole("button", { name: "Inspect current net worth evidence" })
-			.click();
+		const evidence = page.getByRole("button", {
+			name: "Inspect current net worth evidence",
+		});
+		await expect(evidence).toBeVisible();
+		await expect(evidence).toBeEnabled();
+		await evidence.click();
 		await expect(page.getByRole("dialog")).toContainText(
 			"The basis of your net worth",
 		);
-		await expect(page.getByRole("dialog")).toContainText(/\$[\d,]+/);
+		await expect(page.getByRole("dialog")).toContainText("$361,200");
 		await page.keyboard.press("Escape");
 	} finally {
 		release();
@@ -41,9 +38,7 @@ test("current position and evidence load before the forecast", async ({
 	).toBeVisible();
 });
 
-test("forecast failure keeps current position visible and supports retry", async ({
-	page,
-}) => {
+test("forecast failure supports retry", async ({ page }) => {
 	let fail = true;
 	await page.route("**/v1/projections/deterministic", async (route) => {
 		if (!fail) return route.continue();
@@ -57,10 +52,6 @@ test("forecast failure keeps current position visible and supports retry", async
 		});
 	});
 	await page.goto("/");
-	const current = page
-		.locator("section")
-		.filter({ has: page.getByText("Current net worth", { exact: true }) });
-	await expect(current).toContainText("$361,200");
 	await expect(
 		page.getByText("Could not calculate forecast.", { exact: false }),
 	).toBeVisible();
@@ -93,19 +84,23 @@ test("position failure does not block the forecast", async ({ page }) => {
 		});
 	});
 	await page.goto("/");
-	await expect(
-		page.getByText("Could not load current position."),
-	).toBeVisible();
 	// The forecast graph loads from the deterministic projection, independent
 	// of the failed position request.
 	await expect(
 		page.getByRole("slider", { name: "Inspect net worth date" }),
 	).toBeVisible();
+	// The evidence dialog owns the position request, so its error and retry
+	// live there too.
+	await page
+		.getByRole("button", { name: "Inspect current net worth evidence" })
+		.click();
+	await expect(page.getByRole("dialog")).toContainText(
+		"Could not load current position.",
+	);
 	fail = false;
 	await page.getByRole("button", { name: "Retry current position" }).click();
-	await expect(page.getByText("Could not load current position.")).toHaveCount(
-		0,
-	);
+	await expect(page.getByRole("dialog")).toContainText("$361,200");
+	await page.keyboard.press("Escape");
 	await expect(
 		page.getByRole("button", { name: "Inspect current net worth evidence" }),
 	).toBeEnabled();

@@ -17,15 +17,6 @@ vi.mock("../state/useRemoteProjection.ts", () => ({
 	}),
 }));
 
-vi.mock("../state/useCurrentPosition.ts", () => ({
-	useCurrentPosition: () => ({
-		data: null,
-		status: "disabled",
-		error: null,
-		retry: vi.fn(),
-	}),
-}));
-
 const blankPlan = { ...testPlan, accounts: [], movements: [], evaluations: [] };
 const props = {
 	onAddAccount: vi.fn(),

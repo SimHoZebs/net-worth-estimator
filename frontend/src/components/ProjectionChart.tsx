@@ -1,3 +1,4 @@
+import { CircleHelp } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
 	nearestPointIndex,
@@ -8,14 +9,17 @@ import {
 import { dateLabel, money, todayIso } from "../domain/format.ts";
 import type { Projection } from "../domain/result.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
+import { IconButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { Skeleton } from "./Skeleton.tsx";
 
 export function ProjectionChart({
 	projection,
+	onEvidence,
 	pending = false,
 }: {
 	projection: Projection | null;
+	onEvidence: () => void;
 	pending?: boolean;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
@@ -53,6 +57,20 @@ export function ProjectionChart({
 		? Math.min(inspected ?? defaultIndex, model.points.length - 1)
 		: 0;
 	const point = model?.points[selectedIndex] ?? model?.last;
+	// The evidence action lives here so the position breakdown stays
+	// reachable; the dialog fetches its own data.
+	const evidence = (
+		<div className="flex justify-end px-5 pt-4">
+			<IconButton
+				icon={CircleHelp}
+				size="sm"
+				iconSize={14}
+				className="size-6"
+				label="Inspect current net worth evidence"
+				onClick={onEvidence}
+			/>
+		</div>
+	);
 	if (!model || !point) {
 		// Only data slots skeletonize, and only while data is absent.
 		if (!pending) return null;
@@ -61,6 +79,7 @@ export function ProjectionChart({
 				className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
 				aria-label="Net worth over the trailing 30 days"
 			>
+				{evidence}
 				<div aria-busy="true">
 					<Skeleton className="h-56 w-full" />
 				</div>
@@ -72,7 +91,8 @@ export function ProjectionChart({
 			className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
 			aria-label="Net worth over the trailing 30 days"
 		>
-			<div className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2 pt-4">
+			{evidence}
+			<div className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
 				<ProjectionPlot
 					model={model}
 					id={id}
