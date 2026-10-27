@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
-import { Checkbox } from "../../components/Field.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Modal } from "../../components/Modal.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
+import type { Account } from "../../domain/model.ts";
 import {
 	disconnectSyncKey,
 	refreshSyncSettings,
@@ -15,6 +16,35 @@ import {
 } from "../../state/syncSettings.ts";
 
 const PROVIDERS = [{ id: "simplefin", name: "SimpleFIN" }] as const;
+
+type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
+
+function AccountToggle({
+	account,
+	checked,
+	disabled,
+	onToggle,
+}: {
+	account: SyncAccount;
+	checked: boolean;
+	disabled: boolean;
+	onToggle: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			className="group flex w-full cursor-pointer items-center gap-2 rounded-control border border-line-strong bg-surface px-3 py-2 text-left text-sm transition-[border-color,background] duration-150 hover:bg-hover aria-pressed:border-primary aria-pressed:bg-success-bg motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-50"
+			aria-pressed={checked}
+			disabled={disabled}
+			onClick={onToggle}
+		>
+			<AccountLabel
+				account={account}
+				nameClassName="group-aria-[pressed=false]:text-muted"
+			/>
+		</button>
+	);
+}
 
 function formatConnectedAt(value?: string): string | null {
 	if (!value) return null;
@@ -34,7 +64,7 @@ export function SyncProviderModal({
 	onClose,
 	onConnect,
 }: {
-	accounts: { id: string; name: string }[];
+	accounts: SyncAccount[];
 	readOnly: boolean;
 	onClose: () => void;
 	onConnect: () => void;
@@ -144,25 +174,21 @@ export function SyncProviderModal({
 													className="mt-2 grid list-none gap-2 p-0"
 												>
 													{accounts.map((account) => (
-														<li
-															key={account.id}
-															className="flex items-center gap-2 text-sm"
-														>
-															<label className="flex items-center gap-2">
-																<Checkbox
-																	checked={checked.includes(account.id)}
-																	disabled={readOnly || busy !== null}
-																	onChange={(event) => {
-																		const next = event.currentTarget.checked
-																			? [...checked, account.id]
-																			: checked.filter(
+														<li key={account.id}>
+															<AccountToggle
+																account={account}
+																checked={checked.includes(account.id)}
+																disabled={readOnly || busy !== null}
+																onToggle={() =>
+																	setSelected(
+																		checked.includes(account.id)
+																			? checked.filter(
 																					(id) => id !== account.id,
-																				);
-																		setSelected(next);
-																	}}
-																/>{" "}
-																{account.name}
-															</label>
+																				)
+																			: [...checked, account.id],
+																	)
+																}
+															/>
 														</li>
 													))}
 													{accounts.length === 0 && (

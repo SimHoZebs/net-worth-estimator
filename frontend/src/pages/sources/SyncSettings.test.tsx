@@ -18,8 +18,8 @@ vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
 }));
 
 const accounts = [
-	{ id: "checking", name: "Checking" },
-	{ id: "prime_card", name: "Prime Card" },
+	{ id: "checking", name: "Checking", kind: "cash" as const, color: null },
+	{ id: "prime_card", name: "Prime Card", kind: "debt" as const, color: null },
 ];
 
 function stubApi(state: {
@@ -327,7 +327,7 @@ it("saves the card selection", async () => {
 	const requests = stubApi({ configured: true, cards: [] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	fireEvent.click(await screen.findByLabelText("Prime Card"));
+	fireEvent.click(await screen.findByRole("button", { name: /Prime Card/ }));
 	fireEvent.click(screen.getByRole("button", { name: "Save cards" }));
 	await waitFor(() => {
 		expect(
@@ -345,14 +345,16 @@ it("keeps save disabled until the selection changes", async () => {
 	stubApi({ configured: true, cards: ["prime_card"] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByLabelText("Prime Card");
+	await screen.findByRole("button", { name: /Prime Card/ });
 	expect(
 		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
 			.disabled,
 	).toBe(true);
 	expect(
-		(screen.getByLabelText("Prime Card") as HTMLInputElement).checked,
-	).toBe(true);
+		(
+			screen.getByRole("button", { name: /Prime Card/ }) as HTMLButtonElement
+		).getAttribute("aria-pressed"),
+	).toBe("true");
 });
 
 it("shows an inline error when cards fail to load", async () => {
@@ -362,7 +364,7 @@ it("shows an inline error when cards fail to load", async () => {
 	expect(
 		await screen.findByText("The sync details could not be loaded."),
 	).toBeTruthy();
-	expect(screen.queryByRole("checkbox")).toBeNull();
+	expect(screen.queryByRole("button", { name: /Prime Card/ })).toBeNull();
 	expect(
 		(screen.getByRole("button", { name: "Disconnect" }) as HTMLButtonElement)
 			.disabled,
@@ -373,14 +375,17 @@ it("disconnects after confirmation", async () => {
 	const requests = stubApi({ configured: true, cards: ["prime_card"] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByLabelText("Prime Card");
+	await screen.findByRole("button", { name: /Prime Card/ });
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	const confirms = await screen.findAllByRole("button", {
 		name: "Confirm disconnect",
 	});
 	expect(confirms.length).toBeGreaterThan(0);
 	fireEvent.click(confirms[confirms.length - 1]!);
-	await screen.findByText("Not connected");
+	expect(
+		await screen.findByRole("button", { name: "Connect SimpleFIN" }),
+	).toBeTruthy();
+	expect(screen.queryByRole("button", { name: /Prime Card/ })).toBeNull();
 	expect(requests.some((request) => request.method === "DELETE")).toBe(true);
 });
 
@@ -388,7 +393,7 @@ it("disables writes when read-only", async () => {
 	stubApi({ configured: true, cards: [] });
 	render(<SyncSettings accounts={accounts} readOnly={true} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Bank sync" }));
-	await screen.findByLabelText("Checking");
+	await screen.findByRole("button", { name: /Checking/ });
 	expect(
 		(screen.getByRole("button", { name: "Save cards" }) as HTMLButtonElement)
 			.disabled,

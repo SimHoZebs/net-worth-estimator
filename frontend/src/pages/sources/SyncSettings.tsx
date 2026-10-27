@@ -3,15 +3,18 @@ import { Landmark } from "lucide-react";
 import { Button } from "../../components/Button.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
+import type { Account } from "../../domain/model.ts";
 import { useSyncCredential } from "../../state/syncSettings.ts";
 import { SyncConnectModal } from "./SyncConnectModal.tsx";
 import { SyncProviderModal } from "./SyncProviderModal.tsx";
+
+type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
 
 export function SyncSettings({
 	accounts,
 	readOnly,
 }: {
-	accounts: { id: string; name: string }[];
+	accounts: SyncAccount[];
 	readOnly: boolean;
 }) {
 	const credential = useSyncCredential();
@@ -33,9 +36,6 @@ export function SyncSettings({
 				</span>
 				<div className="flex-1">
 					<h2 className="text-base max-sm:text-sm">Bank sync.</h2>
-					<p className="m-0 text-sm text-muted">
-						Connect a bank-data provider. Only connected providers sync.
-					</p>
 				</div>
 			</div>
 

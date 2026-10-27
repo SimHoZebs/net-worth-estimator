@@ -18,6 +18,8 @@ export function SourcesPage() {
 				accounts={plan.accounts.map((account) => ({
 					id: account.id,
 					name: account.name,
+					kind: account.kind,
+					color: account.color,
 				}))}
 				readOnly={readOnly}
 			/>
