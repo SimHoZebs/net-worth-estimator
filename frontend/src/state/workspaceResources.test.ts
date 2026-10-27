@@ -4,6 +4,7 @@ import { testPlan } from "../mocks/plan.ts";
 import {
 	getServerModel,
 	modelOptions,
+	resolversOptions,
 	workspaceResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
@@ -23,6 +24,30 @@ afterEach(() => {
 });
 
 describe("direct Query ownership", () => {
+	it("deduplicates and caches resolver discovery through the generated client", async () => {
+		const server = stubTestServer();
+		const data = {
+			resolvers: [{ name: "fixed", description: "Fixed amount" }],
+			providers: [],
+		};
+		const fetcher = vi.fn(async () => server.ok(data));
+		vi.stubGlobal("fetch", fetcher);
+		const options = resolversOptions();
+		const results = await Promise.all([
+			serverQueryClient().fetchQuery(options),
+			serverQueryClient().fetchQuery(options),
+		]);
+		expect(results).toEqual([data, data]);
+		expect(await serverQueryClient().fetchQuery(options)).toEqual(data);
+		expect(fetcher).toHaveBeenCalledOnce();
+		expect(fetcher).toHaveBeenCalledWith(
+			"/v1/amount-resolvers",
+			expect.objectContaining({
+				method: "GET",
+				signal: expect.any(AbortSignal),
+			}),
+		);
+	});
 	it("deduplicates reads without a workspace request engine", async () => {
 		const server = stubTestServer();
 		server.setRevision("current");

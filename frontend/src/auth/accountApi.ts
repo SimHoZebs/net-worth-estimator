@@ -1,113 +1,148 @@
+import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
+import { useSyncExternalStore } from "react";
+import {
+	changeAccountPassword,
+	getAccountProfile,
+	listAccountSessions,
+	revokeAccountSession,
+	updateAccountProfile,
+} from "../api/generated/endpoints.ts";
+import type {
+	AccountProfileUpdate,
+	AccountPasswordChange,
+} from "../api/generated/model/index.ts";
+import { ApiHttpError } from "../api/http.ts";
 import { getApiBaseUrl } from "../api/runtime.ts";
+import { serverQueryClient } from "../state/serverQuery.ts";
+import {
+	canonicalApiBaseUrl,
+	getResourceScope,
+	subscribeResourceScope,
+} from "./resourceScope.ts";
+import type { Session } from "./sessionContext.ts";
 
-export interface AccountProfile {
-	owner: string;
-	name: string;
-	displayName: string;
-	avatar: string;
-}
-
-export interface AccountSessionItem {
-	id: string;
-	current: boolean;
-	loginStartedAt: string;
-	expiresAt: string;
-}
-
-function problem(detail: string, status: number): Error {
-	return new Error(status === 401 ? "Sign in to manage your account." : detail);
-}
-
-async function readError(response: Response, fallback: string): Promise<Error> {
-	let detail = fallback;
+async function accountRequest<T>(
+	scope: ReturnType<typeof getResourceScope>,
+	session: Session | null,
+	perform: () => Promise<T>,
+	fallback = "Account details are unavailable.",
+): Promise<T> {
+	if (scope !== getResourceScope() || !isAccountScope(scope, session))
+		throw new Error("The active account changed.");
 	try {
-		const body: unknown = await response.json();
-		if (
-			typeof body === "object" &&
-			body !== null &&
-			"detail" in body &&
-			typeof (body as { detail: unknown }).detail === "string"
-		) {
-			detail = (body as { detail: string }).detail;
-		}
-	} catch {
-		// Keep the fallback when the error body is not JSON.
+		const result = await perform();
+		if (scope !== getResourceScope() || !isAccountScope(scope, session))
+			throw new Error("The active account changed.");
+		return result;
+	} catch (cause) {
+		if (cause instanceof ApiHttpError && cause.status === 401)
+			throw new Error("Sign in to manage your account.");
+		if (cause instanceof ApiHttpError)
+			throw new Error(cause.detail ?? fallback);
+		throw cause;
 	}
-	return problem(detail, response.status);
 }
 
-export async function getAccountProfile(
-	signal?: AbortSignal,
-	baseUrl = getApiBaseUrl(),
-): Promise<AccountProfile> {
-	const response = await fetch(`${baseUrl}/v1/auth/profile`, {
-		credentials: "same-origin",
-		cache: "no-store",
-		signal,
-	});
-	if (!response.ok)
-		throw await readError(response, "Account details are unavailable.");
-	const body = (await response.json()) as AccountProfile;
-	if (typeof body.name !== "string" || typeof body.owner !== "string") {
-		throw new Error("The account service returned an invalid profile.");
-	}
-	return body;
-}
-
-export async function updateAccountProfile(
-	input: { displayName?: string; avatar?: string },
-	baseUrl = getApiBaseUrl(),
-): Promise<AccountProfile> {
-	const response = await fetch(`${baseUrl}/v1/auth/profile`, {
-		method: "PATCH",
-		credentials: "same-origin",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(input),
-	});
-	if (!response.ok)
-		throw await readError(response, "The account update was rejected.");
-	return (await response.json()) as AccountProfile;
-}
-
-export async function changeAccountPassword(
-	input: { oldPassword: string; newPassword: string },
-	baseUrl = getApiBaseUrl(),
-): Promise<void> {
-	const response = await fetch(`${baseUrl}/v1/auth/change-password`, {
-		method: "POST",
-		credentials: "same-origin",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(input),
-	});
-	if (!response.ok)
-		throw await readError(response, "The password change was rejected.");
-}
-
-export async function listAccountSessions(
-	signal?: AbortSignal,
-	baseUrl = getApiBaseUrl(),
-): Promise<AccountSessionItem[]> {
-	const response = await fetch(`${baseUrl}/v1/auth/sessions`, {
-		credentials: "same-origin",
-		cache: "no-store",
-		signal,
-	});
-	if (!response.ok)
-		throw await readError(response, "The session list is unavailable.");
-	const body = (await response.json()) as { sessions?: AccountSessionItem[] };
-	if (!Array.isArray(body.sessions))
-		throw new Error("The session list is invalid.");
-	return body.sessions;
-}
-
-export async function revokeAccountSession(
-	id: string,
-	baseUrl = getApiBaseUrl(),
-): Promise<void> {
-	const response = await fetch(
-		`${baseUrl}/v1/auth/sessions?id=${encodeURIComponent(id)}`,
-		{ method: "DELETE", credentials: "same-origin" },
+function isAccountScope(
+	scope: ReturnType<typeof getResourceScope>,
+	session: Session | null,
+): boolean {
+	return (
+		scope.status === "ready" &&
+		session?.authenticated === true &&
+		scope.subject === session.user?.subject &&
+		scope.resource?.id === session.resource.id &&
+		scope.apiBaseUrl === canonicalApiBaseUrl(getApiBaseUrl())
 	);
-	if (!response.ok)
-		throw await readError(response, "That session could not be revoked.");
+}
+
+export function useAccountResources(session: Session | null) {
+	const client = serverQueryClient();
+	const baseUrl = getApiBaseUrl();
+	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const key = ["account", scope.key] as const;
+	const options = queryOptions({
+		queryKey: key,
+		enabled: isAccountScope(scope, session),
+		queryFn: ({ signal }) =>
+			accountRequest(scope, session, async () => {
+				const [profile, sessions] = await Promise.all([
+					getAccountProfile({ signal, baseUrl }),
+					accountRequest(
+						scope,
+						session,
+						() => listAccountSessions({ signal, baseUrl }),
+						"The session list is unavailable.",
+					),
+				]);
+				if (
+					typeof profile.data.name !== "string" ||
+					typeof profile.data.owner !== "string"
+				)
+					throw new Error("The account service returned an invalid profile.");
+				if (!Array.isArray(sessions.data.sessions))
+					throw new Error("The session list is invalid.");
+				return { profile: profile.data, sessions: sessions.data.sessions };
+			}),
+	});
+	const details = useQuery(options, client);
+	const profile = useMutation(
+		{
+			gcTime: 0,
+			retry: false,
+			mutationKey: [...key, "profile"],
+			mutationFn: (input: AccountProfileUpdate) =>
+				accountRequest(
+					scope,
+					session,
+					async () => (await updateAccountProfile(input, { baseUrl })).data,
+					"The account update was rejected.",
+				),
+			onSuccess: (profile) => {
+				if (scope !== getResourceScope()) return;
+				client.setQueryData(key, (previous: typeof details.data) =>
+					previous ? { ...previous, profile } : previous,
+				);
+			},
+		},
+		client,
+	);
+	const password = useMutation(
+		{
+			gcTime: 0,
+			retry: false,
+			mutationKey: [...key, "password"],
+			mutationFn: (input: AccountPasswordChange) =>
+				accountRequest(
+					scope,
+					session,
+					() => changeAccountPassword(input, { baseUrl }),
+					"The password change was rejected.",
+				),
+		},
+		client,
+	);
+	const revoke = useMutation(
+		{
+			gcTime: 0,
+			retry: false,
+			mutationKey: [...key, "revoke"],
+			mutationFn: (id: string) =>
+				accountRequest(
+					scope,
+					session,
+					() => revokeAccountSession({ id }, { baseUrl }),
+					"That session could not be revoked.",
+				),
+		},
+		client,
+	);
+	return {
+		scopeKey: scope.key,
+		details,
+		profile,
+		password,
+		revoke,
+		reload: () => details.refetch({ throwOnError: true }),
+	};
 }

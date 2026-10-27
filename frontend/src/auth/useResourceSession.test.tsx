@@ -56,11 +56,13 @@ it("keeps failed logout after a discovery outage closed without an implicit retr
 	await act(async () => result.current.logout());
 	expect(result.current.phase).toBe("unavailable");
 	expect(result.current.error).toBe("Sign-out failed. Please retry.");
-	expect(
-		fetcher.mock.calls.filter((call) =>
-			String(call[0]).endsWith("/v1/auth/logout"),
-		),
-	).toHaveLength(1);
+	await waitFor(() =>
+		expect(
+			fetcher.mock.calls.filter((call) =>
+				String(call[0]).endsWith("/v1/auth/logout"),
+			),
+		).toHaveLength(1),
+	);
 });
 
 it("restores requests when resource-change discovery returns to the same plan", async () => {
@@ -176,11 +178,13 @@ it("rejects duplicate logout calls before React renders the pending state", asyn
 		logout = result.current.logout();
 		void result.current.logout();
 	});
-	expect(
-		fetcher.mock.calls.filter((call) =>
-			String(call[0]).endsWith("/v1/auth/logout"),
-		),
-	).toHaveLength(1);
+	await waitFor(() =>
+		expect(
+			fetcher.mock.calls.filter((call) =>
+				String(call[0]).endsWith("/v1/auth/logout"),
+			),
+		).toHaveLength(1),
+	);
 	expect(result.current.logoutPending).toBe(true);
 	await act(async () => {
 		finish(response({ logoutURL: "#signed-out" }));

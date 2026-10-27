@@ -2,6 +2,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import {
 	getFinancialModel,
+	getAmountResolvers,
 	getServerStatus as fetchServerStatus,
 	listAmountPresets,
 } from "@/api/generated/endpoints.ts";
@@ -28,7 +29,7 @@ export interface ServerModel extends FinancialModelResponse {
 }
 
 export function workspaceResourceKey(
-	kind: "model" | "status" | "presets",
+	kind: "model" | "status" | "presets" | "resolvers",
 	scope = getResourceScope(),
 ) {
 	return ["workspace-resources", scope.key, kind] as const;
@@ -139,6 +140,30 @@ export function presetsOptions(scope = getResourceScope()) {
 			}
 		},
 	});
+}
+
+export function resolversOptions(scope = getResourceScope()) {
+	return queryOptions({
+		...defaults,
+		queryKey: workspaceResourceKey("resolvers", scope),
+		queryFn: async ({ signal }) => {
+			current(scope, signal);
+			const result = (await getAmountResolvers({ signal })).data;
+			current(scope, signal);
+			return result;
+		},
+	});
+}
+
+export function useAmountResolvers() {
+	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	return useQuery(
+		{
+			...resolversOptions(scope),
+			enabled: scope.status === "ready",
+		},
+		serverQueryClient(),
+	);
 }
 
 export function getServerModel(scope = getResourceScope()) {

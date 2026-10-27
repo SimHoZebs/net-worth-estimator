@@ -1,12 +1,14 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
-import { getAmountResolvers } from "../../api/generated/endpoints.ts";
+import { useId, useState, type FormEvent } from "react";
 import type { PostingAmountResolution } from "../../api/contracts.ts";
 import {
 	BUILT_IN_TEMPLATE_IDS,
 	FALLBACK_PROVIDERS,
 	FALLBACK_RESOLVERS,
 } from "../../domain/amountCatalog.ts";
-import { useAmountPresets } from "../../state/workspaceResources.ts";
+import {
+	useAmountPresets,
+	useAmountResolvers,
+} from "../../state/workspaceResources.ts";
 import { useWorkspaceReadOnly } from "../../state/useWorkspacePlan.ts";
 import {
 	createPreset,
@@ -21,32 +23,6 @@ import { ConfirmDialog } from "../ConfirmDialog.tsx";
 import { textValue } from "./formValues.ts";
 import { AmountBuilder } from "./AmountBuilder.tsx";
 import { useAmountTemplates } from "./amountTemplates.ts";
-
-function useRemoteNames() {
-	const [remote, setRemote] = useState<{
-		resolvers: { name: string; description?: string }[];
-		providers: { name: string; description?: string }[];
-	} | null>(null);
-	useEffect(() => {
-		let cancelled = false;
-		void (async () => {
-			try {
-				const result = (await getAmountResolvers()).data;
-				if (cancelled) return;
-				setRemote({
-					resolvers: result.resolvers ?? [],
-					providers: result.providers ?? [],
-				});
-			} catch {
-				/* The catalog keeps built-in templates when offline. */
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-	return remote;
-}
 
 type CopyEntry = {
 	name: string;
@@ -114,7 +90,7 @@ export function AmountCatalog({
 	postings: { id: string; name: string }[];
 }) {
 	const id = useId();
-	const remote = useRemoteNames();
+	const remote = useAmountResolvers().data;
 	const serverPresets = useAmountPresets().data ?? null;
 	const presetThunks = { createPreset, updatePreset, deletePreset, movePreset };
 	const readOnly = useWorkspaceReadOnly();

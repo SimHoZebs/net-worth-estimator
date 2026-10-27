@@ -8,63 +8,35 @@ import {
 } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
-import {
-	changeAccountPassword,
-	getAccountProfile,
-	listAccountSessions,
-	revokeAccountSession,
-	updateAccountProfile,
-	type AccountProfile,
-	type AccountSessionItem,
-} from "./accountApi.ts";
+import { useAccountResources } from "./accountApi.ts";
 
 export function AccountPage() {
 	const account = useSession();
 	const session = account?.session ?? null;
-	const [profile, setProfile] = useState<AccountProfile | null>(null);
-	const [sessions, setSessions] = useState<AccountSessionItem[]>([]);
-	const [displayName, setDisplayName] = useState("");
+	const resources = useAccountResources(session);
+	const profile = resources.details.data?.profile ?? null;
+	const sessions = resources.details.data?.sessions ?? [];
+	const [nameDraft, setNameDraft] = useState<{
+		scopeKey: string;
+		profile: typeof profile;
+		value: string;
+	} | null>(null);
+	const displayName =
+		nameDraft?.scopeKey === resources.scopeKey && nameDraft.profile === profile
+			? nameDraft.value
+			: (profile?.displayName ?? "");
 	const [oldPassword, setOldPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
-	const [loading, setLoading] = useState(true);
-	const [reloadKey, setReloadKey] = useState(0);
-	const [savingProfile, setSavingProfile] = useState(false);
-	const [savingPassword, setSavingPassword] = useState(false);
+	const loading = resources.details.isPending;
+	const savingProfile = resources.profile.isPending;
+	const savingPassword =
+		resources.password.isPending || resources.password.isSuccess;
 
 	useEffect(() => {
-		if (!session?.authenticated) {
-			// oxlint-disable-next-line react/set-state-in-effect -- Syncs one-time account fetch state when auth resolves.
-			setLoading(false);
-			return;
-		}
-		dismissKey("account");
-		dismissKey("account-notice");
-		const controller = new AbortController();
-		(async () => {
-			try {
-				const [nextProfile, nextSessions] = await Promise.all([
-					getAccountProfile(controller.signal),
-					listAccountSessions(controller.signal),
-				]);
-				if (controller.signal.aborted) return;
-				setProfile(nextProfile);
-				setDisplayName(nextProfile.displayName);
-				setSessions(nextSessions);
-			} catch (cause) {
-				if (!controller.signal.aborted) {
-					notifyError(
-						"account",
-						cause instanceof Error
-							? cause.message
-							: "Account details are unavailable.",
-					);
-				}
-			} finally {
-				if (!controller.signal.aborted) setLoading(false);
-			}
-		})();
-		return () => controller.abort();
-	}, [session?.authenticated, reloadKey]);
+		if (resources.details.error)
+			notifyError("account", resources.details.error.message);
+		else dismissKey("account");
+	}, [resources.details.error]);
 
 	if (!session?.allowed) return null;
 	if (!session.authenticated) {
@@ -81,15 +53,13 @@ export function AccountPage() {
 
 	async function onSaveProfile(event: React.FormEvent) {
 		event.preventDefault();
-		setSavingProfile(true);
 		dismissKey("account");
 		dismissKey("account-notice");
 		try {
-			const next = await updateAccountProfile({
+			await resources.profile.mutateAsync({
 				displayName: displayName.trim(),
 			});
-			setProfile(next);
-			setDisplayName(next.displayName);
+			setNameDraft(null);
 			notifySuccess("account-notice", "Display name updated.");
 		} catch (cause) {
 			notifyError(
@@ -98,18 +68,15 @@ export function AccountPage() {
 					? cause.message
 					: "The account update was rejected.",
 			);
-		} finally {
-			setSavingProfile(false);
 		}
 	}
 
 	async function onChangePassword(event: React.FormEvent) {
 		event.preventDefault();
-		setSavingPassword(true);
 		dismissKey("account");
 		dismissKey("account-notice");
 		try {
-			await changeAccountPassword({ oldPassword, newPassword });
+			await resources.password.mutateAsync({ oldPassword, newPassword });
 			redirectToSignIn();
 		} catch (cause) {
 			notifyError(
@@ -118,7 +85,6 @@ export function AccountPage() {
 					? cause.message
 					: "The password change was rejected.",
 			);
-			setSavingPassword(false);
 		}
 	}
 
@@ -126,7 +92,7 @@ export function AccountPage() {
 		dismissKey("account");
 		dismissKey("account-notice");
 		try {
-			await revokeAccountSession(id);
+			await resources.revoke.mutateAsync(id);
 		} catch (cause) {
 			notifyError(
 				"account",
@@ -137,7 +103,7 @@ export function AccountPage() {
 			return;
 		}
 		try {
-			setSessions(await listAccountSessions());
+			await resources.reload();
 			notifySuccess("account-notice", "Session revoked.");
 		} catch (cause) {
 			notifySuccess("account-notice", "Session revoked.");
@@ -169,8 +135,7 @@ export function AccountPage() {
 					<div>
 						<Button
 							onClick={() => {
-								setLoading(true);
-								setReloadKey((key) => key + 1);
+								void resources.details.refetch();
 							}}
 						>
 							Retry
@@ -185,7 +150,13 @@ export function AccountPage() {
 							label="Display name"
 							value={displayName}
 							maxLength={128}
-							onChange={(event) => setDisplayName(event.target.value)}
+							onChange={(event) =>
+								setNameDraft({
+									scopeKey: resources.scopeKey,
+									profile,
+									value: event.target.value,
+								})
+							}
 							autoComplete="name"
 						/>
 						<div>
