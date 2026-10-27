@@ -117,6 +117,8 @@ for (const width of [320, 390, 768, 1440]) {
 		);
 		await page.goto("/#sources");
 		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+		// The assumptions live behind their Configs tab since the tabbed layout.
+		await page.getByRole("tab", { name: "Assumptions" }).click();
 		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 		await expectWithinViewport(bar, page);
 		const lastField = page.getByLabel("Investment return variability (%)");
