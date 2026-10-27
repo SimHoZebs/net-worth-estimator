@@ -78,6 +78,7 @@ const cashNow: CashNowDecomposition = {
 	bills: 1000,
 	cushion: 1200,
 	since: "2026-09-24",
+	monthEnd: "2026-09-30",
 	short: 0,
 	firstShort: null,
 };

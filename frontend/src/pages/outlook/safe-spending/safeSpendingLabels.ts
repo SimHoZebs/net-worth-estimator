@@ -9,7 +9,6 @@ export const SAFE_SPENDING_LABELS = {
 	fixedBills: "Next month's bills",
 	cardSpending: "Card spending",
 	allowance: "Card spending allowance",
-	dailyAllowance: "Daily card allowance",
 	reserve: "Protected reserve",
 	closedCards: "Closed card balance",
 	closedCardBalances: "Closed card balances",
