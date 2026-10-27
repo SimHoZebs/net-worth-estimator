@@ -11,6 +11,7 @@ import {
 	monthEndIso,
 	nextMonthObligations,
 	nextMonthRange,
+	paycheckBeforeReserve,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
@@ -269,6 +270,28 @@ describe("cycleAllowance", () => {
 				reserve: 725,
 			}),
 		).toBe(7579 - 5000 - 1200 - 725);
+	});
+});
+
+describe("paycheckBeforeReserve", () => {
+	it("subtracts fixed bills and the closed balance from the paycheck", () => {
+		expect(
+			paycheckBeforeReserve({
+				paycheck: 7579.4,
+				fixedObligations: 4181.87,
+				closedTotal: 2601.55,
+			}),
+		).toBeCloseTo(795.98, 2);
+	});
+
+	it("returns null without a closing observation", () => {
+		expect(
+			paycheckBeforeReserve({
+				paycheck: 7579.4,
+				fixedObligations: 4181.87,
+				closedTotal: null,
+			}),
+		).toBeNull();
 	});
 });
 
