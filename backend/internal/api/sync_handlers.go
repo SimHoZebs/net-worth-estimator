@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -123,6 +124,13 @@ func (s *Server) connectSyncCredential(ctx context.Context, input *syncCredentia
 	if (setupToken == "") == (accessURL == "") {
 		return nil, huma.Error400BadRequest("provide exactly one of setupToken or accessUrl")
 	}
+	// Detect the initial connection before storing: only a first-ever key
+	// earns one automatic sync. A rotation stays manual so a recent trigger
+	// or blackout is not forced through twice.
+	var wasInitial bool
+	if previous, err := s.store.GetSyncCredential(); err == nil {
+		wasInitial = previous.AccessURL == ""
+	}
 	if setupToken != "" {
 		claimURL, err := simplefin.DecodeSetupToken(setupToken)
 		if err != nil {
@@ -143,6 +151,20 @@ func (s *Server) connectSyncCredential(ctx context.Context, input *syncCredentia
 	stored, err := s.store.SetSyncCredential(accessURL, simplefin.BridgeHost(accessURL))
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	// One forced sync on initial connection so balances appear without
+	// waiting for the 6-hour scheduler. Sync (not Trigger) bypasses only
+	// the manual interval: it still honors the in-flight guard and the
+	// post-429 blackout, and it leaves lastTrigger untouched so the manual
+	// throttle is not overridden. Best-effort: a throttled or failed sync
+	// never fails the connect itself. Only the primary plan has a runner;
+	// other plans just store their key.
+	if wasInitial && s.SyncRunner != nil {
+		if summary, err := s.SyncRunner.Sync(ctx); err != nil {
+			log.Printf("simplefin initial sync failed: %v", err)
+		} else {
+			log.Printf("simplefin initial sync: %+v", summary)
+		}
 	}
 	return &syncCredentialOutput{Body: syncCredentialBody{Configured: true, BridgeHost: stored.BridgeHost, UpdatedAt: stored.UpdatedAt}}, nil
 }

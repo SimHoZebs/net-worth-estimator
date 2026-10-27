@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
@@ -195,5 +196,144 @@ func TestSyncCredentialReadOnlyPolicy(t *testing.T) {
 		if response.Code != http.StatusForbidden {
 			t.Fatalf("%s %s status = %d, want 403", test.method, test.path, response.Code)
 		}
+	}
+}
+
+func postCredential(t *testing.T, handler http.Handler, accessURL string) *httptest.ResponseRecorder {
+	t.Helper()
+	body := `{"accessUrl":` + strconv.Quote(accessURL) + `}`
+	request := httptest.NewRequest(http.MethodPost, "/v1/sync/simplefin/credential", bytes.NewReader([]byte(body)))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	return response
+}
+
+func TestSyncCredentialInitialConnectForcesOneSync(t *testing.T) {
+	hits := 0
+	bridge := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(syncTriggerFixture))
+	}))
+	t.Cleanup(bridge.Close)
+
+	database := openAPIStore(t)
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+		credential, err := database.GetSyncCredential()
+		if err != nil {
+			return "", nil
+		}
+		return credential.AccessURL, nil
+	}, bridge.Client())
+	handler := New(database, Config{SyncRunner: runner})
+
+	if response := postCredential(t, handler, bridge.URL); response.Code != http.StatusOK {
+		t.Fatalf("initial connect status = %d, body %s", response.Code, response.Body.String())
+	}
+	if hits != 1 {
+		t.Fatalf("bridge hits after connect = %d, want 1 forced sync", hits)
+	}
+	if stamped, err := database.GetLastSyncTime(); err != nil || stamped == "" {
+		t.Fatalf("last sync = %q, err %v, want recorded forced sync", stamped, err)
+	}
+
+	// The forced Sync must not stamp the manual throttle: an immediate
+	// manual trigger stays eligible, and only that trigger arms the guard.
+	trigger := httptest.NewRecorder()
+	handler.ServeHTTP(trigger, httptest.NewRequest(http.MethodPost, "/v1/sync/simplefin", nil))
+	if trigger.Code != http.StatusOK {
+		t.Fatalf("trigger after initial sync status = %d, want 200, body %s", trigger.Code, trigger.Body.String())
+	}
+	if hits != 2 {
+		t.Fatalf("bridge hits after manual trigger = %d, want 2", hits)
+	}
+	throttled := httptest.NewRecorder()
+	handler.ServeHTTP(throttled, httptest.NewRequest(http.MethodPost, "/v1/sync/simplefin", nil))
+	if throttled.Code != http.StatusTooManyRequests {
+		t.Fatalf("second trigger status = %d, want 429, body %s", throttled.Code, throttled.Body.String())
+	}
+	if hits != 2 {
+		t.Fatalf("bridge hits after throttled trigger = %d, want 2", hits)
+	}
+}
+
+func TestSyncCredentialRotationDoesNotResync(t *testing.T) {
+	hits := 0
+	bridge := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(syncTriggerFixture))
+	}))
+	t.Cleanup(bridge.Close)
+
+	database := openAPIStore(t)
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+		credential, err := database.GetSyncCredential()
+		if err != nil {
+			return "", nil
+		}
+		return credential.AccessURL, nil
+	}, bridge.Client())
+	handler := New(database, Config{SyncRunner: runner})
+
+	if response := postCredential(t, handler, bridge.URL); response.Code != http.StatusOK {
+		t.Fatalf("initial connect status = %d, body %s", response.Code, response.Body.String())
+	}
+	if hits != 1 {
+		t.Fatalf("bridge hits after connect = %d, want 1", hits)
+	}
+	if response := postCredential(t, handler, bridge.URL); response.Code != http.StatusOK {
+		t.Fatalf("rotation connect status = %d, body %s", response.Code, response.Body.String())
+	}
+	if hits != 1 {
+		t.Fatalf("bridge hits after rotation = %d, want 1 (no second forced sync)", hits)
+	}
+}
+
+func TestSyncCredentialInitialSyncHonorsBlackout(t *testing.T) {
+	hits := 0
+	bridge := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		w.Header().Set("Retry-After", "60")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error": "rate limited"}`))
+	}))
+	t.Cleanup(bridge.Close)
+
+	database := openAPIStore(t)
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+		credential, err := database.GetSyncCredential()
+		if err != nil {
+			return "", nil
+		}
+		return credential.AccessURL, nil
+	}, bridge.Client())
+	handler := New(database, Config{SyncRunner: runner})
+
+	// The first forced sync hits the Bridge once and arms the blackout.
+	if response := postCredential(t, handler, bridge.URL); response.Code != http.StatusOK {
+		t.Fatalf("initial connect status = %d, body %s", response.Code, response.Body.String())
+	}
+	if hits != 1 {
+		t.Fatalf("bridge hits after connect = %d, want 1", hits)
+	}
+	if stamped, _ := database.GetLastSyncTime(); stamped != "" {
+		t.Fatalf("last sync = %q, want empty after rate-limited forced sync", stamped)
+	}
+
+	// Reconnecting after a disconnect is initial again, but the blackout
+	// must hold: no second Bridge hit, and the connect still succeeds.
+	remove := httptest.NewRecorder()
+	handler.ServeHTTP(remove, httptest.NewRequest(http.MethodDelete, "/v1/sync/simplefin/credential", nil))
+	if remove.Code != http.StatusOK {
+		t.Fatalf("disconnect status = %d, body %s", remove.Code, remove.Body.String())
+	}
+	if response := postCredential(t, handler, bridge.URL); response.Code != http.StatusOK {
+		t.Fatalf("reconnect status = %d, want 200 despite blackout, body %s", response.Code, response.Body.String())
+	}
+	if hits != 1 {
+		t.Fatalf("bridge hits after throttled reconnect = %d, want 1 (blackout honored)", hits)
 	}
 }
