@@ -41,10 +41,6 @@ export function SyncConnectModal({
 			onClose={onClose}
 			titleSize="plain"
 		>
-			<p className="m-0 text-sm text-muted">
-				Paste the setup token from your SimpleFIN Bridge. It is claimed once,
-				then it stops working.
-			</p>
 			{error && <ErrorNotice message={error} />}
 			<InputField
 				label="Setup token"
