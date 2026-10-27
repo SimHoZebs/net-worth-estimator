@@ -172,6 +172,44 @@ describe("SafeSpendingDetailShell", () => {
 	});
 });
 
+describe("SafeSpendingBillsPanel incoming foot", () => {
+	function renderBills(overrides: Partial<SafeSpendingHeroes> = {}) {
+		render(
+			<SafeSpendingBillsPanel
+				heroes={{ ...heroes, ...overrides }}
+				cashNow={cashNow}
+				paycheck={paycheck}
+				section={section}
+				plan={testPlan}
+				transactionOrder="newest"
+				onTransactionOrderChange={noop}
+			/>,
+		);
+	}
+
+	it("names the single incoming paycheck date", () => {
+		renderBills();
+		const region = screen.getByRole("region", {
+			name: labels.cashAfterBills,
+		});
+		expect(
+			within(region).getByText("$900.00 incoming before reserve · Sep 30"),
+		).toBeTruthy();
+	});
+
+	it("names the paycheck date range for several income sources", () => {
+		renderBills({ paycheckEndDate: "2026-10-05" });
+		const region = screen.getByRole("region", {
+			name: labels.cashAfterBills,
+		});
+		expect(
+			within(region).getByText(
+				"$900.00 incoming before reserve · Sep 30 – Oct 5",
+			),
+		).toBeTruthy();
+	});
+});
+
 describe("HouseholdBudgetSummary", () => {
 	it("allocates the next paycheck to closed cards, not new-cycle charges", () => {
 		render(
