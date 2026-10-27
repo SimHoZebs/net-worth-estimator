@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/coreos/go-oidc/v3/oidc"
+	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/singleflight"
 )
@@ -112,10 +113,7 @@ func New(ctx context.Context, c Config) (*Service, error) {
 func (s *Service) Close() error { return s.store.Close() }
 
 type principalKey struct{}
-type Principal struct {
-	Subject string `json:"subject"`
-	Name    string `json:"name"`
-}
+type Principal = authcontract.Principal
 
 func CanWrite(ctx context.Context) bool {
 	scope, ok := Scope(ctx)
@@ -239,8 +237,8 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set(ResourceHeader, scope.Resource.ID)
-		respond(w, map[string]any{"enabled": true, "provider": s.config.Provider, "authenticated": p.Subject != "", "allowed": slices.Contains(scope.Permissions, "plan:read"), "user": p, "accountURL": s.browserProviderURL(s.config.AccountURL, endpoint),
-			"resource": map[string]any{"id": scope.Resource.ID, "kind": scope.Resource.Kind, "permissions": scope.Permissions}})
+		respond(w, authcontract.SessionResponse{Enabled: true, Provider: s.config.Provider, Authenticated: p.Subject != "", Allowed: slices.Contains(scope.Permissions, "plan:read"), User: p, AccountURL: s.browserProviderURL(s.config.AccountURL, endpoint),
+			Resource: authcontract.SessionResource{ID: scope.Resource.ID, Kind: scope.Resource.Kind, Permissions: scope.Permissions}})
 	case "GET " + prefix + "login":
 		s.login(w, r)
 	case "GET " + prefix + "callback":

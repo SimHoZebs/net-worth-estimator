@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -16,6 +17,44 @@ import (
 type evaluationInstanceOutput struct {
 	Body struct {
 		Items []types.EvaluationInstance[types.JsonValue] `json:"items"`
+	}
+}
+
+func TestRawRoutesAppearInOpenAPI(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	New(openAPIStore(t), Config{}).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+	var document struct {
+		Paths map[string]map[string]struct {
+			OperationID string `json:"operationId"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &document); err != nil {
+		t.Fatal(err)
+	}
+	for path, methods := range map[string][]string{
+		"/v1/auth/session": {"get"}, "/v1/auth/logout": {"post"},
+		"/v1/auth/profile": {"get", "patch"}, "/v1/auth/change-password": {"post"},
+		"/v1/auth/sessions": {"get", "delete"}, "/v1/projections/stochastic": {"post"},
+	} {
+		for _, method := range methods {
+			if document.Paths[path][method].OperationID == "" {
+				t.Errorf("missing operation for %s %s", method, path)
+			}
+		}
+	}
+	// Export without a running identity service or access to financial data.
+	if target := os.Getenv("OPENAPI_SNAPSHOT"); target != "" {
+		var pretty any
+		if err := json.Unmarshal(recorder.Body.Bytes(), &pretty); err != nil {
+			t.Fatal(err)
+		}
+		data, err := json.MarshalIndent(pretty, "", "\t")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, append(data, '\n'), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

@@ -19,6 +19,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 )
 
 // errAccountRevoked marks a Casdoor answer that ends the local session: the
@@ -27,12 +29,7 @@ import (
 // does not invite re-login for a transient outage.
 var errAccountRevoked = errors.New("provider account is no longer active")
 
-type casdoorAccount struct {
-	Owner       string `json:"owner"`
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Avatar      string `json:"avatar"`
-}
+type casdoorAccount = authcontract.AccountProfile
 
 func (s *Service) currentGrant(r *http.Request) (grant, string, error) {
 	id := s.sessions.GetString(r.Context(), "grant_id")
@@ -143,7 +140,7 @@ func (s *Service) accountProfile(w http.ResponseWriter, r *http.Request) {
 		failure(w, 503, "The account service is temporarily unavailable.")
 		return
 	}
-	respond(w, map[string]any{"owner": account.Owner, "name": account.Name, "displayName": account.DisplayName, "avatar": account.Avatar})
+	respond(w, account)
 }
 
 func (s *Service) accountUpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -156,10 +153,7 @@ func (s *Service) accountUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		failure(w, 401, "Sign in to manage your account.")
 		return
 	}
-	var input struct {
-		DisplayName *string `json:"displayName"`
-		Avatar      *string `json:"avatar"`
-	}
+	var input authcontract.AccountProfileUpdate
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&input); err != nil {
 		failure(w, 400, "The account update is invalid.")
 		return
@@ -227,10 +221,7 @@ func (s *Service) accountChangePassword(w http.ResponseWriter, r *http.Request) 
 		failure(w, 401, "Sign in to manage your account.")
 		return
 	}
-	var input struct {
-		OldPassword string `json:"oldPassword"`
-		NewPassword string `json:"newPassword"`
-	}
+	var input authcontract.AccountPasswordChange
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&input); err != nil || input.OldPassword == "" || input.NewPassword == "" {
 		failure(w, 400, "Provide the current and a new password.")
 		return
@@ -272,7 +263,7 @@ func (s *Service) accountChangePassword(w http.ResponseWriter, r *http.Request) 
 	// so the caller signs in again with the new password.
 	_ = s.store.deleteSubjectGrants(g.Issuer, g.Subject)
 	_ = s.sessions.Destroy(r.Context())
-	respond(w, map[string]any{"reauth": true})
+	respond(w, authcontract.AccountPasswordChanged{Reauth: true})
 }
 
 func (s *Service) accountSessions(w http.ResponseWriter, r *http.Request) {
@@ -290,16 +281,16 @@ func (s *Service) accountSessions(w http.ResponseWriter, r *http.Request) {
 		failure(w, 503, "The session list is temporarily unavailable.")
 		return
 	}
-	items := make([]map[string]any, 0, len(grants))
+	items := make([]authcontract.AccountSession, 0, len(grants))
 	for _, item := range grants {
-		items = append(items, map[string]any{
-			"id":             item.ID,
-			"current":        item.ID == id,
-			"loginStartedAt": time.Unix(0, item.LoginStartedAt).UTC().Format(time.RFC3339),
-			"expiresAt":      time.Unix(item.Expiry, 0).UTC().Format(time.RFC3339),
+		items = append(items, authcontract.AccountSession{
+			ID:             item.ID,
+			Current:        item.ID == id,
+			LoginStartedAt: time.Unix(0, item.LoginStartedAt).UTC().Format(time.RFC3339),
+			ExpiresAt:      time.Unix(item.Expiry, 0).UTC().Format(time.RFC3339),
 		})
 	}
-	respond(w, map[string]any{"sessions": items})
+	respond(w, authcontract.AccountSessions{Sessions: items})
 }
 
 func (s *Service) accountRevokeSession(w http.ResponseWriter, r *http.Request) {
@@ -330,5 +321,5 @@ func (s *Service) accountRevokeSession(w http.ResponseWriter, r *http.Request) {
 		failure(w, 503, "The session list is temporarily unavailable.")
 		return
 	}
-	respond(w, map[string]any{"revoked": true})
+	respond(w, authcontract.AccountSessionRevoked{Revoked: true})
 }
