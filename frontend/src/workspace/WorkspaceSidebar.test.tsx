@@ -211,7 +211,7 @@ describe("sidebar account placement", () => {
 		);
 	}
 
-	it("places signed-in user info and account actions above navigation", () => {
+	it("keeps session account content out of the navigation sidebar", () => {
 		const view = renderSession({
 			enabled: true,
 			authenticated: true,
@@ -224,51 +224,12 @@ describe("sidebar account placement", () => {
 			},
 			user: { subject: "editor", name: "Sam Lee" },
 		});
-		const sidebar = view.getByRole("complementary", {
-			name: "Workspace navigation",
-		});
-		const navigation = view.getByRole("navigation", {
-			name: "Main navigation",
-		});
-		for (const control of [
-			view.getByText("Sam Lee"),
-			view.getByRole("link", { name: "Account settings" }),
-			view.getByRole("button", { name: "Sign out" }),
-		]) {
-			expect(sidebar.contains(control)).toBe(true);
-			expect(navigation.contains(control)).toBe(false);
-			expect(
-				control.compareDocumentPosition(navigation) &
-					Node.DOCUMENT_POSITION_FOLLOWING,
-			).toBeTruthy();
-		}
-		expect(view.queryByRole("combobox")).toBeNull();
-		expect(view.queryByText("Editor")).toBeNull();
-	});
-
-	it("places the allowed guest preview and sign-in action above navigation", () => {
-		const view = renderSession({
-			enabled: true,
-			authenticated: false,
-			allowed: true,
-			resource: {
-				id: "plans/sample",
-				kind: "sample",
-				permissions: ["plan:read", "plan:project"],
-			},
-			user: { subject: "", name: "" },
-		});
-		const navigation = view.getByRole("navigation", {
-			name: "Main navigation",
-		});
-		expect(view.getByText("Guest")).toBeTruthy();
-		expect(view.getByText("Read-only preview")).toBeTruthy();
-		expect(
-			view
-				.getByRole("button", { name: "Sign in" })
-				.compareDocumentPosition(navigation) & Node.DOCUMENT_POSITION_FOLLOWING,
-		).toBeTruthy();
-		expect(view.queryByRole("button", { name: "Sign out" })).toBeNull();
+		expect(view.queryByText("Sam Lee")).toBeNull();
 		expect(view.queryByText("Account settings")).toBeNull();
+		expect(view.queryByRole("button", { name: "Sign out" })).toBeNull();
+		expect(view.queryByRole("button", { name: "Sign in" })).toBeNull();
+		expect(
+			view.getByRole("link", { name: "Configs" }).getAttribute("href"),
+		).toBe("#sources");
 	});
 });

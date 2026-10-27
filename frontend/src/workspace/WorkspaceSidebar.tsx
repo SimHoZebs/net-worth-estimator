@@ -1,7 +1,6 @@
 import { PanelLeftClose, Settings } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
-import { SessionAccountControl } from "../auth/SessionAccountControl.tsx";
 import { Brand } from "../components/Brand.tsx";
 import { ThemeToggle } from "../components/ThemeToggle.tsx";
 import { IconButton } from "../components/Button.tsx";
@@ -81,11 +80,10 @@ export function WorkspaceSidebar({
 				/>
 			</div>
 			<div className="mt-12">
-				<SessionAccountControl />
 				<nav aria-label="Main navigation">
 					<ul className="grid list-none gap-1 p-0">
 						{pages
-							.filter((item) => item.id !== "sources" && item.id !== "account")
+							.filter((item) => item.id !== "sources")
 							.map((item) => (
 								<li key={item.id}>
 									<SidebarNavLink

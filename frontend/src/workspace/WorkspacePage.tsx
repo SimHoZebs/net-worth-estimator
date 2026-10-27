@@ -1,6 +1,5 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
-import { AccountPage } from "../auth/AccountPage.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
@@ -70,7 +69,5 @@ export function WorkspacePage({
 			);
 		case "sources":
 			return <SourcesPage />;
-		case "account":
-			return <AccountPage />;
 	}
 }

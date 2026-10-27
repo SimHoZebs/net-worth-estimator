@@ -454,6 +454,11 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).not.toBeVisible();
 	await page.goto("/#sources");
+	await expect(page.getByRole("tab", { name: "Bank sync" })).toBeVisible();
+	await expect(page.getByRole("tab", { name: "Amounts" })).toBeVisible();
+	await expect(page.getByRole("tab", { name: "Assumptions" })).toBeVisible();
+	await expect(page.getByRole("tab", { name: "Account" })).toBeVisible();
+	await page.getByRole("tab", { name: "Assumptions" }).click();
 	await expect(
 		page.getByRole("heading", { name: "The inputs behind the outlook" }),
 	).toBeVisible();
