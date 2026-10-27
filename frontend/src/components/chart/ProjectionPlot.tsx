@@ -1,17 +1,20 @@
 import type { ChartModel } from "../../domain/chart.ts";
-import { compactMoney, dateLabel, money } from "../../domain/format.ts";
+import {
+	compactMoney,
+	dateLabel,
+	money,
+	monthDay,
+} from "../../domain/format.ts";
 
 export function ProjectionPlot({
 	model,
 	id,
-	ranges,
 	inspected,
 	selectedIndex,
 	onInspect,
 }: {
 	model: ChartModel;
 	id: string;
-	ranges: boolean;
 	inspected: number | null;
 	selectedIndex: number;
 	onInspect: (value: number | null) => void;
@@ -33,15 +36,13 @@ export function ProjectionPlot({
 		last,
 		basePath,
 		filledBasePath,
-		medianPath,
-		area,
 	} = model;
 	return (
 		<svg
 			className="col-span-full col-start-1 row-start-1 block min-h-48 w-full overflow-visible sm:min-h-64 md:min-h-60 2xl:min-h-72"
 			viewBox={`0 0 ${width} ${height}`}
 			role="img"
-			aria-labelledby={`${id}-title ${id}-description`}
+			aria-labelledby={`${id}-description`}
 			onPointerMove={(event) => {
 				const bounds = event.currentTarget.getBoundingClientRect();
 				onInspect(model.indexAt((event.clientX - bounds.left) / bounds.width));
@@ -49,11 +50,9 @@ export function ProjectionPlot({
 			onPointerLeave={() => onInspect(null)}
 		>
 			<desc id={`${id}-description`}>
-				Base-case net worth starts at {money(start.total)} on{" "}
-				{dateLabel(start.date, true)} and ends at {money(last.total)} on{" "}
-				{dateLabel(last.date, true)}. The solid $0 line marks no debt. The table
-				below contains exact annual values. Shading, when enabled, shows the
-				10th to 90th percentiles across 400 modeled scenarios.
+				Trailing {points.length}-day net worth ends at {money(last.total)} on{" "}
+				{dateLabel(last.date, true)}, starting at {money(start.total)} on{" "}
+				{dateLabel(start.date, true)}. The solid $0 line marks no debt.
 			</desc>
 			<defs>
 				<linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
@@ -92,20 +91,7 @@ export function ProjectionPlot({
 					</text>
 				</g>
 			))}
-			{ranges && model.hasRange ? (
-				<path d={area} className="fill-chart-band" fillOpacity=".7" />
-			) : (
-				<path d={filledBasePath} fill={`url(#${id}-fill)`} />
-			)}
-			{medianPath !== null && (
-				<path
-					d={medianPath}
-					fill="none"
-					className="stroke-chart-median"
-					strokeWidth="1.5"
-					strokeDasharray="4 5"
-				/>
-			)}
+			<path d={filledBasePath} fill={`url(#${id}-fill)`} />
 			<path
 				d={basePath}
 				fill="none"
@@ -144,7 +130,7 @@ export function ProjectionPlot({
 						}
 						className="fill-muted text-xs max-sm:text-sm"
 					>
-						{points[index]?.date.slice(0, 4)}
+						{points[index] ? monthDay(points[index].date) : ""}
 					</text>
 				);
 			})}

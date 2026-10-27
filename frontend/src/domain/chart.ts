@@ -1,5 +1,6 @@
 import type { FundingGap } from "./fundingGaps.ts";
 import { summarizeFundingGap } from "./fundingGaps.ts";
+import { shiftDate } from "./format.ts";
 import type { Projection, RangeResult } from "./result.ts";
 
 export interface LineChartGeometry {
@@ -264,6 +265,43 @@ export function fundingGapChartModel({
 }
 
 export type FundingGapChartModel = ReturnType<typeof fundingGapChartModel>;
+
+/**
+ * Trailing window for the net-worth graph: the last 30 calendar days ending
+ * today, inclusive on both ends.
+ */
+export const TRAILING_NET_WORTH_DAYS = 30;
+
+/**
+ * Expand sparse projection points into one point per day across the trailing
+ * window ending `today`. Each day carries the latest known total at or before
+ * that day; days before the first known point carry the earliest total. The
+ * engine only emits rows on event dates, so forward-filling is what turns
+ * those rows into a continuous daily line.
+ */
+export function trailingDailyPoints(
+	points: ReadonlyArray<Projection["points"][number]>,
+	today: string,
+	days: number = TRAILING_NET_WORTH_DAYS,
+): Projection["points"] {
+	if (points.length === 0 || days < 1) return [];
+	const end = today.slice(0, 10);
+	const sorted = [...points].sort((left, right) =>
+		left.date < right.date ? -1 : left.date > right.date ? 1 : 0,
+	);
+	const start = shiftDate({ date: end, days: -(days - 1) });
+	const result: Projection["points"] = [];
+	for (let offset = 0; offset < days; offset++) {
+		const date = shiftDate({ date: start, days: offset });
+		let current = sorted[0]!;
+		for (const point of sorted) {
+			if (point.date.slice(0, 10) <= date) current = point;
+			else break;
+		}
+		result.push({ date, total: current.total, balances: {} });
+	}
+	return result;
+}
 
 /**
  * Index of the plotted point at or nearest `today` (a YYYY-MM-DD date).

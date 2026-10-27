@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../mocks/plan.ts";
 import { projectionFixture } from "../../mocks/projection.ts";
 import { ProjectionChart } from "../ProjectionChart.tsx";
 
@@ -22,40 +21,40 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+// Sparse engine rows inside the trailing window expand into one daily point
+// per day: 2026-06-02 holds $1,000 through 2026-06-19, $1,400 from 2026-06-20,
+// and $1,800 on 2026-07-01.
 function show() {
-	const setYears = vi.fn();
-	const setRanges = vi.fn();
 	render(
 		<ProjectionChart
-			plan={testPlan}
-			projection={projectionFixture()}
-			range={null}
-			ranges={false}
-			setRanges={setRanges}
-			years={10}
-			setYears={setYears}
-			progress={0}
-			rangeError={null}
+			projection={projectionFixture({
+				points: [
+					{ date: "2026-06-02", total: 1000, balances: {} },
+					{ date: "2026-06-20", total: 1400, balances: {} },
+					{ date: "2026-07-01", total: 1800, balances: {} },
+				],
+			})}
 		/>,
 	);
-	return { setYears, setRanges };
 }
 
 describe("projection chart inspection", () => {
 	it("keeps keyboard inspection values and resets on blur", () => {
 		show();
 		const slider = screen.getByRole("slider", {
-			name: "Inspect projection date",
+			name: "Inspect net worth date",
 		});
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,400");
-		fireEvent.change(slider, { target: { value: "2" } });
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jan 2027: $1,800");
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
+		fireEvent.change(slider, { target: { value: "0" } });
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
+		fireEvent.change(slider, { target: { value: "18" } });
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,400");
 		fireEvent.blur(slider);
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,400");
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
 	});
 
-	it("keeps pointer inspection, horizon changes, and the range switch", () => {
-		const { setYears, setRanges } = show();
+	it("keeps pointer inspection", () => {
+		show();
 		const plot = screen.getByRole("img");
 		vi.spyOn(plot, "getBoundingClientRect").mockReturnValue(
 			new DOMRect(0, 0, 100, 100),
@@ -65,14 +64,8 @@ describe("projection chart inspection", () => {
 			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
 		);
 		const slider = screen.getByRole("slider");
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jan 2026: $1,000");
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
 		fireEvent.pointerLeave(plot);
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,400");
-		fireEvent.change(slider, { target: { value: "2" } });
-		fireEvent.click(screen.getByRole("button", { name: "20 years" }));
-		expect(setYears).toHaveBeenCalledWith(20);
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,400");
-		fireEvent.click(screen.getByRole("switch", { name: "Show range" }));
-		expect(setRanges).toHaveBeenCalledWith(true);
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
 	});
 });

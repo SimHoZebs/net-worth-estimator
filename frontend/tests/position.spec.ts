@@ -19,12 +19,12 @@ test("current position and evidence load before the forecast", async ({
 		const current = page
 			.locator("section")
 			.filter({ has: page.getByText("Current net worth", { exact: true }) });
-		const future = page
-			.locator("section")
-			.filter({ has: page.getByText(/^Base case in \d{4}$/) });
-		await expect(current).toContainText(/\$[\d,]+/);
+		await expect(current).toContainText("$361,200");
 		await expect(current).toHaveAttribute("aria-busy", "false");
-		await expect(future).toHaveAttribute("aria-busy", "true");
+		// The history graph stays empty while the forecast is gated.
+		await expect(
+			page.getByRole("slider", { name: "Inspect net worth date" }),
+		).toHaveCount(0);
 		await page
 			.getByRole("button", { name: "Inspect current net worth evidence" })
 			.click();
@@ -36,7 +36,9 @@ test("current position and evidence load before the forecast", async ({
 	} finally {
 		release();
 	}
-	await expect(page.getByText("$1.02M")).toBeVisible();
+	await expect(
+		page.getByRole("slider", { name: "Inspect net worth date" }),
+	).toBeVisible();
 });
 
 test("forecast failure keeps current position visible and supports retry", async ({
@@ -58,9 +60,9 @@ test("forecast failure keeps current position visible and supports retry", async
 	const current = page
 		.locator("section")
 		.filter({ has: page.getByText("Current net worth", { exact: true }) });
-	await expect(current).toContainText(/\$[\d,]+/);
+	await expect(current).toContainText("$361,200");
 	await expect(
-		page.getByText("Forecast unavailable", { exact: true }),
+		page.getByText("Could not calculate forecast.", { exact: false }),
 	).toBeVisible();
 	await expect(
 		page.getByText("Loading the projection.", { exact: true }),
@@ -69,9 +71,11 @@ test("forecast failure keeps current position visible and supports retry", async
 	await page
 		.getByRole("button", { name: "Retry forecast", exact: true })
 		.click();
-	await expect(page.getByText("$1.02M")).toBeVisible();
 	await expect(
-		page.getByText("Forecast unavailable", { exact: true }),
+		page.getByRole("slider", { name: "Inspect net worth date" }),
+	).toBeVisible();
+	await expect(
+		page.getByText("Could not calculate forecast.", { exact: false }),
 	).toHaveCount(0);
 });
 
@@ -92,7 +96,11 @@ test("position failure does not block the forecast", async ({ page }) => {
 	await expect(
 		page.getByText("Could not load current position."),
 	).toBeVisible();
-	await expect(page.getByText("$1.02M")).toBeVisible();
+	// The forecast graph loads from the deterministic projection, independent
+	// of the failed position request.
+	await expect(
+		page.getByRole("slider", { name: "Inspect net worth date" }),
+	).toBeVisible();
 	fail = false;
 	await page.getByRole("button", { name: "Retry current position" }).click();
 	await expect(page.getByText("Could not load current position.")).toHaveCount(
@@ -101,33 +109,4 @@ test("position failure does not block the forecast", async ({ page }) => {
 	await expect(
 		page.getByRole("button", { name: "Inspect current net worth evidence" }),
 	).toBeEnabled();
-});
-
-test("a new horizon hides the old forecast while current position stays ready", async ({
-	page,
-}) => {
-	await page.goto("/");
-	await expect(page.getByText("$1.02M")).toBeVisible();
-	let release!: () => void;
-	const gate = new Promise<void>((resolve) => {
-		release = resolve;
-	});
-	await page.route("**/v1/projections/deterministic", async (route) => {
-		await gate;
-		await route.continue();
-	});
-	const future = page
-		.locator("section")
-		.filter({ has: page.getByText("Base case in 2036", { exact: true }) });
-	try {
-		await page.getByRole("button", { name: "10 years", exact: true }).click();
-		await expect(future).toHaveAttribute("aria-busy", "true");
-		await expect(page.getByText("$1.02M")).toHaveCount(0);
-		await expect(
-			page.getByRole("button", { name: "Inspect current net worth evidence" }),
-		).toBeEnabled();
-	} finally {
-		release();
-	}
-	await expect(future).toHaveAttribute("aria-busy", "false");
 });
