@@ -50,6 +50,10 @@ type statusOutput struct {
 		// LastSyncAt is the last successful sync completion time (RFC3339
 		// UTC), omitted when no sync has completed yet.
 		LastSyncAt string `json:"lastSyncAt,omitempty"`
+		// SyncQuotaUsed counts Bridge hits in the trailing 24 hours.
+		// SyncQuotaLimit is the Bridge daily allowance.
+		SyncQuotaUsed  int `json:"syncQuotaUsed"`
+		SyncQuotaLimit int `json:"syncQuotaLimit"`
 	}
 }
 
@@ -72,5 +76,10 @@ func (s *Server) getStatus(ctx context.Context, _ *struct{}) (*statusOutput, err
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	output.Body.LastSyncAt = lastSync
+	if s.SyncRunner != nil {
+		used, limit := s.SyncRunner.QuotaUsage()
+		output.Body.SyncQuotaUsed = used
+		output.Body.SyncQuotaLimit = limit
+	}
 	return output, nil
 }

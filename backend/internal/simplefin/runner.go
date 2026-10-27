@@ -94,6 +94,12 @@ type Runner struct {
 	// further Bridge hits.
 	limitedUntil time.Time
 	inFlight     bool
+
+	sleep func(ctx context.Context, d time.Duration) error
+	// fetchAttempts logs each Bridge hit (UTC) for the 24-hour quota
+	// display. Guarded by mu with the other throttle state; pruned on
+	// record and read so a long run stays bounded.
+	fetchAttempts []time.Time
 }
 
 // effectiveTriggerInterval returns the configured manual-trigger spacing,
@@ -132,7 +138,7 @@ func NewRunner(database store.Store, config Config, client *Client) *Runner {
 		accessURL := client.AccessURL
 		provider = func() (string, map[string]struct{}) { return accessURL, nil }
 	}
-	runner := &Runner{store: database, config: config, credential: provider, now: time.Now}
+	runner := &Runner{store: database, config: config, credential: provider, now: time.Now, sleep: sleepContext}
 	if client != nil {
 		httpClient := client.HTTPClient
 		runner.httpClient = httpClient
@@ -150,7 +156,7 @@ func NewRunner(database store.Store, config Config, client *Client) *Runner {
 // NewRunnerWithProvider builds a runner whose Bridge credential resolves per
 // run from the provider (database credential).
 func NewRunnerWithProvider(database store.Store, config Config, provider CredentialProvider, httpClient *http.Client) *Runner {
-	runner := &Runner{store: database, config: config, credential: provider, httpClient: httpClient, now: time.Now}
+	runner := &Runner{store: database, config: config, credential: provider, httpClient: httpClient, now: time.Now, sleep: sleepContext}
 	runner.fetch = runner.fetchWithCredential
 	return runner
 }
@@ -243,7 +249,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	now := r.now()
 	end := now.Add(24 * time.Hour)
 	start := now.Add(-90 * 24 * time.Hour)
-	set, err := r.fetch(ctx, start, end)
+	set, err := r.fetchWithRetry(ctx, start, end)
 	if err != nil {
 		return nil, err
 	}

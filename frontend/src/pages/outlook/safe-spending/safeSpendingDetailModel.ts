@@ -44,6 +44,8 @@ export interface SafeSpendingMandatorySection {
 export interface CashNowDecomposition {
 	checking: number;
 	spentSinceStart: number;
+	/** Past direct cash outflows since the balance check, kept outside bill filters. */
+	directSpentSinceStart?: number;
 	bills: number;
 	cushion: number;
 	/** Projection-start date anchoring spentSinceStart, for caption context. */
