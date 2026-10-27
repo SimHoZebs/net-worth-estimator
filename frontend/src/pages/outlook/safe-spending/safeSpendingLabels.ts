@@ -4,6 +4,8 @@ export const SAFE_SPENDING_LABELS = {
 	cashAfterBills: "Cash after bills",
 	remainingBills: "Bills before month-end",
 	cashPayments: "Cash payments since balance",
+	directCashPayments: "Direct spending since balance",
+	cashSpending: "Cash spending",
 	billShortfall: "Projected bill shortfall",
 	nextPaycheck: "Next paycheck",
 	fixedBills: "Next month's bills",

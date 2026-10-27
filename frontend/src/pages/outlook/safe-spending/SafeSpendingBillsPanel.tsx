@@ -28,6 +28,7 @@ import type {
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
+import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import {
 	householdPanelStyles,
@@ -71,11 +72,14 @@ function HouseholdMetricCard({
 	);
 }
 
+const EMPTY_DIRECT_TRANSACTIONS: AccountTransaction[] = [];
+
 export function SafeSpendingBillsPanel({
 	heroes,
 	cashNow,
 	paycheck,
 	section,
+	directSection,
 	plan,
 	transactionOrder,
 	onTransactionOrderChange,
@@ -85,6 +89,7 @@ export function SafeSpendingBillsPanel({
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
 	section: SafeSpendingMandatorySection;
+	directSection?: SafeSpendingMandatorySection;
 	plan: Plan;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
@@ -119,6 +124,10 @@ export function SafeSpendingBillsPanel({
 				  heroes.paycheckEndDate !== heroes.paycheckDate
 				? ` · ${monthDay(heroes.paycheckDate)} – ${monthDay(heroes.paycheckEndDate)}`
 				: ` · ${monthDay(heroes.paycheckDate)}`;
+	const directSelection = useTransactionSelection(
+		directSection?.transactions ?? EMPTY_DIRECT_TRANSACTIONS,
+		movements,
+	);
 	return (
 		<div className="grid content-start gap-4">
 			<div className="grid grid-cols-2 gap-3">
@@ -258,6 +267,15 @@ export function SafeSpendingBillsPanel({
 						<strong>{exactMoney(cashNow.spentSinceStart)}</strong>
 					</div>
 				) : null}
+				{(cashNow.directSpentSinceStart ?? 0) > 0 ? (
+					<div className="flex items-center justify-between gap-3 pl-4 text-sm text-ink">
+						<span className="flex items-center gap-2 text-muted">
+							<span aria-hidden="true">↳</span> {labels.directCashPayments} ·{" "}
+							{monthDay(cashNow.since)}
+						</span>
+						<strong>{exactMoney(cashNow.directSpentSinceStart ?? 0)}</strong>
+					</div>
+				) : null}
 				<div className="h-px w-full bg-line" />
 				<div className="flex flex-wrap items-center justify-end gap-3">
 					<TransactionSortButton
@@ -280,6 +298,30 @@ export function SafeSpendingBillsPanel({
 					showHeaders={showHeaders}
 				/>
 			</section>
+			{directSection && (
+				<section className={householdPanelStyles()}>
+					<div className="flex flex-wrap items-center justify-end gap-3">
+						<TransactionSortButton
+							order={transactionOrder}
+							onChange={onTransactionOrderChange}
+						/>
+					</div>
+					<SafeSpendingSectionHeader
+						title={directSection.title}
+						subtitle={directSection.subtitle}
+						total={directSection.total}
+					/>
+					<TransactionSectionView
+						transactions={directSection.transactions}
+						caption={directSection.title}
+						emptyMessage="No direct cash spending in this cycle yet."
+						movements={movements}
+						onInspect={directSelection.inspect}
+						order={transactionOrder}
+						showHeaders={showHeaders}
+					/>
+				</section>
+			)}
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}
@@ -294,6 +336,24 @@ export function SafeSpendingBillsPanel({
 							: null
 					}
 					onClose={close}
+				/>
+			)}
+			{directSelection.selected && (
+				<TransactionDetail
+					transaction={directSelection.selected.transaction}
+					movement={directSelection.selected.movement}
+					accounts={plan.accounts}
+					plan={plan}
+					claimRuleName={(() => {
+						const directSelected = directSelection.selected;
+						if (!directSelected?.movement.claimRuleId) return null;
+						return (
+							plan.movements.find(
+								(item) => item.id === directSelected.movement.claimRuleId,
+							)?.name ?? null
+						);
+					})()}
+					onClose={directSelection.close}
 				/>
 			)}
 		</div>

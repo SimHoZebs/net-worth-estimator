@@ -181,17 +181,19 @@ export function SafeSpendingPreview({
 		[plan, movements, incomeIds, settings.incomeRuleIds, displayToday],
 	);
 	const paycheckDerived = income.paycheck;
+	// Past cash outflow stays filter-proof: bill toggles shape the bills
+	// list only, never the cushion. Direct checking spend always counts here.
 	const spentSinceStart = useMemo(
 		() =>
 			spendingIds.length
 				? realizedCheckingOutflows({
-						movements: obligationMovements,
+						movements,
 						checkingIds: spendingIds,
 						after: plan.startDate,
 						through: displayToday,
 					})
 				: 0,
-		[obligationMovements, spendingIds, plan.startDate, displayToday],
+		[movements, spendingIds, plan.startDate, displayToday],
 	);
 	const shortWindow = useMemo(
 		() =>
@@ -229,11 +231,20 @@ export function SafeSpendingPreview({
 	}, [settings.movementIds, billCandidates]);
 
 	const billsStart = shiftDate({ date: displayToday, days: 1 });
+
+	// Bills list shows tracked bills only; one-time purchases live under
+	// direct cash spending so the two sections partition upcoming checking
+	// outflows with no duplication. Cushion math (remaining/fixed) stays on
+	// obligationMovements and is unchanged.
+	const billMovements = useMemo(() => {
+		const bills = new Set(trackedBillIds);
+		return movements.filter((movement) => bills.has(movement.movementId));
+	}, [movements, trackedBillIds]);
 	const billTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return sortTransactionsByDate({
 			items: mandatoryTransactions({
-				movements: obligationMovements,
+				movements: billMovements,
 				checkingIds: spendingIds,
 				start: billsStart,
 				end: cycle.cycleEnd,
@@ -244,7 +255,61 @@ export function SafeSpendingPreview({
 			order: transactionOrder,
 		});
 	}, [
-		obligationMovements,
+		billMovements,
+		spendingIds,
+		plan,
+		billsStart,
+		cycle.cycleEnd,
+		transactionOrder,
+	]);
+
+	// Direct cash spend: checking outflows outside the tracked bill set
+	// (one-time purchases plus deselected recurring rules). Card allowance
+	// stays card-only; this list lives beside it under cash. The list covers
+	// the same upcoming window as bills (after today through cycle end) so
+	// section totals stay comparable; past direct spend lives only in the
+	// since-balance summary rows, matching past bills.
+	const directMovements = useMemo(() => {
+		if (!spendingIds.length) return [];
+		const bills = new Set(trackedBillIds);
+		const sources = new Set(spendingIds);
+		return movements.filter(
+			(movement) =>
+				movement.fromId !== null &&
+				sources.has(movement.fromId) &&
+				!bills.has(movement.movementId),
+		);
+	}, [movements, spendingIds, trackedBillIds]);
+
+	const directSpentSinceStart = useMemo(
+		() =>
+			spendingIds.length
+				? realizedCheckingOutflows({
+						movements: directMovements,
+						checkingIds: spendingIds,
+						after: plan.startDate,
+						through: displayToday,
+					})
+				: 0,
+		[directMovements, spendingIds, plan.startDate, displayToday],
+	);
+
+	const directTransactions = useMemo(() => {
+		if (!spendingIds.length) return [];
+		return sortTransactionsByDate({
+			items: mandatoryTransactions({
+				movements: directMovements,
+				checkingIds: spendingIds,
+				start: billsStart,
+				end: cycle.cycleEnd,
+				plan,
+			}),
+			getDate: (transaction) => transaction.date,
+			getId: (transaction) => transaction.id,
+			order: transactionOrder,
+		});
+	}, [
+		directMovements,
 		spendingIds,
 		plan,
 		billsStart,
@@ -255,8 +320,12 @@ export function SafeSpendingPreview({
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
-					<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
-						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
+					<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
+						<CalendarDays
+							size={16}
+							className="shrink-0 text-muted"
+							aria-hidden="true"
+						/>
 						Safe card spending
 					</h2>
 				</div>
@@ -385,14 +454,25 @@ export function SafeSpendingPreview({
 		total: sum(billTransactions.map((transaction) => transaction.requested)),
 		transactions: billTransactions,
 	};
+
+	const directSection = {
+		title: labels.cashSpending,
+		subtitle: "Upcoming non-bill amounts",
+		total: sum(directTransactions.map((transaction) => transaction.requested)),
+		transactions: directTransactions,
+	};
 	// Plan-derived frame (header, cycle dates) renders regardless; only the
 	// computed safe spending body skeletonizes while the projection is absent.
 	if (pending)
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
-					<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
-						<CalendarDays size={18} className="text-muted" aria-hidden="true" />
+					<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
+						<CalendarDays
+							size={16}
+							className="shrink-0 text-muted"
+							aria-hidden="true"
+						/>
 						Safe card spending
 					</h2>
 				</div>
@@ -417,8 +497,12 @@ export function SafeSpendingPreview({
 				<span className="sr-only">Open safe spending details</span>
 			</button>
 			<div className="flex items-center justify-between gap-4">
-				<h2 className="flex items-center gap-2 text-sm sm:max-lg:text-xs">
-					<CalendarDays size={18} className="text-muted" aria-hidden="true" />
+				<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
+					<CalendarDays
+						size={16}
+						className="shrink-0 text-muted"
+						aria-hidden="true"
+					/>
 					Safe card spending
 				</h2>
 			</div>
@@ -506,6 +590,7 @@ export function SafeSpendingPreview({
 									cashNow={{
 										checking,
 										spentSinceStart,
+										directSpentSinceStart,
 										bills: remainingObligations,
 										cushion,
 										since: plan.startDate.slice(0, 10),
@@ -515,6 +600,7 @@ export function SafeSpendingPreview({
 									}}
 									paycheck={paycheckDetails}
 									section={billsSection}
+									directSection={directSection}
 									plan={plan}
 									transactionOrder={transactionOrder}
 									onTransactionOrderChange={setTransactionOrder}
