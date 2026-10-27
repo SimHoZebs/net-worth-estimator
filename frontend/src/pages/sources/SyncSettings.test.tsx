@@ -28,6 +28,7 @@ function stubApi(state: {
 	links?: { modelAccountId: string; bridgeName: string }[];
 	failConnect?: boolean;
 	failLinks?: boolean;
+	throttled?: boolean;
 }) {
 	const jsonHeaders = () => {
 		const headers = new Headers({ "content-type": "application/json" });
@@ -100,6 +101,31 @@ function stubApi(state: {
 						modelAccountId: link.modelAccountId,
 						origin: "manual",
 					})),
+				}),
+				{ headers: jsonHeaders() },
+			);
+		}
+		if (path === "/v1/sync/simplefin" && method === "POST") {
+			record();
+			if (state.throttled)
+				return new Response(
+					JSON.stringify({
+						title: "Too Many Requests",
+						status: 429,
+						detail: "sync ran recently; retry after 5 hours",
+					}),
+					{ status: 429, headers: jsonHeaders() },
+				);
+			return new Response(
+				JSON.stringify({
+					checkpointsInserted: 1,
+					checkpointsUpdated: 0,
+					checkpointsSkipped: 0,
+					pendingDeleted: 0,
+					pendingInserted: 0,
+					pendingUpdated: 0,
+					accountsProvisioned: 0,
+					skipped: {},
 				}),
 				{ headers: jsonHeaders() },
 			);
@@ -413,6 +439,43 @@ it("shows bridge quota usage when connected", async () => {
 	expect(
 		await screen.findByText("Bridge quota: 5 of 24 used in the last 24 hours."),
 	).toBeTruthy();
+});
+
+it("syncs now through the Sync now button", async () => {
+	const requests = stubApi({ configured: true, links: [] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+	await waitFor(() => {
+		expect(
+			requests.some(
+				(request) =>
+					request.method === "POST" && request.path === "/v1/sync/simplefin",
+			),
+		).toBe(true);
+	});
+	expect(screen.queryByText("Could not sync now. Try again later.")).toBeNull();
+	expect(screen.getByRole("button", { name: "Sync now" })).toBeTruthy();
+});
+
+it("shows an inline error when sync is throttled", async () => {
+	stubApi({ configured: true, links: [], throttled: true });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+	expect(
+		await screen.findByText("Could not sync now. Try again later."),
+	).toBeTruthy();
+});
+
+it("disables Sync now when read-only", async () => {
+	stubApi({ configured: true, links: [] });
+	render(<SyncSettings accounts={accounts} readOnly={true} />);
+	expect(
+		(
+			(await screen.findByRole("button", {
+				name: "Sync now",
+			})) as HTMLButtonElement
+		).disabled,
+	).toBe(true);
 });
 
 it("hides bridge quota when the backend omits it", async () => {

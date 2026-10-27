@@ -8,6 +8,7 @@ import type { Account } from "../../domain/model.ts";
 import {
 	disconnectSyncKey,
 	refreshSyncSettings,
+	triggerSyncNow,
 	useSyncCredential,
 	useSyncLinks,
 } from "../../state/syncSettings.ts";
@@ -42,6 +43,7 @@ export function SyncProviderPanel({
 	const links = useSyncLinks(configured);
 	const status = useServerStatus({ enabled: configured });
 	const [busy, setBusy] = useState(false);
+	const [syncing, setSyncing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [connectOpen, setConnectOpen] = useState(false);
@@ -66,6 +68,14 @@ export function SyncProviderPanel({
 		typeof status.data?.syncQuotaLimit === "number"
 			? `${status.data.syncQuotaUsed} of ${status.data.syncQuotaLimit} used in the last 24 hours`
 			: null;
+
+	async function handleSyncNow() {
+		setSyncing(true);
+		setError(null);
+		const ok = await triggerSyncNow();
+		setSyncing(false);
+		if (!ok) setError("Could not sync now. Try again later.");
+	}
 
 	async function handleDisconnect() {
 		setBusy(true);
@@ -116,14 +126,24 @@ export function SyncProviderPanel({
 									</TextButton>
 								</div>
 							) : (
-								<TextButton
-									type="button"
-									tone="danger"
-									disabled={readOnly || busy}
-									onClick={() => setConfirmingDisconnect(true)}
-								>
-									Disconnect
-								</TextButton>
+								<div className="flex items-center gap-3">
+									<Button
+										type="button"
+										variant="secondary"
+										disabled={readOnly || busy || syncing}
+										onClick={() => void handleSyncNow()}
+									>
+										{syncing ? "Syncing…" : "Sync now"}
+									</Button>
+									<TextButton
+										type="button"
+										tone="danger"
+										disabled={readOnly || busy || syncing}
+										onClick={() => setConfirmingDisconnect(true)}
+									>
+										Disconnect
+									</TextButton>
+								</div>
 							)
 						) : (
 							<Badge tone="neutral">Not connected</Badge>
