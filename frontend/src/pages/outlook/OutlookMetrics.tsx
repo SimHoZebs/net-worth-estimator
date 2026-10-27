@@ -4,7 +4,7 @@ import { Skeleton } from "../../components/Skeleton.tsx";
 import { compactMoney, dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import { currentNetWorth, type Projection } from "../../domain/result.ts";
-import { outlookMetricStyles } from "./outlookMetricStyles.ts";
+import { cardStyles } from "../../components/cardStyles.ts";
 import type { useCurrentPosition } from "../../state/useCurrentPosition.ts";
 
 export function OutlookMetrics({
@@ -31,10 +31,10 @@ export function OutlookMetrics({
 	return (
 		<div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
 			<section
-				className={outlookMetricStyles()}
+				className={cardStyles()}
 				aria-busy={position.status === "pending"}
 			>
-				<div className="mb-2 flex min-h-6 items-center justify-between text-xs text-muted max-sm:mb-3 max-sm:gap-1">
+				<div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted">
 					<span>Current net worth</span>
 					<IconButton
 						icon={CircleHelp}
@@ -60,7 +60,7 @@ export function OutlookMetrics({
 						{money(current)}
 					</div>
 				)}
-				<div className="mt-2 flex items-center gap-2 text-xs text-muted max-sm:mt-3 max-sm:flex-wrap max-sm:gap-1">
+				<div className="flex items-center gap-2 text-xs text-muted max-sm:flex-wrap">
 					<span
 						className="inline-block size-1 rounded-full bg-primary"
 						aria-hidden="true"
@@ -68,11 +68,8 @@ export function OutlookMetrics({
 					As of {dateLabel(position.data?.asOfDate ?? plan.startDate, true)}
 				</div>
 			</section>
-			<section
-				className={outlookMetricStyles({ tone: "projected" })}
-				aria-busy={pending}
-			>
-				<div className="mb-2 flex min-h-6 items-center justify-between text-xs text-muted max-sm:mb-3 max-sm:gap-1">
+			<section className={cardStyles({ tone: "success" })} aria-busy={pending}>
+				<div className="flex min-h-6 items-center justify-between gap-3 text-xs text-muted">
 					<span>Base case in {finalYear}</span>
 					<TrendingUp size={19} className="max-sm:w-4" aria-hidden="true" />
 				</div>
@@ -94,7 +91,7 @@ export function OutlookMetrics({
 						</span>
 					</div>
 				)}
-				<div className="mt-2 flex items-center gap-2 text-xs text-muted max-sm:mt-3 max-sm:flex-wrap max-sm:gap-1">
+				<div className="flex items-center gap-2 text-xs text-muted">
 					{years}-year projection
 				</div>
 			</section>

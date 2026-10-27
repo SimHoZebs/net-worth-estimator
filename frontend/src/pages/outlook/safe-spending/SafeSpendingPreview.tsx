@@ -15,6 +15,8 @@ import {
 	todayIso,
 } from "../../../domain/format.ts";
 import { Skeleton } from "../../../components/Skeleton.tsx";
+import { cardStyles } from "../../../components/cardStyles.ts";
+import { mergeStyles } from "../../../components/mergeStyles.ts";
 import {
 	cashCushion,
 	checkingAccountId,
@@ -250,7 +252,7 @@ export function SafeSpendingPreview({
 	if (!cards.length) {
 		return (
 			<section
-				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 max-lg:px-5 max-lg:py-5 max-sm:p-5 print:break-inside-avoid"
+				className={mergeStyles(cardStyles(), "relative")}
 				aria-label="Safe card spending"
 			>
 				<div className="flex items-center justify-between gap-4">
@@ -259,7 +261,7 @@ export function SafeSpendingPreview({
 						Safe card spending
 					</h2>
 				</div>
-				<p className="px-6 py-5 text-sm leading-relaxed text-muted">
+				<p className="m-0 text-sm leading-relaxed text-muted">
 					Add a debt account to track a card statement cycle here.
 				</p>
 			</section>
@@ -389,7 +391,7 @@ export function SafeSpendingPreview({
 	if (pending)
 		return (
 			<section
-				className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 max-lg:px-5 max-lg:py-5 max-sm:p-5 print:break-inside-avoid"
+				className={mergeStyles(cardStyles(), "relative")}
 				aria-label="Safe card spending"
 			>
 				<div className="flex items-center justify-between gap-4">
@@ -398,7 +400,7 @@ export function SafeSpendingPreview({
 						Safe card spending
 					</h2>
 				</div>
-				<p className="mt-4 text-xs">
+				<p className="m-0 text-xs">
 					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 					{fullDaysLeft === 1 ? "day" : "days"} left
 					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
@@ -411,7 +413,7 @@ export function SafeSpendingPreview({
 
 	return (
 		<section
-			className="relative rounded-surface border border-line bg-surface px-6 pt-6 pb-5 max-lg:px-5 max-lg:py-5 max-sm:p-5 print:break-inside-avoid"
+			className={mergeStyles(cardStyles(), "relative")}
 			aria-label="Safe card spending"
 		>
 			<button
@@ -427,12 +429,12 @@ export function SafeSpendingPreview({
 					Safe card spending
 				</h2>
 			</div>
-			<p className="mt-4 text-xs">
+			<p className="m-0 text-xs">
 				{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 				{fullDaysLeft === 1 ? "day" : "days"} left
 				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
 			</p>
-			<div className="flex flex-col pt-8 pb-5">
+			<div className="flex flex-col">
 				<span className="text-xs text-muted">{labels.allowance}</span>
 				<strong className="mt-2 text-4xl leading-tight font-medium tracking-tight tabular-nums">
 					{money(allowance)}
@@ -469,7 +471,7 @@ export function SafeSpendingPreview({
 					</strong>
 				</div>
 			</div>
-			<div className="relative z-1 mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-4">
+			<div className="relative z-1 flex flex-wrap items-center gap-4 border-t border-line pt-4">
 				<TextButton
 					onClick={(event) => {
 						event.stopPropagation();

@@ -7,7 +7,7 @@ import { Skeleton } from "../../components/Skeleton.tsx";
 import { dateLabel, money, percent } from "../../domain/format.ts";
 import type { Evaluation } from "../../domain/model.ts";
 import type { EvaluationResult } from "../../domain/result.ts";
-import { evaluationCard } from "./evaluationStyles.ts";
+import { cardStyles } from "../../components/cardStyles.ts";
 
 export type { EvaluationPin } from "../../components/evaluationCard.ts";
 
@@ -39,7 +39,9 @@ export function EvaluationCard({
 	const StateIcon = evaluation.enabled && met ? Check : Flag;
 	return (
 		<section
-			className={evaluationCard({ enabled: evaluation.enabled })}
+			className={cardStyles({
+				tone: evaluation.enabled ? "default" : "subtle",
+			})}
 			aria-labelledby={headingId}
 			aria-busy={outcomePending}
 		>
