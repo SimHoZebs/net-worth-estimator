@@ -790,7 +790,11 @@ export function TransactionDetail({
 									min="0.01"
 									max="10000000000"
 									step="0.01"
-									value={edit.draft.amount}
+									value={
+										movement.amountKnown
+											? edit.draft.amount
+											: String(transaction.amount)
+									}
 									onChange={(event) =>
 										edit.updateDraft({ amount: event.target.value }, "amount")
 									}
