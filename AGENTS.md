@@ -88,3 +88,12 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 ## Verification
 
 Run the narrowest relevant package first, then the production-package gate. `TESTING.md` defines the backend completion gate and direct checks.
+
+## Git Workflow
+
+- Work in an isolated worktree on a feature branch. Never implement tasks in the shared `/home/simho/projects/net-worth-estimator` checkout on `main`.
+- Create the worktree first: `git worktree add /home/simho/.local/share/opencode/worktree/<id>/<name> -b feat/<name>`, or via the opencode worktree command. Run all edits, tests, and reviews there.
+- Start each task with a read-only preflight: `git status -sb`, `git log --oneline origin/main..HEAD`, and check for `rebase-merge/` or `rebase-apply/`. If the tree is dirty, behind, or mid-rebase and you do not own that state, stop and report. Do not run `pull --rebase`, `rebase --continue`, `reset`, or `checkout --` on a tree you do not own.
+- Workers never merge to `main`, never push `main`, never amend commits they do not own, and never use `--force` on `main`. Commit in semantic chunks on the feature branch and push only the feature branch. The parent session owns fetch, rebase onto `origin/main`, conflict resolution, merge to `main`, and push of `main`.
+- Follow the default without asking: commit and push the feature branch when the commit gate passes; leave `main` alone. Do not ask "should I commit / merge / push / rebase?" unless the task explicitly overrides this policy.
+- End each task report with: branch, `HEAD` vs `origin/main` (`ahead/behind`), `status -sb`, and pushed commit hashes.
