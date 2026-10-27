@@ -40,6 +40,8 @@ import { SafeSpendingCyclePanel } from "@/pages/outlook/safe-spending/SafeSpendi
 import { SafeSpendingDetailShell } from "@/pages/outlook/safe-spending/SafeSpendingDetailShell.tsx";
 import {
 	isSafeSpendingCycleTab,
+	type SafeSpendingChargeCycle,
+	type SafeSpendingCycleTab,
 	type SafeSpendingDetailTab,
 } from "@/pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import {
@@ -300,7 +302,7 @@ export function SafeSpendingPreview({
 			items: mandatoryTransactions({
 				movements: directMovements,
 				checkingIds: spendingIds,
-				start: billsStart,
+				start: cycle.cycleStart,
 				end: cycle.cycleEnd,
 				plan,
 			}),
@@ -312,10 +314,34 @@ export function SafeSpendingPreview({
 		directMovements,
 		spendingIds,
 		plan,
-		billsStart,
+		cycle.cycleStart,
 		cycle.cycleEnd,
 		transactionOrder,
 	]);
+
+	// Card charges and direct cash share one list so spending never reads
+	// as two ledgers. Cards contribute recorded outflows since the cycle
+	// start; direct cash covers the whole statement cycle. Funding stays
+	// split (allowance for cards, cushion for cash); only the rows merge.
+	const tabChargeCycles = useMemo<
+		Record<SafeSpendingCycleTab, SafeSpendingChargeCycle>
+	>(() => {
+		const spending = sortTransactionsByDate({
+			items: [...chargeCycles.cycle.transactions, ...directTransactions],
+			getDate: (transaction) => transaction.date,
+			getId: (transaction) => transaction.id,
+			order: transactionOrder,
+		});
+		return {
+			...chargeCycles,
+			cycle: {
+				...chargeCycles.cycle,
+				title: labels.cycleSpending,
+				emptyMessage: "No spending this cycle yet.",
+				transactions: spending,
+			},
+		};
+	}, [chargeCycles, directTransactions, transactionOrder]);
 	if (!cards.length) {
 		return (
 			<Card aria-label="Safe card spending" className="relative">
@@ -455,12 +481,6 @@ export function SafeSpendingPreview({
 		transactions: billTransactions,
 	};
 
-	const directSection = {
-		title: labels.cashSpending,
-		subtitle: "Upcoming non-bill amounts",
-		total: sum(directTransactions.map((transaction) => transaction.requested)),
-		transactions: directTransactions,
-	};
 	// Plan-derived frame (header, cycle dates) renders regardless; only the
 	// computed safe spending body skeletonizes while the projection is absent.
 	if (pending)
@@ -572,13 +592,13 @@ export function SafeSpendingPreview({
 					tab={detail}
 					onTabChange={onTabChange}
 					cycleCounts={Object.fromEntries(
-						Object.entries(chargeCycles).map(([id, entry]) => [
+						Object.entries(tabChargeCycles).map(([id, entry]) => [
 							id,
 							entry.transactions.length,
 						]),
 					)}
 					range={
-						isSafeSpendingCycleTab(detail) ? chargeCycles[detail] : undefined
+						isSafeSpendingCycleTab(detail) ? tabChargeCycles[detail] : undefined
 					}
 					onClose={() => onDetail(null)}
 				>
@@ -600,7 +620,6 @@ export function SafeSpendingPreview({
 									}}
 									paycheck={paycheckDetails}
 									section={billsSection}
-									directSection={directSection}
 									plan={plan}
 									transactionOrder={transactionOrder}
 									onTransactionOrderChange={setTransactionOrder}
@@ -613,7 +632,7 @@ export function SafeSpendingPreview({
 							)}
 							<SafeSpendingCyclePanel
 								key={detail}
-								cycle={chargeCycles[detail]}
+								cycle={tabChargeCycles[detail]}
 								plan={plan}
 								transactionOrder={transactionOrder}
 								onTransactionOrderChange={setTransactionOrder}
