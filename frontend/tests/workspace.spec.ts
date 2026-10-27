@@ -365,20 +365,51 @@ test("capture the completed desktop outlook", async ({ page }) => {
 	});
 });
 
-test("scenario failures expose a recovery action without inventing a range", async ({
+test("skips the scenario calculation without pinned threshold evaluations", async ({
 	page,
 }) => {
-	// Server mode streams the range over SSE, so failing the stream is the
-	// equivalent of a worker that cannot start. The history graph draws no
-	// range, so recovery surfaces through the notification action while the
-	// deterministic cards stay visible.
+	// The default pins hold only posting fulfillment, which shows no
+	// probability, so Outlook must not stream the range at all.
+	let rangeRequested = false;
+	await page.route("**/v1/projections/stochastic", async (route) => {
+		rangeRequested = true;
+		await route.continue();
+	});
+	await page.goto("/");
+	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
+	// The default posting-fulfillment pin renders its card, proving pins
+	// resolved: a null pins response alone would also skip the fetch.
+	await page.getByRole("button", { name: "Inspect cash flow" }).waitFor();
+	expect(rangeRequested).toBe(false);
+});
+
+test("scenario failures expose a recovery action without inventing a range", async ({
+	page,
+	request,
+}) => {
+	// Pinned threshold cards are the range's only Outlook consumer, so one
+	// must be pinned for the stream to run at all. Server mode streams the
+	// range over SSE, so failing the stream is the equivalent of a worker
+	// that cannot start. The history graph draws no range, so recovery
+	// surfaces through the notification action while the deterministic
+	// cards stay visible.
+	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
+	expect(response.ok()).toBe(true);
+	const { document } = (await response.json()) as {
+		document: FinancialModelDocument;
+	};
+	const evaluation = document.evaluations.netWorthThreshold.find(
+		(item) => item.enabled,
+	)!;
+	await resetFixture({ pinnedEvaluationIds: [evaluation.instanceId] });
 	await page.route("**/v1/projections/stochastic", (route) => route.abort());
 	await page.goto("/");
 	await expect(page.getByRole("alert")).toContainText("The API request failed");
-	await expect(
-		page.getByRole("button", { name: "Retry scenario calculation" }),
+	await expect(page.getByRole("button", { name: "Retry scenario calculation" }),
 	).toBeVisible();
-	await expect(page.getByText("$361,200")).toBeVisible();
+	// Exact match: the pinned threshold card also shows the current value
+	// with a "today" qualifier.
+	await expect(page.getByText("$361,200", { exact: true })).toBeVisible();
 	// The history graph draws no range, so a failed stream must not add one.
 	await expect(
 		page.getByRole("region", { name: "Net worth over the trailing 30 days" }),

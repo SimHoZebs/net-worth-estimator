@@ -66,22 +66,26 @@ function OutlookContent({
 	const checkpoints =
 		useServerModel().data?.document?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const plan = usePlan();
-	const projection = useRemoteProjection({
-		enabled: (plan?.accounts.length ?? 0) > 0,
-		// The chart no longer offers horizon or range switches, so Outlook
-		// pins the request to the defaults instead of inheriting possibly
-		// stale persisted preferences. Pinned cards still need the range.
-		years: 20,
-		ranges: true,
-	});
-	const position = useCurrentPosition({
-		enabled: (plan?.accounts.length ?? 0) > 0,
-	});
 	const {
 		ids: pinnedIds,
 		toggle: togglePin,
 		loading: pinsLoading,
 	} = usePinnedEvaluations();
+	const projection = useRemoteProjection({
+		enabled: (plan?.accounts.length ?? 0) > 0,
+		// The chart no longer offers horizon or range switches, so Outlook
+		// pins the horizon instead of inheriting possibly stale persisted
+		// preferences. The stochastic range only feeds pinned threshold
+		// cards, so it is requested only while one is pinned.
+		years: 20,
+		ranges:
+			plan?.evaluations.some((evaluation) =>
+				(pinnedIds ?? []).includes(evaluation.id),
+			) ?? false,
+	});
+	const position = useCurrentPosition({
+		enabled: (plan?.accounts.length ?? 0) > 0,
+	});
 	const status = useServerStatus().data;
 	const writeBlocked = useWorkspaceReadOnly();
 	// Previous-input placeholders are not forecasts for the active model.

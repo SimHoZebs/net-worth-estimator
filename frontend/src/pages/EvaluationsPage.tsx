@@ -23,7 +23,11 @@ export function EvaluationsPage({
 	// only UI callbacks arrive as props.
 	const plan = usePlan();
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
-	const projection = useRemoteProjection();
+	const projection = useRemoteProjection({
+		// The stochastic range only feeds threshold-card probabilities, so
+		// it is requested only while a threshold evaluation is configured.
+		ranges: (plan?.evaluations.length ?? 0) > 0,
+	});
 	const base = projection.base instanceof Error ? null : projection.base;
 	if (!plan) return null;
 	return (
