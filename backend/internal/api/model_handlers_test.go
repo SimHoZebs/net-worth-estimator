@@ -112,6 +112,62 @@ func TestStatusReportsSyncConfigurationAndLastSync(t *testing.T) {
 	}
 }
 
+func TestStatusReportsSyncQuota(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
+	}
+	var unconfigured map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &unconfigured); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	for _, key := range []string{"syncQuotaUsed", "syncQuotaLimit"} {
+		value, present := unconfigured[key]
+		if !present {
+			t.Fatalf("status = %v, want emitted %s", unconfigured, key)
+		}
+		if _, ok := value.(float64); !ok {
+			t.Fatalf("status %s = %v, want number", key, value)
+		}
+	}
+	if unconfigured["syncQuotaUsed"] != float64(0) || unconfigured["syncQuotaLimit"] != float64(0) {
+		t.Fatalf("unconfigured quota = %v, want 0/0", unconfigured)
+	}
+
+	bridge := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"accounts":[]}`))
+	}))
+	t.Cleanup(bridge.Close)
+	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
+		return bridge.URL, nil
+	}, bridge.Client())
+	triggered := New(database, Config{SyncRunner: runner})
+	trigger := httptest.NewRecorder()
+	triggered.ServeHTTP(trigger, httptest.NewRequest(http.MethodPost, "/v1/sync/simplefin", nil))
+	if trigger.Code != http.StatusOK {
+		t.Fatalf("trigger status = %d, body %s", trigger.Code, trigger.Body.String())
+	}
+	quota := httptest.NewRecorder()
+	triggered.ServeHTTP(quota, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	if quota.Code != http.StatusOK {
+		t.Fatalf("quota status = %d, body %s", quota.Code, quota.Body.String())
+	}
+	var configured struct {
+		SyncQuotaUsed  int `json:"syncQuotaUsed"`
+		SyncQuotaLimit int `json:"syncQuotaLimit"`
+	}
+	if err := json.Unmarshal(quota.Body.Bytes(), &configured); err != nil {
+		t.Fatalf("decode quota status: %v", err)
+	}
+	if configured.SyncQuotaUsed != 1 || configured.SyncQuotaLimit != simplefin.BridgeDailyQuota {
+		t.Fatalf("quota = %+v, want 1/%d", configured, simplefin.BridgeDailyQuota)
+	}
+}
+
 func TestReadOnlyRejectsWritesButServesReads(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{ReadOnly: true})
