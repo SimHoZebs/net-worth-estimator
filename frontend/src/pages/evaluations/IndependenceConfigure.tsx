@@ -4,7 +4,7 @@ import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
 import { InputField } from "@/components/Field.tsx";
 import { finite, isRecord } from "@/domain/guards.ts";
-import { RuleTogglePill } from "@/pages/outlook/safe-spending/RuleTogglePill.tsx";
+import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
 import {
 	reloadWorkspace,
 	useServerModel,
@@ -272,7 +272,7 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 								key={item.id}
 								className={saving || readOnly ? "opacity-50" : ""}
 							>
-								<RuleTogglePill
+								<TogglePill
 									name={item.name || item.id}
 									detail={item.detail}
 									checked={income.has(item.id)}
