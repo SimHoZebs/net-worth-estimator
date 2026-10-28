@@ -4,7 +4,7 @@ services:
     user: "${CASDOOR_UID:-1000}:${CASDOOR_GID:-1000}"
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${CASDOOR_PORT:-8000}:8000"
+      - "${CASDOOR_BIND:-127.0.0.1}:${CASDOOR_PORT:-8000}:8000"
     volumes:
       - ${CASDOOR_STATE_DIR:-./data}/conf:/conf:ro
       - ${CASDOOR_STATE_DIR:-./data}/db:/data
