@@ -74,10 +74,6 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		if err := validateURL(field.value, field.origin); err != nil {
 			return c, fmt.Errorf("%s: %w", field.name, err)
 		}
-		u, _ := url.Parse(field.value)
-		if u.Scheme == "http" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" && u.Hostname() != "::1" {
-			return c, fmt.Errorf("%s requires HTTPS outside loopback", field.name)
-		}
 	}
 	if c.InternalURL != "" {
 		if err := validateURL(c.InternalURL, false); err != nil {
@@ -119,9 +115,6 @@ func validateURL(raw string, origin bool) error {
 	}
 	if origin && u.Path != "" && u.Path != "/" {
 		return fmt.Errorf("expected an origin without a path")
-	}
-	if origin && u.Scheme == "http" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" && u.Hostname() != "::1" {
-		return fmt.Errorf("HTTP is restricted to loopback hosts; use HTTPS for network access")
 	}
 	return nil
 }
