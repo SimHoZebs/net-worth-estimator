@@ -2,7 +2,6 @@ package domain
 
 import (
 	"math"
-	"sort"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -95,51 +94,13 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 	if path.MovementEvents == nil {
 		return nil
 	}
-	evaluatedBySequence := make(map[int]evaluatedMovementEvent)
+	// Single-pass display: the shared assessment already reconstructed
+	// pre-event balances, replayed the cap ledger in sorted order, and derived
+	// fulfillment, binding constraints, remaining cap, and available amount.
+	// Formatting reads those results without re-deriving them.
+	evaluatedBySequence := make(map[int]evaluatedMovementEvent, len(path.MovementEvents))
 	for _, evaluated := range evaluateMovementEvents(path) {
 		evaluatedBySequence[evaluated.event.Sequence] = evaluated
-	}
-	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
-	accountsByID := make(map[string]types.Account, len(path.EffectiveDocument.Accounts))
-	for _, account := range path.EffectiveDocument.Accounts {
-		accountsByID[account.ID] = account
-	}
-	movements := ResolvedMovementPostings(&path.EffectiveDocument)
-	postingsByID := make(map[string]*types.Posting, len(movements))
-	for index := range movements {
-		posting := &movements[index]
-		postingsByID[posting.ID] = posting
-	}
-	capsByID := RuleCapsByID(&path.EffectiveDocument)
-	capRemainingBySequence := map[int]float64{}
-	realizedByPostingAndYear := map[string]float64{}
-	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
-		for year, amount := range byYear {
-			realizedByPostingAndYear[postingID+":"+year] = amount
-		}
-	}
-	orderedEvents := make([]*types.MovementEvent, len(path.MovementEvents))
-	for index := range path.MovementEvents {
-		orderedEvents[index] = &path.MovementEvents[index]
-	}
-	sort.SliceStable(orderedEvents, func(i, j int) bool {
-		if orderedEvents[i].Date != orderedEvents[j].Date {
-			return orderedEvents[i].Date < orderedEvents[j].Date
-		}
-		return orderedEvents[i].Sequence < orderedEvents[j].Sequence
-	})
-	for _, event := range orderedEvents {
-		posting := postingsByID[event.Origin.PostingID]
-		cap, capped := capsByID[event.Origin.PostingID]
-		if posting == nil || !capped {
-			continue
-		}
-		key := event.Origin.PostingID + ":" + event.Date[:4]
-		remaining := math.Max(0, cap-realizedByPostingAndYear[key])
-		capRemainingBySequence[event.Sequence] = remaining
-		// Losses are balance adjustments, not cap consumption: only
-		// non-negative realizations accrue against the annual cap.
-		realizedByPostingAndYear[key] += maxFloat(0, event.RealizedAmount)
 	}
 	events := make([]types.MovementEvent, len(path.MovementEvents))
 	for index, source := range path.MovementEvents {
@@ -155,27 +116,9 @@ func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
 			for constraintIndex, constraint := range constraints {
 				event.BindingConstraints[constraintIndex] = constraint.toTypes()
 			}
-			if posting := postingsByID[source.Origin.PostingID]; posting != nil {
-				if balancesBefore, ok := balancesBeforeBySequence[source.Sequence]; ok {
-					available := math.Inf(1)
-					if posting.SourceAccountID != nil {
-						if _, exists := accountsByID[*posting.SourceAccountID]; exists {
-							available = math.Min(available, GetWithdrawableAmount(balancesBefore, accountsByID, *posting.SourceAccountID))
-						} else {
-							available = 0
-						}
-					}
-					if posting.Destinations != nil {
-						available = math.Min(available, GetTotalDestinationHeadroom(balancesBefore, accountsByID, posting.Destinations))
-					}
-					if remaining, capped := capRemainingBySequence[source.Sequence]; capped {
-						available = math.Min(available, remaining)
-					}
-					if !math.IsInf(available, 0) {
-						available = roundCurrency(available)
-						event.AvailableAmount = &available
-					}
-				}
+			if evaluated.availableAmount != nil {
+				available := *evaluated.availableAmount
+				event.AvailableAmount = &available
 			}
 		}
 		events[index] = event
