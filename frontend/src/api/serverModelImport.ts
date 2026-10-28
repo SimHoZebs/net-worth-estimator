@@ -47,7 +47,7 @@ export async function importServerModel({
 	if (preconditions.hasDraft)
 		return new ServerModelImportError({
 			detail:
-				"Save or discard your temporary server plan before importing another model.",
+				"Save or discard your unsaved changes before importing another model.",
 		});
 	if (preconditions.loading)
 		return new ServerModelImportError({

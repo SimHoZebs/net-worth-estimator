@@ -11,13 +11,14 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // These tests use the HTTP API over two scopes of one physical database. Router
 // authorization tests separately prove that the caller cannot choose a scope.
 func TestSharedDatabaseAPICanonicalReadsRemainPlanScoped(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainPlanScoped(t *testing.T) {
 }
 
 func TestSharedDatabaseAPIProjectionResultsRemainPlanScoped(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

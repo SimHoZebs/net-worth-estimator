@@ -7,3 +7,4 @@ tmp/
 /tasks/to-groom/long-chaining/
 /node_modules/
 /.vercel/
+/backend/server

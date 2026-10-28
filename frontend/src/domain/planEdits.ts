@@ -32,7 +32,7 @@ export function removePlanItem({
 	if (target.kind === "accounts") {
 		if (plan.accounts.length === 1)
 			return new Error(
-				"Keep at least one account in the plan. Add a replacement before removing this one.",
+				"Keep at least one account. Add a replacement before removing this one.",
 			);
 		if (
 			plan.movements.some(

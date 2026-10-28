@@ -2,7 +2,7 @@
 // Groups never touch financial plans. Membership is enforced here from
 // application tables. Only authenticated subjects may call these routes.
 //
-// Status contract: unknown groups or members report 404 (sql.ErrNoRows),
+// Status contract: unknown groups or members report 404 (store.ErrNotFound),
 // including reads by non-members so membership is not enumerable. Denied
 // actions by members report 403 (store.ErrGroupForbidden); privileged
 // reads such as invite listing deny under-privileged members with 403.
@@ -11,7 +11,6 @@
 package groups
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -34,13 +33,13 @@ type Config struct {
 
 // Handler routes group requests. The identity middleware supplies Principal.
 type Handler struct {
-	db       *store.Database
+	db       store.Database
 	issuer   string
 	readOnly bool
 	origins  []string
 }
 
-func New(db *store.Database, issuer string, config Config) *Handler {
+func New(db store.Database, issuer string, config Config) *Handler {
 	return &Handler{db: db, issuer: issuer, readOnly: config.ReadOnly, origins: config.AllowedOrigins}
 }
 
@@ -83,7 +82,7 @@ func writeStoreError(w http.ResponseWriter, err error, notFound string) {
 		return
 	case errors.Is(err, store.ErrGroupForbidden):
 		writeProblem(w, http.StatusForbidden, "This action is not permitted in this group.")
-	case errors.Is(err, sql.ErrNoRows):
+	case errors.Is(err, store.ErrNotFound), store.IsNotFound(err):
 		writeProblem(w, http.StatusNotFound, notFound)
 	case errors.Is(err, store.ErrGroupInvalid):
 		writeProblem(w, http.StatusBadRequest, strings.TrimPrefix(err.Error(), "invalid group request: "))

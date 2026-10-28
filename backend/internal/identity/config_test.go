@@ -56,7 +56,7 @@ func TestProviderConfiguration(t *testing.T) {
 			if (err != nil) != test.fail {
 				t.Fatalf("error=%v, fail=%v", err, test.fail)
 			}
-			if err == nil && (c.SessionDB != "" || c.Database != nil || c.Lifetime != 7*24*time.Hour) {
+			if err == nil && (c.Store != nil || c.Lifetime != 7*24*time.Hour) {
 				t.Fatalf("unexpected defaults: %+v", c)
 			}
 		})

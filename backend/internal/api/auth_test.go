@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -35,9 +36,7 @@ func TestRowWriteReadOnlyMatrix(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			database := openAPIStore(t)
 			root := apiProjectRoot(t)
-			if _, err := database.ImportCSV(
-				filepath.Join(root, "public", "configs"),
-			); err != nil {
+			if _, err := testseed.Seed(database, filepath.Join(root, "public", "configs")); err != nil {
 				t.Fatalf("seed store: %v", err)
 			}
 			handler := New(database, test.config)

@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -192,7 +194,7 @@ func TestReadOnlyRejectsWritesButServesReads(t *testing.T) {
 func TestReadOnlyRejectsRowWrites(t *testing.T) {
 	database := openAPIStore(t)
 	root := apiProjectRoot(t)
-	if _, err := database.ImportCSV(
+	if _, err := testseed.Seed(database,
 		filepath.Join(root, "public", "configs"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
@@ -231,7 +233,7 @@ func TestReadOnlyRejectsRowWrites(t *testing.T) {
 
 func TestRowWriteReturnsRevision(t *testing.T) {
 	database := openAPIStore(t)
-	if _, err := database.ImportCSV(
+	if _, err := testseed.Seed(database,
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
@@ -273,7 +275,7 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 
 func TestRowWriteRejectsInvalidRow(t *testing.T) {
 	database := openAPIStore(t)
-	if _, err := database.ImportCSV(
+	if _, err := testseed.Seed(database,
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
@@ -391,7 +393,7 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 
 func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
 	database := openAPIStore(t)
-	if _, err := database.ImportCSV(
+	if _, err := testseed.Seed(database,
 		filepath.Join(apiProjectRoot(t), "public", "configs"),
 	); err != nil {
 		t.Fatalf("seed store: %v", err)
@@ -970,7 +972,7 @@ func TestFrontendServingFallsBackToPlain404WithoutBundledPage(t *testing.T) {
 
 func openAPIStore(t *testing.T) store.Store {
 	t.Helper()
-	database, err := store.Open(filepath.Join(t.TempDir(), "api.db"))
+	database, err := sqlite.Open(filepath.Join(t.TempDir(), "api.db"))
 	if err != nil {
 		t.Fatalf("open API store: %v", err)
 	}

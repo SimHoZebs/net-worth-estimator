@@ -2,6 +2,7 @@ package identity
 
 import (
 	"encoding/json"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -112,7 +113,7 @@ func TestBrowserLoginRejectsUnconfiguredHostsAndCrossOriginCallbacks(t *testing.
 		t.Fatalf("cross-origin callback=%d", w.Code)
 	}
 	var count int
-	if err := s.store.db.QueryRow("SELECT COUNT(*) FROM identity_grants").Scan(&count); err != nil || count != 0 {
+	if err := s.store.(*sqlite.Database).SQL().QueryRow("SELECT COUNT(*) FROM identity_grants").Scan(&count); err != nil || count != 0 {
 		t.Fatal("cross-origin callback created a grant")
 	}
 }
