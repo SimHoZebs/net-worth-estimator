@@ -3,10 +3,11 @@ package types
 // Simulation and stochastic wire types.
 
 type FinancialModel struct {
-	Accounts        []Account        `json:"accounts"`
-	Postings        []Posting        `json:"postings"`
-	RecurrenceRules []RecurrenceRule `json:"recurrenceRules"`
-	PaymentTerms    []PaymentTerms   `json:"paymentTerms,omitempty"`
+	Accounts         []Account         `json:"accounts"`
+	Postings         []Posting         `json:"postings"`
+	RecurrenceRules  []RecurrenceRule  `json:"recurrenceRules"`
+	PaymentTerms     []PaymentTerms    `json:"paymentTerms,omitempty"`
+	PlannedPurchases []PlannedPurchase `json:"plannedPurchases,omitempty"`
 }
 
 type SimulationState struct {
