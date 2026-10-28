@@ -2,6 +2,7 @@ import type { ApiRequestOptions } from "@/api/http.ts";
 import type {
 	BackendAccount,
 	BackendCheckpoint,
+	BackendPlannedPurchase,
 	BackendPosting,
 	BackendRecurrenceRule,
 	EvaluationInstance,
@@ -90,6 +91,15 @@ export type RowOperation =
 	| { kind: "rule"; action: "move"; id: string; beforeId: string | null }
 	| { kind: "checkpoint"; action: "save"; row: BackendCheckpoint }
 	| { kind: "checkpoint"; action: "delete"; accountId: string; date: string }
+	| { kind: "plannedPurchase"; action: "create"; row: BackendPlannedPurchase }
+	| {
+			kind: "plannedPurchase";
+			action: "update";
+			id: string;
+			row: BackendPlannedPurchase;
+	  }
+	| { kind: "plannedPurchase"; action: "delete"; id: string }
+	| { kind: "plannedPurchase"; action: "move"; id: string; beforeId: string | null }
 	| {
 			kind: "evaluation";
 			action: "create";
@@ -114,6 +124,33 @@ export type RowOperation =
 
 function stableStringify(value: unknown): string {
 	return JSON.stringify(value);
+}
+
+function midnightOfDay(day: string): number {
+	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
+}
+
+// TODO: switch planned-purchase writes to dedicated /v1/planned-purchases
+// row endpoints once the backend ships them. Until then the standalone rows
+// persist through the legacy posting shape with a purchase marker, so saves
+// keep working against the current backend and the mock server.
+function plannedPurchasePosting(row: BackendPlannedPurchase): BackendPosting {
+	const stamp = midnightOfDay(row.earliestDate);
+	return {
+		id: row.id,
+		name: row.name,
+		sourceAccountId: row.fundingAccountId,
+		destinations: null,
+		amount: {
+			resolver: "expression",
+			config: { expression: String(row.cost) },
+			inputs: {},
+		},
+		postedTime: stamp,
+		transactionTime: stamp,
+		purchase: { priority: row.priority },
+		enabled: row.enabled,
+	};
 }
 
 function diffOrdered<T>(
@@ -168,6 +205,7 @@ export function diffFinancialModelDocuments(
 		},
 		postings: [],
 		recurrenceRules: [],
+		plannedPurchases: [],
 	};
 	const from = base ?? empty;
 	const operations: RowOperation[] = [];
@@ -208,6 +246,23 @@ export function diffFinancialModelDocuments(
 			(id, row) => ({ kind: "rule", action: "update", id, row }),
 			(id) => ({ kind: "rule", action: "delete", id }),
 			(id, beforeId) => ({ kind: "rule", action: "move", id, beforeId }),
+		),
+	);
+	operations.push(
+		...diffOrdered(
+			from.plannedPurchases ?? [],
+			next.plannedPurchases ?? [],
+			(row) => row.id,
+			same,
+			(row) => ({ kind: "plannedPurchase", action: "create", row }),
+			(id, row) => ({ kind: "plannedPurchase", action: "update", id, row }),
+			(id) => ({ kind: "plannedPurchase", action: "delete", id }),
+			(id, beforeId) => ({
+				kind: "plannedPurchase",
+				action: "move",
+				id,
+				beforeId,
+			}),
 		),
 	);
 
@@ -415,6 +470,34 @@ export async function applyRowOperations(
 					outcome = await runWrite(issues, () =>
 						deleteCheckpoint(
 							{ accountId: operation.accountId, date: operation.date },
+							options,
+						),
+					);
+				break;
+			case "plannedPurchase":
+				if (operation.action === "create")
+					outcome = await runWrite(issues, () =>
+						createPosting(
+							plannedPurchasePosting(operation.row) as unknown as PostingBody,
+							options,
+						),
+					);
+				else if (operation.action === "update")
+					outcome = await runWrite(issues, () =>
+						updatePosting(
+							operation.id,
+							plannedPurchasePosting(operation.row) as unknown as PostingBody,
+							options,
+						),
+					);
+				else if (operation.action === "delete")
+					outcome = await runWrite(issues, () =>
+						deletePosting(operation.id, options),
+					);
+				else
+					outcome = await runWrite(issues, () =>
+						movePosting(
+							{ id: operation.id, beforeId: operation.beforeId ?? "" },
 							options,
 						),
 					);

@@ -1,11 +1,12 @@
 import { todayIso } from "../domain/format.ts";
 import { finite, isRecord } from "../domain/guards.ts";
 import { latestCheckpoint } from "./checkpoints.ts";
-import type { Account, Movement, Plan } from "../domain/model.ts";
+import type { Account, Movement, PlannedPurchase, Plan } from "../domain/model.ts";
 import {
 	type AmountInputBinding,
 	type BackendAccount,
 	type BackendCheckpoint,
+	type BackendPlannedPurchase,
 	type BackendPosting,
 	type BackendRecurrenceRule,
 	type EvaluationTables,
@@ -81,6 +82,7 @@ export interface PlanPresentation {
 	assumptions?: Plan["assumptions"];
 	accounts: Record<string, AccountPresentation>;
 	movements: Record<string, MovementPresentation>;
+	plannedPurchases: Record<string, MovementPresentation>;
 }
 
 export interface DisplayPlanInput {
@@ -545,10 +547,46 @@ function movementDisplayFromPosting(
 		claimRuleId: posting.claim?.ruleId ?? null,
 		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
 		postedDate: settledDay(posting.postedTime),
-		...(posting.purchase
-			? { purchasePriority: posting.purchase.priority }
-			: {}),
 		pending: posting.pending === true,
+	};
+}
+
+/**
+ * Wishlist display row from a standalone planned-purchase row. Array order
+ * in the display plan is the priority, so the numeric priority stays on the
+ * wire only.
+ */
+function plannedPurchaseDisplayFromRow(
+	row: BackendPlannedPurchase,
+	previous?: MovementPresentation,
+): PlannedPurchase {
+	return {
+		id: row.id,
+		name: row.name || row.id,
+		amount: Math.max(0, row.cost),
+		fromId: row.fundingAccountId,
+		startDate: row.earliestDate,
+		enabled: row.enabled,
+		readOnly: previous?.readOnly ?? false,
+	};
+}
+
+/**
+ * Wishlist display row from a legacy purchase posting. Kept while the
+ * backend persists purchases as postings with a purchase marker.
+ */
+function plannedPurchaseDisplayFromPosting(
+	posting: BackendPosting,
+	amount: number | null,
+): PlannedPurchase {
+	return {
+		id: posting.id,
+		name: posting.name || posting.id,
+		amount: Math.max(0, amount ?? 0),
+		fromId: posting.sourceAccountId,
+		startDate: dayFromTimes(posting.transactionTime, posting.postedTime),
+		enabled: posting.enabled,
+		readOnly: amount === null || isSyncOwned(posting.source),
 	};
 }
 
@@ -805,6 +843,51 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		return display;
 	});
 
+	// Wishlist rows live in their own display slice, never in movements.
+	// Standalone planned-purchase rows come first, then legacy purchase
+	// postings for IDs no row covers. Both sort by priority, document order
+	// breaking ties; the display slice keeps that order as the priority.
+	const rowById = new Map(
+		(document.plannedPurchases ?? []).map((row) => [row.id, row]),
+	);
+	const legacyPurchases = document.postings
+		.map((posting, order) => ({ posting, order }))
+		.filter(
+			({ posting }) => posting.purchase && !rowById.has(posting.id),
+		)
+		.sort(
+			(left, right) =>
+				left.posting.purchase!.priority - right.posting.purchase!.priority ||
+				left.order - right.order,
+			);
+	const orderedRows = (document.plannedPurchases ?? [])
+		.map((row, order) => ({ row, order }))
+		.sort(
+			(left, right) =>
+				left.row.priority - right.row.priority || left.order - right.order,
+		)
+		.map(({ row }) => row);
+	const plannedPurchases: PlannedPurchase[] = [
+		...orderedRows.map((row) =>
+			plannedPurchaseDisplayFromRow(row, previousPresentation?.plannedPurchases?.[row.id]),
+		),
+		...legacyPurchases.map(({ posting }) => {
+			const amount = postingAmountValue(posting, projection);
+			addForwardPostingWarnings(
+				conversionReport,
+				posting,
+				amount,
+				`plannedPurchases.${posting.id}`,
+			);
+			return plannedPurchaseDisplayFromPosting(posting, amount);
+		}),
+	];
+	// Every purchase posting is wishlist, whether or not a row covers it:
+	// the slice already represents covered IDs, so none stay in movements.
+	const ordinaryPostings = document.postings.filter(
+		(posting) => !posting.purchase,
+	);
+
 	const movements: Movement[] = [
 		...(document.recurrenceRules ?? []).map((rule, index) => {
 			const amount = postingAmountValue(rule, projection);
@@ -817,7 +900,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			);
 			return movementDisplayFromRule(rule, amount, previous);
 		}),
-		...document.postings.map((posting, index) => {
+		...ordinaryPostings.map((posting, index) => {
 			const path = `movements.${(document.recurrenceRules ?? []).length + index}`;
 			const amount = postingAmountValue(posting, projection);
 			const previous = previousPresentation?.movements[posting.id];
@@ -935,8 +1018,41 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 					buildPresentationRule(rule, amount, previous),
 				] as const;
 			}),
-			...document.postings.map((posting) => {
+			...ordinaryPostings.map((posting) => {
 				const previous = previousPresentation?.movements[posting.id];
+				const amount = postingAmountValue(posting, projection);
+				return [
+					posting.id,
+					buildPresentationPosting(posting, amount, previous),
+				] as const;
+			}),
+		]),
+		plannedPurchases: Object.fromEntries([
+			...orderedRows.map((row) => {
+				const previous = previousPresentation?.plannedPurchases?.[row.id];
+				const synthetic: BackendPosting = {
+					id: row.id,
+					name: row.name,
+					sourceAccountId: row.fundingAccountId,
+					destinations: null,
+					amount: {
+						resolver: "expression",
+						config: { expression: String(row.cost) },
+						inputs: {},
+					},
+					postedTime: midnightOf(row.earliestDate),
+					transactionTime: midnightOf(row.earliestDate),
+					enabled: row.enabled,
+				};
+				return [
+					row.id,
+					buildPresentationPosting(synthetic, row.cost, previous),
+				] as const;
+			}),
+			...legacyPurchases.map(({ posting }) => {
+				const previous =
+					previousPresentation?.plannedPurchases?.[posting.id] ??
+					previousPresentation?.movements[posting.id];
 				const amount = postingAmountValue(posting, projection);
 				return [
 					posting.id,
@@ -960,6 +1076,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		readOnly: status.readOnly,
 		accounts,
 		movements,
+		plannedPurchases,
 		evaluations,
 		assumptions,
 	};
@@ -999,6 +1116,7 @@ export function refreshDisplayPlanAccess(
 				]),
 			),
 			movements: presentation?.movements ?? {},
+			plannedPurchases: presentation?.plannedPurchases ?? {},
 		},
 	};
 }
@@ -1336,11 +1454,9 @@ export function displayPlanToBackendDocument(
 				amount,
 				postedTime,
 				transactionTime,
-				...(movement.purchasePriority != null
-					? { purchase: { priority: movement.purchasePriority } }
-					: storedPosting?.purchase
-						? { purchase: null }
-						: {}),
+				// Wishlist items no longer ride on movements. A regular movement
+				// reusing a legacy purchase posting clears its marker.
+				...(storedPosting?.purchase ? { purchase: null } : {}),
 				...(movement.claimRuleId && movement.claimOccurrenceDate
 					? {
 							claim: {
@@ -1393,8 +1509,91 @@ export function displayPlanToBackendDocument(
 		});
 	});
 
+	// The wishlist slice persists as legacy purchase postings until the
+	// backend ships planned-purchase rows and endpoints. Array order is the
+	// priority. Stored owner metadata (source, execution order, exact times)
+	// carries over so a wishlist edit never rewrites unrelated fields.
+	const plannedPresentations = options.presentation?.plannedPurchases ?? {};
+	plan.plannedPurchases.forEach((purchase, priority) => {
+		const storedExtras =
+			plannedPresentations[purchase.id] ?? movementPresentations[purchase.id];
+		const storedPosting = sourcePostings.get(purchase.id);
+		if (storedPosting && storedPosting.pending) {
+			lose(
+				conversionReport,
+				`plannedPurchases.${purchase.id}.pending`,
+				"Pending status is server-owned bank metadata.",
+				`plannedPurchases.${purchase.id}.pending`,
+			);
+		}
+		const originalAmountValue = storedPosting
+			? postingAmountValue(storedPosting, null)
+			: null;
+		const baselineAmountValue =
+			storedExtras?.amountValue ?? originalAmountValue;
+		const sameAmount =
+			baselineAmountValue !== null &&
+			sameNumber(baselineAmountValue, purchase.amount);
+		const preservedAmount = storedExtras?.amount ?? storedPosting?.amount;
+		const amount: PostingAmountResolution =
+			sameAmount && preservedAmount
+				? preservedAmount
+				: {
+						resolver: "expression",
+						config: { expression: String(purchase.amount) },
+						inputs: {},
+					};
+		const source = storedPosting?.source ?? storedExtras?.source;
+		const storedPostedTime =
+			storedExtras?.postedTime ?? storedPosting?.postedTime ?? null;
+		const storedTransactionTime =
+			storedExtras?.transactionTime ?? storedPosting?.transactionTime ?? null;
+		const storedDay =
+			storedPostedTime !== null && storedTransactionTime !== null
+				? dayFromTimes(storedTransactionTime, storedPostedTime)
+				: null;
+		const midnight = midnightOf(purchase.startDate);
+		const postedTime =
+			storedDay === purchase.startDate && storedPostedTime !== null
+				? storedPostedTime
+				: midnight;
+		const transactionTime =
+			storedDay === purchase.startDate && storedTransactionTime !== null
+				? storedTransactionTime
+				: midnight;
+		const previousReadOnly =
+			storedExtras?.readOnly ?? isSyncOwned(storedPosting?.source);
+		if (purchase.readOnly !== previousReadOnly)
+			lose(
+				conversionReport,
+				`plannedPurchases.${purchase.id}.readOnly`,
+				"Display purchase read-only state is not a backend posting field.",
+				`plannedPurchases.${purchase.id}.readOnly`,
+			);
+		provisional(conversionReport, `plannedPurchases.${purchase.id}.readOnly`);
+		postings.push({
+			...storedPosting,
+			id: purchase.id,
+			name: purchase.name,
+			sourceAccountId: purchase.fromId,
+			destinations: null,
+			amount,
+			postedTime,
+			transactionTime,
+			purchase: { priority },
+			...(storedPosting?.claim === undefined ? {} : { claim: null }),
+			enabled: purchase.enabled,
+			...(source === undefined ? {} : { source }),
+		});
+	});
+
 	const removedMovementIDs = (ids: string[]) =>
-		ids.filter((id) => !plan.movements.some((item) => item.id === id));
+		ids.filter(
+			(id) =>
+				!plan.movements.some((item) => item.id === id) &&
+				!plan.plannedPurchases.some((item) => item.id === id),
+		);
+
 	for (const postingId of removedMovementIDs(
 		(sourceDocument?.postings ?? []).map((posting) => posting.id),
 	)) {

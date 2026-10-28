@@ -221,8 +221,7 @@ function TransactionsView({
 		(movement) => movement.frequency !== "once",
 	).length;
 	const transactionsCount = visible.filter(
-		(movement) =>
-			movement.frequency === "once" && movement.purchasePriority == null,
+		(movement) => movement.frequency === "once",
 	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
@@ -237,7 +236,6 @@ function TransactionsView({
 			sortTransactionsByDate({
 				items: visible.filter(
 					(movement) =>
-						movement.purchasePriority == null &&
 						movement.name.toLowerCase().includes(query.toLowerCase()) &&
 						(schedule === "all"
 							? movement.frequency === "once"

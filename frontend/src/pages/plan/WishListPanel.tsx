@@ -12,9 +12,9 @@ import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { EmptyState } from "../../components/EmptyState.tsx";
 import { money } from "../../domain/format.ts";
 import {
-	type Movement,
+	type PlannedPurchase,
 	type Plan,
-	visibleMovements,
+	visiblePlannedPurchases,
 } from "../../domain/model.ts";
 import { movePurchase, purchaseQueue } from "../../domain/purchases.ts";
 import { horizonDate, type PurchaseSchedule } from "../../domain/result.ts";
@@ -40,22 +40,27 @@ export function WishListPanel({
 	const conflict = useDraftConflict();
 	const readOnly = blocked || Boolean(conflict);
 	const years = useUiStore((state) => state.years);
-	const [editor, setEditor] = useState<{ item: Movement | null } | null>(null);
-	const [remove, setRemove] = useState<Movement | null>(null);
+	const [editor, setEditor] = useState<{
+		item: PlannedPurchase | null;
+	} | null>(null);
+	const [remove, setRemove] = useState<PlannedPurchase | null>(null);
 	const [announcement, setAnnouncement] = useState("");
 	const queue = purchaseQueue(
-		visibleMovements({ movements: plan.movements, accounts: plan.accounts }),
+		visiblePlannedPurchases({
+			plannedPurchases: plan.plannedPurchases,
+			accounts: plan.accounts,
+		}),
 	);
 	const locked = readOnly || plan.readOnly;
 	const end = horizonDate({ start: plan.startDate, years });
 	const total = queue
 		.filter((item) => item.enabled)
 		.reduce((sum, item) => sum + item.amount, 0);
-	const move = (item: Movement, direction: -1 | 1) => {
+	const move = (item: PlannedPurchase, direction: -1 | 1) => {
 		const next = movePurchase(plan, item.id, direction);
 		if (onUpdate(next))
 			setAnnouncement(
-				`${item.name} is now priority ${purchaseQueue(next.movements).findIndex((entry) => entry.id === item.id) + 1}.`,
+				`${item.name} is now priority ${purchaseQueue(next.plannedPurchases).findIndex((entry) => entry.id === item.id) + 1}.`,
 			);
 	};
 	return (
@@ -200,7 +205,7 @@ export function WishListPanel({
 						if (
 							onUpdate({
 								...plan,
-								movements: plan.movements.filter(
+								plannedPurchases: plan.plannedPurchases.filter(
 									(item) => item.id !== remove.id,
 								),
 							})

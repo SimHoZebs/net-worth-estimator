@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	BackendAccount,
 	BackendCheckpoint,
+	BackendPlannedPurchase,
 	BackendPosting,
 	FinancialModelDocument,
 } from "@/api/contracts.ts";
@@ -38,6 +39,19 @@ const checkpoint = (
 	Balance: balance,
 });
 
+const plannedPurchase = (
+	id: string,
+	priority: number,
+): BackendPlannedPurchase => ({
+	id,
+	name: id,
+	fundingAccountId: "a",
+	cost: 50,
+	earliestDate: "2026-09-01",
+	enabled: true,
+	priority,
+});
+
 const posting = (id: string, name = id): BackendPosting => ({
 	id,
 	name,
@@ -62,6 +76,7 @@ const emptyDocument = (): FinancialModelDocument => ({
 	},
 	postings: [],
 	recurrenceRules: [],
+	plannedPurchases: [],
 });
 
 describe("diffFinancialModelDocuments", () => {
@@ -193,6 +208,50 @@ describe("diffFinancialModelDocuments", () => {
 });
 
 describe("applyRowOperations", () => {
+	it("diffs planned purchases with moves and translates writes to legacy postings", async () => {
+		const base: FinancialModelDocument = {
+			...emptyDocument(),
+			plannedPurchases: [plannedPurchase("keep", 0), plannedPurchase("drop", 1)],
+		};
+		const next: FinancialModelDocument = {
+			...emptyDocument(),
+			plannedPurchases: [
+				{ ...plannedPurchase("keep", 1), cost: 75 },
+				plannedPurchase("new", 0),
+			],
+		};
+		const operations = diffFinancialModelDocuments(base, next);
+		const kinds = operations.map(
+			(operation) => `${operation.kind}:${operation.action}`,
+		);
+		expect(kinds).toContain("plannedPurchase:create");
+		expect(kinds).toContain("plannedPurchase:update");
+		expect(kinds).toContain("plannedPurchase:delete");
+		expect(kinds).toContain("plannedPurchase:move");
+		const seen = stubFetch(() =>
+			ok({
+				row: posting("new"),
+				issues: [],
+				persisted: true,
+				revision: "r1",
+			}),
+		);
+		const result = await applyRowOperations(operations);
+		expect(result).toEqual({ ok: true, issues: [] });
+		const urls = seen.map((call) => call.url);
+		// Compat shim: standalone rows persist through legacy posting calls.
+		expect(urls).toContain("/v1/postings");
+		expect(urls).toContain("/v1/postings/reorder");
+		expect(urls.some((url) => url.startsWith("/v1/postings/"))).toBe(true);
+		const create = seen.find(
+			(call) => call.url === "/v1/postings" && call.init?.method === "POST",
+		);
+		expect(JSON.parse(String(create?.init?.body))).toMatchObject({
+			purchase: { priority: 0 },
+			sourceAccountId: "a",
+		});
+	});
+
 	const scopeId = `plans/${"a".repeat(64)}`;
 	beforeEach(() => {
 		acceptResourceScope(
