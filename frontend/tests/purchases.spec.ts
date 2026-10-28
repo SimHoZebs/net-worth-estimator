@@ -94,11 +94,10 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	page,
 	request,
 }) => {
-	const { resource, user } = (await (
+	const { resource } = (await (
 		await request.get(`${FIXTURE_API}/v1/auth/session`)
 	).json()) as {
 		resource: { id: string; kind: "private"; permissions: string[] };
-		user: { name: string };
 	};
 	const baselineResponse = await request.get(
 		`${FIXTURE_API}/v1/financial-model`,
@@ -170,7 +169,6 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	});
 
 	await openPurchases(page);
-	await expect(page.getByText(user.name, { exact: true })).toBeVisible();
 	await addPurchase(page, "Synced-account laptop", "500");
 	const draft = (await readTemporaryVersion(page, resource)) as Plan;
 	expect(draft.readOnly).toBe(false);

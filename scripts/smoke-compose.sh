@@ -4,7 +4,7 @@ set -eu
 # Guest sample on the normal Casdoor stack. Owner checks live under auth/.
 
 frontend_url=${FRONTEND_URL:-http://localhost:8080}
-backend_url=${BACKEND_URL:-http://localhost:8787}
+backend_url=${BACKEND_URL:-$frontend_url}
 session=$(curl --fail --silent --show-error "${frontend_url}/v1/auth/session")
 resource=$(printf '%s' "$session" | node --input-type=module -e '
   let data = "";
@@ -15,6 +15,7 @@ resource=$(printf '%s' "$session" | node --input-type=module -e '
 ')
 
 curl --fail --silent --show-error "${backend_url}/healthz" | grep -qx "ok"
+curl --fail --silent --show-error "${backend_url}/readyz" | grep -qx "ok"
 curl --fail --silent --show-error "${frontend_url}/" | grep -q 'id="root"'
 missing_status=$(curl --silent --show-error -o /dev/null -w '%{http_code}' "${frontend_url}/settings")
 test "$missing_status" = 404
