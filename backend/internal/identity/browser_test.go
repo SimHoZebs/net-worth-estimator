@@ -157,3 +157,26 @@ func TestProxyOriginsUseCanonicalAppsAndProviderAliases(t *testing.T) {
 		t.Fatal("accepted an invalid application origin")
 	}
 }
+
+func TestCanonicalBrowserOriginSingleCheckerParity(t *testing.T) {
+	bare, err := canonicalBrowserOrigin("https://app.example.com", false)
+	if err != nil {
+		t.Fatalf("bare: %v", err)
+	}
+	slashed, err := canonicalBrowserOrigin("https://app.example.com/", false)
+	if err != nil {
+		t.Fatalf("slashed: %v", err)
+	}
+	if bare != "https://app.example.com" || slashed != bare {
+		t.Fatalf("trailing slash did not normalize identically: %q vs %q", bare, slashed)
+	}
+	for _, raw := range []string{"https://app.test/v1", "https://user:pass@app.test", "https://app.test.", "https://app.test./"} {
+		if _, err := canonicalBrowserOrigin(raw, false); err == nil {
+			t.Fatalf("canonicalBrowserOrigin(%q) accepted", raw)
+		}
+		c := Config{PublicURL: raw, Issuer: "https://identity.test"}
+		if _, err := c.ProxyOrigins(); err == nil {
+			t.Fatalf("ProxyOrigins accepted %q", raw)
+		}
+	}
+}
