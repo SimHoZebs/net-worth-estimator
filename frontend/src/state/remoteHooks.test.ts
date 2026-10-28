@@ -1528,6 +1528,7 @@ describe("remote workspace state", () => {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			purchasePriority: 0,
+			void: false,
 		};
 
 		const accepted = rendered.result().updatePlan({

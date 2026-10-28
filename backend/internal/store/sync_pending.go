@@ -100,7 +100,7 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPost
 	}
 	used := map[int]bool{}
 	for _, accountID := range accounts {
-		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND plan_id = :plan_id`, SourceSimpleFIN, accountID)
+		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND (pending = 1 OR void = 1) AND plan_id = :plan_id`, SourceSimpleFIN, accountID)
 		if err != nil {
 			return err
 		}
@@ -181,7 +181,7 @@ func insertSettledPostings(tx *planTx, settled []SyncPosting, used map[int]bool,
 			continue
 		}
 		posting := item.Posting
-		posting.Source = SourceModel
+		posting.Source = SourceSimpleFIN
 		posting.Pending = false
 		posting.Enabled = false
 		posting.ExecutionOrder = 0
@@ -192,7 +192,7 @@ func insertSettledPostings(tx *planTx, settled []SyncPosting, used map[int]bool,
 		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
 			return err
 		}
-		if err := insertPosting(tx, position, &posting, SourceModel); err != nil {
+		if err := insertPosting(tx, position, &posting, SourceSimpleFIN); err != nil {
 			return err
 		}
 		key.postingID = posting.ID
@@ -263,14 +263,13 @@ func mirrorAccount(posting types.Posting) (string, bool) {
 	return "", false
 }
 
-// convertSettledPosting converts one vanished bank row (pending or void)
-// into a settled owner row when exactly one settled candidate strictly
-// matches it. The UUID
-// survives, so any future evidence stays linked; the row becomes owner-owned
-// and projection-disabled pending the owner's review. It reports whether a
-// conversion happened; otherwise the caller deletes the row.
+// convertSettledPosting settles one vanished bank row (pending or void)
+// when exactly one settled candidate strictly matches it. The UUID and bank
+// provenance survive; only the values update. It reports whether a
+// conversion happened; otherwise the caller voids pending rows and leaves
+// void rows alone.
 func convertSettledPosting(tx *planTx, id string, settled []SyncPosting, used map[int]bool, summary *SyncApplySummary) (bool, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, id)
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, id)
 	if err != nil {
 		return false, err
 	}
@@ -301,8 +300,8 @@ func convertSettledPosting(tx *planTx, id string, settled []SyncPosting, used ma
 	if err != nil {
 		return false, fmt.Errorf("marshal settled amount %s: %w", id, err)
 	}
-	result, err := tx.Exec(`UPDATE postings SET name = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, source = ?, pending = 0, enabled = 0 WHERE id = ? AND source = ? AND plan_id = :plan_id`,
-		candidate.Name, string(amount), candidate.PostedTime, candidate.TransactionTime, SourceModel, id, SourceSimpleFIN)
+	result, err := tx.Exec(`UPDATE postings SET name = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = 0, void = 0 WHERE id = ? AND source = ? AND plan_id = :plan_id`,
+		candidate.Name, string(amount), candidate.PostedTime, candidate.TransactionTime, id, SourceSimpleFIN)
 	if err != nil {
 		return false, err
 	}
@@ -351,7 +350,7 @@ func updatePendingPosting(tx *planTx, posting types.Posting) error {
 // authorization heals the row back to pending through the normal update
 // path, and a posted match can still convert it to settled.
 func voidPendingPosting(tx *planTx, id string) (bool, error) {
-	result, err := tx.Exec(`UPDATE postings SET pending = 0 WHERE id = ? AND source = ? AND pending = 1 AND plan_id = :plan_id`, id, SourceSimpleFIN)
+	result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source = ? AND pending = 1 AND plan_id = :plan_id`, id, SourceSimpleFIN)
 	if err != nil {
 		return false, err
 	}

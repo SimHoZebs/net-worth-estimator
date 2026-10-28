@@ -41,7 +41,7 @@ export function ReceiptPanel({
 		saved &&
 		(saved.sourceAccountId || saved.destinations?.length) &&
 		!saved.pending &&
-		saved.source !== "simplefin",
+		!saved.void,
 	);
 	const attach = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];

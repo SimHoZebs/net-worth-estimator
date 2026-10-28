@@ -104,6 +104,9 @@ func (d *Database) setupSchema() error {
 	if err := migratePostingReceiptIDs(tx); err != nil {
 		return fmt.Errorf("migrate posting receipt fields: %w", err)
 	}
+	if err := migratePostingVoidFlag(tx); err != nil {
+		return fmt.Errorf("migrate posting void flag: %w", err)
+	}
 	for _, statement := range receiptBlobSchemaObjects {
 		if _, err := tx.Exec(statement); err != nil {
 			return err

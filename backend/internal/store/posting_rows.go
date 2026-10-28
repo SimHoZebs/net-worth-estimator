@@ -9,18 +9,33 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func postingSource(tx *planTx, id string) (string, error) {
+type postingLifecycle struct {
+	source        string
+	pending, void bool
+}
+
+// ownerEditable reports whether an owner write may touch the row. Owner
+// rows are always editable. Bank rows become editable once settled; live
+// pending and void rows stay sync-owned so the sync never fights the owner.
+func (l postingLifecycle) ownerEditable() bool {
+	return l.source == SourceModel || (!l.pending && !l.void)
+}
+
+func postingLifecycleOf(tx *planTx, id string) (postingLifecycle, error) {
+	var out postingLifecycle
 	var source sql.NullString
-	if err := tx.QueryRow(`SELECT source FROM postings WHERE id = ? AND plan_id = :plan_id`, id).Scan(&source); err != nil {
+	var pending, voided int64
+	if err := tx.QueryRow(`SELECT source, pending, void FROM postings WHERE id = ? AND plan_id = :plan_id`, id).Scan(&source, &pending, &voided); err != nil {
 		if err == sql.ErrNoRows {
-			return "", &rowError{code: "not-found", id: id}
+			return out, &rowError{code: "not-found", id: id}
 		}
-		return "", fmt.Errorf("read posting %s: %w", id, err)
+		return out, fmt.Errorf("read posting %s: %w", id, err)
 	}
 	if !source.Valid {
-		return SourceModel, nil
+		return postingLifecycle{source: SourceModel}, nil
 	}
-	return source.String, nil
+	out.source, out.pending, out.void = source.String, pending != 0, voided != 0
+	return out, nil
 }
 
 // CreatePosting inserts one owner posting. Empty IDs get a UUIDv7.
@@ -37,6 +52,7 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 		return types.Posting{}, &rowError{code: "invalid-id", id: posting.ID}
 	}
 	posting.Source, posting.Pending, posting.ExecutionOrder = SourceModel, false, 0
+	posting.Void = false
 	err = withRowTx(s.db, func(tx *planTx) error {
 		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
 			return err
@@ -56,15 +72,17 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 // UpdatePosting preserves the parent row, its order, and dependent evidence.
 // Purchase policy remains replace-on-write, independently of other dependents.
 func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error) {
-	posting.Source, posting.Pending = SourceModel, false
 	err := withRowTx(s.db, func(tx *planTx) error {
-		source, err := postingSource(tx, posting.ID)
+		lifecycle, err := postingLifecycleOf(tx, posting.ID)
 		if err != nil {
 			return err
 		}
-		if source != SourceModel {
+		if !lifecycle.ownerEditable() {
 			return &rowError{code: "sync-owned", id: posting.ID}
 		}
+		// Owner writes change values only. Source, pending, and void stay
+		// as stored so bank rows keep their provenance and lifecycle.
+		posting.Source, posting.Pending, posting.Void = lifecycle.source, lifecycle.pending, lifecycle.void
 		if err := tx.QueryRow(`SELECT execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, posting.ID).Scan(&posting.ExecutionOrder); err != nil {
 			return err
 		}
@@ -97,13 +115,15 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 
 func (s *sqliteStore) DeletePosting(id string) error {
 	return withRowTx(s.db, func(tx *planTx) error {
-		source, err := postingSource(tx, id)
+		lifecycle, err := postingLifecycleOf(tx, id)
 		if err != nil {
 			return err
 		}
-		if source != SourceModel {
+		if !lifecycle.ownerEditable() {
 			return &rowError{code: "sync-owned", id: id}
 		}
+		// Bank sync keys survive as tombstones: a deleted bank row is never
+		// re-imported by later snapshots.
 		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
 			return err
 		}

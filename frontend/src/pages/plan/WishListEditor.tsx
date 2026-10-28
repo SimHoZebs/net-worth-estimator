@@ -54,6 +54,7 @@ export function WishListEditor({
 					claimRuleId: null,
 					claimOccurrenceDate: null,
 					postedDate: null,
+					void: false,
 					purchasePriority:
 						item?.purchasePriority ??
 						Math.max(

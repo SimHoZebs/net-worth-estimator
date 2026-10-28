@@ -102,16 +102,10 @@ func replaceDocument(tx *planTx, document *types.FinancialModelDocument) error {
 	if err != nil {
 		return err
 	}
-	// Bank-backed owner rows (settled imports and conversions) survive
-	// replacement like sync-owned rows do, with their values as the owner
-	// left them. Their receipts are snapshotted below and restored after
-	// the re-merge, since row deletion cascades to receipt rows.
-	bankOwned, err := loadBankOwnedPostings(tx)
-	if err != nil {
-		return err
-	}
-	syncedPostings = append(syncedPostings, bankOwned...)
-	bankReceipts, err := loadReceiptsForPostings(tx, bankPostingIDs(bankOwned))
+	// Receipts can attach to settled bank rows, so evidence for preserved
+	// rows is snapshotted here and restored after the re-merge; row
+	// deletion would otherwise cascade to it.
+	bankReceipts, err := loadReceiptsForPostings(tx, bankPostingIDs(syncedPostings))
 	if err != nil {
 		return err
 	}
@@ -236,10 +230,10 @@ func insertPosting(tx *planTx, position int, posting *types.Posting, source stri
 		claimOccurrenceDate = posting.Claim.OccurrenceDate
 	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order, plan_id)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, :plan_id)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, plan_id)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, :plan_id)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceModel && posting.Pending), posting.ExecutionOrder,
+		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceModel && posting.Pending), boolToInt(posting.Void), posting.ExecutionOrder,
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
 	}
@@ -305,9 +299,9 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	var posting types.Posting
 	var sourceAccountID, claimRuleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string
-	var enabled, pending int64
+	var enabled, pending, voided int64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source, &pending, &posting.ExecutionOrder); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &posting.ExecutionOrder); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -329,6 +323,7 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	}
 	posting.Enabled = enabled != 0
 	posting.Pending = pending != 0
+	posting.Void = voided != 0
 	if source.Valid {
 		posting.Source = source.String
 	}
@@ -501,7 +496,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE plan_id = :plan_id ORDER BY position`)
+	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE plan_id = :plan_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}

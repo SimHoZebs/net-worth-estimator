@@ -52,9 +52,10 @@ export const movementSchema = z.object({
 	purchasePriority: z.number().int().nonnegative().nullable().optional(),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
-	// Void marks a bank authorization that vanished without settling. Missing
-	// means active.
-	void: z.boolean().optional(),
+	// Void marks a bank authorization that vanished without settling. Every
+	// movement carries it explicitly; stored drafts without it migrate to
+	// false on load.
+	void: z.boolean(),
 });
 
 /**
@@ -97,8 +98,27 @@ function migrateLegacyEvaluations(value: unknown): unknown {
 	return value;
 }
 
+function migrateLegacyVoidFlag(value: unknown): unknown {
+	if (typeof value !== "object" || value === null || Array.isArray(value))
+		return value;
+	const record = value as Record<string, unknown>;
+	if (!Array.isArray(record.movements)) return value;
+	let changed = false;
+	const movements = record.movements.map((movement) => {
+		if (
+			typeof movement !== "object" ||
+			movement === null ||
+			"void" in movement
+		)
+			return movement;
+		changed = true;
+		return { ...(movement as Record<string, unknown>), void: false };
+	});
+	return changed ? { ...record, movements } : value;
+}
+
 export const planSchema = z.preprocess(
-	migrateLegacyEvaluations,
+	(value) => migrateLegacyVoidFlag(migrateLegacyEvaluations(value)),
 	z
 		.object({
 			schemaVersion: z.literal(1),

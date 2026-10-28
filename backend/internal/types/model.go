@@ -211,6 +211,10 @@ type Posting struct {
 	// ExecutionOrder breaks equal-time ties independently of identity and display
 	// position. The store assigns it on create and preserves it on owner updates.
 	ExecutionOrder int64 `json:"executionOrder,omitempty"`
+	// Void marks a bank authorization that vanished without settling. Only
+	// the sync sets it, through void-marking; owner and CSV writes never
+	// create void rows.
+	Void bool `json:"void,omitempty"`
 }
 
 // RecurrenceRule owns repetition. Its movement fields are the template
