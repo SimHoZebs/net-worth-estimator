@@ -20,8 +20,10 @@ NODE
 ```
 
 Set `CASDOOR_USER_NAME` in that file. Check both public URLs. Set `CASDOOR_UID`
-and `CASDOOR_GID` to your host IDs if necessary. Use HTTPS outside loopback.
-Select stable hostnames before passkey enrollment.
+and `CASDOOR_GID` to your host IDs if necessary. HTTP and HTTPS origins are
+both accepted; expose plain HTTP only on a trusted private LAN. Select stable
+hostnames before passkey enrollment. For trusted-LAN plain HTTP, use LAN HTTP
+URLs and set `CASDOOR_BIND=0.0.0.0`. LAN HTTP is password-only.
 
 ```bash
 node --env-file=auth/casdoor/.env auth/casdoor/initialize.mjs
@@ -49,7 +51,8 @@ docker compose --env-file auth/casdoor/.env \
 
 `CASDOOR_STATE_DIR` selects state. Use an absolute path for combined Compose or
 isolated tests. `CASDOOR_PROJECT` selects the initializer project. Ports bind to
-loopback. For remote use, provide an HTTPS reverse proxy.
+loopback unless `CASDOOR_BIND` overrides it for trusted-LAN HTTP. For remote use
+outside a trusted LAN, provide an HTTPS reverse proxy.
 
 ## State and client settings
 

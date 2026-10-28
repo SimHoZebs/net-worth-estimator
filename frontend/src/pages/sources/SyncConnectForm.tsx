@@ -1,100 +1,113 @@
-import { useState } from "react";
-import { Button } from "../../components/Button.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { useId, useState, type Ref } from "react";
+import { Button, TextButton } from "../../components/Button.tsx";
 import { InputField } from "../../components/Field.tsx";
 import { connectSyncKey } from "../../state/syncSettings.ts";
 
 export function SyncConnectForm({
 	readOnly,
-	onCancel,
 	onConnected,
+	inputRef,
 }: {
 	readOnly: boolean;
-	onCancel: () => void;
 	onConnected: () => void;
+	inputRef: Ref<HTMLInputElement>;
 }) {
 	const [token, setToken] = useState("");
-	const [accessUrl, setAccessUrl] = useState("");
+	const [visible, setVisible] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const inputId = useId();
+	const errorId = useId();
 
-	async function handleConnect(input: {
-		setupToken?: string;
-		accessUrl?: string;
-	}) {
+	async function handleConnect() {
+		if (readOnly || busy) return;
+		if (!token.trim()) {
+			setError("Paste your setup token to connect.");
+			return;
+		}
 		setBusy(true);
 		setError(null);
-		const ok = await connectSyncKey(input);
+		const ok = await connectSyncKey({ setupToken: token.trim() });
 		setBusy(false);
 		if (ok) {
+			setToken("");
 			onConnected();
 		} else {
-			setError("Could not connect. Check the token and try again.");
+			setError(
+				"Could not connect. Copy the entire setup token from SimpleFIN and try again. If the problem continues, create a new app connection in SimpleFIN.",
+			);
 		}
 	}
 
 	return (
-		<div className="mt-3">
-			{error && <ErrorNotice message={error} />}
+		<form
+			method="post"
+			aria-label="Connect SimpleFIN"
+			aria-busy={busy}
+			onSubmit={(event) => {
+				event.preventDefault();
+				void handleConnect();
+			}}
+		>
 			<InputField
+				id={inputId}
+				ref={inputRef}
+				name="setupToken"
 				label="Setup token"
-				type="text"
+				type={visible ? "text" : "password"}
+				required
 				autoComplete="off"
 				autoCapitalize="off"
 				autoCorrect="off"
 				spellCheck={false}
+				enterKeyHint="go"
 				value={token}
 				disabled={readOnly || busy}
-				onChange={(event) => setToken(event.currentTarget.value)}
+				aria-invalid={error ? true : undefined}
+				aria-describedby={error ? errorId : undefined}
+				onChange={(event) => {
+					setToken(event.currentTarget.value);
+					setError(null);
+				}}
 				placeholder="Paste your setup token"
 			/>
-			<div className="mt-3 flex flex-wrap gap-3">
-				<Button
-					type="button"
-					disabled={
-						readOnly || busy || token.trim() === "" || accessUrl.trim() !== ""
-					}
-					onClick={() => void handleConnect({ setupToken: token.trim() })}
+			<div className="mt-2 flex justify-end">
+				<TextButton
+					className="min-h-6"
+					aria-controls={inputId}
+					aria-pressed={visible}
+					disabled={busy || readOnly}
+					onClick={() => setVisible(!visible)}
 				>
-					{busy ? "Connecting…" : "Connect bank"}
-				</Button>
-				<Button type="button" variant="secondary" onClick={onCancel}>
-					Cancel
+					{visible ? (
+						<EyeOff size={14} aria-hidden="true" />
+					) : (
+						<Eye size={14} aria-hidden="true" />
+					)}
+					{visible ? "Hide token" : "Show token"}
+				</TextButton>
+			</div>
+			{error && (
+				<p
+					id={errorId}
+					role="alert"
+					className="mt-2 mb-3 text-sm leading-relaxed text-danger-text"
+				>
+					{error}
+				</p>
+			)}
+			<div className="mt-3 flex flex-wrap items-center gap-3">
+				<Button type="submit" variant="primary" disabled={readOnly || busy}>
+					{busy ? "Connecting…" : "Connect SimpleFIN"}
+					{!busy && <ArrowRight size={16} aria-hidden="true" />}
 				</Button>
 			</div>
-			<details className="mt-4 text-sm">
-				<summary className="cursor-pointer text-muted">
-					Already have an access URL?
-				</summary>
-				<div className="mt-3">
-					<InputField
-						label="Access URL"
-						type="password"
-						autoComplete="off"
-						value={accessUrl}
-						disabled={readOnly || busy}
-						onChange={(event) => setAccessUrl(event.currentTarget.value)}
-						placeholder="https://user:pass@host/simplefin"
-					/>
-					<div className="mt-3">
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={
-								readOnly ||
-								busy ||
-								accessUrl.trim() === "" ||
-								token.trim() !== ""
-							}
-							onClick={() =>
-								void handleConnect({ accessUrl: accessUrl.trim() })
-							}
-						>
-							{busy ? "Connecting…" : "Connect with URL"}
-						</Button>
-					</div>
-				</div>
-			</details>
-		</div>
+			{busy && (
+				<p className="mt-3 mb-0 text-xs leading-relaxed text-muted">
+					Keep this page open while Waypoint connects to SimpleFIN.
+				</p>
+			)}
+		</form>
 	);
 }

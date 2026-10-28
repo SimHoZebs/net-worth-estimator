@@ -118,7 +118,7 @@ Add receipt tables with composite plan/entity keys. Reference postings with `(pl
 and remove the duplicate `plan_id`. The existing posting key permits identical
 UUIDs across plans, and copy workflows preserve them. Enforce global posting
 identity before removing the composite receipt link. Track the remaining
-dependent-table cleanup in [derived plan ownership](to-groom/derived-plan-ownership.md).
+dependent-table cleanup in [derived plan ownership](derived-plan-ownership.md).
 The user deferred the identity prerequisite and receipt cleanup together. The
 current release keeps the existing composite ownership link.
 

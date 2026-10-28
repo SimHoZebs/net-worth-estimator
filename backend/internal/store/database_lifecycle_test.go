@@ -38,6 +38,7 @@ func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 		{"legacy", `CREATE TABLE accounts(id TEXT PRIMARY KEY); INSERT INTO accounts VALUES ('private')`, ErrLegacyDatabase},
 		{"marker-only", `CREATE TABLE schema_migrations(name TEXT PRIMARY KEY); INSERT INTO schema_migrations VALUES ('shared-plans-v1')`, ErrSetupRequired},
 		{"missing-identity", `DROP TABLE sessions`, ErrSetupRequired},
+		{"missing-groups", `DROP TABLE group_members`, ErrSetupRequired},
 		{"missing-financial", `DROP TABLE account_links`, ErrSetupRequired},
 		{"missing-column", `ALTER TABLE sessions DROP COLUMN data`, ErrSetupRequired},
 		{"missing-index", `DROP INDEX identity_grant_subject`, ErrSetupRequired},

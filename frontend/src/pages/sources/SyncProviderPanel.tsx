@@ -1,25 +1,23 @@
-import { useState } from "react";
-import { AccountLabel } from "../../components/AccountIcon.tsx";
+import { Check, ExternalLink, Landmark, RefreshCw } from "lucide-react";
+import { useRef, useState } from "react";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
+import { buttonStyles } from "../../components/buttonStyles.ts";
+import { mergeStyles } from "../../components/mergeStyles.ts";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
 import type { Account } from "../../domain/model.ts";
 import {
 	disconnectSyncKey,
-	refreshSyncSettings,
 	triggerSyncNow,
 	useSyncCredential,
-	useSyncLinks,
 } from "../../state/syncSettings.ts";
 import { useServerStatus } from "../../state/workspaceResources.ts";
-import { SyncConnectForm } from "./SyncConnectForm.tsx";
+import { SyncConnectedAccounts } from "./SyncConnectedAccounts.tsx";
+import { SyncHelp } from "./SyncHelp.tsx";
+import { SyncOnboarding } from "./SyncOnboarding.tsx";
+import { simplefinLinks } from "./simplefinLinks.ts";
 
-const PROVIDERS = [{ id: "simplefin", name: "SimpleFIN" }] as const;
-
-type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
-
-function formatConnectedAt(value?: string): string | null {
+function formatSyncTime(value?: string): string | null {
 	if (!value) return null;
 	const time = new Date(value);
 	if (Number.isNaN(time.getTime())) return null;
@@ -35,35 +33,22 @@ export function SyncProviderPanel({
 	accounts,
 	readOnly,
 }: {
-	accounts: SyncAccount[];
+	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
 	readOnly: boolean;
 }) {
 	const credential = useSyncCredential();
 	const configured = credential.data?.configured === true;
-	const links = useSyncLinks(configured);
 	const status = useServerStatus({ enabled: configured });
 	const [busy, setBusy] = useState(false);
 	const [syncing, setSyncing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-	const [connectOpen, setConnectOpen] = useState(false);
-
-	const byId = new Map(accounts.map((account) => [account.id, account]));
-	const synced = (links.data ?? []).flatMap((link) => {
-		const account = byId.get(link.modelAccountId);
-		return account ? [account] : [];
-	});
-	const orphaned = (links.data ?? [])
-		.filter((link) => !byId.has(link.modelAccountId))
-		.map((link) => ({
-			id: link.bridgeAccountId || link.modelAccountId,
-			name: link.bridgeName || link.modelAccountId,
-		}));
-	const since = configured
-		? formatConnectedAt(credential.data?.updatedAt)
-		: null;
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	const since = formatSyncTime(credential.data?.updatedAt);
+	const lastSynced = formatSyncTime(status.data?.lastSyncAt);
+	const syncUnavailable = status.data?.syncConfigured === false;
 	const quota =
-		configured &&
 		typeof status.data?.syncQuotaUsed === "number" &&
 		typeof status.data?.syncQuotaLimit === "number"
 			? `${status.data.syncQuotaUsed} of ${status.data.syncQuotaLimit} used in the last 24 hours`
@@ -72,150 +57,189 @@ export function SyncProviderPanel({
 	async function handleSyncNow() {
 		setSyncing(true);
 		setError(null);
+		setMessage("");
 		const ok = await triggerSyncNow();
 		setSyncing(false);
-		if (!ok) setError("Could not sync now. Try again later.");
+		if (ok) setMessage("Sync complete.");
+		else
+			setError(
+				"Could not sync now. Check the connection in SimpleFIN. If you recently synced or reached a request limit, wait before you try again.",
+			);
 	}
 
 	async function handleDisconnect() {
 		setBusy(true);
 		setError(null);
+		setMessage("");
 		const ok = await disconnectSyncKey();
 		setBusy(false);
 		setConfirmingDisconnect(false);
-		if (!ok) setError("Could not disconnect. Try again.");
+		if (ok) {
+			setMessage(
+				"SimpleFIN disconnected. Your accounts and imported history are kept.",
+			);
+			headingRef.current?.focus();
+		} else setError("Could not disconnect. Try again.");
 	}
 
 	return (
-		<ul className="grid list-none gap-4 p-0">
-			{PROVIDERS.map((provider) => (
-				<li
-					key={provider.id}
-					className="rounded-control border border-line bg-surface p-4"
+		<div className="grid gap-6">
+			<header className="flex flex-wrap items-start justify-between gap-4">
+				<h2
+					ref={headingRef}
+					tabIndex={-1}
+					className="m-0 text-xl font-semibold sm:text-2xl"
 				>
-					<div className="flex items-center gap-4">
-						<div className="flex-1">
-							<h3 className="m-0 text-sm">{provider.name}</h3>
-							{since && (
-								<p className="m-0 text-xs text-muted">
-									Connected since {since}.
-								</p>
-							)}
-							{quota && (
-								<p className="m-0 text-xs text-muted">Bridge quota: {quota}.</p>
-							)}
-						</div>
-						{configured ? (
-							confirmingDisconnect ? (
-								<div className="flex items-center gap-3">
-									<Button
-										type="button"
-										variant="secondary"
-										disabled={busy}
-										onClick={() => setConfirmingDisconnect(false)}
-									>
-										Keep connected
-									</Button>
-									<TextButton
-										type="button"
-										tone="danger"
-										disabled={readOnly || busy}
-										onClick={() => void handleDisconnect()}
-									>
-										{busy ? "Disconnecting…" : "Confirm disconnect"}
-									</TextButton>
+					{configured ? "SimpleFIN connection" : "Connect bank accounts"}
+				</h2>
+				<Badge tone={configured ? "success" : "neutral"}>
+					{configured && <Check size={14} aria-hidden="true" />}
+					{configured ? "Connected" : "Not connected"}
+				</Badge>
+			</header>
+
+			{readOnly && (
+				<p className="m-0 rounded-control border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
+					This workspace is read-only. You can view the setup guide and
+					connection details. Write access is required to connect, disconnect,
+					or sync.
+				</p>
+			)}
+			<p
+				role="status"
+				className={message ? "m-0 text-sm text-success-text" : "sr-only"}
+			>
+				{message}
+			</p>
+			{error && <ErrorNotice message={error} />}
+			<div className="grid items-start gap-6 xl:grid-cols-3">
+				<div className="min-w-0 xl:col-span-2">
+					{configured ? (
+						<div className="overflow-hidden rounded-surface border border-line bg-surface">
+							<div className="p-5 sm:p-6">
+								<div className="flex items-start gap-3">
+									<span className="inline-grid size-11 shrink-0 place-items-center rounded-control bg-success-bg text-success-text">
+										<Landmark size={22} aria-hidden="true" />
+									</span>
+									<div className="min-w-0">
+										<h3 className="m-0 text-lg">SimpleFIN</h3>
+										{since && (
+											<p className="mt-1 mb-0 text-xs text-muted">
+												Connected since {since}.
+											</p>
+										)}
+									</div>
 								</div>
-							) : (
-								<div className="flex items-center gap-3">
+								<div className="my-5 rounded-control border border-line bg-surface-2 p-4">
+									<p className="mt-0 mb-2 text-sm font-semibold">
+										{lastSynced ? (
+											<>
+												Last synced{" "}
+												<time dateTime={status.data?.lastSyncAt}>
+													{lastSynced}
+												</time>
+											</>
+										) : (
+											"No successful sync yet."
+										)}
+									</p>
+									<p className="m-0 text-sm leading-relaxed text-muted">
+										When sync is enabled, Waypoint checks for new data about
+										every six hours. Bank updates can take longer.
+									</p>
+									{quota && (
+										<p className="mt-3 mb-0 text-xs text-muted">
+											Bridge quota: {quota}.
+										</p>
+									)}
+								</div>
+								{status.isError && (
+									<ErrorNotice
+										message="The sync status could not be loaded."
+										action="Reload status"
+										onAction={() => void status.refetch()}
+									/>
+								)}
+								{syncUnavailable && (
+									<p className="mb-4 text-sm leading-relaxed text-warning-text">
+										Your connection is saved, but the server has not enabled
+										sync for this plan. Ask your server administrator to check
+										the sync configuration.
+									</p>
+								)}
+								<div className="flex flex-wrap gap-3">
 									<Button
-										type="button"
-										variant="secondary"
-										disabled={readOnly || busy || syncing}
+										variant="primary"
+										disabled={readOnly || busy || syncing || syncUnavailable}
 										onClick={() => void handleSyncNow()}
 									>
+										<RefreshCw size={16} aria-hidden="true" />
 										{syncing ? "Syncing…" : "Sync now"}
 									</Button>
+									<a
+										href={simplefinLinks.home}
+										target="_blank"
+										rel="noopener noreferrer"
+										className={mergeStyles(
+											buttonStyles({ variant: "secondary" }),
+											"hover:bg-hover",
+										)}
+									>
+										Open SimpleFIN <ExternalLink size={14} aria-hidden="true" />
+										<span className="sr-only"> (opens in a new tab)</span>
+									</a>
+								</div>
+							</div>
+							<SyncConnectedAccounts accounts={accounts} />
+							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
+								{confirmingDisconnect ? (
+									<div>
+										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+											Disconnect SimpleFIN? Future imports will stop. Your
+											existing accounts and imported history will stay in
+											Waypoint.
+										</p>
+										<div className="flex flex-wrap items-center gap-4">
+											<Button
+												disabled={busy}
+												onClick={() => setConfirmingDisconnect(false)}
+											>
+												Keep connected
+											</Button>
+											<TextButton
+												tone="danger"
+												className="min-h-6"
+												disabled={readOnly || busy}
+												onClick={() => void handleDisconnect()}
+											>
+												{busy ? "Disconnecting…" : "Confirm disconnect"}
+											</TextButton>
+										</div>
+									</div>
+								) : (
 									<TextButton
-										type="button"
 										tone="danger"
+										className="min-h-6"
 										disabled={readOnly || busy || syncing}
 										onClick={() => setConfirmingDisconnect(true)}
 									>
 										Disconnect
 									</TextButton>
-								</div>
-							)
-						) : (
-							<Badge tone="neutral">Not connected</Badge>
-						)}
-					</div>
-
-					{error && <ErrorNotice message={error} />}
-
-					{configured ? (
-						<div className="mt-4">
-							<span
-								id="sync-accounts-label"
-								className="text-sm font-semibold text-muted"
-							>
-								Synced accounts
-							</span>
-							{links.isPending ? (
-								<Skeleton className="mt-2 h-10 w-full" />
-							) : links.isError ? (
-								<ErrorNotice
-									message="The synced accounts could not be loaded."
-									action="Reload"
-									onAction={() => void refreshSyncSettings(true)}
-								/>
-							) : (
-								<ul
-									aria-labelledby="sync-accounts-label"
-									className="mt-2 grid list-none gap-2 p-0"
-								>
-									{synced.map((account) => (
-										<li
-											key={account.id}
-											className="flex items-center gap-2 text-sm"
-										>
-											<AccountLabel account={account} />
-										</li>
-									))}
-									{orphaned.map((orphan) => (
-										<li
-											key={`bridge-${orphan.id}`}
-											className="text-sm text-muted"
-										>
-											{orphan.name}
-										</li>
-									))}
-									{synced.length === 0 && orphaned.length === 0 && (
-										<li className="text-sm text-muted">
-											No synced accounts yet.
-										</li>
-									)}
-								</ul>
-							)}
+								)}
+							</div>
 						</div>
-					) : connectOpen ? (
-						<SyncConnectForm
-							readOnly={readOnly}
-							onCancel={() => setConnectOpen(false)}
-							onConnected={() => setConnectOpen(false)}
-						/>
 					) : (
-						<div className="mt-3">
-							<Button
-								type="button"
-								disabled={readOnly}
-								onClick={() => setConnectOpen(true)}
-							>
-								Connect {provider.name}
-							</Button>
-						</div>
+						<SyncOnboarding
+							readOnly={readOnly}
+							onConnected={() => {
+								setMessage("SimpleFIN connected.");
+								headingRef.current?.focus();
+							}}
+						/>
 					)}
-				</li>
-			))}
-		</ul>
+				</div>
+				<SyncHelp />
+			</div>
+		</div>
 	);
 }

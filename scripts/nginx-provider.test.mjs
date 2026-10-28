@@ -18,6 +18,11 @@ test(
     const upstream = `
 server {
   listen 18082;
+  location ~ ^/(healthz|readyz)$ {
+    if ($http_cookie != "") { return 400; }
+    if ($http_authorization != "") { return 400; }
+    return 200 "ok";
+  }
   location / {
     set $logo_chunk "${logoChunk}";
     set $logo "${"$logo_chunk".repeat(8)}";
@@ -40,6 +45,8 @@ nginx -t -c /checks/nginx.conf
 nginx -c /checks/nginx.conf
 trap 'nginx -s quit -c /checks/nginx.conf' EXIT
 wget -q -T 3 -O - http://127.0.0.1:81/login/oauth/authorize
+test "$(wget -q -T 3 -O - --header='Cookie: private=value' --header='Authorization: Bearer private' http://127.0.0.1/healthz)" = ok
+test "$(wget -q -T 3 -O - --header='Cookie: private=value' --header='Authorization: Bearer private' http://127.0.0.1/readyz)" = ok
 `;
     for (const control of [false, true]) {
       const template = control
