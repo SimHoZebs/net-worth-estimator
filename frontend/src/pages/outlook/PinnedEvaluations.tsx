@@ -87,6 +87,7 @@ export function PinnedEvaluations({
 									pin={pin}
 									plan={plan}
 									projection={projection}
+									range={range}
 								/>
 							)}
 						</li>

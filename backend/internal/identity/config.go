@@ -21,6 +21,10 @@ type Config struct {
 	RecheckInterval       time.Duration
 	ResolveAccess         func(context.Context, string) (authorization.Scope, error)
 	RequireResourceHeader bool
+	// AllowPrivateHTTP opts into plain-HTTP app and issuer origins. The
+	// operator owns the network boundary and must expose plain HTTP only on
+	// a trusted LAN.
+	AllowPrivateHTTP bool
 	// BrowserOrigins maps additional app origins to browser-facing Casdoor origins.
 	// Issuer and InternalURL remain the server-side identity and transport boundary.
 	BrowserOrigins map[string]string
@@ -38,6 +42,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		AccountURL:   getenv("NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL"),
 		Lifetime:     7 * 24 * time.Hour, RecheckInterval: 30 * time.Second,
 		RequireResourceHeader: true,
+		AllowPrivateHTTP:      authorization.AllowPrivateHTTP(getenv),
 	}
 	if getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN") != "" {
 		return c, fmt.Errorf("AUTH_TOKEN is retired; configure Casdoor session authentication")
@@ -71,12 +76,16 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	}{
 		{"AUTH_ISSUER", c.Issuer, false}, {"PUBLIC_URL", c.PublicURL, true},
 	} {
-		if err := validateURL(field.value, field.origin); err != nil {
+		if err := validateURL(field.value, field.origin, c.AllowPrivateHTTP); err != nil {
 			return c, fmt.Errorf("%s: %w", field.name, err)
+		}
+		u, _ := url.Parse(field.value)
+		if u.Scheme == "http" && !authorization.IsLoopbackHost(u.Hostname()) && !c.AllowPrivateHTTP {
+			return c, fmt.Errorf("%s requires HTTPS outside loopback (set NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1 to allow plain HTTP on a trusted LAN)", field.name)
 		}
 	}
 	if c.InternalURL != "" {
-		if err := validateURL(c.InternalURL, false); err != nil {
+		if err := validateURL(c.InternalURL, false, c.AllowPrivateHTTP); err != nil {
 			return c, fmt.Errorf("AUTH_INTERNAL_URL: %w", err)
 		}
 		u, _ := url.Parse(c.InternalURL)
@@ -105,7 +114,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	return c, nil
 }
 
-func validateURL(raw string, origin bool) error {
+func validateURL(raw string, origin bool, allowPrivateHTTP bool) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return fmt.Errorf("expected an absolute HTTP/S URL without credentials, query, or fragment")
@@ -115,6 +124,9 @@ func validateURL(raw string, origin bool) error {
 	}
 	if origin && u.Path != "" && u.Path != "/" {
 		return fmt.Errorf("expected an origin without a path")
+	}
+	if origin && u.Scheme == "http" && !authorization.IsLoopbackHost(u.Hostname()) && !allowPrivateHTTP {
+		return fmt.Errorf("HTTP is restricted to loopback without the private-LAN flag; use HTTPS or set NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1 for plain HTTP on a trusted LAN")
 	}
 	return nil
 }

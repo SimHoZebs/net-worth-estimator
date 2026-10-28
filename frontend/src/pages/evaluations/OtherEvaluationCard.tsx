@@ -8,7 +8,13 @@ export function OtherEvaluationCard(props: OtherEvaluationCardProps) {
 		case "postingFulfillment":
 			return <FundingGapsCard {...props} />;
 		case "financialIndependence":
-			return <FinancialIndependenceCard item={props.item} pin={props.pin} />;
+			return (
+				<FinancialIndependenceCard
+					item={props.item}
+					pin={props.pin}
+					range={props.range?.financialIndependence?.[props.item.id] ?? null}
+				/>
+			);
 		case "cycleFulfillment":
 			return <CycleFulfillmentCard item={props.item} pin={props.pin} />;
 		default: {

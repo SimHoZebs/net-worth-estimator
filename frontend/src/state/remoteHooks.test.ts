@@ -2617,6 +2617,7 @@ describe("remote projection mapping and SSE", () => {
 			count: 4,
 			evaluationSuccess: { target: 0.75 },
 			failureShare: 0.4,
+			financialIndependence: {},
 		});
 	});
 

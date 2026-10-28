@@ -37,6 +37,7 @@ export function SegmentedBar({
 	showDetails = true,
 	className,
 	captionClassName,
+	showAmounts = true,
 }: {
 	caption: string;
 	segments: BarSegment[];
@@ -44,6 +45,7 @@ export function SegmentedBar({
 	showDetails?: boolean;
 	className?: string;
 	captionClassName?: string;
+	showAmounts?: boolean;
 }) {
 	const total = segments.reduce((sum, segment) => sum + segment.amount, 0);
 	// oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists.
@@ -98,7 +100,8 @@ export function SegmentedBar({
 								data-pattern={segment.pattern}
 								aria-hidden="true"
 							/>
-							{segment.label} · {money(segment.amount)}
+							{segment.label}
+							{showAmounts && ` · ${money(segment.amount)}`}
 						</li>
 					))}
 				</ul>

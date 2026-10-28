@@ -18,8 +18,12 @@ import {
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { projectionMovements } from "../api/projectionMovements.ts";
+import {
+	financialIndependenceEvaluation,
+	financialIndependenceRange,
+} from "../api/financialIndependence.ts";
 import { ResourceScopeError } from "../api/scopedRequest.ts";
-import { dateLabel, money, percent } from "../domain/format.ts";
+import { money, percent } from "../domain/format.ts";
 import {
 	fundingEvaluationName,
 	fundingLabels,
@@ -87,7 +91,11 @@ async function runDeterministic(
 			"The server returned no deterministic projection result. Retry the request.",
 		);
 	try {
-		return projectionResultToLocal(response.result, document);
+		return projectionResultToLocal(
+			response.result,
+			document,
+			request.settings.horizonYears,
+		);
 	} catch (cause) {
 		throw cause instanceof Error
 			? cause
@@ -239,92 +247,12 @@ function balanceEvaluation(
 	};
 }
 
-function arrayValue(value: unknown): Record<string, unknown>[] {
-	return Array.isArray(value)
-		? value.filter((item): item is Record<string, unknown> => isRecord(item))
-		: [];
-}
-
 interface OtherOutcome {
 	goal: string | null;
 	outcomeDate: string | null;
 	outcomeText: string;
 	qualifier: string | null;
 	progress: OtherEvaluationProgress | null;
-}
-
-function fiOutcome(
-	deterministic: Record<string, unknown> | null,
-	config: Record<string, unknown> | null,
-): OtherOutcome {
-	const expenseTarget = finite(config?.annualExpenseTarget);
-	const goal =
-		expenseTarget !== null && expenseTarget > 0
-			? `${money(expenseTarget)}/yr spending`
-			: null;
-	const evaluationYears =
-		Math.trunc(finite(config?.evaluationYears) ?? 0) || null;
-	const unresolved: OtherOutcome = {
-		goal,
-		outcomeDate: null,
-		outcomeText: "Beyond this horizon",
-		qualifier: null,
-		progress: null,
-	};
-	if (!deterministic) return unresolved;
-	const milestones = valueRecord(
-		deterministic.milestones as JsonValue | undefined,
-	);
-	const sustaining = stringValue(milestones?.firstSelfSustainingDate);
-	if (sustaining)
-		return {
-			goal,
-			outcomeDate: sustaining,
-			outcomeText: "Satisfied",
-			qualifier: null,
-			progress: null,
-		};
-	const coverage = stringValue(milestones?.firstCoverageDate);
-	if (coverage) {
-		const runOutcomes = arrayValue(deterministic.runOutcomes);
-		const outcome = runOutcomes.find(
-			(item) => stringValue(item.candidateDate) === coverage,
-		);
-		const shortfallDate = stringValue(outcome?.firstShortfallDate);
-		return {
-			goal,
-			outcomeDate: coverage,
-			outcomeText: "Covered",
-			qualifier: shortfallDate
-				? `Shortfall from ${dateLabel(shortfallDate)}`
-				: evaluationYears
-					? `Not sustained over ${evaluationYears} years`
-					: "Not sustained",
-			progress: null,
-		};
-	}
-	const rows = arrayValue(deterministic.rows);
-	const first = rows[0];
-	const firstExpenseTarget =
-		(first ? finite(first.annualExpenseTarget) : null) ?? expenseTarget;
-	if (!first || firstExpenseTarget === null || firstExpenseTarget <= 0)
-		return {
-			...unresolved,
-			qualifier:
-				!first && evaluationYears
-					? `No ${evaluationYears}-year window fits`
-					: null,
-		};
-	const fraction = Math.max(0, finite(first.coverageRatio) ?? 0);
-	const capacity = finite(first.totalAnnualCapacity) ?? 0;
-	return {
-		...unresolved,
-		progress: {
-			fraction,
-			current: money(capacity),
-			share: percent(fraction),
-		},
-	};
 }
 
 function postingOutcome(
@@ -410,6 +338,7 @@ function rowBalances(
 export function projectionResultToLocal(
 	result: ProjectionResult,
 	document: FinancialModelDocument | null,
+	horizonYears?: number,
 ): Projection {
 	const rows = result.timeline.rows;
 	const points = rows.length
@@ -478,28 +407,19 @@ export function projectionResultToLocal(
 			),
 	];
 	const otherEvaluations = [
-		...(document?.evaluations.financialIndependence ?? []).map((evaluation) => {
-			const config = valueRecord(evaluation.config);
-			const outcome = fiOutcome(
-				valueRecord(
-					result.evaluations.financialIndependence.find(
-						(item) => item.instanceId === evaluation.instanceId,
-					)?.deterministic,
+		...(document?.evaluations.financialIndependence ?? []).map((evaluation) =>
+			financialIndependenceEvaluation(
+				evaluation,
+				result.evaluations.financialIndependence.find(
+					(item) => item.instanceId === evaluation.instanceId,
 				),
-				config,
-			);
-			return {
-				id: evaluation.instanceId,
-				name: evaluation.name || evaluation.instanceId,
-				type: "financialIndependence" as const,
-				enabled: evaluation.enabled,
-				status:
-					result.evaluations.financialIndependence.find(
-						(item) => item.instanceId === evaluation.instanceId,
-					)?.status ?? "indeterminate",
-				...outcome,
-			};
-		}),
+				document,
+				projectionStartDate,
+				horizonYears === undefined
+					? null
+					: horizonDate({ start: projectionStartDate, years: horizonYears }),
+			),
+		),
 		...(document?.evaluations.postingFulfillment ?? []).map((evaluation) => ({
 			id: evaluation.instanceId,
 			name: fundingEvaluationName(evaluation.name),
@@ -605,6 +525,12 @@ export function stochasticResultToLocal(
 		})),
 		count: result.config.runCount,
 		evaluationSuccess,
+		financialIndependence: Object.fromEntries(
+			result.evaluations.financialIndependence.map((envelope) => [
+				envelope.instanceId,
+				financialIndependenceRange(envelope, result.config.runCount),
+			]),
+		),
 		failureShare:
 			fulfillmentProbability === null ? 0 : 1 - fulfillmentProbability,
 	};

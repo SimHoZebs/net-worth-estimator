@@ -72,7 +72,7 @@ plan. Ordinary 409 operation conflicts do not trigger session discovery.
 
 Financial responses include the same resource header. The browser namespaces
 draft storage by resource and clears active model/projection state before a
-resource transition. It does not adopt an old unscoped draft into an account's
+resource transition. It does not adopt an unscoped draft into an account's
 plan. Cross-tab login and logout cannot silently retarget an old tab's write.
 API clients retain their verification scope. A new verification creates new
 clients, while old clients reject further calls before network access. Evaluation
@@ -91,8 +91,8 @@ without a verified session takes over the full screen.
 
 ## Deployment and migration
 
-The rule is the same in dev and production. Casdoor is required. Token-only and
-unauthenticated server configurations fail closed at startup.
+The rule is the same in dev and production. Casdoor is required. Without it
+the server fails closed at startup.
 
 Before an existing authenticated deployment starts the new code:
 
@@ -104,14 +104,12 @@ See [the shared database guide](shared-database.md) for backup and rollback.
 Runtime startup rejects legacy unscoped financial databases. It never merges files or guesses an owner.
 
 No source update automatically publishes private data or changes live Casdoor
-permissions. Existing reader/editor environment lists no longer define access.
-The owner assignment is a one-time data migration, not signup role selection.
+permissions. The owner assignment is a one-time data migration, not signup role selection.
 
 ## Scope limits
 
 The first resource boundary is the whole plan. Per-row sharing, a plan picker,
-an IAM management screen, and cross-account collaboration are not part of this
-change. New action/resource policies belong in Casdoor. New resource visibility
+an IAM management screen, and cross-account collaboration are out of scope. New action/resource policies belong in Casdoor. New resource visibility
 must also pass the API's resource-resolution and storage-isolation boundary.
 
 Casdoor's external permission API evaluates the model and stored policy rows.
