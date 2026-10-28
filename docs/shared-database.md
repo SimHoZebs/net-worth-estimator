@@ -56,9 +56,11 @@ docker compose run --rm --no-deps --entrypoint /app/setupdb backend \
 docker compose up -d
 ```
 
-Use the same private environment file and volume for setup and the API. Run this
-maintenance command explicitly. Do not put setup in the server entrypoint or an
-automatic startup dependency. A successful `migratedb` already provisions its new
+Use the same private environment file and volume for setup and the API. Komodo
+runs this setup automatically as the stack `post_deploy` step on every deploy,
+so app schema changes migrate without manual intervention (re-runs are
+harmless). Do not put setup in the server entrypoint or an automatic startup
+dependency. A successful `migratedb` already provisions its new
 destination. Dev setup and the isolated fixture harness also provision explicitly.
 
 New user signup still inserts account, plan, and default-preset rows. It does not
