@@ -24,7 +24,11 @@ export function SyncSettings({
 				{credential.isPending ? (
 					<Skeleton className="h-10 w-full" />
 				) : (
-					<ErrorNotice message="The sync connection could not be loaded." />
+					<ErrorNotice
+						message="The sync connection could not be loaded."
+						action="Retry"
+						onAction={() => void credential.refetch()}
+					/>
 				)}
 			</section>
 		);
