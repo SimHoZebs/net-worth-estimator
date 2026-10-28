@@ -51,8 +51,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	if err != nil {
 		return nil, nil, err
 	}
-	loginConfig.Database = database.SQL()
-	loginConfig.SessionDB = ""
+	loginConfig.Store = database
 	loginConfig.ResolveAccess = planAccessResolver(database, loginConfig.Issuer, permissions.Resolve)
 	loginConfig.RequireResourceHeader = true
 	login, err := identity.New(ctx, loginConfig)

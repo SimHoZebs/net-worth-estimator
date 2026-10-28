@@ -2,6 +2,7 @@ package identity
 
 import (
 	"context"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -116,7 +117,7 @@ func TestBrowserProviderProxyHasNoApplicationSession(t *testing.T) {
 		t.Fatalf("discovery proxy=%d %s", w.Code, w.Body.String())
 	}
 	var count int
-	if err := s.store.db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM sessions").Scan(&count); err != nil || count != 0 {
+	if err := s.store.(*sqlite.Database).SQL().QueryRowContext(context.Background(), "SELECT COUNT(*) FROM sessions").Scan(&count); err != nil || count != 0 {
 		t.Fatal("provider proxy created an application session")
 	}
 	_, _ = io.Copy(io.Discard, w.Result().Body)
