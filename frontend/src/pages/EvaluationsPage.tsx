@@ -22,11 +22,15 @@ export function EvaluationsPage({
 	// Plan, actions, and projection subscribe where the query is declared;
 	// only UI callbacks arrive as props.
 	const plan = usePlan();
+	const financialIndependence =
+		useServerModel().data?.document?.evaluations.financialIndependence;
 	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
 	const projection = useRemoteProjection({
-		// The stochastic range only feeds threshold-card probabilities, so
-		// it is requested only while a threshold evaluation is configured.
-		ranges: (plan?.evaluations.length ?? 0) > 0,
+		// Reuse the regular range request for configured financial independence
+		// confidence. Inspecting dates and evidence never starts a calculation.
+		ranges:
+			(plan?.evaluations.length ?? 0) > 0 ||
+			(financialIndependence?.some((item) => item.enabled) ?? false),
 	});
 	const base = projection.base instanceof Error ? null : projection.base;
 	if (!plan) return null;
@@ -138,6 +142,7 @@ function EvaluationsContent({
 						item={item}
 						plan={plan}
 						projection={projection}
+						range={range}
 						pin={{
 							pinned: pinnedSet.has(item.id),
 							onPinChange: () => {

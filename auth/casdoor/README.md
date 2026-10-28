@@ -20,10 +20,11 @@ NODE
 ```
 
 Set `CASDOOR_USER_NAME` in that file. Check both public URLs. Set `CASDOOR_UID`
-and `CASDOOR_GID` to your host IDs if necessary. HTTP and HTTPS origins are
-both accepted; expose plain HTTP only on a trusted private LAN. Select stable
-hostnames before passkey enrollment. For trusted-LAN plain HTTP, use LAN HTTP
-URLs and set `CASDOOR_BIND=0.0.0.0`. LAN HTTP is password-only.
+and `CASDOOR_GID` to your host IDs if necessary. Use HTTPS outside loopback
+and trusted LANs. Select stable hostnames before passkey enrollment. For
+trusted-LAN plain HTTP, set `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1`,
+use LAN HTTP URLs, and set `CASDOOR_BIND=0.0.0.0`. Expose plain HTTP only on
+a trusted private LAN. LAN HTTP is password-only.
 
 ```bash
 node --env-file=auth/casdoor/.env auth/casdoor/initialize.mjs

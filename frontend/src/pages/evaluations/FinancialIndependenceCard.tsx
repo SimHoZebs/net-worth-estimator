@@ -1,111 +1,186 @@
-import { Check, Flag, Pin } from "lucide-react";
+import { ArrowUpRight, Check, Flag, Pin, TriangleAlert } from "lucide-react";
 import { useId } from "react";
 import { Badge } from "@/components/Badge.tsx";
 import { IconButton } from "@/components/Button.tsx";
 import { Card } from "@/components/Card.tsx";
+import { useSelectedEntry } from "@/components/entrySelection.ts";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
 import { Progress } from "@/components/Progress.tsx";
-import { dateLabel } from "@/domain/format.ts";
+import { SegmentedBar } from "@/components/SegmentedBar.tsx";
+import {
+	independenceFunding,
+	independenceHorizon,
+	type FinancialIndependenceRange,
+	type IndependenceCandidate,
+} from "@/domain/financialIndependence.ts";
+import { dateLabel, money, percent } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
+import { FinancialIndependenceModal } from "./FinancialIndependenceModal.tsx";
+import { IndependenceRange } from "./IndependenceRange.tsx";
+import { IndependenceVerdict } from "./IndependenceVerdict.tsx";
+
+function CoveragePreview({ candidate }: { candidate: IndependenceCandidate }) {
+	const funding = independenceFunding(candidate);
+	if (!funding) return null;
+	const {
+		income: annualIncome,
+		withdrawals: annualWithdrawals,
+		spending: annualSpending,
+		coverage,
+		gap,
+	} = funding;
+	return (
+		<div className="grid gap-2">
+			<div className="flex justify-between gap-2 text-xs text-muted">
+				<span>Coverage · {dateLabel(candidate.date)}</span>
+				<strong className="type-value text-ink">{percent(coverage)}</strong>
+			</div>
+			<SegmentedBar
+				caption="Spending coverage"
+				showDetails={false}
+				ariaLabel={`Spending coverage at ${dateLabel(candidate.date)}: ${money(annualIncome)} income, ${money(annualWithdrawals)} withdrawal capacity, ${money(gap)} uncovered of ${money(annualSpending)} annual spending.`}
+				segments={[
+					{
+						label: "Income",
+						amount: annualIncome,
+						pattern: "solid",
+						tone: "sage",
+					},
+					{
+						label: "Withdrawals",
+						amount: annualWithdrawals,
+						pattern: "dots",
+						tone: "blue",
+					},
+					{ label: "Uncovered", amount: gap, pattern: "hatch", tone: "tan" },
+				]}
+			/>
+		</div>
+	);
+}
 
 export function FinancialIndependenceCard({
 	item,
 	pin = null,
+	range = null,
 }: {
 	item: OtherEvaluation;
 	pin?: EvaluationPin | null;
+	range?: FinancialIndependenceRange | null;
 }) {
 	const headingId = useId();
-	const pinned = pin?.pinned ?? false;
-	const onPinChange = pin?.onPinChange ?? null;
-	const pinDisabled = pin?.disabled ?? false;
-	const satisfied = item.enabled && item.status === "satisfied";
-	const StateIcon = satisfied ? Check : Flag;
-	const tone =
-		!item.enabled || item.status === "indeterminate"
-			? "neutral"
-			: item.status === "satisfied"
-				? "success"
-				: item.status === "warning"
-					? "warning"
-					: "neutral";
+	const analysis = item.financialIndependence;
+	const [inspector, setInspector] = useSelectedEntry<true>(analysis);
+	const candidate =
+		analysis?.candidates.find((row) => row.date === analysis.defaultDate) ??
+		analysis?.candidates[0];
+	const horizon = analysis ? independenceHorizon(analysis) : null;
+	const reached =
+		analysis?.firstSelfSustainingDate ??
+		(!analysis && item.status === "satisfied" ? item.outcomeDate : null);
+	const StateIcon = reached ? Check : Flag;
 	return (
-		<Card
-			tone={item.enabled ? "default" : "subtle"}
-			aria-labelledby={headingId}
-		>
-			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-				<h2
-					id={headingId}
-					className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]"
-				>
-					<StateIcon
-						size={16}
-						aria-hidden="true"
-						className="shrink-0 text-success-text"
-					/>
-					<span>{item.name}</span>
-				</h2>
-				{onPinChange && (
-					<div className="flex justify-end gap-1">
+		<>
+			<Card
+				tone={item.enabled ? "default" : "subtle"}
+				aria-labelledby={headingId}
+			>
+				<div className="flex items-start justify-between gap-3">
+					<h2
+						id={headingId}
+						className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold [overflow-wrap:anywhere]"
+					>
+						<StateIcon
+							size={16}
+							aria-hidden="true"
+							className="shrink-0 text-primary"
+						/>
+						{item.name}
+					</h2>
+					{pin?.onPinChange && (
 						<IconButton
 							icon={Pin}
 							size="sm"
 							iconSize={16}
-							className="aria-pressed:border-success-border aria-pressed:bg-success-bg aria-pressed:text-success-text"
-							label={
-								pinned
-									? `Unpin ${item.name} from Outlook`
-									: `Pin ${item.name} to Outlook`
-							}
-							onClick={onPinChange}
-							disabled={pinDisabled}
-							aria-pressed={pinned}
+							label={`${pin.pinned ? "Unpin" : "Pin"} ${item.name} ${pin.pinned ? "from" : "to"} Outlook`}
+							onClick={pin.onPinChange}
+							disabled={pin.disabled}
+							aria-pressed={pin.pinned}
+							className="aria-pressed:bg-success-bg aria-pressed:text-success-text"
 						/>
-					</div>
+					)}
+				</div>
+				<IndependenceVerdict item={item} />
+				{item.enabled && (
+					<>
+						{horizon?.tooShort ? (
+							<div className="grid gap-2">
+								<div className="flex justify-between gap-2 text-xs text-muted">
+									<span>{horizon.availableYears}y horizon</span>
+									<span>{horizon.requiredYears}y required</span>
+								</div>
+								<Progress
+									label="Available projection horizon"
+									value={
+										(horizon.availableYears! / horizon.requiredYears!) * 100
+									}
+									tone="warning"
+								/>
+							</div>
+						) : (
+							candidate && <CoveragePreview candidate={candidate} />
+						)}
+						{analysis ? (
+							<>
+								{!!analysis.diagnostics.length && (
+									<button
+										type="button"
+										aria-haspopup="dialog"
+										onClick={() => setInspector(true)}
+										className="flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
+									>
+										<TriangleAlert size={14} aria-hidden="true" />
+										{analysis.diagnostics.length} source or configuration{" "}
+										{analysis.diagnostics.length === 1 ? "issue" : "issues"}
+									</button>
+								)}
+								<IndependenceRange
+									compact
+									range={range}
+									required={analysis.requiredConfidence}
+								/>
+								<button
+									type="button"
+									aria-haspopup="dialog"
+									aria-label={`Inspect independence for ${item.name}`}
+									onClick={() => setInspector(true)}
+									className="mt-auto flex items-center justify-between rounded-control border border-line-strong bg-surface px-3 py-3 text-xs font-semibold text-success-text hover:bg-hover"
+								>
+									Inspect independence{" "}
+									<ArrowUpRight size={15} aria-hidden="true" />
+								</button>
+							</>
+						) : (
+							<>
+								{item.goal && (
+									<p className="m-0 text-xs text-muted">{item.goal}</p>
+								)}
+								<Badge tone={reached ? "success" : "neutral"}>
+									{reached ? "Satisfied" : "Evidence unavailable"}
+								</Badge>
+							</>
+						)}
+					</>
 				)}
-			</div>
-			{item.goal && item.goal !== item.name && (
-				<p className="m-0 text-xs text-muted">{item.goal}</p>
+			</Card>
+			{item.enabled && analysis && inspector !== null && (
+				<FinancialIndependenceModal
+					item={item}
+					analysis={analysis}
+					range={range}
+					onClose={() => setInspector(null)}
+				/>
 			)}
-			<div>
-				<div className="type-value mt-0 mr-0 mb-1 ml-0 text-3xl font-medium leading-[1.2] tracking-tight [overflow-wrap:anywhere]">
-					{!item.enabled
-						? "Paused"
-						: item.outcomeDate
-							? dateLabel(item.outcomeDate)
-							: item.outcomeText}
-				</div>
-				{item.enabled && item.qualifier && (
-					<p className="m-0 text-sm leading-relaxed text-muted">
-						{item.qualifier}
-					</p>
-				)}
-			</div>
-			<div className="mt-auto flex flex-col gap-4">
-				<div>
-					<Badge tone={tone}>
-						{!item.enabled
-							? "Excluded from evaluation"
-							: item.status === "satisfied"
-								? "Satisfied"
-								: item.status === "not-satisfied"
-									? "Not satisfied"
-									: item.status === "warning"
-										? "Needs attention"
-										: "Indeterminate"}
-					</Badge>
-				</div>
-				{item.enabled && item.progress && (
-					<div className="m-0">
-						<div className="mb-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
-							<span>{item.progress.current}</span>
-							{item.progress.share && <span>{item.progress.share}</span>}
-						</div>
-						<Progress value={item.progress.fraction * 100} label={item.name} />
-					</div>
-				)}
-			</div>
-		</Card>
+		</>
 	);
 }

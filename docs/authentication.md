@@ -10,7 +10,7 @@ remains on local branch `experiment/better-auth`.
 The Go API verifies OIDC signature, issuer, audience, nonce, state, PKCE, and any
 access-token hash binding. It uses SCS for durable application sessions. Cookies
 are HttpOnly and SameSite=Lax. HTTPS adds Secure and the `__Host-` prefix.
-HTTP keeps host-only non-Secure cookies. That traffic exposes
+Private-LAN HTTP keeps host-only non-Secure cookies. That traffic exposes
 passwords, codes, cookies, and financial data to the local network.
 
 The shared application database stores hashed application-session IDs, provider
@@ -49,10 +49,13 @@ The default signup form does not collect email or require a mail service.
 | `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT`    | Verified account whose plan may use server-level SimpleFIN credentials          |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h`                                   |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m`                       |
+| `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP`    | `1` opts into plain-HTTP origins on a trusted LAN; default requires HTTPS outside loopback |
 
-The server accepts HTTP and HTTPS origins. The operator owns the network
-boundary: bind and expose plain HTTP only on a trusted private LAN. Use
-password login over HTTP; passkeys need a secure context and stay bound to the
+Set `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1` on both the backend and the
+Casdoor initializer for trusted-LAN plain HTTP, then use LAN HTTP URLs for
+`PUBLIC_URL`, `AUTH_ISSUER`, and `AUTH_ACCOUNT_URL`. The operator owns the
+network boundary: bind and expose plain HTTP only on a trusted private LAN.
+Use password login only; passkeys need a secure context and stay bound to the
 canonical HTTPS hostname. Select stable LAN hostnames before user creation.
 
 Register the callback `<PUBLIC_URL>/v1/auth/callback` and post-logout redirect
@@ -111,10 +114,7 @@ runtime verification.
 Login state binds the starting app origin to its callback and token exchange.
 Account and logout links use that origin's provider address. Unknown auth hosts,
 cross-origin callbacks, and sibling-origin write requests fail closed. Proxies
-must preserve `Host` or use the [authenticated ingress contract](../deploy/README.md#reverse-proxy-contract).
-Authenticated ingress normalizes Host and scheme from an exact configured public
-origin before identity sees the request. Forwarded host headers alone do not
-select redirects. Session-cookie and CSRF policy remain unchanged.
+must preserve `Host`; forwarded host headers do not select redirects.
 
 With additional origins, application cookies use an issuer/client namespace.
 The provider gateway also isolates every Casdoor cookie. This prevents dev and
