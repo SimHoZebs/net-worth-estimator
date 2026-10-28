@@ -1,0 +1,729 @@
+// Package storetest provides the conformance gate for every Store adapter.
+package storetest
+
+import (
+	"context"
+	"errors"
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
+)
+
+const receiptPostingID = "01900000-0000-7000-8000-000000000099"
+
+// Run proves any Store implementation honors the persistence contract using
+// only the public interface: no SQL, no file paths, no implementation types.
+// A replacement backend (Turso, Postgres, CSV files, S3 blobs, a human with
+// paper and mic, …) earns the Store name by calling this with its own factory:
+//
+//	func TestTursoConformance(t *testing.T) {
+//		storetest.Run(t, openTursoTestStore)
+//	}
+//
+// SQLite-only concerns (schema shape, raw scripts, file layout) stay in the
+// sqlite adapter tests.
+func Run(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	t.Run("ReceiptEvidence", func(t *testing.T) { testReceiptConformance(t, newStore) })
+	t.Run("InitializeDocument", func(t *testing.T) {
+		testInitializeDocument(t, newStore)
+	})
+	t.Run("RoundTripsCanonicalDocumentMetadataAndOrder", func(t *testing.T) {
+		testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, newStore)
+	})
+	t.Run("RowWritesUseStoredSyncOwnership", func(t *testing.T) {
+		testRowWritesUseStoredSyncOwnership(t, newStore)
+	})
+	t.Run("OwnerCheckpointWinsKeyCollision", func(t *testing.T) {
+		testOwnerCheckpointWinsKeyCollision(t, newStore)
+	})
+	t.Run("RowRoundTripsPreserveOrder", func(t *testing.T) {
+		testRowRoundTripsPreserveOrder(t, newStore)
+	})
+	t.Run("ApplySyncPlanCheckpointLifecycle", func(t *testing.T) {
+		testApplySyncPlanCheckpointLifecycle(t, newStore)
+	})
+	t.Run("ApplySyncPlanSkipsUserCheckpoint", func(t *testing.T) {
+		testApplySyncPlanSkipsUserCheckpoint(t, newStore)
+	})
+	t.Run("ApplySyncPlanRefreshesPendingSnapshot", func(t *testing.T) {
+		testApplySyncPlanRefreshesPendingSnapshot(t, newStore)
+	})
+	// PendingDeleteSparesUserRows stays SQLite-only: its fixture (a
+	// model-source row with a sync-prefix ID) is legacy data the public API
+	// refuses to create, so only raw SQL can set it up.
+	t.Run("ArtifactsRoundTripAndKeepFirstWrite", func(t *testing.T) {
+		testArtifactsRoundTripAndKeepFirstWrite(t, newStore)
+	})
+	t.Run("SyncStateDefaultsEmptyAndRoundTrips", func(t *testing.T) {
+		testSyncStateDefaultsEmptyAndRoundTrips(t, newStore)
+	})
+	t.Run("SyncCredentialRoundTripAndClear", func(t *testing.T) {
+		testSyncCredentialConformance(t, newStore)
+	})
+	t.Run("AmountPresetsRoundTripAndReorder", func(t *testing.T) {
+		testAmountPresetConformanceRoundTrip(t, newStore)
+	})
+}
+
+func testSyncCredentialConformance(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	database := newStore(t)
+	credential, err := database.GetSyncCredential()
+	if err != nil || credential.Configured() {
+		t.Fatalf("default credential = %+v, err %v", credential, err)
+	}
+	if _, err := database.SetSyncCards([]string{"prime_card"}); err != nil {
+		t.Fatalf("set cards: %v", err)
+	}
+	if _, err := database.SetSyncCredential("https://user:pass@bridge.example/simplefin", "bridge.example"); err != nil {
+		t.Fatalf("set credential: %v", err)
+	}
+	loaded, err := database.GetSyncCredential()
+	if err != nil || !loaded.Configured() || loaded.BridgeHost != "bridge.example" {
+		t.Fatalf("loaded = %+v, err %v", loaded, err)
+	}
+	if len(loaded.CardAccounts) != 1 || loaded.CardAccounts[0] != "prime_card" {
+		t.Fatalf("cards after credential set = %+v", loaded.CardAccounts)
+	}
+	if err := database.ClearSyncCredential(); err != nil {
+		t.Fatalf("clear credential: %v", err)
+	}
+	cleared, err := database.GetSyncCredential()
+	if err != nil || cleared.Configured() {
+		t.Fatalf("cleared = %+v, err %v", cleared, err)
+	}
+	if cards, err := database.GetSyncCards(); err != nil || len(cards) != 1 || cards[0] != "prime_card" {
+		t.Fatalf("cards after disconnect = %+v, err %v, want [prime_card]", cards, err)
+	}
+	if err := database.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	after, err := database.GetSyncCredential()
+	if err != nil || after.Configured() {
+		t.Fatalf("credential after Clear = %+v, err %v", after, err)
+	}
+	if cards, err := database.GetSyncCards(); err != nil || len(cards) != 0 {
+		t.Fatalf("cards after Clear = %+v, err %v, want forgotten", cards, err)
+	}
+}
+
+func testArtifactsRoundTripAndKeepFirstWrite(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	if _, found, err := st.GetArtifact("missing"); err != nil || found {
+		t.Fatalf("missing artifact = found %v, err %v", found, err)
+	}
+	if err := st.PutArtifact("key-1", "stochastic", "payload-v1"); err != nil {
+		t.Fatalf("put artifact: %v", err)
+	}
+	payload, found, err := st.GetArtifact("key-1")
+	if err != nil || !found || payload != "payload-v1" {
+		t.Fatalf("artifact = %q found %v err %v", payload, found, err)
+	}
+	// Cache identities are write-once: a repeated computation must not
+	// clobber the stored result.
+	if err := st.PutArtifact("key-1", "stochastic", "payload-v2"); err != nil {
+		t.Fatalf("repeat put artifact: %v", err)
+	}
+	payload, found, err = st.GetArtifact("key-1")
+	if err != nil || !found || payload != "payload-v1" {
+		t.Fatalf("artifact after repeat put = %q found %v err %v", payload, found, err)
+	}
+}
+
+func testInitializeDocument(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	database := newStore(t)
+	if document, err := database.LoadDocument(); err != nil || document != nil {
+		t.Fatalf("uninitialized document = %+v, %v", document, err)
+	}
+	for range 2 {
+		if err := database.InitializeDocument(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if exists, err := database.DocumentExists(); err != nil || !exists {
+		t.Fatalf("initialized presence = %v, %v", exists, err)
+	}
+	document, err := database.LoadDocument()
+	if err != nil || document == nil || len(document.Accounts) != 0 || document.SourcePath != "" {
+		t.Fatalf("blank document = %+v, %v", document, err)
+	}
+	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "My checking", Kind: "cash", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := database.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.InitializeDocument(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := database.LoadDocument()
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatalf("initialization changed existing document: %+v, %v", after, err)
+	}
+}
+
+func testAmountPresetConformanceRoundTrip(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	created, err := st.CreateAmountPreset(testPresetFixture("conformance"))
+	if err != nil {
+		t.Fatalf("create preset: %v", err)
+	}
+	presets, err := st.ListAmountPresets()
+	if err != nil {
+		t.Fatalf("list presets: %v", err)
+	}
+	found := false
+	for _, preset := range presets {
+		if preset.ID == created.ID {
+			found = true
+			if preset.Label != "Label conformance" {
+				t.Fatalf("preset label = %q", preset.Label)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("created preset missing from list")
+	}
+	created.Summary = "updated"
+	updated, err := st.UpdateAmountPreset(created)
+	if err != nil || updated.Summary != "updated" {
+		t.Fatalf("update preset = %+v, err %v", updated, err)
+	}
+	if err := st.MoveAmountPreset(created.ID, ""); err != nil {
+		t.Fatalf("move preset: %v", err)
+	}
+	if err := st.DeleteAmountPreset(created.ID); err != nil {
+		t.Fatalf("delete preset: %v", err)
+	}
+}
+
+func testPresetFixture(name string) types.AmountPreset {
+	return types.AmountPreset{
+		Name: name, Label: "Label " + name, Enabled: true,
+		Amount: types.PostingAmountResolution{
+			Resolver: "expression",
+			Config:   map[string]any{"expression": "10"},
+			Inputs:   map[string]types.AmountInputBinding{},
+		},
+	}
+}
+
+func testReceiptConformance(t *testing.T, newStore func(*testing.T) store.Store) {
+	s := newStore(t)
+	p := seedReceiptPosting(t, s)
+	r, err := s.CreateReceipt(context.Background(), p.ID, "receipt.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.ListReceipts(p.ID)
+	if err != nil || len(list) != 1 || list[0].ID != r.ID {
+		t.Fatalf("receipt list: %+v %v", list, err)
+	}
+	r.Draft = &types.ReceiptDetails{Merchant: "Draft"}
+	r, err = s.SaveReceipt(r, r.Revision)
+	if err != nil || r.Revision != 2 {
+		t.Fatalf("receipt review: %+v %v", r, err)
+	}
+	if _, err := s.SaveReceipt(r, 1); !errors.Is(err, store.ErrReceiptConflict) {
+		t.Fatalf("stale review: %v", err)
+	}
+	p.Name = "Updated"
+	if _, err := s.UpdatePosting(p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetReceipt(r.ID); err != nil {
+		t.Fatal("posting update removed evidence", err)
+	}
+	r, err = s.ReplaceReceiptImage(context.Background(), r.ID, r.Revision, "replacement.png", types.ReceiptImage{Bytes: []byte("new pixels"), MediaType: "image/png"})
+	if err != nil || r.Draft != nil || r.Status != "attached" {
+		t.Fatalf("replacement: %+v %v", r, err)
+	}
+	if err := s.DeleteReceipt(context.Background(), r.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.GetReceiptImage(context.Background(), r.ID); !errors.Is(err, store.ErrReceiptNotFound) {
+		t.Fatal(err)
+	}
+}
+
+func seedReceiptPosting(t *testing.T, s store.Store) types.Posting {
+	t.Helper()
+	seedAccount(t, s, "checking")
+	p, err := s.CreatePosting(testPostingFixture(receiptPostingID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func testRowRoundTripsPreserveOrder(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	for _, id := range []string{"a", "b", "c"} {
+		if _, err := st.CreateAccount(types.Account{ID: id, Name: id}); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+	}
+	if err := st.MoveAccount("c", "a"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var order []string
+	for _, account := range loaded.Accounts {
+		order = append(order, account.ID)
+	}
+	if !reflect.DeepEqual(order, []string{"c", "a", "b"}) {
+		t.Fatalf("order = %v, want [c a b]", order)
+	}
+}
+
+func testPostingFixture(id string) types.Posting {
+	source := "checking"
+	return types.Posting{
+		ID:              id,
+		Name:            "Posting " + id,
+		SourceAccountID: &source,
+		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		PostedTime:      1782950400, TransactionTime: 1782950400,
+		Enabled: true,
+	}
+}
+
+func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	for _, checkpoint := range []types.Checkpoint{
+		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
+		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
+	} {
+		if _, err := st.SaveCheckpoint(checkpoint); err != nil {
+			t.Fatalf("save checkpoint: %v", err)
+		}
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if loaded == nil {
+		t.Fatal("loaded document is nil")
+	}
+	if !reflect.DeepEqual(loaded.Checkpoints, withSourceUser([]types.Checkpoint{
+		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
+		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
+	})) {
+		t.Fatalf("checkpoint order changed: got %+v", loaded.Checkpoints)
+	}
+	if loaded.Accounts[0].MinBalance == nil || *loaded.Accounts[0].MinBalance != types.NoFloor {
+		t.Fatalf("minimum balance was not normalized: %+v", loaded.Accounts[0].MinBalance)
+	}
+	if loaded.Accounts[0].MaxBalance == nil || *loaded.Accounts[0].MaxBalance != types.NoCeiling {
+		t.Fatalf("maximum balance was not normalized: %+v", loaded.Accounts[0].MaxBalance)
+	}
+
+	empty, err := st.LoadDocument()
+	if err != nil || empty == nil {
+		t.Fatalf("load document = %+v, err %v", empty, err)
+	}
+	if empty.Accounts == nil || empty.Checkpoints == nil || empty.Postings == nil {
+		t.Fatalf("empty collections were not normalized: %+v", empty)
+	}
+
+	if err := st.Clear(); err != nil {
+		t.Fatalf("clear document: %v", err)
+	}
+	exists, err := st.DocumentExists()
+	if err != nil || exists {
+		t.Fatalf("cleared document presence = %v, err %v", exists, err)
+	}
+	loaded, err = st.LoadDocument()
+	if err != nil || loaded != nil {
+		t.Fatalf("cleared document = %+v, err %v", loaded, err)
+	}
+}
+
+func seedAccount(t *testing.T, st store.Store, id string) {
+	t.Helper()
+	if _, err := st.CreateAccount(types.Account{ID: id, Name: id, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func testSyncStateDefaultsEmptyAndRoundTrips(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	database := newStore(t)
+	if got, err := database.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("fresh last sync = %q, err %v, want empty", got, err)
+	}
+	if err := database.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
+		t.Fatalf("record last sync: %v", err)
+	}
+	if got, err := database.GetLastSyncTime(); err != nil || got != "2026-10-18T14:30:00Z" {
+		t.Fatalf("last sync = %q, err %v, want recorded time", got, err)
+	}
+	if err := database.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	if got, err := database.GetLastSyncTime(); err != nil || got != "" {
+		t.Fatalf("cleared last sync = %q, err %v, want empty", got, err)
+	}
+}
+
+func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	seedSyncState(t, st)
+
+	// UUIDs carry no ownership meaning. Owner writes cannot assert sync metadata.
+	forged := testPostingFixture("01900000-0000-7000-8000-000000000013")
+	forged.Source, forged.Pending = store.SourceSimpleFIN, true
+	created, err := st.CreatePosting(forged)
+	if err != nil || created.Source != store.SourceUser || created.Pending {
+		t.Fatalf("owner posting metadata = %+v, err %v", created, err)
+	}
+
+	// Sync-owned rows refuse owner updates and deletes.
+	stored, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	var synced types.Posting
+	for _, posting := range stored.Postings {
+		if posting.Source == store.SourceSimpleFIN {
+			synced = posting
+		}
+	}
+	synced.Name = "Edited"
+	if _, err := st.UpdatePosting(synced); !store.IsSyncOwned(err) {
+		t.Fatalf("update sync posting err = %v, want sync-owned", err)
+	}
+	if err := st.DeletePosting(synced.ID); !store.IsSyncOwned(err) {
+		t.Fatalf("delete sync posting err = %v, want sync-owned", err)
+	}
+
+	// A checkpoint save with a forged source flag still stores owner rows.
+	correction := types.Checkpoint{Date: "2026-07-01", AccountID: "checking", Balance: 500, Source: store.SourceSimpleFIN}
+	saved, err := st.SaveCheckpoint(correction)
+	if err != nil {
+		t.Fatalf("save checkpoint: %v", err)
+	}
+	if saved.Source != store.SourceUser {
+		t.Fatalf("checkpoint source = %q, want recomputed owner", saved.Source)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	if len(loaded.Checkpoints) != 2 {
+		t.Fatalf("checkpoints = %+v, want owner + synced", loaded.Checkpoints)
+	}
+	for _, checkpoint := range loaded.Checkpoints {
+		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-07-01" && checkpoint.Source != store.SourceUser {
+			t.Fatalf("forged checkpoint flag persisted: %+v", checkpoint)
+		}
+	}
+	_, sources := loadPostingIDs(t, st)
+	if sources[synced.ID] != store.SourceSimpleFIN {
+		t.Fatalf("stored sync posting lost flag: %v", sources)
+	}
+	if sources[ownerPostingID] != store.SourceUser || sources[created.ID] != store.SourceUser {
+		t.Fatalf("owner posting flags = %v", sources)
+	}
+}
+
+func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	seedSyncState(t, st)
+
+	if _, err := st.SaveCheckpoint(types.Checkpoint{
+		Date: "2026-08-01", AccountID: "checking", Balance: 222,
+	}); err != nil {
+		t.Fatalf("save correction: %v", err)
+	}
+
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	count := 0
+	for _, checkpoint := range loaded.Checkpoints {
+		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-08-01" {
+			count++
+			if checkpoint.Balance != 222 || checkpoint.Source != store.SourceUser {
+				t.Fatalf("collision row = %+v, want owner correction", checkpoint)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("collision key rows = %d, want 1", count)
+	}
+}
+
+func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	// An owner document first, mirroring production (seeded DB): sync rows
+	// merge into the visible document instead of an empty store.
+	seedOwnerDocument(t, st)
+	seedAccount(t, st, "prime_card")
+
+	summary, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
+		nil)
+	if err != nil || summary.CheckpointsInserted != 1 {
+		t.Fatalf("apply = %+v, err %v", summary, err)
+	}
+
+	again, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
+		nil)
+	if err != nil || again.CheckpointsUpdated != 1 || again.CheckpointsInserted != 0 {
+		t.Fatalf("rerun = %+v, err %v", again, err)
+	}
+
+	changed, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 150}},
+		nil)
+	if err != nil || changed.CheckpointsUpdated != 1 {
+		t.Fatalf("update = %+v, err %v", changed, err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	_ = loaded
+	checkpoint, ok := findCheckpoint(loaded, "checking", "2026-08-05")
+	if !ok || checkpoint.Balance != 150 || checkpoint.Source != store.SourceSimpleFIN {
+		t.Fatalf("checkpoint = %+v, want balance 150 source simplefin", checkpoint)
+	}
+}
+
+func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	extra, err := st.SaveCheckpoint(types.Checkpoint{
+		Date: "2026-08-05", AccountID: "checking", Balance: 999,
+	})
+	if err != nil {
+		t.Fatalf("save user checkpoint: %v", err)
+	}
+	_ = extra
+	summary, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
+		nil)
+	if err != nil || summary.CheckpointsSkipped != 1 {
+		t.Fatalf("apply = %+v, err %v", summary, err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	checkpoint, ok := findCheckpoint(loaded, "checking", "2026-08-05")
+	if !ok || checkpoint.Balance != 999 {
+		t.Fatalf("user checkpoint overwritten: %+v", checkpoint)
+	}
+}
+
+func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	seedAccount(t, st, "prime_card")
+
+	first, err := st.ApplySyncPlan(nil, []store.BankDirective{
+		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
+		syncPendingDirective(syncPendingPosting("b", "prime_card", "2026-08-02")),
+	})
+	if err != nil || first.PendingInserted != 2 {
+		t.Fatalf("first apply = %+v, err %v", first, err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]string{}
+	for _, posting := range loaded.Postings {
+		if posting.Source == store.SourceSimpleFIN && posting.Pending {
+			ids[posting.Name] = posting.ID
+		}
+	}
+	if len(ids) != 2 {
+		t.Fatalf("pending rows = %+v", loaded.Postings)
+	}
+	second, err := st.ApplySyncPlan(nil, []store.BankDirective{
+		syncPendingDirective(syncPendingPosting("b", "prime_card", "2026-08-03")),
+		syncPendingDirective(syncPendingPosting("c", "prime_card", "2026-08-03")),
+		{Void: ids["Pending a"]},
+	})
+	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
+		t.Fatalf("second apply = %+v, err %v", second, err)
+	}
+	reloaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := syncedPendingIDs(reloaded)
+	if len(got) != 2 {
+		t.Fatalf("pending rows = %+v, want b and c", got)
+	}
+	for _, id := range got {
+		if _, err := uuid.Parse(id); err != nil {
+			t.Fatalf("pending identity is not a UUID: %v", got)
+		}
+	}
+}
+
+func withSourceUser(checkpoints []types.Checkpoint) []types.Checkpoint {
+	out := make([]types.Checkpoint, len(checkpoints))
+	for i, checkpoint := range checkpoints {
+		checkpoint.Source = store.SourceUser
+		out[i] = checkpoint
+	}
+	return out
+}
+
+func syncPendingPosting(id, accountID, day string) store.SyncPosting {
+	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
+	if err != nil {
+		stamp = time.Unix(1785628800, 0).UTC()
+	}
+	return store.SyncPosting{
+		ProviderAccountID: "bridge-" + accountID,
+		TransactionID:     id,
+		Posting: types.Posting{
+			Name:            "Pending " + id,
+			SourceAccountID: &accountID,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+		},
+	}
+}
+
+func syncPendingDirective(item store.SyncPosting) store.BankDirective {
+	item.Source = store.SourceSimpleFIN
+	item.Pending = true
+	return store.BankDirective{Upsert: &store.BankUpsert{
+		Posting: item.Posting,
+		Keys:    []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+	}}
+}
+
+const ownerPostingID = "01900000-0000-7000-8000-000000000010"
+
+func seedOwnerDocument(t *testing.T, st store.Store) {
+	t.Helper()
+	document := ownerDocument()
+	for _, account := range document.Accounts {
+		if _, err := st.CreateAccount(account); err != nil {
+			t.Fatalf("seed account %s: %v", account.ID, err)
+		}
+	}
+	for _, checkpoint := range document.Checkpoints {
+		if _, err := st.SaveCheckpoint(checkpoint); err != nil {
+			t.Fatalf("seed checkpoint: %v", err)
+		}
+	}
+	for _, posting := range document.Postings {
+		if _, err := st.CreatePosting(posting); err != nil {
+			t.Fatalf("seed posting %s: %v", posting.ID, err)
+		}
+	}
+}
+
+func seedSyncState(t *testing.T, st store.Store) {
+	t.Helper()
+	if _, err := st.CreateAccount(types.Account{ID: "prime_card", Name: "Prime", Enabled: true}); err != nil {
+		t.Fatalf("seed card account: %v", err)
+	}
+	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
+	summary, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
+		[]store.BankDirective{syncPendingDirective(seed)})
+	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
+		t.Fatalf("seed sync state = %+v, err %v", summary, err)
+	}
+}
+
+func loadPostingIDs(t *testing.T, st store.Store) (ids []string, sources map[string]string) {
+	t.Helper()
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load document: %v", err)
+	}
+	return postingIDsFromDocument(loaded)
+}
+
+func findCheckpoint(document *types.FinancialModelDocument, accountID string, date types.IsoDate) (types.Checkpoint, bool) {
+	if document == nil {
+		return types.Checkpoint{}, false
+	}
+	for _, checkpoint := range document.Checkpoints {
+		if checkpoint.AccountID == accountID && checkpoint.Date == date {
+			return checkpoint, true
+		}
+	}
+	return types.Checkpoint{}, false
+}
+
+func ownerDocument() *types.FinancialModelDocument {
+	checking := "checking"
+	return &types.FinancialModelDocument{
+		SourcePath: "test-source",
+		Accounts: []types.Account{{
+			ID: "checking", Name: "Checking", Enabled: true,
+		}},
+		Checkpoints: []types.Checkpoint{
+			{Date: "2026-07-01", AccountID: "checking", Balance: 500},
+		},
+		Evaluations: types.EmptyEvaluationTables(),
+		Postings: []types.Posting{{
+			ID: ownerPostingID, Name: "Owner", SourceAccountID: &checking,
+			Amount:     types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime: 1782950400, TransactionTime: 1782950400,
+		}},
+	}
+}
+
+func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []string, sources map[string]string) {
+	sources = map[string]string{}
+	if document == nil {
+		return ids, sources
+	}
+	for _, posting := range document.Postings {
+		ids = append(ids, posting.ID)
+		sources[posting.ID] = posting.Source
+	}
+	return ids, sources
+}
+
+func syncedPendingIDs(document *types.FinancialModelDocument) []string {
+	var ids []string
+	if document == nil {
+		return ids
+	}
+	for _, posting := range document.Postings {
+		if posting.Pending && posting.Source != store.SourceUser {
+			ids = append(ids, posting.ID)
+		}
+	}
+	return ids
+}

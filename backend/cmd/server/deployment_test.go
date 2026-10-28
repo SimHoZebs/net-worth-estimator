@@ -9,11 +9,11 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/ingress"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestDeploymentProbesRemainPublicAndReadinessChecksDatabase(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
