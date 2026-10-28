@@ -26,13 +26,22 @@ The development server uses port `5178` and proxies `/v1` to the backend named b
 
 ## Production build and containers
 
-Build static assets with a build-time API origin when the frontend is hosted separately:
+Build environment-independent static assets, including for a separate frontend host:
 
 ```sh
-VITE_API_BASE_URL=https://api.example.com npm --prefix frontend run build
+npm --prefix frontend run build
 ```
 
 The API base resolves in this order: `window.__WAYPOINT_CONFIG__`, `VITE_API_BASE_URL`, then same-origin `/v1`. Runtime configuration must be installed before the application bundle loads.
+
+Session login requires the frontend and API to share one browser origin. Keep
+the API base unset or empty. A separate frontend host must proxy `/v1/*`, including
+authentication callbacks and streaming responses, to the independently hosted
+API. CORS settings alone do not enable cross-origin session login.
+
+The root `vercel.mjs` configures Vercel's proxy from deployment settings without
+embedding the API address or secrets in these assets. See
+[host-portable deployment](../deploy/README.md) for Vercel, Render, and other hosts.
 
 Build the separate images from the repository root:
 
@@ -41,11 +50,8 @@ docker build -f backend/Dockerfile -t net-worth-estimator-backend .
 docker build -f frontend/Dockerfile -t net-worth-estimator-frontend .
 ```
 
-Or run the complete split stack with Compose:
-
-```sh
-docker compose up --build
-```
+For the authenticated Compose stack, initialize Casdoor and provision the
+application database through [the authentication guide](../auth/README.md).
 
 Compose publishes the frontend at `http://localhost:8080` and the API at `http://localhost:8787`. The frontend container proxies `/v1` to `BACKEND_URL` and preserves long-running stochastic SSE responses.
 

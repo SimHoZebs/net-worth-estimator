@@ -41,7 +41,9 @@ creates or repairs its application database. Repeat setup preserves current data
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
 public issuer and Host. The browser uses the public Casdoor URL. The frontend and
-API must share one public origin. Set `FRONTEND_PORT` to match `APP_PUBLIC_URL`.
+API must share one public browser origin, but their hosts can differ. See
+[host-portable deployment](../deploy/README.md) for independent providers.
+Set `FRONTEND_PORT` to match `APP_PUBLIC_URL` for Compose.
 Use an empty `VITE_API_BASE_URL` for the frontend proxy.
 
 The base stack retains the existing `net-worth-estimator-data` financial volume.
