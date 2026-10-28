@@ -48,7 +48,7 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
 The server requires that existing, compatible database. It never creates a missing
 database or repairs its schema. Use the same path in `NET_WORTH_ESTIMATOR_DB`.
 
-Existing per-plan databases require an explicit offline migration. See
+Legacy per-plan databases are unsupported. See
 [the shared database guide](docs/shared-database.md). Runtime startup never merges
 legacy files or assigns their ownership from the first login.
 

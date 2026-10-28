@@ -45,8 +45,8 @@ sync state, default presets, and artifact eviction operate within one plan.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
-Casdoor retains its own external provider database. Legacy per-plan files require
-[explicit offline migration](docs/shared-database.md).
+Casdoor retains its own external provider database. Legacy per-plan files are
+unsupported.
 
 ## 2. HTTP Contracts
 
@@ -223,8 +223,8 @@ Identity initialization also validates its tables without DDL. SQLite can create
 normal WAL/SHM sidecars during operation.
 
 Schema changes are transactional and forward-only. Completed upgrades are recorded
-in `schema_migrations`. Legacy unscoped databases require explicit offline migration.
-Restore a database backup before a downgrade.
+in `schema_migrations`. Legacy unscoped databases are rejected. Restore a
+compatible database backup instead of downgrading.
 
 The current schema stores:
 
@@ -278,14 +278,11 @@ Each row write runs one transaction: validate the resulting document, then inser
 
 Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical document: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
 
-### Posting identity upgrade
+### Posting identity
 
-The previous release's single-plan upgrade converts every
-non-UUID posting ID, rewrites amount/evaluation/preset references, preserves row
-display order, equal-time execution order, and purchase policies, and removes derived simulation results. Account
-and recurrence-rule IDs remain unchanged. The shared database importer requires
-that compatible source schema. Upgrade older backups with the previous release
-before the offline shared migration. See [the migration contract](docs/posting-identity.md).
+Persisted postings use canonical UUIDs; the store generates UUIDv7 IDs when the
+caller supplies none. Sources with non-UUID posting IDs are unsupported, with no
+upgrade path. See [the posting identity contract](docs/posting-identity.md).
 
 ### Artifact durability
 
