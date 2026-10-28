@@ -116,6 +116,7 @@ The mock proves workflow contracts, not OCR accuracy or provider reliability.
 
 | Endpoint | Behavior |
 | --- | --- |
+| `GET /v1/financial-model` | Canonical document, issues, revision, and stored `receiptLinks` (posting ID to receipt IDs). |
 | `GET /v1/postings/{id}/receipts` | Metadata and extraction availability. |
 | `POST /v1/receipts` | Multipart `postingId` string and `image` file. No automatic extraction. |
 | `GET /v1/receipts/{id}` | Extraction, drafts, confirmed values, provenance, diagnostics, revision. |
@@ -179,6 +180,25 @@ unchanged. Protect production backups and dev snapshots as financial records.
 Deletion removes access immediately and queues durable physical cleanup. A
 provider outage can delay removal of stored bytes. Cleanup retries after restart.
 
+### Reverse lookup
+
+Each posting row carries a stored `receipt_ids` field: the IDs of its
+receipts. Receipt creation appends and receipt deletion removes the ID in the
+same transaction as the receipt row, so the field never drifts. Posting edits
+leave it untouched, posting deletion removes it with the row, and CSV
+replacement resets it with the new rows. It is a storage column only:
+`scanPostingRow` ignores it, so it never enters `FinancialModelDocument`,
+financial revisions, or projection identities.
+
+The financial-model response exposes it as `receiptLinks`, mapping each
+posting ID to its receipt IDs. The transaction list renders its receipt badge
+from that map; opening a receipt still fetches full details through
+`GET /v1/postings/{id}/receipts`. Receipt mutations invalidate the cached
+model so badges follow attach, replace, review, extraction, and delete.
+
+SQLite free pages, WAL files, and backups can contain deleted data. Receipt
+deletion does not promise secure erasure from those locations.
+
 ## Verification
 
 ```bash
@@ -202,7 +222,6 @@ Passed backend format/vet/tests, Go build, and receipt/store/API race tests.
 Passed frontend lint, typecheck, build, and 796 unit tests. All seven receipt
 browser tests passed against both dev and production frontends. Replacement
 checks cover canceled and invalid uploads, content reset, preview refresh,
-
 reload, deletion, and unchanged financial revisions. Concurrent image-read and
 cross-plan cleanup regressions passed 20 repeated runs with blob references. Both Nginx
 regressions passed.

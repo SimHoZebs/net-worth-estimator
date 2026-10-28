@@ -177,6 +177,10 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 				values = append(values, "'sample'")
 			case sample && table.name == "sync_state" && column == "last_sync_at":
 				values = append(values, "''")
+			case sample && table.name == "postings" && column == "receipt_ids":
+				// Sample publication excludes receipts, so copied postings
+				// must not reference private receipt IDs.
+				values = append(values, "'[]'")
 			case table.name == "sync_credentials" && (column == "access_url" || column == "bridge_host" || column == "updated_at"):
 				// The Bridge key never travels with a refresh or a sample:
 				// reconnect it where it will run. Card selection is safe

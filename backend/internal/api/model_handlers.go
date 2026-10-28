@@ -9,9 +9,10 @@ import (
 )
 
 type parseResultBody struct {
-	Document *types.FinancialModelDocument `json:"document"`
-	Issues   []types.ModelValidationIssue  `json:"issues"`
-	Revision string                        `json:"revision,omitempty"`
+	Document     *types.FinancialModelDocument `json:"document"`
+	Issues       []types.ModelValidationIssue  `json:"issues"`
+	Revision     string                        `json:"revision,omitempty"`
+	ReceiptLinks map[string][]string           `json:"receiptLinks,omitempty"`
 }
 
 type getModelOutput struct {
@@ -39,7 +40,11 @@ func (s *Server) getModel(_ context.Context, _ *struct{}) (*getModelOutput, erro
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues, Revision: revision}}, nil
+	links, err := s.Receipts.ListLinks()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues, Revision: revision, ReceiptLinks: links}}, nil
 }
 
 type statusOutput struct {

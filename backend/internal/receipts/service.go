@@ -87,6 +87,13 @@ func (s *Service) List(postingID string) ([]types.Receipt, error) {
 	return items, nil
 }
 
+// ListLinks is the stored reverse lookup: posting ID to its receipt IDs,
+// read from the posting row. Receipt writes maintain the field in the same
+// transaction as the receipt row.
+func (s *Service) ListLinks() (map[string][]string, error) {
+	return s.repository.ListPostingReceiptIDs()
+}
+
 func (s *Service) posting(id string) (types.Posting, error) {
 	document, err := s.repository.LoadDocument()
 	if err != nil {

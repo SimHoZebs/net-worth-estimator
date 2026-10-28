@@ -101,6 +101,9 @@ func (d *Database) setupSchema() error {
 	if err := migrateInlineReceiptImages(tx, defaultSQLite); err != nil {
 		return fmt.Errorf("migrate receipt blobs: %w", err)
 	}
+	if err := migratePostingReceiptIDs(tx); err != nil {
+		return fmt.Errorf("migrate posting receipt fields: %w", err)
+	}
 	for _, statement := range receiptBlobSchemaObjects {
 		if _, err := tx.Exec(statement); err != nil {
 			return err

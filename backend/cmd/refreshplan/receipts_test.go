@@ -49,3 +49,42 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 	}
 }
 
+func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForSample(t *testing.T) {
+	dir := t.TempDir()
+	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
+	seed(t, source)
+	seed(t, target)
+	db, err := store.OpenDatabase(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := db.Plan("plans/other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := "checking"
+	p, err := s.CreatePosting(types.Posting{Name: "Field expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.CreateReceipt(context.Background(), p.ID, "field.png", types.ReceiptImage{Bytes: []byte("field image"), MediaType: "image/png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if err := refresh(target, source, "plans/other", "plans/owner", false); err != nil {
+		t.Fatal(err)
+	}
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE plan_id='plans/owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
+		t.Fatalf("private posting field = %s", got)
+	}
+	if err := refresh(target, source, "plans/other", "", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE plan_id='plans/sample' AND id=?", p.ID); got != `[]` {
+		t.Fatalf("sample posting field = %s", got)
+	}
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE plan_id='plans/owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
+		t.Fatalf("sample publication changed private posting field = %s", got)
+	}
+}
