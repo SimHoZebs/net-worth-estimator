@@ -107,6 +107,9 @@ func (d *Database) setupSchema() error {
 	if err := migratePostingVoidFlag(tx); err != nil {
 		return fmt.Errorf("migrate posting void flag: %w", err)
 	}
+	if err := migrateSourceUser(tx); err != nil {
+		return fmt.Errorf("migrate row source names: %w", err)
+	}
 	for _, statement := range receiptBlobSchemaObjects {
 		if _, err := tx.Exec(statement); err != nil {
 			return err

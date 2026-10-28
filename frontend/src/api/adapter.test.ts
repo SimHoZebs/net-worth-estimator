@@ -160,7 +160,7 @@ describe("backend and display plan adapter", () => {
 			},
 			{
 				...syncedPosting("01900000-0000-7000-8000-000000000002"),
-				source: "model",
+				source: "user",
 				pending: false,
 				purchase: { priority: 1 },
 			},
@@ -236,10 +236,10 @@ describe("backend and display plan adapter", () => {
 	});
 
 	it.each([
-		{ source: "model", readOnly: false, expected: false },
+		{ source: "user", readOnly: false, expected: false },
 		{ source: "simplefin", readOnly: false, expected: true },
 		{ source: "other-sync", readOnly: false, expected: true },
-		{ source: "model", readOnly: true, expected: true },
+		{ source: "user", readOnly: true, expected: true },
 	])(
 		"round-trips an unchanged account with checkpoint source $source and server readOnly $readOnly",
 		({ source, readOnly, expected }) => {
@@ -293,7 +293,7 @@ describe("backend and display plan adapter", () => {
 		}
 	});
 
-	it.each(["model", "simplefin"])(
+	it.each(["user", "simplefin"])(
 		"still rejects an account readOnly edit with checkpoint source %s",
 		(source) => {
 			const document = documentFixture();
@@ -392,7 +392,7 @@ describe("backend and display plan adapter", () => {
 			isHistoricalMovement(recurringConversion.plan.movements[0]!, startDate),
 		).toBe(false);
 
-		// Backend sync-owned rows carry a non-"model" owner; the exact sync
+		// Backend sync-owned rows carry a non-"user" author; the exact sync
 		// name is a backend contract, so the fixture uses a stand-in.
 		const syncedDocument = structuredClone(past);
 		syncedDocument.postings[0]!.source = "bank-sync";

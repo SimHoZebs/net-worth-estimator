@@ -125,7 +125,7 @@ func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
 		t.Fatalf("update rule: %v", err)
 	}
 	saved, err := store.SaveCheckpoint(types.Checkpoint{Date: "2026-08-05", AccountID: "checking", Balance: 100})
-	if err != nil || saved.Source != SourceModel {
+	if err != nil || saved.Source != SourceUser {
 		t.Fatalf("save checkpoint = %+v, err %v", saved, err)
 	}
 	saved, err = store.SaveCheckpoint(types.Checkpoint{Date: "2026-08-05", AccountID: "checking", Balance: 150})

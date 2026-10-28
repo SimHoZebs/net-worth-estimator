@@ -122,7 +122,7 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 	handler := New(database, Config{})
 	saved := decodePlanEntrySave[types.Checkpoint](t, doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
 		`{"Date":"2026-08-05","AccountId":"checking","Balance":30,"source":"simplefin"}`))
-	if !saved.Persisted || saved.Row.Source != store.SourceModel || saved.Row.Balance != 30 {
+	if !saved.Persisted || saved.Row.Source != store.SourceUser || saved.Row.Balance != 30 {
 		t.Fatalf("owner balance check = %+v", saved)
 	}
 	if database.loads != 2 {

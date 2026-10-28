@@ -18,7 +18,7 @@ type postingLifecycle struct {
 // rows are always editable. Bank rows become editable once settled; live
 // pending and void rows stay sync-owned so the sync never fights the owner.
 func (l postingLifecycle) ownerEditable() bool {
-	return l.source == SourceModel || (!l.pending && !l.void)
+	return l.source == SourceUser || (!l.pending && !l.void)
 }
 
 func postingLifecycleOf(tx *planTx, id string) (postingLifecycle, error) {
@@ -32,7 +32,7 @@ func postingLifecycleOf(tx *planTx, id string) (postingLifecycle, error) {
 		return out, fmt.Errorf("read posting %s: %w", id, err)
 	}
 	if !source.Valid {
-		return postingLifecycle{source: SourceModel}, nil
+		return postingLifecycle{source: SourceUser}, nil
 	}
 	out.source, out.pending, out.void = source.String, pending != 0, voided != 0
 	return out, nil
@@ -51,7 +51,7 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 	if err != nil || parsed.String() != posting.ID {
 		return types.Posting{}, &rowError{code: "invalid-id", id: posting.ID}
 	}
-	posting.Source, posting.Pending, posting.ExecutionOrder = SourceModel, false, 0
+	posting.Source, posting.Pending, posting.ExecutionOrder = SourceUser, false, 0
 	posting.Void = false
 	err = withRowTx(s.db, func(tx *planTx) error {
 		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
@@ -61,7 +61,7 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 		if err != nil {
 			return err
 		}
-		return insertPosting(tx, position, &posting, SourceModel)
+		return insertPosting(tx, position, &posting, SourceUser)
 	})
 	if err != nil {
 		return types.Posting{}, err

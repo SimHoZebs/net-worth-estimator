@@ -77,7 +77,7 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
 		t.Fatal("owner posting was purged")
 	}
-	if got := countRows(t, store, "checkpoints", "source = 'model'"); got != 1 {
+	if got := countRows(t, store, "checkpoints", "source = 'user'"); got != 1 {
 		t.Fatalf("owner checkpoints = %d, want 1", got)
 	}
 	if got, err := store.GetLastSyncTime(); err != nil || got != "" {

@@ -384,7 +384,7 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode POST response: %v", err)
 	}
-	if !created.Persisted || created.Row.Source != "model" || created.Row.Pending {
+	if !created.Persisted || created.Row.Source != "user" || created.Row.Pending {
 		t.Fatalf("echoed source response = %+v", created)
 	}
 }
