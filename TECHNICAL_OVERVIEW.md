@@ -30,8 +30,9 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 Receipt evidence has its own plan-scoped storage and a provider-neutral extraction
 interface. Images and metadata never enter `FinancialModelDocument` or projection
 identity. See [receipt contracts and source adapters](docs/receipts.md).
-Image bytes also have a separate [blob storage port](docs/blob-storage.md), with
-SQLite and filesystem adapters, private references, and durable cleanup.
+Image bytes also have a separate blob storage port (`backend/internal/blobstore`,
+with SQLite and filesystem adapters, private references, and durable cleanup
+in `backend/internal/store/blob_storage.go`).
 
 `store.Database` owns the shared connection. Each financial store holds one
 immutable plan ID. The plan router creates that scope only after Casdoor verifies
@@ -290,7 +291,9 @@ Amount presets are saved amount recipes managed through `GET /v1/amount-presets`
 
 Persisted postings use canonical UUIDs; the store generates UUIDv7 IDs when the
 caller supplies none. Sources with non-UUID posting IDs are unsupported, with no
-upgrade path. See [the posting identity contract](docs/posting-identity.md).
+upgrade path. Exact upstream `(provider, account_id, transaction_id)` identity
+lives in `posting_sync_keys`, separate from local posting IDs (see
+`postingSyncKey` in `backend/internal/store/sync_pending.go`).
 
 ### Artifact durability
 
