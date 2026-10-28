@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 )
 
 const (
@@ -22,6 +24,9 @@ var validSecret = regexp.MustCompile(`^[A-Za-z0-9_-]{32,256}$`)
 // Host-preserving deployments keep their current behavior. With a secret, every
 // request must come through a proxy that replaces both ingress headers.
 // Public origins come from the identity configuration, never forwarded headers.
+// Origins are validated through the shared api.CanonicalOrigin checker so a
+// trailing "/" normalizes identically and paths, userinfo, and trailing-dot
+// hosts are rejected at every boundary.
 func New(secret string, publicOrigins []string) (func(http.Handler) http.Handler, error) {
 	if secret == "" {
 		return func(next http.Handler) http.Handler { return next }, nil
@@ -31,12 +36,12 @@ func New(secret string, publicOrigins []string) (func(http.Handler) http.Handler
 	}
 	origins := make(map[string]*url.URL, len(publicOrigins))
 	for _, origin := range publicOrigins {
-		u, err := url.Parse(origin)
-		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") ||
-			u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
-			return nil, fmt.Errorf("proxy public origins must be canonical HTTP/S origins")
+		canonical, err := api.CanonicalOrigin(origin)
+		if err != nil {
+			return nil, fmt.Errorf("proxy public origins must be canonical HTTP/S origins: %w", err)
 		}
-		origins[origin] = u
+		u, _ := url.Parse(canonical)
+		origins[canonical] = u
 	}
 	if len(origins) == 0 {
 		return nil, fmt.Errorf("proxy requires at least one configured public origin")
@@ -56,7 +61,9 @@ func New(secret string, publicOrigins []string) (func(http.Handler) http.Handler
 			}
 			var origin *url.URL
 			if len(originsHeader) == 1 {
-				origin = origins[originsHeader[0]]
+				if canonical, err := api.CanonicalOrigin(originsHeader[0]); err == nil {
+					origin = origins[canonical]
+				}
 			}
 			if origin == nil {
 				reject(w)
