@@ -12,7 +12,7 @@ function voidTransaction(): {
 } {
 	const movement = {
 		id: "01900000-0000-7000-8000-000000000099",
-		name: "Voided authorization",
+		name: "Hold that did not post",
 		amount: 42.1,
 		amountKnown: true,
 		fromId: "checking",
@@ -51,7 +51,7 @@ function voidTransaction(): {
 	return { transaction, movement };
 }
 
-it("marks voided bank authorizations instead of pending", () => {
+it("marks holds that did not post instead of pending", () => {
 	const { transaction, movement } = voidTransaction();
 	render(
 		<TransactionRow
@@ -60,9 +60,10 @@ it("marks voided bank authorizations instead of pending", () => {
 			onEdit={() => {}}
 		/>,
 	);
-	expect(screen.getByText("Void")).toBeTruthy();
+	expect(screen.getByText("Did not post")).toBeTruthy();
 	expect(screen.queryByText("Pending")).toBeNull();
-	expect(screen.getByText("voided bank authorization")).toBeTruthy();
+	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
+	expect(screen.getByRole("button", { name: /did not post/i })).toBeTruthy();
 });
 
 it("does not render any badge without status", () => {
@@ -74,5 +75,5 @@ it("does not render any badge without status", () => {
 			onEdit={() => {}}
 		/>,
 	);
-	expect(screen.queryByText("Void")).toBeNull();
+	expect(screen.queryByText("Did not post")).toBeNull();
 });
