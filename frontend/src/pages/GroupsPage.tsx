@@ -53,12 +53,17 @@ export function GroupsPage() {
 		}
 	}, []);
 
+	// Initial load from the API is external sync, not a render cascade.
 	useEffect(() => {
+		// oxlint-disable-next-line react/set-state-in-effect
 		void reload();
 	}, [reload]);
 
 	useEffect(() => {
 		if (!selected) {
+			// Clearing detail state when navigation leaves a group is the
+			// intended sync, not a render cascade.
+			// oxlint-disable-next-line react/set-state-in-effect
 			setMembers([]);
 			setInvites([]);
 			setDetailError(null);
@@ -428,7 +433,6 @@ export function GroupsPage() {
 							label="Group name"
 							value={name}
 							maxLength={100}
-							autoFocus
 							onChange={(event) => setName(event.target.value)}
 						/>
 						<div className={dialogActionsStyles}>

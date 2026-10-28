@@ -102,6 +102,10 @@ func main() {
 		log.Fatalf("configure resource access: %v", err)
 	}
 	defer closeResources()
+	handler, err = deploymentHandler(handler, database.SQL(), identityConfig, os.Getenv("NET_WORTH_ESTIMATOR_PROXY_SECRET"))
+	if err != nil {
+		log.Fatalf("configure deployment ingress: %v", err)
+	}
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		Handler:           handler,
