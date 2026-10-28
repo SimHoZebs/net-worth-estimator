@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-async function smoke(t, finalEvent = "result") {
+async function smoke(t, finalEvent = "result", readiness = 200) {
   let projection;
   const server = createServer(async (request, response) => {
     const send = (status, value) => {
@@ -12,6 +12,7 @@ async function smoke(t, finalEvent = "result") {
       response.end(typeof value === "string" ? value : JSON.stringify(value));
     };
     if (request.url === "/healthz") return send(200, "ok");
+    if (request.url === "/readyz") return send(readiness, readiness === 200 ? "ok" : "not ready");
     if (request.url === "/") return send(200, '<div id="root"></div>');
     if (request.url === "/settings") return send(404, "missing");
     if (request.url === "/v1/auth/session")
@@ -43,7 +44,7 @@ async function smoke(t, finalEvent = "result") {
   t.after(() => server.close());
   const origin = `http://127.0.0.1:${server.address().port}`;
   const child = spawn("sh", [fileURLToPath(new URL("./smoke-compose.sh", import.meta.url))], {
-    env: { ...process.env, FRONTEND_URL: origin, BACKEND_URL: origin },
+    env: { ...process.env, FRONTEND_URL: origin, BACKEND_URL: "" },
   });
   let stderr = "";
   child.stderr.on("data", (chunk) => {
@@ -65,5 +66,10 @@ test("guest smoke asserts its resource, supplies a valid start, and accepts a fi
 
 test("guest smoke fails on an SSE error instead of accepting incomplete progress", async (t) => {
   const result = await smoke(t, "error");
+  assert.equal(result.status, 1);
+});
+
+test("guest smoke fails when the public API is not ready", async (t) => {
+  const result = await smoke(t, "result", 503);
   assert.equal(result.status, 1);
 });

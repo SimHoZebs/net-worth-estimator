@@ -82,7 +82,7 @@ Shared defaults and role classes keep components consistent. Font names, sizes,
 and role assignments remain design choices, rather than test contracts.
 
 Run `npm run lint:typography` from `frontend/` for ownership warnings. The normal
-lint command, pre-push hook, and CI also run it. Warnings do not fail the command.
+lint command and pre-push hook also run it. Warnings do not fail the command.
 
 `scripts/lint-typography.ts` flags local font-family choices, family-token
 overrides, family-changing `font` shorthands, and inline font properties. Its unit
