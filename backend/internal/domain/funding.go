@@ -23,6 +23,8 @@ type evaluatedMovementEvent struct {
 	destinationLimited float64
 	unfulfilled        float64
 	fundingShortfall   float64 // Exact residual; public reports retain their display threshold.
+	capRemaining       *float64
+	availableAmount    *float64
 }
 
 func (evaluated evaluatedMovementEvent) fulfillment() types.MovementFulfillment {
@@ -32,9 +34,44 @@ func (evaluated evaluatedMovementEvent) fulfillment() types.MovementFulfillment 
 	}
 }
 
+// availableAmountFromLimits derives the displayable available amount in the same
+// single pass as constraint classification. It mirrors the former display-path
+// rules: min of withdrawable source, destination headroom, and remaining cap.
+// Returns nil when unconstrained inputs leave an infinite bound or when
+// pre-event balances are unavailable.
+func availableAmountFromLimits(posting *types.Posting, balancesBefore map[string]float64, hasBalances bool, accountsByID map[string]types.Account, capRemaining *float64) *float64 {
+	if posting == nil || !hasBalances {
+		return nil
+	}
+	available := math.Inf(1)
+	if posting.SourceAccountID != nil {
+		if _, exists := accountsByID[*posting.SourceAccountID]; exists {
+			available = math.Min(available, GetWithdrawableAmount(balancesBefore, accountsByID, *posting.SourceAccountID))
+		} else {
+			available = 0
+		}
+	}
+	if posting.Destinations != nil {
+		available = math.Min(available, GetTotalDestinationHeadroom(balancesBefore, accountsByID, posting.Destinations))
+	}
+	if capRemaining != nil {
+		available = math.Min(available, *capRemaining)
+	}
+	if math.IsInf(available, 0) {
+		return nil
+	}
+	rounded := roundCurrency(available)
+	return &rounded
+}
+
 // evaluateMovementEvents is the shared assessment behind public evidence,
 // fulfillment evaluations, and purchase scheduling. It does not read evaluation
 // configuration, so a disabled or narrowly scoped check cannot hide a gap.
+//
+// Single-pass owner: it reconstructs pre-event balances and replays the
+// cap ledger once, returning fulfillment inputs, binding constraints,
+// remaining cap, and display-ready available amount together. Display callers
+// format from this result without re-deriving balances, sort order, or caps.
 func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent {
 	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
 	accountsByID := map[string]types.Account{}
@@ -72,8 +109,11 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		capKey := event.Origin.PostingID + ":" + event.Date[:4]
 		realizedBefore := realizedByPostingAndYear[capKey]
 		var bindingConstraints []accountMovementConstraint
-		if cap, capped := capsByID[event.Origin.PostingID]; capped {
+		var capRemaining *float64
+		if cap, capped := capsByID[event.Origin.PostingID]; capped && posting != nil {
 			limitRemaining := math.Max(0, cap-realizedBefore)
+			remaining := limitRemaining
+			capRemaining = &remaining
 			beforeBalances := balancesBeforeBySequence[event.Sequence]
 			if beforeBalances == nil {
 				beforeBalances = map[string]float64{}
@@ -121,12 +161,19 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 			unfulfilledAmount = residual
 			fundingShortfall = math.Max(0, event.RequestedAmount-event.RealizedAmount)
 		}
+		var availableAmount *float64
+		if len(bindingConstraints) > 0 && posting != nil {
+			if balancesRaw, ok := balancesBeforeBySequence[event.Sequence]; ok {
+				availableAmount = availableAmountFromLimits(posting, balancesRaw, true, accountsByID, capRemaining)
+			}
+		}
 		// Losses are balance adjustments, not cap consumption.
 		realizedByPostingAndYear[capKey] = realizedBefore + maxFloat(0, event.RealizedAmount)
 		out = append(out, evaluatedMovementEvent{
 			event: event, bindingConstraints: bindingConstraints,
 			destinationLimited: destinationLimitedAmount, unfulfilled: unfulfilledAmount,
 			fundingShortfall: fundingShortfall,
+			capRemaining:     capRemaining, availableAmount: availableAmount,
 		})
 	}
 	return out
