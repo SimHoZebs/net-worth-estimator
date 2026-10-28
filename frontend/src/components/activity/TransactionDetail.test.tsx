@@ -108,6 +108,7 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 		constraint: null,
 		excluded: false,
 		pending: false,
+		void: false,
 	};
 	render(
 		<TransactionDetail

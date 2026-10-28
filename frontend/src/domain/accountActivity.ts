@@ -30,6 +30,7 @@ export interface AccountTransaction {
 	constraint: string | null;
 	excluded: boolean;
 	pending: boolean;
+	void: boolean;
 }
 
 export interface ActivityFilters {
@@ -155,9 +156,15 @@ export function accountTransactions({
 			constraint: null,
 			excluded: !movement.enabled,
 			pending: isPendingMovement(movement),
+			void: movement.void === true,
 		}));
 	const pendingIds = new Set(
 		plan.movements.filter(isPendingMovement).map((movement) => movement.id),
+	);
+	const voidIds = new Set(
+		plan.movements
+			.filter((movement) => movement.void === true)
+			.map((movement) => movement.id),
 	);
 	const startDateHasCheckpoint = projection.startDateHasCheckpoint ?? true;
 	const projected: AccountTransaction[] = projection.movements
@@ -201,6 +208,7 @@ export function accountTransactions({
 				constraint: movement.constraint,
 				excluded: false,
 				pending: pendingIds.has(movement.movementId),
+				void: voidIds.has(movement.movementId),
 			};
 		});
 	return [...recorded, ...projected];
@@ -263,6 +271,7 @@ export function movementRuleTransaction({
 		constraint: null,
 		excluded: !movement.enabled,
 		pending,
+		void: movement.void === true,
 	};
 }
 

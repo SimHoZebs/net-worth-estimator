@@ -52,6 +52,9 @@ export const movementSchema = z.object({
 	purchasePriority: z.number().int().nonnegative().nullable().optional(),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
+	// Void marks a bank authorization that vanished without settling. Missing
+	// means active.
+	void: z.boolean().optional(),
 });
 
 /**

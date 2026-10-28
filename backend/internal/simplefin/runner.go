@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -263,8 +264,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	for _, link := range links {
 		resolved[link.BridgeAccountID] = link.ModelAccountID
 	}
-	cardsByID := r.effectiveCards()
-	plan, err := Map(set, cardsByID, resolved, now)
+	plan, err := Map(set, resolved, now)
 	if err != nil {
 		return nil, err
 	}
@@ -305,10 +305,11 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 			Balance:   checkpoint.Balance,
 		})
 	}
-	cards := make([]string, 0, len(cardsByID))
-	for accountID := range cardsByID {
-		cards = append(cards, accountID)
+	cards := make([]string, 0, len(resolved))
+	for _, modelID := range resolved {
+		cards = append(cards, modelID)
 	}
+	sort.Strings(cards)
 	applied, err := r.store.ApplySyncPlan(checkpoints, plan.Pending, plan.Settled, cards)
 	if err != nil {
 		return nil, err

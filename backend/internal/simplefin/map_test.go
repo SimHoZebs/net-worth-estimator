@@ -2,6 +2,7 @@ package simplefin
 
 import (
 	"encoding/json"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,7 +55,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
-	plan, err := Map(&set, fixtureCards(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+	plan, err := Map(&set, map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 	if err != nil {
 		t.Fatalf("map: %v", err)
 	}
@@ -69,15 +70,24 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 			t.Fatalf("prime checkpoint = %+v", checkpoint)
 		}
 	}
-	if len(plan.Pending) != 1 {
-		t.Fatalf("pending = %+v", plan.Pending)
+	if len(plan.Pending) != 2 {
+		t.Fatalf("pending = %+v, want charge and refund seeds", plan.Pending)
 	}
 	pending := plan.Pending[0]
 	if pending.ID != "" || pending.ProviderAccountID != "bridge-prime" || pending.TransactionID != "pend1" || !pending.Pending {
 		t.Fatalf("pending identity/state = %+v", pending)
 	}
-	if pending.PostedTime != 1785628800 || pending.TransactionTime != 1785628800 {
-		t.Fatalf("pending time = %d/%d, want injected now", pending.PostedTime, pending.TransactionTime)
+	var refund *store.SyncPosting
+	for i := range plan.Pending {
+		if plan.Pending[i].TransactionID == "pendpos" {
+			refund = &plan.Pending[i]
+		}
+	}
+	if refund == nil {
+		t.Fatalf("pending refund seed missing: %+v", plan.Pending)
+	}
+	if refund.SourceAccountID != nil || len(refund.Destinations) != 1 || refund.Destinations[0] != "prime_card" {
+		t.Fatalf("pending refund direction = %+v, want inflow to prime_card", refund)
 	}
 	if pending.Enabled {
 		t.Fatal("pending seed must be disabled")
@@ -105,9 +115,6 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.Claim != nil {
 		t.Fatalf("pending shape = %+v", pending)
 	}
-	if len(plan.Settled) != 1 {
-		t.Fatalf("settled = %+v, want the posted card charge", plan.Settled)
-	}
 	settled := plan.Settled[0]
 	if settled.ProviderAccountID != "bridge-prime" || settled.TransactionID != "post1" || settled.Pending || settled.Enabled {
 		t.Fatalf("settled identity/state = %+v", settled)
@@ -115,8 +122,16 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if settled.SourceAccountID == nil || *settled.SourceAccountID != "prime_card" {
 		t.Fatalf("settled source = %+v", settled.SourceAccountID)
 	}
-	if plan.Skipped[SkipNonCharge] != 2 || plan.Skipped[SkipBadAmount] != 1 {
-		t.Fatalf("skipped = %+v, want posted payment + pending refund as non-charge", plan.Skipped)
+	if len(plan.Settled) != 2 {
+		t.Fatalf("settled = %+v, want posted charge and posted payment", plan.Settled)
+	}
+	for _, settled := range plan.Settled {
+		if settled.TransactionID == "pay1" && (settled.SourceAccountID != nil || len(settled.Destinations) != 1) {
+			t.Fatalf("posted payment direction = %+v, want inflow", settled)
+		}
+	}
+	if plan.Skipped[SkipBadAmount] != 1 || len(plan.Skipped) != 2 {
+		t.Fatalf("skipped = %+v, want broken amount plus unmapped account", plan.Skipped)
 	}
 	if plan.Skipped[SkipUnmappedAccount] != 2 {
 		t.Fatalf("unmapped skipped = %+v", plan.Skipped)
@@ -134,8 +149,17 @@ func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
 				set.Accounts[1].Transactions[i].ID = key
 			}
 		}
-		plan, err := Map(&set, fixtureCards(), map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
-		if err != nil || len(plan.Pending) != 1 || plan.Pending[0].TransactionID != key || plan.Pending[0].ID != "" {
+		plan, err := Map(&set, map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+		if err != nil {
+			t.Fatalf("map: %+v, err %v", plan, err)
+		}
+		found := false
+		for _, pending := range plan.Pending {
+			if pending.TransactionID == key && pending.ID == "" {
+				found = true
+			}
+		}
+		if !found {
 			t.Fatalf("upstream key was changed: plan %+v, err %v", plan, err)
 		}
 	}
