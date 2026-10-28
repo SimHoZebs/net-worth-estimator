@@ -3,7 +3,8 @@ import { type Page, request } from "@playwright/test";
 // The fixtureapi harness owns the recorded baseline. Resetting before each
 // test keeps server state from leaking between tests that save.
 export const FIXTURE_API =
-	process.env.FIXTURE_API_ORIGIN ?? "http://127.0.0.1:8799";
+	process.env.FIXTURE_API_ORIGIN ??
+	`http://127.0.0.1:${process.env.TEST_API_PORT ?? 8799}`;
 
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
 

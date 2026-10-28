@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -139,6 +140,7 @@ func schemaStatements() []string {
 			source TEXT NOT NULL DEFAULT 'model',
 			pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
 			execution_order INTEGER NOT NULL DEFAULT 0 CHECK (execution_order >= 0),
+			receipt_ids TEXT NOT NULL DEFAULT '[]',
 			PRIMARY KEY (plan_id, id),
 			FOREIGN KEY(plan_id, source_account_id) REFERENCES accounts(plan_id, id) DEFERRABLE INITIALLY DEFERRED,
 			FOREIGN KEY(plan_id, fulfills_rule_id) REFERENCES recurrence_rules(plan_id, id) DEFERRABLE INITIALLY DEFERRED
@@ -276,6 +278,10 @@ func schemaStatements() []string {
 			PRIMARY KEY(plan_id, id),
 			UNIQUE(plan_id, name)
 		)`,
+		blobObjectSchema,
+		blobsqlite.Schema,
+		receiptSchema,
+		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('receipt-evidence-v1')`,
 		`CREATE TABLE IF NOT EXISTS user_groups (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -422,6 +428,9 @@ func seedAmountPresets() []types.AmountPreset {
 // requiredSchemaColumns covers every application table, including identity.
 // Validation prepares read-only queries; it never executes DDL or repairs shape.
 var requiredSchemaColumns = map[string]string{
+	"receipts":               receiptColumns,
+	"blob_objects":           "key, state, expires_at",
+	"blob_data":              "key, data",
 	"sessions":               "token, data, expiry",
 	"identity_grants":        "id, issuer, subject, sid, expiry, data",
 	"identity_logout_marks":  "issuer, kind, identifier, seen_at, expiry",
@@ -433,7 +442,7 @@ var requiredSchemaColumns = map[string]string{
 	"group_invites":          "id, group_id, code_hash, created_by_account_id, expires_at, max_uses, used_count, revoked_at, created_at",
 	"accounts":               "plan_id, id, position, name, kind, min_balance, max_balance, color, enabled",
 	"checkpoints":            "plan_id, id, position, date, account_id, balance, source",
-	"postings":               "plan_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order",
+	"postings":               "plan_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order, receipt_ids",
 	"posting_sync_keys":      "plan_id, provider, account_id, transaction_id, posting_id",
 	"posting_id_migrations":  "plan_id, old_id, new_id",
 	"schema_migrations":      "name",
@@ -473,12 +482,15 @@ func validateSchemaObjects(db queryer) error {
 	if count != 1 {
 		return fmt.Errorf("%w: missing identity_grant_subject index", ErrSetupRequired)
 	}
-	return nil
+	return checkReceiptBlobSchemaObjects(db)
 }
 
 // expectedSchemaTables lists every table SetupDatabase manages.
 func expectedSchemaTables() []string {
 	return []string{
+		"receipts",
+		"blob_objects",
+		"blob_data",
 		"sessions",
 		"identity_grants",
 		"identity_logout_marks",

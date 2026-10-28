@@ -9,7 +9,8 @@ const baseURL = `http://127.0.0.1:${frontendPort}`;
 // Browser tests run against the real Go engine over real HTTP. The backend is
 // the fixtureapi harness seeded from the canonical CSV model, on its own port
 // so a developer's running backend is never attached to or mutated.
-const apiURL = "http://127.0.0.1:8799";
+const apiPort = Number(process.env.TEST_API_PORT ?? 8799);
+const apiURL = `http://127.0.0.1:${apiPort}`;
 const apiOrigin = process.env.FIXTURE_API_ORIGIN ?? apiURL;
 
 export default defineConfig({
@@ -50,8 +51,8 @@ export default defineConfig({
 				// The backend uses the pure-Go SQLite driver, matching
 				// backend/scripts/verify.sh.
 				CGO_ENABLED: "0",
-				PORT: "8799",
-				NET_WORTH_ESTIMATOR_DB: "/tmp/waypoint-browser-fixture.db",
+				PORT: String(apiPort),
+				NET_WORTH_ESTIMATOR_DB: `/tmp/opencode/waypoint-browser-${apiPort}.db`,
 				// `go -C backend` runs the binary with backend/ as its working
 				// directory, so seed paths are relative to the repository root.
 				// A purpose-built fixture keeps assertions stable and keeps a

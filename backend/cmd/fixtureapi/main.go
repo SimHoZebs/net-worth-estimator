@@ -27,6 +27,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
+	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -75,12 +76,18 @@ func main() {
 		log.Fatalf("open application database: %v", err)
 	}
 	defer application.Close()
+	stopBlobCleanup := application.StartBlobCleanup(context.Background(), func(err error) { log.Printf("blob cleanup: %v", err) })
+	defer stopBlobCleanup()
 	database, err := application.EnsurePrivatePlan(fixtureResource.ID, "fixture-browser-test", "http://fixture.invalid", "browser-test")
 	if err != nil {
 		log.Fatalf("ensure fixture plan: %v", err)
 	}
 
 	readOnly := parseBool(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
+	receiptSource, err := receiptmock.New()
+	if err != nil {
+		log.Fatalf("configure fixture receipt source: %v", err)
+	}
 	// A reset must not interleave with an in-flight request holding the store.
 	var mu sync.Mutex
 	live := &switcher{}
@@ -96,6 +103,7 @@ func main() {
 		}
 		readOnly = nextReadOnly
 		live.set(api.New(database, api.Config{
+			ReceiptSource:  receiptSource,
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
 			ResourceID:     fixtureResource.ID,

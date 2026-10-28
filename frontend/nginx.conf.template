@@ -33,6 +33,13 @@ server {
     }
 
     location ^~ /v1 {
+        # Nested prefix inherits API proxy headers and timeouts. It still needs
+        # its own proxy content handler rather than falling back to static files.
+        # The API enforces its 10 MiB file and bounded multipart limits too.
+        location /v1/receipts {
+            client_max_body_size 11m;
+            proxy_pass ${BACKEND_URL};
+        }
         proxy_pass ${BACKEND_URL};
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;

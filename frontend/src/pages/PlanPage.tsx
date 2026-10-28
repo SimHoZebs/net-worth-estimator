@@ -124,6 +124,12 @@ function usePlanRemoval({
 				The item will be marked as removed in your changes. Your saved plan
 				stays intact until you explicitly save.
 			</p>
+			{remove.kind === "movements" && (
+				<p>
+					Saving this removal also deletes any receipts attached to the
+					transaction.
+				</p>
+			)}
 		</ConfirmDialog>
 	);
 	return { requestRemoval, dialog };

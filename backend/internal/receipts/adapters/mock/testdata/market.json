@@ -1,0 +1,14 @@
+{
+  "merchant": "Sample Market",
+  "date": "2026-10-20",
+  "currency": "USD",
+  "subtotalCents": 1175,
+  "taxCents": 59,
+  "tipCents": 0,
+  "discountCents": 0,
+  "totalCents": 1234,
+  "items": [
+    {"description": "Apples", "quantity": 1.5, "unitPriceCents": 250, "totalCents": 375, "category": ""},
+    {"description": "Bread", "quantity": 2, "unitPriceCents": 400, "totalCents": 800, "category": ""}
+  ]
+}

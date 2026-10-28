@@ -38,6 +38,7 @@ services:
       HOST: 0.0.0.0
       PORT: 8787
       NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
+      NET_WORTH_ESTIMATOR_RECEIPT_SOURCE: mock
       NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
       NET_WORTH_ESTIMATOR_AUTH_PROVIDER: casdoor
       NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${DEV_CASDOOR_PUBLIC_URL:?Run scripts/dev setup}
