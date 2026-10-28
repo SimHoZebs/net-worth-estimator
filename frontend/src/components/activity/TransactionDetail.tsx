@@ -49,6 +49,7 @@ import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import { buildMovementPlan } from "../editors/MovementEditor.tsx";
+import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
@@ -1003,6 +1004,9 @@ export function TransactionDetail({
 					)}
 					<ReadOnlyNotice movement={movement} />
 				</form>
+				{once && (
+					<ReceiptPanel postingId={movement.id} readOnly={plan.readOnly} />
+				)}
 			</Modal>
 		</DetailPortal>
 	);

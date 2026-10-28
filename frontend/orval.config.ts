@@ -11,6 +11,12 @@ export default defineConfig({
 			baseUrl: "",
 			override: {
 				operations: {
+					"get-receipt-image": {
+						mutator: {
+							path: "./src/api/waypoint-fetch.ts",
+							name: "waypointBlobFetch",
+						},
+					},
 					...Object.fromEntries(
 						[
 							"get-auth-session",

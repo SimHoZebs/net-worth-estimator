@@ -17,6 +17,7 @@ import (
 // in TestOpen* and TestPurge* alongside this file.
 func RunConformance(t *testing.T, newStore func(*testing.T) Store) {
 	t.Helper()
+	t.Run("ReceiptEvidence", func(t *testing.T) { testReceiptConformance(t, newStore) })
 	t.Run("InitializeDocument", func(t *testing.T) {
 		testInitializeDocument(t, newStore)
 	})

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"flag"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -24,6 +26,7 @@ var financialTables = []string{
 	"posting_id_migrations", "purchase_policies", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
+	"receipts",
 }
 
 func main() {
@@ -106,6 +109,21 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	if present != 1 {
 		return errors.New("source plan has no financial model")
 	}
+	var receipts *store.ReceiptCopy
+	if !sample {
+		sourceDB, err := sql.Open("sqlite", uri)
+		if err != nil {
+			return err
+		}
+		defer sourceDB.Close()
+		// SQLite remains the configured source adapter. Future providers enter
+		// here through the same port, not through the financial copy loop.
+		receipts, err = db.PrepareReceiptCopy(context.Background(), sourceDB, blobsqlite.New(sourceDB), sourcePlan)
+		if err != nil {
+			return fmt.Errorf("prepare receipt copy: %w", err)
+		}
+		defer receipts.Close()
+	}
 	tx, err := db.SQL().Begin()
 	if err != nil {
 		return err
@@ -142,7 +160,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 		}
 	}
 	for _, table := range tables {
-		if table.name == "projection_artifacts" {
+		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
 		if sample && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations") {
@@ -171,6 +189,11 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 		query := "INSERT INTO " + quote(table.name) + " (" + strings.Join(columns, ",") + ") SELECT " + strings.Join(values, ",") + " FROM incoming." + quote(table.name) + " WHERE plan_id=?"
 		if _, err := tx.Exec(query, targetPlan, sourcePlan); err != nil {
 			return fmt.Errorf("copy %s: %w", table.name, err)
+		}
+	}
+	if receipts != nil {
+		if err := receipts.Apply(tx, targetPlan); err != nil {
+			return fmt.Errorf("copy receipts: %w", err)
 		}
 	}
 	return tx.Commit()

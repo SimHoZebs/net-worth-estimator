@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/blobstore"
+	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
 )
 
 const sharedSchemaVersion = "shared-plans-v1"
@@ -18,28 +21,29 @@ var ErrSetupRequired = errors.New("database setup required: run setupdb before s
 // returned for an explicit plan. SQL is reserved for privileged identity and
 // offline migration code, never API handlers.
 type Database struct {
-	db *sql.DB
+	db    *sql.DB
+	blobs blobstore.Store
 }
 
 // OpenDatabase opens an existing, fully provisioned database. It never creates
 // files, repairs permissions, or changes the schema.
-func OpenDatabase(path string) (*Database, error) {
+func OpenDatabase(path string, options ...DatabaseOption) (*Database, error) {
 	dsn, err := existingDatabaseFile(path, false)
 	if err != nil {
 		return nil, err
 	}
-	return connectDatabase(dsn)
+	return connectDatabase(dsn, options...)
 }
 
 // SetupDatabase provisions the current application schema for deployment or
-// tests. Existing shared databases are supported; legacy databases require the
-// offline migration. Setup never provisions accounts or plans.
-func SetupDatabase(path string) (*Database, error) {
+// tests. Existing shared databases are supported; legacy databases are
+// rejected. Setup never provisions accounts or plans.
+func SetupDatabase(path string, options ...DatabaseOption) (*Database, error) {
 	dsn, err := setupDatabaseFile(path)
 	if err != nil {
 		return nil, err
 	}
-	d, err := connectDatabase(dsn)
+	d, err := connectDatabase(dsn, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,13 +54,19 @@ func SetupDatabase(path string) (*Database, error) {
 	return d, nil
 }
 
-func connectDatabase(dsn string) (*Database, error) {
+func connectDatabase(dsn string, options ...DatabaseOption) (*Database, error) {
 	db, err := sql.Open("sqlite", dsn+"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 	db.SetMaxOpenConns(1)
-	d := &Database{db: db}
+	d := &Database{db: db, blobs: blobsqlite.New(db)}
+	for _, option := range options {
+		if err := option(d); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, err
@@ -87,6 +97,18 @@ func (d *Database) setupSchema() error {
 			return fmt.Errorf("ensure shared schema: %w", err)
 		}
 	}
+	_, defaultSQLite := d.blobs.(*blobsqlite.Store)
+	if err := migrateInlineReceiptImages(tx, defaultSQLite); err != nil {
+		return fmt.Errorf("migrate receipt blobs: %w", err)
+	}
+	for _, statement := range receiptBlobSchemaObjects {
+		if _, err := tx.Exec(statement); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('receipt-blobs-v1')`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`INSERT OR IGNORE INTO schema_migrations(name) VALUES (?)`, sharedSchemaVersion); err != nil {
 		return err
 	}
@@ -114,7 +136,7 @@ func (d *Database) Plan(planID string) (Store, error) {
 	if !exists {
 		return nil, fmt.Errorf("plan %q: %w", planID, sql.ErrNoRows)
 	}
-	return &sqliteStore{db: &planDB{DB: d.db, planID: planID}}, nil
+	return &sqliteStore{db: &planDB{DB: d.db, planID: planID}, application: d}, nil
 }
 
 func (d *Database) EnsurePrivatePlan(planID, accountID, issuer, subject string) (Store, error) {
@@ -170,7 +192,7 @@ func (d *Database) ensurePlan(planID, kind, accountID, issuer, subject string) (
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &sqliteStore{db: &planDB{DB: d.db, planID: planID}}, nil
+	return &sqliteStore{db: &planDB{DB: d.db, planID: planID}, application: d}, nil
 }
 
 func nilIfEmpty(value string) any {

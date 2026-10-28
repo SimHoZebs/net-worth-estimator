@@ -31,6 +31,7 @@ import (
 //     presets, plan ownership, other plans, and identity state. Use
 //     ClearSyncCredential to disconnect the key while keeping cards.
 type Store interface {
+	ReceiptStore
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
 	InitializeDocument() error
@@ -96,8 +97,9 @@ type Store interface {
 // sqliteStore is the embedded-SQLite Store implementation. Pure-Go driver
 // (modernc), single file, WAL mode, one open connection.
 type sqliteStore struct {
-	db    *planDB
-	owned *Database
+	db          *planDB
+	owned       *Database
+	application *Database
 }
 
 // Open creates or opens an explicit plans/fixture scope for isolated tests

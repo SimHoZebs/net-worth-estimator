@@ -4,6 +4,12 @@
 with isolated dev storage, loopback ports, and external sync disabled. Compose
 owns the container lifecycle. It does not load the production Compose files.
 
+Receipt extraction uses a local mock adapter with no cloud credentials or
+external calls. Upload the [synthetic sample](../backend/internal/receipts/adapters/mock/testdata/market.png)
+to a saved expense to exercise extraction. Other images support manual review.
+See [receipt setup and source contracts](../docs/receipts.md). Production snapshots
+and private plan refreshes now include receipt images and review data.
+
 ## One-time setup
 
 Requires Docker Compose 5.0+ and Node 24+. The data commands use
