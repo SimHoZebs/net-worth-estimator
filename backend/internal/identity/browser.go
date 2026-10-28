@@ -4,12 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"golang.org/x/oauth2"
 )
 
@@ -70,31 +70,15 @@ func browserEndpoints(c Config) (map[string]browserEndpoint, error) {
 }
 
 func canonicalBrowserOrigin(raw string, allowPrivateHTTP bool) (string, error) {
-	if err := validateURL(raw, true, allowPrivateHTTP); err != nil {
+	canonical, err := api.CanonicalOrigin(raw)
+	if err != nil {
 		return "", err
 	}
-	u, _ := url.Parse(raw)
-	host := strings.ToLower(u.Hostname())
-	if strings.ContainsAny(host, "* \\%") {
-		return "", fmt.Errorf("expected an exact browser hostname")
+	u, _ := url.Parse(canonical)
+	if u.Scheme == "http" && !authorization.IsLoopbackHost(u.Hostname()) && !allowPrivateHTTP {
+		return "", fmt.Errorf("HTTP is restricted to loopback without the private-LAN flag; use HTTPS or set NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1 for plain HTTP on a trusted LAN")
 	}
-	port := u.Port()
-	if port != "" {
-		n, err := strconv.Atoi(port)
-		if err != nil || n < 1 || n > 65535 {
-			return "", fmt.Errorf("expected a port between 1 and 65535")
-		}
-		port = strconv.Itoa(n)
-		if (u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443") {
-			port = ""
-		}
-	}
-	if port != "" {
-		host = net.JoinHostPort(host, port)
-	} else if strings.Contains(host, ":") {
-		host = "[" + host + "]"
-	}
-	return u.Scheme + "://" + host, nil
+	return canonical, nil
 }
 
 func (s *Service) browserEndpoint(r *http.Request) (browserEndpoint, bool) {

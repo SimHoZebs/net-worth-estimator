@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/singleflight"
@@ -45,7 +46,11 @@ func New(ctx context.Context, c Config) (*Service, error) {
 		c.RecheckInterval = 30 * time.Second
 	}
 	csrf := http.NewCrossOriginProtection()
-	if err := csrf.AddTrustedOrigin(strings.TrimRight(c.PublicURL, "/")); err != nil {
+	publicOrigin, err := canonicalBrowserOrigin(c.PublicURL, c.AllowPrivateHTTP)
+	if err != nil {
+		return nil, fmt.Errorf("configure public origin: %w", err)
+	}
+	if err := csrf.AddTrustedOrigin(publicOrigin); err != nil {
 		return nil, fmt.Errorf("configure public origin: %w", err)
 	}
 	issuer, err := url.Parse(c.Issuer)
@@ -230,9 +235,19 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 		}
 		if endpoint, ok := s.browserEndpoint(r); ok {
 			// A sibling app origin cannot submit this origin's cookies.
-			if origin := r.Header.Get("Origin"); origin != "" && origin != endpoint.app && !isSafeMethod(r.Method) {
-				failure(w, http.StatusForbidden, "The request origin does not match this application address.")
-				return
+			// Compare through the shared canonicalizer so trailing-slash,
+			// case, and default-port variants match identically.
+			if origin := r.Header.Get("Origin"); origin != "" && !isSafeMethod(r.Method) {
+				allowed := origin == endpoint.app
+				if !allowed {
+					if canonical, err := api.CanonicalOrigin(origin); err == nil && canonical == endpoint.app {
+						allowed = true
+					}
+				}
+				if !allowed {
+					failure(w, http.StatusForbidden, "The request origin does not match this application address.")
+					return
+				}
 			}
 		}
 		protected.ServeHTTP(w, r)
