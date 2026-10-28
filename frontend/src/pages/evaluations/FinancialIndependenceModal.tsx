@@ -1,15 +1,22 @@
 import { TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { Drawer } from "@/components/Drawer.tsx";
+import { Tabs } from "@/components/Tabs.tsx";
 import {
 	type FinancialIndependenceAnalysis,
 	type FinancialIndependenceRange,
 } from "@/domain/financialIndependence.ts";
-import { dateLabel } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
+import { IndependenceConfigure } from "./IndependenceConfigure.tsx";
 import { IndependenceDataTable } from "./IndependenceDataTable.tsx";
-import { IndependenceConfigureSection } from "./IndependenceConfigure.tsx";
 import { IndependenceEvidence } from "./IndependenceEvidence.tsx";
 import { IndependenceOverview } from "./IndependenceOverview.tsx";
+
+type InspectorTab = "overview" | "configure";
+const tabs = [
+	{ id: "overview", label: "Overview" },
+	{ id: "configure", label: "Configure" },
+] as const;
 
 export function FinancialIndependenceModal({
 	item,
@@ -22,6 +29,7 @@ export function FinancialIndependenceModal({
 	range: FinancialIndependenceRange | null;
 	onClose: () => void;
 }) {
+	const [tab, setTab] = useState<InspectorTab>("overview");
 	const candidate =
 		analysis.candidates.find((row) => row.date === analysis.defaultDate) ??
 		analysis.candidates[0];
@@ -36,23 +44,38 @@ export function FinancialIndependenceModal({
 				coverage: "full",
 				headerClassName: "border-b-0 pb-2",
 				bodyClassName: "pt-0",
-				eyebrow: analysis.endDate
-					? `${dateLabel(analysis.startDate, true)} – ${dateLabel(analysis.endDate, true)}`
-					: undefined,
 			}}
 		>
-			<div className="grid content-start gap-6">
-				<IndependenceOverview
-					analysis={analysis}
-					range={range}
-					candidate={candidate}
-				/>
-				<IndependenceConfigureSection instanceId={item.id} />
-				{candidate && (
-					<IndependenceEvidence candidate={candidate} analysis={analysis} />
+			<Tabs
+				items={tabs}
+				value={tab}
+				onChange={setTab}
+				label="Financial independence detail view"
+				className="mb-4"
+			>
+				{tab === "overview" && (
+					<div className="grid content-start gap-6">
+						<IndependenceOverview
+							analysis={analysis}
+							range={range}
+							candidate={candidate}
+						/>
+						{candidate && (
+							<IndependenceEvidence candidate={candidate} analysis={analysis} />
+						)}
+						<IndependenceDataTable analysis={analysis} />
+					</div>
 				)}
-				<IndependenceDataTable analysis={analysis} />
-			</div>
+				{tab === "configure" && (
+					<div className="grid content-start gap-3">
+						<p className="m-0 text-xs text-muted">
+							Minimum net worth, spending test duration, and funding sources.
+							Saving recalculates the projection.
+						</p>
+						<IndependenceConfigure instanceId={item.id} />
+					</div>
+				)}
+			</Tabs>
 			{!!analysis.diagnostics.length && (
 				<details
 					className="mt-4 rounded-surface border border-warning-border bg-warning-bg p-4 text-xs text-warning-text"
