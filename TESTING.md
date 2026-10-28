@@ -2,6 +2,16 @@
 
 This checkout holds two packages: the Go backend in `backend/`, and the Waypoint frontend in `frontend/`. Both have their own gates. The backend is the calculation authority; the frontend renders its results and keeps local edits as a temporary review layer.
 
+Use `./scripts/test` as the single entry point:
+
+```bash
+scripts/test --unit          # no servers, Docker daemon, or credentials
+scripts/test --integration   # playwright browser suite (fixtureapi + Vite over real HTTP)
+scripts/test --all           # unit then integration
+```
+
+Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `npm --prefix frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+
 ## Manual Development
 
 Run `./scripts/dev setup` once, then use the dedicated dev Compose stack:
