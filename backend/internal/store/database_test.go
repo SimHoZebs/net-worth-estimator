@@ -40,6 +40,9 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 		if table == "plans" || table == "app_accounts" || table == "schema_migrations" {
 			continue
 		}
+		if table == "user_groups" || table == "group_members" || table == "group_invites" {
+			continue
+		}
 		if table == "sessions" || table == "identity_grants" || table == "identity_logout_marks" || table == "identity_logout_tokens" {
 			continue
 		}

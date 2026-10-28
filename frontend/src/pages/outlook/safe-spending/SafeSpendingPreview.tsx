@@ -265,23 +265,31 @@ export function SafeSpendingPreview({
 		transactionOrder,
 	]);
 
-	// Direct cash spend: checking outflows outside the tracked bill set
-	// (one-time purchases plus deselected recurring rules). Card allowance
-	// stays card-only; this list lives beside it under cash. The list covers
-	// the same upcoming window as bills (after today through cycle end) so
+	// Direct cash spend: checking outflows outside the tracked bill set.
+	// Only genuine one-time postings belong here; occurrences owned by a
+	// recurrence rule stay out even when the rule is deselected, since the
+	// rule (not this list) owns its schedule. Card allowance stays
+	// card-only; this list lives beside it under cash. The list covers the
+	// same upcoming window as bills (after today through cycle end) so
 	// section totals stay comparable; past direct spend lives only in the
 	// since-balance summary rows, matching past bills.
 	const directMovements = useMemo(() => {
 		if (!spendingIds.length) return [];
 		const bills = new Set(trackedBillIds);
+		const rules = new Set(
+			plan.movements
+				.filter((movement) => movement.frequency !== "once")
+				.map((movement) => movement.id),
+		);
 		const sources = new Set(spendingIds);
 		return movements.filter(
 			(movement) =>
 				movement.fromId !== null &&
 				sources.has(movement.fromId) &&
-				!bills.has(movement.movementId),
+				!bills.has(movement.movementId) &&
+				!rules.has(movement.movementId),
 		);
-	}, [movements, spendingIds, trackedBillIds]);
+	}, [movements, spendingIds, trackedBillIds, plan.movements]);
 
 	const directSpentSinceStart = useMemo(
 		() =>

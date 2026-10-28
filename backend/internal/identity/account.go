@@ -109,6 +109,7 @@ func (s *Service) resolveSelf(r *http.Request, g grant) (casdoorAccount, error) 
 // Transport errors stay 503s; only revoked semantics force re-login.
 func (s *Service) revoked(w http.ResponseWriter, r *http.Request, g grant) {
 	_ = s.store.deleteGrant(g.ID, s.config.Issuer)
+	_ = s.store.removeGroupMemberships(s.config.Issuer, g.Subject)
 	_ = s.sessions.Destroy(r.Context())
 	failure(w, 401, "The account is no longer active. Start sign-in again.")
 }
