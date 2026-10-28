@@ -276,6 +276,32 @@ func schemaStatements() []string {
 			PRIMARY KEY(plan_id, id),
 			UNIQUE(plan_id, name)
 		)`,
+		`CREATE TABLE IF NOT EXISTS user_groups (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			created_by_account_id TEXT NOT NULL REFERENCES app_accounts(id),
+			created_at INTEGER NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS group_members (
+			group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+			account_id TEXT NOT NULL REFERENCES app_accounts(id),
+			role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+			joined_at INTEGER NOT NULL,
+			display_name TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY(group_id, account_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS group_members_account ON group_members(account_id, group_id)`,
+		`CREATE TABLE IF NOT EXISTS group_invites (
+			id TEXT PRIMARY KEY,
+			group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+			code_hash TEXT NOT NULL UNIQUE,
+			created_by_account_id TEXT NOT NULL REFERENCES app_accounts(id),
+			expires_at INTEGER NOT NULL,
+			max_uses INTEGER NOT NULL DEFAULT 1 CHECK (max_uses >= 1),
+			used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
+			revoked_at INTEGER,
+			created_at INTEGER NOT NULL
+		)`,
 	}
 }
 
@@ -402,6 +428,9 @@ var requiredSchemaColumns = map[string]string{
 	"identity_logout_tokens": "issuer, jti, expiry",
 	"app_accounts":           "id, issuer, subject",
 	"plans":                  "id, kind, owner_account_id",
+	"user_groups":            "id, name, created_by_account_id, created_at",
+	"group_members":          "group_id, account_id, role, joined_at, display_name",
+	"group_invites":          "id, group_id, code_hash, created_by_account_id, expires_at, max_uses, used_count, revoked_at, created_at",
 	"accounts":               "plan_id, id, position, name, kind, min_balance, max_balance, color, enabled",
 	"checkpoints":            "plan_id, id, position, date, account_id, balance, source",
 	"postings":               "plan_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order",
@@ -456,6 +485,9 @@ func expectedSchemaTables() []string {
 		"identity_logout_tokens",
 		"app_accounts",
 		"plans",
+		"user_groups",
+		"group_members",
+		"group_invites",
 		"accounts",
 		"checkpoints",
 		"postings",

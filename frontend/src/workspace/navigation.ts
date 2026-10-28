@@ -5,6 +5,7 @@ import {
 	LayoutDashboard,
 	Settings,
 	ShoppingBag,
+	Users,
 	Wallet,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ export type Page =
 	| "transactions"
 	| "purchases"
 	| "evaluations"
+	| "groups"
 	| "sources";
 export type PageDefinition = {
 	id: Page;
@@ -52,6 +54,12 @@ export const pages: PageDefinition[] = [
 		label: "Evaluations",
 		icon: Flag,
 		title: "Check what the plan supports",
+	},
+	{
+		id: "groups",
+		label: "Groups",
+		icon: Users,
+		title: "Manage your groups",
 	},
 	{
 		id: "sources",

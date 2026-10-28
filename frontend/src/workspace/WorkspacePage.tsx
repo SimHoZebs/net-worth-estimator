@@ -1,6 +1,7 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/PlanEditor.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
+import { GroupsPage } from "../pages/GroupsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { PlanPage } from "../pages/PlanPage.tsx";
@@ -67,6 +68,8 @@ export function WorkspacePage({
 					onEdit={(item) => onEdit({ kind: "evaluation", item })}
 				/>
 			);
+		case "groups":
+			return <GroupsPage />;
 		case "sources":
 			return <SourcesPage />;
 	}
