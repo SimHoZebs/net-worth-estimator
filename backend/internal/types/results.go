@@ -42,6 +42,17 @@ type EvaluationResultCollection struct {
 	Evaluations EvaluationResultTables `json:"evaluations"`
 }
 
+// ByType returns the result rows for an evaluation type, or nil when the
+// type names no result table.
+func (t *EvaluationResultTables) ByType(evaluationType string) *[]EvaluationResultEnvelope {
+	for _, table := range t.Tables() {
+		if table.Type == evaluationType {
+			return table.Rows
+		}
+	}
+	return nil
+}
+
 // Model validation diagnostics.
 
 type ValidationSeverity string

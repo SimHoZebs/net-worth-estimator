@@ -26,6 +26,9 @@ func Simulate(request types.SimulationRequest) (types.SimulationRun, error) {
 // simulateScheduled executes established payments and accepted purchases.
 // Only the purchase evaluation supplies purchases and candidate dates.
 func simulateScheduled(request types.SimulationRequest, purchases []scheduledPurchase, candidateDates []string) (types.SimulationRun, error) {
+	if err := requireResimulationAllowed("simulateScheduled"); err != nil {
+		return types.SimulationRun{}, err
+	}
 	transitions, err := CreateTransitionRuntime(
 		request.Model,
 		request.InitialState,
