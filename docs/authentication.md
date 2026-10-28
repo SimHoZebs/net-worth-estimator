@@ -104,7 +104,10 @@ runtime verification.
 Login state binds the starting app origin to its callback and token exchange.
 Account and logout links use that origin's provider address. Unknown auth hosts,
 cross-origin callbacks, and sibling-origin write requests fail closed. Proxies
-must preserve `Host`; forwarded host headers do not select redirects.
+must preserve `Host` or use the [authenticated ingress contract](../deploy/README.md#reverse-proxy-contract).
+Authenticated ingress normalizes Host and scheme from an exact configured public
+origin before identity sees the request. Forwarded host headers alone do not
+select redirects. Session-cookie and CSRF policy remain unchanged.
 
 With additional origins, application cookies use an issuer/client namespace.
 The provider gateway also isolates every Casdoor cookie. This prevents dev and
