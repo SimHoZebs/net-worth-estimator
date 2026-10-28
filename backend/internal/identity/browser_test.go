@@ -133,3 +133,27 @@ func TestSiblingAppOriginCannotSubmitLogout(t *testing.T) {
 		t.Fatal("rejected logout destroyed the session")
 	}
 }
+
+func TestProxyOriginsUseCanonicalAppsAndProviderAliases(t *testing.T) {
+	c := Config{
+		PublicURL: "https://APP.test:443/", Issuer: "https://identity.test",
+		BrowserOrigins: map[string]string{"https://ALIAS.test:8443/": "https://LOGIN.test:443/"},
+	}
+	origins, err := c.ProxyOrigins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"https://app.test": true, "https://alias.test:8443": true, "https://login.test": true}
+	if len(origins) != len(want) {
+		t.Fatalf("unexpected proxy origins: %v", origins)
+	}
+	for _, origin := range origins {
+		if !want[origin] {
+			t.Fatalf("unexpected proxy origin %q", origin)
+		}
+	}
+	c.PublicURL = "https://app.test/invalid"
+	if _, err := c.ProxyOrigins(); err == nil {
+		t.Fatal("accepted an invalid application origin")
+	}
+}

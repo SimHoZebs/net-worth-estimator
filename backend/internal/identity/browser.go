@@ -98,9 +98,28 @@ func canonicalBrowserOrigin(raw string) (string, error) {
 }
 
 func (s *Service) browserEndpoint(r *http.Request) (browserEndpoint, bool) {
-	// Nginx preserves Host. Forwarded headers never select a redirect target.
+	// A Host-preserving proxy or authenticated ingress supplies Host.
+	// Forwarded headers alone never select a redirect target.
 	endpoint, ok := s.browsers[strings.ToLower(r.Host)]
 	return endpoint, ok
+}
+
+// ProxyOrigins returns the canonical application and provider-alias origins
+// that an authenticated ingress may select. The issuer itself is not a proxy.
+func (c Config) ProxyOrigins() ([]string, error) {
+	endpoints, err := browserEndpoints(c)
+	if err != nil {
+		return nil, err
+	}
+	origins := make([]string, 0, len(endpoints)*2)
+	issuer, _ := url.Parse(c.Issuer)
+	for _, endpoint := range endpoints {
+		origins = append(origins, endpoint.app)
+		if endpoint.provider != issuer.Scheme+"://"+issuer.Host {
+			origins = append(origins, endpoint.provider)
+		}
+	}
+	return origins, nil
 }
 
 func (s *Service) browserOAuth(endpoint browserEndpoint) oauth2.Config {

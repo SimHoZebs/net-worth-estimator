@@ -7,4 +7,4 @@ Intercept that exact PATCH request. Assert that the interception fired, the erro
 - Fixture/test: `frontend/tests/fixtures/model/recurrence-rules.csv:4`, `frontend/tests/workspace.spec.ts:140-168`.
 - Actual operation: `frontend/src/api/rowSync.ts:226-237,450-459`, `frontend/src/api/client.ts:516-524`.
 
-Run the corrected failed-save test and the successful-save workflow. This test repair should precede [browser CI wiring](frontend-ci-gates.md). No application change is required.
+Run the corrected failed-save test and the successful-save workflow locally. No application change is required.
