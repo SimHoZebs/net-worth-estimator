@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -34,10 +36,10 @@ func testSyncStateDefaultsEmptyAndRoundTrips(t *testing.T, newStore func(*testin
 	}
 }
 
-func withSourceModel(checkpoints []types.Checkpoint) []types.Checkpoint {
+func withSourceUser(checkpoints []types.Checkpoint) []types.Checkpoint {
 	out := make([]types.Checkpoint, len(checkpoints))
 	for i, checkpoint := range checkpoints {
-		checkpoint.Source = SourceModel
+		checkpoint.Source = SourceUser
 		out[i] = checkpoint
 	}
 	return out
@@ -121,10 +123,10 @@ func seedSyncState(t *testing.T, store Store) {
 	if _, err := store.CreateAccount(types.Account{ID: "prime_card", Name: "Prime", Enabled: true}); err != nil {
 		t.Fatalf("seed card account: %v", err)
 	}
+	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
-		[]SyncPosting{syncPendingPosting("tx1", "prime_card", "2026-08-02")},
-		[]string{"prime_card"})
+		[]BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
 	}
@@ -205,7 +207,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	forged := testPostingFixture("01900000-0000-7000-8000-000000000013")
 	forged.Source, forged.Pending = SourceSimpleFIN, true
 	created, err := store.CreatePosting(forged)
-	if err != nil || created.Source != SourceModel || created.Pending {
+	if err != nil || created.Source != SourceUser || created.Pending {
 		t.Fatalf("owner posting metadata = %+v, err %v", created, err)
 	}
 
@@ -234,7 +236,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	if err != nil {
 		t.Fatalf("save checkpoint: %v", err)
 	}
-	if saved.Source != SourceModel {
+	if saved.Source != SourceUser {
 		t.Fatalf("checkpoint source = %q, want recomputed owner", saved.Source)
 	}
 	loaded, err := store.LoadDocument()
@@ -245,7 +247,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 		t.Fatalf("checkpoints = %+v, want owner + synced", loaded.Checkpoints)
 	}
 	for _, checkpoint := range loaded.Checkpoints {
-		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-07-01" && checkpoint.Source != SourceModel {
+		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-07-01" && checkpoint.Source != SourceUser {
 			t.Fatalf("forged checkpoint flag persisted: %+v", checkpoint)
 		}
 	}
@@ -253,7 +255,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	if sources[synced.ID] != SourceSimpleFIN {
 		t.Fatalf("stored sync posting lost flag: %v", sources)
 	}
-	if sources[ownerPostingID] != SourceModel || sources[created.ID] != SourceModel {
+	if sources[ownerPostingID] != SourceUser || sources[created.ID] != SourceUser {
 		t.Fatalf("owner posting flags = %v", sources)
 	}
 }
@@ -305,10 +307,10 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	for key, want := range map[string]string{
 		"checkpoint:checking:2026-08-01":  "simplefin",
 		"checkpoint:checking:2026-08-02":  "plaid",
-		"checkpoint:checking:2026-07-01":  "model",
+		"checkpoint:checking:2026-07-01":  "user",
 		"posting:" + rawSyncedPostingID:   "simplefin",
 		"posting:" + otherSyncedPostingID: "plaid",
-		"posting:" + ownerPostingID:       "model",
+		"posting:" + ownerPostingID:       "user",
 	} {
 		if sources[key] != want {
 			t.Fatalf("source %q = %q, want %q (all rows: %v)", key, sources[key], want, sources)
@@ -340,7 +342,7 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 	for _, checkpoint := range loaded.Checkpoints {
 		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-08-01" {
 			count++
-			if checkpoint.Balance != 222 || checkpoint.Source != SourceModel {
+			if checkpoint.Balance != 222 || checkpoint.Source != SourceUser {
 				t.Fatalf("collision row = %+v, want owner correction", checkpoint)
 			}
 		}
@@ -403,7 +405,7 @@ func syncedPendingIDs(document *types.FinancialModelDocument) []string {
 		return ids
 	}
 	for _, posting := range document.Postings {
-		if posting.Pending && posting.Source != SourceModel {
+		if posting.Pending && posting.Source != SourceUser {
 			ids = append(ids, posting.ID)
 		}
 	}
@@ -420,26 +422,25 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 	// An owner document first, mirroring production (seeded DB): sync rows
 	// merge into the visible document instead of an empty store.
 	seedOwnerDocument(t, store)
-	cards := []string{"prime_card"}
 	seedAccount(t, store, "prime_card")
 
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, cards)
+		nil)
 	if err != nil || summary.CheckpointsInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 
 	again, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, cards)
+		nil)
 	if err != nil || again.CheckpointsUpdated != 1 || again.CheckpointsInserted != 0 {
 		t.Fatalf("rerun = %+v, err %v", again, err)
 	}
 
 	changed, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 150}},
-		nil, cards)
+		nil)
 	if err != nil || changed.CheckpointsUpdated != 1 {
 		t.Fatalf("update = %+v, err %v", changed, err)
 	}
@@ -471,7 +472,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	_ = extra
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, []string{"checking"})
+		nil)
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
@@ -485,6 +486,17 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	}
 }
 
+// syncPendingDirective mirrors what adapters emit for a pending seed:
+// bank source with explicit pending lifecycle.
+func syncPendingDirective(item SyncPosting) BankDirective {
+	item.Source = SourceSimpleFIN
+	item.Pending = true
+	return BankDirective{Upsert: &BankUpsert{
+		Posting: item.Posting,
+		Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+	}}
+}
+
 func TestApplySyncPlanRefreshesPendingSnapshot(t *testing.T) {
 	testApplySyncPlanRefreshesPendingSnapshot(t, openTestStore)
 }
@@ -494,30 +506,42 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	store := newStore(t)
 	seedOwnerDocument(t, store)
 	seedAccount(t, store, "prime_card")
-	cards := []string{"prime_card"}
 
-	first, err := store.ApplySyncPlan(nil, []SyncPosting{
-		syncPendingPosting("a", "prime_card", "2026-08-02"),
-		syncPendingPosting("b", "prime_card", "2026-08-02"),
-	}, cards)
+	first, err := store.ApplySyncPlan(nil, []BankDirective{
+		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
+		syncPendingDirective(syncPendingPosting("b", "prime_card", "2026-08-02")),
+	})
 	if err != nil || first.PendingInserted != 2 {
 		t.Fatalf("first apply = %+v, err %v", first, err)
 	}
-
-	second, err := store.ApplySyncPlan(nil, []SyncPosting{
-		syncPendingPosting("b", "prime_card", "2026-08-03"),
-		syncPendingPosting("c", "prime_card", "2026-08-03"),
-	}, cards)
+	loaded, err := store.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]string{}
+	for _, posting := range loaded.Postings {
+		if posting.Source == SourceSimpleFIN && posting.Pending {
+			ids[posting.Name] = posting.ID
+		}
+	}
+	if len(ids) != 2 {
+		t.Fatalf("pending rows = %+v", loaded.Postings)
+	}
+	second, err := store.ApplySyncPlan(nil, []BankDirective{
+		syncPendingDirective(syncPendingPosting("b", "prime_card", "2026-08-03")),
+		syncPendingDirective(syncPendingPosting("c", "prime_card", "2026-08-03")),
+		{Void: ids["Pending a"]},
+	})
 	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
 		t.Fatalf("second apply = %+v, err %v", second, err)
 	}
-	loaded, err := store.LoadDocument()
+	reloaded, err := store.LoadDocument()
 	if err != nil {
-		t.Fatalf("load: %v", err)
+		t.Fatal(err)
 	}
-	got := syncedPendingIDs(loaded)
+	got := syncedPendingIDs(reloaded)
 	if len(got) != 2 {
-		t.Fatalf("pending rows = %v, want 2", got)
+		t.Fatalf("pending rows = %+v, want b and c", got)
 	}
 	for _, id := range got {
 		if _, err := uuid.Parse(id); err != nil {
@@ -532,15 +556,140 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	seedAccount(t, store, "prime_card")
 	execSyncSetup(t, store, []string{
 		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, plan_id)
-		 VALUES ('` + ownerPostingID + `', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'model', 1, :plan_id)`,
+		 VALUES ('` + ownerPostingID + `', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'user', 1, :plan_id)`,
 	})
-	summary, err := store.ApplySyncPlan(nil, []SyncPosting{
-		syncPendingPosting("a", "prime_card", "2026-08-02"),
-	}, []string{"prime_card"})
+	summary, err := store.ApplySyncPlan(nil, []BankDirective{
+		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
+	})
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
 		t.Fatal("owner row was deleted")
+	}
+}
+
+func TestApplySyncPlanConvertsNamedRowKeepingUUID(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	seed := syncPendingPosting("a", "prime_card", "2026-08-02")
+	if _, err := store.ApplySyncPlan(nil, []BankDirective{syncPendingDirective(seed)}); err != nil {
+		t.Fatal(err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil || len(document.Postings) != 1 {
+		t.Fatal("seed pending missing")
+	}
+	id := document.Postings[0].ID
+	settled := syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03")
+	settled.Source = SourceSimpleFIN
+	summary, err := store.ApplySyncPlan(nil, []BankDirective{{Convert: &BankConvert{
+		ID:      id,
+		Posting: settled.Posting,
+		AddKeys: []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+	}}})
+	if err != nil || summary.SettledConverted != 1 {
+		t.Fatalf("convert = %+v, err %v", summary, err)
+	}
+	converted, err := store.LoadDocument()
+	if err != nil || len(converted.Postings) != 1 {
+		t.Fatal("convert changed row count")
+	}
+	row := converted.Postings[0]
+	if row.ID != id || row.Source != SourceSimpleFIN || row.Pending || row.Void || row.Enabled {
+		t.Fatalf("converted row = %+v", row)
+	}
+	rows, err := store.LoadBankPostings()
+	if err != nil || len(rows) != 1 || len(rows[0].Keys) != 1 || rows[0].Keys[0].TransactionID != "posted-a" {
+		t.Fatalf("keys after rotation = %+v, %v", rows, err)
+	}
+}
+
+func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	settled := syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03")
+	settled.Source = SourceSimpleFIN
+	if _, err := database.ApplySyncPlan(nil, []BankDirective{{Upsert: &BankUpsert{
+		Posting: settled.Posting,
+		Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	document, err := database.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id string
+	for _, posting := range document.Postings {
+		if posting.Name == "Corner Store" {
+			id = posting.ID
+		}
+	}
+	if id == "" {
+		t.Fatal("inserted settled row missing")
+	}
+	receipt, err := database.CreateReceipt(context.Background(), id, "corner.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ImportCSV(filepath.Join(projectRoot(t), "frontend", "tests", "fixtures", "model")); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := database.GetReceipt(receipt.ID)
+	if err != nil || restored.PostingID != id {
+		t.Fatalf("replacement dropped bank evidence: %+v, %v", restored, err)
+	}
+	links, err := database.ListPostingReceiptIDs()
+	if err != nil || len(links[id]) != 1 || links[id][0] != receipt.ID {
+		t.Fatalf("replacement dropped posting field: %+v, %v", links, err)
+	}
+}
+
+func syncSettledPosting(id, accountID, name, day string) SyncPosting {
+	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
+	if err != nil {
+		stamp = time.Unix(1785628800, 0).UTC()
+	}
+	return SyncPosting{
+		ProviderAccountID: "bridge-" + accountID,
+		TransactionID:     id,
+		Posting: types.Posting{
+			Name:            name,
+			SourceAccountID: &accountID,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+		},
+	}
+}
+
+func TestSetupRenamesOwnerSourceValue(t *testing.T) {
+	path := t.TempDir() + "/source-rename.db"
+	database, err := SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateTestPlan(t, database, "other")
+	account := "checking"
+	plan, err := database.Plan("plans/other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := plan.CreateAccount(types.Account{ID: account, Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.SQL().Exec(`INSERT INTO postings (id, position, name, source_account_id, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, plan_id) VALUES ('row', 0, 'Legacy', 'checking', '{}', 1, 1, 1, 'model', 0, 'plans/other')`); err != nil {
+		t.Fatal(err)
+	}
+	database.Close()
+	database, err = SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	var source string
+	if err := database.SQL().QueryRow(`SELECT source FROM postings WHERE id = 'row'`).Scan(&source); err != nil || source != "user" {
+		t.Fatalf("source = %q, %v", source, err)
 	}
 }

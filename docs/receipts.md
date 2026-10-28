@@ -61,9 +61,15 @@ cached results receive no artificial delay. The UI shows a busy button and
 spinner during local requests or resumed extraction, then confirms completion.
 Unit tests use `mock.NewWithLatency(0)` or Go's virtual clock.
 
-Multiple receipts can attach to one expense. Pending charges, transfers, income,
-recurrence rules, and planned-purchase policies cannot receive new attachments.
-Receipt review remains separate from unsaved financial-plan edits.
+Multiple receipts can attach to one transaction. Pending and void bank rows
+cannot receive attachments: pending rows are transient sync snapshots, and
+void rows record authorizations that never settled. Recurrence rules and
+generated occurrences cannot receive attachments; attach to a saved
+transaction instead. Receipt review remains separate from unsaved
+financial-plan edits. Converted settled rows are owner transactions, so they
+accept receipts and keep the original posting UUID. Posted charges with no
+pending predecessor insert as new disabled owner rows; they accept receipts
+once saved and never duplicate across repeat syncs.
 
 ## Source boundary
 

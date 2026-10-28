@@ -61,6 +61,10 @@ export const movementSchema = z.object({
 	postedDate: date.nullable().default(null),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
+	// Void marks a bank authorization that vanished without settling. Every
+	// movement carries it explicitly; stored drafts without it migrate to
+	// false on load.
+	void: z.boolean(),
 });
 
 /**
@@ -100,6 +104,21 @@ function migrateLegacyEvaluations(value: unknown): unknown {
 	if (record.evaluations === undefined && Array.isArray(record.goals))
 		return { ...record, evaluations: record.goals };
 	return value;
+}
+
+function migrateLegacyVoidFlag(value: unknown): unknown {
+	if (typeof value !== "object" || value === null || Array.isArray(value))
+		return value;
+	const record = value as Record<string, unknown>;
+	if (!Array.isArray(record.movements)) return value;
+	let changed = false;
+	const movements = record.movements.map((movement) => {
+		if (typeof movement !== "object" || movement === null || "void" in movement)
+			return movement;
+		changed = true;
+		return { ...(movement as Record<string, unknown>), void: false };
+	});
+	return changed ? { ...record, movements } : value;
 }
 
 /**
@@ -154,7 +173,9 @@ function migrateLegacyPurchases(value: unknown): unknown {
 }
 
 function migrateLegacyPlan(value: unknown): unknown {
-	return migrateLegacyPurchases(migrateLegacyEvaluations(value));
+	return migrateLegacyVoidFlag(
+		migrateLegacyPurchases(migrateLegacyEvaluations(value)),
+	);
 }
 
 export const planSchema = z.preprocess(
@@ -323,8 +344,7 @@ export function visiblePlannedPurchases({
 	);
 	if (!archivedIds.size) return plannedPurchases;
 	return plannedPurchases.filter(
-		(purchase) =>
-			!(purchase.fromId && archivedIds.has(purchase.fromId)),
+		(purchase) => !(purchase.fromId && archivedIds.has(purchase.fromId)),
 	);
 }
 
@@ -341,7 +361,12 @@ export function changesBetween({
 		before: string;
 		after: string;
 	}[] = [];
-	for (const key of ["accounts", "movements", "plannedPurchases", "evaluations"] as const) {
+	for (const key of [
+		"accounts",
+		"movements",
+		"plannedPurchases",
+		"evaluations",
+	] as const) {
 		for (const item of current[key]) {
 			const previous = saved[key].find((old) => old.id === item.id);
 			if (!previous)

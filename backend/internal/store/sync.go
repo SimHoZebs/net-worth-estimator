@@ -7,16 +7,17 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Row ownership for bank-data sync coexistence. "model" rows are
-// owner/seed content; any other source value is system-owned sync output
-// managed only by the sync (PUT payloads cannot create, edit, or delete
-// them). The exact sync source name is a backend contract; row ownership
-// checks match by exclusion (not "model"), never by provider name.
+// Row authorship for bank-data sync coexistence. "user" rows are
+// owner-authored; any other source value is bank-reported sync output.
+// Authorship never changes after creation. Owner writes may touch settled
+// bank rows but never live pending or void rows; the sync may touch pending
+// and void rows but never settled ones. The exact sync source name is a
+// backend contract; never match it by provider name outside the sync.
 const (
-	SourceModel = "model"
+	SourceUser = "user"
 	// SourceSimpleFIN is the sync source written by the current SimpleFIN
 	// bank-data provider. A future provider (Plaid, MX, CSV import) writes
-	// its own source name; all non-"model" sources share the sync-owned
+	// its own source name; all non-"user" sources share the sync-owned
 	// lifecycle below.
 	SourceSimpleFIN = "simplefin"
 )
@@ -63,7 +64,7 @@ func remergeCheckpoints(tx *planTx, incoming []types.Checkpoint, synced []types.
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
+			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceUser,
 		); err != nil {
 			return 0, fmt.Errorf("insert checkpoint: %w", err)
 		}
@@ -98,7 +99,7 @@ func remergePostings(tx *planTx, incoming []types.Posting, synced []types.Postin
 		if syncedIDs[incoming[i].ID] {
 			continue
 		}
-		if err := insertPosting(tx, position, &incoming[i], SourceModel); err != nil {
+		if err := insertPosting(tx, position, &incoming[i], SourceUser); err != nil {
 			return 0, err
 		}
 		position++
@@ -116,7 +117,7 @@ func loadSyncedCheckpoints(tx *planTx) ([]types.Checkpoint, error) {
 	// Any non-model source is sync-owned. Sources stay per-provider
 	// (simplefin, plaid, ...) so metrics and debugging can tell bank-data
 	// origins apart; the lifecycle treats them uniformly.
-	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceModel)
+	rows, err := tx.Query(`SELECT date, account_id, balance, source FROM checkpoints WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +137,7 @@ func loadSyncedCheckpoints(tx *planTx) ([]types.Checkpoint, error) {
 }
 
 func loadSyncedPostings(tx *planTx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceModel)
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +202,8 @@ type SyncApplySummary struct {
 	PendingDeleted      int `json:"pendingDeleted"`
 	PendingInserted     int `json:"pendingInserted"`
 	PendingUpdated      int `json:"pendingUpdated"`
+	SettledConverted    int `json:"settledConverted"`
+	SettledInserted     int `json:"settledInserted"`
 }
 
 // SyncProvision is one bridge account needing link resolution: an
@@ -262,11 +265,12 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 	return resolved, provisioned, stale, nil
 }
 
-// ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings
-// in one transaction. Owner rows always win key conflicts. Pending rows are
-// snapshot-scoped per card account. Exact provider keys preserve UUIDs across
-// refreshes; only missing pending rows are deleted.
-func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string) (SyncApplySummary, error) {
+// ApplySyncPlan upserts sync checkpoints and applies reconciled bank
+// directives in one transaction. Owner rows always win key conflicts. The
+// directives carry fully resolved lifecycle state; the store verifies
+// structural validity (keys present, non-user source, row existence) but
+// never interprets provider behavior.
+func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -316,7 +320,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 		summary.CheckpointsUpdated++
 	}
 
-	if err := applyPendingSnapshot(tx, pending, cardAccounts, &summary); err != nil {
+	if err := applyBankDirectives(tx, directives, &summary); err != nil {
 		return summary, err
 	}
 
@@ -324,4 +328,16 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 		return summary, fmt.Errorf("sync commit: %w", err)
 	}
 	return summary, nil
+}
+
+// migrateSourceUser renames the owner-authored source value from "model" to
+// "user" in databases created before the rename. It runs only inside
+// explicit SetupDatabase, before schema validation.
+func migrateSourceUser(tx *sql.Tx) error {
+	for _, table := range []string{"postings", "checkpoints"} {
+		if _, err := tx.Exec(`UPDATE "` + table + `" SET source = 'user' WHERE source = 'model'`); err != nil {
+			return err
+		}
+	}
+	return nil
 }

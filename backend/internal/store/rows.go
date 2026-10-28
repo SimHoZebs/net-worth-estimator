@@ -448,7 +448,7 @@ func (s *sqliteStore) MoveRule(id, beforeID string) error {
 // SaveCheckpoint upserts one owner checkpoint by account/date. An owner
 // write wins over a sync-owned row on the same key.
 func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error) {
-	checkpoint.Source = SourceModel
+	checkpoint.Source = SourceUser
 	err := withRowTx(s.db, func(tx *planTx) error {
 		position, err := nextTablePosition(tx, "checkpoints")
 		if err != nil {
@@ -457,7 +457,7 @@ func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpo
 		result, err := tx.Exec(
 			`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))
 			 ON CONFLICT(plan_id, account_id, date) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceModel,
+			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceUser,
 		)
 		if err != nil {
 			return fmt.Errorf("save checkpoint %s %s: %w", checkpoint.AccountID, checkpoint.Date, err)

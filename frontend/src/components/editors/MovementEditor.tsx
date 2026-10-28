@@ -55,6 +55,7 @@ export function buildMovementPlan({
 		claimRuleId,
 		claimOccurrenceDate,
 		postedDate: (textValue(data, "postedDate") || item?.postedDate) ?? null,
+		void: item?.void ?? false,
 	};
 	return {
 		...plan,

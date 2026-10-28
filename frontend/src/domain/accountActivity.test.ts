@@ -153,6 +153,7 @@ describe("account-scoped transactions", () => {
 			claimRuleId: null,
 			claimOccurrenceDate: null,
 			postedDate: null,
+			void: false,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
@@ -165,6 +166,43 @@ describe("account-scoped transactions", () => {
 			),
 		).toMatchObject({
 			pending: true,
+			excluded: true,
+		});
+	});
+
+	it("marks voided bank charges without pending status", () => {
+		const plan = structuredClone(examplePlan);
+		plan.movements.push({
+			id: "01900000-0000-7000-8000-000000000002",
+			name: "Voided authorization",
+			pending: false,
+			void: true,
+			amount: 42.1,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			frequency: "once",
+			startDate: plan.startDate,
+			endDate: null,
+			annualIncrease: 0,
+			enabled: false,
+			readOnly: true,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+		});
+		const rows = accountTransactions({
+			accountId: "checking",
+			plan,
+			projection: activityProjection(plan),
+		});
+		expect(
+			rows.find(
+				(row) => row.movementId === "01900000-0000-7000-8000-000000000002",
+			),
+		).toMatchObject({
+			pending: false,
+			void: true,
 			excluded: true,
 		});
 	});
@@ -187,6 +225,7 @@ describe("account-scoped transactions", () => {
 			claimRuleId: null,
 			claimOccurrenceDate: null,
 			postedDate: null,
+			void: false,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",

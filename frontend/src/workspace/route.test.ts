@@ -48,6 +48,7 @@ function movement(id: string): Movement {
 		claimRuleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
+		void: false,
 	};
 }
 

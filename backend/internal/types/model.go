@@ -96,8 +96,9 @@ type Checkpoint struct {
 	Date      IsoDate `json:"Date"`
 	AccountID string  `json:"AccountId"`
 	Balance   float64 `json:"Balance"`
-	// Source names the row owner: "model" (owner/seed) or "simplefin".
-	// Read-only on GET; PUT ignores it (server recomputes ownership).
+	// Source names the row author: "user" for owner-authored rows,
+	// "simplefin" for bank-reported rows. Authorship never changes after
+	// creation.
 	Source string `json:"source,omitempty"`
 }
 
@@ -205,12 +206,19 @@ type Posting struct {
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
 	// Owner writes cannot set it.
 	Pending bool `json:"pending,omitempty"`
-	// Source names the row owner: "model" (owner/seed) or "simplefin".
-	// Read-only on GET; PUT ignores it (server recomputes ownership).
+	// Source names the row author: "user" for owner-authored rows,
+	// "simplefin" for bank-reported rows. Authorship never changes after
+	// creation. Owner writes may touch settled bank rows but never live
+	// pending or void rows; the sync may touch pending and void rows but
+	// never settled ones.
 	Source string `json:"source,omitempty"`
 	// ExecutionOrder breaks equal-time ties independently of identity and display
 	// position. The store assigns it on create and preserves it on owner updates.
 	ExecutionOrder int64 `json:"executionOrder,omitempty"`
+	// Void marks a bank authorization that vanished without settling. Only
+	// the sync sets it, through void-marking; owner and CSV writes never
+	// create void rows.
+	Void bool `json:"void,omitempty"`
 }
 
 // RecurrenceRule owns repetition. Its movement fields are the template

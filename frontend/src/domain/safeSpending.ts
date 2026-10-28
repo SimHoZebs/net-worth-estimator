@@ -371,6 +371,7 @@ export function mandatoryTransactions({
 			constraint: movement.constraint,
 			excluded: false,
 			pending: pendingIds.has(movement.movementId),
+			void: false,
 		});
 	}
 	return rows;

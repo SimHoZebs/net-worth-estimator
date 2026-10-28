@@ -196,13 +196,13 @@ function boundValue(
 }
 
 /**
- * Backend row ownership is "model" (owner/seed) or a sync-owned name set by
- * the server. Any non-model owner is system-owned sync output: read-only in
+ * Backend row authorship is "user" (owner-authored) or a sync-owned name set by
+ * the server. Any non-user author is system-owned sync output: read-only in
  * the workspace and protected from removal. The exact sync name is a
  * backend contract, so match by exclusion rather than by name.
  */
 function isSyncOwned(source: string | undefined | null): boolean {
-	return source != null && source !== "model";
+	return source != null && source !== "user";
 }
 
 function accountReadOnly(
@@ -522,6 +522,7 @@ function movementDisplayFromRule(
 		claimRuleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
+		void: false,
 	};
 }
 
@@ -548,6 +549,7 @@ function movementDisplayFromPosting(
 		claimOccurrenceDate: posting.claim?.occurrenceDate ?? null,
 		postedDate: settledDay(posting.postedTime),
 		pending: posting.pending === true,
+		void: posting.void === true,
 	};
 }
 
@@ -1220,7 +1222,7 @@ export function displayPlanToBackendDocument(
 					Date: account.observedOn || plan.startDate,
 					AccountId: accountId,
 					Balance: account.balance,
-					source: "model",
+					source: "user",
 				},
 			]);
 		} else {
@@ -1230,7 +1232,7 @@ export function displayPlanToBackendDocument(
 					Date: account.observedOn || plan.startDate,
 					AccountId: accountId,
 					Balance: account.balance,
-					source: "model",
+					source: "user",
 				},
 			]);
 		}
