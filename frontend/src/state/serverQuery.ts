@@ -40,6 +40,28 @@ export function stochasticQueryKey(
 	];
 }
 
+/**
+ * Eval-overlay queries share the base path cache entry and add the
+ * eval/view scope. Toggling an evaluation or view preference changes only
+ * this key, so the base simulation is never refetched for it.
+ */
+export function evalOverlayQueryKey(
+	baseKey: string,
+	evalKey: string,
+	years: number,
+	rangeKey = "",
+): readonly unknown[] {
+	const scope = getResourceScope();
+	return [
+		"deterministic-eval-overlay",
+		scope.key,
+		baseKey,
+		evalKey,
+		years,
+		rangeKey,
+	];
+}
+
 export function currentPositionQueryKey(
 	documentKey: string,
 	asOfDate: string,

@@ -69,7 +69,7 @@ Financial-independence branches do not replay or schedule planned purchases.
 
 Protection ends at the selected horizon. A longer horizon can defer a purchase
 that fits under a shorter one. The scheduler is deliberately greedy and uses
-full trial simulations, not an optimizer.
+full candidate simulations, not an optimizer.
 
 ## Persistence
 

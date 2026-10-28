@@ -363,11 +363,11 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 
 // ProjectRawFinancialModelDocument prepares and simulates without evaluations.
 func ProjectRawFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionPath, *types.ProjectionResult, error) {
-	prepared, err := PrepareSimulationRequest(document, settings, overrides, monteCarloSample)
+	prepared, err := orchestratedPrepare(document, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, nil, err
 	}
-	run, err := Simulate(prepared.Request)
+	run, err := orchestratedSimulate(prepared.Request)
 	if err != nil {
 		return nil, nil, err
 	}

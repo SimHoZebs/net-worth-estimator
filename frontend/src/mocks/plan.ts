@@ -249,4 +249,5 @@ export const testPlan: Plan = {
 		},
 	],
 	assumptions: { inflation: 2.5, volatility: 12 },
+	plannedPurchases: [],
 };

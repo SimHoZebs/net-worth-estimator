@@ -102,10 +102,11 @@ func replayHistoricalState(document *types.FinancialModelDocument, projectionSta
 	}
 
 	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts:        document.Accounts,
-		Postings:        document.Postings,
-		RecurrenceRules: document.RecurrenceRules,
-		PaymentTerms:    document.PaymentTerms,
+		Accounts:         document.Accounts,
+		Postings:         document.Postings,
+		RecurrenceRules:  document.RecurrenceRules,
+		PaymentTerms:     document.PaymentTerms,
+		PlannedPurchases: document.PlannedPurchases,
 	}, SimulationState{
 		Balances:                     InitAccountBalances(document.Accounts),
 		LatestRealizedPostingAmounts: map[string]float64{},
@@ -216,6 +217,9 @@ func preparePosition(document *types.FinancialModelDocument, startDate string, o
 
 // PrepareSimulationRequest resolves overrides, validation, history, and dates.
 func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
+	if err := requireResimulationAllowed("PrepareSimulationRequest"); err != nil {
+		return nil, err
+	}
 	position, err := preparePosition(document, settings.FallbackProjectionStartDate, overrides)
 	if err != nil {
 		return nil, err
@@ -226,10 +230,11 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 		HistoricalSnapshots: position.snapshots,
 		Request: types.SimulationRequest{
 			Model: types.FinancialModel{
-				Accounts:        effectiveDocument.Accounts,
-				Postings:        effectiveDocument.Postings,
-				RecurrenceRules: effectiveDocument.RecurrenceRules,
-				PaymentTerms:    effectiveDocument.PaymentTerms,
+				Accounts:         effectiveDocument.Accounts,
+				Postings:         effectiveDocument.Postings,
+				RecurrenceRules:  effectiveDocument.RecurrenceRules,
+				PaymentTerms:     effectiveDocument.PaymentTerms,
+				PlannedPurchases: effectiveDocument.PlannedPurchases,
 			},
 			InitialState:           *position.state,
 			StartDate:              settings.FallbackProjectionStartDate,

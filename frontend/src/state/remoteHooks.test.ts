@@ -1515,30 +1515,20 @@ describe("remote workspace state", () => {
 			id: "01900000-0000-7000-8000-000000000002",
 			name: "New laptop",
 			amount: 1200,
-			amountKnown: true,
 			fromId: "cash",
-			toId: null,
-			frequency: "once" as const,
 			startDate: "2026-02-15",
-			endDate: null,
-			annualIncrease: 0,
 			enabled: true,
 			readOnly: false,
-			claimRuleId: null,
-			claimOccurrenceDate: null,
-			postedDate: null,
-			purchasePriority: 0,
-			void: false,
 		};
 
 		const accepted = rendered.result().updatePlan({
 			...plan,
-			movements: [...plan.movements, purchase],
+			plannedPurchases: [...plan.plannedPurchases, purchase],
 		});
 		await rendered.settle();
 		expect(rendered.result().error).toBeNull();
 		expect(accepted).toBe(true);
-		expect(rendered.result().workspace?.draft?.movements).toContainEqual(
+		expect(rendered.result().workspace?.draft?.plannedPurchases).toContainEqual(
 			purchase,
 		);
 		server.setStatus({ readOnly: true });
@@ -1557,7 +1547,7 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(false);
 		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(false);
-		expect(rendered.result().workspace?.draft?.movements).toContainEqual(
+		expect(rendered.result().workspace?.draft?.plannedPurchases).toContainEqual(
 			purchase,
 		);
 		expect(await rendered.result().save()).toBe(true);
@@ -1601,12 +1591,11 @@ describe("remote workspace state", () => {
 			model.checkpoints,
 		);
 		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().plan?.movements).toContainEqual(
+		expect(rendered.result().plan?.plannedPurchases).toContainEqual(
 			expect.objectContaining({
 				id: purchase.id,
 				amount: purchase.amount,
 				fromId: purchase.fromId,
-				purchasePriority: purchase.purchasePriority,
 			}),
 		);
 		expect(rendered.result().plan?.accounts[0]?.readOnly).toBe(true);

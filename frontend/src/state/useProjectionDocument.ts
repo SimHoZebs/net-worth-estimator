@@ -39,13 +39,27 @@ export function useProjectionDocument({
 	const saved = document !== undefined ? document : storeDocument;
 	const source =
 		getResourceScope().status === "ready" ? (draft ?? saved ?? null) : null;
+	// The eval/view scope never rewrites plan data: the base document holds
+	// the plan, the active document layers the request-local evaluations on
+	// top. Keys hash the two halves separately so the base path cache stays
+	// valid while eval/view prefs (reserve toggles, statement day, account
+	// selection) only change the eval key.
+	const baseDocument = source;
 	const activeDocument = useMemo(
 		() => (source && evaluations ? { ...source, evaluations } : source),
 		[source, evaluations],
 	);
-	const documentKey = useMemo(
-		() => (activeDocument ? JSON.stringify(activeDocument) : "null"),
-		[activeDocument],
+	const baseKey = useMemo(
+		() => (baseDocument ? JSON.stringify(baseDocument) : "null"),
+		[baseDocument],
 	);
-	return { activeDocument, documentKey };
+	const evalKey = useMemo(
+		() => (evaluations ? JSON.stringify(evaluations) : "base"),
+		[evaluations],
+	);
+	const documentKey = useMemo(
+		() => `${baseKey}::${evalKey}`,
+		[baseKey, evalKey],
+	);
+	return { activeDocument, baseDocument, documentKey, baseKey, evalKey };
 }

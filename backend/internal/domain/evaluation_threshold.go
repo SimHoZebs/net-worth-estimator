@@ -42,7 +42,81 @@ type reachedDateResult interface {
 	firstReached() *string
 }
 
+// NewReachedDateReader builds the Reader plugin: a reader definition
+// for evaluations whose outcome is "the first date a measure crossed a
+// target". This is the entire plugin contract for this family — type, name,
+// config validation, path evaluation, and the deterministic satisfied
+// predicate. Accumulation, finalization, stochastic status, and the no-resim
+// Kind come from the shared wiring. Simulator evaluations (FI, purchases simulations)
+// keep the full EvaluationDefinition struct instead.
+
 func (r *NetWorthThresholdPathResult) firstReached() *string { return r.FirstReachedDate }
+
+func NewReachedDateReader(
+	evalType, name string,
+	validate func(config any) error,
+	parse func(config any) (any, error),
+	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
+	satisfied func(deterministic PathResult) bool,
+) *EvaluationDefinition {
+	return newReachedDateDefinition(evalType, name, EvaluationKindReader, false, validate, parse, evaluate, satisfied)
+}
+
+// NewReachedDateSimulator is the simulator variant of NewReachedDateReader for
+// evaluations that share the reached-date shape but run simulations against
+// shared base path state (purchases). Same wiring, explicit simulator opt-in.
+func NewReachedDateSimulator(
+	evalType, name string,
+	validate func(config any) error,
+	parse func(config any) (any, error),
+	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
+	satisfied func(deterministic PathResult) bool,
+) *EvaluationDefinition {
+	return newReachedDateDefinition(evalType, name, EvaluationKindSimulator, true, validate, parse, evaluate, satisfied)
+}
+
+func newReachedDateDefinition(
+	evalType, name string,
+	kind EvaluationKind,
+	allowSimulator bool,
+	validate func(config any) error,
+	parse func(config any) (any, error),
+	evaluate func(ctx *EvaluationContext, config any) (PathResult, error),
+	satisfied func(deterministic PathResult) bool,
+) *EvaluationDefinition {
+	return &EvaluationDefinition{
+		Type: evalType,
+		Name: name,
+
+		Kind:            kind,
+		AllowSimulation: allowSimulator,
+
+		ValidateConfig: validate,
+		ParseConfig:    parse,
+		EvaluatePath:   evaluate,
+
+		CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
+			return &thresholdAccumulator{reachedDates: []string{}}, nil
+		},
+		Accumulate: accumulateReachedDate,
+		Finalize: func(accumulator Accumulator, ctx *EvaluationFinalizeContext) (types.JsonValue, error) {
+			return finalizeReachedDates(accumulator.(*thresholdAccumulator)), nil
+		},
+		Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
+			if probabilistic != nil {
+				probability, _ := probabilistic.(map[string]any)["probability"].(float64)
+				if probability >= 0.5 {
+					return types.StatusSatisfied
+				}
+				return types.StatusNotSatisfied
+			}
+			if deterministic != nil && satisfied(deterministic) {
+				return types.StatusSatisfied
+			}
+			return types.StatusNotSatisfied
+		},
+	}
+}
 
 // accumulateReachedDate folds one run's result into the shared accumulator.
 func accumulateReachedDate(accumulator Accumulator, pathResult PathResult) error {
@@ -108,43 +182,23 @@ func datePercentile(sortedDates []string, percentile float64) *string {
 	return &sortedDates[index]
 }
 
-var netWorthThresholdDefinition = &EvaluationDefinition{
-	Type: types.EvaluationTypeNetWorthThreshold,
-	Name: "Net worth threshold",
-
-	ValidateConfig: ValidateThresholdConfig,
-	ParseConfig: func(config any) (any, error) {
+var netWorthThresholdDefinition = NewReachedDateReader(
+	types.EvaluationTypeNetWorthThreshold,
+	"Net worth threshold",
+	ValidateThresholdConfig,
+	func(config any) (any, error) {
 		parsed, err := ParseThresholdConfig(config)
 		if err != nil {
 			return nil, err
 		}
 		return parsed, nil
 	},
-
-	EvaluatePath: func(ctx *EvaluationContext, config any) (PathResult, error) {
+	func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.NetWorthThresholdConfig)
 		result := EvaluateNetWorthThreshold(ctx.Path, typed.Target)
 		return &result, nil
 	},
-
-	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
-		return &thresholdAccumulator{reachedDates: []string{}}, nil
+	func(deterministic PathResult) bool {
+		return deterministic.(*NetWorthThresholdPathResult).Reached
 	},
-	Accumulate: accumulateReachedDate,
-	Finalize: func(accumulator Accumulator, ctx *EvaluationFinalizeContext) (types.JsonValue, error) {
-		return finalizeReachedDates(accumulator.(*thresholdAccumulator)), nil
-	},
-	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
-		if probabilistic != nil {
-			probability, _ := probabilistic.(map[string]any)["probability"].(float64)
-			if probability >= 0.5 {
-				return types.StatusSatisfied
-			}
-			return types.StatusNotSatisfied
-		}
-		if deterministic != nil && deterministic.(*NetWorthThresholdPathResult).Reached {
-			return types.StatusSatisfied
-		}
-		return types.StatusNotSatisfied
-	},
-}
+)

@@ -61,11 +61,18 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 	validateUniqueIDs(&issues, ruleIDList, "rule.id", func(index int, field string) []any {
 		return pathWithField([]any{"recurrenceRules", index}, field)
 	})
+	purchaseIDList := make([]string, len(document.PlannedPurchases))
+	for i, purchase := range document.PlannedPurchases {
+		purchaseIDList[i] = purchase.ID
+	}
+	validateUniqueIDs(&issues, purchaseIDList, "plannedPurchase.id", func(index int, field string) []any {
+		return pathWithField([]any{"plannedPurchases", index}, field)
+	})
 	validateEvaluationInstanceIDs(&issues, document)
 
-	// Movement identity checks: posting and rule IDs share one namespace
-	// with account IDs.
-	movementIDs := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules))
+	// Movement identity checks: posting, rule, and planned-purchase IDs share
+	// one namespace with account IDs.
+	movementIDs := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
 	for _, posting := range document.Postings {
 		movementIDs[posting.ID] = true
 	}
@@ -76,6 +83,14 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 				pathWithField([]any{"recurrenceRules", index}, "id")...)
 		}
 		movementIDs[rule.ID] = true
+	}
+	for index, purchase := range document.PlannedPurchases {
+		if movementIDs[purchase.ID] {
+			addIssue(&issues, types.SeverityError, "plannedPurchase.id.collision",
+				fmt.Sprintf("Planned purchase ID '%s' collides with a posting or rule ID. IDs must be unique across movements and purchases.", purchase.ID),
+				pathWithField([]any{"plannedPurchases", index}, "id")...)
+		}
+		movementIDs[purchase.ID] = true
 	}
 
 	// Account identity checks.

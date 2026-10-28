@@ -48,9 +48,30 @@ function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
 
 describe("isolated purchase evaluation", () => {
 	it("never derives a baseline start date from a planned purchase", () => {
-		const document = displayPlanToBackendDocument(testPlan).document;
+		const document = displayPlanToBackendDocument({
+			...testPlan,
+			plannedPurchases: [
+				{
+					id: "purchase",
+					name: "Purchase",
+					amount: 50,
+					fromId: "checking",
+					startDate: "2020-01-01",
+					enabled: true,
+					readOnly: false,
+				},
+			],
+		}).document;
 		document.checkpoints = [];
 		document.recurrenceRules = [];
+		// Compat wire shape: the slice persists as a legacy purchase posting.
+		expect(
+			document.postings.find((item) => item.id === "purchase"),
+		).toMatchObject({
+			id: "purchase",
+			sourceAccountId: "checking",
+			purchase: { priority: 0 },
+		});
 		const posting = {
 			id: "real",
 			name: "Real",
@@ -61,15 +82,24 @@ describe("isolated purchase evaluation", () => {
 			postedTime: 1769904000,
 			transactionTime: 1769904000,
 		};
-		document.postings = [
+		const legacyPurchase = {
+			...document.postings.find((item) => item.id === "purchase")!,
+			postedTime: 1577836800,
+			transactionTime: 1577836800,
+		};
+		document.postings = [legacyPurchase, posting];
+		expect(projectionStartDate(document)).toBe("2026-02-01");
+		// Standalone rows never feed the fallback either.
+		document.plannedPurchases = [
 			{
-				...posting,
-				id: "purchase",
-				postedTime: 1577836800,
-				transactionTime: 1577836800,
-				purchase: { priority: 0 },
+				id: "row",
+				name: "Row",
+				fundingAccountId: "checking",
+				cost: 10,
+				earliestDate: "2020-01-01",
+				enabled: true,
+				priority: 0,
 			},
-			posting,
 		];
 		expect(projectionStartDate(document)).toBe("2026-02-01");
 	});
@@ -110,13 +140,13 @@ describe("isolated purchase evaluation", () => {
 				deterministic: null,
 				probabilistic: null,
 				diagnostics: [
-					{ code: "error", severity: "error", message: "Trial failed" },
+					{ code: "error", severity: "error", message: "Simulation failed" },
 				],
 			},
 		];
 		expect(() =>
 			purchaseEvaluationResult(tables, PURCHASE_EVALUATIONS),
-		).toThrow("Trial failed");
+		).toThrow("Simulation failed");
 		expect(purchaseEvaluationResult(tables, undefined)).toBeNull();
 	});
 
@@ -126,18 +156,20 @@ describe("isolated purchase evaluation", () => {
 		});
 		const wrapper = ({ children }: { children: ReactNode }) =>
 			createElement(QueryClientProvider, { client: queryClient }, children);
-		const document = displayPlanToBackendDocument(testPlan).document;
-		document.postings.push({
-			id: "laptop",
-			name: "Laptop",
-			sourceAccountId: "checking",
-			destinations: null,
-			amount: { resolver: "expression", config: { expression: "500" } },
-			enabled: true,
-			postedTime: 1769904000,
-			transactionTime: 1769904000,
-			purchase: { priority: 0 },
-		});
+		const document = displayPlanToBackendDocument({
+			...testPlan,
+			plannedPurchases: [
+				{
+					id: "laptop",
+					name: "Laptop",
+					amount: 500,
+					fromId: "checking",
+					startDate: "2026-02-01",
+					enabled: true,
+					readOnly: false,
+				},
+			],
+		}).document;
 		const before = JSON.stringify(document);
 		const deterministicCalls: unknown[] = [];
 		const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {

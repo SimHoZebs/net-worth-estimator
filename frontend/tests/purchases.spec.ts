@@ -240,10 +240,11 @@ test("purchase priorities persist and purchases protect all established payments
 	await expect(
 		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
 	).toHaveCount(2);
-	const temporary = await readTemporaryVersion(page);
+	const temporary = (await readTemporaryVersion(page)) as Plan;
 	expect(
-		temporary.movements.find((item: { name: string }) => item.name === "Chair")
-			.purchasePriority,
+		temporary.plannedPurchases.findIndex(
+			(item: { name: string }) => item.name === "Chair",
+		),
 	).toBe(0);
 	await page.reload();
 	await expect(queue.locator("li").first()).toContainText("Chair");

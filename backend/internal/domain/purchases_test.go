@@ -87,7 +87,7 @@ func TestPurchasesProtectFuturePayments(t *testing.T) {
 			}
 			after, _ := json.Marshal(request)
 			if string(before) != string(after) {
-				t.Fatal("trial mutated its input")
+				t.Fatal("simulation mutated its input")
 			}
 		})
 	}

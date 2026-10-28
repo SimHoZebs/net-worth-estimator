@@ -915,6 +915,11 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 	Type: types.EvaluationTypeFinancialIndependence,
 	Name: "Financial independence",
 
+	// Simulator: FI replays continuing postings in branch transitions against
+	// the shared base path. Branch state only; never a fresh Prepare.
+	Kind:            EvaluationKindSimulator,
+	AllowSimulation: true,
+
 	ValidateConfig: ValidateFIPlanConfig,
 	ParseConfig: func(config any) (any, error) {
 		parsed, err := ParseFIPlan(config)

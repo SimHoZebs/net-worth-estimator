@@ -166,9 +166,11 @@ function mapAnalysis(
 			candidate.outcome?.kind === "evaluated",
 	);
 	const transactions = new Map(
-		[...(document?.postings ?? []), ...(document?.recurrenceRules ?? [])].map(
-			(item) => [item.id, item.name],
-		),
+		[
+			...(document?.postings ?? []),
+			...(document?.recurrenceRules ?? []),
+			...(document?.plannedPurchases ?? []),
+		].map((item) => [item.id, item.name]),
 	);
 	const years = finite(config.evaluationYears);
 	const confidence = finite(config.requiredConfidence);

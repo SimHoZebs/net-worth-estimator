@@ -83,45 +83,23 @@ func accountBalanceInRow(row *types.ProjectionRow, accountID string) (float64, b
 
 func (r *AccountBalancePathResult) firstReached() *string { return r.FirstReachedDate }
 
-var accountBalanceDefinition = &EvaluationDefinition{
-	Type: types.EvaluationTypeAccountBalance,
-	Name: "Account balance",
-
-	ValidateConfig: ValidateAccountBalanceConfig,
-	ParseConfig: func(config any) (any, error) {
+var accountBalanceDefinition = NewReachedDateReader(
+	types.EvaluationTypeAccountBalance,
+	"Account balance",
+	ValidateAccountBalanceConfig,
+	func(config any) (any, error) {
 		parsed, err := ParseAccountBalanceConfig(config)
 		if err != nil {
 			return nil, err
 		}
 		return parsed, nil
 	},
-
-	EvaluatePath: func(ctx *EvaluationContext, config any) (PathResult, error) {
+	func(ctx *EvaluationContext, config any) (PathResult, error) {
 		typed := config.(types.AccountBalanceConfig)
 		result := EvaluateAccountBalance(ctx.Path, typed.AccountID, typed.Target)
 		return &result, nil
 	},
-
-	// Threshold and account balance evaluations aggregate identically, so they share
-	// the accumulator, the fold, and the finalize step.
-	CreateAccumulator: func(config any, deterministic PathResult) (Accumulator, error) {
-		return &thresholdAccumulator{reachedDates: []string{}}, nil
+	func(deterministic PathResult) bool {
+		return deterministic.(*AccountBalancePathResult).Reached
 	},
-	Accumulate: accumulateReachedDate,
-	Finalize: func(accumulator Accumulator, ctx *EvaluationFinalizeContext) (types.JsonValue, error) {
-		return finalizeReachedDates(accumulator.(*thresholdAccumulator)), nil
-	},
-	Status: func(deterministic PathResult, probabilistic types.JsonValue) types.EvaluationResultStatus {
-		if probabilistic != nil {
-			probability, _ := probabilistic.(map[string]any)["probability"].(float64)
-			if probability >= 0.5 {
-				return types.StatusSatisfied
-			}
-			return types.StatusNotSatisfied
-		}
-		if deterministic != nil && deterministic.(*AccountBalancePathResult).Reached {
-			return types.StatusSatisfied
-		}
-		return types.StatusNotSatisfied
-	},
-}
+)

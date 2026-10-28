@@ -56,9 +56,6 @@ export function buildMovementPlan({
 		claimOccurrenceDate,
 		postedDate: (textValue(data, "postedDate") || item?.postedDate) ?? null,
 		void: item?.void ?? false,
-		...(item?.purchasePriority != null
-			? { purchasePriority: item.purchasePriority }
-			: {}),
 	};
 	return {
 		...plan,

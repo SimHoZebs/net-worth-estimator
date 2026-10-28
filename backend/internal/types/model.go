@@ -243,13 +243,14 @@ type RecurrenceRule struct {
 }
 
 type FinancialModelDocument struct {
-	SourcePath      string           `json:"sourcePath"`
-	Accounts        []Account        `json:"accounts"`
-	Checkpoints     []Checkpoint     `json:"checkpoints"`
-	Evaluations     EvaluationTables `json:"evaluations"`
-	Postings        []Posting        `json:"postings"`
-	RecurrenceRules []RecurrenceRule `json:"recurrenceRules"`
-	PaymentTerms    []PaymentTerms   `json:"paymentTerms"`
+	SourcePath       string            `json:"sourcePath"`
+	Accounts         []Account         `json:"accounts"`
+	Checkpoints      []Checkpoint      `json:"checkpoints"`
+	Evaluations      EvaluationTables  `json:"evaluations"`
+	Postings         []Posting         `json:"postings"`
+	RecurrenceRules  []RecurrenceRule  `json:"recurrenceRules"`
+	PaymentTerms     []PaymentTerms    `json:"paymentTerms"`
+	PlannedPurchases []PlannedPurchase `json:"plannedPurchases,omitempty"`
 }
 
 // PaymentTerms is mechanism config linked to one debt account. Accounts
@@ -334,13 +335,14 @@ func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrid
 	}
 	rules = append(rules, overrides.AddedRules...)
 	return FinancialModelDocument{
-		SourcePath:      document.SourcePath,
-		Accounts:        accounts,
-		Checkpoints:     checkpoints,
-		Evaluations:     document.Evaluations,
-		Postings:        postings,
-		RecurrenceRules: rules,
-		PaymentTerms:    document.PaymentTerms,
+		SourcePath:       document.SourcePath,
+		Accounts:         accounts,
+		Checkpoints:      checkpoints,
+		Evaluations:      document.Evaluations,
+		Postings:         postings,
+		RecurrenceRules:  rules,
+		PaymentTerms:     document.PaymentTerms,
+		PlannedPurchases: document.PlannedPurchases,
 	}
 }
 

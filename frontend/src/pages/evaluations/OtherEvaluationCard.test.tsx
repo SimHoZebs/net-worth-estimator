@@ -88,4 +88,21 @@ describe("OtherEvaluationCard", () => {
 		expect(view.getByText("Paused")).toBeTruthy();
 		expect(view.getByText("Excluded from evaluation")).toBeTruthy();
 	});
+
+	it("renders numeric values and bands alongside the status badge", () => {
+		const view = renderCard({
+			...cycleBase,
+			value: { current: 900, unit: "currency" },
+			bands: { p10: 800, p50: 900, p90: 950 },
+		});
+		expect(view.getAllByText("Within budget")).toHaveLength(2);
+		expect(view.getAllByText("$900")).toHaveLength(2);
+		expect(view.getByText(/Bands p10 800/)).toBeTruthy();
+	});
+
+	it("renders no value line without a numeric result", () => {
+		const view = renderCard(cycleBase);
+		expect(view.queryByText(/Value:/)).toBeNull();
+		expect(view.queryByText(/Bands/)).toBeNull();
+	});
 });
