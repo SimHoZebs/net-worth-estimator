@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -48,7 +51,7 @@ func insertPostingSyncKey(tx *planTx, key postingSyncKey) error {
 	return err
 }
 
-func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, accounts []string, summary *SyncApplySummary) error {
+func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPosting, accounts []string, summary *SyncApplySummary) error {
 	position, err := nextTablePosition(tx, "postings")
 	if err != nil {
 		return err
@@ -116,7 +119,15 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, accounts []string,
 			return err
 		}
 		rows.Close()
+		used := map[int]bool{}
 		for _, id := range stale {
+			converted, err := convertSettledPosting(tx, id, settled, used, summary)
+			if err != nil {
+				return err
+			}
+			if converted {
+				continue
+			}
 			if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
 				return err
 			}
@@ -127,6 +138,102 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, accounts []string,
 		}
 	}
 	return nil
+}
+
+// settleMatchWindowSeconds bounds pending-to-settled matching: charges
+// usually finalize within days, and a wider window risks joining two
+// distinct same-merchant charges.
+const settleMatchWindowSeconds = 7 * 24 * 3600
+
+func postingAmountCents(posting types.Posting) (int64, bool) {
+	if posting.Amount.Resolver != "expression" {
+		return 0, false
+	}
+	raw, ok := posting.Amount.Config["expression"].(string)
+	if !ok {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, false
+	}
+	return int64(math.Round(value * 100)), true
+}
+
+func settleMatch(stale types.Posting, candidate SyncPosting) bool {
+	if stale.SourceAccountID == nil || candidate.SourceAccountID == nil || *stale.SourceAccountID != *candidate.SourceAccountID {
+		return false
+	}
+	staleCents, ok := postingAmountCents(stale)
+	if !ok {
+		return false
+	}
+	candidateCents, ok := postingAmountCents(candidate.Posting)
+	if !ok || staleCents != candidateCents {
+		return false
+	}
+	gap := candidate.TransactionTime - stale.TransactionTime
+	if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
+		return false
+	}
+	a, b := strings.ToUpper(strings.TrimSpace(candidate.Name)), strings.ToUpper(strings.TrimSpace(stale.Name))
+	return strings.Contains(a, b) || strings.Contains(b, a)
+}
+
+// convertSettledPosting converts one vanished pending row into a settled
+// owner row when exactly one settled candidate strictly matches it. The UUID
+// survives, so any future evidence stays linked; the row becomes owner-owned
+// and projection-disabled pending the owner's review. It reports whether a
+// conversion happened; otherwise the caller deletes the row.
+func convertSettledPosting(tx *planTx, id string, settled []SyncPosting, used map[int]bool, summary *SyncApplySummary) (bool, error) {
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, id)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return false, rows.Err()
+	}
+	stale, err := scanPostingRow(rows)
+	if err != nil {
+		return false, err
+	}
+	match := -1
+	for i, candidate := range settled {
+		if used[i] || !settleMatch(stale, candidate) {
+			continue
+		}
+		if match != -1 {
+			return false, nil
+		}
+		match = i
+	}
+	if match == -1 {
+		return false, nil
+	}
+	used[match] = true
+	candidate := settled[match]
+	amount, err := json.Marshal(candidate.Amount)
+	if err != nil {
+		return false, fmt.Errorf("marshal settled amount %s: %w", id, err)
+	}
+	result, err := tx.Exec(`UPDATE postings SET name = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, source = ?, pending = 0, enabled = 0 WHERE id = ? AND source = ? AND pending = 1 AND plan_id = :plan_id`,
+		candidate.Name, string(amount), candidate.PostedTime, candidate.TransactionTime, SourceModel, id, SourceSimpleFIN)
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if count != 1 {
+		return false, fmt.Errorf("settled conversion missed its pending row")
+	}
+	if _, err := tx.Exec(`DELETE FROM posting_sync_keys WHERE posting_id = ? AND plan_id = :plan_id`, id); err != nil {
+		return false, err
+	}
+	summary.SettledConverted++
+	return true, nil
 }
 
 func updatePendingPosting(tx *planTx, posting types.Posting) error {

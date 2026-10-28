@@ -201,6 +201,7 @@ type SyncApplySummary struct {
 	PendingDeleted      int `json:"pendingDeleted"`
 	PendingInserted     int `json:"pendingInserted"`
 	PendingUpdated      int `json:"pendingUpdated"`
+	SettledConverted    int `json:"settledConverted"`
 }
 
 // SyncProvision is one bridge account needing link resolution: an
@@ -265,8 +266,9 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 // ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings
 // in one transaction. Owner rows always win key conflicts. Pending rows are
 // snapshot-scoped per card account. Exact provider keys preserve UUIDs across
-// refreshes; only missing pending rows are deleted.
-func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string) (SyncApplySummary, error) {
+// refreshes; a missing pending row converts to a settled owner row on a
+// unique strict match against settled candidates, and is otherwise deleted.
+func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, settled []SyncPosting, cardAccounts []string) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -316,7 +318,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 		summary.CheckpointsUpdated++
 	}
 
-	if err := applyPendingSnapshot(tx, pending, cardAccounts, &summary); err != nil {
+	if err := applyPendingSnapshot(tx, pending, settled, cardAccounts, &summary); err != nil {
 		return summary, err
 	}
 

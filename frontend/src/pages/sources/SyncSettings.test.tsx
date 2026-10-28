@@ -126,6 +126,7 @@ function stubApi(state: {
 					pendingDeleted: 0,
 					pendingInserted: 0,
 					pendingUpdated: 0,
+					settledConverted: 0,
 					accountsProvisioned: 0,
 					skipped: {},
 				}),

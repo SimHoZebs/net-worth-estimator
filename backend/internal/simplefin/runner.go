@@ -29,6 +29,7 @@ type Summary struct {
 	PendingDeleted      int            `json:"pendingDeleted"`
 	PendingInserted     int            `json:"pendingInserted"`
 	PendingUpdated      int            `json:"pendingUpdated"`
+	SettledConverted    int            `json:"settledConverted"`
 	AccountsProvisioned int            `json:"accountsProvisioned"`
 	Skipped             map[string]int `json:"skipped"`
 }
@@ -307,7 +308,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	for accountID := range cardsByID {
 		cards = append(cards, accountID)
 	}
-	applied, err := r.store.ApplySyncPlan(checkpoints, plan.Pending, cards)
+	applied, err := r.store.ApplySyncPlan(checkpoints, plan.Pending, plan.Settled, cards)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +328,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		PendingDeleted:      applied.PendingDeleted,
 		PendingInserted:     applied.PendingInserted,
 		PendingUpdated:      applied.PendingUpdated,
+		SettledConverted:    applied.SettledConverted,
 		AccountsProvisioned: provisioned,
 		Skipped:             skipped,
 	}, nil

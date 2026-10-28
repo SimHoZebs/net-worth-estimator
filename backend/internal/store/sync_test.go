@@ -124,6 +124,7 @@ func seedSyncState(t *testing.T, store Store) {
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
 		[]SyncPosting{syncPendingPosting("tx1", "prime_card", "2026-08-02")},
+		nil,
 		[]string{"prime_card"})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
@@ -425,21 +426,21 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, cards)
+		nil, nil, cards)
 	if err != nil || summary.CheckpointsInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 
 	again, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, cards)
+		nil, nil, cards)
 	if err != nil || again.CheckpointsUpdated != 1 || again.CheckpointsInserted != 0 {
 		t.Fatalf("rerun = %+v, err %v", again, err)
 	}
 
 	changed, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 150}},
-		nil, cards)
+		nil, nil, cards)
 	if err != nil || changed.CheckpointsUpdated != 1 {
 		t.Fatalf("update = %+v, err %v", changed, err)
 	}
@@ -471,7 +472,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	_ = extra
 	summary, err := store.ApplySyncPlan(
 		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
-		nil, []string{"checking"})
+		nil, nil, []string{"checking"})
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
@@ -499,7 +500,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	first, err := store.ApplySyncPlan(nil, []SyncPosting{
 		syncPendingPosting("a", "prime_card", "2026-08-02"),
 		syncPendingPosting("b", "prime_card", "2026-08-02"),
-	}, cards)
+	}, nil, cards)
 	if err != nil || first.PendingInserted != 2 {
 		t.Fatalf("first apply = %+v, err %v", first, err)
 	}
@@ -507,7 +508,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	second, err := store.ApplySyncPlan(nil, []SyncPosting{
 		syncPendingPosting("b", "prime_card", "2026-08-03"),
 		syncPendingPosting("c", "prime_card", "2026-08-03"),
-	}, cards)
+	}, nil, cards)
 	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
 		t.Fatalf("second apply = %+v, err %v", second, err)
 	}
@@ -536,11 +537,109 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	})
 	summary, err := store.ApplySyncPlan(nil, []SyncPosting{
 		syncPendingPosting("a", "prime_card", "2026-08-02"),
-	}, []string{"prime_card"})
+	}, nil, []string{"prime_card"})
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 	if got := countRows(t, store, "postings", "id = '"+ownerPostingID+"'"); got != 1 {
 		t.Fatal("owner row was deleted")
+	}
+}
+
+func syncSettledPosting(id, accountID, name, day string) SyncPosting {
+	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
+	if err != nil {
+		stamp = time.Unix(1785628800, 0).UTC()
+	}
+	return SyncPosting{
+		ProviderAccountID: "bridge-" + accountID,
+		TransactionID:     id,
+		Posting: types.Posting{
+			Name:            name,
+			SourceAccountID: &accountID,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+		},
+	}
+}
+
+func TestApplySyncPlanConvertsVanishedPendingOnUniqueStrictMatch(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	first, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, nil, cards)
+	if err != nil || first.PendingInserted != 1 {
+		t.Fatalf("seed pending = %+v, err %v", first, err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil || len(syncedPendingIDs(document)) != 1 {
+		t.Fatalf("seeded pending rows = %+v, err %v", document, err)
+	}
+	pendingID := syncedPendingIDs(document)[0]
+	second, err := store.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03"),
+	}, cards)
+	if err != nil || second.SettledConverted != 1 || second.PendingDeleted != 0 {
+		t.Fatalf("convert = %+v, err %v", second, err)
+	}
+	converted, err := store.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row types.Posting
+	for _, posting := range converted.Postings {
+		if posting.ID == pendingID {
+			row = posting
+		}
+	}
+	if row.ID == "" {
+		t.Fatal("conversion changed the posting UUID")
+	}
+	if row.Source != SourceModel || row.Pending || row.Enabled {
+		t.Fatalf("converted row = %+v, want settled owner row pending review", row)
+	}
+	if row.Name != "Pending a" {
+		t.Fatalf("converted name = %q", row.Name)
+	}
+	if countRows(t, store, "posting_sync_keys", "posting_id = '"+pendingID+"'") != 0 {
+		t.Fatal("conversion left the pending sync key behind")
+	}
+	// The settled charge stays in later feeds without duplicating or deleting.
+	third, err := store.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03"),
+	}, cards)
+	if err != nil || third.SettledConverted != 0 || third.PendingDeleted != 0 {
+		t.Fatalf("repeat = %+v, err %v", third, err)
+	}
+	if got := countRows(t, store, "postings", "id = '"+pendingID+"'"); got != 1 {
+		t.Fatal("repeat sync duplicated or removed the settled row")
+	}
+}
+
+func TestApplySyncPlanDeletesVanishedPendingWithoutUniqueMatch(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	// Two same-amount candidates on consecutive days: ambiguous, so no conversion.
+	summary, err := store.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03"),
+		syncSettledPosting("posted-b", "prime_card", "Pending a (2)", "2026-08-04"),
+	}, cards)
+	if err != nil || summary.SettledConverted != 0 || summary.PendingDeleted != 1 {
+		t.Fatalf("ambiguous = %+v, err %v", summary, err)
+	}
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("b", "prime_card", "2026-08-02")}, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	// Wrong amount: no match, so the row deletes as before.
+	other := syncSettledPosting("posted-c", "prime_card", "Pending b", "2026-08-03")
+	other.Amount = types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "99"}, Inputs: map[string]types.AmountInputBinding{}}
+	unmatched, err := store.ApplySyncPlan(nil, nil, []SyncPosting{other}, cards)
+	if err != nil || unmatched.SettledConverted != 0 || unmatched.PendingDeleted != 1 {
+		t.Fatalf("unmatched = %+v, err %v", unmatched, err)
 	}
 }

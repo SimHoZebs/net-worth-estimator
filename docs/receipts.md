@@ -62,10 +62,12 @@ spinner during local requests or resumed extraction, then confirms completion.
 Unit tests use `mock.NewWithLatency(0)` or Go's virtual clock.
 
 Multiple receipts can attach to one transaction. Pending charges cannot
-receive attachments: the next sync deletes bank-vanished pending rows, which
-would destroy the evidence. Recurrence rules and generated occurrences cannot
-receive attachments; attach to a saved transaction instead. Receipt review
-remains separate from unsaved financial-plan edits.
+receive attachments: a vanished pending row either converts to a settled
+owner row on a unique strict match or deletes with its evidence. Recurrence
+rules and generated occurrences cannot receive attachments; attach to a saved
+transaction instead. Receipt review remains separate from unsaved
+financial-plan edits. Converted settled rows are owner transactions, so they
+accept receipts and keep the original posting UUID.
 
 ## Source boundary
 
