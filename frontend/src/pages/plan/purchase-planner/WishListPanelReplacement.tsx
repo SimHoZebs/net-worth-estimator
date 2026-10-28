@@ -6,6 +6,7 @@ import { horizonDate } from "../../../domain/result.ts";
 import type { PurchaseSchedule } from "../../../domain/result.ts";
 import { useUiStore } from "../../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../../state/workspaceStore.ts";
+import { stageAndSave } from "../../../state/workspaceWrites.ts";
 import {
 	useDraftConflict,
 	useWorkspaceReadOnly,
@@ -29,7 +30,7 @@ export function WishListPanel({
 	schedule: PurchaseSchedule | null;
 	enhancements?: PurchaseEnhancements;
 }) {
-	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
+	const onUpdate = stageAndSave;
 	const applyError = useWorkspaceStore((state) => state.error);
 	const blocked = useWorkspaceReadOnly();
 	const draftConflict = useDraftConflict();
@@ -81,7 +82,7 @@ export function WishListPanel({
 					title={`Remove ${remove.name}?`}
 					eyebrow="Planned purchases"
 					cancelLabel="Keep item"
-					confirmLabel="Remove from unsaved changes"
+					confirmLabel="Remove and save"
 					onCancel={() => setRemove(null)}
 					onConfirm={() => {
 						if (
@@ -95,7 +96,7 @@ export function WishListPanel({
 							setRemove(null);
 					}}
 				>
-					<p>Your saved plan stays intact until you save these changes.</p>
+					<p>This removes the item and saves immediately.</p>
 				</ConfirmDialog>
 			)}
 		</>
