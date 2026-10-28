@@ -273,6 +273,11 @@ Consistency turns visual details into learned vocabulary.
 
 Inconsistency forces users back into reading and interpretation.
 
+Typography follows the same rule: one typeface per text role, never per page
+or component. Manrope serves UI, data, display, and value roles; system
+monospace serves code. The roles live in `frontend/src/styles/typography.css`
+and `lint:typography` flags local font-family choices.
+
 ## 17. Never make color carry meaning alone
 
 Color is an extremely fast communication channel, but it should reinforce meaning rather than be its only carrier.

@@ -27,7 +27,7 @@ Select the adapter at server startup through constructor injection. Use the mock
 | `backend/internal/types/model.go:188-245` owns postings and the projection document. | Store receipts separately. Link to the saved posting UUID, not an activity row ID or generated rule occurrence. |
 | `backend/internal/store/rows.go:423-444` deletes and recreates a posting during updates. | Refactor this operation before adding receipt foreign keys. Otherwise ordinary edits can delete attachments. |
 | `frontend/src/components/activity/TransactionDetail.tsx` has 1,326 lines and combines display and edit behavior. | Add only a receipt-panel composition point. Put receipt behavior in separate components and hooks. |
-| `frontend/src/api/README.md` requires generated endpoints and a shared resource-scoped transport. The default mutator parses JSON. | Document multipart and binary contracts in OpenAPI. Add a binary-response mutator for private image previews. |
+| `frontend/src/api/waypoint-fetch.ts` requires generated endpoints and a shared resource-scoped transport. The default mutator parses JSON. | Document multipart and binary contracts in OpenAPI. Add a binary-response mutator for private image previews. |
 | `backend/internal/api/auth.go` uses an explicit write-route list. | Add every receipt mutation to the global read-only guard. Test the full permission matrix. |
 | `frontend/nginx.conf.template` has no upload-size override. Nginx's documented default is `1m`. | Set an explicit bounded limit for receipt uploads and test through Nginx, not only the fixture API. |
 
