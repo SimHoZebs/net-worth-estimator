@@ -25,9 +25,6 @@ Posting UUID migration and exact upstream identity checks:
 CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api
 ```
 
-See [the posting identity contract](docs/posting-identity.md) for upgrade, backup,
-reference preservation, and rollback behavior.
-
 ## Frontend Gates
 
 Run from the repository root:
@@ -71,8 +68,7 @@ transport, API, permissions, and SQLite remain real. See
 Nginx upload-limit regression.
 
 Blob adapter conformance and receipt storage failure checks live under
-`backend/internal/blobstore/` and `backend/internal/store/`. See
-[private blob storage verification](docs/blob-storage.md#verification).
+`backend/internal/blobstore/` and `backend/internal/store/`.
 
 To exercise the production build instead of the dev server:
 

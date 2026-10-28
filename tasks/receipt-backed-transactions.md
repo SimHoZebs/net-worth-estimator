@@ -110,7 +110,7 @@ Keep receipt metadata independent of image storage. The default SQLite adapter
 keeps images in the existing database backup. Inject storage through
 `blobstore.Store`; use opaque references and durable cleanup instead of provider
 types or paths in receipt logic. Keep byte reads out of model loads and receipt
-lists. See [blob storage contracts](../docs/blob-storage.md).
+lists. See `backend/internal/blobstore` and `backend/internal/store/blob_storage.go`.
 
 Add receipt tables with composite plan/entity keys. Reference postings with `(plan_id, posting_id)`. Do not extend `FinancialModelDocument` or store receipts in the evictable `projection_artifacts` table.
 
