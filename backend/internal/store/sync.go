@@ -265,12 +265,12 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 	return resolved, provisioned, stale, nil
 }
 
-// ApplySyncPlan upserts sync checkpoints and refreshes pending seed postings
-// in one transaction. Owner rows always win key conflicts. Pending rows are
-// snapshot-scoped per card account. Exact provider keys preserve UUIDs across
-// refreshes; a missing pending row converts to a settled owner row on a
-// unique strict match against settled candidates, and is otherwise deleted.
-func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, settled []SyncPosting, cardAccounts []string) (SyncApplySummary, error) {
+// ApplySyncPlan upserts sync checkpoints and applies reconciled bank
+// directives in one transaction. Owner rows always win key conflicts. The
+// directives carry fully resolved lifecycle state; the store verifies
+// structural validity (keys present, non-user source, row existence) but
+// never interprets provider behavior.
+func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -320,7 +320,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, pending []Sync
 		summary.CheckpointsUpdated++
 	}
 
-	if err := applyPendingSnapshot(tx, pending, settled, cardAccounts, &summary); err != nil {
+	if err := applyBankDirectives(tx, directives, &summary); err != nil {
 		return summary, err
 	}
 

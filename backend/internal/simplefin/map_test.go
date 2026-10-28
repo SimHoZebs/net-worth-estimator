@@ -46,10 +46,6 @@ const fixtureAccountSet = `{
   ]
 }`
 
-func fixtureCards() map[string]struct{} {
-	return map[string]struct{}{"prime_card": {}}
-}
-
 func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	var set AccountSet
 	if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
