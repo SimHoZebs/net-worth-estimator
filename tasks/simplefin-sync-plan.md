@@ -1,6 +1,6 @@
 # SimpleFIN Synchronization Plan
 
-Status: implemented. Current contracts live in `backend/cmd/server/sync.go`, `backend/internal/simplefin/`, `TECHNICAL_OVERVIEW.md` §11, and `docs/backend-migration/ASSUMPTIONS.md` A5/A18. This file records planning history; intervals below are stale where they disagree with code (scheduler is every 6 hours, manual-trigger spacing defaults to 6 hours).
+Status: implemented. Current contracts live in `backend/cmd/server/sync.go`, `backend/internal/simplefin/`, and `TECHNICAL_OVERVIEW.md` §§3, 11. This file records planning history; intervals below are stale where they disagree with code (scheduler is every 6 hours, manual-trigger spacing defaults to 6 hours).
 
 ## Objective
 

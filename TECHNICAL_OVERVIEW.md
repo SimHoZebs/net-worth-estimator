@@ -269,7 +269,7 @@ The current schema stores:
 
 ### First boot and import
 
-The authenticated plan router initializes a blank private plan on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected plan's model state in one transaction.
+The authenticated plan router initializes a blank private plan on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected plan's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
 
 `cmd/importcsv` requires both an existing shared database and an explicit existing plan resource ID. It invokes the same import path for operator-controlled replacement within that plan.
 
@@ -324,6 +324,7 @@ Consequences:
 - a seed is part of stochastic identity;
 - unseeded stochastic runs are not content-addressed;
 - result identities are backend-owned and have no cross-runtime compatibility requirement.
+- projection payloads keep dates as strings, `projectionStartPostingState` as a plain JSON object, and evaluation `deterministic`/`probabilistic` values as arbitrary JSON.
 
 ## 5. Model Semantics
 
@@ -333,6 +334,7 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 
 - `NoFloor` is `-1e13`.
 - `NoCeiling` is `+1e13`.
+- CSV accepts `Infinity` and `-Infinity` only as import spellings for those bounds.
 - A source can withdraw only `max(0, balance - minBalance)`.
 - A destination can receive only `max(0, maxBalance - balance)`.
 - Bounds are structural constraints, not labels or categories.
@@ -541,6 +543,14 @@ A residual below 0.5 is not reportable. Deterministic output includes first unde
 Samples are created sequentially from one sampler. Worker completion order does not change accumulation order. Percentiles require all configured runs; an interrupted run is not a successful partial result.
 
 The seed controls the state sequence. Run-count normalization and seed-null behavior are part of the artifact and sharing contract.
+
+### Numeric precision
+
+`golden_test.go` compares numeric goldens with relative-scaled tolerance `1e-9 * max(max(abs(expected), abs(actual)), 1)` across deterministic projection, checkpoint replay, paycheck rule-chain resolution, and seeded stochastic bands, milestones, and evaluations. Tighten it only with matching evidence across all covered fixtures.
+
+A non-null seed produces the established 31-bit linear-congruential sequence `(state * 1664525 + 1013904223)` computed in `float64`, reduced modulo `2^32` and masked with `0x7fffffff`; uniforms are `state / 0x7fffffff`. Sampling consumes two uniforms per variable annual rate with the established log-normal transform (see `sampler.go`).
+
+Two rounding rules stay explicit: deterministic public currency, fulfillment amounts, and evaluation summaries use `math.Round` (halves away from zero); stochastic net-worth samples use `mathRound(value) = math.Floor(value + 0.5)` (halves toward positive infinity). Currency summaries multiply by 100, round, and divide by 100. A change to a negative half value is a contract change.
 
 ## 11. SimpleFIN Flow
 
