@@ -14,6 +14,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/singleflight"
 )
@@ -25,7 +26,7 @@ type Service struct {
 	browsers         map[string]browserEndpoint
 	browserProviders map[string]http.Handler
 	sessions         *scs.SessionManager
-	store            *sessionStore
+	store            store.IdentityStore
 	provider         *oidc.Provider
 	deviceAuth       string
 	oauth            oauth2.Config
@@ -70,15 +71,10 @@ func New(ctx context.Context, c Config) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("discover identity provider: %w", err)
 	}
-	var store *sessionStore
-	if c.Database != nil {
-		store, err = sharedSessions(c.Database)
-	} else {
-		store, err = openSessions(c.SessionDB)
+	if c.Store == nil {
+		return nil, fmt.Errorf("identity store is required")
 	}
-	if err != nil {
-		return nil, fmt.Errorf("open sessions: %w", err)
-	}
+	store := c.Store
 	sm := scs.New()
 	sm.Store = store
 	sm.Lifetime = c.Lifetime
@@ -102,11 +98,9 @@ func New(ctx context.Context, c Config) (*Service, error) {
 		BackchannelSupported  bool   `json:"backchannel_logout_supported"`
 	}
 	if err := provider.Claims(&metadata); err != nil {
-		store.Close()
 		return nil, err
 	}
 	if metadata.IntrospectionEndpoint == "" || !metadata.BackchannelSupported {
-		store.Close()
 		return nil, fmt.Errorf("identity provider must support token introspection and back-channel logout")
 	}
 	service := &Service{config: c, browsers: browsers, sessions: sm, store: store, provider: provider, client: client, deviceAuth: metadata.DeviceAuthEndpoint, logoutEndpoint: metadata.EndSessionEndpoint, introspection: metadata.IntrospectionEndpoint, csrf: csrf,
@@ -115,7 +109,7 @@ func New(ctx context.Context, c Config) (*Service, error) {
 	return service, nil
 }
 
-func (s *Service) Close() error { return s.store.Close() }
+func (s *Service) Close() error { return nil }
 
 type principalKey struct{}
 type Principal = authcontract.Principal

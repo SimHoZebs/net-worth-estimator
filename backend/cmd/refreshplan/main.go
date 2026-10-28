@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 // Keep identity and ownership tables outside this allowlist. Unknown scoped
@@ -84,7 +84,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	if os.SameFile(targetInfo, sourceInfo) {
 		return errors.New("source must be a separate SQLite snapshot")
 	}
-	db, err := store.OpenDatabase(target)
+	db, err := sqlite.OpenDatabase(target)
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	if present != 1 {
 		return errors.New("source plan has no financial model")
 	}
-	var receipts *store.ReceiptCopy
+	var receipts *sqlite.ReceiptCopy
 	if !sample {
 		sourceDB, err := sql.Open("sqlite", uri)
 		if err != nil {

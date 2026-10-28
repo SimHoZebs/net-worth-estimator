@@ -8,7 +8,7 @@ import { removeEvaluation } from "@/domain/planEdits.ts";
 import type { Projection, RangeResult } from "@/domain/result.ts";
 import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "@/state/workspaceStore.ts";
+import { stageAndSave } from "@/state/workspaceWrites.ts";
 import { usePlan } from "@/state/useWorkspacePlan.ts";
 import { useServerModel, useServerStatus } from "@/state/workspaceResources.ts";
 import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
@@ -24,7 +24,7 @@ export function EvaluationsPage({
 	const plan = usePlan();
 	const financialIndependence =
 		useServerModel().data?.document?.evaluations.financialIndependence;
-	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
+	const onUpdate = stageAndSave;
 	const projection = useRemoteProjection({
 		// Reuse the regular range request for configured financial independence
 		// confidence. Inspecting dates and evidence never starts a calculation.

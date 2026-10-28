@@ -13,6 +13,7 @@ import { money } from "../../domain/format.ts";
 import type { Account, Movement, Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { stageAndSave } from "../../state/workspaceWrites.ts";
 import {
 	useServerModel,
 	useServerStatus,
@@ -116,7 +117,6 @@ export function RecurringRules({
 	plan: Plan;
 	onEdit: (target: EditorTarget) => void;
 }) {
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const status = useServerStatus().data;
 	const model = useServerModel().data;
 	const serverDocument = model?.document;
@@ -174,7 +174,7 @@ export function RecurringRules({
 			cursor += 1;
 			return next ?? movement;
 		});
-		return updatePlan({ ...plan, movements });
+		return stageAndSave({ ...plan, movements });
 	};
 
 	// Local drag order. Reorder fires onReorder continuously mid-drag, so

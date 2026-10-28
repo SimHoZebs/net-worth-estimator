@@ -25,9 +25,10 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 const resetPath = "/__fixture/reset"
@@ -73,7 +74,7 @@ func main() {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o700); err != nil {
 		log.Fatalf("create fixture directory: %v", err)
 	}
-	application, err := store.SetupDatabase(dbPath)
+	application, err := sqlite.SetupDatabase(dbPath)
 	if err != nil {
 		log.Fatalf("open application database: %v", err)
 	}
@@ -100,7 +101,11 @@ func main() {
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
-		if _, err := database.ImportCSV(modelPath); err != nil {
+		doc, err := csvio.ImportModel(modelPath)
+		if err != nil {
+			return fmt.Errorf("import fixture: %w", err)
+		}
+		if _, err := database.ImportDocument(doc); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
 		readOnly = nextReadOnly
