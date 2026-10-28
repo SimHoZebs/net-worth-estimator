@@ -5,6 +5,7 @@ import {
 	editorHash,
 	evidenceHash,
 	findAccount,
+	groupHash,
 	pageHash,
 	parseHash,
 	resolveOverlayRoute,
@@ -101,6 +102,20 @@ describe("parseHash", () => {
 			overlay: null,
 		});
 		expect(pageHash("purchases")).toBe("#purchases");
+	});
+
+	test("group detail is a first-class groups view", () => {
+		expect(parseHash("#groups/abc-123")).toEqual({
+			page: "groups",
+			overlay: { type: "group", key: "abc-123" },
+		});
+		expect(groupHash("abc-123")).toBe("#groups/abc-123");
+		expect(
+			resolveOverlayRoute(
+				{ page: "groups", overlay: { type: "group", key: "abc-123" } },
+				null,
+			),
+		).toEqual({ state: "ready", overlay: { kind: "group", id: "abc-123" } });
 	});
 
 	test("unknown pages fall back to outlook with an invalid overlay", () => {

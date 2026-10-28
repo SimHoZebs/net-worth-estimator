@@ -203,7 +203,6 @@ func TestInternalTransportPreservesPublicHost(t *testing.T) {
 func TestConfigAndRequestValidation(t *testing.T) {
 	base := Config{Issuer: "https://identity.example.test", ClientID: "id", ClientSecret: "secret"}
 	for _, invalid := range []Config{
-		{Issuer: "http://identity.example.test", ClientID: "id", ClientSecret: "secret"},
 		{Issuer: "https://user:secret@identity.example.test", ClientID: "id", ClientSecret: "secret"},
 		{Issuer: "https://identity.example.test?query=1", ClientID: "id", ClientSecret: "secret"},
 		{Issuer: "https://identity.example.test", ClientID: "bad:id", ClientSecret: "secret"},
@@ -215,6 +214,9 @@ func TestConfigAndRequestValidation(t *testing.T) {
 		if _, err := New(invalid); err == nil {
 			t.Errorf("accepted invalid config: %+v", invalid)
 		}
+	}
+	if _, err := New(Config{Issuer: "http://192.168.1.50:8000", ClientID: "id", ClientSecret: "secret"}); err != nil {
+		t.Errorf("rejected HTTP issuer: %v", err)
 	}
 	calls := 0
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) { calls++ })
