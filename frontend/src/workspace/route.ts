@@ -23,6 +23,7 @@ export type OverlayRoute =
 	| { type: "accountEdit"; key: string }
 	| { type: "movementEdit"; key: string }
 	| { type: "evaluationEdit"; key: string }
+	| { type: "group"; key: string }
 	| { type: "position" }
 	| { type: "shortfall" }
 	| { type: "safe-spending" }
@@ -57,6 +58,7 @@ export type ResolvedOverlay =
 			tab: SafeSpendingDetailTab;
 			edit: EditorTarget | null;
 	  }
+	| { kind: "group"; id: string }
 	| { kind: "discard" };
 
 export type OverlayResolution =
@@ -184,6 +186,9 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 	}
 	if (rest.length > 2) return { type: "invalid" };
 	if (rest.length === 1) {
+		// Group detail is a first-class view, not a plan overlay: the id
+		// resolves against group membership, never the financial plan.
+		if (page === "groups") return { type: "group", key: first };
 		switch (first) {
 			case "discard":
 				return { type: "discard" };
@@ -267,6 +272,9 @@ export function resolveOverlayRoute(
 	const overlay = route.overlay;
 	if (!overlay) return { state: "none" };
 	if (overlay.type === "invalid") return unknown();
+	// Group detail resolves against membership, never the financial plan.
+	if (overlay.type === "group")
+		return ready({ kind: "group", id: overlay.key });
 	// Data not fetched yet: keep the URL and render nothing until the plan
 	// arrives, then resolve or normalize.
 	if (!plan) return { state: "pending" };
@@ -358,6 +366,10 @@ export function resolveOverlayRoute(
 
 export function pageHash(page: Page): string {
 	return `#${page}`;
+}
+
+export function groupHash(id: string): string {
+	return `#groups/${encode(id)}`;
 }
 
 const encode = (value: string): string => encodeURIComponent(value);
