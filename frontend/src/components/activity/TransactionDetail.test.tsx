@@ -4,7 +4,8 @@ import { testPlan } from "../../mocks/plan.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { resetWorkspaceStore } from "../../state/workspaceStore.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { MovementDetail, TransactionDetail } from "./TransactionDetail.tsx";
+import { movementRuleTransaction } from "../../domain/accountActivity.ts";
+import { TransactionDetail } from "./TransactionDetail.tsx";
 
 function calculatedMovement() {
 	return {
@@ -45,13 +46,17 @@ afterEach(() => {
 
 it("shows the resolved figure with a single Calculated label", () => {
 	const movement = calculatedMovement();
+	const plan = { ...testPlan, movements: [movement] };
 	render(
-		<MovementDetail
+		<TransactionDetail
+			transaction={movementRuleTransaction({
+				movement,
+				plan,
+				resolved: { amount: 2881, requested: 2881, date: "2026-10-31" },
+			})}
 			movement={movement}
 			accounts={testPlan.accounts}
-			plan={{ ...testPlan, movements: [movement] }}
-			resolvedAmount={2881}
-			resolvedDate="2026-10-31"
+			plan={plan}
 			claimRuleName={null}
 			onClose={() => {}}
 		/>,
@@ -68,11 +73,13 @@ it("shows the resolved figure with a single Calculated label", () => {
 
 it("shows only the Calculated label when no resolved amount exists", () => {
 	const movement = calculatedMovement();
+	const plan = { ...testPlan, movements: [movement] };
 	render(
-		<MovementDetail
+		<TransactionDetail
+			transaction={movementRuleTransaction({ movement, plan })}
 			movement={movement}
 			accounts={testPlan.accounts}
-			plan={{ ...testPlan, movements: [movement] }}
+			plan={plan}
 			claimRuleName={null}
 			onClose={() => {}}
 		/>,

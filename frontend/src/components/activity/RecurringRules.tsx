@@ -24,7 +24,8 @@ import {
 	movementIconStyles,
 	transactionBadgeStyles,
 } from "./activityStyles.ts";
-import { MovementDetail } from "./TransactionDetail.tsx";
+import { TransactionDetail } from "./TransactionDetail.tsx";
+import { movementRuleTransaction } from "../../domain/accountActivity.ts";
 
 type Direction = "in" | "out" | "transfer";
 
@@ -393,7 +394,8 @@ export function RecurringRules({
 					const movement = rules.find((item) => item.id === selectedId);
 					if (!movement) return null;
 					return (
-						<MovementDetail
+						<TransactionDetail
+							transaction={movementRuleTransaction({ movement, plan })}
 							movement={movement}
 							accounts={plan.accounts}
 							plan={plan}
