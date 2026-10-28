@@ -16,7 +16,10 @@ import {
   sanitizeSlot,
   stateDirFor,
 } from "./config.mjs";
-import { composeArgs, composeCommandFor, pickFreePorts, validateOperation } from "./run.mjs";
+import { composeArgs, composeCommandFor } from "./lib/compose.mjs";
+import { pickFreePorts } from "./lib/slots.mjs";
+import { validateSetup } from "./setup.mjs";
+import { validateStatus } from "./ps-all.mjs";
 
 test("slots stay on lowercase names with isolated projects, state, and env files", () => {
   assert.equal(sanitizeSlot(undefined), "");
@@ -95,12 +98,12 @@ test("slot compose args isolate the project without touching the canonical defau
 });
 
 test("ps-all and slot options validate before any service operation", () => {
-  assert.doesNotThrow(() => validateOperation("ps-all", {}));
-  assert.throws(() => validateOperation("ps-all", { slot: "shots" }), /bare/);
+  assert.doesNotThrow(() => validateStatus({}, []));
+  assert.throws(() => validateStatus({ slot: "shots" }, []), /bare/);
   assert.doesNotThrow(() =>
-    validateOperation("setup", { slot: "shots", "source-plan": "plans/owner" }),
+    validateSetup({ slot: "shots", "source-plan": "plans/owner" }, []),
   );
-  assert.throws(() => validateOperation("setup", { slot: "Bad Name" }), /Slot names/);
+  assert.throws(() => validateSetup({ slot: "Bad Name" }, []), /Slot names/);
 });
 
 test("slot state rejects another slot name and fixed-port changes", async () => {
