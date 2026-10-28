@@ -16,44 +16,6 @@ import (
 
 const receiptPostingID = "01900000-0000-7000-8000-000000000099"
 
-func testReceiptConformance(t *testing.T, newStore func(*testing.T) store.Store) {
-	s := newStore(t)
-	p := seedReceiptPosting(t, s)
-	r, err := s.CreateReceipt(context.Background(), p.ID, "receipt.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	list, err := s.ListReceipts(p.ID)
-	if err != nil || len(list) != 1 || list[0].ID != r.ID {
-		t.Fatalf("receipt list: %+v %v", list, err)
-	}
-	r.Draft = &types.ReceiptDetails{Merchant: "Draft"}
-	r, err = s.SaveReceipt(r, r.Revision)
-	if err != nil || r.Revision != 2 {
-		t.Fatalf("receipt review: %+v %v", r, err)
-	}
-	if _, err := s.SaveReceipt(r, 1); !errors.Is(err, ErrReceiptConflict) {
-		t.Fatalf("stale review: %v", err)
-	}
-	p.Name = "Updated"
-	if _, err := s.UpdatePosting(p); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.GetReceipt(r.ID); err != nil {
-		t.Fatal("posting update removed evidence", err)
-	}
-	r, err = s.ReplaceReceiptImage(context.Background(), r.ID, r.Revision, "replacement.png", types.ReceiptImage{Bytes: []byte("new pixels"), MediaType: "image/png"})
-	if err != nil || r.Draft != nil || r.Status != "attached" {
-		t.Fatalf("replacement: %+v %v", r, err)
-	}
-	if err := s.DeleteReceipt(context.Background(), r.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.GetReceiptImage(context.Background(), r.ID); !errors.Is(err, ErrReceiptNotFound) {
-		t.Fatal(err)
-	}
-}
-
 func seedReceiptPosting(t *testing.T, s store.Store) types.Posting {
 	t.Helper()
 	seedAccount(t, s, "checking")

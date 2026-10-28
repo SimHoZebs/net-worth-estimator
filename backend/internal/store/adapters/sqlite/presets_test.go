@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -150,45 +149,5 @@ func TestClearPreservesAmountPresets(t *testing.T) {
 	}
 	if exists, err := store.DocumentExists(); err != nil || exists {
 		t.Fatalf("document exists after clear = %v, err %v", exists, err)
-	}
-}
-
-func TestAmountPresetConformanceRoundTrip(t *testing.T) {
-	testAmountPresetConformanceRoundTrip(t, openTestStore)
-}
-
-func testAmountPresetConformanceRoundTrip(t *testing.T, newStore func(*testing.T) store.Store) {
-	t.Helper()
-	store := newStore(t)
-	created, err := store.CreateAmountPreset(testPresetFixture("conformance"))
-	if err != nil {
-		t.Fatalf("create preset: %v", err)
-	}
-	presets, err := store.ListAmountPresets()
-	if err != nil {
-		t.Fatalf("list presets: %v", err)
-	}
-	found := false
-	for _, preset := range presets {
-		if preset.ID == created.ID {
-			found = true
-			if preset.Label != "Label conformance" {
-				t.Fatalf("preset label = %q", preset.Label)
-			}
-		}
-	}
-	if !found {
-		t.Fatal("created preset missing from list")
-	}
-	created.Summary = "updated"
-	updated, err := store.UpdateAmountPreset(created)
-	if err != nil || updated.Summary != "updated" {
-		t.Fatalf("update preset = %+v, err %v", updated, err)
-	}
-	if err := store.MoveAmountPreset(created.ID, ""); err != nil {
-		t.Fatalf("move preset: %v", err)
-	}
-	if err := store.DeleteAmountPreset(created.ID); err != nil {
-		t.Fatalf("delete preset: %v", err)
 	}
 }

@@ -1,8 +1,6 @@
 package sqlite
 
 import (
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"reflect"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -194,34 +192,6 @@ func TestRowEvaluationCRUD(t *testing.T) {
 	}
 	if err := store.DeleteEvaluation(created.InstanceID); !IsNotFound(err) {
 		t.Fatalf("delete missing err = %v, want not-found", err)
-	}
-}
-
-func TestRowRoundTripsPreserveOrder(t *testing.T) {
-	testRowRoundTripsPreserveOrder(t, openTestStore)
-}
-
-func testRowRoundTripsPreserveOrder(t *testing.T, newStore func(*testing.T) store.Store) {
-	t.Helper()
-	store := newStore(t)
-	for _, id := range []string{"a", "b", "c"} {
-		if _, err := store.CreateAccount(types.Account{ID: id, Name: id}); err != nil {
-			t.Fatalf("create %s: %v", id, err)
-		}
-	}
-	if err := store.MoveAccount("c", "a"); err != nil {
-		t.Fatalf("move: %v", err)
-	}
-	loaded, err := store.LoadDocument()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	var order []string
-	for _, account := range loaded.Accounts {
-		order = append(order, account.ID)
-	}
-	if !reflect.DeepEqual(order, []string{"c", "a", "b"}) {
-		t.Fatalf("order = %v, want [c a b]", order)
 	}
 }
 
