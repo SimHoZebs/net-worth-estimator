@@ -810,7 +810,12 @@ export function TransactionDetail({
 						</div>
 					)}
 					<div className="mt-3 flex flex-wrap items-center gap-2">
-						{transaction.pending ? (
+						{transaction.void ? (
+							<Badge tone="neutral">
+								Did not post
+								<span className="sr-only">bank hold that did not post</span>
+							</Badge>
+						) : transaction.pending ? (
 							<Badge tone="warning">
 								<Clock3 size={10} aria-hidden="true" />
 								Pending
