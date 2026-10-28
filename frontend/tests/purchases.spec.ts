@@ -213,7 +213,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	await page.reload();
 	await expect(
 		page
-			.getByRole("list", { name: "Purchase priorities" })
+			.getByRole("region", { name: "Purchase priority" })
 			.getByRole("listitem"),
 	).toContainText("Synced-account laptop");
 	expect(await readTemporaryVersion(page, resource)).toBeNull();
@@ -230,16 +230,18 @@ test("purchase priorities persist and purchases protect all established payments
 	await openPurchases(page);
 	await addPurchase(page, "Laptop", "500");
 	await addPurchase(page, "Chair", "150");
-	const queue = page.getByRole("list", { name: "Purchase priorities" });
+	const queue = page.getByRole("region", { name: "Purchase priority" });
 	await expect(queue.locator("li").first()).toContainText("Laptop");
 	await page.getByRole("button", { name: "Move Chair up" }).click();
 	await expect(queue.locator("li").first()).toContainText("Chair");
 	await expect(
 		page.getByRole("status").filter({ hasText: "Chair is now priority 1" }),
 	).toHaveText("Chair is now priority 1.");
+	await page.getByRole("tab", { name: "Schedule" }).click();
 	await expect(
-		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
-	).toHaveCount(2);
+		page.getByRole("region", { name: "Purchase schedule" }).locator("time"),
+	).toHaveCount(2, { timeout: 30_000 });
+	await page.getByRole("tab", { name: "Priority" }).click();
 	const temporary = (await readTemporaryVersion(page)) as Plan;
 	expect(
 		temporary.plannedPurchases.findIndex(
@@ -322,12 +324,20 @@ test("purchase priorities persist and purchases protect all established payments
 	expect(result.evaluations.financialIndependence).toEqual(
 		baseline.evaluations.financialIndependence,
 	);
-	await page.getByRole("button", { name: "Edit Chair" }).click();
+	await page.getByRole("button", { name: /Inspect Chair/ }).click();
+	await page
+		.getByRole("dialog", { name: "Chair" })
+		.getByRole("button", { name: "Edit purchase" })
+		.click();
 	const editor = page.getByRole("dialog", { name: "Edit purchase" });
 	await editor.getByLabel("Cost (USD)").fill("200");
 	await editor.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(queue.locator("li").first()).toContainText("$200");
-	await page.getByRole("button", { name: "Remove Chair" }).click();
+	await page.getByRole("button", { name: /Inspect Chair/ }).click();
+	await page
+		.getByRole("dialog", { name: "Chair" })
+		.getByRole("button", { name: "Remove", exact: true })
+		.click();
 	await page
 		.getByRole("button", { name: "Remove from unsaved changes" })
 		.click();
@@ -350,23 +360,25 @@ test("unfunded purchases hold lower priorities and the page remains accessible o
 	await expect(page).toHaveURL(/#purchases$/);
 	await addPurchase(page, "Unfunded item", "1000000000");
 	await addPurchase(page, "Small item", "25");
-	await expect(page.getByText("Not funded within this timeframe")).toHaveCount(
-		2,
-	);
+	await expect(page.getByText("2 not yet dated")).toBeVisible();
+	await page.getByRole("tab", { name: "Schedule" }).click();
 	await expect(
-		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
+		page.getByRole("region", { name: "Purchase schedule" }).locator("time"),
 	).toHaveCount(0);
+	await page.getByRole("tab", { name: "Priority" }).click();
 	await page.getByRole("button", { name: "Move Small item up" }).focus();
 	await page.keyboard.press("Enter");
 	await expect(
 		page
-			.getByRole("list", { name: "Purchase priorities" })
+			.getByRole("region", { name: "Purchase priority" })
 			.getByRole("listitem")
 			.first(),
 	).toContainText("Small item");
+	await page.getByRole("tab", { name: "Schedule" }).click();
 	await expect(
-		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
-	).toHaveCount(1);
+		page.getByRole("region", { name: "Purchase schedule" }).locator("time"),
+	).toHaveCount(1, { timeout: 30_000 });
+	await page.getByRole("tab", { name: "Priority" }).click();
 	const audit = await new AxeBuilder({ page })
 		.include('[aria-label="Planned purchases"]')
 		.analyze();
