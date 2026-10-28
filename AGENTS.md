@@ -63,6 +63,7 @@ The frontend image is environment-independent. All deployments proxy `/v1` under
 | `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`                | empty                                                          | comma-separated exact HTTP/S origins for direct cross-origin API access                                      |
 | `NET_WORTH_ESTIMATOR_READ_ONLY`                      | writable                                                       | `1`, `true`, or `yes` rejects guarded writes with 403                                                        |
 | `NET_WORTH_ESTIMATOR_AUTH_PROVIDER`                  | `casdoor`                                                      | required OIDC sessions and plan permissions; token-only and unauthenticated startup are unsupported          |
+| `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP`             | empty (HTTPS outside loopback)                                 | `1`, `true`, or `yes` allows plain-HTTP origins; operator must expose plain HTTP only on a trusted LAN       |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL` | `6h`                                                           | Go duration spacing successful manual sync triggers; Bridge expects 24 requests or fewer per day             |
 | `NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN`  | `1h`                                                           | Go duration Bridge-fetch blackout after an upstream 429; excess triggers return local 429 with `Retry-After` |
 

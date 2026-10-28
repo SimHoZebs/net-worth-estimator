@@ -11,6 +11,14 @@ import (
 
 // ReceiptExtractor is the source boundary. Adapters normalize their own wire
 // formats and asynchronous provider lifecycle behind this single operation.
+//
+// Keep this as the only image-to-structured-receipt boundary. A future adapter
+// may compose one OCR provider with one receipt interpreter internally, but
+// define those recognizer/interpreter interfaces inside that adapter package
+// only when it lands; do not add a configurable pipeline framework or a
+// mandatory OCR stage to the service, database, API, or UI. Both stages share
+// the parent cancellation and deadline budget, and the Source identity must
+// version the complete composition so either stage can invalidate cached results.
 type ReceiptExtractor interface {
 	Extract(context.Context, ExtractionInput) (ExtractionResult, error)
 }

@@ -6,7 +6,7 @@ Replace those callbacks with a direct monthly loop in `evaluateCycleWithShared`.
 
 - Wrapper: `backend/internal/domain/behavior.go:1-32`.
 - Caller and unused state: `backend/internal/domain/evaluation_fi.go:336-432,494-495,552-751`.
-- Required calculation boundary: `PRODUCT_INTENT.md:95`, `docs/backend-migration/ASSUMPTIONS.md:30-31`.
+- Required calculation boundary: `PRODUCT_INTENT.md:95`, `TECHNICAL_OVERVIEW.md` §§8, 9.
 
 This overlaps [the existing branch task](../financial-independence-branch-simulation.md). Reconcile the two before scheduling. Reusing schedules across scenarios is a separate change, not a capability of the current per-path shared data.
 

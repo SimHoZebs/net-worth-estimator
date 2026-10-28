@@ -1,5 +1,9 @@
 import type { Plan } from "../domain/model.ts";
-import type { OtherEvaluation, Projection } from "../domain/result.ts";
+import type {
+	OtherEvaluation,
+	Projection,
+	RangeResult,
+} from "../domain/result.ts";
 
 export type EvaluationPin = {
 	pinned: boolean;
@@ -12,4 +16,5 @@ export interface OtherEvaluationCardProps {
 	plan: Plan;
 	projection: Projection | null;
 	pin?: EvaluationPin | null;
+	range?: RangeResult | null;
 }

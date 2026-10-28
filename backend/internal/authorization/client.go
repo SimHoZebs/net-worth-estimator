@@ -26,6 +26,9 @@ const (
 type Config struct {
 	Issuer, InternalURL, ClientID, ClientSecret string
 	ModelID, Adapter                            string
+	// AllowPrivateHTTP opts into plain-HTTP issuers. The operator owns the
+	// network boundary and must expose plain HTTP only on a trusted LAN.
+	AllowPrivateHTTP bool
 }
 
 type Client struct {
@@ -46,6 +49,9 @@ func New(config Config) (*Client, error) {
 	issuer, err := providerURL(config.Issuer, false)
 	if err != nil {
 		return nil, fmt.Errorf("authorization issuer: %w", err)
+	}
+	if issuer.Scheme == "http" && !IsLoopbackHost(issuer.Hostname()) && !config.AllowPrivateHTTP {
+		return nil, errors.New("authorization issuer requires HTTPS outside loopback (set NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1 to allow plain HTTP on a trusted LAN)")
 	}
 	if config.ClientID == "" || strings.Contains(config.ClientID, ":") || config.ClientSecret == "" {
 		return nil, errors.New("authorization client credentials are required; client ID cannot contain a colon")

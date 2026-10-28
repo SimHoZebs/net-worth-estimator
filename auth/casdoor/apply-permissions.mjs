@@ -7,10 +7,11 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildPermissionSeed, permissionModelId } from "./permissions.mjs";
 import { origin, defaultStateDir } from "./generate.mjs";
+import { allowPrivateHTTP } from "./private-lan.mjs";
 import { casdoorSession } from "./provision.mjs";
 
 export function permissionTarget(env) {
-  const issuer = origin(env.CASDOOR_PUBLIC_URL, "CASDOOR_PUBLIC_URL");
+  const issuer = origin(env.CASDOOR_PUBLIC_URL, "CASDOOR_PUBLIC_URL", allowPrivateHTTP(env));
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(env.AUTH_CLIENT_ID || "")) {
     throw new Error("AUTH_CLIENT_ID must contain 1–100 URL-safe characters");
   }

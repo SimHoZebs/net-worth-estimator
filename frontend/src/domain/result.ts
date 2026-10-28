@@ -1,4 +1,8 @@
 import type { MovementFulfillment } from "../api/contracts.ts";
+import type {
+	FinancialIndependenceAnalysis,
+	FinancialIndependenceRange,
+} from "./financialIndependence.ts";
 import { clampMonth } from "./format.ts";
 import type { Evaluation } from "./model.ts";
 
@@ -58,6 +62,7 @@ export interface OtherEvaluation {
 	progress: OtherEvaluationProgress | null;
 	/** Configured transaction scope for posting-fulfillment evidence. Null means all. */
 	postingIds?: string[] | null;
+	financialIndependence?: FinancialIndependenceAnalysis | null;
 }
 export interface Projection {
 	points: Point[];
@@ -87,6 +92,7 @@ export interface RangeResult {
 	count: number;
 	evaluationSuccess: Record<string, number>;
 	failureShare: number;
+	financialIndependence?: Record<string, FinancialIndependenceRange>;
 }
 
 function monthDate({

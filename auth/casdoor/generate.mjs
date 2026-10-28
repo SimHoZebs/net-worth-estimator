@@ -3,19 +3,11 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildBranding } from "./branding.mjs";
 import { buildPermissionSeed } from "./permissions.mjs";
+import { allowPrivateHTTP, origin } from "./private-lan.mjs";
 
 export const defaultStateDir = resolve(dirname(fileURLToPath(import.meta.url)), "data");
 
-export function origin(value, name) {
-  const url = new URL(value);
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new Error(`${name} must use HTTP or HTTPS`);
-  }
-  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
-    throw new Error(`${name} must be an origin without credentials, path, query, or fragment`);
-  }
-  return url.origin;
-}
+export { origin };
 
 export function settingsFromEnv(env) {
   const required = (name) => {
@@ -29,9 +21,10 @@ export function settingsFromEnv(env) {
     }
     return value;
   };
+  const allowPrivate = allowPrivateHTTP(env);
   const settings = {
-    publicUrl: origin(required("CASDOOR_PUBLIC_URL"), "CASDOOR_PUBLIC_URL"),
-    appUrl: origin(required("APP_PUBLIC_URL"), "APP_PUBLIC_URL"),
+    publicUrl: origin(required("CASDOOR_PUBLIC_URL"), "CASDOOR_PUBLIC_URL", allowPrivate),
+    appUrl: origin(required("APP_PUBLIC_URL"), "APP_PUBLIC_URL", allowPrivate),
     clientId: required("AUTH_CLIENT_ID"),
     clientSecret: secret("AUTH_CLIENT_SECRET"),
     adminPassword: secret("CASDOOR_ADMIN_PASSWORD"),
@@ -47,8 +40,8 @@ export function settingsFromEnv(env) {
       throw new Error("AUTH_BROWSER_ORIGINS must map app origins to Casdoor origins");
     }
     for (const [app, provider] of Object.entries(aliases)) {
-      const appUrl = origin(app, "browser app URL");
-      const providerUrl = origin(provider, "browser Casdoor URL");
+      const appUrl = origin(app, "browser app URL", allowPrivate);
+      const providerUrl = origin(provider, "browser Casdoor URL", allowPrivate);
       if (appUrl === settings.appUrl && providerUrl !== settings.publicUrl) {
         throw new Error("AUTH_BROWSER_ORIGINS cannot replace the primary browser endpoint");
       }
