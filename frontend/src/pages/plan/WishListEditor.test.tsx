@@ -34,7 +34,7 @@ describe("WishListEditor", () => {
 		});
 		fireEvent.submit(
 			view
-				.getByRole("button", { name: "Apply unsaved changes" })
+				.getByRole("button", { name: "Save changes" })
 				.closest("form")!,
 		);
 		expect(view.getByRole("alert").textContent).toContain(
@@ -62,7 +62,7 @@ describe("WishListEditor", () => {
 		});
 		fireEvent.submit(
 			view
-				.getByRole("button", { name: "Apply unsaved changes" })
+				.getByRole("button", { name: "Save changes" })
 				.closest("form")!,
 		);
 		expect(view.getByRole("alert").textContent).toContain(
@@ -107,7 +107,7 @@ describe("WishListEditor", () => {
 		fireEvent.click(include);
 		fireEvent.submit(
 			view
-				.getByRole("button", { name: "Apply unsaved changes" })
+				.getByRole("button", { name: "Save changes" })
 				.closest("form")!,
 		);
 		expect(onApply).toHaveBeenCalledOnce();
@@ -139,7 +139,7 @@ describe("WishListEditor", () => {
 		expect(
 			(
 				view.getByRole("button", {
-					name: "Apply unsaved changes",
+					name: "Save changes",
 				}) as HTMLButtonElement
 			).disabled,
 		).toBe(true);

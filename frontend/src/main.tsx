@@ -25,8 +25,8 @@ class ErrorBoundary extends Component<
 				<main className="mx-auto my-[12vh] max-w-2xl p-6">
 					<h1 className="mt-12 mb-6">Let’s get your outlook back.</h1>
 					<p className="mb-6">
-						The workspace could not be displayed. The server model and any
-						browser draft remain unchanged.
+						The workspace could not be displayed. Your saved data and any
+						unsaved changes remain unchanged.
 					</p>
 					<Button variant="primary" onClick={() => window.location.reload()}>
 						Reload workspace

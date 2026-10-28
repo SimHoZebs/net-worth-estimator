@@ -2,7 +2,7 @@ import { create } from "zustand";
 // State owner derives from the data's authority and lifetime, not its
 // reader count. Saved model, pins, budget settings, projections, and
 // mutation status live in TanStack Query (resource-scoped keys; scope
-// changes cancel queries and clear private data). The shared unsaved plan,
+// changes cancel queries and clear private data). The shared unsaved changes,
 // comparison baseline, theme, and projection controls live in Zustand here.
 // Unsubmitted fields, selections, and pagination stay local. New server
 // state gets a resource-scoped query and mutation, never a second cache.
@@ -127,7 +127,6 @@ interface DraftActions {
 	restore: (scope: ResourceScope) => void;
 	reconcile: (model: ServerModel) => void;
 	updatePlan: (next: Plan) => boolean;
-	replace: (next: Plan) => boolean;
 	discard: (allowStale?: boolean) => boolean;
 	acknowledgeSave: (draft: Plan) => boolean;
 }
@@ -149,7 +148,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 					}
 				: errorCode === "storage-conflict"
 					? {
-							label: "Reload latest saved plan",
+							label: "Reload last save",
 							onAction: () => window.location.reload(),
 						}
 					: undefined,
@@ -179,10 +178,10 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 		});
 		return true;
 	};
-	const edit = (next: Plan, replacing: boolean) => {
+	const edit = (next: Plan) => {
 		if (workspaceIsBusy())
 			return fail(
-				"Wait for the current server operation to finish before editing the plan.",
+				"Wait for the current server operation to finish before editing.",
 			);
 		const model = getServerModel();
 		const saved = model?.conversion?.plan;
@@ -190,28 +189,12 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			return fail("Load the server workspace before editing it.");
 		const conflict = draftConflict(get(), model);
 		if (conflict) return fail(conflict);
-		if (replacing && get().draft)
-			return fail(
-				"Save or discard the current temporary plan before importing another plan.",
-			);
 		const validated = validatePlan(next);
 		if (validated instanceof Error) return fail(validated.message);
-		const presentation = replacing
-			? {
-					...model.conversion!.presentation,
-					name: validated.name,
-					origin: validated.origin,
-					updatedAt: validated.updatedAt,
-					revision: validated.revision,
-					assumptions: validated.assumptions,
-				}
-			: (get().draftPresentation ?? model.conversion!.presentation);
+		const presentation =
+			get().draftPresentation ?? model.conversion!.presentation;
 		try {
-			conversion(
-				validated,
-				model,
-				replacing ? model.conversion!.presentation : presentation,
-			);
+			conversion(validated, model, presentation);
 		} catch (error) {
 			return fail(
 				error instanceof Error
@@ -238,12 +221,6 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 		};
 		set(state);
 		persist(state);
-		notifySuccess(
-			"workspace-notice",
-			replacing
-				? "Imported plan is ready for review and save."
-				: "Unsaved changes updated. Saved plan unchanged.",
-		);
 		return true;
 	};
 	return {
@@ -298,8 +275,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 					onAction: () => void reloadDraft(),
 				});
 		},
-		updatePlan: (next) => edit(next, false),
-		replace: (next) => edit(next, true),
+		updatePlan: (next) => edit(next),
 		discard: (allowStale = false) => {
 			if (!get().draft) return false;
 			if (workspaceIsBusy())
@@ -326,7 +302,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			});
 			notifySuccess(
 				"workspace-notice",
-				"Unsaved changes discarded. Saved server plan restored.",
+				"Unsaved changes discarded. Your last save is restored.",
 			);
 			return true;
 		},
@@ -369,7 +345,7 @@ export function draftDocumentForSave(): FinancialModelDocument {
 	if (getServerStatus()?.readOnly || state.draft.readOnly)
 		throw new ApiHttpError({
 			status: 403,
-			message: "The server is read-only. The temporary plan remains unsaved.",
+			message: "The server is read-only. Your changes remain unsaved.",
 		});
 	return conversion(
 		state.draft,
