@@ -15,6 +15,12 @@ import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
 
+// TODO: replace these client-stored budget settings with a server
+// safe-spending evaluation when the backend ships one. The display already
+// routes through the envelope renderer (see safeSpendingEval.ts), so the
+// server result will swap in as progressive enhancement. Until then this
+// Query-owned local state is the source of truth and never joins the
+// projection cache key, so toggles never retrigger the base simulation.
 export type TotalCycleSettings = SafeSpendingSettings;
 
 export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({

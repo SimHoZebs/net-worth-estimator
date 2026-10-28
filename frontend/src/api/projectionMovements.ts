@@ -30,6 +30,14 @@ function movementSourceIndex(
 				destinations: item.destinations,
 			});
 	}
+	for (const item of document.plannedPurchases ?? []) {
+		if (!index.has(item.id))
+			index.set(item.id, {
+				name: item.name,
+				sourceAccountId: item.fundingAccountId,
+				destinations: null,
+			});
+	}
 	return index;
 }
 

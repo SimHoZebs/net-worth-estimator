@@ -49,6 +49,21 @@ export interface OtherEvaluationProgress {
 	current: string;
 	share: string | null;
 }
+/**
+ * Generic numeric result carried alongside the status badge. Envelopes that
+ * report a numeric `value` (and optional `bands`) surface it here; cards
+ * render it next to the status without changing status semantics. Null when
+ * the envelope carries no numeric result.
+ */
+export interface OtherEvaluationValue {
+	current: number | null;
+	unit: "currency" | "ratio" | "count" | null;
+}
+export interface OtherEvaluationBands {
+	p10: number | null;
+	p50: number | null;
+	p90: number | null;
+}
 export interface OtherEvaluation {
 	id: string;
 	name: string;
@@ -60,6 +75,10 @@ export interface OtherEvaluation {
 	outcomeText: string;
 	qualifier: string | null;
 	progress: OtherEvaluationProgress | null;
+	/** Numeric result rendered alongside the status badge. Null when absent. */
+	value?: OtherEvaluationValue | null;
+	/** Percentile bands rendered alongside the status badge. Null when absent. */
+	bands?: OtherEvaluationBands | null;
 	/** Configured transaction scope for posting-fulfillment evidence. Null means all. */
 	postingIds?: string[] | null;
 	financialIndependence?: FinancialIndependenceAnalysis | null;

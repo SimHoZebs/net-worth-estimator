@@ -315,7 +315,8 @@ func RuleCapsByID(document *types.FinancialModelDocument) map[string]float64 {
 	return caps
 }
 
-// MovementIDExists reports whether an ID names a manual posting or a rule.
+// MovementIDExists reports whether an ID names a manual posting, a rule,
+// or a planned purchase.
 func MovementIDExists(document *types.FinancialModelDocument, id string) bool {
 	for index := range document.Postings {
 		if document.Postings[index].ID == id {
@@ -327,18 +328,26 @@ func MovementIDExists(document *types.FinancialModelDocument, id string) bool {
 			return true
 		}
 	}
+	for index := range document.PlannedPurchases {
+		if document.PlannedPurchases[index].ID == id {
+			return true
+		}
+	}
 	return false
 }
 
 // MovementIDs returns every movement identity in a document: manual posting
-// IDs plus rule IDs.
+// IDs, rule IDs, and planned-purchase IDs.
 func MovementIDs(document *types.FinancialModelDocument) map[string]bool {
-	ids := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules))
+	ids := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
 	for index := range document.Postings {
 		ids[document.Postings[index].ID] = true
 	}
 	for index := range document.RecurrenceRules {
 		ids[document.RecurrenceRules[index].ID] = true
+	}
+	for index := range document.PlannedPurchases {
+		ids[document.PlannedPurchases[index].ID] = true
 	}
 	return ids
 }

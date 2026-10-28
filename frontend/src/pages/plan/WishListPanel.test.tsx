@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { setServerStatusFixture } from "../../mocks/workspace.ts";
-import type { Movement, Plan } from "../../domain/model.ts";
+import type { PlannedPurchase, Plan } from "../../domain/model.ts";
 import { testPlan } from "../../mocks/plan.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { WishListPanel } from "./WishListPanel.tsx";
@@ -17,25 +17,22 @@ afterEach(() => {
 	useWorkspaceStore.setState(useWorkspaceStore.getInitialState(), true);
 });
 
-const laptop: Movement = {
-	...testPlan.movements[0]!,
+const laptop: PlannedPurchase = {
 	id: "laptop",
 	name: "Laptop",
-	frequency: "once",
 	amount: 500,
 	fromId: "checking",
-	toId: null,
-	annualIncrease: 0,
-	purchasePriority: 0,
+	startDate: testPlan.startDate,
+	enabled: true,
+	readOnly: false,
 };
-const chair: Movement = {
+const chair: PlannedPurchase = {
 	...laptop,
 	id: "chair",
 	name: "Chair",
 	amount: 150,
-	purchasePriority: 1,
 };
-const plan = { ...testPlan, movements: [laptop, chair] };
+const plan = { ...testPlan, plannedPurchases: [laptop, chair] };
 
 describe("wish list", () => {
 	it("names the purchase region and its independent priority and date lists", () => {
@@ -82,10 +79,10 @@ describe("wish list", () => {
 		const view = render(<WishListPanel plan={plan} schedule={null} />);
 		fireEvent.click(view.getByRole("button", { name: "Move Chair up" }));
 		expect(
-			update.mock.calls[0]![0].movements.find(
-				(item: Movement) => item.id === "chair",
-			)?.purchasePriority,
-		).toBe(0);
+			update.mock.calls[0]![0].plannedPurchases.find(
+				(item: PlannedPurchase) => item.id === "chair",
+			),
+		).toEqual({ ...chair });
 		expect(view.getByRole("status").textContent).toContain(
 			"Chair is now priority 1",
 		);
@@ -116,7 +113,10 @@ describe("wish list", () => {
 	it("locks source-owned purchases without locking other items", () => {
 		const view = render(
 			<WishListPanel
-				plan={{ ...plan, movements: [{ ...laptop, readOnly: true }, chair] }}
+				plan={{
+				...plan,
+				plannedPurchases: [{ ...laptop, readOnly: true }, chair],
+			}}
 				schedule={null}
 			/>,
 		);

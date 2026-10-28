@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -12,12 +14,41 @@ import (
 // never import evaluator-specific logic.
 //
 // Plugin contract: a new check adds one type plus one definition, core loop
-// untouched. Core hooks (required): ParseConfig parses once and returns a
-// typed config or error; EvaluatePath answers over one path; Accumulate plus
-// Finalize aggregate sampled paths; Status drives the UI verdict.
+// untouched. Two systems share this registry:
+//   - Reader: answers from the cached path only. Use NewReachedDateReader
+//     when the outcome is "the first date a measure crossed a target" (the
+//     whole plugin is 5 arguments); otherwise fill the shared accumulator
+//     wiring by hand and leave resimulation hooks nil. Core hooks (required):
+//     ParseConfig parses once and returns a typed config or error;
+//     EvaluatePath answers over one path; Accumulate plus Finalize aggregate
+//     sampled paths; Status drives the UI verdict.
+//   - Simulator: runs simulations against shared base path state (FI,
+//     purchases). Requires Kind simulator PLUS AllowSimulation, DetailLevel
+//     handling, and DescribeStochasticWork/MeasureStochasticWork for progress.
 // Optional hooks: DescribeStochasticWork and MeasureStochasticWork only tune
 // progress-bar labels and default to one unit per run; DiagnoseConfig folds
 // into ParseConfig when absent.
+//
+// Simulation contract: rerunning the base simulation is NOT the default.
+// Every definition is a reader (Kind "" or "reader") unless it
+// opts into simulation with BOTH Kind "simulator" AND AllowSimulation true.
+// Reader evaluations run against the cached ProjectionPath shared by all
+// evaluations; while a reader EvaluatePath runs, PrepareSimulationRequest,
+// Simulate, simulateScheduled, and simulatePurchases refuse to run and report
+// a reader violation. Simulator evaluations (purchases, FI) reuse the shared
+// base path state and run simulations only — never a fresh Prepare per eval.
+
+// EvaluationKind states whether an evaluator may run simulations.
+type EvaluationKind string
+
+const (
+	// EvaluationKindReader answers from the cached path only. This is
+	// the default: the zero value ("") means reader.
+	EvaluationKindReader EvaluationKind = "reader"
+	// EvaluationKindSimulator runs simulations against shared base path state.
+	// Requires AllowSimulation as an explicit second opt-in.
+	EvaluationKindSimulator EvaluationKind = "simulator"
+)
 
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
@@ -63,6 +94,12 @@ type EvaluationDefinition struct {
 	Type string
 	Name string
 
+	// Kind selects the simulation contract. "" defaults to reader:
+	// answer from ctx.Path only. Simulator requires Kind simulator PLUS
+	// AllowSimulation; one without the other is misconfigured.
+	Kind            EvaluationKind
+	AllowSimulation bool
+
 	ValidateConfig func(config any) error
 	ParseConfig    func(config any) (any, error)
 
@@ -80,6 +117,19 @@ type EvaluationDefinition struct {
 	DiagnoseConfig func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic
 }
 
+// KindOrDefault resolves the zero value to reader.
+func (d *EvaluationDefinition) KindOrDefault() EvaluationKind {
+	if d == nil || d.Kind == "" {
+		return EvaluationKindReader
+	}
+	return d.Kind
+}
+
+// IsSimulator reports explicit simulator opt-in: Kind simulator plus the flag.
+func (d *EvaluationDefinition) IsSimulator() bool {
+	return d != nil && d.Kind == EvaluationKindSimulator && d.AllowSimulation
+}
+
 // EvaluationRegistry holds registered definitions keyed by type.
 type EvaluationRegistry struct {
 	definitions map[string]*EvaluationDefinition
@@ -91,14 +141,30 @@ func NewEvaluationRegistry() *EvaluationRegistry {
 	return &EvaluationRegistry{definitions: map[string]*EvaluationDefinition{}}
 }
 
-// Register adds a definition; duplicate registration panics.
+// Register adds a definition; duplicate registration panics. Simulator opt-in
+// requires both Kind simulator and AllowSimulation; one without the other
+// panics so a resimulating evaluator can never register by accident.
 func (r *EvaluationRegistry) Register(definition *EvaluationDefinition) {
 	if _, exists := r.definitions[definition.Type]; exists {
 		panic(fmt.Sprintf("Evaluation definition %q is already registered.", definition.Type))
 	}
+	if definition.Kind == EvaluationKindSimulator && !definition.AllowSimulation {
+		panic(fmt.Sprintf("Evaluation definition %q selects Kind simulator without AllowSimulation.", definition.Type))
+	}
 	r.definitions[definition.Type] = definition
 	r.order = append(r.order, definition.Type)
 	sort.Strings(r.order) // keep deterministic iteration; type order comes from tables
+}
+
+// Validate reports misconfigured definitions without mutating the registry.
+func (r *EvaluationRegistry) Validate() error {
+	for _, evaluationType := range r.order {
+		definition := r.definitions[evaluationType]
+		if definition.Kind == EvaluationKindSimulator && !definition.AllowSimulation {
+			return fmt.Errorf("Evaluation definition %q selects Kind simulator without AllowSimulation.", evaluationType)
+		}
+	}
+	return nil
 }
 
 // Get returns the definition for a type, if registered.
@@ -116,11 +182,89 @@ func (r *EvaluationRegistry) List() []struct{ Type, Name string } {
 	return out
 }
 
+// readerSimGuard counts active reader EvaluatePath calls. While
+// nonzero, the simulation entry points below refuse to run: a reader
+// must answer from the cached path, never rerun the base simulation.
+// readerSimEval names the guarded evaluation for diagnostics.
+var readerSimGuard int32
+var readerSimEvalMu sync.Mutex
+var readerSimEval string
+
+// orchestratorSimDepth counts in-flight orchestrator simulations: the base
+// path builder and the stochastic sample projector. Simulation is concurrent
+// by design (sample workers run while the coordinator evaluates), so the
+// resimulation refusal below exempts orchestrator-initiated runs and only
+// fires for simulation entered from inside a guarded reader evaluation
+// with no orchestrator simulation in flight.
+var orchestratorSimDepth int32
+
+func readerSimulationBlocked() (string, bool) {
+	if atomic.LoadInt32(&readerSimGuard) == 0 {
+		return "", false
+	}
+	if atomic.LoadInt32(&orchestratorSimDepth) > 0 {
+		return "", false
+	}
+	readerSimEvalMu.Lock()
+	defer readerSimEvalMu.Unlock()
+	return readerSimEval, true
+}
+
+// withOrchestratorSim marks fn as an orchestrator-initiated simulation run.
+func withOrchestratorSim(fn func()) {
+	atomic.AddInt32(&orchestratorSimDepth, 1)
+	defer atomic.AddInt32(&orchestratorSimDepth, -1)
+	fn()
+}
+
+// orchestratedPrepare runs PrepareSimulationRequest as an orchestrator: the
+// base path builder and the stochastic sampler simulate concurrently with
+// evaluation by design, so their runs never count as reader violations.
+func orchestratedPrepare(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (prepared *types.PreparedProjection, err error) {
+	withOrchestratorSim(func() {
+		prepared, err = PrepareSimulationRequest(document, settings, overrides, monteCarloSample)
+	})
+	return prepared, err
+}
+
+// orchestratedSimulate runs Simulate as an orchestrator (see above).
+func orchestratedSimulate(request types.SimulationRequest) (run types.SimulationRun, err error) {
+	withOrchestratorSim(func() {
+		run, err = Simulate(request)
+	})
+	return run, err
+}
+
+// requireResimulationAllowed reports a violation when a reader
+// evaluation attempts to rerun the base simulation.
+func requireResimulationAllowed(caller string) error {
+	if evalType, blocked := readerSimulationBlocked(); blocked {
+		return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; mark Kind=simulator with explicit opt-in to run simulations", evalType, caller)
+	}
+	return nil
+}
+
+// withReaderGuard runs fn with resimulation refused when the definition
+// is a reader (the default). Simulator evaluations run unguarded.
+func withReaderGuard(definition *EvaluationDefinition, evalType string, fn func() (PathResult, error)) (PathResult, error) {
+	if definition.IsSimulator() {
+		return fn()
+	}
+	readerSimEvalMu.Lock()
+	readerSimEval = evalType
+	readerSimEvalMu.Unlock()
+	atomic.AddInt32(&readerSimGuard, 1)
+	defer atomic.AddInt32(&readerSimGuard, -1)
+	return fn()
+}
+
 type instanceRuntime struct {
 	evaluationType string
 	configuredRaw  any // one of *types.FIEvaluation etc.
+	sourceConfig   any // raw configured value, for per-kind cache keys
 	instanceID     string
 	name           string
+	enabled        bool
 	definition     *EvaluationDefinition
 	diagnostics    []types.EvaluationDiagnostic
 
@@ -151,7 +295,9 @@ func (r *instanceRuntime) evaluateDeterministic(ctx *EvaluationContext) {
 	if r.definition.DiagnoseConfig != nil {
 		r.diagnostics = append(r.diagnostics, r.definition.DiagnoseConfig(ctx, r.configuredRaw)...)
 	}
-	result, err := r.definition.EvaluatePath(ctx, r.configuredRaw)
+	result, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {
+		return r.definition.EvaluatePath(ctx, r.configuredRaw)
+	})
 	if err != nil {
 		r.diagnostics = append(r.diagnostics, errorDiagnostic("evaluation-runtime-error", err))
 		return
@@ -186,7 +332,9 @@ func (r *instanceRuntime) consume(ctx *EvaluationContext) {
 	if r.definition == nil || r.accumulator == nil || r.stochasticFailed {
 		return
 	}
-	pathResult, err := r.definition.EvaluatePath(ctx, r.configuredRaw)
+	pathResult, err := withReaderGuard(r.definition, r.evaluationType, func() (PathResult, error) {
+		return r.definition.EvaluatePath(ctx, r.configuredRaw)
+	})
 	if err == nil {
 		err = r.definition.Accumulate(r.accumulator, pathResult)
 	}
@@ -318,8 +466,10 @@ func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *Evaluatio
 		runtimeInstance := &instanceRuntime{
 			evaluationType: instance.evaluationType,
 			configuredRaw:  instance.rawConfig,
+			sourceConfig:   instance.rawConfig,
 			instanceID:     instance.instanceID,
 			name:           instance.name,
+			enabled:        instance.enabled,
 		}
 		if strings.TrimSpace(instance.instanceID) == "" || idCounts[instance.instanceID] > 1 {
 			message := fmt.Sprintf("Evaluation instance ID %q is duplicated.", instance.instanceID)
@@ -364,6 +514,66 @@ func NewEvaluationRuntimeSet(tables *types.EvaluationTables, registry *Evaluatio
 		set.runtimes = append(set.runtimes, runtimeInstance)
 	}
 	return set
+}
+
+// PartitionByKind splits a fully built runtime set into reader and simulator
+// subsets, preserving global ID validation and relative order. Only runtimes
+// with an explicit simulator definition run simulations; everything else —
+// readers, disabled instances, unknown types, and invalid configs — stays on
+// the reader side, which never resimulates.
+func (s *EvaluationRuntimeSet) PartitionByKind() (readers, simulators *EvaluationRuntimeSet) {
+	readers = &EvaluationRuntimeSet{}
+	simulators = &EvaluationRuntimeSet{}
+	for _, runtimeInstance := range s.runtimes {
+		if runtimeInstance.definition != nil && runtimeInstance.definition.IsSimulator() {
+			simulators.runtimes = append(simulators.runtimes, runtimeInstance)
+			continue
+		}
+		readers.runtimes = append(readers.runtimes, runtimeInstance)
+	}
+	return readers, simulators
+}
+
+// MergeEvaluationResultCollections combines per-kind collections in full-set
+// order. Each evaluation type belongs to one definition kind, so rows never
+// interleave; a reader-side diagnostic (disabled, unknown, or invalid
+// simulator config) keeps its global position among that table's rows.
+func MergeEvaluationResultCollections(set *EvaluationRuntimeSet, reader, simulator *types.EvaluationResultCollection) *types.EvaluationResultCollection {
+	merged := &types.EvaluationResultCollection{
+		Evaluations: types.EvaluationResultTables{
+			FinancialIndependence: []types.EvaluationResultEnvelope{},
+			NetWorthThreshold:     []types.EvaluationResultEnvelope{},
+			AccountBalance:        []types.EvaluationResultEnvelope{},
+			PostingFulfillment:    []types.EvaluationResultEnvelope{},
+			CycleFulfillment:      []types.EvaluationResultEnvelope{},
+			// PlannedPurchases stays nil when empty: Result() appends per
+			// registered instance, and nil-vs-empty matters to DeepEqual
+			// callers that strip the table before comparing baselines.
+		},
+	}
+	byID := map[string]types.EvaluationResultEnvelope{}
+	for _, collection := range []*types.EvaluationResultCollection{reader, simulator} {
+		if collection == nil {
+			continue
+		}
+		for _, table := range collection.Evaluations.Tables() {
+			for _, envelope := range *table.Rows {
+				byID[envelope.InstanceID] = envelope
+			}
+		}
+	}
+	for _, runtimeInstance := range set.runtimes {
+		envelope, ok := byID[runtimeInstance.instanceID]
+		if !ok {
+			continue
+		}
+		rows := merged.Evaluations.ByType(runtimeInstance.evaluationType)
+		if rows == nil {
+			continue
+		}
+		*rows = append(*rows, envelope)
+	}
+	return merged
 }
 
 // EvaluateDeterministic runs all enabled evaluators once over the path.
@@ -421,6 +631,9 @@ func (s *EvaluationRuntimeSet) Result() types.EvaluationResultCollection {
 			AccountBalance:        []types.EvaluationResultEnvelope{},
 			PostingFulfillment:    []types.EvaluationResultEnvelope{},
 			CycleFulfillment:      []types.EvaluationResultEnvelope{},
+			// PlannedPurchases stays nil when empty: Result() appends per
+			// registered instance, and nil-vs-empty matters to DeepEqual
+			// callers that strip the table before comparing baselines.
 		},
 	}
 	for _, table := range collection.Evaluations.Tables() {
