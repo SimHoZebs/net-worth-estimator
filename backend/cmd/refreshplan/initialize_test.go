@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestInitializeSeedsOnlySelectedFinancialScopeForDevIdentity(t *testing.T) {
@@ -68,7 +68,7 @@ func TestInitializeInfersOnlyUnambiguousPrivateSource(t *testing.T) {
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
 		t.Fatalf("ambiguous source created destination: %v", err)
 	}
-	db, err := store.OpenDatabase(source)
+	db, err := sqlite.OpenDatabase(source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestInitializeFailedCopyPublishesNoDatabase(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "dev.db")
 	seed(t, source)
-	db, err := store.OpenDatabase(source)
+	db, err := sqlite.OpenDatabase(source)
 	if err != nil {
 		t.Fatal(err)
 	}

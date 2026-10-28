@@ -17,7 +17,7 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func envOr(key, fallback string) string {
@@ -78,7 +78,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure identity: %v", err)
 	}
-	database, err := store.OpenDatabase(dbPath)
+	database, err := sqlite.OpenDatabase(dbPath)
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
@@ -109,7 +109,7 @@ func main() {
 		log.Fatalf("configure resource access: %v", err)
 	}
 	defer closeResources()
-	handler, err = deploymentHandler(handler, database.SQL(), identityConfig, os.Getenv("NET_WORTH_ESTIMATOR_PROXY_SECRET"))
+	handler, err = deploymentHandler(handler, database, identityConfig, os.Getenv("NET_WORTH_ESTIMATOR_PROXY_SECRET"))
 	if err != nil {
 		log.Fatalf("configure deployment ingress: %v", err)
 	}

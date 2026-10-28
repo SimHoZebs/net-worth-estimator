@@ -3,9 +3,9 @@ package identity
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"net/url"
 	"time"
 
@@ -14,9 +14,10 @@ import (
 
 type Config struct {
 	Provider, Issuer, InternalURL, ClientID, ClientSecret string
-	PublicURL, AccountURL, SessionDB                      string
-	// Database is the application-owned connection. SessionDB is test-only fallback.
-	Database              *sql.DB
+	PublicURL, AccountURL                                 string
+	// Store is the application-owned identity storage. The composition root
+	// provides the adapter.
+	Store                 store.IdentityStore
 	Lifetime              time.Duration
 	RecheckInterval       time.Duration
 	ResolveAccess         func(context.Context, string) (authorization.Scope, error)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -15,7 +16,7 @@ var errBridgeDown = errors.New("bridge down")
 
 func openRunnerStore(t *testing.T) store.Store {
 	t.Helper()
-	database, err := store.Open(filepath.Join(t.TempDir(), "runner.db"))
+	database, err := sqlite.Open(filepath.Join(t.TempDir(), "runner.db"))
 	if err != nil {
 		t.Fatalf("open runner store: %v", err)
 	}
