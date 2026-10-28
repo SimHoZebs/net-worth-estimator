@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
@@ -33,7 +33,7 @@ func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
 }
 
 func TestPlanProvisioningRequiresAuthorizedIdentity(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestPlanProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 }
 
 func TestOwnerSyncStoreSkipsMissingPlan(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
