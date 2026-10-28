@@ -68,6 +68,8 @@ TEST_PRODUCTION=1 npm --prefix frontend run test:browser
 
 ## Completion Gate
 
+Agents run the completion gates locally. The repository has no hosted CI workflows.
+
 For a frontend change, the gate is:
 
 ```bash
@@ -154,6 +156,24 @@ approval or import, first-account editing, draft reload, and saved restart persi
 ---
 
 # Backend
+
+## Deployment portability
+
+```bash
+backend/scripts/verify.sh ./internal/ingress
+go -C backend test ./internal/identity -run TestDeploymentProxy
+backend/scripts/verify.sh ./cmd/server
+node --test deploy/vercel.test.mjs scripts/smoke-compose.test.mjs
+docker build -f backend/Dockerfile -t waypoint-deployment-test .
+DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs
+```
+
+These checks use disposable state, not the dev stack or production database.
+They cover authenticated and Host-preserving HTTP proxies, real API writes,
+CSRF denial, incremental streaming, persistent sessions and artifacts, public
+probes, command overrides, and a provider-assigned API port. Run the image checks
+locally before completion. See [the operator contract](deploy/README.md) for the
+Vercel/Render settings and the separate actual-provider checklist.
 
 The verification surface for the backend is its HTTP/SSE contract, CSV seed path, and SQLite persistence.
 
