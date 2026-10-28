@@ -1,5 +1,10 @@
 import { shiftDate } from "./format.ts";
-import { isHistoricalMovement, isPendingMovement, type Plan } from "./model.ts";
+import {
+	isHistoricalMovement,
+	isPendingMovement,
+	type Movement,
+	type Plan,
+} from "./model.ts";
 import type { Projection } from "./result.ts";
 import { horizonDate } from "./result.ts";
 import {
@@ -199,6 +204,66 @@ export function accountTransactions({
 			};
 		});
 	return [...recorded, ...projected];
+}
+
+/**
+ * Single rule-to-occurrence adapter for plan-level detail views.
+ * MovementsPanel and RecurringRules list rules, not occurrences, but the
+ * detail modal is the shared occurrence view (TransactionDetail). This
+ * synthesizes the representative occurrence so every entry point renders
+ * the identical modal instead of maintaining a second implementation.
+ */
+export function movementRuleTransaction({
+	movement,
+	plan,
+	resolved,
+}: {
+	movement: Movement;
+	plan: Plan;
+	resolved?: { amount: number; requested: number; date: string };
+}): AccountTransaction {
+	const names = new Map(
+		plan.accounts.map((account) => [account.id, account.name]),
+	);
+	const pending = isPendingMovement(movement);
+	const historical = isHistoricalMovement(movement, plan.startDate) || pending;
+	const direction = movement.fromId ? ("out" as const) : ("in" as const);
+	const category =
+		movement.fromId && movement.toId
+			? ("transfer" as const)
+			: movement.fromId
+				? ("expense" as const)
+				: ("income" as const);
+	const from = movement.fromId
+		? (names.get(movement.fromId) ?? "Unknown account")
+		: externalCounterpartyName("in");
+	const to = movement.toId
+		? (names.get(movement.toId) ?? "Unknown account")
+		: externalCounterpartyName("out");
+	const amount = movement.amountKnown
+		? movement.amount
+		: (resolved?.amount ?? 0);
+	const requested = movement.amountKnown
+		? movement.amount
+		: (resolved?.requested ?? amount);
+	return {
+		id: `rule-${movement.id}`,
+		movementId: movement.id,
+		date: resolved?.date ?? movement.startDate,
+		name: movement.name,
+		source: historical ? "historical" : "projected",
+		direction,
+		category,
+		counterparty: direction === "in" ? from : to,
+		from,
+		to,
+		amount,
+		requested,
+		shortfall: Math.max(0, requested - amount),
+		constraint: null,
+		excluded: !movement.enabled,
+		pending,
+	};
 }
 
 export function filterTransactions({
