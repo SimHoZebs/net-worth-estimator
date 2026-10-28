@@ -82,6 +82,22 @@ describe("projection chart inspection", () => {
 		expect(onEvidence).toHaveBeenCalledOnce();
 	});
 
+	it("switches between 30-day and 90-day windows", () => {
+		show();
+		const slider = screen.getByRole("slider", {
+			name: "Inspect net worth date",
+		});
+		expect(slider.getAttribute("max")).toBe("29");
+		fireEvent.click(screen.getByRole("button", { name: "90 days" }));
+		expect(slider.getAttribute("max")).toBe("89");
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
+		fireEvent.change(slider, { target: { value: "0" } });
+		expect(slider.getAttribute("aria-valuetext")).toBe("Apr 2026: $1,000");
+		fireEvent.click(screen.getByRole("button", { name: "30 days" }));
+		expect(slider.getAttribute("max")).toBe("29");
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
+	});
+
 	it("hides the $0 line for an all-debt window", () => {
 		render(
 			<ProjectionChart

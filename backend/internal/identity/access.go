@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
@@ -28,6 +29,17 @@ func Subject(ctx context.Context) string {
 	return p.Subject
 }
 
+func Name(ctx context.Context) string {
+	p, _ := ctx.Value(principalKey{}).(Principal)
+	return p.Name
+}
+
+// PrincipalContext carries a verified principal. It is a test seam for
+// handlers that read identity from context without a live session.
+func PrincipalContext(ctx context.Context, p Principal) context.Context {
+	return context.WithValue(ctx, principalKey{}, p)
+}
+
 func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization.Scope, error) {
 	if s.config.ResolveAccess == nil {
 		return authorization.Scope{}, errors.New("resource permissions are not configured")
@@ -45,3 +57,15 @@ func requestAction(r *http.Request) string {
 	}
 	return "plan:write"
 }
+
+// IsGroupRoute reports social group routes, which need authentication
+// only. Membership is enforced by the groups handler, not plan
+// permissions. It matches exactly the routes the groups handler serves so
+// no future plan route can hide inside the bypass.
+func IsGroupRoute(path string) bool {
+	return path == "/v1/groups" || strings.HasPrefix(path, "/v1/groups/") ||
+		path == "/v1/invites/accept"
+}
+
+// isGroupRoute is the internal alias used by the request pipeline.
+func isGroupRoute(path string) bool { return IsGroupRoute(path) }

@@ -47,9 +47,6 @@ func New(config Config) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("authorization issuer: %w", err)
 	}
-	if issuer.Scheme == "http" && issuer.Hostname() != "localhost" && issuer.Hostname() != "127.0.0.1" && issuer.Hostname() != "::1" {
-		return nil, errors.New("authorization issuer requires HTTPS outside loopback")
-	}
 	if config.ClientID == "" || strings.Contains(config.ClientID, ":") || config.ClientSecret == "" {
 		return nil, errors.New("authorization client credentials are required; client ID cannot contain a colon")
 	}
