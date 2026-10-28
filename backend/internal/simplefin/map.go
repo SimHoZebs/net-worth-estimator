@@ -43,9 +43,11 @@ type Provision struct {
 	Kind     string
 }
 
-// Plan is the mapped sync output before applying. Settled holds posted
-// charges on card accounts for pending-to-settled conversion in the store;
-// charges that match no vanished pending row are ignored, never inserted.
+// Plan is the mapped sync output before applying. Pending holds pending
+// authorizations; Settled holds posted charges. The reconciler converts a
+// vanished pending row on a unique strict posted match, voids it otherwise,
+// and inserts unmatched posted charges as new rows; void rows never
+// suppress an insert.
 type Plan struct {
 	Checkpoints []Checkpoint
 	Pending     []store.SyncPosting
@@ -181,7 +183,8 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 				ProviderAccountID: account.ID,
 				TransactionID:     transaction.ID,
 				Posting: types.Posting{
-					Name: truncateLabel(transaction.Description),
+					Name:   truncateLabel(transaction.Description),
+					Source: store.SourceSimpleFIN,
 					Amount: types.PostingAmountResolution{
 						Resolver: "expression",
 						Config:   map[string]any{"expression": abs},

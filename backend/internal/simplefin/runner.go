@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 	"sync"
 	"time"
 
@@ -305,12 +304,16 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 			Balance:   checkpoint.Balance,
 		})
 	}
-	cards := make([]string, 0, len(resolved))
-	for _, modelID := range resolved {
-		cards = append(cards, modelID)
+	bank, err := r.store.LoadBankPostings()
+	if err != nil {
+		return nil, err
 	}
-	sort.Strings(cards)
-	applied, err := r.store.ApplySyncPlan(checkpoints, plan.Pending, plan.Settled, cards)
+	covered := make(map[string]bool, len(resolved))
+	for _, modelID := range resolved {
+		covered[modelID] = true
+	}
+	directives := Reconcile(plan.Pending, plan.Settled, bank, covered)
+	applied, err := r.store.ApplySyncPlan(checkpoints, directives)
 	if err != nil {
 		return nil, err
 	}
