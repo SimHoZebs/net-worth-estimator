@@ -17,7 +17,7 @@ var (
 	ErrReceiptNotFound   = errors.New("receipt or posting not found")
 	ErrReceiptConflict   = errors.New("receipt changed; reload before retrying")
 	ErrReceiptDuplicate  = errors.New("this image is already attached to the transaction")
-	ErrReceiptIneligible = errors.New("receipts require a saved non-pending expense, not a planned purchase")
+	ErrReceiptIneligible = errors.New("receipts require a saved owner transaction")
 	ErrReceiptQuota      = errors.New("receipt storage exceeds the 100 MiB or 500-receipt plan limit")
 )
 
@@ -212,14 +212,7 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		if err != nil {
 			return err
 		}
-		if posting.SourceAccountID == nil || len(posting.Destinations) != 0 || posting.Pending || posting.Source != SourceModel {
-			return ErrReceiptIneligible
-		}
-		var purchases int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM purchase_policies WHERE posting_id = ? AND plan_id = :plan_id`, postingID).Scan(&purchases); err != nil {
-			return err
-		}
-		if purchases != 0 {
+		if posting.SourceAccountID == nil && len(posting.Destinations) == 0 || posting.Pending || posting.Source != SourceModel {
 			return ErrReceiptIneligible
 		}
 		var existing string

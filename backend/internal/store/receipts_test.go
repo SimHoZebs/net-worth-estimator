@@ -205,11 +205,20 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	if _, err := s.UpdatePosting(p); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image); !errors.Is(err, ErrReceiptIneligible) {
-		t.Fatal(err)
+	if _, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image); err != nil {
+		t.Fatal("planned purchase rejected evidence", err)
 	}
 	p.Purchase = nil
 	if _, err := s.UpdatePosting(p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE id = ? AND plan_id = :plan_id`, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateReceipt(context.Background(), p.ID, "b.png", image); !errors.Is(err, ErrReceiptIneligible) {
+		t.Fatal("pending sync row accepted evidence")
+	}
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 0, source = 'model' WHERE id = ? AND plan_id = :plan_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image)
