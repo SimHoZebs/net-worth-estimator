@@ -36,7 +36,7 @@ import {
 	type Plan,
 } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { stageAndSave } from "../../state/workspaceWrites.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { Badge } from "../Badge.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
@@ -475,7 +475,6 @@ function useMovementEdit({
 	plan: Plan;
 	onClose: () => void;
 }) {
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	// Only the clicked value is editable; null renders the pure read view.
 	const [activeField, setActiveField] = useState<EditField | null>(null);
 	const [touched, setTouched] = useState(false);
@@ -551,9 +550,9 @@ function useMovementEdit({
 			setError(validated.message);
 			return;
 		}
-		// Like the overlay editor, a successful apply returns to the
-		// underlying view so Save/Discard stay one click away.
-		if (updatePlan(validated)) onClose();
+		// Like the overlay editor, a successful save returns to the
+		// underlying view.
+		if (stageAndSave(validated)) onClose();
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
@@ -567,7 +566,7 @@ function useMovementEdit({
 				/>
 				<IconButton
 					icon={Save}
-					label="Apply unsaved changes"
+					label="Save changes"
 					type="submit"
 					form={formId}
 					disabled={Boolean(readOnlyReason)}
@@ -602,7 +601,6 @@ function MarkAsSubscriptionAction({
 	locked: boolean;
 	onDone: () => void;
 }) {
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const [error, setError] = useState<string | null>(null);
 	if (movement.frequency !== "once" || movement.claimRuleId || locked)
 		return null;
@@ -612,8 +610,8 @@ function MarkAsSubscriptionAction({
 			setError(next.message);
 			return;
 		}
-		if (updatePlan(next)) onDone();
-		else setError("That change could not be applied to the plan.");
+		if (stageAndSave(next)) onDone();
+		else setError("That change could not be applied.");
 	};
 	return (
 		<Notice className="my-4">

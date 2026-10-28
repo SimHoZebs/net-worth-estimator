@@ -235,12 +235,12 @@ export function AccountDetailsModal({
 				{transactions.length > 0 && selected == null ? (
 					<span>
 						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
-						Recurring movements show in the plan with their schedule. Dates
+						Recurring movements show with their schedule. Dates
 						shown {dateLabel(plan.startDate, true)} onward.
 					</span>
 				) : (
 					<span>
-						Sample balances are never shown; every figure comes from the plan.
+						Sample balances are never shown; every figure comes from your saved data.
 					</span>
 				)}
 			</p>

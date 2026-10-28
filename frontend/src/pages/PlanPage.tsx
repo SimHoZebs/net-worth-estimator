@@ -26,7 +26,7 @@ import {
 import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
 import type { Projection } from "../domain/result.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { stageAndSave } from "../state/workspaceWrites.ts";
 import { usePlan } from "../state/useWorkspacePlan.ts";
 import { AccountsPanel } from "./plan/AccountsPanel.tsx";
 import { MovementsPanel } from "./plan/MovementsPanel.tsx";
@@ -49,14 +49,13 @@ export function PlanPage({
 	// Plan data and actions subscribe here; only the viewed tab and UI
 	// callbacks arrive as props.
 	const plan = usePlan();
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	if (!plan) return null;
 	if (view === "accounts") {
 		return (
 			<AccountsView
 				plan={plan}
 				onEdit={onEdit}
-				onUpdate={updatePlan}
+				onUpdate={stageAndSave}
 				onAccount={onAccount}
 			/>
 		);
@@ -117,12 +116,11 @@ function usePlanRemoval({
 			onCancel={() => setRemove(null)}
 			onConfirm={deleteItem}
 			cancelLabel="Keep item"
-			confirmLabel="Remove from unsaved changes"
+			confirmLabel="Remove and save"
 			error={error}
 		>
 			<p>
-				The item will be marked as removed in your changes. Your saved plan
-				stays intact until you explicitly save.
+				This removes the item and saves immediately.
 			</p>
 			{remove.kind === "movements" && (
 				<p>
