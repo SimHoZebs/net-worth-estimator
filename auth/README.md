@@ -2,7 +2,6 @@
 
 Casdoor owns passwords, passkeys, and local SQLite identities. The Go API owns
 OpenID Connect (OIDC) verification, persistent application sessions, and plan access.
-The Better Auth comparison and resource benchmarks remain on `experiment/better-auth`.
 
 ## Start the split stack
 
@@ -31,8 +30,7 @@ docker compose --env-file auth/casdoor/.env up -d --build
 
 If initialization uses another project or state directory, use those same values.
 Never run two Casdoor processes against one SQLite directory. Keep the verified
-primary-data owner in private deployment configuration. Remove the retired
-`NET_WORTH_ESTIMATOR_AUTH_TOKEN` setting. Both dev and production require Casdoor;
+primary-data owner in private deployment configuration. Both dev and production require Casdoor;
 the server rejects token-only and unauthenticated configurations.
 
 `setupdb` is an explicit deployment step. Legacy per-plan data is unsupported.

@@ -2,8 +2,7 @@
 
 Casdoor is the mainline identity provider. It owns password verification,
 passkeys, browser sign-in, and its local SQLite identity database. The Go API
-never receives passwords or passkey private keys. The Better Auth experiment
-remains on local branch `experiment/better-auth`.
+never receives passwords or passkey private keys.
 
 ## Security boundary
 
@@ -65,15 +64,14 @@ sets these fields. It uses one-hour access/ID tokens and 30-day refresh grants.
 
 The frontend and API share one public origin through the proxy. The proxy
 preserves Origin for Go's browser CSRF protection. Dev and production use the
-same Casdoor session boundary. The server rejects the retired `AUTH_TOKEN`
-setting and `AUTH_PROVIDER=none` before it opens financial storage. Missing
+same Casdoor session boundary. Missing
 identity settings stop startup rather than expose an unauthenticated API.
 Cross-origin session login is outside this integration.
 
 `GET /v1/auth/session` supplies identity and resource-capability discovery.
 The API checks Casdoor's resource permissions before any plan read or write.
 Guests read only sample status, which reports `readOnly: true`. Authentication
-discovery belongs to `/v1/auth/session`; status no longer contains `authEnabled`.
+discovery belongs to `/v1/auth/session`.
 The frontend has no shared-token prompt or token state. Its API client uses
 session cookies and strips caller-supplied Authorization headers.
 
@@ -82,7 +80,7 @@ That executable is not a supported deployment or manual-development entry point.
 
 Legacy private databases are unsupported. New
 accounts receive their own empty private plan. Casdoor owns action/resource
-policies. Retired `AUTH_READERS`/`AUTH_EDITORS` lists do not grant plan access.
+policies.
 
 ## Session lifecycle
 
@@ -151,8 +149,8 @@ rejects a nonce and expired optional expiry. Persistent replay records and
 revocation markers block retries, delayed callbacks, and stale refresh results.
 This endpoint uses signed tokens, not browser cookies.
 
-Casdoor 4.23 omits `sid` from ID tokens. The receiver conservatively deletes all
-grants for the subject when it cannot match a precise provider session.
+When the logout token cannot match a precise provider session, the receiver
+conservatively deletes all grants for the subject.
 
 Introspection covers disabled/deleted users, revoked tokens, administrator session
 deletion, and password resets. The next request after the configured interval
@@ -167,7 +165,7 @@ Casdoor permits private RFC1918 destinations but rejects loopback, link-local,
 and shared-address-space destinations for logout delivery. Native loopback tests
 therefore rely on introspection unless they use a private callback route.
 
-Casdoor password login remembers browsers for 30 days. Its v4.23 passkey flow
+Casdoor password login remembers browsers for 30 days. Its passkey flow
 caps the provider session at 24 hours despite a 30-day cookie. Application
 refresh grants remain separate. They can outlive that provider browser session
 until revoked or their own deadline ends.

@@ -194,7 +194,7 @@ The identity boundary checks session and plan permissions for all plan reads, wr
 - `POST`, `PATCH`, `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`;
 - `POST /v1/sync/simplefin` and link writes under `/v1/sync/simplefin/accounts`.
 
-The kill switch rejects those writes with 403. Guests can read and project only the separate sample. Shared bearer tokens and unauthenticated server startup are unsupported in dev and production. The server rejects the retired `AUTH_TOKEN` setting before opening financial storage.
+The kill switch rejects those writes with 403. Guests can read and project only the separate sample. Shared bearer tokens and unauthenticated server modes are unsupported in dev and production.
 
 ## 3. Persistence
 
@@ -546,7 +546,7 @@ The seed controls the state sequence. Run-count normalization and seed-null beha
 
 `internal/simplefin` is configured once in `cmd/server`:
 
-- The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`. The old `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` and `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` environment variables are retired.
+- The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
 - Account links live in the `account_links` table.
 - Card selection is stored per plan in `sync_credentials` and selects model accounts eligible for pending-charge seeds.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
