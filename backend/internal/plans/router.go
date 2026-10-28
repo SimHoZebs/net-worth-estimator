@@ -25,14 +25,14 @@ type Config struct {
 
 type Router struct {
 	mu       sync.Mutex
-	database *store.Database
+	database store.Database
 	config   Config
 	public   http.Handler
 	opened   map[string]http.Handler
 	closed   bool
 }
 
-func New(database *store.Database, config Config) (*Router, error) {
+func New(database store.Database, config Config) (*Router, error) {
 	if database == nil {
 		return nil, errors.New("plan routing requires the application database")
 	}

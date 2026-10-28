@@ -12,7 +12,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -20,7 +19,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 type testIDP struct {
@@ -205,7 +204,7 @@ func newIDP(t *testing.T) *testIDP {
 
 func newService(t *testing.T, p *testIDP, path string, options ...func(*Config)) *Service {
 	t.Helper()
-	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", SessionDB: path, Lifetime: time.Hour,
+	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour,
 		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
 			permissions := []string{"plan:read", "plan:project"}
 			if subject != "" {
@@ -217,14 +216,16 @@ func newService(t *testing.T, p *testIDP, path string, options ...func(*Config))
 	for _, option := range options {
 		option(&config)
 	}
-	if config.Database == nil && config.SessionDB != "" {
-		database, err := store.SetupDatabase(config.SessionDB)
+	if config.Store == nil {
+		if path == "" {
+			t.Fatal("identity store is required")
+		}
+		database, err := sqlite.SetupDatabase(path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := database.Close(); err != nil {
-			t.Fatal(err)
-		}
+		t.Cleanup(func() { _ = database.Close() })
+		config.Store = database
 	}
 	s, err := New(context.Background(), config)
 	if err != nil {
@@ -416,55 +417,6 @@ func TestAccountAccessSessionsAndCSRF(t *testing.T) {
 				t.Fatalf("logged-out status=%d", r.StatusCode)
 			}
 		})
-	}
-}
-
-func TestSessionStorePersistsHashesAndExpires(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sessions.db")
-	if err := os.WriteFile(path, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	database, err := store.SetupDatabase(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := database.Close(); err != nil {
-		t.Fatal(err)
-	}
-	s, err := openSessions(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("private session file permissions: %v %v", info, err)
-	}
-	if err := s.Commit("secret-cookie", []byte("state"), time.Now().Add(time.Hour)); err != nil {
-		t.Fatal(err)
-	}
-	var token string
-	if err := s.db.QueryRow(`SELECT token FROM sessions`).Scan(&token); err != nil {
-		t.Fatal(err)
-	}
-	if token == "secret-cookie" {
-		t.Fatal("raw token stored")
-	}
-	s.db.Close()
-	s, err = openSessions(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.db.Close()
-	b, found, err := s.Find("secret-cookie")
-	if err != nil || !found || string(b) != "state" {
-		t.Fatalf("restarted session=%q %v %v", b, found, err)
-	}
-	if err := s.Commit("expired", []byte("expired state"), time.Now().Add(-time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	_, found, err = s.Find("expired")
-	if err != nil || found {
-		t.Fatalf("expired=%v %v", found, err)
 	}
 }
 

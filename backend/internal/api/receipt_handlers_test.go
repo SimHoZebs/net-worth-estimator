@@ -14,6 +14,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -209,7 +210,7 @@ func TestReceiptReadOnlyAndInputBoundaries(t *testing.T) {
 }
 
 func TestReceiptAPIPlanIsolation(t *testing.T) {
-	database, err := store.SetupDatabase(t.TempDir() + "/shared.db")
+	database, err := sqlite.SetupDatabase(t.TempDir() + "/shared.db")
 	if err != nil {
 		t.Fatal(err)
 	}
