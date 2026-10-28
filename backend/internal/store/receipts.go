@@ -392,3 +392,61 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 	}
 	return err
 }
+
+func bankPostingIDs(postings []types.Posting) []string {
+	ids := make([]string, 0, len(postings))
+	for _, posting := range postings {
+		ids = append(ids, posting.ID)
+	}
+	return ids
+}
+
+type preservedReceipt struct {
+	id, postingID, digest, blobKey, payload string
+	size                                    int64
+	revision                                int64
+}
+
+// loadReceiptsForPostings snapshots receipt rows so CSV replacement can
+// restore evidence for preserved postings after row deletion cascades.
+func loadReceiptsForPostings(tx *planTx, postingIDs []string) ([]preservedReceipt, error) {
+	var out []preservedReceipt
+	for _, postingID := range postingIDs {
+		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id = ? AND plan_id = :plan_id ORDER BY id`, postingID)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var receipt preservedReceipt
+			if err := rows.Scan(&receipt.id, &receipt.postingID, &receipt.digest, &receipt.size, &receipt.blobKey, &receipt.revision, &receipt.payload); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out = append(out, receipt)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	return out, nil
+}
+
+func restoreReceipts(tx *planTx, receipts []preservedReceipt) error {
+	for _, receipt := range receipts {
+		// Row deletion cascades to receipts and queues their blobs for
+		// cleanup; reviving the reference must unqueue the object first.
+		if _, err := tx.Exec(`UPDATE blob_objects SET state = 'live', expires_at = 0 WHERE key = ?`, receipt.blobKey); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, plan_id) VALUES (?, ?, ?, ?, ?, ?, ?, :plan_id)`,
+			receipt.id, receipt.postingID, receipt.digest, receipt.size, receipt.blobKey, receipt.revision, receipt.payload); err != nil {
+			return err
+		}
+		if err := addPostingReceiptID(tx, receipt.postingID, receipt.id); err != nil {
+			return err
+		}
+	}
+	return nil
+}

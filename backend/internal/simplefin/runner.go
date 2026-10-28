@@ -30,6 +30,7 @@ type Summary struct {
 	PendingInserted     int            `json:"pendingInserted"`
 	PendingUpdated      int            `json:"pendingUpdated"`
 	SettledConverted    int            `json:"settledConverted"`
+	SettledInserted     int            `json:"settledInserted"`
 	AccountsProvisioned int            `json:"accountsProvisioned"`
 	Skipped             map[string]int `json:"skipped"`
 }
@@ -329,6 +330,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		PendingInserted:     applied.PendingInserted,
 		PendingUpdated:      applied.PendingUpdated,
 		SettledConverted:    applied.SettledConverted,
+		SettledInserted:     applied.SettledInserted,
 		AccountsProvisioned: provisioned,
 		Skipped:             skipped,
 	}, nil
