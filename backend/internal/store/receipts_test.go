@@ -218,7 +218,7 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	if _, err := s.CreateReceipt(context.Background(), p.ID, "b.png", image); !errors.Is(err, ErrReceiptIneligible) {
 		t.Fatal("pending sync row accepted evidence")
 	}
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 0, source = 'model' WHERE id = ? AND plan_id = :plan_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 0, source = 'user' WHERE id = ? AND plan_id = :plan_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image)

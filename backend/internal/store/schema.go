@@ -119,7 +119,7 @@ func schemaStatements() []string {
 			date TEXT NOT NULL,
 			account_id TEXT NOT NULL,
 			balance REAL NOT NULL,
-			source TEXT NOT NULL DEFAULT 'model',
+			source TEXT NOT NULL DEFAULT 'user',
 			PRIMARY KEY(plan_id, id),
 			UNIQUE(plan_id, account_id, date),
 			FOREIGN KEY(plan_id, account_id) REFERENCES accounts(plan_id, id) DEFERRABLE INITIALLY DEFERRED
@@ -137,7 +137,7 @@ func schemaStatements() []string {
 			fulfills_rule_id TEXT,
 			fulfills_occurrence_date TEXT,
 			enabled INTEGER NOT NULL,
-			source TEXT NOT NULL DEFAULT 'model',
+			source TEXT NOT NULL DEFAULT 'user',
 			pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
 			void INTEGER NOT NULL DEFAULT 0 CHECK (void IN (0, 1)),
 			execution_order INTEGER NOT NULL DEFAULT 0 CHECK (execution_order >= 0),

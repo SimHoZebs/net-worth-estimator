@@ -233,7 +233,7 @@ func insertPosting(tx *planTx, position int, posting *types.Posting, source stri
 		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, plan_id)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, :plan_id)`,
 		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceModel && posting.Pending), boolToInt(posting.Void), posting.ExecutionOrder,
+		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceUser && posting.Pending), boolToInt(posting.Void), posting.ExecutionOrder,
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
 	}

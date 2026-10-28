@@ -64,7 +64,7 @@ func (s *Server) createPosting(_ context.Context, input *postingInput) (*posting
 		return nil, err
 	}
 	if persisted {
-		row.Source = store.SourceModel
+		row.Source = store.SourceUser
 	}
 	return &postingOutput{Body: rowResultBody[types.Posting]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }
@@ -83,7 +83,7 @@ func (s *Server) updatePosting(_ context.Context, input *struct {
 		return nil, err
 	}
 	if persisted {
-		row.Source = store.SourceModel
+		row.Source = store.SourceUser
 	}
 	return &postingOutput{Body: rowResultBody[types.Posting]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
 }

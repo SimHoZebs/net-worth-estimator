@@ -96,8 +96,9 @@ type Checkpoint struct {
 	Date      IsoDate `json:"Date"`
 	AccountID string  `json:"AccountId"`
 	Balance   float64 `json:"Balance"`
-	// Source names the row owner: "model" (owner/seed) or "simplefin".
-	// Read-only on GET; PUT ignores it (server recomputes ownership).
+	// Source names the row author: "user" for owner-authored rows,
+	// "simplefin" for bank-reported rows. Authorship never changes after
+	// creation.
 	Source string `json:"source,omitempty"`
 }
 
@@ -205,7 +206,7 @@ type Posting struct {
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
 	// Owner writes cannot set it.
 	Pending bool `json:"pending,omitempty"`
-	// Source names the row author: "model" for owner-authored rows,
+	// Source names the row author: "user" for owner-authored rows,
 	// "simplefin" for bank-reported rows. Authorship never changes after
 	// creation. Owner writes may touch settled bank rows but never live
 	// pending or void rows; the sync may touch pending and void rows but
