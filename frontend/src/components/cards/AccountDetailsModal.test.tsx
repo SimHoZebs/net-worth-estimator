@@ -1,9 +1,13 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toAccountCard } from "../../domain/accountCards.ts";
 import { testPlan } from "../../mocks/plan.ts";
-import { movementFixture, projectionFixture } from "../../mocks/projection.ts";
+import {
+	activityProjection,
+	movementFixture,
+	projectionFixture,
+} from "../../mocks/projection.ts";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
 
 // Native modal focus and dismissal belong to Modal's browser coverage.
@@ -15,6 +19,11 @@ vi.mock("../Modal.tsx", async (importOriginal) => ({
 }));
 
 afterEach(cleanup);
+
+beforeEach(() => {
+	// jsdom has no scrollIntoView; the pager scrolls the table into view.
+	window.HTMLElement.prototype.scrollIntoView ??= () => {};
+});
 
 describe("AccountDetailsModal", () => {
 	it("keeps metrics semantic and searches transactions through a labeled input", () => {
@@ -32,7 +41,6 @@ describe("AccountDetailsModal", () => {
 		});
 		const card = toAccountCard({
 			account: testPlan.accounts[0]!,
-			plan: testPlan,
 			projection,
 		});
 		const view = render(
@@ -72,7 +80,6 @@ describe("AccountDetailsModal", () => {
 		});
 		const card = toAccountCard({
 			account: testPlan.accounts[0]!,
-			plan: testPlan,
 			projection,
 		});
 		const view = render(
@@ -103,5 +110,28 @@ describe("AccountDetailsModal", () => {
 		expect(
 			view.getAllByRole("button", { name: /View Household payroll/ }),
 		).toHaveLength(3);
+	});
+
+	it("paginates long transaction lists client-side", () => {
+		const projection = activityProjection();
+		const card = toAccountCard({
+			account: testPlan.accounts[0]!,
+			projection,
+		});
+		const view = render(
+			<AccountDetailsModal
+				card={card}
+				plan={testPlan}
+				projection={projection}
+				onClose={() => {}}
+			/>,
+		);
+		expect(view.getByRole("status").textContent).toMatch(
+			/Showing 1–20 of \d+ transactions/,
+		);
+		fireEvent.click(
+			view.getByRole("button", { name: "Next transaction page" }),
+		);
+		expect(view.getByRole("status").textContent).toMatch(/Showing 21–40 of/);
 	});
 });

@@ -1,6 +1,6 @@
 import { cva } from "class-variance-authority";
 import { Repeat2, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
@@ -12,6 +12,7 @@ import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 import { Badge } from "../Badge.tsx";
+import { TablePagination } from "../DataTable.tsx";
 import { EmptyState } from "../EmptyState.tsx";
 import { Modal } from "../Modal.tsx";
 import { Progress } from "../Progress.tsx";
@@ -19,6 +20,9 @@ import type { AccountCardModel } from "../../domain/accountCards.ts";
 import { useSelectedId } from "../entrySelection.ts";
 
 type StatusFilter = "all" | "pending" | "posted";
+
+/** Rows per transaction page. */
+const PAGE_SIZE = 20;
 
 const postingFilter = cva(
 	"rounded-control border-0 px-2 py-1 text-xs whitespace-nowrap capitalize",
@@ -51,7 +55,14 @@ export function AccountDetailsModal({
 }) {
 	const [query, setQuery] = useState("");
 	const [filter, setFilter] = useState<StatusFilter>("all");
+	const [page, setPage] = useState(0);
 	const [selectedId, setSelectedId] = useSelectedId(plan);
+	const listId = useId();
+	const [pageAccountId, setPageAccountId] = useState(card.id);
+	if (pageAccountId !== card.id) {
+		setPageAccountId(card.id);
+		setPage(0);
+	}
 	const transactions = useMemo(
 		() =>
 			projection
@@ -81,6 +92,18 @@ export function AccountDetailsModal({
 				.includes(needle);
 		});
 	}, [transactions, query, filter]);
+	const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+	const currentPage = Math.min(page, pageCount - 1);
+	const rows = shown.slice(
+		currentPage * PAGE_SIZE,
+		(currentPage + 1) * PAGE_SIZE,
+	);
+	const turnPage = (next: number) => {
+		setPage(next);
+		document
+			.getElementById(`${listId}-table`)
+			?.scrollIntoView({ block: "nearest" });
+	};
 	const selected = selectedId
 		? (transactions.find((transaction) => transaction.id === selectedId) ??
 			null)
@@ -103,7 +126,7 @@ export function AccountDetailsModal({
 							{exactMoney(card.balance)}
 						</strong>
 						<div className="text-sm leading-relaxed text-muted">
-							{card.balanceLabel} · {card.summary}
+							{card.balanceLabel}
 						</div>
 					</div>
 				</div>
@@ -149,7 +172,10 @@ export function AccountDetailsModal({
 					label="Search account transactions"
 					containerClassName="flex-1"
 					value={query}
-					onChange={(event) => setQuery(event.target.value)}
+					onChange={(event) => {
+						setQuery(event.target.value);
+						setPage(0);
+					}}
 					placeholder="Search transactions…"
 				/>
 				<div
@@ -163,7 +189,10 @@ export function AccountDetailsModal({
 							type="button"
 							className={postingFilter({ selected: filter === key })}
 							aria-pressed={filter === key}
-							onClick={() => setFilter(key)}
+							onClick={() => {
+								setFilter(key);
+								setPage(0);
+							}}
 						>
 							{key}
 						</button>
@@ -171,18 +200,30 @@ export function AccountDetailsModal({
 				</div>
 			</div>
 			{shown.length ? (
-				<TransactionTable
-					caption={`${card.name} transactions filtered by ${filter}.`}
-				>
-					{shown.slice(0, 60).map((transaction) => (
-						<TransactionRow
-							key={transaction.id}
-							transaction={transaction}
-							movement={movements.get(transaction.movementId) ?? null}
-							onEdit={() => setSelectedId(transaction.id)}
+				<>
+					<TransactionTable
+						caption={`${card.name} transactions filtered by ${filter}.`}
+						scrollId={`${listId}-table`}
+					>
+						{rows.map((transaction) => (
+							<TransactionRow
+								key={transaction.id}
+								transaction={transaction}
+								movement={movements.get(transaction.movementId) ?? null}
+								onEdit={() => setSelectedId(transaction.id)}
+							/>
+						))}
+					</TransactionTable>
+					{pageCount > 1 && (
+						<TablePagination
+							page={currentPage}
+							pageCount={pageCount}
+							total={shown.length}
+							pageSize={PAGE_SIZE}
+							onPage={turnPage}
 						/>
-					))}
-				</TransactionTable>
+					)}
+				</>
 			) : (
 				<EmptyState
 					icon={Search}
@@ -190,13 +231,8 @@ export function AccountDetailsModal({
 					description="Try a different search or status filter."
 				/>
 			)}
-			{shown.length > 60 && (
-				<p className="py-2 text-sm leading-relaxed text-muted">
-					Showing 60 of {shown.length} matches.
-				</p>
-			)}
 			<p className="py-2 text-sm leading-relaxed text-muted">
-				{card.transactions.length > 0 && selected == null ? (
+				{transactions.length > 0 && selected == null ? (
 					<span>
 						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
 						Recurring movements show in the plan with their schedule. Dates
