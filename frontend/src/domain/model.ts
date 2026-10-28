@@ -61,9 +61,9 @@ export const movementSchema = z.object({
 	postedDate: date.nullable().default(null),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
-	// Void marks a bank authorization that vanished without settling. Every
-	// movement carries it explicitly; stored drafts without it migrate to
-	// false on load.
+	// Void marks a bank hold that vanished without posting. The UI shows
+	// it as "Did not post". Every movement carries it explicitly; stored
+	// drafts without it migrate to false on load.
 	void: z.boolean(),
 });
 
