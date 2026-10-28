@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Unified test dispatcher: documents the unit vs integration split in one place.
+# Unit needs no servers, Docker daemon, or credentials.
+# Integration boots servers, Docker images, or a real provider.
+# Usage: scripts/test [--unit|--integration|--all|--help]
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/test [--unit|--integration|--all|--help]
+
+  --unit         go test + vitest + config contract tests (no servers/daemon/credentials)
+  --integration  playwright browser suite (fixtureapi + Vite over real HTTP)
+  --all          --unit then --integration (tests only; not the completion gate:
+               lint, typecheck, and build still run separately per TESTING.md)
+  --help         this message
+
+Matrix:
+  unit         backend/scripts/verify.sh (CGO_ENABLED=0 gofmt+vet+test ./...)
+               npm --prefix frontend test (vitest: src/** and scripts/**, jsdom)
+               node --test dev/*.test.mjs auth/casdoor/*.test.mjs (Compose CLI, no daemon)
+  integration  npm --prefix frontend run test:browser (tests/*.spec.ts, single worker)
+               Manual, credential-gated (not in this dispatcher):
+                 auth/test-integration.mjs (CASDOOR_TEST_MUTATIONS=1, disposable tmp/)
+                 scripts/smoke-backend.sh / smoke-compose.sh (running stack + cookie jar)
+                 NGINX_TEST_IMAGE=... node --test scripts/nginx-provider.test.mjs
+                 DEPLOYMENT_TEST_IMAGE=... node --test deploy/container.test.mjs
+EOF
+}
+
+run_unit() {
+  backend/scripts/verify.sh
+  npm --prefix frontend test
+  # shellcheck disable=SC2086
+  node --test dev/*.test.mjs auth/casdoor/*.test.mjs
+}
+
+run_integration() {
+  npm --prefix frontend run test:browser
+}
+
+mode="${1:---help}"
+if [ "$#" -gt 1 ]; then
+  echo "error: unexpected extra arguments (use --help)" >&2
+  exit 2
+fi
+case "$mode" in
+  --help|-h) usage; exit 0 ;;
+  --unit) run_unit ;;
+  --integration) run_integration ;;
+  --all) run_unit; run_integration ;;
+  *) echo "error: unknown mode '$mode' (use --help)" >&2; exit 2 ;;
+esac

@@ -58,7 +58,7 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 		failure(w, 400, "Invalid or expired logout claims.")
 		return
 	}
-	if err := s.store.revokeGrants(s.config.Issuer, identity.Subject, claims.SID, claims.JTI, s.config.Lifetime); err != nil {
+	if err := s.store.RevokeGrants(s.config.Issuer, identity.Subject, claims.SID, claims.JTI, s.config.Lifetime); err != nil {
 		failure(w, 500, "Could not apply the logout notification.")
 		return
 	}

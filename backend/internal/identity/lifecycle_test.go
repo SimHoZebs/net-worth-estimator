@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -30,27 +32,27 @@ func signedIn(t *testing.T, p *testIDP, path string) (*Service, *httptest.Server
 	return s, server, client
 }
 
-func currentGrant(t *testing.T, s *Service) grant {
+func currentGrant(t *testing.T, s *Service) store.Grant {
 	t.Helper()
 	var data []byte
-	if err := s.store.db.QueryRow(`SELECT data FROM identity_grants LIMIT 1`).Scan(&data); err != nil {
+	if err := s.store.(*sqlite.Database).SQL().QueryRow(`SELECT data FROM identity_grants LIMIT 1`).Scan(&data); err != nil {
 		t.Fatal(err)
 	}
-	var g grant
+	var g store.Grant
 	if err := json.Unmarshal(data, &g); err != nil {
 		t.Fatal(err)
 	}
 	return g
 }
 
-func staleGrant(t *testing.T, s *Service, expireToken bool) grant {
+func staleGrant(t *testing.T, s *Service, expireToken bool) store.Grant {
 	t.Helper()
 	g := currentGrant(t, s)
 	g.CheckedAt = time.Now().Add(-time.Hour).UnixNano()
 	if expireToken {
 		g.TokenExpiry = time.Now().Add(-time.Minute).Unix()
 	}
-	if err := s.store.updateGrant(g); err != nil {
+	if err := s.store.UpdateGrant(g); err != nil {
 		t.Fatal(err)
 	}
 	return g
@@ -82,7 +84,7 @@ func TestProviderRevocationAndOutage(t *testing.T) {
 			if got := writeStatus(t, client, server.URL); got != want {
 				t.Fatalf("provider check=%d want=%d", got, want)
 			}
-			persisted, err := s.store.findGrant(g.ID, g.Issuer)
+			persisted, err := s.store.FindGrant(g.ID, g.Issuer)
 			if err != nil || (persisted.ID == "") != revoked {
 				t.Fatalf("grant retained/revoked=%v %v", persisted.ID != "", err)
 			}
@@ -240,10 +242,10 @@ func TestBackchannelScopeReplayAndPersistence(t *testing.T) {
 			if got := sendLogout(t, server, raw); got != 200 || writeStatus(t, client, server.URL) != 401 {
 				t.Fatalf("logout notification=%d", got)
 			}
-			if err := s.store.updateGrant(before); !errors.Is(err, errGrantRevoked) {
+			if err := s.store.UpdateGrant(before); !errors.Is(err, store.ErrGrantRevoked) {
 				t.Fatalf("stale refresh restored a revoked grant: %v", err)
 			}
-			if err := s.store.createGrant(before); !errors.Is(err, errGrantRevoked) {
+			if err := s.store.CreateGrant(before); !errors.Is(err, store.ErrGrantRevoked) {
 				t.Fatalf("pending callback restored a revoked grant: %v", err)
 			}
 			if err := s.Close(); err != nil {

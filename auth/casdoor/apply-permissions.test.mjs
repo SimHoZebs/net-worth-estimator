@@ -133,6 +133,7 @@ test("offline preview pins exact artifact bytes, target, source version, and dig
     permissionTarget({
       CASDOOR_PUBLIC_URL: "http://identity.example.test",
       AUTH_CLIENT_ID: "id",
+      NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP: "1",
     }).issuer,
     "http://identity.example.test",
   );

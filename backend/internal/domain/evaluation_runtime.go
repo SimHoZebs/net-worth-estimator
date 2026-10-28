@@ -190,12 +190,20 @@ var readerSimGuard int32
 var readerSimEvalMu sync.Mutex
 var readerSimEval string
 
+// simulatorSimDepth counts in-flight simulator EvaluatePath calls.
+// Simulators run simulations by design, so their resimulation never counts
+// as a reader violation even when a concurrent request holds the reader
+// guard above: the guard is process-global while requests evaluate
+// concurrently (base and eval-overlay requests from one page overlap).
+var simulatorSimDepth int32
+
 // orchestratorSimDepth counts in-flight orchestrator simulations: the base
 // path builder and the stochastic sample projector. Simulation is concurrent
 // by design (sample workers run while the coordinator evaluates), so the
-// resimulation refusal below exempts orchestrator-initiated runs and only
-// fires for simulation entered from inside a guarded reader evaluation
-// with no orchestrator simulation in flight.
+// resimulation refusal below exempts orchestrator-initiated runs and
+// simulator evaluations, and only fires for simulation entered from inside
+// a guarded reader evaluation with no orchestrator simulation or simulator
+// evaluation in flight.
 var orchestratorSimDepth int32
 
 func readerSimulationBlocked() (string, bool) {
@@ -203,6 +211,9 @@ func readerSimulationBlocked() (string, bool) {
 		return "", false
 	}
 	if atomic.LoadInt32(&orchestratorSimDepth) > 0 {
+		return "", false
+	}
+	if atomic.LoadInt32(&simulatorSimDepth) > 0 {
 		return "", false
 	}
 	readerSimEvalMu.Lock()
@@ -245,9 +256,12 @@ func requireResimulationAllowed(caller string) error {
 }
 
 // withReaderGuard runs fn with resimulation refused when the definition
-// is a reader (the default). Simulator evaluations run unguarded.
+// is a reader (the default). Simulator evaluations run unguarded and mark
+// their own depth so concurrent readers in other requests never block them.
 func withReaderGuard(definition *EvaluationDefinition, evalType string, fn func() (PathResult, error)) (PathResult, error) {
 	if definition.IsSimulator() {
+		atomic.AddInt32(&simulatorSimDepth, 1)
+		defer atomic.AddInt32(&simulatorSimDepth, -1)
 		return fn()
 	}
 	readerSimEvalMu.Lock()

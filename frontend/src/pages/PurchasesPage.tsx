@@ -1,7 +1,7 @@
 import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
 import { PURCHASE_EVALUATIONS } from "../state/purchaseEvaluation.ts";
 import { usePlan } from "../state/useWorkspacePlan.ts";
-import { WishListPanel } from "./plan/WishListPanel.tsx";
+import { WishListPanel } from "./plan/purchase-planner/WishListPanelReplacement.tsx";
 
 export function PurchasesPage() {
 	const plan = usePlan();
