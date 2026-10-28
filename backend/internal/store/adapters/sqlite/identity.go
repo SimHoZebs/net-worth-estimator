@@ -1,32 +1,61 @@
-package identity
+package sqlite
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
-var errGrantRevoked = errors.New("provider grant was revoked")
+var _ store.IdentityStore = (*Database)(nil)
 
-// Provider credentials stay in identity tables in the app database, never in cookies.
-// An application session holds only an opaque grant reference.
-type grant struct {
-	ID, Issuer, Subject, SID, Name, Nonce string
-	AccessToken, RefreshToken, IDToken    string
-	LoginStartedAt, TokenExpiry           int64
-	CheckedAt, Expiry                     int64
+func tokenHash(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
 }
 
-func (s *sessionStore) createGrant(g grant) error {
+func (d *Database) Find(token string) ([]byte, bool, error) {
+	var data []byte
+	err := d.db.QueryRow(`SELECT data FROM sessions WHERE token=? AND expiry>?`, tokenHash(token), time.Now().Unix()).Scan(&data)
+	if err == sql.ErrNoRows {
+		return nil, false, nil
+	}
+	return data, err == nil, err
+}
+
+func (d *Database) Commit(token string, data []byte, expiry time.Time) error {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM sessions WHERE expiry<=?`, time.Now().Unix()); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`INSERT INTO sessions(token,data,expiry) VALUES(?,?,?) ON CONFLICT(token) DO UPDATE SET data=excluded.data, expiry=excluded.expiry`, tokenHash(token), data, expiry.Unix()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (d *Database) Delete(token string) error {
+	_, err := d.db.Exec(`DELETE FROM sessions WHERE token=?`, tokenHash(token))
+	return err
+}
+
+// CreateGrant persists provider credentials. Provider credentials stay in
+// identity tables in the app database, never in cookies.
+func (d *Database) CreateGrant(g store.Grant) error {
 	data, err := json.Marshal(g)
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.Begin()
+	tx, err := d.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -40,7 +69,7 @@ func (s *sessionStore) createGrant(g grant) error {
 		return err
 	}
 	if revoked {
-		return errGrantRevoked
+		return store.ErrGrantRevoked
 	}
 	if _, err = tx.Exec(`DELETE FROM identity_grants WHERE expiry<=?`, time.Now().Unix()); err != nil {
 		return err
@@ -52,10 +81,10 @@ func (s *sessionStore) createGrant(g grant) error {
 	return tx.Commit()
 }
 
-func (s *sessionStore) findGrant(id, issuer string) (grant, error) {
-	var g grant
+func (d *Database) FindGrant(id, issuer string) (store.Grant, error) {
+	var g store.Grant
 	var data []byte
-	err := s.db.QueryRow(`SELECT data FROM identity_grants WHERE id=? AND issuer=? AND expiry>?`, id, issuer, time.Now().Unix()).Scan(&data)
+	err := d.db.QueryRow(`SELECT data FROM identity_grants WHERE id=? AND issuer=? AND expiry>?`, id, issuer, time.Now().Unix()).Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
 		return g, nil
 	}
@@ -66,12 +95,12 @@ func (s *sessionStore) findGrant(id, issuer string) (grant, error) {
 	return g, err
 }
 
-func (s *sessionStore) updateGrant(g grant) error {
+func (d *Database) UpdateGrant(g store.Grant) error {
 	data, err := json.Marshal(g)
 	if err != nil {
 		return err
 	}
-	result, err := s.db.Exec(`UPDATE identity_grants SET data=? WHERE id=? AND issuer=? AND expiry>?`,
+	result, err := d.db.Exec(`UPDATE identity_grants SET data=? WHERE id=? AND issuer=? AND expiry>?`,
 		data, g.ID, g.Issuer, time.Now().Unix())
 	if err != nil {
 		return err
@@ -81,50 +110,38 @@ func (s *sessionStore) updateGrant(g grant) error {
 		return err
 	}
 	if n == 0 {
-		return errGrantRevoked
+		return store.ErrGrantRevoked
 	}
 	return nil
 }
 
-func (s *sessionStore) deleteGrant(id, issuer string) error {
-	_, err := s.db.Exec(`DELETE FROM identity_grants WHERE id=? AND issuer=?`, id, issuer)
+func (d *Database) DeleteGrant(id, issuer string) error {
+	_, err := d.db.Exec(`DELETE FROM identity_grants WHERE id=? AND issuer=?`, id, issuer)
 	return err
 }
 
-// deleteSubjectGrants ends every app session for a subject, for example after
+// DeleteSubjectGrants ends every app session for a subject, for example after
 // a password change. Provider tokens are already expired by Casdoor at that
 // point; this keeps the local session list honest immediately instead of
 // waiting for the next recheck to discard each grant lazily.
-func (s *sessionStore) deleteSubjectGrants(issuer, subject string) error {
-	_, err := s.db.Exec(`DELETE FROM identity_grants WHERE issuer=? AND subject=?`, issuer, subject)
+func (d *Database) DeleteSubjectGrants(issuer, subject string) error {
+	_, err := d.db.Exec(`DELETE FROM identity_grants WHERE issuer=? AND subject=?`, issuer, subject)
 	return err
 }
 
-// removeGroupMemberships drops social group memberships after the provider
-// confirms the account is gone. It delegates to the store's shared removal
-// path so revocation and offline cleanup cannot diverge. It preserves
-// app_accounts and private plans. Logout and password changes must not call
-// this.
-func (s *sessionStore) removeGroupMemberships(issuer, subject string) error {
-	if issuer == "" || subject == "" {
-		return nil
-	}
-	return sqlite.DeleteGroupMemberships(s.db, authorization.ActorKey(issuer, subject))
-}
-
-func (s *sessionStore) listGrants(issuer, subject string) ([]grant, error) {
-	rows, err := s.db.Query(`SELECT data FROM identity_grants WHERE issuer=? AND subject=? AND expiry>?`, issuer, subject, time.Now().Unix())
+func (d *Database) ListGrants(issuer, subject string) ([]store.Grant, error) {
+	rows, err := d.db.Query(`SELECT data FROM identity_grants WHERE issuer=? AND subject=? AND expiry>?`, issuer, subject, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []grant
+	var out []store.Grant
 	for rows.Next() {
 		var data []byte
 		if err := rows.Scan(&data); err != nil {
 			return nil, err
 		}
-		var g grant
+		var g store.Grant
 		if err := json.Unmarshal(data, &g); err != nil {
 			return nil, err
 		}
@@ -133,10 +150,11 @@ func (s *sessionStore) listGrants(issuer, subject string) ([]grant, error) {
 	return out, rows.Err()
 }
 
-// Replay records and grant deletion share a transaction. Retries cannot revoke
-// a later login twice, and a delayed callback cannot restore an older login.
-func (s *sessionStore) revokeGrants(issuer, subject, sid, jti string, lifetime time.Duration) error {
-	tx, err := s.db.Begin()
+// RevokeGrants records logout and deletes grants. Replay records and grant
+// deletion share a transaction. Retries cannot revoke a later login twice,
+// and a delayed callback cannot restore an older login.
+func (d *Database) RevokeGrants(issuer, subject, sid, jti string, lifetime time.Duration) error {
+	tx, err := d.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -187,4 +205,15 @@ func (s *sessionStore) revokeGrants(issuer, subject, sid, jti string, lifetime t
 		}
 	}
 	return tx.Commit()
+}
+
+// RemoveGroupMemberships drops social group memberships after the provider
+// confirms the account is gone. It delegates to the shared removal path so
+// revocation and offline cleanup cannot diverge. It preserves app_accounts
+// and private plans. Logout and password changes must not call this.
+func (d *Database) RemoveGroupMemberships(issuer, subject string) error {
+	if issuer == "" || subject == "" {
+		return nil
+	}
+	return DeleteGroupMemberships(d.db, authorization.ActorKey(issuer, subject))
 }

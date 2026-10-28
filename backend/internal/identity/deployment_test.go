@@ -2,6 +2,7 @@ package identity
 
 import (
 	"encoding/json"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -17,7 +18,6 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/ingress"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
@@ -87,7 +87,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			startBackend := func(database *sqlite.Database) *httptest.Server {
 				t.Helper()
 				login := newService(t, p, "", func(c *Config) {
-					c.Database, c.PublicURL, c.RequireResourceHeader = database.SQL(), publicURL, true
+					c.Store, c.PublicURL, c.RequireResourceHeader = database, publicURL, true
 				})
 				scoped, err := database.Plan(resource.ID)
 				if err != nil {

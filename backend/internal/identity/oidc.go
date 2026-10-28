@@ -14,6 +14,7 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 func (s *Service) login(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +133,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	raw, _ := token.Extra("id_token").(string)
-	g := grant{ID: oauth2.GenerateVerifier(), Issuer: s.config.Issuer, Subject: id.Subject, SID: claims.SID,
+	g := store.Grant{ID: oauth2.GenerateVerifier(), Issuer: s.config.Issuer, Subject: id.Subject, SID: claims.SID,
 		Name: claims.Name, Nonce: entry.Nonce, AccessToken: token.AccessToken, RefreshToken: token.RefreshToken, IDToken: raw,
 		LoginStartedAt: entry.At, TokenExpiry: tokenDeadline(token, id), Expiry: time.Now().Add(s.config.Lifetime).Unix()}
 	if err := s.introspect(ctx, g); err != nil {
@@ -140,16 +141,16 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g.CheckedAt = time.Now().UnixNano()
-	if err := s.store.createGrant(g); err != nil {
+	if err := s.store.CreateGrant(g); err != nil {
 		status := 500
-		if errors.Is(err, errGrantRevoked) {
+		if errors.Is(err, store.ErrGrantRevoked) {
 			status = 401
 		}
 		failure(w, status, "Could not establish an active identity grant.")
 		return
 	}
 	if err := s.sessions.RenewToken(r.Context()); err != nil {
-		s.store.deleteGrant(g.ID, g.Issuer)
+		s.store.DeleteGrant(g.ID, g.Issuer)
 		failure(w, 500, "Could not establish a session.")
 		return
 	}
@@ -167,7 +168,7 @@ func tokenDeadline(token *oauth2.Token, id *oidc.IDToken) int64 {
 
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 	endpoint, _ := s.browserEndpoint(r)
-	g, err := s.store.findGrant(s.sessions.GetString(r.Context(), "grant_id"), s.config.Issuer)
+	g, err := s.store.FindGrant(s.sessions.GetString(r.Context(), "grant_id"), s.config.Issuer)
 	if err == nil {
 		resource := authorization.ResourceFor(s.config.Issuer, g.Subject)
 		if expected := r.Header.Get(ResourceHeader); expected != "" && expected != resource.ID {
@@ -176,7 +177,7 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err != nil || s.store.deleteGrant(g.ID, s.config.Issuer) != nil || s.sessions.Destroy(r.Context()) != nil {
+	if err != nil || s.store.DeleteGrant(g.ID, s.config.Issuer) != nil || s.sessions.Destroy(r.Context()) != nil {
 		failure(w, 500, "Could not end the session.")
 		return
 	}
