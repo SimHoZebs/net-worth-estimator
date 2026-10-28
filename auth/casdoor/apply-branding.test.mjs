@@ -131,8 +131,11 @@ test("preview has no credentials and requires an exact approved digest, source, 
   const extra = serializePlan({ ...plan, fields: { ...plan.fields, enableSignUp: false } });
   assert.throws(() => approvedPlan(extra, digest(extra), target), /source version and target/);
   assert.equal(
-    brandingTarget({ CASDOOR_PUBLIC_URL: "http://identity.example.test", AUTH_CLIENT_ID: "id" })
-      .issuer,
+    brandingTarget({
+      CASDOOR_PUBLIC_URL: "http://identity.example.test",
+      AUTH_CLIENT_ID: "id",
+      NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP: "1",
+    }).issuer,
     "http://identity.example.test",
   );
   assert.throws(
