@@ -520,12 +520,24 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	}
 	got := syncedPendingIDs(loaded)
 	if len(got) != 2 {
-		t.Fatalf("pending rows = %v, want 2", got)
+		t.Fatalf("pending rows = %+v, want b and c", got)
 	}
 	for _, id := range got {
 		if _, err := uuid.Parse(id); err != nil {
 			t.Fatalf("pending identity is not a UUID: %v", got)
 		}
+	}
+	var voided types.Posting
+	for _, posting := range loaded.Postings {
+		if posting.Source != SourceModel && !posting.Pending {
+			voided = posting
+		}
+	}
+	if voided.ID == "" {
+		t.Fatal("vanished pending charge was deleted instead of voided")
+	}
+	if voided.Enabled {
+		t.Fatalf("void row enabled: %+v", voided)
 	}
 }
 
@@ -743,5 +755,103 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	links, err := database.ListPostingReceiptIDs()
 	if err != nil || len(links[id]) != 1 || links[id][0] != receipt.ID {
 		t.Fatalf("replacement dropped posting field: %+v, %v", links, err)
+	}
+}
+
+func TestApplySyncPlanVoidsVanishedPendingWithoutDeleting(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil || len(syncedPendingIDs(document)) != 1 {
+		t.Fatal("seed pending missing")
+	}
+	voided, err := store.ApplySyncPlan(nil, nil, nil, cards)
+	if err != nil || voided.PendingDeleted != 1 {
+		t.Fatalf("void mark = %+v, err %v", voided, err)
+	}
+	restored, err := store.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(syncedPendingIDs(restored)) != 0 {
+		t.Fatal("voided row still reports pending")
+	}
+	var row types.Posting
+	for _, posting := range restored.Postings {
+		if posting.Source != SourceModel {
+			row = posting
+		}
+	}
+	if row.ID == "" || row.Pending || row.Enabled {
+		t.Fatalf("void row = %+v", row)
+	}
+	// Repeat feeds with no match are a stable no-op, not repeated work.
+	again, err := store.ApplySyncPlan(nil, nil, nil, cards)
+	if err != nil || again.PendingDeleted != 0 {
+		t.Fatalf("repeat = %+v, err %v", again, err)
+	}
+}
+
+func TestApplySyncPlanHealsVoidRowWhenAuthorizationReappears(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ApplySyncPlan(nil, nil, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	healed, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-04")}, nil, cards)
+	if err != nil || healed.PendingUpdated != 1 || healed.PendingInserted != 0 {
+		t.Fatalf("heal = %+v, err %v", healed, err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil || len(syncedPendingIDs(document)) != 1 {
+		t.Fatalf("healed pending rows = %+v, err %v", document, err)
+	}
+}
+
+func TestApplySyncPlanConvertsVoidRowOnLatePostedMatch(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ApplySyncPlan(nil, nil, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	late, err := store.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03"),
+	}, cards)
+	if err != nil || late.SettledConverted != 1 {
+		t.Fatalf("late convert = %+v, err %v", late, err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, posting := range document.Postings {
+		if posting.Source == SourceModel {
+			continue
+		}
+		t.Fatalf("sync-owned row remains after late conversion: %+v", posting)
+	}
+}
+
+func TestApplySyncPlanSeedsPendingOnNonCardAccounts(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "checking")
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "checking", "2026-08-02")}, nil, []string{"checking"}); err != nil {
+		t.Fatal(err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil || len(syncedPendingIDs(document)) != 1 {
+		t.Fatalf("non-card pending rows = %+v, err %v", document, err)
 	}
 }

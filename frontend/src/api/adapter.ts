@@ -549,6 +549,7 @@ function movementDisplayFromPosting(
 			? { purchasePriority: posting.purchase.priority }
 			: {}),
 		pending: posting.pending === true,
+		void: isSyncOwned(posting.source) && posting.pending !== true,
 	};
 }
 

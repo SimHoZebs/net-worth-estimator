@@ -49,6 +49,7 @@ function charge(
 		constraint: null,
 		excluded: false,
 		pending: false,
+		void: false,
 		...overrides,
 	};
 }

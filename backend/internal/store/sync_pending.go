@@ -100,7 +100,7 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPost
 	}
 	used := map[int]bool{}
 	for _, accountID := range accounts {
-		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND pending = 1 AND plan_id = :plan_id`, SourceSimpleFIN, accountID)
+		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND plan_id = :plan_id`, SourceSimpleFIN, accountID)
 		if err != nil {
 			return err
 		}
@@ -128,13 +128,13 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPost
 			if converted {
 				continue
 			}
-			if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
+			stillPending, err := voidPendingPosting(tx, id)
+			if err != nil {
 				return err
 			}
-			if err := releaseRowID(tx, id); err != nil {
-				return err
+			if stillPending {
+				summary.PendingDeleted++
 			}
-			summary.PendingDeleted++
 		}
 	}
 	return insertSettledPostings(tx, settled, used, summary)
@@ -226,7 +226,12 @@ func postingAmountCents(posting types.Posting) (int64, bool) {
 }
 
 func settleMatch(stale types.Posting, candidate SyncPosting) bool {
-	if stale.SourceAccountID == nil || candidate.SourceAccountID == nil || *stale.SourceAccountID != *candidate.SourceAccountID {
+	staleAccount, ok := mirrorAccount(stale)
+	if !ok {
+		return false
+	}
+	candidateAccount, ok := mirrorAccount(candidate.Posting)
+	if !ok || staleAccount != candidateAccount {
 		return false
 	}
 	staleCents, ok := postingAmountCents(stale)
@@ -245,8 +250,22 @@ func settleMatch(stale types.Posting, candidate SyncPosting) bool {
 	return strings.Contains(a, b) || strings.Contains(b, a)
 }
 
-// convertSettledPosting converts one vanished pending row into a settled
-// owner row when exactly one settled candidate strictly matches it. The UUID
+// mirrorAccount returns the single model account a bank-mirrored posting
+// touches: the source account for outflows, the first destination for
+// inflows. Bank rows never carry both.
+func mirrorAccount(posting types.Posting) (string, bool) {
+	if posting.SourceAccountID != nil {
+		return *posting.SourceAccountID, true
+	}
+	if len(posting.Destinations) > 0 {
+		return posting.Destinations[0], true
+	}
+	return "", false
+}
+
+// convertSettledPosting converts one vanished bank row (pending or void)
+// into a settled owner row when exactly one settled candidate strictly
+// matches it. The UUID
 // survives, so any future evidence stays linked; the row becomes owner-owned
 // and projection-disabled pending the owner's review. It reports whether a
 // conversion happened; otherwise the caller deletes the row.
@@ -282,7 +301,7 @@ func convertSettledPosting(tx *planTx, id string, settled []SyncPosting, used ma
 	if err != nil {
 		return false, fmt.Errorf("marshal settled amount %s: %w", id, err)
 	}
-	result, err := tx.Exec(`UPDATE postings SET name = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, source = ?, pending = 0, enabled = 0 WHERE id = ? AND source = ? AND pending = 1 AND plan_id = :plan_id`,
+	result, err := tx.Exec(`UPDATE postings SET name = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, source = ?, pending = 0, enabled = 0 WHERE id = ? AND source = ? AND plan_id = :plan_id`,
 		candidate.Name, string(amount), candidate.PostedTime, candidate.TransactionTime, SourceModel, id, SourceSimpleFIN)
 	if err != nil {
 		return false, err
@@ -323,4 +342,22 @@ func updatePendingPosting(tx *planTx, posting types.Posting) error {
 		return fmt.Errorf("pending sync identity does not reference a provider-owned posting")
 	}
 	return nil
+}
+
+// voidPendingPosting retires a bank-vanished pending row to void without
+// deleting it: the authorization is gone but the record stays visible. It
+// reports whether the row was still pending; already-void rows are a no-op
+// so repeat feeds cause no churn. The sync key survives, so a reappearing
+// authorization heals the row back to pending through the normal update
+// path, and a posted match can still convert it to settled.
+func voidPendingPosting(tx *planTx, id string) (bool, error) {
+	result, err := tx.Exec(`UPDATE postings SET pending = 0 WHERE id = ? AND source = ? AND pending = 1 AND plan_id = :plan_id`, id, SourceSimpleFIN)
+	if err != nil {
+		return false, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return count == 1, nil
 }

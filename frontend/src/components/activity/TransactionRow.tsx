@@ -82,12 +82,18 @@ export function TransactionRow({
 					</time>
 				),
 				badges: (transaction.pending ||
+					transaction.void ||
 					transaction.excluded ||
 					transaction.shortfall > 0.01 ||
 					receiptBadge) && (
 					<>
 						{receiptBadge}{" "}
-						{transaction.pending ? (
+						{transaction.void ? (
+							<Badge tone="neutral" className={transactionBadgeStyles()}>
+								Void
+								<span className="sr-only">voided bank authorization</span>
+							</Badge>
+						) : transaction.pending ? (
 							<Badge tone="neutral" className={transactionBadgeStyles()}>
 								Pending
 							</Badge>

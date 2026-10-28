@@ -16,7 +16,6 @@ type SkipReason string
 const (
 	SkipUnmappedAccount SkipReason = "unmapped-account"
 	SkipNonUSD          SkipReason = "non-usd"
-	SkipNonCharge       SkipReason = "non-charge"
 	SkipBadAmount       SkipReason = "bad-amount"
 	// SkipStaleLink counts bridge accounts whose link points at a
 	// deleted model account. Nothing is written for them; the link
@@ -106,15 +105,12 @@ func truncateLabel(description string) string {
 	return name
 }
 
-// Map converts an account set into checkpoints plus pending seed postings.
-// cards lists model account IDs treated as cards: only these get pending
-// seed postings. resolved maps bridge account IDs to model account IDs
-// (stored links). Mapped accounts emit checkpoints with model IDs; mappable
-// USD accounts without a resolution emit bridge-keyed checkpoints plus a
-// Provision the runner fulfills before apply. Posted charges on card
-// accounts convert vanished pending rows or insert as new settled rows;
-// all other posted transactions are skipped, as are checking flows.
-func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string, now time.Time) (*Plan, error) {
+// Map converts an account set into checkpoints plus bank mirror rows.
+// Every mapped USD account contributes its transactions: pending ones seed
+// pending rows, posted ones become settled candidates. Charges, payments,
+// and refunds all mirror; only unmapped accounts, non-USD rows, and invalid
+// amounts are skipped, as are checking flows outside mapped accounts.
+func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, error) {
 	plan := &Plan{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}
 	for _, account := range set.Accounts {
@@ -160,18 +156,11 @@ func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string,
 			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Date: day, Balance: balance})
 		}
 
-		if _, isCard := cards[modelAccountID]; !isCard {
-			continue
-		}
 		for _, transaction := range account.Transactions {
 			seed := transaction.IsPending()
 			amount, err := transaction.ParseAmount()
 			if err != nil {
 				plan.Skipped[SkipBadAmount]++
-				continue
-			}
-			if amount >= 0 {
-				plan.Skipped[SkipNonCharge]++
 				continue
 			}
 			abs, err := absDecimal(transaction.Amount)
@@ -192,8 +181,7 @@ func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string,
 				ProviderAccountID: account.ID,
 				TransactionID:     transaction.ID,
 				Posting: types.Posting{
-					Name:            truncateLabel(transaction.Description),
-					SourceAccountID: &source,
+					Name: truncateLabel(transaction.Description),
 					Amount: types.PostingAmountResolution{
 						Resolver: "expression",
 						Config:   map[string]any{"expression": abs},
@@ -204,6 +192,11 @@ func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string,
 					Enabled:         false,
 					Pending:         seed,
 				},
+			}
+			if amount >= 0 {
+				posting.Destinations = []string{modelAccountID}
+			} else {
+				posting.SourceAccountID = &source
 			}
 			if seed {
 				plan.Pending = append(plan.Pending, posting)
