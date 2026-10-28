@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 var errGrantRevoked = errors.New("provider grant was revoked")
@@ -109,7 +109,7 @@ func (s *sessionStore) removeGroupMemberships(issuer, subject string) error {
 	if issuer == "" || subject == "" {
 		return nil
 	}
-	return store.DeleteGroupMemberships(s.db, authorization.ActorKey(issuer, subject))
+	return sqlite.DeleteGroupMemberships(s.db, authorization.ActorKey(issuer, subject))
 }
 
 func (s *sessionStore) listGrants(issuer, subject string) ([]grant, error) {

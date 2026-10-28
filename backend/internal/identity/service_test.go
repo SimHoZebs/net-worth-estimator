@@ -20,7 +20,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 type testIDP struct {
@@ -218,7 +218,7 @@ func newService(t *testing.T, p *testIDP, path string, options ...func(*Config))
 		option(&config)
 	}
 	if config.Database == nil && config.SessionDB != "" {
-		database, err := store.SetupDatabase(config.SessionDB)
+		database, err := sqlite.SetupDatabase(config.SessionDB)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -424,7 +424,7 @@ func TestSessionStorePersistsHashesAndExpires(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	database, err := store.SetupDatabase(path)
+	database, err := sqlite.SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}

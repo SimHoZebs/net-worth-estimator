@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestIdentityUsesSharedApplicationDatabaseAcrossRestart(t *testing.T) {
 	p := newIDP(t)
 	path := filepath.Join(t.TempDir(), "app.db")
-	database, err := store.SetupDatabase(path)
+	database, err := sqlite.SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestIdentityUsesSharedApplicationDatabaseAcrossRestart(t *testing.T) {
 	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := store.OpenDatabase(path)
+	reopened, err := sqlite.OpenDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestSessionsNeverCreateDatabaseOrIdentitySchema(t *testing.T) {
 }
 
 func TestIdentityStartupFailureDoesNotCloseSharedDatabase(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
