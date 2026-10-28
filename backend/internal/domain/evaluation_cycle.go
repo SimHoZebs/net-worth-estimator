@@ -226,6 +226,9 @@ var cycleFulfillmentDefinition = &EvaluationDefinition{
 	Type: types.EvaluationTypeCycleFulfillment,
 	Name: "Cycle fulfillment",
 
+	// Reader: answers from the cached path's rows and events only.
+	Kind: EvaluationKindReader,
+
 	ValidateConfig: ValidateCycleFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {
 		parsed, err := ParseCycleFulfillmentConfig(config)

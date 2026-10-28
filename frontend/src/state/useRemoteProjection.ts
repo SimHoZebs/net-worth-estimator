@@ -11,32 +11,25 @@ import {
 	type EvaluationResultEnvelope,
 	type EvaluationTables,
 	type FinancialModelDocument,
-	type JsonValue,
-	type ProjectionAccountSummary,
 	type ProjectionResult,
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
 import { projectionMovements } from "../api/projectionMovements.ts";
 import {
-	financialIndependenceEvaluation,
-	financialIndependenceRange,
-} from "../api/financialIndependence.ts";
+	OTHER_EVAL_OUTCOME_RENDERERS,
+	balanceEvaluation,
+	thresholdEvaluation,
+	valueRecord,
+} from "../api/evalOutcomes.ts";
+import { financialIndependenceRange } from "../api/financialIndependence.ts";
 import { ResourceScopeError } from "../api/scopedRequest.ts";
-import { money, percent } from "../domain/format.ts";
-import {
-	fundingEvaluationName,
-	fundingLabels,
-} from "../domain/fundingTerminology.ts";
-import { finite, isRecord, stringValue } from "../domain/guards.ts";
-import type {
-	OtherEvaluationProgress,
-	Projection,
-	RangeResult,
-} from "../domain/result.ts";
+import { finite } from "../domain/guards.ts";
+import type { Projection, RangeResult } from "../domain/result.ts";
 import { horizonDate } from "../domain/result.ts";
 import {
 	deterministicQueryKey,
+	evalOverlayQueryKey,
 	serverQueryClient,
 	stochasticQueryKey,
 } from "./serverQuery.ts";
@@ -72,12 +65,12 @@ export interface UseRemoteProjectionOptions {
 const MISSING_DOCUMENT_MESSAGE =
 	"No server financial model is available for projection. Load or replace a model before calculating.";
 
-async function runDeterministic(
+async function fetchDeterministicResult(
 	document: FinancialModelDocument,
 	years: number,
 	range: ProjectionDateRange,
 	signal: AbortSignal,
-): Promise<Projection> {
+): Promise<ProjectionResult> {
 	const request: DeterministicProjectionRequest = {
 		...projectionRequest(document, years),
 		range,
@@ -90,25 +83,7 @@ async function runDeterministic(
 		throw new Error(
 			"The server returned no deterministic projection result. Retry the request.",
 		);
-	try {
-		return projectionResultToLocal(
-			response.result,
-			document,
-			request.settings.horizonYears,
-		);
-	} catch (cause) {
-		throw cause instanceof Error
-			? cause
-			: new Error(
-					"The deterministic projection could not be mapped for display.",
-				);
-	}
-}
-
-function valueRecord(
-	value: JsonValue | undefined,
-): Record<string, unknown> | null {
-	return isRecord(value) ? value : null;
+	return response.result;
 }
 
 export function projectionRequest(
@@ -159,13 +134,6 @@ export function projectionRangeKey(range: ProjectionDateRange): string {
 	return `${range.startDate ?? ""}..${range.endDate ?? ""}`;
 }
 
-function evaluationDate(
-	envelope: EvaluationResultEnvelope | undefined,
-): string | null {
-	const deterministic = valueRecord(envelope?.deterministic);
-	return stringValue(deterministic?.firstReachedDate);
-}
-
 function evaluationProbability(
 	envelope: EvaluationResultEnvelope | undefined,
 	key: string,
@@ -173,136 +141,6 @@ function evaluationProbability(
 	const probabilistic = valueRecord(envelope?.probabilistic);
 	const value = finite(probabilistic?.[key]);
 	return value === null ? null : Math.max(0, Math.min(1, value));
-}
-
-// Both threshold-shaped evaluations (net worth threshold, account balance)
-// share this instance shape, so one mapper serves each kind.
-type EditableEvaluation = {
-	instanceId: string;
-	name: string;
-	enabled: boolean;
-	config: JsonValue;
-};
-
-// An evaluation whose envelope is missing is named indeterminate rather than
-// reported as unmet, so an unevaluated evaluation is never shown as a failure.
-function evaluatedEvaluation(
-	evaluation: EditableEvaluation,
-	envelope: EvaluationResultEnvelope | undefined,
-) {
-	const represented =
-		envelope?.status === "satisfied" || envelope?.status === "not-satisfied";
-	const name = evaluation.name || evaluation.instanceId;
-	return {
-		name: represented ? name : `${name} (indeterminate)`,
-		firstDate: represented ? evaluationDate(envelope) : null,
-	};
-}
-
-function thresholdEvaluation(
-	evaluation: EditableEvaluation,
-	envelope: EvaluationResultEnvelope | undefined,
-	current: number,
-	final: number,
-) {
-	const config = valueRecord(evaluation.config);
-	const { name, firstDate } = evaluatedEvaluation(evaluation, envelope);
-	return {
-		evaluation: {
-			id: evaluation.instanceId,
-			name,
-			kind: "net-worth" as const,
-			target: finite(config?.target) ?? 0,
-			accountId: null,
-			enabled: evaluation.enabled,
-		},
-		firstDate,
-		current,
-		final,
-	};
-}
-
-function balanceEvaluation(
-	evaluation: EditableEvaluation,
-	envelope: EvaluationResultEnvelope | undefined,
-	balances: Map<string, ProjectionAccountSummary>,
-) {
-	const config = valueRecord(evaluation.config);
-	const accountId =
-		typeof config?.accountId === "string" ? config.accountId : null;
-	const { name, firstDate } = evaluatedEvaluation(evaluation, envelope);
-	const summary = accountId === null ? undefined : balances.get(accountId);
-	return {
-		evaluation: {
-			id: evaluation.instanceId,
-			name,
-			kind: "reserve" as const,
-			target: finite(config?.target) ?? 0,
-			accountId,
-			enabled: evaluation.enabled,
-		},
-		firstDate,
-		current: summary?.startingBalance ?? 0,
-		final: summary?.endingBalance ?? 0,
-	};
-}
-
-interface OtherOutcome {
-	goal: string | null;
-	outcomeDate: string | null;
-	outcomeText: string;
-	qualifier: string | null;
-	progress: OtherEvaluationProgress | null;
-}
-
-function postingOutcome(
-	deterministic: Record<string, unknown> | null,
-): OtherOutcome {
-	const fulfilled: OtherOutcome = {
-		goal: null,
-		outcomeDate: null,
-		outcomeText: fundingLabels.clear,
-		qualifier: null,
-		progress: null,
-	};
-	if (!deterministic) return fulfilled;
-	const firstDate = stringValue(deterministic.firstUnderfulfilledDate);
-	if (!firstDate) return fulfilled;
-	const completion = finite(deterministic.completionRate);
-	return {
-		...fulfilled,
-		outcomeDate: firstDate,
-		outcomeText: "Shortfall",
-		progress:
-			completion !== null && completion >= 0
-				? { fraction: completion, current: percent(completion), share: null }
-				: null,
-	};
-}
-
-function cycleOutcome(
-	deterministic: Record<string, unknown> | null,
-): OtherOutcome {
-	const within = deterministic?.withinBudget === true;
-	const base: OtherOutcome = {
-		goal: null,
-		outcomeDate: null,
-		outcomeText: within ? "Within budget" : "Over budget",
-		qualifier: null,
-		progress: null,
-	};
-	const spent = finite(deterministic?.spent);
-	const budget = finite(deterministic?.budget);
-	if (spent === null || budget === null || budget <= 0) return base;
-	const fraction = Math.max(0, spent / budget);
-	return {
-		...base,
-		progress: {
-			fraction,
-			current: money(spent),
-			share: `${Math.round(fraction * 100)}%`,
-		},
-	};
 }
 
 function rowBalances(
@@ -406,57 +244,48 @@ export function projectionResultToLocal(
 				),
 			),
 	];
+	// Eval displays resolve through the outcome renderer registry: pure
+	// readers over the cached base path plus each evaluation envelope. A
+	// missing envelope renders indeterminate values without refetching.
+	const horizonEnd =
+		horizonYears === undefined
+			? null
+			: horizonDate({ start: projectionStartDate, years: horizonYears });
 	const otherEvaluations = [
 		...(document?.evaluations.financialIndependence ?? []).map((evaluation) =>
-			financialIndependenceEvaluation(
-				evaluation,
-				result.evaluations.financialIndependence.find(
+			OTHER_EVAL_OUTCOME_RENDERERS.financialIndependence(evaluation, {
+				envelope: result.evaluations.financialIndependence.find(
 					(item) => item.instanceId === evaluation.instanceId,
 				),
+				postingIds: null,
+				enabled: evaluation.enabled,
 				document,
 				projectionStartDate,
-				horizonYears === undefined
-					? null
-					: horizonDate({ start: projectionStartDate, years: horizonYears }),
-			),
+				horizonEndDate: horizonEnd,
+			}),
 		),
-		...(document?.evaluations.postingFulfillment ?? []).map((evaluation) => ({
-			id: evaluation.instanceId,
-			name: fundingEvaluationName(evaluation.name),
-			type: "postingFulfillment" as const,
-			postingIds: Array.isArray(valueRecord(evaluation.config)?.postingIds)
-				? (valueRecord(evaluation.config)!.postingIds as string[])
-				: null,
-			enabled: evaluation.enabled,
-			status:
-				result.evaluations.postingFulfillment.find(
+		...(document?.evaluations.postingFulfillment ?? []).map((evaluation) =>
+			OTHER_EVAL_OUTCOME_RENDERERS.postingFulfillment(evaluation, {
+				envelope: result.evaluations.postingFulfillment.find(
 					(item) => item.instanceId === evaluation.instanceId,
-				)?.status ?? "indeterminate",
-			...postingOutcome(
-				valueRecord(
-					result.evaluations.postingFulfillment.find(
-						(item) => item.instanceId === evaluation.instanceId,
-					)?.deterministic,
 				),
-			),
-		})),
-		...(document?.evaluations.cycleFulfillment ?? []).map((evaluation) => ({
-			id: evaluation.instanceId,
-			name: evaluation.name || evaluation.instanceId,
-			type: "cycleFulfillment" as const,
-			enabled: evaluation.enabled,
-			status:
-				(result.evaluations.cycleFulfillment ?? []).find(
+				postingIds: Array.isArray(
+					valueRecord(evaluation.config)?.postingIds,
+				)
+					? (valueRecord(evaluation.config)!.postingIds as string[])
+					: null,
+				enabled: evaluation.enabled,
+			}),
+		),
+		...(document?.evaluations.cycleFulfillment ?? []).map((evaluation) =>
+			OTHER_EVAL_OUTCOME_RENDERERS.cycleFulfillment(evaluation, {
+				envelope: (result.evaluations.cycleFulfillment ?? []).find(
 					(item) => item.instanceId === evaluation.instanceId,
-				)?.status ?? "indeterminate",
-			...cycleOutcome(
-				valueRecord(
-					(result.evaluations.cycleFulfillment ?? []).find(
-						(item) => item.instanceId === evaluation.instanceId,
-					)?.deterministic,
 				),
-			),
-		})),
+				postingIds: null,
+				enabled: evaluation.enabled,
+			}),
+		),
 	];
 	return {
 		points,
@@ -536,6 +365,51 @@ export function stochasticResultToLocal(
 	};
 }
 
+/**
+ * Overlay the eval-scoped envelopes onto the cached base path. The base
+ * result owns timeline, movements, totals, and summary; the overlay owns
+ * evaluation envelopes. Overlay tables win per instance ID so request-local
+ * evaluations replace the base scope without touching the path.
+ */
+export function mergeEvaluationResults(
+	base: ProjectionResult,
+	overlay: ProjectionResult,
+): ProjectionResult {
+	const pick = <T extends { instanceId: string }>(left: T[], right: T[]): T[] => {
+		const ids = new Set(right.map((item) => item.instanceId));
+		return [...left.filter((item) => !ids.has(item.instanceId)), ...right];
+	};
+	return {
+		...base,
+		evaluations: {
+			financialIndependence: pick(
+				base.evaluations.financialIndependence,
+				overlay.evaluations.financialIndependence,
+			),
+			netWorthThreshold: pick(
+				base.evaluations.netWorthThreshold,
+				overlay.evaluations.netWorthThreshold,
+			),
+			accountBalance: pick(
+				base.evaluations.accountBalance,
+				overlay.evaluations.accountBalance,
+			),
+			postingFulfillment: pick(
+				base.evaluations.postingFulfillment,
+				overlay.evaluations.postingFulfillment,
+			),
+			cycleFulfillment: pick(
+				base.evaluations.cycleFulfillment ?? [],
+				overlay.evaluations.cycleFulfillment ?? [],
+			),
+			plannedPurchases: pick(
+				base.evaluations.plannedPurchases ?? [],
+				overlay.evaluations.plannedPurchases ?? [],
+			),
+		},
+	};
+}
+
 function projectionResponseError(
 	response: DeterministicProjectionResponse,
 ): Error | null {
@@ -575,7 +449,8 @@ export function useRemoteProjection({
 	dateRange: dateRangeOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
-	const { activeDocument, documentKey } = useProjectionDocument({
+	const { activeDocument, baseDocument, baseKey, evalKey } =
+		useProjectionDocument({
 		document: documentOverride,
 		draftDocument: draftOverride,
 		evaluations: evaluationsOverride,
@@ -584,17 +459,24 @@ export function useRemoteProjection({
 	const storeRanges = useUiStore((state) => state.ranges);
 	const years = yearsOverride ?? storeYears;
 	const ranges = rangesOverride ?? storeRanges;
+	// The eval/view scope layers onto the plan without rewriting it, so the
+	// base simulation keys on plan data alone. Eval/view changes (toggles,
+	// statement day, account selection) only move the overlay key below.
+	const overlayNeeded =
+		evaluationsOverride !== undefined &&
+		baseDocument !== null &&
+		activeDocument !== null;
 	// The requested slice participates in cache identity alongside the
 	// document: different ranges hold different payloads.
 	const effectiveRange = useMemo(
 		() =>
-			activeDocument
-				? resolveProjectionRange(activeDocument, years, dateRangeOverride)
+			baseDocument
+				? resolveProjectionRange(baseDocument, years, dateRangeOverride)
 				: null,
-		[activeDocument, years, dateRangeOverride],
+		[baseDocument, years, dateRangeOverride],
 	);
 	const rangeKey = effectiveRange ? projectionRangeKey(effectiveRange) : "";
-	const hasDocument = activeDocument !== null;
+	const hasDocument = baseDocument !== null;
 	const queryClient = useQueryClient();
 	const queryClientRef = useRef(queryClient);
 	// oxlint-disable-next-line react/refs
@@ -605,26 +487,34 @@ export function useRemoteProjection({
 			void queryClientRef.current.refetchQueries({ queryKey, exact: true });
 		},
 	});
+	const notifyDeterministicError = (
+		queryKey: readonly unknown[],
+		cause: unknown,
+	) => {
+		if (!isAbortError(cause) && !(cause instanceof ResourceScopeError))
+			notifyError(
+				"projection",
+				cause instanceof Error && cause.message
+					? cause.message
+					: "The deterministic projection request failed. Retry the connection.",
+				reportDeterministicError(queryKey),
+			);
+	};
+	// Base path: plan data only. Eval/view preference changes never move
+	// this key, so the cached simulation (and its mapped path) is reused.
 	const deterministic = useQuery({
-		queryKey: deterministicQueryKey(documentKey, years, rangeKey),
+		queryKey: deterministicQueryKey(baseKey, years, rangeKey),
 		queryFn: ({ signal, queryKey }) => {
-			const current = activeDocument;
+			const current = baseDocument;
 			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
 			const range = effectiveRange ?? resolveProjectionRange(current, years);
-			return runDeterministic(current, years, range, signal)
+			return fetchDeterministicResult(current, years, range, signal)
 				.then((result) => {
 					dismissKey("projection");
 					return result;
 				})
 				.catch((cause: unknown) => {
-					if (!isAbortError(cause) && !(cause instanceof ResourceScopeError))
-						notifyError(
-							"projection",
-							cause instanceof Error && cause.message
-								? cause.message
-								: "The deterministic projection request failed. Retry the connection.",
-							reportDeterministicError(queryKey),
-						);
+					notifyDeterministicError(queryKey, cause);
 					throw cause;
 				});
 		},
@@ -632,35 +522,118 @@ export function useRemoteProjection({
 		placeholderData: keepPreviousData,
 		retry: false,
 	});
+	// Eval overlay: request-local evaluations layered onto the cached base
+	// path. Shares the base timeline; only envelope identity changes.
+	const overlay = useQuery({
+		queryKey: evalOverlayQueryKey(baseKey, evalKey, years, rangeKey),
+		queryFn: ({ signal, queryKey }) => {
+			const current = activeDocument;
+			if (!current) throw new Error(MISSING_DOCUMENT_MESSAGE);
+			const range = effectiveRange ?? resolveProjectionRange(current, years);
+			return fetchDeterministicResult(current, years, range, signal).catch(
+				(cause: unknown) => {
+					notifyDeterministicError(queryKey, cause);
+					throw cause;
+				},
+			);
+		},
+		enabled: enabled && hasDocument && overlayNeeded,
+		placeholderData: keepPreviousData,
+		retry: false,
+	});
 	const missingDocument = enabled && !hasDocument;
 	const missingError = useMemo(() => new Error(MISSING_DOCUMENT_MESSAGE), []);
+	// Map the cached path locally: without an overlay the base document
+	// carries its own evaluations; with one, the base path renders instantly
+	// while the overlay envelopes arrive progressively underneath.
+	const mapped = useMemo((): {
+		projection: Projection | null;
+		error: string | null;
+	} => {
+		const raw = deterministic.data ?? null;
+		if (!raw || !baseDocument) return { projection: null, error: null };
+		const horizonYears = projectionRequest(baseDocument, years).settings
+			.horizonYears;
+		try {
+			if (!overlayNeeded || !activeDocument) {
+				return {
+					projection: projectionResultToLocal(raw, baseDocument, horizonYears),
+					error: null,
+				};
+			}
+			const overlaid = overlay.data ?? null;
+			if (!overlaid) {
+				return {
+					projection: projectionResultToLocal(raw, baseDocument, horizonYears),
+					error: null,
+				};
+			}
+			return {
+				projection: projectionResultToLocal(
+					mergeEvaluationResults(raw, overlaid),
+					activeDocument,
+					horizonYears,
+				),
+				error: null,
+			};
+		} catch (cause) {
+			return {
+				projection: null,
+				error:
+					cause instanceof Error && cause.message
+						? cause.message
+						: "The deterministic projection could not be mapped for display.",
+			};
+		}
+	}, [
+		deterministic.data,
+		overlay.data,
+		baseDocument,
+		activeDocument,
+		overlayNeeded,
+		years,
+	]);
 	// Failures resolve with fetching false, so an error under load is
 	// superseded by the pending skeletons instead of flashing stale errors.
 	const base: Projection | Error | null = missingDocument
 		? missingError
-		: (deterministic.data ?? null);
+		: (mapped.projection ?? null);
+	const overlayErrorMessage =
+		overlayNeeded && overlay.error
+			? (overlay.error.message ??
+				"The evaluation overlay request failed. Retry the connection.")
+			: null;
+	const mappingErrorMessage = mapped.error;
 	const baseError =
-		missingDocument || deterministic.error === null
+		missingDocument ||
+		(deterministic.error === null &&
+			!overlayErrorMessage &&
+			!mappingErrorMessage)
 			? missingDocument
 				? MISSING_DOCUMENT_MESSAGE
 				: null
-			: (deterministic.error.message ??
-				"The deterministic projection request failed. Retry the connection.");
-	const loading = deterministic.isFetching;
+			: (deterministic.error?.message ??
+					overlayErrorMessage ??
+					mappingErrorMessage ??
+					"The deterministic projection request failed. Retry the connection.");
+	const loading = deterministic.isFetching || overlay.isFetching;
 	const runCount = randomRunCount();
 	const seed = 42;
-	const rangeEnabled = enabled && ranges && activeDocument !== null;
+	// Ranges derive from the base path. Eval/view preferences never move this
+	// key: overlay envelopes describe single-path outcomes, not bands.
+	const rangeEnabled = enabled && ranges && baseDocument !== null;
 	// A disabled observer must detach from the active stream, so the last
 	// real subscriber leaving lets Query cancel its signal.
 	const rangeQueryKey = rangeEnabled
-		? stochasticQueryKey(documentKey, years, runCount, seed, 0)
+		? stochasticQueryKey(baseKey, years, runCount, seed, 0)
 		: ["stochastic-projection-disabled"];
-	const rangeRequest: StochasticProjectionRequest | null = rangeEnabled
-		? {
-				...projectionRequest(activeDocument, years),
-				config: { runCount, seed },
-			}
-		: null;
+	const rangeRequest: StochasticProjectionRequest | null =
+		rangeEnabled && baseDocument
+			? {
+					...projectionRequest(baseDocument, years),
+					config: { runCount, seed },
+				}
+			: null;
 	const rangeQuery = useQuery(
 		stochasticProjectionOptions({
 			queryKey: rangeQueryKey,
@@ -674,12 +647,15 @@ export function useRemoteProjection({
 		base,
 		status: !enabled
 			? ("disabled" as const)
-			: missingDocument || deterministic.isError
+			: missingDocument ||
+					deterministic.isError ||
+					mappingErrorMessage !== null
 				? ("error" as const)
-				: deterministic.isPending
+				: deterministic.isPending || (overlayNeeded && overlay.isPending)
 					? ("pending" as const)
 					: ("success" as const),
-		isPlaceholderData: deterministic.isPlaceholderData,
+		isPlaceholderData:
+			deterministic.isPlaceholderData || overlay.isPlaceholderData,
 		range: rangeQuery.data?.range ?? null,
 		progress: rangeQuery.data?.progress ?? 0,
 		rangeError: rangeQuery.error?.message ?? null,
@@ -689,6 +665,7 @@ export function useRemoteProjection({
 		},
 		retryProjection: () => {
 			void deterministic.refetch();
+			if (overlayNeeded) void overlay.refetch();
 		},
 		loading,
 		abort: () => {

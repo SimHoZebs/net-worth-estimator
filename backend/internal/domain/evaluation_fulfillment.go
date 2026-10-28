@@ -290,6 +290,9 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 	Type: types.EvaluationTypePostingFulfillment,
 	Name: "Posting fulfillment",
 
+	// Reader: answers from the cached path's movement events only.
+	Kind: EvaluationKindReader,
+
 	ValidateConfig: ValidateFulfillmentConfig,
 	ParseConfig: func(config any) (any, error) {
 		parsed, err := ParseFulfillmentConfig(config)

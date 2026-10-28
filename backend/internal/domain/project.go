@@ -19,28 +19,53 @@ func init() {
 }
 
 // EvaluateProjectionPath runs configured deterministic evaluations over a path.
+// Reader and simulator runtimes evaluate separately so each system keeps its
+// own caching policy; the merged collection preserves canonical table order.
 func EvaluateProjectionPath(path *types.ProjectionPath, evaluations *types.EvaluationTables, monteCarloSample *types.MonteCarloSample, detailLevel string) *types.EvaluationResultCollection {
-	runtimes := NewEvaluationRuntimeSet(evaluations, evaluationRegistryInstance)
 	if detailLevel == "" {
 		detailLevel = "detailed"
 	}
-	runtimes.EvaluateDeterministic(&EvaluationContext{
+	set := NewEvaluationRuntimeSet(evaluations, evaluationRegistryInstance)
+	readers, simulators := set.PartitionByKind()
+	readers.EvaluateDeterministic(&EvaluationContext{
 		Path:             path,
 		Document:         &path.EffectiveDocument,
 		MonteCarloSample: monteCarloSample,
 		DetailLevel:      detailLevel,
 	})
-	collection := runtimes.Result()
-	return &collection
+	simulators.EvaluateDeterministic(&EvaluationContext{
+		Path:             path,
+		Document:         &path.EffectiveDocument,
+		MonteCarloSample: monteCarloSample,
+		DetailLevel:      detailLevel,
+	})
+	readerCollection := readers.Result()
+	simulatorCollection := simulators.Result()
+	return MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
 }
 
 // ProjectFinancialModelDocument produces the full public projection result.
+// The base path comes from the base-path cache (keyed without evaluations);
+// evaluations run separately against the cached path, so eval-only changes
+// never rerun the base simulation.
 func ProjectFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionResult, error) {
-	path, result, err := ProjectRawFinancialModelDocument(document, settings, overrides, monteCarloSample)
+	_, path, baseResult, err := projectBaseWithCache(document, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, err
 	}
-	collection := EvaluateProjectionPath(path, &settings.Evaluations, monteCarloSample, "detailed")
+	// Reader and simulator results change only when the base content or the
+	// eval configuration changes: serve each stored system to every later
+	// identical request instead of recomputing per request. Detail stays in
+	// the simulator key because simulators honor it; readers ignore it.
+	baseHash := BaseDocumentHash(document, overrides, settings, monteCarloSample)
+	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
+	readers, simulators := set.PartitionByKind()
+	readerCollection := projectReaderEvaluationsWithCache(path, baseHash, readers)
+	simulatorCollection := projectSimulatorEvaluationsWithCache(path, baseHash, simulators, monteCarloSample, "detailed")
+	collection := MergeEvaluationResultCollections(set, readerCollection, simulatorCollection)
+	// Copy the shell: the cached base result stays evaluation-free for the
+	// next caller with different eval config.
+	result := *baseResult
 	result.Evaluations = collection.Evaluations
-	return result, nil
+	return &result, nil
 }

@@ -160,17 +160,16 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 		}, nil)
 	}
 	session.sampler = NewStochasticSampler(session.config.Seed)
-	prepared, err := PrepareSimulationRequest(document, settings, overrides, nil)
+	// The deterministic base path is shared with deterministic projections
+	// through the base-path cache: identical base inputs never simulate twice.
+	prepared, path, baseResult, err := projectBaseWithCache(document, settings, overrides, nil)
 	if err != nil {
 		return nil, err
 	}
 	session.prepared = prepared
-	run, err := Simulate(prepared.Request)
-	if err != nil {
-		return nil, err
-	}
-	path, result := AdaptSimulationRun(prepared, &run)
 	session.deterministicPath = path
+	deterministic := *baseResult // copy the shell; evaluations attach below
+	session.deterministic = &deterministic
 
 	session.sampleCountsByPostingID = buildSampleCountsByPostingId(
 		prepared.Request.Model.RecurrenceRules,
@@ -198,7 +197,6 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 	if onProgress != nil {
 		onProgress(session.progress(types.PhaseStochasticRuns), nil)
 	}
-	session.deterministic = result
 	session.deterministic.Evaluations = session.runtimes.Result().Evaluations
 	session.sortedDates = make([]string, len(session.deterministic.Timeline.Rows))
 	for index, row := range session.deterministic.Timeline.Rows {
@@ -228,7 +226,7 @@ func (s *stochasticSession) progress(phase types.StochasticProgressPhase) types.
 func (s *stochasticSession) projectSample(sample *types.MonteCarloSample) (*types.ProjectionPath, error) {
 	request := s.prepared.Request
 	request.MonteCarloSample = sample
-	run, err := Simulate(request)
+	run, err := orchestratedSimulate(request)
 	if err != nil {
 		return nil, err
 	}

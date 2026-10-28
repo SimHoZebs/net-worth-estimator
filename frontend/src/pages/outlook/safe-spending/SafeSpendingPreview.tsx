@@ -30,6 +30,7 @@ import {
 	remainingMonthlyObligations,
 	spendingBalance,
 } from "@/domain/safeSpending.ts";
+import { safeSpendingFromEnvelope } from "@/domain/safeSpendingEval.ts";
 import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
 import type { Plan } from "@/domain/model.ts";
 import { visibleAccounts } from "@/domain/model.ts";
@@ -64,6 +65,7 @@ export function SafeSpendingPreview({
 	detail,
 	onDetail,
 	onTabChange,
+	envelope = null,
 }: {
 	plan: Plan;
 	checkpoints: BackendCheckpoint[];
@@ -72,7 +74,14 @@ export function SafeSpendingPreview({
 	detail: SafeSpendingDetailTab | null;
 	onDetail: (tab: SafeSpendingDetailTab | null) => void;
 	onTabChange: (tab: SafeSpendingDetailTab) => void;
+	// Future server evaluation envelope. Null today: the client derivation
+	// below stays the instant source of truth and never blocks on it.
+	envelope?: import("@/api/contracts.ts").EvaluationResultEnvelope | null;
 }) {
+	// Envelope renderer route: a future server evaluation swaps in here as
+	// progressive enhancement. Client math stays instant either way.
+	const serverView = safeSpendingFromEnvelope(envelope);
+	void serverView;
 	const movements = projection?.movements ?? EMPTY_MOVEMENTS;
 	const cards = useMemo(
 		() =>
