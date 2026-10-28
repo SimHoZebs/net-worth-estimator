@@ -111,13 +111,12 @@ describe("WishListEditor", () => {
 				.closest("form")!,
 		);
 		expect(onApply).toHaveBeenCalledOnce();
-		expect(onApply.mock.calls[0]![0].movements.at(-1)).toMatchObject({
+		expect(onApply.mock.calls[0]![0].plannedPurchases.at(-1)).toMatchObject({
 			name: "Desk",
 			amount: 400.25,
 			fromId: "checking",
 			startDate: testPlan.startDate,
 			enabled: false,
-			purchasePriority: 0,
 		});
 		expect(onClose).toHaveBeenCalledOnce();
 	});

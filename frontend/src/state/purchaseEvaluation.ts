@@ -7,7 +7,9 @@ import { isRecord } from "../domain/guards.ts";
 import type { PurchaseSchedule } from "../domain/result.ts";
 
 // Request-only evaluation. It neither creates a saved evaluation nor runs FI
-// again on this page. The full overridden document remains in the query key.
+// again on this page. The base path keys on plan data alone; this override
+// travels in the eval-overlay key, so the cached base simulation is reused
+// and only the purchase envelopes refetch.
 export const PURCHASE_EVALUATION_ID = "planned-purchases-preview";
 export const PURCHASE_EVALUATIONS: EvaluationTables = {
 	financialIndependence: [],

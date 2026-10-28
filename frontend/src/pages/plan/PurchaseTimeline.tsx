@@ -1,6 +1,6 @@
 import { cssVariables } from "../../components/cssVariables.ts";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { Movement } from "../../domain/model.ts";
+import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseSchedule } from "../../domain/result.ts";
 
 export function PurchaseTimeline({
@@ -9,7 +9,7 @@ export function PurchaseTimeline({
 	start,
 	end,
 }: {
-	queue: Movement[];
+	queue: PlannedPurchase[];
 	schedule: PurchaseSchedule | null;
 	start: string;
 	end: string;

@@ -1,8 +1,7 @@
 import { useId } from "react";
-import type { Movement, Plan } from "../../domain/model.ts";
+import type { PlannedPurchase, Plan } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { upsertItem } from "../../domain/planEdits.ts";
-import { purchaseQueue } from "../../domain/purchases.ts";
 import { Checkbox, InputField, SelectField } from "../../components/Field.tsx";
 import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
 import { EditorForm } from "../../components/editors/EditorForm.tsx";
@@ -17,7 +16,7 @@ export function WishListEditor({
 	readOnly,
 }: {
 	plan: Plan;
-	item: Movement | null;
+	item: PlannedPurchase | null;
 	onApply: (plan: Plan) => boolean;
 	onClose: () => void;
 	applyError?: string | null;
@@ -37,33 +36,21 @@ export function WishListEditor({
 				readOnly ? "These planned purchases are read-only." : undefined
 			}
 			buildPlan={(data) => {
-				const queue = purchaseQueue(plan.movements);
-				const movement: Movement = {
+				const purchase: PlannedPurchase = {
 					id: item?.id ?? crypto.randomUUID(),
 					name: textValue(data, "name"),
 					amount: numberValue(data, "amount"),
-					amountKnown: true,
 					fromId: textValue(data, "fromId"),
-					toId: null,
-					frequency: "once",
 					startDate: textValue(data, "startDate"),
-					endDate: null,
-					annualIncrease: 0,
 					enabled: textValue(data, "enabled") === "on",
 					readOnly: false,
-					claimRuleId: null,
-					claimOccurrenceDate: null,
-					postedDate: null,
-					purchasePriority:
-						item?.purchasePriority ??
-						Math.max(
-							-1,
-							...queue.map((movement) => movement.purchasePriority!),
-						) + 1,
 				};
 				return {
 					...plan,
-					movements: upsertItem({ items: plan.movements, item: movement }),
+					plannedPurchases: upsertItem({
+						items: plan.plannedPurchases,
+						item: purchase,
+					}),
 				};
 			}}
 		>

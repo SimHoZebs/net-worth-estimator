@@ -155,6 +155,24 @@ export type RecurrenceFrequency =
 	| "quarterly"
 	| "annual";
 
+/**
+ * Standalone planned-purchase row, separated from postings. Lower priority
+ * executes first; document order breaks ties. EarliestDate is the earliest
+ * buy day; cost is the fixed positive cost. Mirrors the backend
+ * `PlannedPurchase` row. Legacy documents carry purchases as postings with
+ * a `purchase` marker instead; the adapter reads both and always writes the
+ * legacy posting shape until the backend ships row endpoints (see rowSync).
+ */
+export interface BackendPlannedPurchase extends HumaMetadata {
+	id: string;
+	name: string;
+	fundingAccountId: string | null;
+	cost: number;
+	earliestDate: IsoDate;
+	enabled: boolean;
+	priority: number;
+}
+
 export interface PostingClaim extends HumaMetadata {
 	ruleId: string;
 	occurrenceDate: IsoDate;
@@ -237,6 +255,7 @@ export interface FinancialModelDocument extends HumaMetadata {
 	evaluations: EvaluationTables;
 	postings: BackendPosting[];
 	recurrenceRules: BackendRecurrenceRule[];
+	plannedPurchases?: BackendPlannedPurchase[];
 }
 
 export interface ModelOverrides extends HumaMetadata {
