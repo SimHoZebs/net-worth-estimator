@@ -215,8 +215,11 @@ func TestConfigAndRequestValidation(t *testing.T) {
 			t.Errorf("accepted invalid config: %+v", invalid)
 		}
 	}
-	if _, err := New(Config{Issuer: "http://192.168.1.50:8000", ClientID: "id", ClientSecret: "secret"}); err != nil {
-		t.Errorf("rejected HTTP issuer: %v", err)
+	if _, err := New(Config{Issuer: "http://192.168.1.50:8000", ClientID: "id", ClientSecret: "secret", AllowPrivateHTTP: true}); err != nil {
+		t.Errorf("rejected opted-in private HTTP issuer: %v", err)
+	}
+	if _, err := New(Config{Issuer: "http://192.168.1.50:8000", ClientID: "id", ClientSecret: "secret"}); err == nil {
+		t.Errorf("accepted private HTTP issuer without opt-in")
 	}
 	calls := 0
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) { calls++ })

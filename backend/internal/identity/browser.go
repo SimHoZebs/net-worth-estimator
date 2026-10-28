@@ -103,6 +103,24 @@ func (s *Service) browserEndpoint(r *http.Request) (browserEndpoint, bool) {
 	return endpoint, ok
 }
 
+// ProxyOrigins returns the canonical application and provider-alias origins
+// that an authenticated ingress may select. The issuer itself is not a proxy.
+func (c Config) ProxyOrigins() ([]string, error) {
+	endpoints, err := browserEndpoints(c)
+	if err != nil {
+		return nil, err
+	}
+	origins := make([]string, 0, len(endpoints)*2)
+	issuer, _ := url.Parse(c.Issuer)
+	for _, endpoint := range endpoints {
+		origins = append(origins, endpoint.app)
+		if endpoint.provider != issuer.Scheme+"://"+issuer.Host {
+			origins = append(origins, endpoint.provider)
+		}
+	}
+	return origins, nil
+}
+
 func (s *Service) browserOAuth(endpoint browserEndpoint) oauth2.Config {
 	config := s.oauth
 	config.RedirectURL = endpoint.app + prefix + "callback"
