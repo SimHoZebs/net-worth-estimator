@@ -86,7 +86,7 @@ test("sidebar flags a stale sync and explains the fix", async ({ page }) => {
 		"aria-selected",
 		"true",
 	);
-	await expect(page.getByText("SimpleFIN")).toBeVisible();
+	await expect(page.getByRole("heading", { name: "SimpleFIN" })).toBeVisible();
 });
 
 test("sidebar reports unconfigured sync from the real status endpoint", async ({

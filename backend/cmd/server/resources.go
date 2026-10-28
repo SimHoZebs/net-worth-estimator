@@ -8,6 +8,7 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/plans"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -59,7 +60,28 @@ func resourceHandler(ctx context.Context, database *store.Database, config resou
 		router.Close()
 		return nil, nil, err
 	}
-	return login.Wrap(router), func() error { return errors.Join(login.Close(), router.Close()) }, nil
+	combined := &combinedHandler{groups: groups.New(database, loginConfig.Issuer, groups.Config{
+		AllowedOrigins: apiConfig.AllowedOrigins,
+		ReadOnly:       apiConfig.ReadOnly,
+	}).Routes(), plans: router}
+	return login.Wrap(combined), func() error { return errors.Join(login.Close(), router.Close()) }, nil
+}
+
+// combinedHandler serves social groups before plan routes.
+// Groups require authentication only. Plans keep Casdoor authorization.
+// The group set matches identity.IsGroupRoute exactly: one predicate owns
+// both the auth bypass and this dispatch.
+type combinedHandler struct {
+	groups http.Handler
+	plans  http.Handler
+}
+
+func (h *combinedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if identity.IsGroupRoute(r.URL.Path) {
+		h.groups.ServeHTTP(w, r)
+		return
+	}
+	h.plans.ServeHTTP(w, r)
 }
 
 // The subject comes only from a verified identity grant. Casdoor must authorize

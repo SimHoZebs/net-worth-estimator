@@ -23,6 +23,7 @@ export function ProjectionChart({
 	pending?: boolean;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
+	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
 	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const id = useId().replaceAll(":", "");
 	// The graph covers only the trailing window ending today: sparse engine
@@ -35,11 +36,7 @@ export function ProjectionChart({
 				? projectionChartModel({
 						projection: {
 							...projection,
-							points: trailingDailyPoints(
-								projection.points,
-								today,
-								TRAILING_NET_WORTH_DAYS,
-							),
+							points: trailingDailyPoints(projection.points, today, days),
 						},
 						range: null,
 						inflation: 0,
@@ -47,7 +44,7 @@ export function ProjectionChart({
 						narrow,
 					})
 				: null,
-		[projection, narrow, today],
+		[projection, narrow, today, days],
 	);
 	const defaultIndex = useMemo(
 		() => (model ? nearestPointIndex(model.points, today) : 0),
@@ -59,8 +56,28 @@ export function ProjectionChart({
 	const point = model?.points[selectedIndex] ?? model?.last;
 	// The evidence action lives here so the position breakdown stays
 	// reachable; the dialog fetches its own data.
-	const evidence = (
-		<div className="flex justify-end px-5 pt-4">
+	const topRow = (
+		<div className="flex items-center justify-between gap-4 px-5 pt-4">
+			<div
+				className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
+				role="group"
+				aria-label="Trailing window"
+			>
+				{[TRAILING_NET_WORTH_DAYS, 90].map((option) => (
+					<button
+						className="rounded-control border-0 bg-transparent px-2 py-1 text-xs whitespace-nowrap text-muted aria-pressed:bg-surface aria-pressed:font-bold aria-pressed:text-ink aria-pressed:shadow-xs"
+						type="button"
+						key={option}
+						aria-pressed={days === option}
+						onClick={() => {
+							setDays(option);
+							setInspected(null);
+						}}
+					>
+						{option} days
+					</button>
+				))}
+			</div>
 			<IconButton
 				icon={CircleHelp}
 				size="sm"
@@ -77,9 +94,9 @@ export function ProjectionChart({
 		return (
 			<section
 				className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
-				aria-label="Net worth over the trailing 30 days"
+				aria-label={`Net worth over the trailing ${days} days`}
 			>
-				{evidence}
+				{topRow}
 				<div aria-busy="true">
 					<Skeleton className="h-56 w-full" />
 				</div>
@@ -89,9 +106,9 @@ export function ProjectionChart({
 	return (
 		<section
 			className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
-			aria-label="Net worth over the trailing 30 days"
+			aria-label={`Net worth over the trailing ${days} days`}
 		>
-			{evidence}
+			{topRow}
 			<div className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
 				<ProjectionPlot
 					model={model}
