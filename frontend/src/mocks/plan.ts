@@ -119,6 +119,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		},
 		{
 			id: "living",
@@ -136,6 +137,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		},
 		{
 			id: "mortgage-payment",
@@ -153,6 +155,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		},
 		{
 			id: "invest",
@@ -170,6 +173,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		},
 		{
 			id: "retirement-contribution",
@@ -187,6 +191,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		},
 		{
 			id: "renovation",
@@ -204,6 +209,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		},
 		...["2026-06-28", "2026-07-28", "2026-08-28"].map((startDate, index) => ({
 			id: `pay-record-${index}`,
@@ -221,6 +227,7 @@ export const testPlan: Plan = {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			readOnly: false,
+			void: false,
 		})),
 	],
 	evaluations: [

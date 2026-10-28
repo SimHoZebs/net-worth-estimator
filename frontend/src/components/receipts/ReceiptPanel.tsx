@@ -39,11 +39,9 @@ export function ReceiptPanel({
 		!scope.resource?.permissions.includes("plan:write");
 	const eligible = Boolean(
 		saved &&
-		saved.sourceAccountId &&
-		!saved.destinations?.length &&
+		(saved.sourceAccountId || saved.destinations?.length) &&
 		!saved.pending &&
-		!saved.purchase &&
-		saved.source !== "simplefin",
+		!saved.void,
 	);
 	const attach = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -160,8 +158,8 @@ export function ReceiptPanel({
 					)}
 					{!eligible && receipts.length === 0 && (
 						<p className="text-sm text-muted">
-							Receipts attach to saved expenses, not transfers, pending charges,
-							or planned purchases.
+							Receipts attach to saved owner transactions, not pending
+							or void bank rows.
 						</p>
 					)}
 				</>

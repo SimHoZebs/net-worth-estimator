@@ -85,7 +85,7 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 	if loaded == nil {
 		t.Fatal("loaded document is nil")
 	}
-	if !reflect.DeepEqual(loaded.Checkpoints, withSourceModel([]types.Checkpoint{
+	if !reflect.DeepEqual(loaded.Checkpoints, withSourceUser([]types.Checkpoint{
 		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
 		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
 	})) {

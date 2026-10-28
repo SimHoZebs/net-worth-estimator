@@ -41,7 +41,7 @@ Select the adapter at server startup through constructor injection. Use the mock
 6. Let the user enter optional item categories. Require an explicit confirmation of reviewed details.
 7. Reopen the receipt after reload or server restart. Download or delete it through authorized endpoints.
 
-Eligibility is server-checked: the target must be a saved, non-pending, one-time external outflow. Exclude future-dated planned purchases, recurrence rules, generated occurrences, and unsaved draft IDs. A manual posting plus a receipt does not establish independent bank verification.
+Eligibility is server-checked: the target must be a saved settled transaction. Pending and void bank rows, recurrence rules, generated occurrences, and unsaved draft IDs are excluded. A vanished pending row converts to a settled owner row on a unique strict match against posted charges, and otherwise deletes with its evidence. A manual posting plus a receipt does not establish independent bank verification.
 
 Permit multiple receipts on one posting. Each receipt belongs to one posting in this release. Receipt actions have their own save state, separate from unsaved financial-plan edits. Require the posting to be saved before attachment.
 

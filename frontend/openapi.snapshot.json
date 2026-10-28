@@ -2782,6 +2782,14 @@
 						"format": "int64",
 						"type": "integer"
 					},
+					"settledConverted": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"settledInserted": {
+						"format": "int64",
+						"type": "integer"
+					},
 					"skipped": {
 						"additionalProperties": {
 							"format": "int64",
@@ -2797,6 +2805,8 @@
 					"pendingDeleted",
 					"pendingInserted",
 					"pendingUpdated",
+					"settledConverted",
+					"settledInserted",
 					"accountsProvisioned",
 					"skipped"
 				],

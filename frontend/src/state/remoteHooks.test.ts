@@ -1529,9 +1529,9 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 		expect(rendered.result().error).toBeNull();
 		expect(accepted).toBe(true);
-		expect(
-			rendered.result().workspace?.draft?.plannedPurchases,
-		).toContainEqual(purchase);
+		expect(rendered.result().workspace?.draft?.plannedPurchases).toContainEqual(
+			purchase,
+		);
 		server.setStatus({ readOnly: true });
 		await rendered.result().refreshStatus();
 		await rendered.settle();
@@ -1548,9 +1548,9 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 		expect(rendered.result().plan?.readOnly).toBe(false);
 		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(false);
-		expect(
-			rendered.result().workspace?.draft?.plannedPurchases,
-		).toContainEqual(purchase);
+		expect(rendered.result().workspace?.draft?.plannedPurchases).toContainEqual(
+			purchase,
+		);
 		expect(await rendered.result().save()).toBe(true);
 		await rendered.settle();
 

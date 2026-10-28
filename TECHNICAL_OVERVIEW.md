@@ -279,7 +279,7 @@ Each row write runs one transaction: validate the resulting document, then inser
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
-3. Posting IDs are canonical UUIDs. Incoming `source` and `pending` values are ignored and recomputed. Stored ownership protects sync rows from owner updates and deletes. ID prefixes carry no policy or lifecycle meaning.
+3. Posting IDs are canonical UUIDs. Incoming `source`, `pending`, and `void` values are ignored and recomputed. Stored lifecycle protects live pending and void bank rows from owner updates and deletes; settled bank rows accept them. ID prefixes carry no policy or lifecycle meaning.
 4. Owner checkpoints win key collisions; a later synchronization skips the owner-owned key until owner data is removed.
 5. Deleting an account keeps its bridge links; the link is the memory of the mapping, so recreating the account resumes sync flow. A link whose model account is gone resolves to nothing and is counted as `linked-account-missing` until relinked.
 
@@ -558,13 +558,13 @@ Two rounding rules stay explicit: deterministic public currency, fulfillment amo
 
 - The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
 - Account links live in the `account_links` table.
-- Card selection is stored per plan in `sync_credentials` and selects model accounts eligible for pending-charge seeds.
+- Card selection is stored per plan in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date and only pending negative card charges as disabled postings. Posted, positive, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-`Store.ApplySyncPlan` applies checkpoints and the pending snapshot in one transaction. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs. Repeated snapshots update those same rows. Only absent rows with the matching provider, model account, and explicit pending state are deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, and `pendingDeleted`.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySyncPlan` applies checkpoints and directives in one transaction without interpreting provider behavior. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 
@@ -586,7 +586,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle     |
 | `backend/internal/store/model.go`                   | seed/import replacement and ordered reload              |
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning              |
-| `backend/internal/store/sync.go`                    | sync application and pending snapshot                   |
+| `backend/internal/store/sync.go`                    | sync application and bank directives                      |
 | `backend/internal/store/artifacts.go`               | bounded artifact storage                                |
 | `backend/internal/csvio/import.go`                  | canonical model CSV parsing                             |
 | `backend/internal/domain/validation.go`             | authoritative model validation                          |
@@ -602,4 +602,5 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators            |
 | `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers                  |
 | `backend/internal/simplefin/runner.go`              | fetch/map/apply orchestration and trigger guards        |
-| `backend/internal/simplefin/map.go`                 | checkpoint and pending-charge mapping                   |
+| `backend/internal/simplefin/map.go`                 | checkpoint and bank-transaction mapping                   |
+| `backend/internal/simplefin/reconcile.go`           | snapshot-to-directive lifecycle policy                  |

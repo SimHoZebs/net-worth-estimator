@@ -29,6 +29,8 @@ type Summary struct {
 	PendingDeleted      int            `json:"pendingDeleted"`
 	PendingInserted     int            `json:"pendingInserted"`
 	PendingUpdated      int            `json:"pendingUpdated"`
+	SettledConverted    int            `json:"settledConverted"`
+	SettledInserted     int            `json:"settledInserted"`
 	AccountsProvisioned int            `json:"accountsProvisioned"`
 	Skipped             map[string]int `json:"skipped"`
 }
@@ -261,8 +263,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	for _, link := range links {
 		resolved[link.BridgeAccountID] = link.ModelAccountID
 	}
-	cardsByID := r.effectiveCards()
-	plan, err := Map(set, cardsByID, resolved, now)
+	plan, err := Map(set, resolved, now)
 	if err != nil {
 		return nil, err
 	}
@@ -303,11 +304,16 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 			Balance:   checkpoint.Balance,
 		})
 	}
-	cards := make([]string, 0, len(cardsByID))
-	for accountID := range cardsByID {
-		cards = append(cards, accountID)
+	bank, err := r.store.LoadBankPostings()
+	if err != nil {
+		return nil, err
 	}
-	applied, err := r.store.ApplySyncPlan(checkpoints, plan.Pending, cards)
+	covered := make(map[string]bool, len(resolved))
+	for _, modelID := range resolved {
+		covered[modelID] = true
+	}
+	directives := Reconcile(plan.Pending, plan.Settled, bank, covered)
+	applied, err := r.store.ApplySyncPlan(checkpoints, directives)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +333,8 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		PendingDeleted:      applied.PendingDeleted,
 		PendingInserted:     applied.PendingInserted,
 		PendingUpdated:      applied.PendingUpdated,
+		SettledConverted:    applied.SettledConverted,
+		SettledInserted:     applied.SettledInserted,
 		AccountsProvisioned: provisioned,
 		Skipped:             skipped,
 	}, nil

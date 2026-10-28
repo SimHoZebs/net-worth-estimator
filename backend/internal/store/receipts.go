@@ -17,7 +17,7 @@ var (
 	ErrReceiptNotFound   = errors.New("receipt or posting not found")
 	ErrReceiptConflict   = errors.New("receipt changed; reload before retrying")
 	ErrReceiptDuplicate  = errors.New("this image is already attached to the transaction")
-	ErrReceiptIneligible = errors.New("receipts require a saved non-pending expense, not a planned purchase")
+	ErrReceiptIneligible = errors.New("receipts require a saved settled transaction")
 	ErrReceiptQuota      = errors.New("receipt storage exceeds the 100 MiB or 500-receipt plan limit")
 )
 
@@ -39,7 +39,7 @@ type ReceiptStore interface {
 }
 
 func receiptPosting(q queryer, id string) (types.Posting, error) {
-	rows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, id)
+	rows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, id)
 	if err != nil {
 		return types.Posting{}, err
 	}
@@ -212,14 +212,10 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		if err != nil {
 			return err
 		}
-		if posting.SourceAccountID == nil || len(posting.Destinations) != 0 || posting.Pending || posting.Source != SourceModel {
+		if posting.SourceAccountID == nil && len(posting.Destinations) == 0 {
 			return ErrReceiptIneligible
 		}
-		var purchases int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM purchase_policies WHERE posting_id = ? AND plan_id = :plan_id`, postingID).Scan(&purchases); err != nil {
-			return err
-		}
-		if purchases != 0 {
+		if posting.Pending || posting.Void {
 			return ErrReceiptIneligible
 		}
 		var existing string
@@ -398,4 +394,95 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 		s.application.finishBlobWrite("")
 	}
 	return err
+}
+
+func bankPostingIDs(postings []types.Posting) []string {
+	ids := make([]string, 0, len(postings))
+	for _, posting := range postings {
+		ids = append(ids, posting.ID)
+	}
+	return ids
+}
+
+type preservedReceipt struct {
+	id, postingID, digest, blobKey, payload string
+	size                                    int64
+	revision                                int64
+}
+
+// loadReceiptsForPostings snapshots receipt rows so CSV replacement can
+// restore evidence for preserved postings after row deletion cascades.
+func loadReceiptsForPostings(tx *planTx, postingIDs []string) ([]preservedReceipt, error) {
+	var out []preservedReceipt
+	for _, postingID := range postingIDs {
+		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id = ? AND plan_id = :plan_id ORDER BY id`, postingID)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var receipt preservedReceipt
+			if err := rows.Scan(&receipt.id, &receipt.postingID, &receipt.digest, &receipt.size, &receipt.blobKey, &receipt.revision, &receipt.payload); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out = append(out, receipt)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	return out, nil
+}
+
+func restoreReceipts(tx *planTx, receipts []preservedReceipt) error {
+	for _, receipt := range receipts {
+		// Row deletion cascades to receipts and queues their blobs for
+		// cleanup; reviving the reference must unqueue the object first.
+		if _, err := tx.Exec(`UPDATE blob_objects SET state = 'live', expires_at = 0 WHERE key = ?`, receipt.blobKey); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, plan_id) VALUES (?, ?, ?, ?, ?, ?, ?, :plan_id)`,
+			receipt.id, receipt.postingID, receipt.digest, receipt.size, receipt.blobKey, receipt.revision, receipt.payload); err != nil {
+			return err
+		}
+		if err := addPostingReceiptID(tx, receipt.postingID, receipt.id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// migratePostingVoidFlag adds the explicit void lifecycle flag to databases
+// created before it. No backfill runs: no void row can predate the code that
+// writes them, so the column default is already correct everywhere. It runs
+// only inside explicit SetupDatabase, before schema validation.
+func migratePostingVoidFlag(tx *sql.Tx) error {
+	rows, err := tx.Query(`PRAGMA table_info(postings)`)
+	if err != nil {
+		return err
+	}
+	hasColumn := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, kind string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &kind, &notnull, &defaultValue, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		hasColumn = hasColumn || name == "void"
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	if !hasColumn {
+		if _, err := tx.Exec(`ALTER TABLE postings ADD COLUMN void INTEGER NOT NULL DEFAULT 0 CHECK (void IN (0, 1))`); err != nil {
+			return err
+		}
+	}
+	return nil
 }

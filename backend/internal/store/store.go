@@ -89,7 +89,8 @@ type Store interface {
 	SetLastSyncTime(completedAt string) error
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
-	ApplySyncPlan(checkpoints []SyncCheckpoint, pending []SyncPosting, cardAccounts []string) (SyncApplySummary, error)
+	ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
+	LoadBankPostings() ([]BankRow, error)
 	Clear() error
 	Close() error
 }
