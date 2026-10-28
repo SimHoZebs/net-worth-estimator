@@ -20,7 +20,7 @@ type browserEndpoint struct {
 }
 
 func browserEndpoints(c Config) (map[string]browserEndpoint, error) {
-	primary, err := canonicalBrowserOrigin(c.PublicURL)
+	primary, err := canonicalBrowserOrigin(c.PublicURL, c.AllowPrivateHTTP)
 	if err != nil {
 		return nil, fmt.Errorf("primary browser app URL: %w", err)
 	}
@@ -30,11 +30,11 @@ func browserEndpoints(c Config) (map[string]browserEndpoint, error) {
 	}
 	pairs := map[string]string{primary: issuer.Scheme + "://" + issuer.Host}
 	for app, provider := range c.BrowserOrigins {
-		app, err = canonicalBrowserOrigin(app)
+		app, err = canonicalBrowserOrigin(app, c.AllowPrivateHTTP)
 		if err != nil {
 			return nil, fmt.Errorf("browser app URL: %w", err)
 		}
-		provider, err = canonicalBrowserOrigin(provider)
+		provider, err = canonicalBrowserOrigin(provider, c.AllowPrivateHTTP)
 		if err != nil {
 			return nil, fmt.Errorf("browser provider URL: %w", err)
 		}
@@ -69,8 +69,8 @@ func browserEndpoints(c Config) (map[string]browserEndpoint, error) {
 	return endpoints, nil
 }
 
-func canonicalBrowserOrigin(raw string) (string, error) {
-	if err := validateURL(raw, true); err != nil {
+func canonicalBrowserOrigin(raw string, allowPrivateHTTP bool) (string, error) {
+	if err := validateURL(raw, true, allowPrivateHTTP); err != nil {
 		return "", err
 	}
 	u, _ := url.Parse(raw)
@@ -98,28 +98,9 @@ func canonicalBrowserOrigin(raw string) (string, error) {
 }
 
 func (s *Service) browserEndpoint(r *http.Request) (browserEndpoint, bool) {
-	// A Host-preserving proxy or authenticated ingress supplies Host.
-	// Forwarded headers alone never select a redirect target.
+	// Nginx preserves Host. Forwarded headers never select a redirect target.
 	endpoint, ok := s.browsers[strings.ToLower(r.Host)]
 	return endpoint, ok
-}
-
-// ProxyOrigins returns the canonical application and provider-alias origins
-// that an authenticated ingress may select. The issuer itself is not a proxy.
-func (c Config) ProxyOrigins() ([]string, error) {
-	endpoints, err := browserEndpoints(c)
-	if err != nil {
-		return nil, err
-	}
-	origins := make([]string, 0, len(endpoints)*2)
-	issuer, _ := url.Parse(c.Issuer)
-	for _, endpoint := range endpoints {
-		origins = append(origins, endpoint.app)
-		if endpoint.provider != issuer.Scheme+"://"+issuer.Host {
-			origins = append(origins, endpoint.provider)
-		}
-	}
-	return origins, nil
 }
 
 func (s *Service) browserOAuth(endpoint browserEndpoint) oauth2.Config {
