@@ -52,7 +52,15 @@ unsupported.
 
 `api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, optional `simplefin.Runner`, and optional static frontend directory. The server always wraps plan APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
 
-The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy removes the browser `Origin` header, disables response buffering, and keeps the SSE connection open for long stochastic runs. `docker compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image.
+The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image.
+
+Frontend and API hosts can differ while the browser uses one public origin.
+The runtime's optional `internal/ingress` boundary authenticates a proxy with
+`NET_WORTH_ESTIMATOR_PROXY_SECRET` and accepts only configured public origins.
+It normalizes Host and scheme before identity, CSRF, and CORS checks. Existing
+Host-preserving proxies require no new settings. Runtime `/healthz` and `/readyz`
+probes bypass sessions and proxy credentials. Readiness checks the shared database
+connection with a two-second deadline. See [the deployment contract](deploy/README.md).
 
 ### Canonical model
 

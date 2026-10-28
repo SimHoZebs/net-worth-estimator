@@ -111,6 +111,9 @@ The split deployment has two images:
 
 Initialize Casdoor and run the split stack through the [authentication guide](auth/README.md).
 For normal development, use the [dedicated dev stack](dev/README.md).
+For independent frontend/API hosts, use the [host-portable deployment guide](deploy/README.md).
+It covers Vercel's same-origin API proxy, Render, configurable ports, authenticated
+ingress, explicit database maintenance, and host cutover without application changes.
 
 The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
 
@@ -125,8 +128,8 @@ Configure a backend service with this durable contract:
 | Setting                | Value                                                              |
 | ---------------------- | ------------------------------------------------------------------ |
 | Build                  | `backend/Dockerfile` with repository root context                  |
-| Port                   | `8787`                                                             |
-| Health check           | `GET /healthz` on port `8787`                                      |
+| Port                   | `PORT`, default `8787`; bind `HOST=0.0.0.0`                       |
+| Health checks          | readiness `GET /readyz`; liveness `GET /healthz` on `PORT`         |
 | Instances              | `1`                                                                |
 | Persistent volume      | `/data`                                                            |
 | Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`              |
