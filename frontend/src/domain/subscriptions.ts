@@ -129,6 +129,7 @@ function markAsRecurring(
 		claimRuleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
+		void: false,
 	};
 	const claimed: Movement = {
 		...source,

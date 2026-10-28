@@ -174,6 +174,7 @@ export interface BackendPosting extends HumaMetadata {
 	enabled: boolean;
 	source?: string;
 	pending?: boolean;
+	void?: boolean;
 }
 export type Posting = BackendPosting;
 

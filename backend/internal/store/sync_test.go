@@ -610,8 +610,8 @@ func TestApplySyncPlanConvertsVanishedPendingOnUniqueStrictMatch(t *testing.T) {
 	if row.ID == "" {
 		t.Fatal("conversion changed the posting UUID")
 	}
-	if row.Source != SourceModel || row.Pending || row.Enabled {
-		t.Fatalf("converted row = %+v, want settled owner row pending review", row)
+	if row.Source != SourceSimpleFIN || row.Pending || row.Void || row.Enabled {
+		t.Fatalf("converted row = %+v, want settled bank row pending review", row)
 	}
 	if row.Name != "Pending a" {
 		t.Fatalf("converted name = %q", row.Name)
@@ -681,8 +681,8 @@ func TestApplySyncPlanInsertsUnmatchedPostedAsDisabledOwnerRows(t *testing.T) {
 	if row.ID == "" {
 		t.Fatal("inserted settled row missing")
 	}
-	if row.Source != SourceModel || row.Pending || row.Enabled {
-		t.Fatalf("inserted row = %+v, want disabled owner row", row)
+	if row.Source != SourceSimpleFIN || row.Pending || row.Void || row.Enabled {
+		t.Fatalf("inserted row = %+v, want disabled settled bank row", row)
 	}
 	if _, err := uuid.Parse(row.ID); err != nil {
 		t.Fatalf("inserted identity is not a UUID: %v", row.ID)
@@ -836,11 +836,17 @@ func TestApplySyncPlanConvertsVoidRowOnLatePostedMatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pending := 0
 	for _, posting := range document.Postings {
-		if posting.Source == SourceModel {
-			continue
+		if posting.Pending {
+			pending++
 		}
-		t.Fatalf("sync-owned row remains after late conversion: %+v", posting)
+		if posting.Void {
+			t.Fatalf("void row remains after late conversion: %+v", posting)
+		}
+	}
+	if pending != 0 {
+		t.Fatalf("pending rows remain after late conversion: %+v", document.Postings)
 	}
 }
 

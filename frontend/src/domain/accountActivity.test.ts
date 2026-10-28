@@ -153,6 +153,7 @@ describe("account-scoped transactions", () => {
 			claimRuleId: null,
 			claimOccurrenceDate: null,
 			postedDate: null,
+			void: false,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
@@ -224,6 +225,7 @@ describe("account-scoped transactions", () => {
 			claimRuleId: null,
 			claimOccurrenceDate: null,
 			postedDate: null,
+			void: false,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",

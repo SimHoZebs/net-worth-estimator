@@ -520,6 +520,7 @@ function movementDisplayFromRule(
 		claimRuleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
+		void: false,
 	};
 }
 
@@ -549,7 +550,7 @@ function movementDisplayFromPosting(
 			? { purchasePriority: posting.purchase.priority }
 			: {}),
 		pending: posting.pending === true,
-		void: isSyncOwned(posting.source) && posting.pending !== true,
+		void: posting.void === true,
 	};
 }
 
