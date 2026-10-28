@@ -61,9 +61,11 @@ cached results receive no artificial delay. The UI shows a busy button and
 spinner during local requests or resumed extraction, then confirms completion.
 Unit tests use `mock.NewWithLatency(0)` or Go's virtual clock.
 
-Multiple receipts can attach to one expense. Pending charges, transfers, income,
-recurrence rules, and planned-purchase policies cannot receive new attachments.
-Receipt review remains separate from unsaved financial-plan edits.
+Multiple receipts can attach to one transaction. Pending charges cannot
+receive attachments: the next sync deletes bank-vanished pending rows, which
+would destroy the evidence. Recurrence rules and generated occurrences cannot
+receive attachments; attach to a saved transaction instead. Receipt review
+remains separate from unsaved financial-plan edits.
 
 ## Source boundary
 
