@@ -19,8 +19,9 @@ Requires Docker Compose 5.0+ and Node 24+. The data commands use
 ./scripts/dev setup
 ```
 
-Setup generates private credentials, initializes Casdoor, and takes a SQLite-safe,
-read-only production snapshot. Use `setup --from /absolute/path/backup.db` instead
+Setup generates private credentials, initializes Casdoor, and snapshots the
+stopped production database. Stop the production container first so the file
+copies cleanly. Use `setup --from /absolute/path/backup.db` instead
 to start from an existing shared-schema backup. Fresh setup copies one selected
 financial plan into the bootstrap dev account. It excludes production identity
 records and other users' plans. It starts Casdoor only if identity initialization
@@ -86,7 +87,8 @@ to another origin without an explicit identity migration.
 
 Start the stack before these operations. Each command validates the incoming
 database, stops the API for the scoped update, then starts the same API container.
-It does not build images or change production data.
+It does not build images or change production data. Without --from, the source
+is the production container: stop it first so the file copies cleanly.
 
 ```bash
 ./scripts/dev refresh-db --plan "$TARGET_PLAN" --source-plan "$SOURCE_PLAN"

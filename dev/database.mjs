@@ -1,9 +1,9 @@
 import { DatabaseSync, backup } from "node:sqlite";
 import { open, chmod, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { createReadStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
+import { runIfCli } from "./lib/entry.mjs";
 
 export const databaseName = "net-worth-estimator.db";
 
@@ -55,11 +55,13 @@ export async function snapshotFile(source, destination) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+async function cli(args) {
   process.umask(0o077);
-  const [source, destination] = process.argv.slice(2);
+  const [source, destination] = args;
   if (!source || !destination) throw new Error("Usage: snapshot.mjs SOURCE_DB DESTINATION_DB");
   const target = destination === "--stdout" ? "/tmp/snapshot.db" : destination;
   await snapshotFile(source, target);
   if (destination === "--stdout") await pipeline(createReadStream(target), process.stdout);
 }
+
+runIfCli(import.meta.url, process.argv, cli);

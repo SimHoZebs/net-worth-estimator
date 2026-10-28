@@ -16,8 +16,8 @@ import {
 import { RecurringRules } from "./RecurringRules.tsx";
 
 vi.mock("./TransactionDetail.tsx", () => ({
-	MovementDetail: ({ movement }: { movement: { name: string } }) => (
-		<p data-testid="selected-rule">{movement.name}</p>
+	TransactionDetail: ({ transaction }: { transaction: { name: string } }) => (
+		<p data-testid="selected-rule">{transaction.name}</p>
 	),
 }));
 

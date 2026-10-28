@@ -17,7 +17,9 @@ Setup adds the plan-scoped `receipts` table and `receipt-evidence-v1` migration
 record. It preserves existing financial and identity data. Runtime never repairs
 missing schema. A schema downgrade requires a compatible backup.
 
-Image bytes now use the [private blob storage port](blob-storage.md). Explicit
+Image bytes use the private blob storage port (`backend/internal/blobstore`,
+SQLite default plus filesystem adapter, lifecycle in
+`backend/internal/store/blob_storage.go`). Explicit
 setup also adds blob references and lifecycle tracking. It migrates earlier
 inline images into the default SQLite adapter and records `receipt-blobs-v1`.
 
@@ -76,21 +78,9 @@ operation state. Adapters must not send it as part of a provider's receipt input
 
 ### Extraction composition decision
 
-Keep `ReceiptExtractor` as the image-to-structured-receipt boundary. An adapter
-can use one integrated provider or compose an OCR provider with a receipt
-interpreter. OCR produces text and layout evidence. The interpreter produces
-receipt fields and can use an LLM or another parser.
-
-Add small recognizer and interpreter interfaces inside the first composed
-adapter when that implementation is needed. Those interfaces do not exist yet.
-The current mock remains an end-to-end adapter. Keep provider count and stage
-selection out of the receipt service, database, HTTP API, and UI.
-
-Both stages share the parent cancellation and deadline budget. The source
-identity must version the complete composition, including provider/model and
-interpretation prompt/schema versions, so either stage can invalidate cached
-results. All outputs still pass application validation and human review. Do not
-add a configurable pipeline framework or mandatory OCR stage.
+Keep `ReceiptExtractor` as the image-to-structured-receipt boundary; see its
+interface comment in `backend/internal/receipts/extractor.go` for the
+composition constraint (no pipeline framework, no mandatory OCR stage).
 
 ### Add a source
 
@@ -182,13 +172,13 @@ provider outage can delay removal of stored bytes. Cleanup retries after restart
 
 ### Reverse lookup
 
-Each posting row carries a stored `receipt_ids` field: the IDs of its
-receipts. Receipt creation appends and receipt deletion removes the ID in the
+Each posting row carries a stored `receipt_ids` back-reference (storage column
+only; see `scanPostingRow` in `backend/internal/store/model.go` — it never
+enters `FinancialModelDocument`, financial revisions, or projection
+identities). Receipt creation appends and receipt deletion removes the ID in the
 same transaction as the receipt row, so the field never drifts. Posting edits
 leave it untouched, posting deletion removes it with the row, and CSV
-replacement resets it with the new rows. It is a storage column only:
-`scanPostingRow` ignores it, so it never enters `FinancialModelDocument`,
-financial revisions, or projection identities.
+replacement resets it with the new rows.
 
 The financial-model response exposes it as `receiptLinks`, mapping each
 posting ID to its receipt IDs. The transaction list renders its receipt badge
@@ -215,34 +205,3 @@ NGINX_TEST_IMAGE=net-worth-frontend:main node --test scripts/nginx-receipts.test
 Use an existing local Nginx-based image for the final check. It runs an isolated,
 non-root container without network access. Do not create Docker networks during
 browser tests. The normal backend and frontend completion gates still apply.
-
-### Implementation verification — 2026-10-27
-
-Passed backend format/vet/tests, Go build, and receipt/store/API race tests.
-Passed frontend lint, typecheck, build, and 796 unit tests. All seven receipt
-browser tests passed against both dev and production frontends. Replacement
-checks cover canceled and invalid uploads, content reset, preview refresh,
-reload, deletion, and unchanged financial revisions. Concurrent image-read and
-cross-plan cleanup regressions passed 20 repeated runs with blob references. Both Nginx
-regressions passed.
-
-The [blob storage verification record](blob-storage.md#verification)
-covers both adapters, cleanup failures, private copies, and the explicit upgrade.
-
-The last full production browser run, before the loading and image-action refinements,
-passed 65 of 68 tests. The three unrelated failures also occurred on unchanged
-baseline `835f79f88a8e`:
-
-| Test assertion | Baseline failure |
-| --- | --- |
-| `frontend/tests/purchases.spec.ts:173` | The expected `Browser test` label was absent. |
-| `frontend/tests/safeSpending.spec.ts:357` | The expected empty-cycle text was absent. |
-| `frontend/tests/syncStatus.spec.ts:89` | `SimpleFIN` matched both a heading and a button. |
-
-Baseline reproduction used an isolated `git archive`, the same dependencies,
-and a production build. Only the fixture API port and database path differed.
-These failures remain outside the receipt change. The full browser completion
-gate remains partial until they are resolved.
-
-No live extraction, physical phone camera, production migration, or deployment
-was performed. Apply explicit database setup before the updated API starts.

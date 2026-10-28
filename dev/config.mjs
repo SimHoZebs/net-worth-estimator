@@ -5,6 +5,56 @@ import { settingsFromEnv } from "../auth/casdoor/generate.mjs";
 
 export const project = "waypoint-dev";
 
+export const defaultPorts = { app: 5178, casdoor: 8000, backend: 8788 };
+
+export function sanitizeSlot(slot) {
+  if (slot === undefined || slot === null || slot === "") return "";
+  if (typeof slot !== "string" || !/^[a-z0-9][a-z0-9_-]{0,31}$/.test(slot)) {
+    throw new Error("Slot names use 1–32 lowercase letters, digits, - or _");
+  }
+  return slot;
+}
+
+export function projectFor(slot) {
+  const clean = sanitizeSlot(slot);
+  return clean ? `${project}-${clean}` : project;
+}
+
+export function stateDirFor(root, slot) {
+  const clean = sanitizeSlot(slot);
+  return resolve(root, clean ? `tmp/dev-${clean}` : "tmp/dev");
+}
+
+export function envFileFor(root, slot) {
+  const clean = sanitizeSlot(slot);
+  return resolve(root, clean ? `.env.dev.${clean}` : ".env.dev");
+}
+
+export function slotFromOptions(values) {
+  return sanitizeSlot(values?.slot ?? process.env.DEV_SLOT ?? "");
+}
+
+function validPort(value, name) {
+  const port = typeof value === "string" && value !== "" ? Number(value) : value;
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error(`${name} must be a loopback port from 1024 to 65535`);
+  }
+  return port;
+}
+
+function isLoopbackOrigin(value) {
+  try {
+    const url = new URL(value);
+    return (
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+      url.protocol === "http:" &&
+      url.port !== ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function tailnetOrigins(hostname) {
   const host = hostname.toLowerCase().replace(/\.$/, "");
   if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/.test(host)) {
@@ -14,7 +64,14 @@ export function tailnetOrigins(hostname) {
 }
 
 export function originProfile(appUrl, issuerUrl) {
-  if (appUrl === "http://localhost:5178" && issuerUrl === "http://localhost:8000") return null;
+  if (isLoopbackOrigin(appUrl) && isLoopbackOrigin(issuerUrl)) {
+    const appPort = Number(new URL(appUrl).port);
+    const issuerPort = Number(new URL(issuerUrl).port);
+    validPort(appPort, "App port");
+    validPort(issuerPort, "Casdoor port");
+    if (appPort === issuerPort) throw new Error("App and Casdoor loopback ports must differ");
+    return null;
+  }
   const app = new URL(appUrl);
   const expected = tailnetOrigins(app.hostname);
   if (appUrl !== expected.APP_PUBLIC_URL || issuerUrl !== expected.CASDOOR_PUBLIC_URL) {
@@ -25,15 +82,36 @@ export function originProfile(appUrl, issuerUrl) {
   return app.hostname;
 }
 
-export function newConfig(source = { container: "net-worth-estimator" }, hostname) {
+export function newConfig(source = { container: "net-worth-estimator" }, hostname, options = {}) {
   const secret = () => randomBytes(24).toString("hex");
+  const slot = sanitizeSlot(options.slot ?? "");
+  const appPort = options.appPort ?? defaultPorts.app;
+  const casdoorPort = options.casdoorPort ?? defaultPorts.casdoor;
+  const backendPort = options.backendPort ?? defaultPorts.backend;
+  if (hostname && (slot !== "" || appPort !== defaultPorts.app || casdoorPort !== defaultPorts.casdoor)) {
+    throw new Error("Tailnet HTTPS stays on the canonical stack. Slots use loopback HTTP only.");
+  }
+  const app = hostname
+    ? tailnetOrigins(hostname).APP_PUBLIC_URL
+    : `http://localhost:${validPort(appPort, "App port")}`;
+  const issuer = hostname
+    ? tailnetOrigins(hostname).CASDOOR_PUBLIC_URL
+    : `http://localhost:${validPort(casdoorPort, "Casdoor port")}`;
+  validPort(backendPort, "Backend port");
+  if (!hostname && app === issuer) throw new Error("App and Casdoor loopback ports must differ");
   return {
     version: 1,
     source,
     ownerSubject: null,
+    slot,
+    ports: {
+      app: hostname ? defaultPorts.app : Number(new URL(app).port),
+      casdoor: hostname ? defaultPorts.casdoor : Number(new URL(issuer).port),
+      backend: Number(backendPort),
+    },
     identity: {
-      CASDOOR_PUBLIC_URL: "http://localhost:8000",
-      APP_PUBLIC_URL: "http://localhost:5178",
+      CASDOOR_PUBLIC_URL: issuer,
+      APP_PUBLIC_URL: app,
       AUTH_CLIENT_ID: "waypoint-dev",
       AUTH_CLIENT_SECRET: secret(),
       CASDOOR_ADMIN_PASSWORD: secret(),
@@ -48,6 +126,7 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
 
 export function settings(config) {
   if (config.version !== 1) throw new Error("Unsupported dev configuration version");
+  sanitizeSlot(config.slot ?? "");
   if (
     config.ownerSubject !== undefined &&
     config.ownerSubject !== null &&
@@ -75,14 +154,55 @@ export function settings(config) {
   }
   const result = settingsFromEnv(config.identity);
   originProfile(result.appUrl, result.publicUrl);
+  if (config.ports !== undefined) {
+    if (typeof config.ports !== "object" || config.ports === null) {
+      throw new Error("Dev ports must map app, casdoor, and backend to loopback ports");
+    }
+    const app = validPort(config.ports.app, "App port");
+    const casdoor = validPort(config.ports.casdoor, "Casdoor port");
+    const backend = validPort(config.ports.backend, "Backend port");
+    if (app === casdoor) throw new Error("App and Casdoor loopback ports must differ");
+    if (config.slot) {
+      const parsedApp = isLoopbackOrigin(result.appUrl) ? Number(new URL(result.appUrl).port) : null;
+      const parsedIssuer = isLoopbackOrigin(result.publicUrl)
+        ? Number(new URL(result.publicUrl).port)
+        : null;
+      if (parsedApp !== app || parsedIssuer !== casdoor) {
+        throw new Error("Slot ports must match the slot identity URLs");
+      }
+    }
+  }
   return result;
+}
+
+export function portsFor(config) {
+  if (config.ports) {
+    return {
+      app: validPort(config.ports.app, "App port"),
+      casdoor: validPort(config.ports.casdoor, "Casdoor port"),
+      backend: validPort(config.ports.backend, "Backend port"),
+    };
+  }
+  if (isLoopbackOrigin(config.identity.APP_PUBLIC_URL) && isLoopbackOrigin(config.identity.CASDOOR_PUBLIC_URL)) {
+    return {
+      app: Number(new URL(config.identity.APP_PUBLIC_URL).port),
+      casdoor: Number(new URL(config.identity.CASDOOR_PUBLIC_URL).port),
+      backend: defaultPorts.backend,
+    };
+  }
+  return { ...defaultPorts };
 }
 
 export function composeEnvironment(config) {
   settings(config);
+  const ports = portsFor(config);
   return {
     DEV_UID: String(process.getuid()),
     DEV_GID: String(process.getgid()),
+    DEV_PROJECT: projectFor(config.slot ?? ""),
+    DEV_FRONTEND_PORT: String(ports.app),
+    DEV_CASDOOR_PORT: String(ports.casdoor),
+    DEV_BACKEND_DEBUG_PORT: String(ports.backend),
     DEV_APP_PUBLIC_URL: config.identity.APP_PUBLIC_URL,
     DEV_CASDOOR_PUBLIC_URL: config.identity.CASDOOR_PUBLIC_URL,
     DEV_AUTH_CLIENT_ID: config.identity.AUTH_CLIENT_ID,
@@ -91,16 +211,20 @@ export function composeEnvironment(config) {
   };
 }
 
-export async function writeComposeEnv(config, path) {
+export async function writeComposeEnv(config, path, stateDir) {
+  const env = composeEnvironment(config);
+  if (stateDir) env.DEV_SLOT_STATE_DIR = stateDir;
+  const slot = sanitizeSlot(config.slot ?? "");
+  const configRef = slot ? `tmp/dev-${slot}/config.json` : "tmp/dev/config.json";
   const contents =
-    "# Generated by scripts/dev setup from tmp/dev/config.json. Do not commit.\n" +
-    Object.entries(composeEnvironment(config))
+    `# Generated by scripts/dev setup from ${configRef}. Do not commit.\n` +
+    Object.entries(env)
       .map(([name, value]) => `${name}='${value.replaceAll("'", "\\'")}'\n`)
       .join("");
   try {
     if ((await readFile(path, "utf8")) !== contents)
       throw new Error(
-        "Existing .env.dev differs from saved setup settings. Preserve it and reconcile the settings before setup.",
+        `Existing ${path.split("/").pop()} differs from saved setup settings. Preserve it and reconcile the settings before setup.`,
       );
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -122,7 +246,7 @@ export async function saveConfig(stateDir, config) {
   }
 }
 
-export async function loadConfig(stateDir, create, source, hostname) {
+export async function loadConfig(stateDir, create, source, hostname, options = {}) {
   try {
     const config = JSON.parse(await readFile(resolve(stateDir, "config.json"), "utf8"));
     settings(config);
@@ -131,11 +255,26 @@ export async function loadConfig(stateDir, create, source, hostname) {
         "Existing dev identities use another origin. Preserve their state and migrate the registered URLs before changing profiles. See dev/README.md.",
       );
     }
+    const wantSlot = sanitizeSlot(options.slot ?? config.slot ?? "");
+    if (sanitizeSlot(config.slot ?? "") !== wantSlot) {
+      throw new Error("Slot state belongs to another slot. Use its own --slot name.");
+    }
+    for (const key of ["appPort", "casdoorPort", "backendPort"]) {
+      if (options[key] !== undefined) {
+        const ports = portsFor(config);
+        const current = key === "appPort" ? ports.app : key === "casdoorPort" ? ports.casdoor : ports.backend;
+        if (Number(options[key]) !== current) {
+          throw new Error(
+            "Slot ports are fixed at creation. Delete the slot state or pick a new --slot name.",
+          );
+        }
+      }
+    }
     return config;
   } catch (error) {
     if (error.code !== "ENOENT" || !create) throw error;
   }
-  const config = newConfig(source, hostname);
+  const config = newConfig(source, hostname, options);
   await saveConfig(stateDir, config);
   return config;
 }

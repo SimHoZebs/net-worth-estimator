@@ -1,5 +1,5 @@
 import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
-import { formatRuleDetail, RuleTogglePill } from "./RuleTogglePill.tsx";
+import { formatRuleDetail, TogglePill } from "./TogglePill.tsx";
 
 export function IncomeSourcesFieldset({
 	income,
@@ -18,7 +18,7 @@ export function IncomeSourcesFieldset({
 					{income.candidates.map((rule) => {
 						const checked = income.selectedRuleIds.includes(rule.id);
 						return (
-							<RuleTogglePill
+							<TogglePill
 								key={rule.id}
 								name={rule.name}
 								detail={formatRuleDetail({ amount: rule.amount })}

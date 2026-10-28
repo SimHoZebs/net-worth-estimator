@@ -9,7 +9,7 @@ export function typographyWarnings(path: string, source: string): string[] {
 	const warnings: string[] = [];
 	const warn = (property: string, line = 1) =>
 		warnings.push(
-			`${path}:${line}: warning typography-owner: Use shared typography roles instead of local ${property} (src/styles/README.md).`,
+			`${path}:${line}: warning typography-owner: Use shared typography roles instead of local ${property} (src/styles/typography.css).`,
 		);
 	if (path.endsWith(".css")) {
 		postcss.parse(source, { from: path }).walkDecls((declaration) => {

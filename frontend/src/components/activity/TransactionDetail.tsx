@@ -90,12 +90,6 @@ function DirectionIcon({
 	return <Icon size={size} aria-hidden="true" />;
 }
 
-function directionKindFor(movement: Movement): "in" | "out" | "transfer" {
-	if (movement.fromId && movement.toId) return "transfer";
-	if (movement.toId && !movement.fromId) return "in";
-	return "out";
-}
-
 function accountFor(
 	accounts: AccountRef[],
 	id: string | null,
@@ -709,6 +703,13 @@ export function TransactionDetail({
 		showShortfall ||
 		movement.amountKnown === false ||
 		(!movement.enabled && !transaction.pending && !showExcluded);
+	// Formula-driven rules without a resolved figure carry no amount to show:
+	// the Calculated badge says it all. Real zero-amount occurrences always
+	// carry a requested figure or shortfall, so they still render.
+	const showAmount =
+		movement.amountKnown ||
+		transaction.amount !== 0 ||
+		transaction.requested !== 0;
 	const editHeading = (
 		<>
 			<span className="sr-only">{edit.draft.name}</span>
@@ -769,45 +770,47 @@ export function TransactionDetail({
 							</span>
 						)}
 					</div>
-					<div className="flex items-center gap-4 pt-1 pb-2">
-						<div className="flex min-w-0 flex-1 flex-col gap-1">
-							<span
-								className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
-							>
+					{showAmount && (
+						<div className="flex items-center gap-4 pt-1 pb-2">
+							<div className="flex min-w-0 flex-1 flex-col gap-1">
 								<span
-									className="flex-none whitespace-nowrap"
-									aria-hidden="true"
+									className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
 								>
-									{transaction.amount === 0
-										? "$"
-										: `${transaction.direction === "in" ? "+" : "−"}$`}
+									<span
+										className="flex-none whitespace-nowrap"
+										aria-hidden="true"
+									>
+										{transaction.amount === 0
+											? "$"
+											: `${transaction.direction === "in" ? "+" : "−"}$`}
+									</span>
+									<input
+										id={`${edit.formId}-amount`}
+										aria-label="Amount (USD)"
+										name="amount"
+										type="number"
+										required
+										min="0.01"
+										max="10000000000"
+										step="0.01"
+										value={
+											movement.amountKnown
+												? edit.draft.amount
+												: String(transaction.amount)
+										}
+										onChange={(event) =>
+											edit.updateDraft({ amount: event.target.value }, "amount")
+										}
+										readOnly={!canEdit}
+										className={transactionControlStyles({
+											shape: "amount",
+											positive: transaction.direction === "in",
+										})}
+									/>
 								</span>
-								<input
-									id={`${edit.formId}-amount`}
-									aria-label="Amount (USD)"
-									name="amount"
-									type="number"
-									required
-									min="0.01"
-									max="10000000000"
-									step="0.01"
-									value={
-										movement.amountKnown
-											? edit.draft.amount
-											: String(transaction.amount)
-									}
-									onChange={(event) =>
-										edit.updateDraft({ amount: event.target.value }, "amount")
-									}
-									readOnly={!canEdit}
-									className={transactionControlStyles({
-										shape: "amount",
-										positive: transaction.direction === "in",
-									})}
-								/>
-							</span>
+							</div>
 						</div>
-					</div>
+					)}
 					<div className="mt-3 flex flex-wrap items-center gap-2">
 						{transaction.pending ? (
 							<Badge tone="warning">
@@ -1007,323 +1010,6 @@ export function TransactionDetail({
 				{once && (
 					<ReceiptPanel postingId={movement.id} readOnly={plan.readOnly} />
 				)}
-			</Modal>
-		</DetailPortal>
-	);
-}
-
-/**
- * Read-friendly view of a plan rule (no single occurrence date). Used by the
- * plan list and the recurring tab where the row represents the rule itself.
- * Every value is always its own control: read mode is an attribute flip
- * (readOnly/disabled plus armed styling), so clicking a value edits it in
- * place with no component swap.
- */
-export function MovementDetail({
-	movement,
-	accounts,
-	plan,
-	resolvedAmount,
-	claimRuleName,
-	onClose,
-}: {
-	movement: Movement;
-	accounts: AccountRef[];
-	plan: Plan;
-	resolvedAmount?: number;
-	resolvedDate?: string;
-	claimRuleName?: string | null;
-	onClose: () => void;
-}) {
-	const kind = directionKindFor(movement);
-	const edit = useMovementEdit({ movement, plan, onClose });
-	const once = movement.frequency === "once";
-	const canEdit = !edit.readOnlyReason;
-	const postedDiffers =
-		movement.postedDate !== null &&
-		movement.postedDate !== edit.draft.startDate;
-	const fromAccount = accountFor(accounts, edit.draft.fromId || null);
-	const toAccount = accountFor(accounts, edit.draft.toId || null);
-	const editHeading = (
-		<>
-			<span className="sr-only">{edit.draft.name}</span>
-			<span className="flex items-center gap-3">
-				<span
-					className={movementIconStyles({
-						tone:
-							kind === "transfer"
-								? "transfer"
-								: kind === "in"
-									? "inflow"
-									: "outflow",
-						size: "hero",
-					})}
-				>
-					<DirectionIcon kind={kind} size={22} />
-				</span>
-				<span className="text-xs font-semibold tracking-widest text-muted uppercase">
-					Transaction details
-				</span>
-			</span>
-		</>
-	);
-	return (
-		<DetailPortal>
-			<Modal
-				title={editHeading}
-				titleSize="plain"
-				headerClassName="border-b-0 pb-0"
-				actions={edit.actions}
-				onClose={edit.close}
-				focusPanelOnOpen
-			>
-				<form id={edit.formId} onSubmit={edit.submit}>
-					<div className="flex items-center gap-3">
-						<input
-							id={`${edit.formId}-name`}
-							aria-label="Transaction name"
-							name="name"
-							required
-							maxLength={100}
-							value={edit.draft.name}
-							onChange={(event) =>
-								edit.updateDraft({ name: event.target.value }, "name")
-							}
-							readOnly={!canEdit}
-							form={edit.formId}
-							className={transactionControlStyles({ shape: "name" })}
-						/>
-						{movement.frequency !== "once" && (
-							<span
-								title="Recurring transaction"
-								aria-label="Recurring transaction"
-								role="img"
-								className="inline-flex size-9 flex-none items-center justify-center rounded-surface bg-surface-2 text-muted"
-							>
-								<Repeat size={16} aria-hidden="true" />
-							</span>
-						)}
-					</div>
-					{(movement.amountKnown ||
-						resolvedAmount !== undefined ||
-						once ||
-						postedDiffers) && (
-						<div className="flex items-center gap-4 pt-1 pb-2">
-							{(movement.amountKnown || resolvedAmount !== undefined) && (
-								<div className="flex min-w-0 flex-1 flex-col gap-1">
-									<span className="type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap">
-										<span
-											className="flex-none whitespace-nowrap"
-											aria-hidden="true"
-										>
-											$
-										</span>
-										<input
-											id={`${edit.formId}-amount`}
-											aria-label="Amount (USD)"
-											name="amount"
-											type="number"
-											required
-											min="0.01"
-											max="10000000000"
-											step="0.01"
-											value={
-												movement.amountKnown
-													? edit.draft.amount
-													: String(resolvedAmount)
-											}
-											onChange={(event) =>
-												edit.updateDraft(
-													{ amount: event.target.value },
-													"amount",
-												)
-											}
-											readOnly={!canEdit}
-											className={transactionControlStyles({ shape: "amount" })}
-										/>
-									</span>
-									{movement.amountKnown && (
-										<span className="text-xs text-muted">Per occurrence</span>
-									)}
-								</div>
-							)}
-							{(once || postedDiffers) && (
-								<div className="mt-5 flex min-w-0 flex-1 flex-col gap-1 border-t border-line pt-2">
-									{once && (
-										<MetaRow icon={CalendarDays} label="Transaction date">
-											<input
-												className={transactionControlStyles({ shape: "date" })}
-												id={`${edit.formId}-date`}
-												type="date"
-												name="startDate"
-												required
-												value={edit.draft.startDate}
-												onChange={(event) =>
-													edit.updateDraft(
-														{ startDate: event.target.value },
-														"schedule",
-													)
-												}
-												readOnly={!canEdit}
-											/>
-										</MetaRow>
-									)}
-									{postedDiffers && (
-										<MetaRow icon={CalendarCheck2} label="Date posted">
-											<input
-												className={transactionControlStyles({ shape: "date" })}
-												id={`${edit.formId}-posted`}
-												type="date"
-												name="postedDate"
-												required
-												value={edit.draft.postedDate}
-												onChange={(event) =>
-													edit.updateDraft(
-														{ postedDate: event.target.value },
-														"posted",
-													)
-												}
-												readOnly={!canEdit}
-											/>
-										</MetaRow>
-									)}
-								</div>
-							)}
-						</div>
-					)}
-					<div className="mt-3 flex flex-wrap items-center gap-2">
-						{movement.readOnly && <Badge tone="neutral">Synced</Badge>}
-						{movement.amountKnown === false && (
-							<Badge tone="neutral">Calculated</Badge>
-						)}
-						{!movement.enabled && <Badge tone="warning">Excluded</Badge>}
-						{(movement.readOnly ||
-							movement.amountKnown === false ||
-							!movement.enabled) && (
-							<span className="text-muted" aria-hidden="true">
-								·
-							</span>
-						)}
-						<span className="text-sm text-muted">{categoryLabel(kind)}</span>
-					</div>
-					{kind === "transfer" && (
-						<div className="mt-5">
-							<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>
-							<div className="rounded-surface bg-surface-2 p-4">
-								<div className="flex items-center gap-3">
-									{fromAccount ? (
-										<AccountIcon account={fromAccount} />
-									) : (
-										<span className="inline-flex size-8 flex-none items-center justify-center rounded-surface border border-line bg-surface text-muted">
-											<Banknote size={15} aria-hidden="true" />
-										</span>
-									)}
-									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
-										<span
-											className="text-xs font-semibold tracking-wide text-muted"
-											aria-hidden="true"
-										>
-											FROM ACCOUNT
-										</span>
-										<select
-											id={`${edit.formId}-from`}
-											aria-label="From"
-											name="fromId"
-											value={edit.draft.fromId}
-											onChange={(event) =>
-												edit.updateDraft({ fromId: event.target.value }, "from")
-											}
-											disabled={!canEdit}
-											className={transactionControlStyles({
-												element: "select",
-												shape: "account",
-												appearance:
-													edit.activeField === "from" ? "native" : "plain",
-											})}
-										>
-											<option value="">External income</option>
-											<AccountOptions accounts={fromAccountOptions(plan)} />
-										</select>
-									</div>
-								</div>
-								<div
-									className="my-2 ml-3 flex items-center gap-3 text-muted"
-									aria-hidden="true"
-								>
-									<ArrowDown size={16} />
-									<span className="h-px flex-auto bg-line" />
-								</div>
-								<div className="flex items-center gap-3">
-									{toAccount ? (
-										<AccountIcon account={toAccount} />
-									) : (
-										<span className="inline-flex size-8 flex-none items-center justify-center rounded-surface border border-line bg-surface text-muted">
-											<Banknote size={15} aria-hidden="true" />
-										</span>
-									)}
-									<div className="flex min-w-0 flex-auto flex-col gap-0.5">
-										<span
-											className="text-xs font-semibold tracking-wide text-muted"
-											aria-hidden="true"
-										>
-											TO ACCOUNT
-										</span>
-										<select
-											id={`${edit.formId}-to`}
-											aria-label="To"
-											name="toId"
-											value={edit.draft.toId}
-											onChange={(event) =>
-												edit.updateDraft({ toId: event.target.value }, "to")
-											}
-											disabled={!canEdit}
-											className={transactionControlStyles({
-												element: "select",
-												shape: "account",
-												appearance:
-													edit.activeField === "to" ? "native" : "plain",
-											})}
-										>
-											<option value="">External spending</option>
-											<AccountOptions
-												accounts={visibleAccounts(plan.accounts)}
-											/>
-										</select>
-									</div>
-								</div>
-							</div>
-						</div>
-					)}
-					<ScheduleCapsule
-						draft={edit.draft}
-						updateDraft={edit.updateDraft}
-						claimRuleName={claimRuleName}
-						editing={edit.activeField === "schedule"}
-						locked={!canEdit}
-						scheduleControlId={`${edit.formId}-schedule`}
-					/>
-					<MarkAsSubscriptionAction
-						movement={movement}
-						plan={plan}
-						locked={!canEdit}
-						onDone={onClose}
-					/>
-					<MoreOptions
-						movement={movement}
-						plan={plan}
-						draft={edit.draft}
-						updateDraft={edit.updateDraft}
-						locked={!canEdit}
-					/>
-					{edit.error && <ErrorNotice message={edit.error} />}
-					{edit.confirmCancel && (
-						<DiscardConfirm
-							onContinue={() => edit.setConfirmCancel(false)}
-							onDiscard={edit.discardAndClose}
-						/>
-					)}
-					<ReadOnlyNotice movement={movement} />
-				</form>
 			</Modal>
 		</DetailPortal>
 	);

@@ -281,6 +281,11 @@ func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 }
 
 func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
+	// postings.receipt_ids is a storage-only back-reference. It is never
+	// selected here, so it cannot enter FinancialModelDocument, financial
+	// revisions, or projection identities; the API exposes it separately as
+	// receiptLinks. Creation/deletion maintain it in the same transaction as
+	// the receipt row (see addPostingReceiptID/removePostingReceiptID).
 	var posting types.Posting
 	var sourceAccountID, claimRuleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string

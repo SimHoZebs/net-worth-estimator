@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Badge } from "../../components/Badge.tsx";
 import { EmptyState } from "../../components/EmptyState.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
-import { MovementDetail } from "../../components/activity/TransactionDetail.tsx";
+import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
+import { movementRuleTransaction } from "../../domain/accountActivity.ts";
 import {
 	transactionAmountStyles,
 	transactionBadgeStyles,
@@ -139,12 +140,15 @@ export function MovementsPanel({
 				})}
 			</TransactionTable>
 			{selected && (
-				<MovementDetail
+				<TransactionDetail
+					transaction={movementRuleTransaction({
+						movement: selected,
+						plan,
+						resolved: selectedResolved,
+					})}
 					movement={selected}
 					accounts={accounts}
 					plan={plan}
-					resolvedAmount={selectedResolved?.amount}
-					resolvedDate={selectedResolved?.date}
 					claimRuleName={selectedClaimRuleName}
 					onClose={() => setSelectedId(null)}
 				/>

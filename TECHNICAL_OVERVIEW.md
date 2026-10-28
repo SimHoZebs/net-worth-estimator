@@ -30,8 +30,9 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 Receipt evidence has its own plan-scoped storage and a provider-neutral extraction
 interface. Images and metadata never enter `FinancialModelDocument` or projection
 identity. See [receipt contracts and source adapters](docs/receipts.md).
-Image bytes also have a separate [blob storage port](docs/blob-storage.md), with
-SQLite and filesystem adapters, private references, and durable cleanup.
+Image bytes also have a separate blob storage port (`backend/internal/blobstore`,
+with SQLite and filesystem adapters, private references, and durable cleanup
+in `backend/internal/store/blob_storage.go`).
 
 `store.Database` owns the shared connection. Each financial store holds one
 immutable plan ID. The plan router creates that scope only after Casdoor verifies
@@ -193,7 +194,7 @@ The identity boundary checks session and plan permissions for all plan reads, wr
 - `POST`, `PATCH`, `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`;
 - `POST /v1/sync/simplefin` and link writes under `/v1/sync/simplefin/accounts`.
 
-The kill switch rejects those writes with 403. Guests can read and project only the separate sample. Shared bearer tokens and unauthenticated server startup are unsupported in dev and production. The server rejects the retired `AUTH_TOKEN` setting before opening financial storage.
+The kill switch rejects those writes with 403. Guests can read and project only the separate sample. Shared bearer tokens and unauthenticated server modes are unsupported in dev and production.
 
 ## 3. Persistence
 
@@ -268,7 +269,7 @@ The current schema stores:
 
 ### First boot and import
 
-The authenticated plan router initializes a blank private plan on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected plan's model state in one transaction.
+The authenticated plan router initializes a blank private plan on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected plan's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
 
 `cmd/importcsv` requires both an existing shared database and an explicit existing plan resource ID. It invokes the same import path for operator-controlled replacement within that plan.
 
@@ -290,7 +291,9 @@ Amount presets are saved amount recipes managed through `GET /v1/amount-presets`
 
 Persisted postings use canonical UUIDs; the store generates UUIDv7 IDs when the
 caller supplies none. Sources with non-UUID posting IDs are unsupported, with no
-upgrade path. See [the posting identity contract](docs/posting-identity.md).
+upgrade path. Exact upstream `(provider, account_id, transaction_id)` identity
+lives in `posting_sync_keys`, separate from local posting IDs (see
+`postingSyncKey` in `backend/internal/store/sync_pending.go`).
 
 ### Artifact durability
 
@@ -321,6 +324,7 @@ Consequences:
 - a seed is part of stochastic identity;
 - unseeded stochastic runs are not content-addressed;
 - result identities are backend-owned and have no cross-runtime compatibility requirement.
+- projection payloads keep dates as strings, `projectionStartPostingState` as a plain JSON object, and evaluation `deterministic`/`probabilistic` values as arbitrary JSON.
 
 ## 5. Model Semantics
 
@@ -330,6 +334,7 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 
 - `NoFloor` is `-1e13`.
 - `NoCeiling` is `+1e13`.
+- CSV accepts `Infinity` and `-Infinity` only as import spellings for those bounds.
 - A source can withdraw only `max(0, balance - minBalance)`.
 - A destination can receive only `max(0, maxBalance - balance)`.
 - Bounds are structural constraints, not labels or categories.
@@ -539,11 +544,19 @@ Samples are created sequentially from one sampler. Worker completion order does 
 
 The seed controls the state sequence. Run-count normalization and seed-null behavior are part of the artifact and sharing contract.
 
+### Numeric precision
+
+`golden_test.go` compares numeric goldens with relative-scaled tolerance `1e-9 * max(max(abs(expected), abs(actual)), 1)` across deterministic projection, checkpoint replay, paycheck rule-chain resolution, and seeded stochastic bands, milestones, and evaluations. Tighten it only with matching evidence across all covered fixtures.
+
+A non-null seed produces the established 31-bit linear-congruential sequence `(state * 1664525 + 1013904223)` computed in `float64`, reduced modulo `2^32` and masked with `0x7fffffff`; uniforms are `state / 0x7fffffff`. Sampling consumes two uniforms per variable annual rate with the established log-normal transform (see `sampler.go`).
+
+Two rounding rules stay explicit: deterministic public currency, fulfillment amounts, and evaluation summaries use `math.Round` (halves away from zero); stochastic net-worth samples use `mathRound(value) = math.Floor(value + 0.5)` (halves toward positive infinity). Currency summaries multiply by 100, round, and divide by 100. A change to a negative half value is a contract change.
+
 ## 11. SimpleFIN Flow
 
 `internal/simplefin` is configured once in `cmd/server`:
 
-- The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`. The old `NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL` and `NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS` environment variables are retired.
+- The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
 - Account links live in the `account_links` table.
 - Card selection is stored per plan in `sync_credentials` and selects model accounts eligible for pending-charge seeds.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.

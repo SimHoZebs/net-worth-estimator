@@ -11,7 +11,7 @@ import type {
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { IncomeSourcesFieldset } from "./IncomeSourcesFieldset.tsx";
-import { formatRuleDetail, RuleTogglePill } from "./RuleTogglePill.tsx";
+import { formatRuleDetail, TogglePill } from "./TogglePill.tsx";
 
 export function SafeSpendingConfigurePanel({
 	config,
@@ -138,7 +138,7 @@ export function SafeSpendingConfigurePanel({
 				{billCandidates.length ? (
 					<div className="flex flex-wrap gap-2">
 						{billCandidates.map((bill) => (
-							<RuleTogglePill
+							<TogglePill
 								key={bill.id}
 								name={bill.name}
 								detail={formatRuleDetail({ amount: bill.amount })}
