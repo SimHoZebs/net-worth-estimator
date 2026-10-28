@@ -1,5 +1,11 @@
 import { defineConfig } from "orval";
 
+// Transport contract per operation: plan requests verify resource identity
+// and cancel on scope change; identity requests precede verification;
+// streams return the live resource-guarded Response; logout returns a
+// Response so local state clears first. New identity operations or streams
+// need a backend OpenAPI contract plus an override below, then a call from a
+// query or mutation.
 export default defineConfig({
 	waypoint: {
 		input: "./openapi.snapshot.json",

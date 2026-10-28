@@ -1,2 +1,2 @@
 #!/bin/sh
-exec node "$(dirname "$0")/../dev/run.mjs" "$@"
+exec node "$(dirname "$0")/../dev/main.mjs" "$@"

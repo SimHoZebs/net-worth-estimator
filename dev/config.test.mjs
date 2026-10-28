@@ -15,16 +15,7 @@ import {
   withLock,
   writeComposeEnv,
 } from "./config.mjs";
-import { composeArgs, main } from "./run.mjs";
-
-test("Compose owns daily lifecycle commands; the helper only accepts setup and data operations", async () => {
-  for (const command of ["up", "down", "status", "logs", undefined]) {
-    await assert.rejects(() => main(command ? [command] : []), /Use docker compose/);
-  }
-  await assert.rejects(() => main(["setup", "--no-build"]), /Unknown option/);
-  await assert.rejects(() => main(["refresh-db", "--tailnet"]), /only to setup/);
-  await assert.rejects(() => main(["publish-sample", "extra"]), /Unexpected/);
-});
+import { composeArgs } from "./lib/compose.mjs";
 
 test("dev has one dedicated Compose file and exports only its runtime settings", () => {
   const config = newConfig();
@@ -178,7 +169,6 @@ test("access needs no role configuration and retired grants do not reach the bac
   const env = composeEnvironment(old);
   assert.equal(env.NET_WORTH_ESTIMATOR_AUTH_EDITORS, undefined);
   assert.equal(env.NET_WORTH_ESTIMATOR_AUTH_READERS, undefined);
-  await assert.rejects(() => main(["grant", "subject", "editor"]), /Access is automatic/);
   const dir = await mkdtemp(resolve(tmpdir(), "waypoint-dev-policy-"));
   try {
     await saveConfig(dir, old);

@@ -1,4 +1,11 @@
 import { create } from "zustand";
+// State owner derives from the data's authority and lifetime, not its
+// reader count. Saved model, pins, budget settings, projections, and
+// mutation status live in TanStack Query (resource-scoped keys; scope
+// changes cancel queries and clear private data). The shared unsaved plan,
+// comparison baseline, theme, and projection controls live in Zustand here.
+// Unsubmitted fields, selections, and pagination stay local. New server
+// state gets a resource-scoped query and mutation, never a second cache.
 import {
 	ApiHttpError,
 	displayPlanToBackendDocument,

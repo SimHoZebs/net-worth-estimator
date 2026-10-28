@@ -56,7 +56,7 @@ payments. Public movement evidence and fulfillment evaluations use the same
 assessment. It checks every movement, regardless of configured evaluation
 selection or enablement. It retains the
 destination-ceiling distinction. Protection uses exact residual amounts, even
-below the existing 0.5 threshold used to display public shortfall reports.
+below the 0.5 threshold used to display public shortfall reports.
 Existing earlier gaps remain visible. The queue may resume after those gaps
 when replenished funds protect all later established payments.
 
@@ -76,5 +76,5 @@ full candidate simulations, not an optimizer.
 `purchase_policies` stores the optional priority beside its owning posting.
 The foreign key cascades posting deletion and replacement. Schema creation adds
 the table to existing current-shape databases without changing posting columns.
-Canonical JSON exports and browser drafts preserve the policy. Legacy model CSVs
+Canonical JSON exports and browser drafts preserve the policy. Model CSVs
 do not represent it.

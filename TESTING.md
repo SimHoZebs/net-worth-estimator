@@ -19,14 +19,25 @@ See [dev/README.md](dev/README.md).
 Dev setup checks: `node --test dev/*.test.mjs auth/casdoor/*.test.mjs`.
 Configuration checks require the Docker Compose CLI, but no running daemon.
 
+Parallel agents use isolated slots instead of stopping the canonical stack or
+stealing its ports. Setup picks three free loopback ports, clones the canonical
+plan database when one exists, and prints the slot URLs plus the exact Compose
+invocation. State lives in `tmp/dev-<slot>/`, the env file is
+`.env.dev.<slot>`, and the Compose project is `waypoint-dev-<slot>`. Slots are
+loopback-only: `--tailnet` stays on the canonical stack.
+
+```bash
+scripts/dev setup --slot shots
+docker compose --env-file .env.dev.shots -f docker-compose.dev.yml up -d --build --wait
+docker compose --env-file .env.dev.shots -f docker-compose.dev.yml down
+scripts/dev ps-all
+```
+
 Posting UUID migration and exact upstream identity checks:
 
 ```bash
 CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api
 ```
-
-See [the posting identity contract](docs/posting-identity.md) for upgrade, backup,
-reference preservation, and rollback behavior.
 
 ## Frontend Gates
 
@@ -42,7 +53,16 @@ npm --prefix frontend run build
 
 `typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
 
-Font roles follow `frontend/src/styles/README.md`. `npm --prefix frontend run lint:typography` warns about font choices outside the shared owner without failing the command. The normal lint gate also runs it. Unit tests cover the lint rule's detection logic, not exact fonts, role classes, or rendered sizes.
+Refresh the checked-in OpenAPI snapshot without a running server or financial data:
+
+```bash
+OPENAPI_SNAPSHOT="$PWD/frontend/openapi.snapshot.json" CGO_ENABLED=0 \
+  go -C backend test ./internal/api -run TestRawRoutesAppearInOpenAPI -count=1
+npm --prefix frontend run format -- openapi.snapshot.json
+npm --prefix frontend run api:generate
+```
+
+Font roles live in `frontend/src/styles/typography.css`. `npm --prefix frontend run lint:typography` warns about font choices outside the shared owner without failing the command. The normal lint gate also runs it. Unit tests cover the lint rule's detection logic, not exact fonts, role classes, or rendered sizes.
 
 `npm --prefix frontend run lint:styles` enforces Tailwind's spacing scale in JSX classes, typed recipes, and CSS declarations. It also rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. `npm --prefix frontend run lint:fix` normalizes literal spacing values to that scale. Runtime variables, chart geometry, native state selectors, and calculated layout constraints remain valid.
 
@@ -71,8 +91,7 @@ transport, API, permissions, and SQLite remain real. See
 Nginx upload-limit regression.
 
 Blob adapter conformance and receipt storage failure checks live under
-`backend/internal/blobstore/` and `backend/internal/store/`. See
-[private blob storage verification](docs/blob-storage.md#verification).
+`backend/internal/blobstore/` and `backend/internal/store/`.
 
 To exercise the production build instead of the dev server:
 
