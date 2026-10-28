@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 // sessionStore implements SCS storage. Session tokens are hashed at rest.
@@ -22,7 +22,7 @@ func openSessions(path string) (*sessionStore, error) {
 	if path == "" {
 		return nil, errors.New("sessions require the application database")
 	}
-	database, err := store.OpenDatabase(path)
+	database, err := sqlite.OpenDatabase(path)
 	if err != nil {
 		return nil, err
 	}

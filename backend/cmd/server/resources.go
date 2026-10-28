@@ -10,7 +10,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/plans"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 type resourceConfig struct {
@@ -31,7 +31,7 @@ func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	return c, nil
 }
 
-func resourceHandler(ctx context.Context, database *store.Database, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, func() error, error) {
+func resourceHandler(ctx context.Context, database *sqlite.Database, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, func() error, error) {
 	permissions, err := authorization.New(authorization.Config{
 		Issuer: loginConfig.Issuer, InternalURL: loginConfig.InternalURL,
 		ClientID: loginConfig.ClientID, ClientSecret: loginConfig.ClientSecret, ModelID: config.ModelID,
@@ -65,7 +65,7 @@ func resourceHandler(ctx context.Context, database *store.Database, config resou
 
 // The subject comes only from a verified identity grant. Casdoor must authorize
 // the derived resource before this boundary provisions any private state.
-func planAccessResolver(database *store.Database, issuer string, resolve func(context.Context, string) (authorization.Scope, error)) func(context.Context, string) (authorization.Scope, error) {
+func planAccessResolver(database *sqlite.Database, issuer string, resolve func(context.Context, string) (authorization.Scope, error)) func(context.Context, string) (authorization.Scope, error) {
 	return func(ctx context.Context, subject string) (authorization.Scope, error) {
 		scope, err := resolve(ctx, subject)
 		if err != nil {

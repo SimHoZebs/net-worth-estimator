@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 
 // deploymentHandler owns the public ingress and infrastructure probes. Identity
 // and API handlers receive the same request shape on every hosting provider.
-func deploymentHandler(next http.Handler, database *sql.DB, config identity.Config, secret string) (http.Handler, error) {
+func deploymentHandler(next http.Handler, database interface{ PingContext(context.Context) error }, config identity.Config, secret string) (http.Handler, error) {
 	origins, err := config.ProxyOrigins()
 	if err != nil {
 		return nil, err

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 // initialize publishes a new, private dev database only after its selected
@@ -51,7 +51,7 @@ func initialize(target, source, sourcePlan, issuer, subject string) error {
 			os.Remove(temporary + suffix)
 		}
 	}()
-	db, err := store.SetupDatabase(temporary)
+	db, err := sqlite.SetupDatabase(temporary)
 	if err != nil {
 		return err
 	}

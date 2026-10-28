@@ -18,6 +18,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/ingress"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 // Artifact storage has a longer lifetime than its attached HTTP stream. Signal
@@ -45,7 +46,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			p := newIDP(t)
 			path := filepath.Join(t.TempDir(), "app.db")
-			database, err := store.SetupDatabase(path)
+			database, err := sqlite.SetupDatabase(path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -83,7 +84,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			}
 			edge.StartTLS()
 			t.Cleanup(edge.Close)
-			startBackend := func(database *store.Database) *httptest.Server {
+			startBackend := func(database *sqlite.Database) *httptest.Server {
 				t.Helper()
 				login := newService(t, p, "", func(c *Config) {
 					c.Database, c.PublicURL, c.RequireResourceHeader = database.SQL(), publicURL, true
@@ -204,7 +205,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			if err := database.Close(); err != nil {
 				t.Fatal(err)
 			}
-			reopened, err := store.OpenDatabase(path)
+			reopened, err := sqlite.OpenDatabase(path)
 			if err != nil {
 				t.Fatal(err)
 			}

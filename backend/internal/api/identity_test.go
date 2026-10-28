@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestCapabilitiesDriveReadOnlyStatusWithoutIdentityFallback(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "model.db"))
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "model.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestCapabilitiesDriveReadOnlyStatusWithoutIdentityFallback(t *testing.T) {
 }
 
 func TestBareAPIStatusForFixtureHarness(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "model.db"))
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "model.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

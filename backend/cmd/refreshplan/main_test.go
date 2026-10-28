@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestFailedSampleCopyIsAtomic(t *testing.T) {
@@ -26,7 +26,7 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 			before := sampleRows(t, target)
 			// A malformed snapshot passes shape checks but fails the destination's
 			// deferred foreign-key constraint at commit, after every row copy.
-			db, err := store.OpenDatabase(source)
+			db, err := sqlite.OpenDatabase(source)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -51,7 +51,7 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 			if !bytes.Equal(sourceBefore, sourceAfter) {
 				t.Fatal("source snapshot changed")
 			}
-			db, err = store.OpenDatabase(target)
+			db, err = sqlite.OpenDatabase(target)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -72,7 +72,7 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 
 func sampleRows(t *testing.T, path string) string {
 	t.Helper()
-	db, err := store.OpenDatabase(path)
+	db, err := sqlite.OpenDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func sampleRows(t *testing.T, path string) string {
 
 func seed(t *testing.T, path string) {
 	t.Helper()
-	db, err := store.SetupDatabase(path)
+	db, err := sqlite.SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func seed(t *testing.T, path string) {
 
 func query(t *testing.T, path, sql string, args ...any) string {
 	t.Helper()
-	db, err := store.OpenDatabase(path)
+	db, err := sqlite.OpenDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestRefreshPreservesOtherPlansAndIdentity(t *testing.T) {
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
 	seed(t, target)
-	sourceDB, err := store.OpenDatabase(source)
+	sourceDB, err := sqlite.OpenDatabase(source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestSamplePublicationStripsPrivateHistory(t *testing.T) {
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
 	seed(t, target)
-	db, err := store.OpenDatabase(source)
+	db, err := sqlite.OpenDatabase(source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 			t.Fatal("unsafe operation accepted", args)
 		}
 	}
-	db, err := store.OpenDatabase(target)
+	db, err := sqlite.OpenDatabase(target)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 	if got := query(t, target, "SELECT name FROM accounts WHERE plan_id='plans/owner'"); got != "owner" {
 		t.Fatal("transaction did not roll back", got)
 	}
-	db, err = store.OpenDatabase(target)
+	db, err = sqlite.OpenDatabase(target)
 	if err != nil {
 		t.Fatal(err)
 	}
