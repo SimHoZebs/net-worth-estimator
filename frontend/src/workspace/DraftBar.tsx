@@ -43,7 +43,7 @@ export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
 					<strong className="text-xs">
 						{loading
 							? "Updating unsaved changes…"
-							: `${count} unsaved ${count === 1 ? "change" : "changes"} · saved plan unchanged`}
+							: `${count} unsaved ${count === 1 ? "change" : "changes"} · not saved yet`}
 					</strong>
 				</span>
 			</div>

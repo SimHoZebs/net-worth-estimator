@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -30,7 +30,7 @@ func TestRequiresExplicitDatabaseAndPlan(t *testing.T) {
 
 func TestScopedImportPreservesOtherPlanAndIdentity(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shared.db")
-	db, err := store.SetupDatabase(path)
+	db, err := sqlite.SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
