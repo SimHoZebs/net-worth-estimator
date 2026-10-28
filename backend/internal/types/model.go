@@ -205,8 +205,11 @@ type Posting struct {
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
 	// Owner writes cannot set it.
 	Pending bool `json:"pending,omitempty"`
-	// Source names the row owner: "model" (owner/seed) or "simplefin".
-	// Read-only on GET; PUT ignores it (server recomputes ownership).
+	// Source names the row author: "model" for owner-authored rows,
+	// "simplefin" for bank-reported rows. Authorship never changes after
+	// creation. Owner writes may touch settled bank rows but never live
+	// pending or void rows; the sync may touch pending and void rows but
+	// never settled ones.
 	Source string `json:"source,omitempty"`
 	// ExecutionOrder breaks equal-time ties independently of identity and display
 	// position. The store assigns it on create and preserves it on owner updates.
