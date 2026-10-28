@@ -156,7 +156,7 @@ async function setup(config, sourcePlan) {
   const fresh = !(await exists(destination));
   if (!fresh && validateSnapshot(destination) !== "application") {
     throw new Error(
-      "Existing dev database requires offline migration. Preserve its identity and plan files, migrate with cmd/migratedb to a new path, then install the reviewed result explicitly.",
+      "Existing dev database is a legacy format without migration support. Back it up, delete it, and run setup again.",
     );
   }
   const bootstrapPath = resolve(identityDir, "bootstrap.json");
@@ -179,13 +179,13 @@ async function setup(config, sourcePlan) {
   }
   if (!config.ownerSubject)
     throw new Error(
-      "Set the verified Bridge ownerSubject in tmp/dev/config.json. Plan ownership comes from the application database and its migration manifest.",
+      "Set the verified Bridge ownerSubject in tmp/dev/config.json. Plan ownership comes from the application database.",
     );
   if (fresh) {
     const incoming = await snapshot(config);
     if (validateSnapshot(incoming) !== "application")
       throw new Error(
-        `Legacy snapshot saved at ${incoming}. Use setup --manifest with explicit source ownership to migrate it first.`,
+        `Legacy snapshot saved at ${incoming} has no migration path. Use a current application database instead.`,
       );
     const helper = resolve(stateDir, "refreshplan");
     run("go", ["-C", "backend", "build", "-o", helper, "./cmd/refreshplan"]);
@@ -217,7 +217,6 @@ export async function main(args) {
     allowPositionals: true,
     options: {
       from: { type: "string" },
-      manifest: { type: "string" },
       plan: { type: "string" },
       "source-plan": { type: "string" },
       tailnet: { type: "boolean" },
@@ -227,7 +226,7 @@ export async function main(args) {
   const [command] = positionals;
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db | --manifest migration.json] [--source-plan SOURCE_ID] | refresh-db --plan PLAN_ID --source-plan SOURCE_ID [--from migrated-app.db] | publish-sample --source-plan SOURCE_ID [--from approved-app.db]",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-plan SOURCE_ID] | refresh-db --plan PLAN_ID --source-plan SOURCE_ID [--from migrated-app.db] | publish-sample --source-plan SOURCE_ID [--from approved-app.db]",
     );
     return;
   }
@@ -249,7 +248,7 @@ export async function main(args) {
       : undefined;
     const config = await loadConfig(stateDir, command === "setup", source, hostname);
     if (command === "setup") {
-      if ((source || values.manifest) && (await exists(resolve(stateDir, "data", databaseName)))) {
+      if (source && (await exists(resolve(stateDir, "data", databaseName)))) {
         throw new Error(
           "Dev data already exists. Use refresh-db --plan PLAN_ID --source-plan SOURCE_ID --from to replace only the selected financial scope.",
         );
@@ -258,22 +257,6 @@ export async function main(args) {
         throw new Error(
           "Dev data already exists. Select a plan through refresh-db instead of setup.",
         );
-      if (values.manifest) {
-        const directory = resolve(stateDir, "snapshots");
-        await mkdir(directory, { recursive: true, mode: 0o700 });
-        const migrated = resolve(directory, `migrated-${Date.now()}-${randomUUID()}.db`);
-        run("go", [
-          "-C",
-          "backend",
-          "run",
-          "./cmd/migratedb",
-          "--manifest",
-          resolve(values.manifest),
-          "--db",
-          migrated,
-        ]);
-        source = { file: migrated };
-      }
       if (source) {
         config.source = source;
         await saveConfig(stateDir, config);
@@ -289,7 +272,7 @@ export async function main(args) {
       });
       if (validateSnapshot(incoming) !== "application")
         throw new Error(
-          "Migrate the source snapshot with cmd/migratedb first. Refresh never imports an unscoped legacy database.",
+          "Legacy source snapshots have no migration path. Refresh only imports current application databases.",
         );
       const destination = resolve(stateDir, "data", databaseName);
       const backupDir = resolve(stateDir, "backups");
@@ -327,8 +310,6 @@ export async function main(args) {
 }
 
 export function validateOperation(command, values) {
-  if (values.manifest && (command !== "setup" || values.from))
-    throw new Error("--manifest applies only to setup and cannot combine with --from");
   if (command === "setup" && values.plan)
     throw new Error(
       "--plan applies only to refresh-db; setup binds a new plan to its verified dev identity",

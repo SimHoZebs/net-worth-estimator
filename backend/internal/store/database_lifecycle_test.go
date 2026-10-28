@@ -35,7 +35,7 @@ func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 		want      error
 	}{
 		{"empty", "", ErrSetupRequired},
-		{"legacy", `CREATE TABLE accounts(id TEXT PRIMARY KEY); INSERT INTO accounts VALUES ('private')`, ErrMigrationRequired},
+		{"legacy", `CREATE TABLE accounts(id TEXT PRIMARY KEY); INSERT INTO accounts VALUES ('private')`, ErrLegacyDatabase},
 		{"marker-only", `CREATE TABLE schema_migrations(name TEXT PRIMARY KEY); INSERT INTO schema_migrations VALUES ('shared-plans-v1')`, ErrSetupRequired},
 		{"missing-identity", `DROP TABLE sessions`, ErrSetupRequired},
 		{"missing-groups", `DROP TABLE group_members`, ErrSetupRequired},
@@ -229,7 +229,7 @@ func TestSetupDatabaseRejectsLegacyWithoutChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d, err := SetupDatabase(path); !errors.Is(err, ErrMigrationRequired) {
+	if d, err := SetupDatabase(path); !errors.Is(err, ErrLegacyDatabase) {
 		if d != nil {
 			d.Close()
 		}

@@ -25,7 +25,7 @@ The resource ID derives from the exact OIDC issuer and immutable subject, not
 the display name, username, email, or browser input. A new account starts with
 an editable blank private plan with no import or administrator approval step.
 The plan router activates the empty model on first access. Initialization never
-replaces existing financial rows. Offline migration assigns existing data to its
+replaces existing financial rows. Existing data stays with its
 verified owner. There is no first-login claim of existing data.
 
 Casdoor stores the model, roles, and action/resource rules in its SQLite state.
@@ -96,16 +96,12 @@ unauthenticated server configurations fail closed at startup.
 
 Before an existing authenticated deployment starts the new code:
 
-1. Stop API writes and sync. Back up every legacy database and Casdoor state.
-2. Map each source database to its verified owner or approved sample resource.
-3. Run the explicit offline migration into a new shared application database.
-4. Validate the migration report before switching `NET_WORTH_ESTIMATOR_DB`.
-5. Retain the existing Casdoor issuer, subjects, model, roles, and permissions.
-6. Verify guest, owner, second-account, denial, and provider-outage cases.
+1. Stop API writes and sync. Back up the application database and Casdoor state.
+2. Retain the existing Casdoor issuer, subjects, model, roles, and permissions.
+3. Verify guest, owner, second-account, denial, and provider-outage cases.
 
-See [the shared database migration guide](shared-database.md) for the manifest,
-validation, backup, and rollback procedure. Runtime startup rejects legacy
-unscoped financial databases. It never merges files or guesses an owner.
+See [the shared database guide](shared-database.md) for backup and rollback.
+Runtime startup rejects legacy unscoped financial databases. It never merges files or guesses an owner.
 
 No source update automatically publishes private data or changes live Casdoor
 permissions. Existing reader/editor environment lists no longer define access.

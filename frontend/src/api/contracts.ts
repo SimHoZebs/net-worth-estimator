@@ -522,6 +522,8 @@ export interface FinancialModelResponse extends HumaMetadata {
 	document: FinancialModelDocument | null;
 	issues: ModelValidationIssue[];
 	revision?: string;
+	/** Stored reverse lookup: posting ID to its receipt IDs. */
+	receiptLinks?: Record<string, string[]>;
 }
 
 export type ModelResponse = FinancialModelResponse;

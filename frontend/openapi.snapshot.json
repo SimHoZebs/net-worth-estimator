@@ -556,6 +556,25 @@
 				"required": ["deletedId"],
 				"type": "object"
 			},
+			"Delete-receiptResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Delete-receiptResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"deletedId": {
+						"type": "string"
+					}
+				},
+				"required": ["deletedId"],
+				"type": "object"
+			},
 			"DeterministicOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -978,6 +997,31 @@
 				"required": ["modelAccountId"],
 				"type": "object"
 			},
+			"List-receiptsResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/List-receiptsResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"extractionAvailable": {
+						"type": "boolean"
+					},
+					"receipts": {
+						"items": {
+							"$ref": "#/components/schemas/Receipt"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["receipts", "extractionAvailable"],
+				"type": "object"
+			},
 			"LogoutResponse": {
 				"additionalProperties": false,
 				"properties": {
@@ -1226,6 +1270,15 @@
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
 						"type": ["array", "null"]
+					},
+					"receiptLinks": {
+						"additionalProperties": {
+							"items": {
+								"type": "string"
+							},
+							"type": ["array", "null"]
+						},
+						"type": "object"
 					},
 					"revision": {
 						"type": "string"
@@ -1847,6 +1900,253 @@
 				"required": ["priority"],
 				"type": "object"
 			},
+			"Receipt": {
+				"additionalProperties": false,
+				"properties": {
+					"confirmed": {
+						"$ref": "#/components/schemas/ReceiptDetails"
+					},
+					"confirmedProvenance": {
+						"$ref": "#/components/schemas/ReceiptProvenance"
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"digest": {
+						"type": "string"
+					},
+					"draft": {
+						"$ref": "#/components/schemas/ReceiptDetails"
+					},
+					"draftProvenance": {
+						"$ref": "#/components/schemas/ReceiptProvenance"
+					},
+					"extraction": {
+						"$ref": "#/components/schemas/ReceiptExtraction"
+					},
+					"extractionStartedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"filename": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"mediaType": {
+						"type": "string"
+					},
+					"postingFingerprint": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"problem": {
+						"$ref": "#/components/schemas/ReceiptProblem"
+					},
+					"revision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"size": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"stale": {
+						"type": "boolean"
+					},
+					"status": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"postingId",
+					"filename",
+					"mediaType",
+					"size",
+					"digest",
+					"createdAt",
+					"revision",
+					"status",
+					"postingFingerprint",
+					"stale"
+				],
+				"type": "object"
+			},
+			"ReceiptDetails": {
+				"additionalProperties": false,
+				"properties": {
+					"currency": {
+						"maxLength": 3,
+						"type": "string"
+					},
+					"date": {
+						"maxLength": 10,
+						"type": "string"
+					},
+					"discountCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					},
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/ReceiptItem"
+						},
+						"maxItems": 200,
+						"type": ["array", "null"]
+					},
+					"merchant": {
+						"maxLength": 200,
+						"type": "string"
+					},
+					"subtotalCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					},
+					"taxCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					},
+					"tipCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					},
+					"totalCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					}
+				},
+				"required": [
+					"merchant",
+					"date",
+					"currency",
+					"totalCents",
+					"subtotalCents",
+					"taxCents",
+					"tipCents",
+					"discountCents",
+					"items"
+				],
+				"type": "object"
+			},
+			"ReceiptExtraction": {
+				"additionalProperties": false,
+				"properties": {
+					"confidence": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"details": {
+						"$ref": "#/components/schemas/ReceiptDetails"
+					},
+					"diagnostics": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"provenance": {
+						"$ref": "#/components/schemas/ReceiptProvenance"
+					}
+				},
+				"required": ["details", "provenance", "confidence", "diagnostics"],
+				"type": "object"
+			},
+			"ReceiptItem": {
+				"additionalProperties": false,
+				"properties": {
+					"category": {
+						"maxLength": 80,
+						"type": "string"
+					},
+					"description": {
+						"maxLength": 300,
+						"type": "string"
+					},
+					"quantity": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"totalCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					},
+					"unitPriceCents": {
+						"format": "int64",
+						"type": ["integer", "null"]
+					}
+				},
+				"required": [
+					"description",
+					"quantity",
+					"unitPriceCents",
+					"totalCents",
+					"category"
+				],
+				"type": "object"
+			},
+			"ReceiptOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ReceiptOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"diagnostics": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"receipt": {
+						"$ref": "#/components/schemas/Receipt"
+					}
+				},
+				"required": ["receipt", "diagnostics"],
+				"type": "object"
+			},
+			"ReceiptProblem": {
+				"additionalProperties": false,
+				"properties": {
+					"code": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"retryAfterSeconds": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"retryable": {
+						"type": "boolean"
+					}
+				},
+				"required": ["code", "message", "retryable"],
+				"type": "object"
+			},
+			"ReceiptProvenance": {
+				"additionalProperties": false,
+				"properties": {
+					"producer": {
+						"type": "string"
+					},
+					"simulated": {
+						"type": "boolean"
+					},
+					"version": {
+						"type": "string"
+					}
+				},
+				"required": ["producer", "version", "simulated"],
+				"type": "object"
+			},
 			"RecurrenceRule": {
 				"additionalProperties": false,
 				"properties": {
@@ -1939,6 +2239,33 @@
 					}
 				},
 				"required": ["revision"],
+				"type": "object"
+			},
+			"Review-receiptRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Review-receiptRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"confirm": {
+						"type": "boolean"
+					},
+					"details": {
+						"$ref": "#/components/schemas/ReceiptDetails"
+					},
+					"revision": {
+						"format": "int64",
+						"minimum": 1,
+						"type": "integer"
+					}
+				},
+				"required": ["revision", "details", "confirm"],
 				"type": "object"
 			},
 			"RowResultBodyAccount": {
@@ -2368,7 +2695,12 @@
 						"type": "integer"
 					}
 				},
-				"required": ["readOnly", "syncConfigured", "syncQuotaUsed", "syncQuotaLimit"],
+				"required": [
+					"readOnly",
+					"syncConfigured",
+					"syncQuotaUsed",
+					"syncQuotaLimit"
+				],
 				"type": "object"
 			},
 			"StochasticConfig": {
@@ -3724,6 +4056,51 @@
 				"summary": "Replace one posting"
 			}
 		},
+		"/v1/postings/{id}/receipts": {
+			"get": {
+				"operationId": "list-receipts",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/List-receiptsResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List private receipt evidence for a saved posting"
+			}
+		},
 		"/v1/projections/deterministic": {
 			"post": {
 				"operationId": "project-deterministic",
@@ -3794,6 +4171,372 @@
 						"description": "Success"
 					}
 				}
+			}
+		},
+		"/v1/receipts": {
+			"post": {
+				"operationId": "attach-receipt",
+				"requestBody": {
+					"content": {
+						"multipart/form-data": {
+							"encoding": {
+								"image": {
+									"contentType": "image/jpeg,image/png"
+								}
+							},
+							"schema": {
+								"properties": {
+									"image": {
+										"contentMediaType": "application/octet-stream",
+										"format": "binary",
+										"type": "string"
+									},
+									"postingId": {
+										"maxLength": 100,
+										"type": "string"
+									}
+								},
+								"required": ["postingId", "image"],
+								"type": "object"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Attach a private receipt image"
+			}
+		},
+		"/v1/receipts/{id}": {
+			"delete": {
+				"operationId": "delete-receipt",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Delete-receiptResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete private receipt evidence"
+			},
+			"get": {
+				"operationId": "get-receipt",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read receipt evidence and review details"
+			},
+			"patch": {
+				"operationId": "review-receipt",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Review-receiptRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Save or confirm reviewed receipt details"
+			}
+		},
+		"/v1/receipts/{id}/extract": {
+			"post": {
+				"operationId": "extract-receipt",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Extract receipt evidence using the configured source"
+			}
+		},
+		"/v1/receipts/{id}/image": {
+			"get": {
+				"operationId": "get-receipt-image",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "download",
+						"schema": {
+							"default": false,
+							"type": "boolean"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"image/jpeg": {
+								"schema": {
+									"contentMediaType": "application/octet-stream",
+									"format": "binary",
+									"type": "string"
+								}
+							},
+							"image/png": {
+								"schema": {
+									"contentMediaType": "application/octet-stream",
+									"format": "binary",
+									"type": "string"
+								}
+							}
+						},
+						"description": "Private receipt pixels"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read a private receipt image"
+			},
+			"put": {
+				"operationId": "replace-receipt-image",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"multipart/form-data": {
+							"encoding": {
+								"image": {
+									"contentType": "image/jpeg,image/png"
+								}
+							},
+							"schema": {
+								"properties": {
+									"image": {
+										"contentMediaType": "application/octet-stream",
+										"format": "binary",
+										"type": "string"
+									},
+									"revision": {
+										"format": "int64",
+										"minimum": 1,
+										"type": "integer"
+									}
+								},
+								"required": ["revision", "image"],
+								"type": "object"
+							}
+						}
+					}
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace receipt image and clear receipt content"
 			}
 		},
 		"/v1/recurrence-rules": {

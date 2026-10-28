@@ -6,7 +6,11 @@ import {
 } from "@/auth/resourceScope.ts";
 import { ApiHttpError, ApiNetworkError } from "@/api/http.ts";
 import { ResourceScopeError } from "@/api/scopedRequest.ts";
-import { waypointFetch } from "@/api/waypoint-fetch.ts";
+import { waypointBlobFetch, waypointFetch } from "@/api/waypoint-fetch.ts";
+import {
+	attachReceipt,
+	replaceReceiptImage,
+} from "@/api/generated/endpoints.ts";
 
 const A = `plans/${"a".repeat(64)}`;
 
@@ -64,6 +68,74 @@ it("sends the verified scope header and parses JSON", async () => {
 	expect(String(request?.url)).toBe("/v1/status");
 	expect(new Headers(request?.init?.headers).get("Waypoint-Resource")).toBe(A);
 	expect(request?.init?.credentials).toBe("same-origin");
+});
+
+it("uses the scoped binary transport for private receipt pixels", async () => {
+	const fetcher = vi.fn(
+		async (_url: unknown, _options?: RequestInit) =>
+			new Response(new Uint8Array([1, 2, 3]), {
+				headers: { "Content-Type": "image/png", "Waypoint-Resource": A },
+			}),
+	);
+	vi.stubGlobal("fetch", fetcher);
+	const result = await waypointBlobFetch<{ data: Blob }>(
+		"/v1/receipts/example/image",
+	);
+	expect(result.data.type).toBe("image/png");
+	expect([...new Uint8Array(await result.data.arrayBuffer())]).toEqual([
+		1, 2, 3,
+	]);
+	expect(
+		new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("Waypoint-Resource"),
+	).toBe(A);
+});
+
+it("generates a real file part and a scalar posting ID for receipt uploads", async () => {
+	const seen: RequestInit[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, options?: RequestInit) => {
+			seen.push(options ?? {});
+			return response({ receipt: { id: "receipt" }, diagnostics: [] });
+		}),
+	);
+	const image = new File(["pixels"], "receipt.png", { type: "image/png" });
+	await attachReceipt({ image, postingId: "posting" });
+	const data = seen[0]?.body as FormData;
+	expect(data.get("postingId")).toBe("posting");
+	expect(data.get("image")).toBeInstanceOf(File);
+	expect(new Headers(seen[0]?.headers).has("Content-Type")).toBe(false);
+});
+
+it("sends a replacement image with its scalar conflict revision", async () => {
+	const seen: RequestInit[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, options?: RequestInit) => {
+			seen.push(options ?? {});
+			return response({ receipt: { id: "receipt" }, diagnostics: [] });
+		}),
+	);
+	await replaceReceiptImage("receipt", {
+		image: new File(["pixels"], "new.png", { type: "image/png" }),
+		revision: 4,
+	});
+	expect(seen[0]?.method).toBe("PUT");
+	const data = seen[0]?.body as FormData;
+	expect(data.get("revision")).toBe("4");
+	expect(data.get("image")).toBeInstanceOf(File);
+	expect(new Headers(seen[0]?.headers).has("Content-Type")).toBe(false);
+});
+
+it("does not expose binary receipt content after a resource change", async () => {
+	const fetcher = vi.fn(async () => {
+		suspendResourceScope();
+		return new Response("private", { headers: { "Waypoint-Resource": A } });
+	});
+	vi.stubGlobal("fetch", fetcher);
+	await expect(
+		waypointBlobFetch("/v1/receipts/example/image"),
+	).rejects.toBeInstanceOf(ResourceScopeError);
 });
 
 it("refuses generated requests without a verified workspace", async () => {

@@ -27,15 +27,3 @@ test("publication explicitly selects reviewed source and cannot redirect its pub
     validateOperation("setup", { from: "shared.db", "source-plan": "plans/reviewed-owner" }),
   );
 });
-
-test("legacy setup migration uses an explicit manifest and a fresh destination", () => {
-  assert.doesNotThrow(() => validateOperation("setup", { manifest: "/approved/migration.json" }));
-  assert.throws(
-    () => validateOperation("setup", { manifest: "migration.json", from: "source.db" }),
-    /cannot combine/,
-  );
-  assert.throws(
-    () => validateOperation("refresh-db", { manifest: "migration.json" }),
-    /only to setup/,
-  );
-});

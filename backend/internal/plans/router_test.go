@@ -244,7 +244,7 @@ func TestServerBridgeCredentialsStayInConfiguredOwnersPlan(t *testing.T) {
 	}
 }
 
-func TestLegacyUnscopedDatabaseRequiresExplicitMigration(t *testing.T) {
+func TestLegacyUnscopedDatabaseRejected(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
 	legacy, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -263,7 +263,7 @@ func TestLegacyUnscopedDatabaseRequiresExplicitMigration(t *testing.T) {
 		database.Close()
 		t.Fatal("runtime accepted an unscoped legacy database")
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "migration") {
-		t.Fatalf("legacy database lacks explicit migration error: %v", err)
+	if !strings.Contains(strings.ToLower(err.Error()), "legacy") {
+		t.Fatalf("legacy database lacks explicit rejection error: %v", err)
 	}
 }

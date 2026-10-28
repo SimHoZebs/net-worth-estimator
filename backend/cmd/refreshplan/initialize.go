@@ -95,7 +95,7 @@ func selectSourcePlan(path, selected string) (string, error) {
 	}
 	rows, err := db.Query("SELECT id FROM plans WHERE kind='private' ORDER BY id LIMIT 2")
 	if err != nil {
-		return "", fmt.Errorf("source requires a migrated application database: %w", err)
+		return "", fmt.Errorf("source must be a current application database: %w", err)
 	}
 	defer rows.Close()
 	var ids []string

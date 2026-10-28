@@ -59,6 +59,21 @@ Run it from a stopped dev server on 5178, or it will reuse yours and test the wr
 
 If another dev server uses 5178, set `TEST_FRONTEND_PORT=5179` to give the browser suite its own frontend port.
 
+If another fixture API uses 8799, set `TEST_API_PORT=18899`. The harness uses a
+port-specific database under `/tmp/opencode/`. Set `CI=1` to reject existing
+servers instead of reusing them.
+
+Receipt upload, image replacement, deletion, review, extraction fallback,
+provenance, reload, read-only, keyboard dismissal, and mobile accessibility checks live in
+`frontend/tests/receipts.spec.ts`. The mock replaces only extraction. The generated
+transport, API, permissions, and SQLite remain real. See
+[receipt verification](docs/receipts.md#verification) for scoped checks and the
+Nginx upload-limit regression.
+
+Blob adapter conformance and receipt storage failure checks live under
+`backend/internal/blobstore/` and `backend/internal/store/`. See
+[private blob storage verification](docs/blob-storage.md#verification).
+
 To exercise the production build instead of the dev server:
 
 ```bash
@@ -93,15 +108,10 @@ files alone do not prove row-level isolation.
 
 ```bash
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/dbmigration
 backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api
 ```
-
-Migration tests use disposable legacy sources and a new destination. They verify
-source immutability, failed-import cleanup, ownership validation, private sync
-identities, and application sessions. See [the migration guide](docs/shared-database.md).
 
 Test fixtures provision through `store.SetupDatabase` before runtime opens. Startup
 regressions verify that missing, empty, and incompatible databases create no files

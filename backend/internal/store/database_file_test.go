@@ -90,7 +90,7 @@ func TestLegacyRejectionPreservesSourcePermissions(t *testing.T) {
 	if err := os.Chmod(path, 0640); err != nil {
 		t.Fatal(err)
 	}
-	if d, err := OpenDatabase(path); !errors.Is(err, ErrMigrationRequired) {
+	if d, err := OpenDatabase(path); !errors.Is(err, ErrLegacyDatabase) {
 		if d != nil {
 			d.Close()
 		}
@@ -119,7 +119,7 @@ func TestSharedDatabaseRejectsSymlinkPaths(t *testing.T) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	for _, open := range []func(string) (*Database, error){OpenDatabase, SetupDatabase} {
+	for _, open := range []func(string, ...DatabaseOption) (*Database, error){OpenDatabase, SetupDatabase} {
 		if d, err := open(link); err == nil {
 			d.Close()
 			t.Fatal("followed database symlink")
@@ -134,7 +134,7 @@ func TestSharedDatabaseRejectsSymlinkPaths(t *testing.T) {
 	if err := os.Symlink(realDir, linkedDir); err != nil {
 		t.Fatal(err)
 	}
-	for _, open := range []func(string) (*Database, error){OpenDatabase, SetupDatabase} {
+	for _, open := range []func(string, ...DatabaseOption) (*Database, error){OpenDatabase, SetupDatabase} {
 		if d, err := open(filepath.Join(linkedDir, "new.db")); err == nil {
 			d.Close()
 			t.Fatal("followed parent directory symlink")
@@ -160,7 +160,7 @@ func TestSharedDatabaseRejectsSidecarSymlink(t *testing.T) {
 	if err := os.Symlink(target, path+"-wal"); err != nil {
 		t.Fatal(err)
 	}
-	for _, open := range []func(string) (*Database, error){OpenDatabase, SetupDatabase} {
+	for _, open := range []func(string, ...DatabaseOption) (*Database, error){OpenDatabase, SetupDatabase} {
 		if d, err := open(path); err == nil {
 			d.Close()
 			t.Fatal("followed sidecar symlink")

@@ -27,6 +27,12 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 
 ### Shared persistence and ownership
 
+Receipt evidence has its own plan-scoped storage and a provider-neutral extraction
+interface. Images and metadata never enter `FinancialModelDocument` or projection
+identity. See [receipt contracts and source adapters](docs/receipts.md).
+Image bytes also have a separate [blob storage port](docs/blob-storage.md), with
+SQLite and filesystem adapters, private references, and durable cleanup.
+
 `store.Database` owns the shared connection. Each financial store holds one
 immutable plan ID. The plan router creates that scope only after Casdoor verifies
 access. `app_accounts` identifies users by immutable issuer and subject. Private
@@ -39,8 +45,8 @@ sync state, default presets, and artifact eviction operate within one plan.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
-Casdoor retains its own external provider database. Legacy per-plan files require
-[explicit offline migration](docs/shared-database.md).
+Casdoor retains its own external provider database. Legacy per-plan files are
+unsupported.
 
 ## 2. HTTP Contracts
 
@@ -225,8 +231,8 @@ Identity initialization also validates its tables without DDL. SQLite can create
 normal WAL/SHM sidecars during operation.
 
 Schema changes are transactional and forward-only. Completed upgrades are recorded
-in `schema_migrations`. Legacy unscoped databases require explicit offline migration.
-Restore a database backup before a downgrade.
+in `schema_migrations`. Legacy unscoped databases are rejected. Restore a
+compatible database backup instead of downgrading.
 
 The current schema stores:
 
@@ -243,6 +249,9 @@ The current schema stores:
 | `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |
 | `postings`               | ordered UUID posting definitions with owner and explicit pending state                                        |
 | `purchase_policies`      | plan-scoped purchase priorities attached to posting identities                                                |
+| `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
+| `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
+| `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
 | `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
 | `evaluations`            | type, plan-scoped instance ID, order, label, enablement, and JSON config                                      |
@@ -277,14 +286,11 @@ Each row write runs one transaction: validate the resulting document, then inser
 
 Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical document: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
 
-### Posting identity upgrade
+### Posting identity
 
-The previous release's single-plan upgrade converts every
-non-UUID posting ID, rewrites amount/evaluation/preset references, preserves row
-display order, equal-time execution order, and purchase policies, and removes derived simulation results. Account
-and recurrence-rule IDs remain unchanged. The shared database importer requires
-that compatible source schema. Upgrade older backups with the previous release
-before the offline shared migration. See [the migration contract](docs/posting-identity.md).
+Persisted postings use canonical UUIDs; the store generates UUIDv7 IDs when the
+caller supplies none. Sources with non-UUID posting IDs are unsupported, with no
+upgrade path. See [the posting identity contract](docs/posting-identity.md).
 
 ### Artifact durability
 

@@ -4,6 +4,12 @@
 with isolated dev storage, loopback ports, and external sync disabled. Compose
 owns the container lifecycle. It does not load the production Compose files.
 
+Receipt extraction uses a local mock adapter with no cloud credentials or
+external calls. Upload the [synthetic sample](../backend/internal/receipts/adapters/mock/testdata/market.png)
+to a saved expense to exercise extraction. Other images support manual review.
+See [receipt setup and source contracts](../docs/receipts.md). Production snapshots
+and private plan refreshes now include receipt images and review data.
+
 ## One-time setup
 
 Requires Docker Compose 5.0+ and Node 24+. The data commands use
@@ -25,13 +31,11 @@ requires the existing complete schema and never creates or repairs a database.
 
 If the source contains several private plans, supply `--source-plan "$SOURCE_PLAN"`.
 If the source contains exactly one private plan, setup selects it automatically.
-For legacy files, use `setup --manifest /private/migration.json` with the
-[explicit migration manifest](../docs/shared-database.md#manifest-version-1).
-Setup migrates into a private intermediate before it copies the selected financial scope.
+Legacy files are unsupported.
 
 For an existing dev stack, run the same setup command once. It preserves saved
 credentials, issuer URLs, plan ownership, financial data, and sessions. Legacy dev
-databases require offline migration before setup can continue. Setup
+databases are unsupported; delete the dev database and run setup again. Setup
 exports runtime settings to the ignored `.env.dev` file without restarting services.
 
 `tmp/dev/config.json` retains setup credentials and the snapshot source. `.env.dev`
@@ -102,7 +106,7 @@ Bridge links, upstream sync keys, sync times, migration history, and the source
 path. Later private edits do not change the sample.
 
 Use verified resource IDs for `TARGET_PLAN` and `SOURCE_PLAN`. The source must
-use the shared application schema. Migrate legacy backups first. The commands
+use the shared application schema. Legacy backups are unsupported. The commands
 require explicit selection because one source snapshot can contain several owners.
 
 ## Access and state
@@ -122,8 +126,7 @@ and private directories use `0700`. Compose `down` retains the bind-mounted data
 Existing Casdoor instances require the reviewed permission objects described in
 [the authorization contract](../docs/authorization.md).
 
-Legacy per-plan databases require [explicit offline migration](../docs/shared-database.md).
-Back up every legacy source before migration. Runtime startup does not merge
+Legacy per-plan databases are unsupported. Runtime startup does not merge
 files or infer ownership. Casdoor's external state remains separate from the
 shared application database.
 

@@ -37,7 +37,7 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	for _, table := range expectedSchemaTables() {
-		if table == "plans" || table == "app_accounts" || table == "schema_migrations" {
+		if table == "plans" || table == "app_accounts" || table == "schema_migrations" || table == "blob_objects" || table == "blob_data" {
 			continue
 		}
 		if table == "user_groups" || table == "group_members" || table == "group_invites" {

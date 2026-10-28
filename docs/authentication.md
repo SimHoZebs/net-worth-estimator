@@ -80,7 +80,7 @@ session cookies and strips caller-supplied Authorization headers.
 The isolated `cmd/fixtureapi` browser-test harness intentionally omits identity.
 That executable is not a supported deployment or manual-development entry point.
 
-Assign every legacy private database to its verified owner during offline migration. New
+Legacy private databases are unsupported. New
 accounts receive their own empty private plan. Casdoor owns action/resource
 policies. Retired `AUTH_READERS`/`AUTH_EDITORS` lists do not grant plan access.
 

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"flag"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -24,6 +26,7 @@ var financialTables = []string{
 	"posting_id_migrations", "purchase_policies", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
+	"receipts",
 }
 
 func main() {
@@ -101,10 +104,25 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	}
 	var present int
 	if err := db.SQL().QueryRow("SELECT document_present FROM incoming.model_metadata WHERE plan_id=? AND id=1", sourcePlan).Scan(&present); err != nil {
-		return fmt.Errorf("source plan must contain a migrated financial model: %w", err)
+		return fmt.Errorf("source plan must contain a current financial model: %w", err)
 	}
 	if present != 1 {
 		return errors.New("source plan has no financial model")
+	}
+	var receipts *store.ReceiptCopy
+	if !sample {
+		sourceDB, err := sql.Open("sqlite", uri)
+		if err != nil {
+			return err
+		}
+		defer sourceDB.Close()
+		// SQLite remains the configured source adapter. Future providers enter
+		// here through the same port, not through the financial copy loop.
+		receipts, err = db.PrepareReceiptCopy(context.Background(), sourceDB, blobsqlite.New(sourceDB), sourcePlan)
+		if err != nil {
+			return fmt.Errorf("prepare receipt copy: %w", err)
+		}
+		defer receipts.Close()
 	}
 	tx, err := db.SQL().Begin()
 	if err != nil {
@@ -142,7 +160,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 		}
 	}
 	for _, table := range tables {
-		if table.name == "projection_artifacts" {
+		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
 		if sample && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations") {
@@ -159,6 +177,10 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 				values = append(values, "'sample'")
 			case sample && table.name == "sync_state" && column == "last_sync_at":
 				values = append(values, "''")
+			case sample && table.name == "postings" && column == "receipt_ids":
+				// Sample publication excludes receipts, so copied postings
+				// must not reference private receipt IDs.
+				values = append(values, "'[]'")
 			case table.name == "sync_credentials" && (column == "access_url" || column == "bridge_host" || column == "updated_at"):
 				// The Bridge key never travels with a refresh or a sample:
 				// reconnect it where it will run. Card selection is safe
@@ -171,6 +193,11 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 		query := "INSERT INTO " + quote(table.name) + " (" + strings.Join(columns, ",") + ") SELECT " + strings.Join(values, ",") + " FROM incoming." + quote(table.name) + " WHERE plan_id=?"
 		if _, err := tx.Exec(query, targetPlan, sourcePlan); err != nil {
 			return fmt.Errorf("copy %s: %w", table.name, err)
+		}
+	}
+	if receipts != nil {
+		if err := receipts.Apply(tx, targetPlan); err != nil {
+			return fmt.Errorf("copy receipts: %w", err)
 		}
 	}
 	return tx.Commit()
@@ -230,12 +257,12 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 			result = shapes
 		} else {
 			if fmt.Sprint(result) != fmt.Sprint(shapes) {
-				return nil, errors.New("source and destination financial schemas differ; migrate the snapshot first")
+				return nil, errors.New("source and destination financial schemas differ; use a compatible current snapshot")
 			}
 		}
 	}
 	if len(result) != len(financialTables) {
-		return nil, errors.New("application financial schema incomplete; migrate the snapshot first")
+		return nil, errors.New("application financial schema incomplete; use a compatible current snapshot")
 	}
 	return result, nil
 }

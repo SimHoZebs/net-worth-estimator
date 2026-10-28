@@ -2,12 +2,14 @@ import {
 	ArrowDownLeft,
 	ArrowRightLeft,
 	ArrowUpRight,
+	ReceiptText,
 	TriangleAlert,
 } from "lucide-react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Movement } from "../../domain/model.ts";
+import { useReceiptLinks } from "../../state/receipts.ts";
 import { Badge } from "../Badge.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import {
@@ -47,6 +49,17 @@ export function TransactionRow({
 		transaction.counterparty === externalCounterpartyName("out")
 			? null
 			: transaction.counterparty;
+	const receipts = useReceiptLinks(movement?.id ?? "");
+	const receiptBadge =
+		movement && receipts.length > 0 ? (
+			<Badge tone="neutral" className={transactionBadgeStyles()}>
+				<ReceiptText size={10} aria-hidden="true" />
+				{receipts.length}
+				<span className="sr-only">
+					{receipts.length === 1 ? "1 receipt" : `${receipts.length} receipts`}
+				</span>
+			</Badge>
+		) : null;
 	return (
 		<TransactionItemRow
 			date={
@@ -70,8 +83,10 @@ export function TransactionRow({
 				),
 				badges: (transaction.pending ||
 					transaction.excluded ||
-					transaction.shortfall > 0.01) && (
+					transaction.shortfall > 0.01 ||
+					receiptBadge) && (
 					<>
+						{receiptBadge}{" "}
 						{transaction.pending ? (
 							<Badge tone="neutral" className={transactionBadgeStyles()}>
 								Pending
