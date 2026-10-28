@@ -81,7 +81,9 @@ export async function waypointBlobFetch<T>(
  * Orval mutator. Generated endpoints delegate transport here so scope
  * capture, the Waypoint-Resource assertion, abort-on-scope-change, and the
  * shared error taxonomy stay in one place instead of forking a second
- * client. Resolves the full response envelope; throws ResourceScopeError or
+ * client. Application requests flow query/mutation -> generated endpoint ->
+ * mutator; only the mutator uses the network transport
+ * (clientBoundary.test.ts). Resolves the full response envelope; throws ResourceScopeError or
  * ApiError; never resolves to Error.
  */
 export async function waypointFetch<T>(

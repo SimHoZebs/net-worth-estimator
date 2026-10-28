@@ -1,4 +1,8 @@
-/* Single font-family owner. Roles and extension rules: ./README.md.
+/* Single font-family owner. Choose a font by the text's role, never by its
+   page or component: UI and data use Manrope (the default), display
+   headings use h1 or .type-display, headline amounts and evaluation
+   outcomes use .type-value (kept even for text outcomes such as
+   "Already reached"), and code or editable JSON uses .type-code.
    Component styles own size, weight, and layout, never family selection.
     :focus-visible here is the single global focus owner; do not add
     per-component focus rings. */
