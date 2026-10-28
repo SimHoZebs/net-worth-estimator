@@ -1,6 +1,8 @@
 package store
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -641,5 +643,105 @@ func TestApplySyncPlanDeletesVanishedPendingWithoutUniqueMatch(t *testing.T) {
 	unmatched, err := store.ApplySyncPlan(nil, nil, []SyncPosting{other}, cards)
 	if err != nil || unmatched.SettledConverted != 0 || unmatched.PendingDeleted != 1 {
 		t.Fatalf("unmatched = %+v, err %v", unmatched, err)
+	}
+}
+
+func TestApplySyncPlanInsertsUnmatchedPostedAsDisabledOwnerRows(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	first, err := store.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03"),
+	}, cards)
+	if err != nil || first.SettledInserted != 1 {
+		t.Fatalf("insert = %+v, err %v", first, err)
+	}
+	document, err := store.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var row types.Posting
+	for _, posting := range document.Postings {
+		if posting.Name == "Corner Store" {
+			row = posting
+		}
+	}
+	if row.ID == "" {
+		t.Fatal("inserted settled row missing")
+	}
+	if row.Source != SourceModel || row.Pending || row.Enabled {
+		t.Fatalf("inserted row = %+v, want disabled owner row", row)
+	}
+	if _, err := uuid.Parse(row.ID); err != nil {
+		t.Fatalf("inserted identity is not a UUID: %v", row.ID)
+	}
+	// Repeat feeds with the same posted charge insert nothing.
+	again, err := store.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03"),
+	}, cards)
+	if err != nil || again.SettledInserted != 0 {
+		t.Fatalf("repeat = %+v, err %v", again, err)
+	}
+	if got := countRows(t, store, "postings", "name = 'Corner Store'"); got != 1 {
+		t.Fatal("repeat feed duplicated the settled row")
+	}
+}
+
+func TestApplySyncPlanDefersPostedMatchingPresentPending(t *testing.T) {
+	store := openSQLiteStore(t)
+	seedAccount(t, store, "prime_card")
+	cards := []string{"prime_card"}
+	if _, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, nil, cards); err != nil {
+		t.Fatal(err)
+	}
+	// The same charge is still pending and now also posted: no duplicate row.
+	// Conversion happens once the pending row vanishes instead.
+	summary, err := store.ApplySyncPlan(nil, []SyncPosting{syncPendingPosting("a", "prime_card", "2026-08-02")}, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-02"),
+	}, cards)
+	if err != nil || summary.SettledInserted != 0 || summary.SettledConverted != 0 || summary.PendingDeleted != 0 {
+		t.Fatalf("deferred = %+v, err %v", summary, err)
+	}
+	if got := countRows(t, store, "postings", ""); got != 1 {
+		t.Fatalf("pending plus posted duplicated the charge: %d rows", got)
+	}
+}
+
+func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	cards := []string{"prime_card"}
+	if _, err := database.ApplySyncPlan(nil, nil, []SyncPosting{
+		syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03"),
+	}, cards); err != nil {
+		t.Fatal(err)
+	}
+	document, err := database.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id string
+	for _, posting := range document.Postings {
+		if posting.Name == "Corner Store" {
+			id = posting.ID
+		}
+	}
+	if id == "" {
+		t.Fatal("inserted settled row missing")
+	}
+	receipt, err := database.CreateReceipt(context.Background(), id, "corner.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ImportCSV(filepath.Join(projectRoot(t), "frontend", "tests", "fixtures", "model")); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := database.GetReceipt(receipt.ID)
+	if err != nil || restored.PostingID != id {
+		t.Fatalf("replacement dropped bank evidence: %+v, %v", restored, err)
+	}
+	links, err := database.ListPostingReceiptIDs()
+	if err != nil || len(links[id]) != 1 || links[id][0] != receipt.ID {
+		t.Fatalf("replacement dropped posting field: %+v, %v", links, err)
 	}
 }

@@ -112,9 +112,8 @@ func truncateLabel(description string) string {
 // (stored links). Mapped accounts emit checkpoints with model IDs; mappable
 // USD accounts without a resolution emit bridge-keyed checkpoints plus a
 // Provision the runner fulfills before apply. Posted charges on card
-// accounts are collected as settled candidates for pending-to-settled
-// conversion; all other posted transactions are skipped, as are checking
-// flows.
+// accounts convert vanished pending rows or insert as new settled rows;
+// all other posted transactions are skipped, as are checking flows.
 func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string, now time.Time) (*Plan, error) {
 	plan := &Plan{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}

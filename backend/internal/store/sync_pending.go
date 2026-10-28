@@ -98,6 +98,7 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPost
 		}
 		seen[posting.ID] = true
 	}
+	used := map[int]bool{}
 	for _, accountID := range accounts {
 		rows, err := tx.Query(`SELECT id FROM postings WHERE source = ? AND source_account_id = ? AND pending = 1 AND plan_id = :plan_id`, SourceSimpleFIN, accountID)
 		if err != nil {
@@ -119,7 +120,6 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPost
 			return err
 		}
 		rows.Close()
-		used := map[int]bool{}
 		for _, id := range stale {
 			converted, err := convertSettledPosting(tx, id, settled, used, summary)
 			if err != nil {
@@ -136,6 +136,71 @@ func applyPendingSnapshot(tx *planTx, incoming []SyncPosting, settled []SyncPost
 			}
 			summary.PendingDeleted++
 		}
+	}
+	return insertSettledPostings(tx, settled, used, summary)
+}
+
+// insertSettledPostings materializes posted charges that matched no vanished
+// pending row as new disabled owner rows. Provider keys make repeat feeds
+// idempotent. A candidate matching a still-present pending row is skipped:
+// it converts when that row vanishes instead of duplicating it now.
+func insertSettledPostings(tx *planTx, settled []SyncPosting, used map[int]bool, summary *SyncApplySummary) error {
+	position, err := nextTablePosition(tx, "postings")
+	if err != nil {
+		return err
+	}
+	present, err := loadSyncedPostings(tx)
+	if err != nil {
+		return err
+	}
+	for i, item := range settled {
+		if used[i] {
+			continue
+		}
+		if item.ProviderAccountID == "" || item.TransactionID == "" || item.SourceAccountID == nil {
+			return fmt.Errorf("settled sync posting requires exact provider account and transaction identities plus a model account")
+		}
+		key := postingSyncKey{provider: SourceSimpleFIN, accountID: item.ProviderAccountID, transactionID: item.TransactionID}
+		var existing string
+		err := tx.QueryRow(`SELECT posting_id FROM posting_sync_keys WHERE provider = ? AND account_id = ? AND transaction_id = ? AND plan_id = :plan_id`,
+			key.provider, key.accountID, key.transactionID).Scan(&existing)
+		if err == nil {
+			continue
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
+		deferred := false
+		for _, pending := range present {
+			if settleMatch(pending, item) {
+				deferred = true
+				break
+			}
+		}
+		if deferred {
+			continue
+		}
+		posting := item.Posting
+		posting.Source = SourceModel
+		posting.Pending = false
+		posting.Enabled = false
+		posting.ExecutionOrder = 0
+		posting.ID, err = newRowID()
+		if err != nil {
+			return err
+		}
+		if err := claimRowID(tx, posting.ID, "posting"); err != nil {
+			return err
+		}
+		if err := insertPosting(tx, position, &posting, SourceModel); err != nil {
+			return err
+		}
+		key.postingID = posting.ID
+		if err := insertPostingSyncKey(tx, key); err != nil {
+			return err
+		}
+		position++
+		summary.SettledInserted++
 	}
 	return nil
 }

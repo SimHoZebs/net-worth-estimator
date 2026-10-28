@@ -155,6 +155,29 @@ func loadSyncedPostings(tx *planTx) ([]types.Posting, error) {
 	return postings, rows.Close()
 }
 
+// loadBankOwnedPostings snapshots owner postings backed by bank sync keys
+// (settled imports and pending-to-settled conversions) so CSV replacement
+// preserves them with the owner's current values.
+func loadBankOwnedPostings(tx *planTx) ([]types.Posting, error) {
+	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, execution_order FROM postings WHERE source = ? AND id IN (SELECT posting_id FROM posting_sync_keys WHERE plan_id = :plan_id) AND plan_id = :plan_id ORDER BY position`, SourceModel)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var postings []types.Posting
+	for rows.Next() {
+		posting, err := scanPostingRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		postings = append(postings, posting)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return postings, rows.Close()
+}
+
 // syncedSource preserves a sync row's provider source on re-merge,
 // defaulting blank sources to the current provider.
 func syncedSource(source string) string {
@@ -202,6 +225,7 @@ type SyncApplySummary struct {
 	PendingInserted     int `json:"pendingInserted"`
 	PendingUpdated      int `json:"pendingUpdated"`
 	SettledConverted    int `json:"settledConverted"`
+	SettledInserted     int `json:"settledInserted"`
 }
 
 // SyncProvision is one bridge account needing link resolution: an

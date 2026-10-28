@@ -102,6 +102,19 @@ func replaceDocument(tx *planTx, document *types.FinancialModelDocument) error {
 	if err != nil {
 		return err
 	}
+	// Bank-backed owner rows (settled imports and conversions) survive
+	// replacement like sync-owned rows do, with their values as the owner
+	// left them. Their receipts are snapshotted below and restored after
+	// the re-merge, since row deletion cascades to receipt rows.
+	bankOwned, err := loadBankOwnedPostings(tx)
+	if err != nil {
+		return err
+	}
+	syncedPostings = append(syncedPostings, bankOwned...)
+	bankReceipts, err := loadReceiptsForPostings(tx, bankPostingIDs(bankOwned))
+	if err != nil {
+		return err
+	}
 	syncKeys, err := loadPostingSyncKeys(tx)
 	if err != nil {
 		return err
@@ -170,6 +183,9 @@ func replaceDocument(tx *planTx, document *types.FinancialModelDocument) error {
 		if err := insertPostingSyncKey(tx, key); err != nil {
 			return err
 		}
+	}
+	if err := restoreReceipts(tx, bankReceipts); err != nil {
+		return err
 	}
 	position = 0
 	for _, rule := range document.RecurrenceRules {
