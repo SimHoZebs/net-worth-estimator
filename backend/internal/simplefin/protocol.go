@@ -1,8 +1,10 @@
 // Package simplefin syncs bank balances and pending card charges from a
-// SimpleFIN Bridge Access URL into the canonical store. It writes only
-// balance checkpoints and projection-disabled pending seed postings, all
-// marked source "simplefin". It never materializes checking transactions,
-// positive card transactions, or posted charges.
+// SimpleFIN Bridge Access URL into the canonical store. It writes balance
+// checkpoints and projection-disabled pending seed postings, all marked
+// source "simplefin". It never materializes checking transactions or
+// positive card transactions. Posted charges convert vanished pending rows
+// into settled owner rows on a unique strict match; other posted charges
+// are ignored.
 package simplefin
 
 import (

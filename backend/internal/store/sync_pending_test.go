@@ -22,7 +22,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	other := syncPendingPosting("a/b", "other_card", "2026-08-02")
 	incoming = append(incoming, other)
 	cards := []string{"prime_card", "other_card"}
-	first, err := database.ApplySyncPlan(nil, incoming, cards)
+	first, err := database.ApplySyncPlan(nil, incoming, nil, cards)
 	if err != nil || first.PendingInserted != len(incoming) {
 		t.Fatalf("first = %+v, err %v", first, err)
 	}
@@ -44,7 +44,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	if len(ids) != len(incoming) || countRows(t, database, "posting_sync_keys", "") != len(incoming) {
 		t.Fatal("distinct raw provider keys collapsed into one identity")
 	}
-	again, err := database.ApplySyncPlan(nil, incoming, cards)
+	again, err := database.ApplySyncPlan(nil, incoming, nil, cards)
 	if err != nil || again.PendingUpdated != len(incoming) || again.PendingInserted != 0 || again.PendingDeleted != 0 {
 		t.Fatalf("repeat = %+v, err %v", again, err)
 	}
@@ -53,7 +53,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 		t.Fatal("repeated snapshot changed local IDs or financial content")
 	}
 	// A duplicate delivery of the same upstream identity remains one row.
-	if _, err := database.ApplySyncPlan(nil, append(incoming, incoming[0]), cards); err != nil {
+	if _, err := database.ApplySyncPlan(nil, append(incoming, incoming[0]), nil, cards); err != nil {
 		t.Fatal(err)
 	}
 	if countRows(t, database, "posting_sync_keys", "") != len(incoming) {
@@ -74,7 +74,7 @@ func TestPendingUUIDsUseExactUpstreamKeysAndSurviveRefresh(t *testing.T) {
 	if countRows(t, database, "posting_sync_keys", "") != len(incoming) {
 		t.Fatal("owner replacement lost private upstream identities")
 	}
-	final, err := database.ApplySyncPlan(nil, incoming, cards)
+	final, err := database.ApplySyncPlan(nil, incoming, nil, cards)
 	if err != nil || final.PendingInserted != 0 || final.PendingDeleted != 0 {
 		t.Fatalf("sync after owner replacement = %+v, err %v", final, err)
 	}

@@ -105,8 +105,18 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.Claim != nil {
 		t.Fatalf("pending shape = %+v", pending)
 	}
-	if plan.Skipped[SkipPosted] != 2 || plan.Skipped[SkipNonCharge] != 1 || plan.Skipped[SkipBadAmount] != 1 {
-		t.Fatalf("skipped = %+v", plan.Skipped)
+	if len(plan.Settled) != 1 {
+		t.Fatalf("settled = %+v, want the posted card charge", plan.Settled)
+	}
+	settled := plan.Settled[0]
+	if settled.ProviderAccountID != "bridge-prime" || settled.TransactionID != "post1" || settled.Pending || settled.Enabled {
+		t.Fatalf("settled identity/state = %+v", settled)
+	}
+	if settled.SourceAccountID == nil || *settled.SourceAccountID != "prime_card" {
+		t.Fatalf("settled source = %+v", settled.SourceAccountID)
+	}
+	if plan.Skipped[SkipNonCharge] != 2 || plan.Skipped[SkipBadAmount] != 1 {
+		t.Fatalf("skipped = %+v, want posted payment + pending refund as non-charge", plan.Skipped)
 	}
 	if plan.Skipped[SkipUnmappedAccount] != 2 {
 		t.Fatalf("unmapped skipped = %+v", plan.Skipped)

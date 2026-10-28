@@ -16,7 +16,6 @@ type SkipReason string
 const (
 	SkipUnmappedAccount SkipReason = "unmapped-account"
 	SkipNonUSD          SkipReason = "non-usd"
-	SkipPosted          SkipReason = "posted-not-materialized"
 	SkipNonCharge       SkipReason = "non-charge"
 	SkipBadAmount       SkipReason = "bad-amount"
 	// SkipStaleLink counts bridge accounts whose link points at a
@@ -45,10 +44,13 @@ type Provision struct {
 	Kind     string
 }
 
-// Plan is the mapped sync output before applying.
+// Plan is the mapped sync output before applying. Settled holds posted
+// charges on card accounts for pending-to-settled conversion in the store;
+// charges that match no vanished pending row are ignored, never inserted.
 type Plan struct {
 	Checkpoints []Checkpoint
 	Pending     []store.SyncPosting
+	Settled     []store.SyncPosting
 	Provisions  []Provision
 	Skipped     map[SkipReason]int
 }
@@ -109,8 +111,10 @@ func truncateLabel(description string) string {
 // seed postings. resolved maps bridge account IDs to model account IDs
 // (stored links). Mapped accounts emit checkpoints with model IDs; mappable
 // USD accounts without a resolution emit bridge-keyed checkpoints plus a
-// Provision the runner fulfills before apply. Posted transactions are
-// never materialized; neither are checking flows.
+// Provision the runner fulfills before apply. Posted charges on card
+// accounts are collected as settled candidates for pending-to-settled
+// conversion; all other posted transactions are skipped, as are checking
+// flows.
 func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string, now time.Time) (*Plan, error) {
 	plan := &Plan{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}
@@ -161,10 +165,7 @@ func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string,
 			continue
 		}
 		for _, transaction := range account.Transactions {
-			if !transaction.IsPending() {
-				plan.Skipped[SkipPosted]++
-				continue
-			}
+			seed := transaction.IsPending()
 			amount, err := transaction.ParseAmount()
 			if err != nil {
 				plan.Skipped[SkipBadAmount]++
@@ -188,7 +189,7 @@ func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string,
 			if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
 				transactionTime = *transaction.TransactedAt
 			}
-			plan.Pending = append(plan.Pending, store.SyncPosting{
+			posting := store.SyncPosting{
 				ProviderAccountID: account.ID,
 				TransactionID:     transaction.ID,
 				Posting: types.Posting{
@@ -202,9 +203,14 @@ func Map(set *AccountSet, cards map[string]struct{}, resolved map[string]string,
 					PostedTime:      postedTime,
 					TransactionTime: transactionTime,
 					Enabled:         false,
-					Pending:         true,
+					Pending:         seed,
 				},
-			})
+			}
+			if seed {
+				plan.Pending = append(plan.Pending, posting)
+			} else {
+				plan.Settled = append(plan.Settled, posting)
+			}
 		}
 	}
 	return plan, nil

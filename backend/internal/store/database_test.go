@@ -200,11 +200,11 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 			return err
 		},
 		func() error {
-			_, err := a.ApplySyncPlan([]SyncCheckpoint{{"checking", "2026-02-01", 50}}, []SyncPosting{syncPendingPosting("same-transaction", "checking", "2026-08-03")}, []string{"checking"})
+			_, err := a.ApplySyncPlan([]SyncCheckpoint{{"checking", "2026-02-01", 50}}, []SyncPosting{syncPendingPosting("same-transaction", "checking", "2026-08-03")}, nil, []string{"checking"})
 			return err
 		},
 		func() error { return a.SetLastSyncTime("after") },
-		func() error { _, err := a.ApplySyncPlan(nil, nil, []string{"checking"}); return err },
+		func() error { _, err := a.ApplySyncPlan(nil, nil, nil, []string{"checking"}); return err },
 		func() error { return a.DeletePosting(postingID) },
 		func() error { return a.DeleteRule("same-rule") },
 		func() error { return a.DeleteEvaluation(eval.InstanceID) },
