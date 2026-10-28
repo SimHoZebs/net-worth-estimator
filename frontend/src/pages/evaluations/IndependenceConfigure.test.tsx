@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	buildFiConfig,
 	fiConfigureState,
-	IndependenceConfigureSection,
+	IndependenceConfigure,
 } from "./IndependenceConfigure.tsx";
 
 const modelState = vi.hoisted(() => ({
@@ -131,17 +131,15 @@ describe("buildFiConfig", () => {
 	});
 });
 
-describe("IndependenceConfigureSection", () => {
+describe("IndependenceConfigure", () => {
 	it("shows unavailable state without a server evaluation", () => {
-		const view = render(<IndependenceConfigureSection instanceId="fi-1" />);
-		expect(view.getByText("Configure")).toBeTruthy();
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
 		expect(view.getByText("Configuration unavailable.")).toBeTruthy();
 	});
 
 	it("edits minimum, duration, and funding sources then saves", async () => {
 		seedDocument();
-		const view = render(<IndependenceConfigureSection instanceId="fi-1" />);
-		fireEvent.click(view.getByText("Configure"));
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
 		const minimum = view.getByLabelText(
 			"Minimum net worth ($)",
 		) as HTMLInputElement;
@@ -159,7 +157,7 @@ describe("IndependenceConfigureSection", () => {
 		fireEvent.change(minimum, { target: { value: "5000" } });
 		fireEvent.change(years, { target: { value: "12" } });
 		fireEvent.click(view.getByRole("button", { name: /Cash/ }));
-		fireEvent.click(view.getByLabelText("Salary"));
+		fireEvent.click(view.getByRole("button", { name: /Salary/ }));
 		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
 		await view.findByText("Saved. Updating projection…");
 		expect(endpointState.saved).toHaveLength(1);

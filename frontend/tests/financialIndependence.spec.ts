@@ -75,7 +75,9 @@ test("compact financial independence cards open an inspector without more calcul
 		exact: true,
 	});
 	await expect(dialog).toBeVisible();
-	await expect(dialog.getByRole("tab")).toHaveCount(0);
+	await expect(dialog.getByRole("tab")).toHaveCount(2);
+	await expect(dialog.getByRole("tab", { name: "Data" })).toHaveCount(0);
+	await expect(dialog.getByRole("tab", { name: "Checks" })).toHaveCount(0);
 	await expect(
 		dialog.getByRole("region", { name: "Financial independence checks" }),
 	).toHaveCount(0);
@@ -84,6 +86,10 @@ test("compact financial independence cards open an inspector without more calcul
 	expect(drawerBox.y).toBeCloseTo(0, 0);
 	expect(drawerBox.x + drawerBox.width).toBeCloseTo(viewport.width, 0);
 	expect(drawerBox.height).toBeCloseTo(viewport.height, 0);
+	await expect(dialog.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
 	const spendingBar = dialog.getByRole("img", { name: /^Annual spending at/ });
 	await expect(spendingBar).toBeVisible();
 	await expect(spendingBar).toHaveAttribute(
@@ -129,6 +135,22 @@ test("compact financial independence cards open an inspector without more calcul
 			name: "Financial independence funding over time",
 		}),
 	).toBeVisible();
+	await expect(dialog.getByRole("slider")).toHaveCount(0);
+	await dialog.getByRole("tab", { name: "Configure" }).click();
+	await expect(dialog.getByLabel("Minimum net worth ($)")).toHaveValue("0");
+	await expect(dialog.getByLabel("Spending test duration (years)")).toHaveValue(
+		"10",
+	);
+	await expect(
+		dialog.getByRole("button", { name: "Save configuration" }),
+	).toBeVisible();
+	await dialog.getByRole("tab", { name: "Configure" }).focus();
+	await page.keyboard.press("Home");
+	await expect(dialog.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+	await expect(dateLabel).toHaveText(evidenceDate!);
 	await expect(dialog.getByRole("slider")).toHaveCount(0);
 	expect(projections).toBe(count);
 	await page.keyboard.press("Escape");
@@ -250,8 +272,8 @@ test("financial independence configuration updates minimum, duration, and fundin
 		name: "Financial independence",
 		exact: true,
 	});
-	await expect(dialog.getByText("Configure", { exact: true })).toBeVisible();
-	await dialog.getByText("Configure", { exact: true }).click();
+	await expect(dialog.getByRole("tab", { name: "Configure" })).toBeVisible();
+	await dialog.getByRole("tab", { name: "Configure" }).click();
 	const minimum = dialog.getByLabel("Minimum net worth ($)");
 	await expect(minimum).toHaveValue("0");
 	const duration = dialog.getByLabel("Spending test duration (years)");
@@ -331,7 +353,11 @@ for (const theme of ["light", "dark"]) {
 				name: "Financial independence",
 				exact: true,
 			});
-			await expect(dialog.getByRole("tab")).toHaveCount(0);
+			await expect(dialog.getByRole("tab")).toHaveCount(2);
+			await expect(
+				dialog.getByRole("tab", { name: "Overview" }),
+			).toHaveAttribute("aria-selected", "true");
+			await expect(dialog.getByRole("tab", { name: "Data" })).toHaveCount(0);
 			await expect(
 				dialog.getByRole("combobox", { name: "Start date" }),
 			).toHaveCount(0);
@@ -361,10 +387,21 @@ for (const theme of ["light", "dark"]) {
 					(element) => element.scrollWidth <= element.clientWidth,
 				),
 			).toBe(true);
-			const data = await new AxeBuilder({ page })
+			await dialog.getByRole("tab", { name: "Configure" }).click();
+			await expect(dialog.getByLabel("Minimum net worth ($)")).toBeVisible();
+			await expect(
+				dialog.getByRole("button", { name: "Save configuration" }),
+			).toBeVisible();
+			expect(
+				await dialog.evaluate(
+					(element) => element.scrollWidth <= element.clientWidth,
+				),
+			).toBe(true);
+			const configure = await new AxeBuilder({ page })
 				.include('[role="dialog"]')
 				.analyze();
-			expect(data.violations).toEqual([]);
+			expect(configure.violations).toEqual([]);
+			await dialog.getByRole("tab", { name: "Overview" }).click();
 			await expect(
 				dialog.getByRole("region", { name: "Base case", exact: true }),
 			).toHaveCount(0);

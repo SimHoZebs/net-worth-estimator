@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { updateEvaluation } from "@/api/generated/endpoints.ts";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
-import { Checkbox, InputField } from "@/components/Field.tsx";
-import { inspectionPanelStyles } from "@/components/inspectionStyles.ts";
+import { InputField } from "@/components/Field.tsx";
 import { finite, isRecord } from "@/domain/guards.ts";
+import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
 import {
 	reloadWorkspace,
 	useServerModel,
@@ -123,10 +123,12 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 		const postings = (document?.postings ?? []).map((posting) => ({
 			id: posting.id,
 			name: posting.name,
+			detail: "One-time",
 		}));
 		const rules = (document?.recurrenceRules ?? []).map((rule) => ({
 			id: rule.id,
 			name: rule.name,
+			detail: "Recurring",
 		}));
 		const seen = new Set<string>();
 		return [...postings, ...rules].filter((item) =>
@@ -259,28 +261,25 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 					<p className="m-0 text-xs text-muted">No accounts available.</p>
 				)}
 			</fieldset>
-			<fieldset className="grid gap-2">
+			<fieldset className="grid gap-2" disabled={saving || readOnly}>
 				<legend className="m-0 p-0 text-xs font-semibold text-muted">
 					Funding income
 				</legend>
 				{incomeCandidates.length ? (
-					<div className="grid gap-2">
-						{incomeCandidates.map((item) => {
-							const checked = income.has(item.id);
-							return (
-								<label
-									key={item.id}
-									className="flex min-h-10 cursor-pointer items-center gap-2 text-xs text-ink pointer-coarse:min-h-12"
-								>
-									<Checkbox
-										checked={checked}
-										disabled={saving || readOnly}
-										onChange={() => toggleIncome(item.id)}
-									/>
-									<span>{item.name || item.id}</span>
-								</label>
-							);
-						})}
+					<div className="flex flex-wrap gap-2">
+						{incomeCandidates.map((item) => (
+							<span
+								key={item.id}
+								className={saving || readOnly ? "opacity-50" : ""}
+							>
+								<TogglePill
+									name={item.name || item.id}
+									detail={item.detail}
+									checked={income.has(item.id)}
+									onToggle={() => toggleIncome(item.id)}
+								/>
+							</span>
+						))}
 					</div>
 				) : (
 					<p className="m-0 text-xs text-muted">No income sources available.</p>
@@ -312,24 +311,5 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 				)}
 			</div>
 		</div>
-	);
-}
-
-export function IndependenceConfigureSection({
-	instanceId,
-}: {
-	instanceId: string;
-}) {
-	return (
-		<details className={inspectionPanelStyles()}>
-			<summary className="cursor-pointer text-xs font-semibold text-ink">
-				Configure
-			</summary>
-			<p className="m-0 text-xs text-muted">
-				Minimum net worth, spending test duration, and funding sources. Saving
-				recalculates the projection.
-			</p>
-			<IndependenceConfigure instanceId={instanceId} />
-		</details>
 	);
 }

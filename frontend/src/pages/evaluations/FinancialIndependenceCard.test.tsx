@@ -63,7 +63,10 @@ describe("FinancialIndependenceCard", () => {
 		expect(view.getByText("Not reached")).toBeTruthy();
 		expect(view.queryByRole("button", { name: /Inspect evidence/ })).toBeNull();
 		const dialog = openInspector(view);
-		expect(dialog.queryByRole("tab")).toBeNull();
+		expect(dialog.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+			"Overview",
+			"Configure",
+		]);
 		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
 		expect(
 			dialog.getByRole("table", {
@@ -89,7 +92,8 @@ describe("FinancialIndependenceCard", () => {
 			),
 		).toBeNull();
 		expect(dialog.queryByRole("columnheader", { name: "Test" })).toBeNull();
-		expect(dialog.getByText("Configure", { exact: true })).toBeTruthy();
+		fireEvent.click(dialog.getByRole("tab", { name: "Configure" }));
+		expect(dialog.getByText("Configuration unavailable.")).toBeTruthy();
 	});
 
 	it("keeps the card compact and opens financial evidence without expanding it", () => {
@@ -103,11 +107,13 @@ describe("FinancialIndependenceCard", () => {
 		expect(view.queryByRole("slider")).toBeNull();
 		expect(view.queryByRole("table")).toBeNull();
 		const dialog = openInspector(view);
-		expect(dialog.queryByRole("tab")).toBeNull();
-		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
 		expect(
-			dialog.getAllByText("$20,000", { exact: true }).length,
-		).toBeGreaterThanOrEqual(1);
+			dialog
+				.getByRole("tab", { name: "Overview" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
+		expect(dialog.getAllByText("$20,000", { exact: true })).toHaveLength(2);
 		expect(dialog.queryByText("Not reached")).toBeNull();
 		expect(within(card).queryByRole("table")).toBeNull();
 		expect(
@@ -237,7 +243,8 @@ describe("FinancialIndependenceCard", () => {
 		expect(
 			dialog.getByRole("progressbar", { name: "Required assessment period" }),
 		).toBeTruthy();
-		expect(dialog.queryByRole("tab")).toBeNull();
+		expect(dialog.queryByRole("tab", { name: "Checks" })).toBeNull();
+		expect(dialog.queryByRole("tab", { name: "Data" })).toBeNull();
 		expect(
 			dialog.queryByRole("img", { name: /^Annual spending at/ }),
 		).toBeNull();
