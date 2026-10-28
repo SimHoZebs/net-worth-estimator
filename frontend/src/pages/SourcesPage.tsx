@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AccountPage } from "../auth/AccountPage.tsx";
 import { Tabs, type TabItem } from "../components/Tabs.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
-import { useWorkspaceStore } from "../state/workspaceStore.ts";
+import { stageAndSave } from "../state/workspaceWrites.ts";
 import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
 import { useServerModel } from "../state/workspaceResources.ts";
 import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
@@ -23,7 +23,7 @@ export function SourcesPage() {
 	const plan = usePlan();
 	const serverDocument = useServerModel().data?.document;
 	const readOnly = useWorkspaceReadOnly();
-	const onUpdatePlan = useWorkspaceStore((state) => state.updatePlan);
+	const onUpdatePlan = stageAndSave;
 	if (!plan) return null;
 	const accounts = plan.accounts.map((account) => ({
 		id: account.id,
