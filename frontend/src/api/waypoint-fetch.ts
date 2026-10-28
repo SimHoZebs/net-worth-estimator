@@ -64,6 +64,19 @@ export async function waypointStreamFetch<_T>(
 	return resourceRequest(url, options);
 }
 
+/** Binary responses use the same resource assertion and guarded body lifetime. */
+export async function waypointBlobFetch<T>(
+	url: string,
+	options?: RequestInit,
+): Promise<T> {
+	const response = await resourceRequest(url, options);
+	const data = await response.blob().catch((cause: unknown) => {
+		if (cause instanceof ResourceScopeError) throw cause;
+		throw new ApiNetworkError(cause);
+	});
+	return { data, status: response.status, headers: response.headers } as T;
+}
+
 /**
  * Orval mutator. Generated endpoints delegate transport here so scope
  * capture, the Waypoint-Resource assertion, abort-on-scope-change, and the

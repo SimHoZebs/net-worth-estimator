@@ -27,6 +27,12 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 
 ### Shared persistence and ownership
 
+Receipt evidence has its own plan-scoped storage and a provider-neutral extraction
+interface. Images and metadata never enter `FinancialModelDocument` or projection
+identity. See [receipt contracts and source adapters](docs/receipts.md).
+Image bytes also have a separate [blob storage port](docs/blob-storage.md), with
+SQLite and filesystem adapters, private references, and durable cleanup.
+
 `store.Database` owns the shared connection. Each financial store holds one
 immutable plan ID. The plan router creates that scope only after Casdoor verifies
 access. `app_accounts` identifies users by immutable issuer and subject. Private
@@ -235,6 +241,9 @@ The current schema stores:
 | `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |
 | `postings`               | ordered UUID posting definitions with owner and explicit pending state                                        |
 | `purchase_policies`      | plan-scoped purchase priorities attached to posting identities                                                |
+| `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
+| `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
+| `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
 | `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
 | `evaluations`            | type, plan-scoped instance ID, order, label, enablement, and JSON config                                      |

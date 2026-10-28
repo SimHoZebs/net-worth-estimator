@@ -14,12 +14,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 // Server carries runtime dependencies.
 type Server struct {
+	Receipts   *receipts.Service
 	store      store.Store
 	ResourceID string
 	CanWrite   func(context.Context) bool
@@ -34,6 +36,7 @@ type Server struct {
 
 // Config controls HTTP integration behavior.
 type Config struct {
+	ReceiptSource *receipts.Source
 	// ResourceID namespaces in-flight projections as well as persisted artifacts.
 	ResourceID     string
 	CanWrite       func(context.Context) bool
@@ -151,6 +154,7 @@ func frontendHandler(frontendDir string) http.HandlerFunc {
 // New builds the chi router with all routes.
 func New(store store.Store, serverConfig Config) http.Handler {
 	server := &Server{
+		Receipts:   receipts.NewService(store, serverConfig.ReceiptSource, serverConfig.ResourceID),
 		ResourceID: serverConfig.ResourceID,
 		CanWrite:   serverConfig.CanWrite,
 		store:      store,
@@ -161,6 +165,7 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 	router.Use(readOnlyMiddleware(serverConfig.ReadOnly))
+	router.Use(receiptUploadLimit)
 	// Compress JSON payloads (8 MB deterministic results gzip to ~400 KB).
 	// text/event-stream is not a compressible type, so stochastic SSE
 	// streams pass through uncompressed with flushing intact.
@@ -175,6 +180,7 @@ func New(store store.Store, serverConfig Config) http.Handler {
 	config.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", waypointSchemaNamer)
 	api := humachi.New(router, config)
 	documentRawRoutes(api)
+	server.registerReceiptRoutes(api)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/v1/safe-spending-settings", Summary: "Load safe card spending settings"}, server.getSafeSpendingSettings)
 	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/v1/safe-spending-settings", Summary: "Save safe card spending settings"}, server.setSafeSpendingSettings)
 

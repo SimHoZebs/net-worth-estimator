@@ -85,6 +85,9 @@ export function Modal({
 			aria-labelledby={id}
 			onCancel={(event) => {
 				event.preventDefault();
+				// React also bubbles cancel events through portal ancestry. Only
+				// the top dialog may act, or a parent can discard a blocked edit.
+				event.stopPropagation();
 				requestClose();
 			}}
 			onClick={(event) => {

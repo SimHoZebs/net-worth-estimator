@@ -13,6 +13,10 @@ import (
 // not derived from route registration, so an unlisted route stays open.
 func readOnlyMiddleware(readOnly bool) func(http.Handler) http.Handler {
 	guardedPrefixes := []string{
+		http.MethodPost + " /v1/receipts",
+		http.MethodPut + " /v1/receipts/",
+		http.MethodPatch + " /v1/receipts/",
+		http.MethodDelete + " /v1/receipts/",
 		http.MethodPut + " /v1/safe-spending-settings",
 		http.MethodPost + " /v1/accounts",
 		http.MethodPatch + " /v1/accounts/",

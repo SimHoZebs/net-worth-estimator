@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -276,6 +277,10 @@ func schemaStatements() []string {
 			PRIMARY KEY(plan_id, id),
 			UNIQUE(plan_id, name)
 		)`,
+		blobObjectSchema,
+		blobsqlite.Schema,
+		receiptSchema,
+		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('receipt-evidence-v1')`,
 	}
 }
 
@@ -396,6 +401,9 @@ func seedAmountPresets() []types.AmountPreset {
 // requiredSchemaColumns covers every application table, including identity.
 // Validation prepares read-only queries; it never executes DDL or repairs shape.
 var requiredSchemaColumns = map[string]string{
+	"receipts":               receiptColumns,
+	"blob_objects":           "key, state, expires_at",
+	"blob_data":              "key, data",
 	"sessions":               "token, data, expiry",
 	"identity_grants":        "id, issuer, subject, sid, expiry, data",
 	"identity_logout_marks":  "issuer, kind, identifier, seen_at, expiry",
@@ -444,12 +452,15 @@ func validateSchemaObjects(db queryer) error {
 	if count != 1 {
 		return fmt.Errorf("%w: missing identity_grant_subject index", ErrSetupRequired)
 	}
-	return nil
+	return checkReceiptBlobSchemaObjects(db)
 }
 
 // expectedSchemaTables lists every table SetupDatabase manages.
 func expectedSchemaTables() []string {
 	return []string{
+		"receipts",
+		"blob_objects",
+		"blob_data",
 		"sessions",
 		"identity_grants",
 		"identity_logout_marks",

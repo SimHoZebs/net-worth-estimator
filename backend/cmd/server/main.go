@@ -70,6 +70,10 @@ func main() {
 		log.Fatalf("configure allowed origins: %v", err)
 	}
 	readOnly := parseReadOnly(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
+	receiptSource, err := configureReceiptSource(os.Getenv("NET_WORTH_ESTIMATOR_RECEIPT_SOURCE"))
+	if err != nil {
+		log.Fatalf("configure receipt extraction: %v", err)
+	}
 	identityConfig, err := identity.FromEnv(os.Getenv)
 	if err != nil {
 		log.Fatalf("configure identity: %v", err)
@@ -79,6 +83,8 @@ func main() {
 		log.Fatalf("open store: %v", err)
 	}
 	defer database.Close()
+	stopBlobCleanup := database.StartBlobCleanup(context.Background(), func(err error) { log.Printf("blob cleanup: %v", err) })
+	defer stopBlobCleanup()
 
 	resources, err := resourceConfigFromEnv(os.Getenv)
 	if err != nil {
@@ -92,6 +98,7 @@ func main() {
 	defer syncStop()
 
 	apiConfig := api.Config{
+		ReceiptSource:  receiptSource,
 		AllowedOrigins: allowedOrigins,
 		ReadOnly:       readOnly,
 		SyncRunner:     syncRunner,
