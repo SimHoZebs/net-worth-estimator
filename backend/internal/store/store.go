@@ -104,7 +104,7 @@ type sqliteStore struct {
 
 // Open creates or opens an explicit plans/fixture scope for isolated tests
 // and fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
-// databases require offline migration and are never converted here.
+// databases are rejected and never converted here.
 func Open(path string) (Store, error) {
 	db, err := SetupDatabase(path)
 	if err != nil {

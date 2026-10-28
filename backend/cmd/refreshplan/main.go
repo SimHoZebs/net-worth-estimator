@@ -104,7 +104,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	}
 	var present int
 	if err := db.SQL().QueryRow("SELECT document_present FROM incoming.model_metadata WHERE plan_id=? AND id=1", sourcePlan).Scan(&present); err != nil {
-		return fmt.Errorf("source plan must contain a migrated financial model: %w", err)
+		return fmt.Errorf("source plan must contain a current financial model: %w", err)
 	}
 	if present != 1 {
 		return errors.New("source plan has no financial model")
@@ -257,12 +257,12 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 			result = shapes
 		} else {
 			if fmt.Sprint(result) != fmt.Sprint(shapes) {
-				return nil, errors.New("source and destination financial schemas differ; migrate the snapshot first")
+				return nil, errors.New("source and destination financial schemas differ; use a compatible current snapshot")
 			}
 		}
 	}
 	if len(result) != len(financialTables) {
-		return nil, errors.New("application financial schema incomplete; migrate the snapshot first")
+		return nil, errors.New("application financial schema incomplete; use a compatible current snapshot")
 	}
 	return result, nil
 }

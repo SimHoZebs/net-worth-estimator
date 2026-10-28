@@ -106,15 +106,10 @@ files alone do not prove row-level isolation.
 
 ```bash
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/dbmigration
 backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api
 ```
-
-Migration tests use disposable legacy sources and a new destination. They verify
-source immutability, failed-import cleanup, ownership validation, private sync
-identities, and application sessions. See [the migration guide](docs/shared-database.md).
 
 Test fixtures provision through `store.SetupDatabase` before runtime opens. Startup
 regressions verify that missing, empty, and incompatible databases create no files

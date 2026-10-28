@@ -184,13 +184,13 @@ func checkSharedSchemaMarker(db queryer) error {
 		return err
 	}
 	if count == 0 {
-		return ErrMigrationRequired
+		return ErrLegacyDatabase
 	}
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name = ?`, sharedSchemaVersion).Scan(&count); err != nil {
-		return fmt.Errorf("%w: invalid schema marker: %v", ErrMigrationRequired, err)
+		return fmt.Errorf("%w: invalid schema marker: %v", ErrLegacyDatabase, err)
 	}
 	if count != 1 {
-		return ErrMigrationRequired
+		return ErrLegacyDatabase
 	}
 	return nil
 }

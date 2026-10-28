@@ -90,7 +90,7 @@ func TestLegacyRejectionPreservesSourcePermissions(t *testing.T) {
 	if err := os.Chmod(path, 0640); err != nil {
 		t.Fatal(err)
 	}
-	if d, err := OpenDatabase(path); !errors.Is(err, ErrMigrationRequired) {
+	if d, err := OpenDatabase(path); !errors.Is(err, ErrLegacyDatabase) {
 		if d != nil {
 			d.Close()
 		}

@@ -35,9 +35,8 @@ primary-data owner in private deployment configuration. Remove the retired
 `NET_WORTH_ESTIMATOR_AUTH_TOKEN` setting. Both dev and production require Casdoor;
 the server rejects token-only and unauthenticated configurations.
 
-`setupdb` is an explicit deployment step. Existing legacy per-plan data requires
-[offline migration](../docs/shared-database.md) before startup. The API never
-creates or repairs its application database. Repeat setup preserves current data.
+`setupdb` is an explicit deployment step. Legacy per-plan data is unsupported.
+The API never creates or repairs its application database. Repeat setup preserves current data.
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
 public issuer and Host. The browser uses the public Casdoor URL. The frontend and

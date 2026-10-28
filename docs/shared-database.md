@@ -39,7 +39,7 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
 `setupdb` creates the private parent directory, database, and complete financial
 and identity schema. Repeat setup preserves existing data. Run schema setup with
 the API stopped when a deployment requires a schema change. Legacy unscoped
-databases require `migratedb` instead.
+databases are unsupported.
 
 The API never creates a missing directory, database, table, or index. It never
 repairs an incomplete schema. Missing, empty, and incompatible databases stop
@@ -58,101 +58,15 @@ docker compose up -d
 
 Use the same private environment file and volume for setup and the API. Run this
 maintenance command explicitly. Do not put setup in the server entrypoint or an
-automatic startup dependency. A successful `migratedb` already provisions its new
-destination. Dev setup and the isolated fixture harness also provision explicitly.
+automatic startup dependency. Dev setup and the isolated fixture harness also provision explicitly.
 
 New user signup still inserts account, plan, and default-preset rows. It does not
 create database files or change schema.
 
-## Upgrade from per-plan files
-
-Runtime startup does not merge legacy files. Existing financial databases require
-an explicit offline migration into a new destination. The operation preserves
-plan resource IDs and financial entity IDs. Casdoor issuer, account subjects,
-permissions, and signing keys remain unchanged.
-
-Before migration:
-
-1. Stop the API and its background sync scheduler.
-2. Back up every primary, private, sample, and application-session database.
-3. Back up Casdoor's whole state directory and private deployment configuration.
-4. Record the verified issuer and subject for each private database.
-5. Approve the exact sample source before publication.
-6. Prepare a migration manifest with an explicit source-to-plan mapping.
-
-Use SQLite-safe backups. A raw copy of a live `.db` file can omit committed WAL
-data. Never start an old and new server against the same storage.
-
-SQLite documents its [online backup API](https://www.sqlite.org/backup.html)
-and [`VACUUM INTO`](https://www.sqlite.org/lang_vacuum.html#vacuuminto) as safe
-snapshot methods. Source read transactions must include committed WAL content.
-
-Run migration from the repository root:
-
-```bash
-CGO_ENABLED=0 go -C backend run ./cmd/migratedb \
-  --manifest /private/migration.json \
-  --db /private/application-new.db --dry-run
-CGO_ENABLED=0 go -C backend run ./cmd/migratedb \
-  --manifest /private/migration.json \
-  --db /private/application-new.db
-```
-
-### Manifest version 1
-
-```json
-{
-  "version": 1,
-  "sources": [
-    {
-      "path": "owner.db",
-      "resource_id": "plans/<owner-hash>",
-      "kind": "private",
-      "issuer": "https://issuer.example",
-      "subject": "immutable-subject"
-    },
-    {
-      "path": "approved-sample.db",
-      "resource_id": "plans/sample",
-      "kind": "sample"
-    }
-  ],
-  "sessions_db": "application.sessions"
-}
-```
-
-Paths resolve relative to the manifest. Add one private source per existing
-account. `sessions_db` is optional. A sample source cannot specify an owner.
-`<owner-hash>` is lowercase SHA-256 of `issuer + "\u0000" + subject`, matching
-the existing resource ID. Use the discovered verified resource when available.
-
-Unknown fields, duplicate plans, aliased source files, missing owners, and
-unsupported schemas fail. The importer requires the previous release's current
-posting schema, including UUID/pending and execution-order fields. Upgrade an
-older disposable backup with that release first. Source files remain unchanged.
-
-Dry-run performs the full migration and verification in a disposable workspace.
-It does not publish the destination. Output contains counts, not financial data,
-provider tokens, or identity subjects.
-
-The destination must be new. Source databases remain read-only. Failed imports
-must not publish a partially migrated application database. A safe rerun starts
-with another new destination rather than an implicit conflict merge.
-
-Check the migration report, SQLite integrity, foreign keys, and per-plan row
-counts before cutover. Verify canonical revisions, execution order, sync keys,
-preferences, and session persistence. Test owner, second-account, guest sample,
-stale-resource rejection, and provider-outage behavior.
-
-After validation, point `NET_WORTH_ESTIMATOR_DB` at the destination. Remove the
-retired per-plan directory, sample-path, and separate session-path settings from
-runtime configuration. Retain the old files as private rollback backups.
-
 ## Rollback
 
-Before new writes, stop the new API and restore the previous images and database
-configuration. Keep original source files unchanged until the rollback window
-ends. Do not point the old application at the shared database.
+Before new writes, stop the API and restore the previous images and database
+configuration. Do not silently restore an older backup over current account data.
 
 After new writes, a rollback requires reconciliation or an accepted loss of those
 writes. Do not silently restore an older backup over current account data.
@@ -176,7 +90,6 @@ read-only switch still blocks editor writes.
 
 ```bash
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/dbmigration
 backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api
@@ -188,9 +101,7 @@ Use identical entity IDs, preset names, sync identities, and projection inputs
 in two plans. Exercise imports, clears, deletes, reorders, sync, and artifact
 eviction. Every result must remain within the selected plan.
 
-The current deployment keeps one API instance and one SQLite writer. This
-migration changes ownership and storage layout, not the database engine or the
-authorization policy.
+The current deployment keeps one API instance and one SQLite writer.
 
 ## Offline plan replacement
 
@@ -209,7 +120,7 @@ discards derived projection artifacts. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
 
-The API container includes `setupdb`, `migratedb`, `importcsv`, and `refreshplan` under `/app`.
+The API container includes `setupdb`, `importcsv`, and `refreshplan` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
 server container for migration or plan replacement.

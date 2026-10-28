@@ -11,15 +11,15 @@ import (
 
 const sharedSchemaVersion = "shared-plans-v1"
 
-// ErrMigrationRequired identifies a database that needs the offline migration.
-var ErrMigrationRequired = errors.New("database migration required: stop services and run migratedb with an explicit migration manifest")
+// ErrLegacyDatabase identifies a pre-shared-schema database. No migration
+// path exists: start from a current application database.
+var ErrLegacyDatabase = errors.New("unsupported legacy database: start from a current application database")
 
 // ErrSetupRequired identifies a missing or incomplete current database.
 var ErrSetupRequired = errors.New("database setup required: run setupdb before starting the server")
 
 // Database owns the shared SQLite connection. Financial operations use a Store
-// returned for an explicit plan. SQL is reserved for privileged identity and
-// offline migration code, never API handlers.
+// returned for an explicit plan.
 type Database struct {
 	db    *sql.DB
 	blobs blobstore.Store
