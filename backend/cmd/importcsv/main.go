@@ -7,7 +7,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "--db must name an existing shared database")
 		return 1
 	}
-	database, err := store.OpenDatabase(*dbPath)
+	database, err := sqlite.OpenDatabase(*dbPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "open store: %v\n", err)
 		return 1
@@ -43,7 +44,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "select existing plan: %v\n", err)
 		return 1
 	}
-	if _, err := plan.ImportCSV(*modelPath); err != nil {
+	doc, err := csvio.ImportModel(*modelPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "import: %v\n", err)
+		return 1
+	}
+	if _, err := plan.ImportDocument(doc); err != nil {
 		fmt.Fprintf(stderr, "import: %v\n", err)
 		return 1
 	}

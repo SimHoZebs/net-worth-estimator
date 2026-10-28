@@ -13,13 +13,14 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 const testIssuer = "https://issuer.test"
 
-func testHandler(t *testing.T, readOnly bool) (*groups.Handler, *store.Database) {
+func testHandler(t *testing.T, readOnly bool) (*groups.Handler, store.Database) {
 	t.Helper()
-	db, err := store.SetupDatabase(filepath.Join(t.TempDir(), "groups-http.db"))
+	db, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "groups-http.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +55,7 @@ func do(t *testing.T, h *groups.Handler, method, target, subject, body string, h
 	return w
 }
 
-func mustCreateGroup(t *testing.T, db *store.Database, owner, name string) string {
+func mustCreateGroup(t *testing.T, db store.Database, owner, name string) string {
 	t.Helper()
 	account, err := db.EnsureGroupAccount(testIssuer, owner)
 	if err != nil {
@@ -176,7 +177,7 @@ func TestGroupsHTTPMembershipMatrix(t *testing.T) {
 	}
 }
 
-func mustAccount(t *testing.T, db *store.Database, subject string) string {
+func mustAccount(t *testing.T, db store.Database, subject string) string {
 	t.Helper()
 	account, err := db.EnsureGroupAccount(testIssuer, subject)
 	if err != nil {
