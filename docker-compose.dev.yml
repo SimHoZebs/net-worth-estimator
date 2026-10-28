@@ -1,5 +1,7 @@
 # Daily use: docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
-name: waypoint-dev
+# Slots: docker compose --env-file .env.dev.<slot> -f docker-compose.dev.yml up -d --build --wait
+# The slot env file sets DEV_PROJECT and DEV_SLOT_STATE_DIR plus free loopback ports.
+name: ${DEV_PROJECT:-waypoint-dev}
 
 services:
   casdoor:
@@ -7,12 +9,12 @@ services:
     user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${DEV_CASDOOR_PORT:-8000}:8000"
     volumes:
-      - ./tmp/dev/casdoor/conf:/conf:ro
-      - ./tmp/dev/casdoor/db:/data
+      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/casdoor/conf:/conf:ro
+      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/casdoor/db:/data
       # Casdoor stores its file sessions in ./tmp.
-      - ./tmp/dev/casdoor/sessions:/tmp
+      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/casdoor/sessions:/tmp
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -31,9 +33,9 @@ services:
       dockerfile: backend/Dockerfile
     user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
     ports:
-      - "127.0.0.1:8788:8787"
+      - "127.0.0.1:${DEV_BACKEND_DEBUG_PORT:-8788}:8787"
     volumes:
-      - ./tmp/dev/data:/data
+      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/data:/data
     environment:
       HOST: 0.0.0.0
       PORT: 8787
@@ -67,7 +69,7 @@ services:
     environment:
       BACKEND_URL: http://backend:8787
     ports:
-      - "127.0.0.1:5178:80"
+      - "127.0.0.1:${DEV_FRONTEND_PORT:-5178}:80"
     depends_on:
       backend:
         condition: service_healthy
