@@ -15,10 +15,12 @@ const env = {
   CASDOOR_USER_PASSWORD: "test-member-password-000",
 };
 
-test("requires explicit distinct secrets and HTTPS outside loopback", () => {
+test("requires explicit distinct secrets and well-formed origins", () => {
   for (const key of Object.keys(env)) assert.throws(() => settingsFromEnv({ ...env, [key]: "" }));
-  assert.throws(() => settingsFromEnv({ ...env, CASDOOR_PUBLIC_URL: "http://auth.example.test" }));
-  assert.throws(() => settingsFromEnv({ ...env, APP_PUBLIC_URL: "http://192.168.0.1" }));
+  assert.equal(
+    settingsFromEnv({ ...env, CASDOOR_PUBLIC_URL: "http://192.168.1.50:8000" }).publicUrl,
+    "http://192.168.1.50:8000",
+  );
   assert.throws(() =>
     settingsFromEnv({ ...env, CASDOOR_PUBLIC_URL: "https://auth.example.test/path" }),
   );
@@ -113,10 +115,18 @@ test("additional browser addresses add exact callbacks without changing identiti
   app.redirectUris = before.applications.find((app) => app.name === "waypoint").redirectUris;
   assert.deepEqual(after, before);
   assert.equal(buildConfig(settings), buildConfig(baseline));
+  const lanAlias = settingsFromEnv({
+    ...env,
+    CASDOOR_PUBLIC_URL: "http://192.168.1.50:8000",
+    APP_PUBLIC_URL: "http://192.168.1.50:8080",
+    NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS: JSON.stringify({
+      "http://192.168.1.50:18081": "http://192.168.1.50:18083",
+    }),
+  });
+  assert.equal(lanAlias.browserOrigins["http://192.168.1.50:18081"], "http://192.168.1.50:18083");
   for (const aliases of [
     null,
     [],
-    { "http://host.test": "http://localhost:8000" },
     { "http://localhost:5178": "http://localhost:18083" },
     { "http://localhost:18081": "http://localhost:5178" },
     { "http://localhost:18081/path": "http://localhost:18083" },

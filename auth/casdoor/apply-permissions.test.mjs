@@ -129,13 +129,12 @@ test("offline preview pins exact artifact bytes, target, source version, and dig
     () => approvedPermissionPlan(modifiedBytes, permissionDigest(modifiedBytes), target),
     /source version and target/,
   );
-  assert.throws(
-    () =>
-      permissionTarget({
-        CASDOOR_PUBLIC_URL: "http://identity.example.test",
-        AUTH_CLIENT_ID: "id",
-      }),
-    /HTTPS/,
+  assert.equal(
+    permissionTarget({
+      CASDOOR_PUBLIC_URL: "http://identity.example.test",
+      AUTH_CLIENT_ID: "id",
+    }).issuer,
+    "http://identity.example.test",
   );
   assert.throws(
     () => permissionPlan({ ...target, organization: "built-in" }),

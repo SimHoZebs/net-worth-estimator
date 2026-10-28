@@ -8,9 +8,8 @@ export const defaultStateDir = resolve(dirname(fileURLToPath(import.meta.url)), 
 
 export function origin(value, name) {
   const url = new URL(value);
-  const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-  if (!["http:", "https:"].includes(url.protocol) || (url.protocol === "http:" && !loopback)) {
-    throw new Error(`${name} requires HTTPS except on loopback`);
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error(`${name} must use HTTP or HTTPS`);
   }
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
     throw new Error(`${name} must be an origin without credentials, path, query, or fragment`);

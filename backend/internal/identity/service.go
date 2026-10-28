@@ -162,6 +162,28 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		if r.URL.Path == "/v1" || strings.HasPrefix(r.URL.Path, "/v1/") {
+			if isGroupRoute(r.URL.Path) {
+				w.Header().Set("Cache-Control", "no-store")
+				// Preflight carries no session; the groups CORS wrapper
+				// answers it. Authenticated group calls continue below.
+				if r.Method == http.MethodOptions {
+					next.ServeHTTP(w, r)
+					return
+				}
+				p, err := s.principal(r)
+				if err != nil {
+					failure(w, 503, "Identity verification is temporarily unavailable. Retry this request.")
+					return
+				}
+				if p.Subject == "" {
+					w.Header().Set("WWW-Authenticate", "Session")
+					failure(w, 401, "Sign in to manage groups.")
+					return
+				}
+				r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
+				next.ServeHTTP(w, r)
+				return
+			}
 			w.Header().Set("Cache-Control", "no-store")
 			p, err := s.principal(r)
 			if err != nil {
