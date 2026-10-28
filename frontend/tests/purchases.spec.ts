@@ -4,7 +4,6 @@ import type {
 	FinancialModelDocument,
 	FinancialModelResponse,
 } from "../src/api/contracts.ts";
-import type { Plan } from "../src/domain/model.ts";
 import { FIXTURE_API, readTemporaryVersion, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
@@ -24,8 +23,11 @@ async function addPurchase(page: Page, name: string, cost: string) {
 	await dialog.getByLabel("Purchase name").fill(name);
 	await dialog.getByLabel("Cost (USD)").fill(cost);
 	await dialog.getByLabel("Funding account").selectOption("checking");
-	await dialog.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await dialog.getByRole("button", { name: "Save changes" }).click();
 	await expect(dialog).not.toBeVisible();
+	await expect
+		.poll(() => readTemporaryVersion(page), { timeout: 15_000 })
+		.toBeNull();
 }
 
 test("planned purchases has a navigation entry, direct route, and browser history", async ({
@@ -170,26 +172,9 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 
 	await openPurchases(page);
 	await addPurchase(page, "Synced-account laptop", "500");
-	const draft = (await readTemporaryVersion(page, resource)) as Plan;
-	expect(draft.readOnly).toBe(false);
-	expect(
-		draft.accounts.find((account) => account.id === "checking"),
-	).toMatchObject({
-		readOnly: true,
-		source: "Synced checkpoint",
-	});
-	expect(
-		draft.movements.find((movement) => movement.id === pending.id),
-	).toMatchObject({
-		readOnly: true,
-		pending: true,
-		enabled: false,
-	});
 	await expect(
 		page.getByText(/This change cannot be saved to the server/),
 	).toHaveCount(0);
-	await page.getByRole("button", { name: "Save changes", exact: true }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 	expect(await readTemporaryVersion(page, resource)).toBeNull();
 	const savedResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	expect(savedResponse.ok()).toBe(true);
@@ -242,16 +227,9 @@ test("purchase priorities persist and purchases protect all established payments
 		page.getByRole("region", { name: "Purchase schedule" }).locator("time"),
 	).toHaveCount(2, { timeout: 30_000 });
 	await page.getByRole("tab", { name: "Priority" }).click();
-	const temporary = (await readTemporaryVersion(page)) as Plan;
-	expect(
-		temporary.plannedPurchases.findIndex(
-			(item: { name: string }) => item.name === "Chair",
-		),
-	).toBe(0);
+	await expect.poll(() => readTemporaryVersion(page)).toBeNull();
 	await page.reload();
 	await expect(queue.locator("li").first()).toContainText("Chair");
-	await page.getByRole("button", { name: "Save changes", exact: true }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	const { document } = (await response.json()) as {
 		document: FinancialModelDocument;
@@ -331,16 +309,14 @@ test("purchase priorities persist and purchases protect all established payments
 		.click();
 	const editor = page.getByRole("dialog", { name: "Edit purchase" });
 	await editor.getByLabel("Cost (USD)").fill("200");
-	await editor.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await editor.getByRole("button", { name: "Save changes" }).click();
 	await expect(queue.locator("li").first()).toContainText("$200");
 	await page.getByRole("button", { name: /Inspect Chair/ }).click();
 	await page
 		.getByRole("dialog", { name: "Chair" })
 		.getByRole("button", { name: "Remove", exact: true })
 		.click();
-	await page
-		.getByRole("button", { name: "Remove from unsaved changes" })
-		.click();
+	await page.getByRole("button", { name: "Remove and save" }).click();
 	await expect(queue.locator("li")).toHaveCount(1);
 	expect(errors).toEqual([]);
 });
