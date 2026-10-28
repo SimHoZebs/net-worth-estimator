@@ -111,7 +111,7 @@ export function EditorForm({
 							variant="primary"
 							disabled={Boolean(readOnlyReason)}
 						>
-							Apply unsaved changes <ArrowRight size={16} aria-hidden="true" />
+							Save changes <ArrowRight size={16} aria-hidden="true" />
 						</Button>
 					</div>
 				)}
@@ -121,4 +121,4 @@ export function EditorForm({
 }
 
 export const sourceReadOnlyReason =
-	"Change it at the source and import a refreshed plan.";
+	"Change it at the source and import a refreshed copy.";

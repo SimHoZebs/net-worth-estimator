@@ -61,9 +61,9 @@ export const movementSchema = z.object({
 	postedDate: date.nullable().default(null),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
-	// Void marks a bank authorization that vanished without settling. Every
-	// movement carries it explicitly; stored drafts without it migrate to
-	// false on load.
+	// Void marks a bank hold that vanished without posting. The UI shows
+	// it as "Did not post". Every movement carries it explicitly; stored
+	// drafts without it migrate to false on load.
 	void: z.boolean(),
 });
 
@@ -367,6 +367,21 @@ export function changesBetween({
 		"plannedPurchases",
 		"evaluations",
 	] as const) {
+		// Order is meaningful (queue priority, execution order), so a pure
+		// reorder must stage a draft even when every record is unchanged.
+		const beforeIds = saved[key].map((item) => item.id);
+		const afterIds = current[key].map((item) => item.id);
+		if (
+			beforeIds.length === afterIds.length &&
+			beforeIds.some((id, index) => afterIds[index] !== id) &&
+			beforeIds.every((id) => afterIds.includes(id))
+		)
+			changes.push({
+				label: "Order",
+				kind: "Modified",
+				before: beforeIds.join(","),
+				after: afterIds.join(","),
+			});
 		for (const item of current[key]) {
 			const previous = saved[key].find((old) => old.id === item.id);
 			if (!previous)
