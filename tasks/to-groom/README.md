@@ -1,6 +1,6 @@
 # Tasks to groom
 
-These 35 task files record the seven-scope optimization audit and follow-up discussion. Each file explains the relevant background, states the direct change, and names verification. Repeated before/after lists are unnecessary when the workflow stays the same.
+These task files record the seven-scope optimization audit and follow-up architecture work. Each file explains the relevant background, states the direct change, and names verification. Repeated before/after lists are unnecessary when the workflow stays the same.
 
 Evidence references describe audit commit `9990a6545fc21fc8bbef4f8b2532909e9796e67e` and its working tree. Recheck current code before implementation. Concurrent work may already resolve a finding or move its source.
 
@@ -15,6 +15,7 @@ chaining pass. Its records defer justification and change decisions to pass two.
 They do not adopt the recommendations in the older tasks below.
 
 - [Use one saved-plan identity](saved-plan-identity.md).
+- [Derive plan ownership from parent entities](derived-plan-ownership.md).
 - [Use server shortfall evidence](transaction-shortfall-evidence.md).
 - [Replace financial-independence callbacks with a direct loop](financial-independence-monthly-loop.md).
 - [Share target-evaluation verdict selection](shared-target-date-status.md).

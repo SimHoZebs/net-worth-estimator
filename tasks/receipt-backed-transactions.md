@@ -92,6 +92,11 @@ Inject the same mock implementation into normal dev wiring and isolated browser 
 
 **Swap contract:** adding a real source requires its adapter, adapter tests, credentials/configuration, and startup wiring only. Existing receipt entities, migrations, service logic, HTTP/OpenAPI contracts, generated client, frontend hooks, and receipt components remain unchanged. If a proposed adapter requires changes to those consumers, revise the boundary before implementation.
 
+**Agreed composition:** keep this end-to-end contract for both integrated vision
+providers and an OCR-plus-interpreter adapter. Add the two internal stage
+interfaces with the first composed implementation, rather than speculatively.
+See the [extraction composition decision](../docs/receipts.md#extraction-composition-decision).
+
 ### State and persistence ownership
 
 - **SQLite:** receipt metadata, private blob references, cleanup state, extraction state, extracted values, review drafts, and confirmed corrections.
@@ -108,6 +113,14 @@ types or paths in receipt logic. Keep byte reads out of model loads and receipt
 lists. See [blob storage contracts](../docs/blob-storage.md).
 
 Add receipt tables with composite plan/entity keys. Reference postings with `(plan_id, posting_id)`. Do not extend `FinancialModelDocument` or store receipts in the evictable `projection_artifacts` table.
+
+**Requested ownership normalization:** derive receipt ownership from its posting
+and remove the duplicate `plan_id`. The existing posting key permits identical
+UUIDs across plans, and copy workflows preserve them. Enforce global posting
+identity before removing the composite receipt link. Track the remaining
+dependent-table cleanup in [derived plan ownership](to-groom/derived-plan-ownership.md).
+The user deferred the identity prerequisite and receipt cleanup together. The
+current release keeps the existing composite ownership link.
 
 Store receipt amounts as integer USD cents. Preserve missing values as unknown. Support fractional quantities. Keep confidence, producer/version, and simulated provenance with extracted values. User corrections must not overwrite the extraction record. Confirmation must not remove a mock result's simulated provenance. Item categories remain receipt-local user annotations.
 

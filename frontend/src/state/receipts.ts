@@ -20,6 +20,7 @@ import {
 	subscribeResourceScope,
 } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
+import { useServerModel, workspaceResourceKey } from "./workspaceResources.ts";
 
 export function useReceiptScope() {
 	return useSyncExternalStore(subscribeResourceScope, getResourceScope);
@@ -43,6 +44,12 @@ export function useReceipts(postingId: string, enabled: boolean) {
 		},
 		serverQueryClient(),
 	);
+}
+
+/** Stored reverse lookup: receipt IDs attached to a posting, from the loaded model. */
+export function useReceiptLinks(postingId: string): string[] {
+	const model = useServerModel({ enabled: false });
+	return model.data?.receiptLinks?.[postingId] ?? [];
 }
 
 export function useReceipt(id: string) {
@@ -100,6 +107,11 @@ function useReceiptWrite<T>(
 					);
 				await cache.invalidateQueries({
 					queryKey: receiptCollectionKey(postingId, scope),
+				});
+				// Reverse lookup lives on the financial-model envelope, outside
+				// the document. Refresh it so posting badges follow mutations.
+				await cache.invalidateQueries({
+					queryKey: workspaceResourceKey("model", scope),
 				});
 			},
 		},

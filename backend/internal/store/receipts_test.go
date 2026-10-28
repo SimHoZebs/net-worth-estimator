@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -276,3 +277,105 @@ func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 	}
 }
 
+func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	s := privateTestPlan(t, d, "receipt-field")
+	p := seedReceiptPosting(t, s)
+	image := types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"}
+	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image)
+	if err != nil {
+		t.Fatal(err)
+	}
+	field := func() string {
+		t.Helper()
+		var raw string
+		if err := s.db.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND plan_id = :plan_id`, p.ID).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
+	links, err := s.ListPostingReceiptIDs()
+	if err != nil || len(links[p.ID]) != 1 || links[p.ID][0] != r.ID {
+		t.Fatalf("links = %+v, %v", links, err)
+	}
+	// Duplicate uploads reuse the receipt and must not duplicate the field.
+	image.Bytes = []byte("pixels")
+	if _, err := s.CreateReceipt(context.Background(), p.ID, "renamed.png", image); err != nil {
+		t.Fatal(err)
+	}
+	if got := field(); got != `["`+r.ID+`"]` {
+		t.Fatalf("field after duplicate = %s", got)
+	}
+	otherImage := types.ReceiptImage{Bytes: []byte("other pixels"), MediaType: "image/png"}
+	other, err := s.CreateReceipt(context.Background(), p.ID, "b.png", otherImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	links, err = s.ListPostingReceiptIDs()
+	if err != nil || len(links[p.ID]) != 2 {
+		t.Fatalf("links = %+v, %v", links, err)
+	}
+	// Ordinary posting edits preserve the field and keep it out of the document.
+	p.Name = "Updated"
+	if _, err := s.UpdatePosting(p); err != nil {
+		t.Fatal(err)
+	}
+	links, err = s.ListPostingReceiptIDs()
+	if err != nil || len(links[p.ID]) != 2 {
+		t.Fatalf("links after edit = %+v, %v", links, err)
+	}
+	doc, _ := s.LoadDocument()
+	raw, _ := json.Marshal(doc)
+	if strings.Contains(string(raw), r.ID) || strings.Contains(string(raw), "receipt") {
+		t.Fatal("receipt field leaked into the financial document")
+	}
+	if err := s.DeleteReceipt(context.Background(), r.ID); err != nil {
+		t.Fatal(err)
+	}
+	links, err = s.ListPostingReceiptIDs()
+	if err != nil || len(links[p.ID]) != 1 || links[p.ID][0] != other.ID {
+		t.Fatalf("links after delete = %+v, %v", links, err)
+	}
+	if err := s.DeleteReceipt(context.Background(), other.ID); err != nil {
+		t.Fatal(err)
+	}
+	links, err = s.ListPostingReceiptIDs()
+	if err != nil || len(links) != 0 {
+		t.Fatalf("links after full delete = %+v, %v", links, err)
+	}
+	if got := field(); got != `[]` {
+		t.Fatalf("field after full delete = %s", got)
+	}
+}
+
+func TestSetupRestoresPostingReceiptFieldFromReceipts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "field-backfill.db")
+	d, err := SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := privateTestPlan(t, d, "backfill")
+	p := seedReceiptPosting(t, s)
+	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.db.Exec(`ALTER TABLE postings DROP COLUMN receipt_ids`); err != nil {
+		t.Fatal(err)
+	}
+	d.Close()
+	d, err = SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	scoped, err := d.Plan("plans/backfill")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s = scoped.(*sqliteStore)
+	links, err := s.ListPostingReceiptIDs()
+	if err != nil || len(links[p.ID]) != 1 || links[p.ID][0] != r.ID {
+		t.Fatalf("backfilled links = %+v, %v", links, err)
+	}
+}

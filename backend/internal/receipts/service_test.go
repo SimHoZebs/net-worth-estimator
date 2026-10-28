@@ -317,3 +317,24 @@ func TestImageReplacementDiscardsAnEarlierExtractionCompletion(t *testing.T) {
 	}
 }
 
+func TestListLinksExposesReverseLookupWithoutSecondQuery(t *testing.T) {
+	_, svc, r := serviceFixture(t, nil)
+	links, err := svc.ListLinks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := links[postingID]
+	if !ok || len(got) != 1 || got[0] != r.ID {
+		t.Fatalf("links = %+v", links)
+	}
+	if _, err := svc.Review(r.ID, r.Revision, types.ReceiptDetails{Merchant: "Draft"}, false); err != nil {
+		t.Fatal(err)
+	}
+	links, err = svc.ListLinks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := links[postingID]; len(got) != 1 || got[0] != r.ID {
+		t.Fatalf("links after review = %+v", links)
+	}
+}
