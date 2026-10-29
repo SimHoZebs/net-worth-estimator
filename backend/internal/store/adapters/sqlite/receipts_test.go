@@ -67,7 +67,7 @@ func TestReceiptsStayPlanScopedAndPreserveModel(t *testing.T) {
 		oldID := pair.receipt.ID
 		pair.receipt.ID = "identical-receipt-id"
 		payload, _ := json.Marshal(pair.receipt)
-		if _, err := pair.store.db.Exec(`UPDATE receipts SET id = ?, payload = ? WHERE id = ? AND account_id = :account_id`, pair.receipt.ID, string(payload), oldID); err != nil {
+		if _, err := pair.store.db.Exec(`UPDATE receipts SET id = ?, payload = ? WHERE id = ? AND user_id = :user_id`, pair.receipt.ID, string(payload), oldID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -176,20 +176,20 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	if _, err := s.UpdatePosting(p); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE id = ? AND account_id = :account_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateReceipt(context.Background(), p.ID, "b.png", image); !errors.Is(err, ErrReceiptIneligible) {
 		t.Fatal("pending sync row accepted evidence")
 	}
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 0, source = 'user' WHERE id = ? AND account_id = :account_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 0, source = 'user' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`UPDATE receipts SET size = ? WHERE id = ? AND account_id = :account_id`, ReceiptStorageLimit, r.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE receipts SET size = ? WHERE id = ? AND user_id = :user_id`, ReceiptStorageLimit, r.ID); err != nil {
 		t.Fatal(err)
 	}
 	image.Bytes = []byte("other pixels")
@@ -229,7 +229,7 @@ func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The old replace-on-write path always recomputed owner pending state.
-	if _, err := s.db.Exec(`UPDATE postings SET pending=1 WHERE id=? AND account_id=:account_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE postings SET pending=1 WHERE id=? AND user_id=:user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.UpdatePosting(p); err != nil {
@@ -262,7 +262,7 @@ func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
 	field := func() string {
 		t.Helper()
 		var raw string
-		if err := s.db.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND account_id = :account_id`, p.ID).Scan(&raw); err != nil {
+		if err := s.db.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND user_id = :user_id`, p.ID).Scan(&raw); err != nil {
 			t.Fatal(err)
 		}
 		return raw
@@ -342,7 +342,7 @@ func TestSetupRestoresPostingReceiptFieldFromReceipts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	scoped, err := d.Account("backfill")
+	scoped, err := d.User("backfill")
 	if err != nil {
 		t.Fatal(err)
 	}

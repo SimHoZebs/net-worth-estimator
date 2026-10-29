@@ -5,49 +5,49 @@ import (
 	"database/sql"
 )
 
-// accountDB and accountTx bind the scope explicitly named in every financial
+// userDB and userTx bind the scope explicitly named in every financial
 // SQL statement. They never rewrite SQL or infer a tenant from request state.
-// Scope column is account_id referencing app_accounts(id); model-account
+// Scope column is user_id referencing users(id); model-account
 // references use model_account_id/bridge_account_id to avoid collision.
-type accountDB struct {
+type userDB struct {
 	*sql.DB
-	accountID string
+	userID string
 }
 
-type accountTx struct {
+type userTx struct {
 	*sql.Tx
-	accountID string
+	userID string
 }
 
-func accountArgs(accountID string, args []any) []any {
-	return append(args, sql.Named("account_id", accountID))
+func userArgs(userID string, args []any) []any {
+	return append(args, sql.Named("user_id", userID))
 }
 
-func (d *accountDB) Exec(q string, args ...any) (sql.Result, error) {
-	return d.DB.Exec(q, accountArgs(d.accountID, args)...)
+func (d *userDB) Exec(q string, args ...any) (sql.Result, error) {
+	return d.DB.Exec(q, userArgs(d.userID, args)...)
 }
-func (d *accountDB) Query(q string, args ...any) (*sql.Rows, error) {
-	return d.DB.Query(q, accountArgs(d.accountID, args)...)
+func (d *userDB) Query(q string, args ...any) (*sql.Rows, error) {
+	return d.DB.Query(q, userArgs(d.userID, args)...)
 }
-func (d *accountDB) QueryRow(q string, args ...any) *sql.Row {
-	return d.DB.QueryRow(q, accountArgs(d.accountID, args)...)
+func (d *userDB) QueryRow(q string, args ...any) *sql.Row {
+	return d.DB.QueryRow(q, userArgs(d.userID, args)...)
 }
-func (d *accountDB) Begin() (*accountTx, error) {
+func (d *userDB) Begin() (*userTx, error) {
 	return d.BeginTx(context.Background(), nil)
 }
-func (d *accountDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*accountTx, error) {
+func (d *userDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*userTx, error) {
 	tx, err := d.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return &accountTx{Tx: tx, accountID: d.accountID}, nil
+	return &userTx{Tx: tx, userID: d.userID}, nil
 }
-func (t *accountTx) Exec(q string, args ...any) (sql.Result, error) {
-	return t.Tx.Exec(q, accountArgs(t.accountID, args)...)
+func (t *userTx) Exec(q string, args ...any) (sql.Result, error) {
+	return t.Tx.Exec(q, userArgs(t.userID, args)...)
 }
-func (t *accountTx) Query(q string, args ...any) (*sql.Rows, error) {
-	return t.Tx.Query(q, accountArgs(t.accountID, args)...)
+func (t *userTx) Query(q string, args ...any) (*sql.Rows, error) {
+	return t.Tx.Query(q, userArgs(t.userID, args)...)
 }
-func (t *accountTx) QueryRow(q string, args ...any) *sql.Row {
-	return t.Tx.QueryRow(q, accountArgs(t.accountID, args)...)
+func (t *userTx) QueryRow(q string, args ...any) *sql.Row {
+	return t.Tx.QueryRow(q, userArgs(t.userID, args)...)
 }

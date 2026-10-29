@@ -123,7 +123,7 @@ test("offline preview pins exact artifact bytes, target, source version, and dig
     /source version and target/,
   );
   const modified = structuredClone(plan);
-  modified.seed.permissions[1].actions.push("account:write");
+  modified.seed.permissions[1].actions.push("user:write");
   const modifiedBytes = serializePermissionPlan(modified);
   assert.throws(
     () => approvedPermissionPlan(modifiedBytes, permissionDigest(modifiedBytes), target),

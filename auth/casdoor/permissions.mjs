@@ -1,11 +1,11 @@
 // Casdoor v4.23.0 imports models, roles, adapters, then permissions. See:
 // https://github.com/casdoor/casdoor/blob/v4.23.0/object/init_data.go
 // https://github.com/casdoor/casdoor/blob/v4.23.0/object/permission_enforcer.go
-export const permissionModelId = "waypoint/account-access";
-export const permissionAdapter = "account-policy-store";
-export const accountActions = Object.freeze(["account:read", "account:project", "account:write"]);
+export const permissionModelId = "waypoint/user-access";
+export const permissionAdapter = "user-policy-store";
+export const userActions = Object.freeze(["user:read", "user:project", "user:write"]);
 
-export const accountModelText = `[request_definition]
+export const userModelText = `[request_definition]
 r = sub, obj, act, owner
 
 [policy_definition]
@@ -18,12 +18,12 @@ g = _, _
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 
 [matchers]
-m = ((p.sub == "waypoint/account-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "accounts/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
+m = ((p.sub == "waypoint/user-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "users/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
 `;
 
-// Account scope: action strings are account:* under waypoint/account-access.
-// Permission resources are accounts/* only, including the guest sample
-// accounts/sample (global read-only).
+// User scope: action strings are user:* under waypoint/user-access.
+// Permission resources are users/* only, including the guest sample
+// users/sample (global read-only).
 export function buildPermissionSeed() {
   const role = (name, displayName, description) => ({
     owner: "waypoint",
@@ -60,21 +60,21 @@ export function buildPermissionSeed() {
     models: [
       {
         owner: "waypoint",
-        name: "account-access",
-        displayName: "Waypoint account access",
-        modelText: accountModelText,
+        name: "user-access",
+        displayName: "Waypoint user access",
+        modelText: userModelText,
       },
     ],
     roles: [
       role(
-        "account-owner",
-        "Private account owner",
-        "Contextual role: the verified actor owns this private account. No signup-time role writes.",
+        "user-owner",
+        "Private user owner",
+        "Contextual role: the verified actor owns this private user. No signup-time role writes.",
       ),
       role(
         "guest",
-        "Sample account guest",
-        "Contextual role: an anonymous actor can read and project only the separate sample account.",
+        "Sample user guest",
+        "Contextual role: an anonymous actor can read and project only the separate sample user.",
       ),
     ],
     adapters: [
@@ -87,18 +87,18 @@ export function buildPermissionSeed() {
     ],
     permissions: [
       permission(
-        "own-private-account",
-        "Own private account: read, project, write",
-        "account-owner",
-        ["accounts/*"],
-        [...accountActions],
+        "own-private-user",
+        "Own private user: read, project, write",
+        "user-owner",
+        ["users/*"],
+        [...userActions],
       ),
       permission(
-        "guest-sample-account",
-        "Sample account: guest read and project",
+        "guest-sample-user",
+        "Sample user: guest read and project",
         "guest",
-        ["accounts/sample"],
-        ["account:read", "account:project"],
+        ["users/sample"],
+        ["user:read", "user:project"],
       ),
     ],
   };

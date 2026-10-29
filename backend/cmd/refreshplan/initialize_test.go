@@ -23,14 +23,14 @@ func TestInitializeSeedsOnlySelectedFinancialScopeForDevIdentity(t *testing.T) {
 	if err := initialize(target, source, "other", issuer, subject); err != nil {
 		t.Fatal(err)
 	}
-	accountID := authorization.ActorKey(issuer, subject)
+	userID := authorization.ActorKey(issuer, subject)
 	for _, check := range []struct{ sql, want string }{
-		{"SELECT COUNT(*) FROM app_accounts", "1"},
-		{"SELECT issuer FROM app_accounts", issuer},
-		{"SELECT subject FROM app_accounts", subject},
-		{"SELECT id FROM app_accounts", accountID},
+		{"SELECT COUNT(*) FROM users", "1"},
+		{"SELECT issuer FROM users", issuer},
+		{"SELECT subject FROM users", subject},
+		{"SELECT id FROM users", userID},
 		{"SELECT name FROM accounts", "other"},
-		{"SELECT account_id FROM accounts", accountID},
+		{"SELECT user_id FROM accounts", userID},
 		{"SELECT document_present FROM model_metadata", "1"},
 		{"SELECT COUNT(*) FROM sessions", "0"},
 		{"SELECT COUNT(*) FROM identity_grants", "0"},
@@ -60,7 +60,7 @@ func TestInitializeInfersOnlyUnambiguousPrivateSource(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "dev.db")
 	seed(t, source)
-	if err := initialize(target, source, "", "http://dev.invalid", "dev-owner"); err == nil || !strings.Contains(err.Error(), "exactly one private account") {
+	if err := initialize(target, source, "", "http://dev.invalid", "dev-owner"); err == nil || !strings.Contains(err.Error(), "exactly one private user") {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
@@ -70,7 +70,7 @@ func TestInitializeInfersOnlyUnambiguousPrivateSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.SQL().Exec("DELETE FROM app_accounts WHERE id='other'")
+	_, err = db.SQL().Exec("DELETE FROM users WHERE id='other'")
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +92,7 @@ func TestInitializeFailedCopyPublishesNoDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
-		INSERT INTO checkpoints(account_id,id,position,date,model_account_id,balance)
+		INSERT INTO checkpoints(user_id,id,position,date,model_account_id,balance)
 		VALUES ('owner',1,0,'2026-01-01','missing',1)`)
 	db.Close()
 	if err != nil {

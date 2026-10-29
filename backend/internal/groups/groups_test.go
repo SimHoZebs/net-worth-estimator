@@ -57,11 +57,11 @@ func do(t *testing.T, h *groups.Handler, method, target, subject, body string, h
 
 func mustCreateGroup(t *testing.T, db store.Database, owner, name string) string {
 	t.Helper()
-	account, err := db.EnsureGroupAccount(testIssuer, owner)
+	user, err := db.EnsureGroupUser(testIssuer, owner)
 	if err != nil {
 		t.Fatal(err)
 	}
-	group, err := db.CreateGroup(account, name, owner)
+	group, err := db.CreateGroup(user, name, owner)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestGroupsHTTPRequiresAuthentication(t *testing.T) {
 
 func TestGroupsHTTPValidationNeverLeaksInternals(t *testing.T) {
 	h, db := testHandler(t, false)
-	if _, err := db.EnsureGroupAccount(testIssuer, "alice"); err != nil {
+	if _, err := db.EnsureGroupUser(testIssuer, "alice"); err != nil {
 		t.Fatal(err)
 	}
 	w := do(t, h, "POST", "/v1/groups", "alice", `{"name":""}`, nil)
@@ -110,7 +110,7 @@ func TestGroupsHTTPValidationNeverLeaksInternals(t *testing.T) {
 
 func TestGroupsHTTPReadOnlyRejectsWrites(t *testing.T) {
 	h, db := testHandler(t, true)
-	if _, err := db.EnsureGroupAccount(testIssuer, "alice"); err != nil {
+	if _, err := db.EnsureGroupUser(testIssuer, "alice"); err != nil {
 		t.Fatal(err)
 	}
 	id := mustCreateGroup(t, db, "alice", "Readonly")
@@ -134,7 +134,7 @@ func TestGroupsHTTPReadOnlyRejectsWrites(t *testing.T) {
 func TestGroupsHTTPMembershipMatrix(t *testing.T) {
 	h, db := testHandler(t, false)
 	for _, user := range []string{"alice", "bob"} {
-		if _, err := db.EnsureGroupAccount(testIssuer, user); err != nil {
+		if _, err := db.EnsureGroupUser(testIssuer, user); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -148,7 +148,7 @@ func TestGroupsHTTPMembershipMatrix(t *testing.T) {
 	}
 
 	// Alice invites Bob; Bob reads but cannot manage.
-	invite, code, err := db.CreateInvite(id, mustAccount(t, db, "alice"), 5, 24*time.Hour)
+	invite, code, err := db.CreateInvite(id, mustUser(t, db, "alice"), 5, 24*time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestGroupsHTTPMembershipMatrix(t *testing.T) {
 	if w := do(t, h, "GET", "/v1/groups/"+id, "bob", "", nil); w.Code != http.StatusOK {
 		t.Fatalf("member get = %d, want 200", w.Code)
 	}
-	if w := do(t, h, "DELETE", "/v1/groups/"+id+"/members/"+mustAccount(t, db, "alice"), "bob", "", nil); w.Code != http.StatusForbidden {
+	if w := do(t, h, "DELETE", "/v1/groups/"+id+"/members/"+mustUser(t, db, "alice"), "bob", "", nil); w.Code != http.StatusForbidden {
 		t.Fatalf("member kick owner = %d, want 403", w.Code)
 	}
 	// Accepting the same code twice is a 400, not a 500.
@@ -177,13 +177,13 @@ func TestGroupsHTTPMembershipMatrix(t *testing.T) {
 	}
 }
 
-func mustAccount(t *testing.T, db store.Database, subject string) string {
+func mustUser(t *testing.T, db store.Database, subject string) string {
 	t.Helper()
-	account, err := db.EnsureGroupAccount(testIssuer, subject)
+	user, err := db.EnsureGroupUser(testIssuer, subject)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return account
+	return user
 }
 
 func strconv_quote(s string) string {
@@ -198,7 +198,7 @@ func TestGroupsHTTPMethodAndPreflight(t *testing.T) {
 		t.Fatalf("PUT = %d allow=%q, want 405 with Allow", w.Code, w.Header().Get("Allow"))
 	}
 	h2, db2 := testHandler(t, false)
-	if _, err := db2.EnsureGroupAccount(testIssuer, "alice"); err != nil {
+	if _, err := db2.EnsureGroupUser(testIssuer, "alice"); err != nil {
 		t.Fatal(err)
 	}
 	leaveID := mustCreateGroup(t, db2, "alice", "Methods")

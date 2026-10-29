@@ -88,11 +88,11 @@ func main() {
 
 	resources, err := resourceConfigFromEnv(os.Getenv)
 	if err != nil {
-		log.Fatalf("configure account resources: %v", err)
+		log.Fatalf("configure user resources: %v", err)
 	}
 	syncStore, err := ownerSyncStore(database, identityConfig.Issuer, resources.OwnerSubject)
 	if err != nil {
-		log.Fatalf("configure SimpleFIN account: %v", err)
+		log.Fatalf("configure SimpleFIN user: %v", err)
 	}
 	syncRunner, syncStop := configureSync(syncStore)
 	defer syncStop()

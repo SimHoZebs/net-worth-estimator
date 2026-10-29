@@ -131,8 +131,8 @@ func TestSetupDatabaseAndRepeatedOpenPreserveSchemaAndData(t *testing.T) {
 		if err := d.SQL().QueryRow(`SELECT token FROM sessions`).Scan(&token); err != nil || token != "session" {
 			t.Fatalf("session = %q, %v", token, err)
 		}
-		if exists, err := d.HasAccount("a"); err != nil || !exists {
-			t.Fatalf("account = %v, %v", exists, err)
+		if exists, err := d.HasUser("a"); err != nil || !exists {
+			t.Fatalf("user = %v, %v", exists, err)
 		}
 		if err := d.Close(); err != nil {
 			t.Fatal(err)
@@ -197,8 +197,8 @@ func TestSetupDatabaseAcceptsEmptyFileAndCompletesSharedSchema(t *testing.T) {
 			t.Fatal(err)
 		}
 		var count int
-		if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM app_accounts`).Scan(&count); err != nil || count != 0 {
-			t.Fatalf("setup provisioned accounts: %d, %v", count, err)
+		if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("setup provisioned users: %d, %v", count, err)
 		}
 		if err := d.Close(); err != nil {
 			t.Fatal(err)

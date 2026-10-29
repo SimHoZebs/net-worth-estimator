@@ -88,7 +88,7 @@ func TestReceiptReplacementIsolationDuplicateAndQuota(t *testing.T) {
 	if _, err := a.ReplaceReceiptImage(context.Background(), r.ID, r.Revision, "duplicate.png", otherImage); !errors.Is(err, ErrReceiptDuplicate) {
 		t.Fatalf("duplicate replace = %v", err)
 	}
-	if _, err := a.db.Exec(`UPDATE receipts SET size = ? WHERE id = ? AND account_id = :account_id`, ReceiptStorageLimit-r.Size, other.ID); err != nil {
+	if _, err := a.db.Exec(`UPDATE receipts SET size = ? WHERE id = ? AND user_id = :user_id`, ReceiptStorageLimit-r.Size, other.ID); err != nil {
 		t.Fatal(err)
 	}
 	image.Bytes = bytes.Repeat([]byte("x"), 100)

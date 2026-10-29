@@ -45,13 +45,13 @@ func execSyncSetup(t *testing.T, store *sqliteStore, statements []string) {
 func seedSyncRows(t *testing.T, store *sqliteStore) {
 	t.Helper()
 	execSyncSetup(t, store, []string{
-		`INSERT INTO accounts (id, position, name, enabled, account_id) VALUES ('prime_card', 1, 'Prime', 1, :account_id)`,
-		`INSERT INTO entity_ids (id, kind, account_id) VALUES ('prime_card', 'account', :account_id)`,
-		`INSERT INTO checkpoints (id, position, date, model_account_id, balance, source, account_id) VALUES (10, 10, '2026-08-01', 'checking', 111, 'simplefin', :account_id)`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, account_id)
-		 VALUES ('` + rawSyncedPostingID + `', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin', 1, :account_id)`,
-		`INSERT INTO entity_ids (id, kind, account_id) VALUES ('` + rawSyncedPostingID + `', 'posting', :account_id)`,
-		`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, account_id) VALUES ('simplefin', 'bridge-prime', 'tx1', '` + rawSyncedPostingID + `', :account_id)`,
+		`INSERT INTO accounts (id, position, name, enabled, user_id) VALUES ('prime_card', 1, 'Prime', 1, :user_id)`,
+		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('prime_card', 'account', :user_id)`,
+		`INSERT INTO checkpoints (id, position, date, model_account_id, balance, source, user_id) VALUES (10, 10, '2026-08-01', 'checking', 111, 'simplefin', :user_id)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id)
+		 VALUES ('` + rawSyncedPostingID + `', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin', 1, :user_id)`,
+		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + rawSyncedPostingID + `', 'posting', :user_id)`,
+		`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES ('simplefin', 'bridge-prime', 'tx1', '` + rawSyncedPostingID + `', :user_id)`,
 	})
 }
 
@@ -190,10 +190,10 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO checkpoints (id, position, date, model_account_id, balance, source, account_id) VALUES (11, 11, '2026-08-02', 'checking', 222, 'plaid', :account_id)`,
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, account_id)
-		 VALUES ('` + otherSyncedPostingID + `', 11, 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'plaid', 1, :account_id)`,
-		`INSERT INTO entity_ids (id, kind, account_id) VALUES ('` + otherSyncedPostingID + `', 'posting', :account_id)`,
+		`INSERT INTO checkpoints (id, position, date, model_account_id, balance, source, user_id) VALUES (11, 11, '2026-08-02', 'checking', 222, 'plaid', :user_id)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id)
+		 VALUES ('` + otherSyncedPostingID + `', 11, 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'plaid', 1, :user_id)`,
+		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + otherSyncedPostingID + `', 'posting', :user_id)`,
 	})
 	tx, err := store.db.Begin()
 	if err != nil {
@@ -252,7 +252,7 @@ func syncPendingPosting(id, accountID, day string) SyncPosting {
 func countRows(t *testing.T, store *sqliteStore, table, where string) int {
 	t.Helper()
 	var count int
-	query := `SELECT COUNT(*) FROM ` + table + ` WHERE account_id = :account_id`
+	query := `SELECT COUNT(*) FROM ` + table + ` WHERE user_id = :user_id`
 	if where != "" {
 		query += ` AND ` + where
 	}
@@ -307,8 +307,8 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedAccount(t, store, "prime_card")
 	execSyncSetup(t, store, []string{
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, account_id)
-		 VALUES ('` + ownerPostingID + `', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'user', 1, :account_id)`,
+		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id)
+		 VALUES ('` + ownerPostingID + `', 0, 'Manual', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 1, 'user', 1, :user_id)`,
 	})
 	summary, err := store.ApplySyncPlan(nil, []BankDirective{
 		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
@@ -424,14 +424,14 @@ func TestSetupRenamesOwnerSourceValue(t *testing.T) {
 	}
 	privateTestPlan(t, database, "other")
 	account := "checking"
-	plan, err := database.Account("other")
+	plan, err := database.User("other")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := plan.CreateAccount(types.Account{ID: account, Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.SQL().Exec(`INSERT INTO postings (id, position, name, source_account_id, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, account_id) VALUES ('row', 0, 'Legacy', 'checking', '{}', 1, 1, 1, 'model', 0, 'other')`); err != nil {
+	if _, err := database.SQL().Exec(`INSERT INTO postings (id, position, name, source_account_id, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id) VALUES ('row', 0, 'Legacy', 'checking', '{}', 1, 1, 1, 'model', 0, 'other')`); err != nil {
 		t.Fatal(err)
 	}
 	database.Close()

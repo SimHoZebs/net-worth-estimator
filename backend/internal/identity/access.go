@@ -12,13 +12,13 @@ import (
 const ResourceHeader = "Waypoint-Resource"
 
 // The header name stays Waypoint-Resource: browsers and the nwe CLI already
-// assert it, and the value is now an account resource (accounts/<opaque-id>,
-// guest accounts/sample). Only the copy changes from plan to account; the 409
+// assert it, and the value is now a user resource (users/<opaque-id>,
+// guest users/sample). Only the copy changes from plan to user; the 409
 // RESOURCE_CHANGED contract is unchanged.
 
-// WriteResourceChanged distinguishes a stale account assertion from an operation conflict.
+// WriteResourceChanged distinguishes a stale user assertion from an operation conflict.
 func WriteResourceChanged(w http.ResponseWriter) {
-	failureWithCode(w, http.StatusConflict, "The active account changed. Reload the session before this request.", "RESOURCE_CHANGED")
+	failureWithCode(w, http.StatusConflict, "The active user changed. Reload the session before this request.", "RESOURCE_CHANGED")
 }
 
 type scopeKey struct{}
@@ -53,21 +53,21 @@ func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization
 }
 
 // Every unknown state-changing route requires write permission by default.
-// Action strings are account:* under the Casdoor model waypoint/account-access.
+// Action strings are user:* under the Casdoor model waypoint/user-access.
 func requestAction(r *http.Request) string {
 	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic") {
-		return "account:project"
+		return "user:project"
 	}
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
-		return "account:read"
+		return "user:read"
 	}
-	return "account:write"
+	return "user:write"
 }
 
 // IsGroupRoute reports social group routes, which need authentication
-// only. Membership is enforced by the groups handler, not account
+// only. Membership is enforced by the groups handler, not user
 // permissions. It matches exactly the routes the groups handler serves so
-// no future account route can hide inside the bypass.
+// no future user route can hide inside the bypass.
 func IsGroupRoute(path string) bool {
 	return path == "/v1/groups" || strings.HasPrefix(path, "/v1/groups/") ||
 		path == "/v1/invites/accept"

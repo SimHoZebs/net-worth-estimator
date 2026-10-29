@@ -206,9 +206,9 @@ func newService(t *testing.T, p *testIDP, path string, options ...func(*Config))
 	t.Helper()
 	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour,
 		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
-			permissions := []string{"account:read", "account:project"}
+			permissions := []string{"user:read", "user:project"}
 			if subject != "" {
-				permissions = append(permissions, "account:write")
+				permissions = append(permissions, "user:write")
 			}
 			return authorization.Scope{Resource: authorization.ResourceFor(p.server.URL, subject), Permissions: permissions}, nil
 		},
@@ -356,7 +356,7 @@ func TestOIDCIdentityVerification(t *testing.T) {
 	}
 }
 
-func TestAccountAccessSessionsAndCSRF(t *testing.T) {
+func TestUserAccessSessionsAndCSRF(t *testing.T) {
 	p := newIDP(t)
 	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
 	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -17,7 +17,7 @@ import (
 
 // These tests use the HTTP API over two scopes of one physical database. Router
 // authorization tests separately prove that the caller cannot choose a scope.
-func TestSharedDatabaseAPICanonicalReadsRemainAccountScoped(t *testing.T) {
+func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainAccountScoped(t *testing.T) {
 	handlers := make([]http.Handler, 2)
 	for i, subject := range []string{"alice", "bob"} {
 		resource := authorization.ResourceFor(issuer, subject)
-		stores[i], err = database.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject)
+		stores[i], err = database.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +100,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainAccountScoped(t *testing.T) {
 	}
 }
 
-func TestSharedDatabaseAPIProjectionResultsRemainAccountScoped(t *testing.T) {
+func TestSharedDatabaseAPIProjectionResultsRemainUserScoped(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestSharedDatabaseAPIProjectionResultsRemainAccountScoped(t *testing.T) {
 	const issuer = "https://identity.example"
 	for _, subject := range []string{"alice", "bob"} {
 		resource := authorization.ResourceFor(issuer, subject)
-		plan, err := database.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject)
+		plan, err := database.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject)
 		if err != nil {
 			t.Fatal(err)
 		}

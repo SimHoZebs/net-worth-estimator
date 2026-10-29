@@ -1,4 +1,4 @@
-// Command refreshplan replaces one account's financial rows in an application
+// Command refreshplan replaces one user's financial rows in an application
 // database. It never replaces the database file or copies identity records.
 // Stop the application and take a SQLite backup before this offline operation.
 package main
@@ -30,14 +30,14 @@ var financialTables = []string{
 }
 
 func main() {
-	var target, source, sourceAccount, targetAccount string
+	var target, source, sourceUser, targetUser string
 	var initIssuer, initSubject string
 	var sample bool
 	flag.StringVar(&target, "db", "", "existing application database (application must be stopped)")
 	flag.StringVar(&source, "source", "", "application database snapshot")
-	flag.StringVar(&sourceAccount, "source-account", "", "explicit source account ID")
-	flag.StringVar(&targetAccount, "account", "", "existing destination private account ID")
-	flag.BoolVar(&sample, "sample", false, "publish canonical financial data to accounts/sample")
+	flag.StringVar(&sourceUser, "source-user", "", "explicit source user ID")
+	flag.StringVar(&targetUser, "user", "", "existing destination private user ID")
+	flag.BoolVar(&sample, "sample", false, "publish canonical financial data to users/sample")
 	flag.StringVar(&initIssuer, "init-issuer", "", "initialize a NEW database for this verified dev issuer")
 	flag.StringVar(&initSubject, "init-subject", "", "initialize a NEW database for this verified dev subject")
 	flag.Parse()
@@ -46,32 +46,32 @@ func main() {
 	}
 	var err error
 	if initIssuer != "" || initSubject != "" {
-		if sample || targetAccount != "" {
-			log.Fatal("initialization cannot combine with --sample or --account")
+		if sample || targetUser != "" {
+			log.Fatal("initialization cannot combine with --sample or --user")
 		}
-		err = initialize(target, source, sourceAccount, initIssuer, initSubject)
+		err = initialize(target, source, sourceUser, initIssuer, initSubject)
 	} else {
-		err = refresh(target, source, sourceAccount, targetAccount, sample)
+		err = refresh(target, source, sourceUser, targetUser, sample)
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func refresh(target, source, sourceAccount, targetAccount string, sample bool) error {
-	if target == "" || source == "" || sourceAccount == "" {
-		return errors.New("--db, --source, and --source-account are required")
+func refresh(target, source, sourceUser, targetUser string, sample bool) error {
+	if target == "" || source == "" || sourceUser == "" {
+		return errors.New("--db, --source, and --source-user are required")
 	}
 	if sample {
-		if targetAccount != "" && targetAccount != sampleResourceID {
-			return errors.New("--sample can only replace accounts/sample")
+		if targetUser != "" && targetUser != sampleResourceID {
+			return errors.New("--sample can only replace users/sample")
 		}
-		targetAccount = sampleResourceID
-	} else if targetAccount == "" || normalizeAccountRow(targetAccount) == sqlite.SampleAccountID {
-		return errors.New("--account must name an existing private account; use --sample to publish public data")
+		targetUser = sampleResourceID
+	} else if targetUser == "" || normalizeUserRow(targetUser) == sqlite.SampleUserID {
+		return errors.New("--user must name an existing private user; use --sample to publish public data")
 	}
-	sourceRow := normalizeAccountRow(sourceAccount)
-	targetRow := normalizeAccountRow(targetAccount)
+	sourceRow := normalizeUserRow(sourceUser)
+	targetRow := normalizeUserRow(targetUser)
 	for _, path := range []string{target, source} {
 		info, err := os.Stat(path)
 		if err != nil {
@@ -105,11 +105,11 @@ func refresh(target, source, sourceAccount, targetAccount string, sample bool) e
 		return err
 	}
 	var present int
-	if err := db.SQL().QueryRow("SELECT document_present FROM incoming.model_metadata WHERE account_id=? AND id=1", sourceRow).Scan(&present); err != nil {
-		return fmt.Errorf("source account must contain a current financial model: %w", err)
+	if err := db.SQL().QueryRow("SELECT document_present FROM incoming.model_metadata WHERE user_id=? AND id=1", sourceRow).Scan(&present); err != nil {
+		return fmt.Errorf("source user must contain a current financial model: %w", err)
 	}
 	if present != 1 {
-		return errors.New("source account has no financial model")
+		return errors.New("source user has no financial model")
 	}
 	var receipts *sqlite.ReceiptCopy
 	if !sample {
@@ -138,28 +138,28 @@ func refresh(target, source, sourceAccount, targetAccount string, sample bool) e
 		// The financial copy supplies singleton rows and defaults. Create only
 		// the registry row here, within that same transaction, so a failed first
 		// publication cannot expose a blank sample.
-		if _, err := tx.Exec("INSERT INTO app_accounts(id, issuer, subject) VALUES (?, 'sample', 'sample') ON CONFLICT(id) DO NOTHING", targetRow); err != nil {
+		if _, err := tx.Exec("INSERT INTO users(id, issuer, subject) VALUES (?, 'sample', 'sample') ON CONFLICT(id) DO NOTHING", targetRow); err != nil {
 			return err
 		}
 	}
 	var exists bool
-	if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM app_accounts WHERE id=?)", targetRow).Scan(&exists); err != nil {
-		return fmt.Errorf("destination account must already exist: %w", err)
+	if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id=?)", targetRow).Scan(&exists); err != nil {
+		return fmt.Errorf("destination user must already exist: %w", err)
 	}
 	if !exists {
-		return errors.New("destination account must already exist")
+		return errors.New("destination user must already exist")
 	}
 	if sample {
-		if targetRow != sqlite.SampleAccountID {
-			return errors.New("sample account ownership conflict")
+		if targetRow != sqlite.SampleUserID {
+			return errors.New("sample user ownership conflict")
 		}
-	} else if targetRow == sqlite.SampleAccountID {
-		return errors.New("destination must be a private account")
+	} else if targetRow == sqlite.SampleUserID {
+		return errors.New("destination must be a private user")
 	}
 	// Child tables precede parents during deletion. Deferred checks also permit
 	// future references between canonical tables within the same transaction.
 	for i := len(tables) - 1; i >= 0; i-- {
-		if _, err := tx.Exec("DELETE FROM "+quote(tables[i].name)+" WHERE account_id=?", targetRow); err != nil {
+		if _, err := tx.Exec("DELETE FROM "+quote(tables[i].name)+" WHERE user_id=?", targetRow); err != nil {
 			return err
 		}
 	}
@@ -170,9 +170,9 @@ func refresh(target, source, sourceAccount, targetAccount string, sample bool) e
 		if sample && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations") {
 			continue
 		}
-		columns, values := []string{"account_id"}, []string{"?"}
+		columns, values := []string{"user_id"}, []string{"?"}
 		for _, column := range table.columns {
-			if column == "account_id" {
+			if column == "user_id" {
 				continue
 			}
 			columns = append(columns, quote(column))
@@ -194,7 +194,7 @@ func refresh(target, source, sourceAccount, targetAccount string, sample bool) e
 				values = append(values, quote(column))
 			}
 		}
-		query := "INSERT INTO " + quote(table.name) + " (" + strings.Join(columns, ",") + ") SELECT " + strings.Join(values, ",") + " FROM incoming." + quote(table.name) + " WHERE account_id=?"
+		query := "INSERT INTO " + quote(table.name) + " (" + strings.Join(columns, ",") + ") SELECT " + strings.Join(values, ",") + " FROM incoming." + quote(table.name) + " WHERE user_id=?"
 		if _, err := tx.Exec(query, targetRow, sourceRow); err != nil {
 			return fmt.Errorf("copy %s: %w", table.name, err)
 		}
@@ -207,17 +207,17 @@ func refresh(target, source, sourceAccount, targetAccount string, sample bool) e
 	return tx.Commit()
 }
 
-// sampleResourceID is the guest sample account resource. normalizeAccountRow
-// maps it (and any private account resource) to the store's account row ID:
-// accounts/<hash> is owned by user:<hash>; raw row IDs pass through for
+// sampleResourceID is the guest sample user resource. normalizeUserRow
+// maps it (and any private user resource) to the store's user row ID:
+// users/<hash> is owned by user:<hash>; raw row IDs pass through for
 // offline operators.
-const sampleResourceID = "accounts/sample"
+const sampleResourceID = "users/sample"
 
-func normalizeAccountRow(id string) string {
+func normalizeUserRow(id string) string {
 	if id == sampleResourceID {
-		return sqlite.SampleAccountID
+		return sqlite.SampleUserID
 	}
-	if rest, ok := strings.CutPrefix(id, "accounts/"); ok {
+	if rest, ok := strings.CutPrefix(id, "users/"); ok {
 		return "user:" + rest
 	}
 	return id
@@ -228,8 +228,8 @@ type tableShape struct {
 	columns []string
 }
 
-// identityTables are account-scoped but never financial: social membership
-// belongs to the group boundary, not to the copied account. They stay
+// identityTables are user-scoped but never financial: social membership
+// belongs to the group boundary, not to the copied user. They stay
 // outside the allowlist and are skipped in both schemas; any other unknown
 // scoped table still fails closed.
 var identityTables = map[string]bool{
@@ -269,7 +269,7 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 			}
 			scoped := false
 			for _, column := range columns {
-				if column == "account_id" {
+				if column == "user_id" {
 					scoped = true
 				}
 			}
@@ -280,7 +280,7 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 				continue
 			}
 			if !allowed[name] {
-				return nil, fmt.Errorf("unknown account-scoped table %s; review refresh allowlist", name)
+				return nil, fmt.Errorf("unknown user-scoped table %s; review refresh allowlist", name)
 			}
 			shapes = append(shapes, tableShape{name, columns})
 		}

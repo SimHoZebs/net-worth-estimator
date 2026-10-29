@@ -6,11 +6,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func insertPurchasePolicy(tx *accountTx, posting *types.Posting) error {
+func insertPurchasePolicy(tx *userTx, posting *types.Posting) error {
 	if posting.Purchase == nil {
 		return nil
 	}
-	_, err := tx.Exec(`INSERT INTO purchase_policies (posting_id, priority, account_id) VALUES (?,?, :account_id)`, posting.ID, posting.Purchase.Priority)
+	_, err := tx.Exec(`INSERT INTO purchase_policies (posting_id, priority, user_id) VALUES (?,?, :user_id)`, posting.ID, posting.Purchase.Priority)
 	if err != nil {
 		return fmt.Errorf("save purchase policy %s: %w", posting.ID, err)
 	}
@@ -18,7 +18,7 @@ func insertPurchasePolicy(tx *accountTx, posting *types.Posting) error {
 }
 
 func loadPurchasePolicies(q queryer, postings []types.Posting) error {
-	rows, err := q.Query(`SELECT posting_id, priority FROM purchase_policies WHERE account_id = :account_id`)
+	rows, err := q.Query(`SELECT posting_id, priority FROM purchase_policies WHERE user_id = :user_id`)
 	if err != nil {
 		return err
 	}
