@@ -36,7 +36,7 @@ func main() {
 	flag.StringVar(&target, "db", "", "existing application database (application must be stopped)")
 	flag.StringVar(&source, "source", "", "application database snapshot")
 	flag.StringVar(&sourcePlan, "source-plan", "", "explicit source account ID")
-	flag.StringVar(&targetPlan, "plan", "", "existing destination private account ID")
+	flag.StringVar(&targetPlan, "account", "", "existing destination private account ID")
 	flag.BoolVar(&sample, "sample", false, "publish canonical financial data to accounts/sample")
 	flag.StringVar(&initIssuer, "init-issuer", "", "initialize a NEW database for this verified dev issuer")
 	flag.StringVar(&initSubject, "init-subject", "", "initialize a NEW database for this verified dev subject")
@@ -47,7 +47,7 @@ func main() {
 	var err error
 	if initIssuer != "" || initSubject != "" {
 		if sample || targetPlan != "" {
-			log.Fatal("initialization cannot combine with --sample or --plan")
+			log.Fatal("initialization cannot combine with --sample or --account")
 		}
 		err = initialize(target, source, sourcePlan, initIssuer, initSubject)
 	} else {
@@ -68,7 +68,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 		}
 		targetPlan = sampleResourceID
 	} else if targetPlan == "" || normalizeAccountRow(targetPlan) == sqlite.SampleAccountID {
-		return errors.New("--plan must name an existing private account; use --sample to publish public data")
+		return errors.New("--account must name an existing private account; use --sample to publish public data")
 	}
 	sourceRow := normalizeAccountRow(sourcePlan)
 	targetRow := normalizeAccountRow(targetPlan)

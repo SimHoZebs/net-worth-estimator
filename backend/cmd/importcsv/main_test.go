@@ -16,39 +16,39 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestRequiresExplicitDatabaseAndPlan(t *testing.T) {
-	for _, args := range [][]string{nil, {"--db", filepath.Join(t.TempDir(), "absent.db")}, {"--plan", "plans/sample"}} {
+func TestRequiresExplicitDatabaseAndAccount(t *testing.T) {
+	for _, args := range [][]string{nil, {"--db", filepath.Join(t.TempDir(), "absent.db")}, {"--account", "accounts/sample"}} {
 		var out, errOut bytes.Buffer
 		if code := run(args, &out, &errOut); code != 2 {
 			t.Fatalf("code=%d stderr=%s", code, errOut.String())
 		}
-		if !strings.Contains(errOut.String(), "--plan") || out.Len() != 0 {
+		if !strings.Contains(errOut.String(), "--account") || out.Len() != 0 {
 			t.Fatalf("unexpected output: %q %q", out.String(), errOut.String())
 		}
 	}
 }
 
-func TestScopedImportPreservesOtherPlanAndIdentity(t *testing.T) {
+func TestScopedImportPreservesOtherAccountAndIdentity(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "shared.db")
 	db, err := sqlite.SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	var plans []string
+	var accounts []string
 	for _, subject := range []string{"alice", "bob"} {
-		resource := authorization.ResourceFor("https://issuer.example", subject)
-		plan, err := db.EnsurePrivatePlan(resource.ID, resource.Owner, "https://issuer.example", subject)
+		accountID := authorization.ActorKey("https://issuer.example", subject)
+		account, err := db.EnsureAccount(accountID, "https://issuer.example", subject)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := plan.InitializeDocument(); err != nil {
+		if err := account.InitializeDocument(); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := plan.CreateAccount(types.Account{ID: "same-id", Name: subject, Kind: types.AccountKind("cash"), Enabled: true}); err != nil {
+		if _, err := account.CreateAccount(types.Account{ID: "same-id", Name: subject, Kind: types.AccountKind("cash"), Enabled: true}); err != nil {
 			t.Fatal(err)
 		}
-		plans = append(plans, resource.ID)
+		accounts = append(accounts, accountID)
 	}
 	_, err = db.SQL().Exec(`INSERT INTO sessions VALUES('opaque-token',X'00FF',999);
 INSERT INTO identity_grants VALUES('grant-id','issuer','subject','sid',999,X'0100');
@@ -57,7 +57,7 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := protectedRows(t, db.SQL(), plans[1])
+	before := protectedRows(t, db.SQL(), accounts[1])
 	model := t.TempDir()
 	files := map[string]string{
 		"accounts.csv":                        "id,name,kind,enabled\nsame-id,Imported account,cash,true\n",
@@ -78,22 +78,22 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 		}
 	}
 	var out, errOut bytes.Buffer
-	if code := run([]string{"--db", path, "--plan", plans[0], "--model", model}, &out, &errOut); code != 0 {
+	if code := run([]string{"--db", path, "--account", accounts[0], "--model", model}, &out, &errOut); code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, errOut.String())
 	}
-	after := protectedRows(t, db.SQL(), plans[1])
+	after := protectedRows(t, db.SQL(), accounts[1])
 	if !reflect.DeepEqual(before, after) {
 		t.Fatalf("import changed protected rows\nbefore: %v\nafter: %v", before, after)
 	}
 	var name string
-	if err := db.SQL().QueryRow(`SELECT name FROM accounts WHERE plan_id=? AND id='same-id'`, plans[0]).Scan(&name); err != nil || name != "Imported account" {
-		t.Fatalf("selected plan was not imported: %q %v", name, err)
+	if err := db.SQL().QueryRow(`SELECT name FROM accounts WHERE account_id=? AND id='same-id'`, accounts[0]).Scan(&name); err != nil || name != "Imported account" {
+		t.Fatalf("selected account was not imported: %q %v", name, err)
 	}
 }
 
-// Snapshot every plan-scoped table plus ownership and identity tables. This
+// Snapshot every account-scoped table plus ownership and identity tables. This
 // also catches side effects outside the canonical model document.
-func protectedRows(t *testing.T, db *sql.DB, plan string) map[string][]string {
+func protectedRows(t *testing.T, db *sql.DB, account string) map[string][]string {
 	t.Helper()
 	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`)
 	if err != nil {
@@ -114,17 +114,17 @@ func protectedRows(t *testing.T, db *sql.DB, plan string) map[string][]string {
 	result := map[string][]string{}
 	for _, table := range tables {
 		var scoped int
-		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name='plan_id'`, table).Scan(&scoped); err != nil {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name='account_id'`, table).Scan(&scoped); err != nil {
 			t.Fatal(err)
 		}
-		if scoped == 0 && table != "sessions" && !strings.HasPrefix(table, "identity_") && table != "app_accounts" && table != "plans" {
+		if scoped == 0 && table != "sessions" && !strings.HasPrefix(table, "identity_") && table != "app_accounts" {
 			continue
 		}
 		query := `SELECT * FROM "` + strings.ReplaceAll(table, `"`, `""`) + `"`
 		var args []any
 		if scoped != 0 {
-			query += " WHERE plan_id=?"
-			args = append(args, plan)
+			query += " WHERE account_id=?"
+			args = append(args, account)
 		}
 		r, err := db.Query(query, args...)
 		if err != nil {
