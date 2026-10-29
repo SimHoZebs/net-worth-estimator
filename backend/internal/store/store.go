@@ -115,6 +115,10 @@ type Database interface {
 	Account(accountID string) (Store, error)
 	EnsurePrivateAccount(accountID, issuer, subject string) (Store, error)
 	EnsureSampleAccount() (Store, error)
+	// ResolveAccountID returns the scope ID a resource string binds to:
+	// the normalized form when that scope exists, else the bare-owner
+	// form for legacy plans/<name> IDs, else ErrNotFound.
+	ResolveAccountID(accountID string) (string, error)
 	// HasPlan, Plan, EnsurePrivatePlan, and EnsureSamplePlan are
 	// compatibility wrappers. Legacy plan resource IDs (plans/<hash>,
 	// plans/sample, plans/fixture) normalize to account scope.

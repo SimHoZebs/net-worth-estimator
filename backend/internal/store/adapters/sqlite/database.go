@@ -196,18 +196,11 @@ const SampleAccountID = "sample"
 const FixtureAccountID = "fixture"
 
 func (d *Database) HasAccount(accountID string) (bool, error) {
-	normalized := NormalizeAccountID(accountID)
-	exists, err := d.hasAccountExact(normalized)
-	if err != nil || exists {
-		return exists, err
+	_, err := d.ResolveAccountID(accountID)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
 	}
-	// Legacy plan IDs paired an explicit owner name (plans/<name> owned by
-	// account <name>). Fall back to that convention when the canonical
-	// user:<hash> scope is absent.
-	if rest, ok := strings.CutPrefix(accountID, "plans/"); ok && rest != normalized {
-		return d.hasAccountExact(rest)
-	}
-	return false, nil
+	return err == nil, err
 }
 
 // hasAccountExact checks one scope ID with no legacy fallback.
@@ -229,28 +222,34 @@ func (d *Database) HasPlan(planID string) (bool, error) {
 }
 
 func (d *Database) Account(accountID string) (store.Store, error) {
-	original := accountID
-	normalized := NormalizeAccountID(accountID)
-	exists, err := d.hasAccountExact(normalized)
+	resolved, err := d.ResolveAccountID(accountID)
 	if err != nil {
 		return nil, err
 	}
-	// Resolve the same bare-owner fallback as HasAccount so the returned
-	// store binds the winning scope, not the requested alias.
-	if !exists {
-		if rest, ok := strings.CutPrefix(original, "plans/"); ok && rest != normalized {
-			if fallback, err := d.hasAccountExact(rest); err != nil {
-				return nil, err
-			} else if fallback {
-				normalized = rest
-				exists = true
-			}
+	return &sqliteStore{db: &accountDB{DB: d.db, accountID: resolved}, application: d}, nil
+}
+
+// ResolveAccountID returns the scope ID a resource string binds to: the
+// normalized form when that scope exists, else the bare-owner form for
+// legacy plans/<name> IDs, else ErrNotFound. Operator tooling uses this so
+// legacy plans/* inputs resolve to the same winning scope as Account.
+func (d *Database) ResolveAccountID(accountID string) (string, error) {
+	normalized := NormalizeAccountID(accountID)
+	exists, err := d.hasAccountExact(normalized)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return normalized, nil
+	}
+	if rest, ok := strings.CutPrefix(accountID, "plans/"); ok && rest != normalized {
+		if fallback, err := d.hasAccountExact(rest); err != nil {
+			return "", err
+		} else if fallback {
+			return rest, nil
 		}
 	}
-	if !exists {
-		return nil, fmt.Errorf("account %q: %w", accountID, store.ErrNotFound)
-	}
-	return &sqliteStore{db: &accountDB{DB: d.db, accountID: normalized}, application: d}, nil
+	return "", fmt.Errorf("account %q: %w", accountID, store.ErrNotFound)
 }
 
 // Plan is a compatibility wrapper over Account.
