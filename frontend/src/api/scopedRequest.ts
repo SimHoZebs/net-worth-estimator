@@ -10,7 +10,7 @@ import type { ApiHttpError, FetchLike } from "./http.ts";
 export class AccountScopeError extends Error {
 	readonly status = 409;
 	constructor(
-		message = "The active plan changed. Verify your session before continuing.",
+		message = "The active account changed. Verify your session before continuing.",
 	) {
 		super(message);
 		this.name = "AccountScopeError";

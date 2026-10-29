@@ -234,7 +234,7 @@ describe("provider-independent authentication boundary", () => {
 			}),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
-			"This account does not have access to this plan.",
+			"This account does not have access.",
 		);
 		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 		expect(
@@ -323,7 +323,7 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+			await screen.findByRole("heading", { name: "Cannot reach your account" }),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
 			"The Waypoint server is unavailable (HTTP 502). It may be restarting; retry shortly.",
@@ -351,7 +351,7 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+			await screen.findByRole("heading", { name: "Cannot reach your account" }),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
 			"Cannot reach the Waypoint server. It may be down or restarting.",

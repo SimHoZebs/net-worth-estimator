@@ -76,53 +76,32 @@ export function appJsonStorage<T>() {
 	return createJSONStorage<T>(() => appLocalStorage);
 }
 
-/**
- * One-time upgrade path for browser records written before the account
- * cutover. Old keys use `:resource:` plus `plans/*` ids; current keys use
- * `:account:` plus `accounts/*` ids. On a primary miss the legacy key is
- * read once, copied forward, and deleted. Nothing writes legacy keys.
- */
-function legacyKeyFor(name: string, scope: AccountScope): string | null {
-	const primary = accountStorageKey(name, scope);
-	if (!primary) return null;
-	return primary
-		.replace(":account:", ":resource:")
-		.replaceAll("accounts%2F", "plans%2F");
-}
-
 /** Financial preferences bind to one verified account, including memory fallbacks. */
 export function accountLocalStorage(scope: AccountScope): StateStorage {
 	const keyFor = (name: string) =>
 		scope === getAccountScope() ? accountStorageKey(name, scope) : null;
-	const readThrough = (name: string): string | null => {
-		const key = keyFor(name);
-		if (!key) return null;
-		try {
-			const raw = appLocalStorage.getItem(key);
-			if (raw instanceof Promise) return null;
-			if (raw !== null) return raw;
-			const legacy = legacyKeyFor(name, scope);
-			if (!legacy) return null;
-			const migrated = appLocalStorage.getItem(legacy);
-			if (migrated === null || migrated instanceof Promise) return null;
-			appLocalStorage.setItem(key, migrated);
-			appLocalStorage.removeItem(legacy);
-			return migrated;
-		} catch {
-			return null;
-		}
-	};
 	return {
-		getItem: (name) => (keyFor(name) ? readThrough(name) : null),
+		getItem: (name) => {
+			const key = keyFor(name);
+			if (!key) return null;
+			try {
+				const raw = appLocalStorage.getItem(key);
+				if (raw instanceof Promise)
+					return raw
+						.then((value) => (keyFor(name) ? value : null))
+						.catch(() => null);
+				return keyFor(name) ? raw : null;
+			} catch {
+				return null;
+			}
+		},
 		setItem: (name, value) => {
 			const key = keyFor(name);
 			if (key) return appLocalStorage.setItem(key, value);
 		},
 		removeItem: (name) => {
 			const key = keyFor(name);
-			const legacy = legacyKeyFor(name, scope);
 			if (key) appLocalStorage.removeItem(key);
-			if (legacy) appLocalStorage.removeItem(legacy);
 		},
 	};
 }

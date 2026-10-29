@@ -47,13 +47,13 @@ export const pages: PageDefinition[] = [
 		id: "purchases",
 		label: "Planned purchases",
 		icon: ShoppingBag,
-		title: "Plan your purchases",
+		title: "Planned purchases",
 	},
 	{
 		id: "evaluations",
 		label: "Evaluations",
 		icon: Flag,
-		title: "Check what the plan supports",
+		title: "Check what your accounts support",
 	},
 	{
 		id: "groups",
@@ -65,12 +65,6 @@ export const pages: PageDefinition[] = [
 		id: "sources",
 		label: "Configs",
 		icon: Settings,
-		title: "How the plan is configured",
+		title: "How your data is configured",
 	},
 ];
-
-export const LEGACY_PAGES: Record<string, Page> = {
-	plan: "accounts",
-	goals: "evaluations",
-	account: "sources",
-};

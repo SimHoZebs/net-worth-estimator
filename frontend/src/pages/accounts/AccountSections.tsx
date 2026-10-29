@@ -298,7 +298,7 @@ function TransactionsView({
 		>
 			<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4 max-sm:pb-4">
 				<SearchField
-					label="Search plan"
+					label="Search transactions"
 					value={query}
 					onChange={(event) => search(event.target.value)}
 					placeholder="Find a transaction…"

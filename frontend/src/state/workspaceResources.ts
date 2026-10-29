@@ -60,7 +60,7 @@ function current(scope: AccountScope, signal?: AbortSignal) {
 		scope.status !== "ready" ||
 		signal?.aborted
 	)
-		throw new Error("The active resource changed or the request was canceled.");
+		throw new Error("The active account changed or the request was canceled.");
 }
 
 const defaults = {

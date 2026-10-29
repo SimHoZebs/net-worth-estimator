@@ -100,7 +100,7 @@ function OutlookContent({
 			<EmptyState
 				icon={Wallet}
 				title="Your workspace is ready"
-				description="Start with an account and its current balance. Add income, expenses, and plans at your own pace."
+				description="Start with an account and its current balance. Add income, expenses, and goals at your own pace."
 				action={readOnly ? undefined : "Add your first account"}
 				onAction={onAddAccount}
 			/>
