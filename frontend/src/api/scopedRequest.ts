@@ -1,54 +1,60 @@
 import {
 	canonicalApiBaseUrl,
-	getResourceScope,
-	requireSessionRecheck,
-	subscribeResourceScope,
+	denormalizeAccountId,
+	getAccountScope,
+	normalizeAccountId,
+	requireAccountRecheck,
+	subscribeAccountScope,
+	type AccountScope,
 	type ResourceScope,
 } from "../auth/resourceScope.ts";
 import type { ApiHttpError, FetchLike } from "./http.ts";
 
-export class ResourceScopeError extends Error {
+export class AccountScopeError extends Error {
 	readonly status = 409;
 	constructor(
-		message = "The active plan changed. Verify your session before continuing.",
+		message = "The active account changed. Verify your session before continuing.",
 	) {
 		super(message);
-		this.name = "ResourceScopeError";
+		this.name = "AccountScopeError";
 	}
 }
 
+/** @deprecated Use AccountScopeError. */
+export const ResourceScopeError = AccountScopeError;
+
 export interface ScopedResponse {
 	response: Response;
-	scope: ResourceScope;
+	scope: AccountScope;
 }
 
 export function responseScopeError(
-	scope: ResourceScope,
-): ResourceScopeError | null {
-	return scope === getResourceScope() ? null : new ResourceScopeError();
+	scope: AccountScope,
+): AccountScopeError | null {
+	return scope === getAccountScope() ? null : new AccountScopeError();
 }
 
 /** Only the server's resource-change error requests a new session check. */
 export function scopedResponseError(
-	scope: ResourceScope,
+	scope: AccountScope,
 	error: ApiHttpError,
-): ApiHttpError | ResourceScopeError {
+): ApiHttpError | AccountScopeError {
 	const stale = responseScopeError(scope);
 	if (stale) return stale;
 	if (error.status === 409 && error.problem?.code === "RESOURCE_CHANGED") {
-		requireSessionRecheck();
-		return new ResourceScopeError();
+		requireAccountRecheck();
+		return new AccountScopeError();
 	}
 	return error;
 }
 
 /** One lifetime covers fetch, JSON body reads, and streaming response consumption. */
-function requestLifetime(scope: ResourceScope, signal?: AbortSignal | null) {
+function requestLifetime(scope: AccountScope, signal?: AbortSignal | null) {
 	const controller = new AbortController();
 	const forwardAbort = () => controller.abort(signal?.reason);
-	const stopScope = subscribeResourceScope(() => {
-		if (scope !== getResourceScope())
-			controller.abort(new ResourceScopeError());
+	const stopScope = subscribeAccountScope(() => {
+		if (scope !== getAccountScope())
+			controller.abort(new AccountScopeError());
 	});
 	if (signal?.aborted) forwardAbort();
 	else signal?.addEventListener("abort", forwardAbort, { once: true });
@@ -125,35 +131,42 @@ export async function scopedRequest(
 	url: string,
 	init: RequestInit,
 	fetcher: FetchLike,
-	scope: ResourceScope,
-): Promise<ScopedResponse | ResourceScopeError> {
+	scope: AccountScope,
+): Promise<ScopedResponse | AccountScopeError> {
 	if (scope.status === "pending" || !scope.resource)
-		return new ResourceScopeError(
-			"Verify your session before requesting workspace data.",
+		return new AccountScopeError(
+			"Verify your session before requesting account data.",
 		);
 	if (canonicalApiBaseUrl(baseUrl) !== scope.apiBaseUrl)
-		return new ResourceScopeError(
-			"The API address does not match the verified workspace.",
+		return new AccountScopeError(
+			"The API address does not match the verified account.",
 		);
-	const current = getResourceScope();
+	const current = getAccountScope();
 	if (scope !== current) {
-		// Retired same-plan work stays retired. The server cannot tell it
-		// apart (same plan ID, same cookie), so block it before network access.
-		// A signed-out browser has no verified workspace: fail fast.
+		// Retired same-account work stays retired. The server cannot tell it
+		// apart (same account ID, same cookie), so block it before network access.
+		// A signed-out browser has no verified account: fail fast.
+		// Compare canonical ids so plans/* and accounts/* for the same
+		// account retire together.
 		if (
 			current.status === "pending" ||
 			!current.resource ||
-			current.resource.id === scope.resource.id
+			normalizeAccountId(current.resource.id) ===
+				normalizeAccountId(scope.resource.id)
 		)
-			return new ResourceScopeError();
-		// Different plan: send the pinned original ID and let the backend
+			return new AccountScopeError();
+		// Different account: send the pinned original ID and let the backend
 		// reject with 409 RESOURCE_CHANGED. Never retarget the header.
 	}
 	const lifetime = requestLifetime(scope, init.signal);
 	const headers = new Headers(init.headers);
 	// The assertion always comes from discovery, never caller-supplied options.
+	// Denormalize to the wire form the unchanged backend expects.
 	headers.delete("Waypoint-Resource");
-	headers.set("Waypoint-Resource", scope.resource.id);
+	headers.set(
+		"Waypoint-Resource",
+		denormalizeAccountId(scope.resource.id),
+	);
 	let response: Response;
 	try {
 		response = await fetcher(url, {
@@ -174,12 +187,15 @@ export async function scopedRequest(
 	if (
 		stale ||
 		(response.ok &&
-			response.headers.get("Waypoint-Resource") !== scope.resource.id)
+			response.headers.get("Waypoint-Resource") !==
+				denormalizeAccountId(scope.resource.id))
 	) {
 		lifetime.dispose();
 		void response.body?.cancel().catch(() => {});
-		if (!stale) requireSessionRecheck();
-		return stale ?? new ResourceScopeError();
+		if (!stale) requireAccountRecheck();
+		return stale ?? new AccountScopeError();
 	}
 	return { response: guardedBody(response, lifetime), scope };
 }
+
+export type { ResourceScope };

@@ -138,7 +138,7 @@ it("does not expose binary receipt content after a resource change", async () =>
 	).rejects.toBeInstanceOf(ResourceScopeError);
 });
 
-it("refuses generated requests without a verified workspace", async () => {
+it("refuses generated requests without a verified account", async () => {
 	suspendResourceScope();
 	const fetcher = vi.fn(async () => response({}));
 	vi.stubGlobal("fetch", fetcher);
