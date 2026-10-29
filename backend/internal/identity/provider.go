@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,13 +15,13 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func (s *Service) introspect(ctx context.Context, g grant) error {
+func (s *Service) introspect(ctx context.Context, g store.Grant) error {
 	result, err := s.postIntrospection(ctx, g.AccessToken)
 	if err != nil {
 		return err
 	}
 	if result.Subject != g.Subject || result.ClientID != s.config.ClientID || result.Issuer != s.config.Issuer || !audienceMatches(result.Audience, s.config.ClientID) {
-		return errGrantRevoked
+		return store.ErrGrantRevoked
 	}
 	return nil
 }
@@ -75,16 +76,16 @@ func (s *Service) postIntrospection(ctx context.Context, accessToken string) (in
 		return result, errors.New("invalid provider introspection response")
 	}
 	if !*result.Active {
-		return result, errGrantRevoked
+		return result, store.ErrGrantRevoked
 	}
 	return result, nil
 }
 
-func (s *Service) validateGrant(ctx context.Context, id string) (grant, error) {
+func (s *Service) validateGrant(ctx context.Context, id string) (store.Grant, error) {
 	if id == "" {
-		return grant{}, nil
+		return store.Grant{}, nil
 	}
-	g, err := s.store.findGrant(id, s.config.Issuer)
+	g, err := s.store.FindGrant(id, s.config.Issuer)
 	if err != nil || g.ID == "" {
 		return g, err
 	}
@@ -94,7 +95,7 @@ func (s *Service) validateGrant(ctx context.Context, id string) (grant, error) {
 	// Rotating refresh tokens belong to a persisted grant, not an individual
 	// request. Concurrent browser/API requests share one revalidation/refresh.
 	result, err, _ := s.validation.Do(id, func() (any, error) {
-		current, err := s.store.findGrant(id, s.config.Issuer)
+		current, err := s.store.FindGrant(id, s.config.Issuer)
 		if err != nil || current.ID == "" {
 			return current, err
 		}
@@ -108,13 +109,13 @@ func (s *Service) validateGrant(ctx context.Context, id string) (grant, error) {
 			if err != nil {
 				var rejection *oauth2.RetrieveError
 				if errors.As(err, &rejection) && (rejection.ErrorCode == "invalid_grant" || rejection.ErrorCode == "invalid_token") {
-					return grant{}, s.discardGrant(current)
+					return store.Grant{}, s.discardGrant(current)
 				}
-				return grant{}, errors.New("provider refresh unavailable")
+				return store.Grant{}, errors.New("provider refresh unavailable")
 			}
 			identity, err := s.verifiedIdentity(providerContext, token, current.Nonce, current.Subject)
 			if err != nil || token.AccessToken == "" {
-				return grant{}, s.discardGrant(current)
+				return store.Grant{}, s.discardGrant(current)
 			}
 			current.AccessToken = token.AccessToken
 			if token.RefreshToken != "" {
@@ -125,32 +126,32 @@ func (s *Service) validateGrant(ctx context.Context, id string) (grant, error) {
 			// Rotation is already committed at the provider. Preserve the new
 			// credentials even if the following introspection temporarily fails.
 			// Keep CheckedAt stale so the next request still validates them.
-			if err := s.store.updateGrant(current); err != nil {
-				if errors.Is(err, errGrantRevoked) {
-					return grant{}, nil
+			if err := s.store.UpdateGrant(current); err != nil {
+				if errors.Is(err, store.ErrGrantRevoked) {
+					return store.Grant{}, nil
 				}
-				return grant{}, err
+				return store.Grant{}, err
 			}
 		}
 		if err := s.introspect(providerContext, current); err != nil {
-			if errors.Is(err, errGrantRevoked) {
-				return grant{}, s.discardGrant(current)
+			if errors.Is(err, store.ErrGrantRevoked) {
+				return store.Grant{}, s.discardGrant(current)
 			}
-			return grant{}, err
+			return store.Grant{}, err
 		}
 		current.CheckedAt = time.Now().UnixNano()
-		if err := s.store.updateGrant(current); err != nil {
-			if errors.Is(err, errGrantRevoked) {
-				return grant{}, nil
+		if err := s.store.UpdateGrant(current); err != nil {
+			if errors.Is(err, store.ErrGrantRevoked) {
+				return store.Grant{}, nil
 			}
-			return grant{}, err
+			return store.Grant{}, err
 		}
 		return current, nil
 	})
 	if err != nil {
-		return grant{}, err
+		return store.Grant{}, err
 	}
-	return result.(grant), nil
+	return result.(store.Grant), nil
 }
 
-func (s *Service) discardGrant(g grant) error { return s.store.deleteGrant(g.ID, g.Issuer) }
+func (s *Service) discardGrant(g store.Grant) error { return s.store.DeleteGrant(g.ID, g.Issuer) }

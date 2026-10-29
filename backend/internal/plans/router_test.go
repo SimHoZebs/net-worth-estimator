@@ -1,6 +1,7 @@
 package plans
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -20,7 +22,7 @@ const testIssuer = "https://identity.test"
 
 func privateID(subject string) string { return authorization.ResourceFor(testIssuer, subject).ID }
 
-func ensurePrivate(t *testing.T, db *store.Database, subject string) store.Store {
+func ensurePrivate(t *testing.T, db store.Database, subject string) store.Store {
 	t.Helper()
 	scoped, err := db.EnsurePrivatePlan(privateID(subject), authorization.ActorKey(testIssuer, subject), testIssuer, subject)
 	if err != nil {
@@ -32,10 +34,10 @@ func ensurePrivate(t *testing.T, db *store.Database, subject string) store.Store
 	return scoped
 }
 
-func newRouter(t *testing.T) (*Router, *store.Database, string) {
+func newRouter(t *testing.T) (*Router, store.Database, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "app.db")
-	database, err := store.SetupDatabase(path)
+	database, err := sqlite.SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,13 +134,13 @@ func TestPlansIsolateEveryAccountFromSampleAndOtherAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Closing a router must not close its shared connection.
-	if err := database.SQL().Ping(); err != nil {
+	if err := database.PingContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := store.OpenDatabase(path)
+	reopened, err := sqlite.OpenDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +177,7 @@ func TestPrivatePlansInitializeBlankWorkspaces(t *testing.T) {
 }
 
 func TestPlanRoutingFailsClosedWithoutProvisioning(t *testing.T) {
-	database, err := store.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
+	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +260,7 @@ func TestLegacyUnscopedDatabaseRejected(t *testing.T) {
 	if err := legacy.Close(); err != nil {
 		t.Fatal(err)
 	}
-	database, err := store.OpenDatabase(path)
+	database, err := sqlite.OpenDatabase(path)
 	if err == nil {
 		database.Close()
 		t.Fatal("runtime accepted an unscoped legacy database")

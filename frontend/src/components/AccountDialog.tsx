@@ -57,7 +57,7 @@ export function AccountDialog({
 			label={account.name}
 			appearance={{
 				title: account.name,
-				eyebrow: `Account activity · ${temporary ? "Changes" : "Saved plan"}`,
+				eyebrow: `Account activity · ${temporary ? "Changes" : "Saved"}`,
 				coverage: "full",
 			}}
 		>

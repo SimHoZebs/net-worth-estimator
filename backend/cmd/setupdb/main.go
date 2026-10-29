@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: setupdb --db PATH")
 		return 2
 	}
-	database, err := store.SetupDatabase(*dbPath)
+	database, err := sqlite.SetupDatabase(*dbPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "setup database: %v\n", err)
 		return 1

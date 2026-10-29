@@ -185,3 +185,59 @@ it("deletes the transaction through the row endpoint", async () => {
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
+
+it("marks holds that did not post instead of posted", () => {
+	const planTransaction = {
+		...testPlan.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000099",
+		name: "Hold that did not post",
+		amount: 42.1,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		frequency: "once" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: true,
+	};
+	const transaction: AccountTransaction = {
+		id: "recorded-01900000-0000-7000-8000-000000000099",
+		movementId: planTransaction.id,
+		date: "2026-10-20",
+		name: planTransaction.name,
+		source: "historical",
+		direction: "out",
+		category: "expense",
+		counterparty: "Unknown account",
+		from: "Everyday checking",
+		to: "External spending",
+		amount: 42.1,
+		requested: 42.1,
+		shortfall: 0,
+		constraint: null,
+		excluded: true,
+		pending: false,
+		void: true,
+	};
+	render(
+		<TransactionDetail
+			transaction={transaction}
+			planTransaction={planTransaction}
+			accounts={testPlan.accounts}
+			plan={{ ...testPlan, transactions: [planTransaction] }}
+			claimRuleName={null}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.getByText("Did not post")).toBeTruthy();
+	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
+	expect(screen.queryByText("Posted")).toBeNull();
+	expect(screen.queryByText("Pending")).toBeNull();
+});

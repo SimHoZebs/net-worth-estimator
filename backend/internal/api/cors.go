@@ -48,6 +48,11 @@ func corsMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			}
 
 			_, configured := origins[origin]
+			if !configured {
+				if canonical, err := CanonicalOrigin(origin); err == nil {
+					_, configured = origins[canonical]
+				}
+			}
 			requestHost, validRequestHost := corsRequestHost(r)
 			if !configured && (!validRequestHost || !sameCORSOrigin(origin, requestHost, corsRequestScheme(r))) {
 				http.Error(w, "origin is not allowed", http.StatusForbidden)
@@ -231,6 +236,23 @@ func normalizeCORSOriginHost(host string) (string, bool) {
 	if normalized == "" {
 		return "", false
 	}
+	if strings.ContainsAny(normalized, "* \\%") {
+		return "", false
+	}
+	if strings.Contains(normalized, ":") {
+		if net.ParseIP(normalized) == nil {
+			return "", false
+		}
+		return normalized, true
+	}
+	if strings.HasPrefix(normalized, ".") || strings.HasSuffix(normalized, ".") {
+		return "", false
+	}
+	for _, label := range strings.Split(normalized, ".") {
+		if label == "" || strings.HasPrefix(label, "-") || strings.HasSuffix(label, "-") {
+			return "", false
+		}
+	}
 	return normalized, true
 }
 
@@ -271,6 +293,49 @@ func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	return corsMiddleware(allowedOrigins)
 }
 
+// CanonicalOrigin validates a single origin and returns its canonical
+// scheme://host[:port] form. This is the single origin checker: CORS
+// allow-list parsing, browser endpoints, proxy ingress, CSRF guards, and the
+// fixture harness all delegate to it. A trailing "/" is accepted and stripped
+// so "https://app.example.com/" normalizes identically to
+// "https://app.example.com". Paths, queries, fragments, userinfo, non-HTTP/S
+// schemes, invalid ports, and non-canonical hosts (trailing dots, wildcards,
+// empty labels) are rejected. Default ports are stripped to keep the
+// serialized allowlist shape stable.
+func CanonicalOrigin(raw string) (string, error) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return "", errors.New("origin entries cannot be empty")
+	}
+	parsed, err := url.Parse(candidate)
+	if err != nil {
+		return "", fmt.Errorf("parse origin %q: %w", candidate, err)
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Opaque != "" {
+		return "", fmt.Errorf("origin %q must contain only an HTTP/S scheme and host", candidate)
+	}
+	if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return "", fmt.Errorf("origin %q cannot contain a path, query, or fragment", candidate)
+	}
+	host, ok := normalizeCORSOriginHost(parsed.Hostname())
+	if !ok {
+		return "", fmt.Errorf("origin %q must contain a valid host", candidate)
+	}
+	port := parsed.Port()
+	if port != "" {
+		normalized, ok := normalizeCORSOriginPort(port)
+		if !ok {
+			return "", fmt.Errorf("origin %q contains an invalid port", candidate)
+		}
+		port = normalized
+	} else if strings.HasSuffix(parsed.Host, ":") {
+		return "", fmt.Errorf("origin %q contains an invalid port", candidate)
+	}
+	joined, _ := formatCORSOrigin(host, port, scheme, true)
+	return scheme + "://" + joined, nil
+}
+
 // ParseAllowedOrigins validates and normalizes a comma-separated origin
 // allow-list. Kept with CORS enforcement: this is the validation half, the
 // middleware above is the enforcement half.
@@ -282,36 +347,14 @@ func ParseAllowedOrigins(value string) ([]string, error) {
 	origins := make([]string, 0)
 	seen := make(map[string]struct{})
 	for _, candidate := range strings.Split(value, ",") {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "" {
+		trimmed := strings.TrimSpace(candidate)
+		if trimmed == "" {
 			return nil, errors.New("origin entries cannot be empty")
 		}
-		parsed, err := url.Parse(candidate)
+		origin, err := CanonicalOrigin(trimmed)
 		if err != nil {
-			return nil, fmt.Errorf("parse origin %q: %w", candidate, err)
+			return nil, err
 		}
-		scheme := strings.ToLower(parsed.Scheme)
-		if (scheme != "http" && scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Opaque != "" {
-			return nil, fmt.Errorf("origin %q must contain only an HTTP/S scheme and host", candidate)
-		}
-		if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
-			return nil, fmt.Errorf("origin %q cannot contain a path, query, or fragment", candidate)
-		}
-
-		host, ok := normalizeCORSOriginHost(parsed.Hostname())
-		if !ok {
-			return nil, fmt.Errorf("origin %q must contain a host", candidate)
-		}
-		port := parsed.Port()
-		if port != "" {
-			normalized, ok := normalizeCORSOriginPort(port)
-			if !ok {
-				return nil, fmt.Errorf("origin %q contains an invalid port", candidate)
-			}
-			port = normalized
-		}
-		joined, _ := formatCORSOrigin(host, port, scheme, true)
-		origin := scheme + "://" + joined
 		if _, exists := seen[origin]; exists {
 			continue
 		}

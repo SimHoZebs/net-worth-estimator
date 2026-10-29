@@ -248,7 +248,8 @@ export function AccountDetailsModal({
 					</span>
 				) : (
 					<span>
-						Sample balances are never shown; every figure comes from the plan.
+						Sample balances are never shown; every figure comes from your saved
+						data.
 					</span>
 				)}
 			</p>

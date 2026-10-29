@@ -16,6 +16,7 @@ import {
 	type FinancialModelDocument,
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
+import type { Plan } from "@/domain/model.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
@@ -196,7 +197,7 @@ export async function saveWorkspace(): Promise<boolean> {
 			if (!response.ok)
 				throw new Error(
 					response.issues.map((issue) => issue.message).join(" ") ||
-						"The server rejected the save. Your temporary plan remains unsaved.",
+						"The server rejected the save. Your changes remain unsaved.",
 				);
 			const errors = response.issues.filter(
 				(issue) => issue.severity === "error",
@@ -212,16 +213,28 @@ export async function saveWorkspace(): Promise<boolean> {
 			if (scope !== getResourceScope()) return false;
 			if (!authoritative.document)
 				throw new Error(
-					"The save completed, but the server returned no authoritative model. Your temporary plan remains available locally.",
+					"The save completed, but the server returned no saved data. Your unsaved changes remain available locally.",
 				);
 			const saved = useWorkspaceStore.getState().acknowledgeSave(draft);
 			if (saved) {
 				dismissKey("workspace");
-				notifySuccess("workspace-notice", "Plan saved on the server.");
+				notifySuccess("workspace-notice", "Changes saved.");
 			}
 			return saved;
 		})) === true
 	);
+}
+
+/**
+ * Stage an edit and persist it immediately, so one Save press means saved.
+ * Returns false (and saves nothing) when the edit is rejected or changes
+ * nothing. A failed save keeps the staged draft; retry it from the banner.
+ */
+export function stageAndSave(next: Plan): boolean {
+	const staged = useWorkspaceStore.getState().updatePlan(next);
+	if (!staged || !useWorkspaceStore.getState().draft) return staged;
+	void saveWorkspace();
+	return true;
 }
 
 export async function importServerDocument(

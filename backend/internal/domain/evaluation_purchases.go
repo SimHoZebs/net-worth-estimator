@@ -48,89 +48,15 @@ func (r *PlannedPurchasesPathResult) NumericValue() float64 {
 	return funded
 }
 
-func cloneStringFloatMap(in map[string]float64) map[string]float64 {
-	out := make(map[string]float64, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
-func cloneStringMap(in map[string]string) map[string]string {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
-func cloneNestedMap(in map[string]map[string]float64) map[string]map[string]float64 {
-	if in == nil {
-		return nil
-	}
-	out := make(map[string]map[string]float64, len(in))
-	for k, v := range in {
-		inner := make(map[string]float64, len(v))
-		for k2, v2 := range v {
-			inner[k2] = v2
-		}
-		out[k] = inner
-	}
-	return out
-}
-
 func evaluatePlannedPurchases(ctx *EvaluationContext, _ any) (PathResult, error) {
-	// Reuse the shared path: rebuild the simulation request from the
-	// already-prepared effective document and the caller's Monte Carlo
-	// sample. Candidate simulations own all state and never write to the source path,
-	// document, or FI branch. No PrepareSimulationRequest here: the base
-	// path already carries the validated start state.
+	// Reuse the shared path: rebuild the candidate simulation request from
+	// the already-prepared effective document and the caller's Monte Carlo
+	// sample through the shared purchases builder. Candidate simulations own
+	// all state and never write to the source path, document, or FI branch.
+	// No PrepareSimulationRequest here: the base path already carries the
+	// validated start state.
 	document := ctx.Path.EffectiveDocument
-	startBalances := map[string]float64{}
-	for _, account := range document.Accounts {
-		startBalances[account.ID] = 0
-	}
-	for _, row := range ctx.Path.Rows {
-		if !row.IsHistorical {
-			break
-		}
-		for _, snapshot := range row.AccountSnapshots {
-			startBalances[snapshot.AccountID] = snapshot.Balance
-		}
-	}
-	// Reuse the shared base path's window semantics: a start-day checkpoint
-	// is an end-of-day observation whose events already replayed as history,
-	// so candidate simulations exclude start-day events exactly when the base path does.
-	// With no history the start state is the prepared zero state.
-	includeStartDateEvents := true
-	for _, row := range ctx.Path.Rows {
-		if row.IsHistorical && row.Date == ctx.Path.ProjectionStartDate {
-			includeStartDateEvents = false
-			break
-		}
-	}
-	request := types.SimulationRequest{
-		Model: types.FinancialModel{
-			Accounts:         document.Accounts,
-			Postings:         document.Postings,
-			RecurrenceRules:  document.RecurrenceRules,
-			PaymentTerms:     document.PaymentTerms,
-			PlannedPurchases: document.PlannedPurchases,
-		},
-		InitialState: types.SimulationState{
-			Balances:                     startBalances,
-			LatestRealizedPostingAmounts: cloneStringFloatMap(ctx.Path.ProjectionStartPostingState.LatestRealizedPostingAmounts),
-			LatestRealizedPostingDates:   cloneStringMap(ctx.Path.ProjectionStartPostingState.LatestRealizedPostingDates),
-			RealizedPostingAmountsByYear: cloneNestedMap(ctx.Path.ProjectionStartPostingState.RealizedPostingAmountsByYear),
-		},
-		StartDate:              ctx.Path.ProjectionStartDate,
-		EndDate:                ctx.Path.ProjectionEndDate,
-		IncludeStartDateEvents: includeStartDateEvents,
-		MonteCarloSample:       ctx.MonteCarloSample,
-	}
+	request := purchasesCandidateRequest(ctx.Path, ctx.MonteCarloSample)
 	run, err := simulatePurchases(request)
 	if err != nil {
 		return nil, err
