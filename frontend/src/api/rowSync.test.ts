@@ -7,9 +7,9 @@ import type {
 	FinancialModelDocument,
 } from "@/api/contracts.ts";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendAccountScope,
+	suspendUserScope,
 } from "@/auth/resourceScope.ts";
 import {
 	applyRowOperations,
@@ -255,23 +255,23 @@ describe("applyRowOperations", () => {
 		});
 	});
 
-	const scopeId = `accounts/${"a".repeat(64)}`;
+	const scopeId = `users/${"a".repeat(64)}`;
 	beforeEach(() => {
-		acceptAccountScope(
+		acceptUserScope(
 			{
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				resource: {
 					id: scopeId,
 					kind: "private",
-					permissions: ["account:read", "account:project", "account:write"],
+					permissions: ["user:read", "user:project", "user:write"],
 				},
 				subject: scopeId,
 			},
-			suspendAccountScope(),
+			suspendUserScope(),
 		);
 	});
 	afterEach(() => {
-		suspendAccountScope();
+		suspendUserScope();
 		vi.unstubAllGlobals();
 	});
 

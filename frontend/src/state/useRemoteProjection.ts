@@ -23,7 +23,7 @@ import {
 	valueRecord,
 } from "../api/evalOutcomes.ts";
 import { financialIndependenceRange } from "../api/financialIndependence.ts";
-import { AccountScopeError } from "../api/scopedRequest.ts";
+import { UserScopeError } from "../api/scopedRequest.ts";
 import { finite } from "../domain/guards.ts";
 import type { Projection, RangeResult } from "../domain/result.ts";
 import { horizonDate } from "../domain/result.ts";
@@ -486,7 +486,7 @@ export function useRemoteProjection({
 		queryKey: readonly unknown[],
 		cause: unknown,
 	) => {
-		if (!isAbortError(cause) && !(cause instanceof AccountScopeError))
+		if (!isAbortError(cause) && !(cause instanceof UserScopeError))
 			notifyError(
 				"projection",
 				cause instanceof Error && cause.message

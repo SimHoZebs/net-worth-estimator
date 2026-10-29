@@ -17,7 +17,7 @@ async function fixtureResource(page: Page): Promise<FixtureResource> {
 	return (await response.json()).resource as FixtureResource;
 }
 
-/** Seed this fixture account without overwriting changes on browser reload. */
+/** Seed this fixture user without overwriting changes on browser reload. */
 export async function seedResourceStorage(
 	page: Page,
 	baseKey: string,
@@ -25,7 +25,8 @@ export async function seedResourceStorage(
 ): Promise<void> {
 	await page.addInitScript(
 		({ baseKey, raw, resource }) => {
-			const key = `${baseKey}:account:${encodeURIComponent(window.location.origin)}:${resource.kind}:${encodeURIComponent(resource.id)}`;
+			const mappedId = resource.id.replace(/^accounts\//, "users/");
+			const key = `${baseKey}:user:${encodeURIComponent(window.location.origin)}:${resource.kind}:${encodeURIComponent(mappedId)}`;
 			if (localStorage.getItem(key) === null) localStorage.setItem(key, raw);
 		},
 		{ baseKey, raw, resource: await fixtureResource(page) },

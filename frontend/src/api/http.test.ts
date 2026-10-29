@@ -1,29 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendAccountScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { ApiHttpError, parseErrorResponse } from "./http.ts";
 
 function response(body: string, init: ResponseInit): Response {
 	const headers = new Headers(init.headers);
-	headers.set("Waypoint-Resource", "accounts/sample");
+	headers.set("Waypoint-Resource", "users/sample");
 	return new Response(body, { ...init, headers });
 }
 
 function scope(baseUrl = "") {
-	acceptAccountScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 			resource: {
-				id: "accounts/sample",
+				id: "users/sample",
 				kind: "sample",
-				permissions: ["account:read", "account:project"],
+				permissions: ["user:read", "user:project"],
 			},
 			subject: null,
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	);
 }
 
@@ -31,7 +31,7 @@ beforeEach(() => {
 	scope();
 	vi.unstubAllGlobals();
 });
-afterEach(() => suspendAccountScope());
+afterEach(() => suspendUserScope());
 
 describe("shared error taxonomy", () => {
 	it.each([

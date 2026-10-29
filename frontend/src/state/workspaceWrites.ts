@@ -18,8 +18,8 @@ import {
 } from "@/api/index.ts";
 import type { Plan } from "@/domain/model.ts";
 import {
-	getAccountScope,
-	subscribeAccountScope,
+	getUserScope,
+	subscribeUserScope,
 } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
@@ -29,7 +29,7 @@ import {
 	presetsOptions,
 	reloadWorkspace,
 	workspaceIsBusy,
-	accountResourceKey,
+	userResourceKey,
 } from "@/state/workspaceResources.ts";
 import {
 	draftDocumentForSave,
@@ -42,7 +42,7 @@ import {
 } from "@/state/notifications.ts";
 
 export function workspaceWriteKey(kind: "model" | "presets") {
-	return ["workspace-write", getAccountScope().key, kind] as const;
+	return ["workspace-write", getUserScope().key, kind] as const;
 }
 
 /** Backend save envelope: persisted with issues, or rejected with reasons. */
@@ -84,7 +84,7 @@ export async function performSave(options: {
 		);
 		return false;
 	}
-	if (getAccountScope().status !== "ready") {
+	if (getUserScope().status !== "ready") {
 		notifyError("workspace", "Load the server workspace before editing it.");
 		return false;
 	}
@@ -110,7 +110,7 @@ async function write<T>(
 	kind: "model" | "presets",
 	perform: () => Promise<T>,
 ): Promise<T | false> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	const key = workspaceWriteKey(kind);
 	if (
@@ -122,15 +122,15 @@ async function write<T>(
 		mutationKey: key,
 		scope: { id: JSON.stringify(key) },
 		mutationFn: async () => {
-			if (scope !== getAccountScope())
+			if (scope !== getUserScope())
 				throw new Error("The active resource changed.");
 			const result = await perform();
-			if (scope !== getAccountScope())
+			if (scope !== getUserScope())
 				throw new Error("The active resource changed.");
 			return result;
 		},
 		onError: (error) => {
-			if (scope === getAccountScope())
+			if (scope === getUserScope())
 				notifyError(
 					kind === "presets" ? "amount-presets" : "workspace",
 					error instanceof Error ? error.message : "The server write failed.",
@@ -149,7 +149,7 @@ async function write<T>(
 }
 
 export function useWorkspaceSaving() {
-	useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	useSyncExternalStore(subscribeUserScope, getUserScope);
 	return (
 		useIsMutating(
 			{ mutationKey: workspaceWriteKey("model") },
@@ -159,7 +159,7 @@ export function useWorkspaceSaving() {
 }
 
 export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
-	useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	useSyncExternalStore(subscribeUserScope, getUserScope);
 	const errors = useMutationState(
 		{
 			filters: { mutationKey: workspaceWriteKey(kind) },
@@ -172,9 +172,9 @@ export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
 }
 
 export async function saveWorkspace(): Promise<boolean> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	if (
-		serverQueryClient().isFetching({ queryKey: accountResourceKey("model") })
+		serverQueryClient().isFetching({ queryKey: userResourceKey("model") })
 	) {
 		notifyError(
 			"workspace",
@@ -192,7 +192,7 @@ export async function saveWorkspace(): Promise<boolean> {
 					document,
 				),
 			);
-			if (scope !== getAccountScope()) return false;
+			if (scope !== getUserScope()) return false;
 			if (response instanceof Error) throw response;
 			if (!response.ok)
 				throw new Error(
@@ -206,11 +206,11 @@ export async function saveWorkspace(): Promise<boolean> {
 				throw new Error(errors.map((issue) => issue.message).join(" "));
 			const cache = serverQueryClient();
 			await cache.invalidateQueries({
-				queryKey: accountResourceKey("model", scope),
+				queryKey: userResourceKey("model", scope),
 				refetchType: "none",
 			});
 			const authoritative = await cache.fetchQuery(modelOptions(scope));
-			if (scope !== getAccountScope()) return false;
+			if (scope !== getUserScope()) return false;
 			if (!authoritative.document)
 				throw new Error(
 					"The save completed, but the server returned no saved data. Your unsaved changes remain available locally.",
@@ -240,9 +240,9 @@ export function stageAndSave(next: Plan): boolean {
 export async function importServerDocument(
 	document: FinancialModelDocument,
 ): Promise<boolean> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	if (
-		serverQueryClient().isFetching({ queryKey: accountResourceKey("model") })
+		serverQueryClient().isFetching({ queryKey: userResourceKey("model") })
 	) {
 		notifyError(
 			"workspace",
@@ -264,17 +264,17 @@ export async function importServerDocument(
 			const result = await applyRowOperations(
 				diffFinancialModelDocuments(null, document),
 			);
-			if (scope !== getAccountScope()) return false;
+			if (scope !== getUserScope()) return false;
 			if (result instanceof Error) throw result;
 			if (!result.ok)
 				throw new Error(result.issues.map((issue) => issue.message).join(" "));
 			const cache = serverQueryClient();
 			await cache.invalidateQueries({
-				queryKey: accountResourceKey("model", scope),
+				queryKey: userResourceKey("model", scope),
 				refetchType: "none",
 			});
 			const model = await cache.fetchQuery(modelOptions(scope));
-			return scope === getAccountScope() && Boolean(model.document);
+			return scope === getUserScope() && Boolean(model.document);
 		})) === true
 	);
 }
@@ -286,18 +286,18 @@ export async function reloadDraft() {
 }
 
 async function changePreset(action: () => Promise<{ persisted: boolean }>) {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	return (
 		(await write("presets", async () => {
 			await serverQueryClient().cancelQueries({
-				queryKey: accountResourceKey("presets", scope),
+				queryKey: userResourceKey("presets", scope),
 			});
 			const response = await action();
 			if (!response.persisted)
 				throw new Error("The recipe was rejected by the server.");
-			if (scope !== getAccountScope()) return false;
+			if (scope !== getUserScope()) return false;
 			await serverQueryClient().invalidateQueries({
-				queryKey: accountResourceKey("presets", scope),
+				queryKey: userResourceKey("presets", scope),
 				refetchType: "none",
 			});
 			await serverQueryClient().fetchQuery(presetsOptions(scope));

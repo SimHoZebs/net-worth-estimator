@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { useAccountPlan } from "../state/useAccountScope.ts";
+import { useUserPlan } from "../state/useUserScope.ts";
 import {
 	discardHash,
 	editorHash,
@@ -31,7 +31,7 @@ export function useWorkspaceOverlays({
 	pushHash: (hash: string) => void;
 	replaceHash: (hash: string) => void;
 }) {
-	const plan: AccountLike | null = useAccountPlan();
+	const plan: AccountLike | null = useUserPlan();
 	const resolution = resolveOverlayRoute(route, plan);
 	const [returnTo, setReturnTo] = useState<EvidenceTarget | null>(null);
 	const [discarding, setDiscarding] = useState(false);

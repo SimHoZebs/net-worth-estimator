@@ -12,36 +12,36 @@ import type {
 	AccountLink,
 } from "@/api/generated/model/index.ts";
 import {
-	getAccountScope,
-	subscribeAccountScope,
-	type AccountScope,
+	getUserScope,
+	subscribeUserScope,
+	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
-import { accountResourceKey } from "@/state/workspaceResources.ts";
+import { userResourceKey } from "@/state/workspaceResources.ts";
 
-export function syncCredentialKey(scope = getAccountScope()) {
+export function syncCredentialKey(scope = getUserScope()) {
 	return ["sync-credential", scope.key] as const;
 }
 
-export function syncLinksKey(scope = getAccountScope()) {
+export function syncLinksKey(scope = getUserScope()) {
 	return ["sync-links", scope.key] as const;
 }
 
-function syncTriggerKey(scope = getAccountScope()) {
+function syncTriggerKey(scope = getUserScope()) {
 	return ["sync-trigger", scope.key] as const;
 }
 
-function current(scope: AccountScope, signal?: AbortSignal) {
+function current(scope: UserScope, signal?: AbortSignal) {
 	if (
-		scope !== getAccountScope() ||
+		scope !== getUserScope() ||
 		scope.status !== "ready" ||
 		signal?.aborted
 	)
 		throw new Error("The active resource changed or the request was canceled.");
 }
 
-function credentialOptions(scope = getAccountScope()) {
+function credentialOptions(scope = getUserScope()) {
 	return {
 		queryKey: syncCredentialKey(scope),
 		staleTime: 30_000,
@@ -53,7 +53,7 @@ function credentialOptions(scope = getAccountScope()) {
 				dismissKey("sync-credential");
 				return data;
 			} catch (error) {
-				if (scope === getAccountScope() && !signal.aborted)
+				if (scope === getUserScope() && !signal.aborted)
 					notifyError(
 						"sync-credential",
 						error instanceof Error
@@ -70,7 +70,7 @@ function credentialOptions(scope = getAccountScope()) {
 	};
 }
 
-function linksOptions(scope = getAccountScope()) {
+function linksOptions(scope = getUserScope()) {
 	return {
 		queryKey: syncLinksKey(scope),
 		staleTime: 30_000,
@@ -81,7 +81,7 @@ function linksOptions(scope = getAccountScope()) {
 				dismissKey("sync-links");
 				return (data.links ?? []) as AccountLink[];
 			} catch (error) {
-				if (scope === getAccountScope() && !signal.aborted)
+				if (scope === getUserScope() && !signal.aborted)
 					notifyError(
 						"sync-links",
 						error instanceof Error
@@ -98,16 +98,16 @@ function linksOptions(scope = getAccountScope()) {
 	};
 }
 
-async function refreshStatus(scope: AccountScope) {
-	if (scope.status === "pending" || scope !== getAccountScope()) return;
+async function refreshStatus(scope: UserScope) {
+	if (scope.status === "pending" || scope !== getUserScope()) return;
 	await serverQueryClient().invalidateQueries({
-		queryKey: accountResourceKey("status", scope),
+		queryKey: userResourceKey("status", scope),
 		refetchType: "active",
 	});
 }
 
-async function refreshSyncData(scope: AccountScope) {
-	if (scope.status === "pending" || scope !== getAccountScope()) return;
+async function refreshSyncData(scope: UserScope) {
+	if (scope.status === "pending" || scope !== getUserScope()) return;
 	await serverQueryClient().invalidateQueries({
 		queryKey: syncLinksKey(scope),
 		refetchType: "active",
@@ -116,7 +116,7 @@ async function refreshSyncData(scope: AccountScope) {
 }
 
 export async function refreshSyncSettings(force = false): Promise<void> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	if (scope.status === "pending") return;
 	try {
 		const options = credentialOptions(scope);
@@ -147,24 +147,24 @@ async function runMutation<T>(
 	mutationFn: () => Promise<T>,
 	notice: string,
 ): Promise<T | null> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	if (scope.status === "pending") return null;
 	const cache = serverQueryClient();
 	const mutation = cache.getMutationCache().build(cache, {
 		mutationKey: key,
 		scope: { id: JSON.stringify(key) },
 		mutationFn: async () => {
-			if (scope !== getAccountScope())
+			if (scope !== getUserScope())
 				throw new Error("The active resource changed.");
 			return mutationFn();
 		},
 	});
 	try {
 		const result = await mutation.execute(undefined);
-		if (scope !== getAccountScope()) return null;
+		if (scope !== getUserScope()) return null;
 		return result as T;
 	} catch (error) {
-		if (scope === getAccountScope())
+		if (scope === getUserScope())
 			notifyError(
 				notice,
 				error instanceof Error ? error.message : "The sync request failed.",
@@ -186,7 +186,7 @@ export async function connectSyncKey(input: {
 	setupToken?: string;
 	accessUrl?: string;
 }): Promise<boolean> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const updated = await runMutation<SyncCredentialBody>(
 		syncCredentialKey(scope),
 		async () => (await connectSyncCredential(input)).data,
@@ -200,7 +200,7 @@ export async function connectSyncKey(input: {
 }
 
 export async function disconnectSyncKey(): Promise<boolean> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const updated = await runMutation<SyncCredentialBody>(
 		syncCredentialKey(scope),
 		async () => (await disconnectSyncCredential()).data,
@@ -220,14 +220,14 @@ export async function disconnectSyncKey(): Promise<boolean> {
 // the new lastSyncAt and quota propagate (the sync monitor reloads the
 // workspace once the stamp flips).
 export async function triggerSyncNow(): Promise<boolean> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const result = await runMutation<unknown>(
 		syncTriggerKey(scope),
 		async () => (await triggerSimplefinSync()).data,
 		"sync-trigger",
 	);
 	if (!result) return false;
-	if (scope !== getAccountScope()) return false;
+	if (scope !== getUserScope()) return false;
 	await refreshSyncData(scope);
 	dismissKey("sync-trigger");
 	return true;
@@ -238,10 +238,10 @@ export function resetSyncSettingsClient(): void {
 	serverQueryClient().removeQueries({ queryKey: ["sync-links"] });
 }
 
-subscribeAccountScope(resetSyncSettingsClient);
+subscribeUserScope(resetSyncSettingsClient);
 
 export function useSyncCredential() {
-	const scope = useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{ ...credentialOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
@@ -249,7 +249,7 @@ export function useSyncCredential() {
 }
 
 export function useSyncLinks(enabled = true) {
-	const scope = useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{ ...linksOptions(scope), enabled: scope.status === "ready" && enabled },
 		serverQueryClient(),

@@ -5,7 +5,7 @@ import {
 	selectDraftChangeCount,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
-import { useAccountReadOnly } from "../state/useAccountScope.ts";
+import { useUserReadOnly } from "../state/useUserScope.ts";
 import { useServerModel } from "../state/workspaceResources.ts";
 import { saveWorkspace, useWorkspaceSaving } from "../state/workspaceWrites.ts";
 
@@ -14,7 +14,7 @@ export function DraftBar({ onDiscard }: { onDiscard: () => void }) {
 	// no review step or navigation callback is needed.
 	const workspaceLoading = useServerModel().isFetching;
 	const saving = useWorkspaceSaving();
-	const readOnly = useAccountReadOnly();
+	const readOnly = useUserReadOnly();
 	const importing = useUiStore((state) => state.importing);
 	const count = useWorkspaceStore(selectDraftChangeCount);
 	const loading = workspaceLoading || importing || saving;

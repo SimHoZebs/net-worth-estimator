@@ -1,31 +1,31 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendAccountScope,
+	suspendUserScope,
 } from "@/auth/resourceScope.ts";
 import { ApiHttpError, ApiNetworkError } from "@/api/http.ts";
-import { AccountScopeError } from "@/api/scopedRequest.ts";
+import { UserScopeError } from "@/api/scopedRequest.ts";
 import { waypointBlobFetch, waypointFetch } from "@/api/waypoint-fetch.ts";
 import {
 	attachReceipt,
 	replaceReceiptImage,
 } from "@/api/generated/endpoints.ts";
 
-const A = `accounts/${"a".repeat(64)}`;
+const A = `users/${"a".repeat(64)}`;
 
 function owner() {
-	return acceptAccountScope(
+	return acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: A,
 				kind: "private",
-				permissions: ["account:read", "account:project", "account:write"],
+				permissions: ["user:read", "user:project", "user:write"],
 			},
 			subject: A,
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	)!;
 }
 
@@ -42,7 +42,7 @@ beforeEach(() => {
 	owner();
 });
 afterEach(() => {
-	suspendAccountScope();
+	suspendUserScope();
 	vi.unstubAllGlobals();
 });
 
@@ -129,21 +129,21 @@ it("sends a replacement image with its scalar conflict revision", async () => {
 
 it("does not expose binary receipt content after a resource change", async () => {
 	const fetcher = vi.fn(async () => {
-		suspendAccountScope();
+		suspendUserScope();
 		return new Response("private", { headers: { "Waypoint-Resource": A } });
 	});
 	vi.stubGlobal("fetch", fetcher);
 	await expect(
 		waypointBlobFetch("/v1/receipts/example/image"),
-	).rejects.toBeInstanceOf(AccountScopeError);
+	).rejects.toBeInstanceOf(UserScopeError);
 });
 
 it("refuses generated requests without a verified account", async () => {
-	suspendAccountScope();
+	suspendUserScope();
 	const fetcher = vi.fn(async () => response({}));
 	vi.stubGlobal("fetch", fetcher);
 	await expect(waypointFetch("/v1/status")).rejects.toBeInstanceOf(
-		AccountScopeError,
+		UserScopeError,
 	);
 	expect(fetcher).not.toHaveBeenCalled();
 });
@@ -168,7 +168,7 @@ it("treats a resource change as a scope error", async () => {
 		),
 	);
 	await expect(waypointFetch("/v1/status")).rejects.toBeInstanceOf(
-		AccountScopeError,
+		UserScopeError,
 	);
 });
 
@@ -176,17 +176,17 @@ it("prefixes generated requests with a non-root API base", async () => {
 	const base = canonicalApiBaseUrl("/proxy");
 	window.__WAYPOINT_CONFIG__ = { apiBaseUrl: base };
 	try {
-		acceptAccountScope(
+		acceptUserScope(
 			{
 				apiBaseUrl: base,
 				resource: {
 					id: A,
 					kind: "private",
-					permissions: ["account:read", "account:project", "account:write"],
+					permissions: ["user:read", "user:project", "user:write"],
 				},
 				subject: A,
 			},
-			suspendAccountScope(),
+			suspendUserScope(),
 		);
 		const seen: { url: unknown; init: RequestInit | undefined }[] = [];
 		vi.stubGlobal(
