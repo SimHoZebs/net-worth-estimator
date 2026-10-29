@@ -20,7 +20,7 @@ import { movePurchase, purchaseQueue } from "../../domain/purchases.ts";
 import { horizonDate, type PurchaseSchedule } from "../../domain/result.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { saveWorkspace } from "../../state/workspaceWrites.ts";
+import { saveWorkspace, useWorkspaceSaving } from "../../state/workspaceWrites.ts";
 import {
 	useDraftConflict,
 	useWorkspaceReadOnly,
@@ -53,11 +53,13 @@ export function WishListPanel({
 		}),
 	);
 	const locked = readOnly || plan.readOnly;
+	const saving = useWorkspaceSaving();
 	const end = horizonDate({ start: plan.startDate, years });
 	const total = queue
 		.filter((item) => item.enabled)
 		.reduce((sum, item) => sum + item.amount, 0);
 	const move = (item: PlannedPurchase, direction: -1 | 1) => {
+		if (saving) return;
 		const next = movePurchase(plan, item.id, direction);
 		if (!onUpdate(next)) return;
 		setAnnouncement(
@@ -142,7 +144,7 @@ export function WishListPanel({
 										iconSize={16}
 										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Move ${item.name} up`}
-										disabled={locked || item.readOnly || index === 0}
+										disabled={locked || saving || item.readOnly || index === 0}
 										onClick={() => move(item, -1)}
 									/>
 									<IconButton
@@ -151,7 +153,7 @@ export function WishListPanel({
 										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Move ${item.name} down`}
 										disabled={
-											locked || item.readOnly || index === queue.length - 1
+											locked || saving || item.readOnly || index === queue.length - 1
 										}
 										onClick={() => move(item, 1)}
 									/>

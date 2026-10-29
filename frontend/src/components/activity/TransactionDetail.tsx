@@ -518,7 +518,7 @@ function useMovementEdit({
 	// The visible form holds only the active control, so the draft (kept in
 	// the exact shape a full form would submit) is synthesized into FormData
 	// for the shared movement builder.
-	const submit = (event: FormEvent<HTMLFormElement>) => {
+	const submit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (readOnlyReason) return;
 		const data = new FormData();
@@ -552,12 +552,12 @@ function useMovementEdit({
 			setError(validated.message);
 			return;
 		}
-		// Stored-only: apply updates the draft then saves immediately. A
-		// failed save leaves the draft for the DraftBar retry path; a
-		// successful save returns to the underlying view.
+		// Stored-only: apply updates the draft then saves before returning to
+		// the underlying view. A failed save leaves the dialog open on the
+		// draft for the DraftBar retry path.
 		if (updatePlan(validated)) {
-			onClose();
-			void saveWorkspace();
+			const ok = await saveWorkspace();
+			if (ok) onClose();
 		}
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
@@ -618,8 +618,9 @@ function MarkAsSubscriptionAction({
 			return;
 		}
 		if (updatePlan(next)) {
-			onDone();
-			void saveWorkspace();
+			void (async () => {
+				if (await saveWorkspace()) onDone();
+			})();
 		} else setError("That change could not be applied to the plan.");
 	};
 	return (
