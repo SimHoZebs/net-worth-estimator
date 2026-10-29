@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,61 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
+
+func TestSetupMigratesLegacyPlansDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE schema_migrations(name TEXT PRIMARY KEY)`,
+		`INSERT INTO schema_migrations(name) VALUES ('receipt-blobs-v1'), ('shared-plans-v1')`,
+		`CREATE TABLE app_accounts(id TEXT PRIMARY KEY, issuer TEXT NOT NULL, subject TEXT NOT NULL, UNIQUE(issuer, subject))`,
+		`CREATE TABLE plans(id TEXT PRIMARY KEY, kind TEXT NOT NULL, owner_account_id TEXT UNIQUE REFERENCES app_accounts(id))`,
+		`CREATE TABLE user_groups(id TEXT PRIMARY KEY, name TEXT NOT NULL, created_by_account_id TEXT NOT NULL REFERENCES app_accounts(id), created_at INTEGER NOT NULL)`,
+		`CREATE TABLE group_members(group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE, account_id TEXT NOT NULL REFERENCES app_accounts(id), role TEXT NOT NULL, joined_at INTEGER NOT NULL, display_name TEXT NOT NULL DEFAULT '', PRIMARY KEY(group_id, account_id))`,
+		`CREATE TABLE group_invites(id TEXT PRIMARY KEY, group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE, code_hash TEXT NOT NULL UNIQUE, created_by_account_id TEXT NOT NULL REFERENCES app_accounts(id), expires_at INTEGER NOT NULL, max_uses INTEGER NOT NULL DEFAULT 1, used_count INTEGER NOT NULL DEFAULT 0, revoked_at INTEGER, created_at INTEGER NOT NULL)`,
+		`CREATE TABLE accounts(plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE, id TEXT NOT NULL, position INTEGER NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'cash', min_balance REAL, max_balance REAL, color TEXT, enabled INTEGER NOT NULL, PRIMARY KEY (plan_id, id))`,
+		`CREATE TABLE model_metadata(plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE, id INTEGER NOT NULL, source_path TEXT NOT NULL, document_present INTEGER NOT NULL, PRIMARY KEY(plan_id, id))`,
+		`INSERT INTO app_accounts(id, issuer, subject) VALUES ('user:owner1', 'https://issuer.test', 'owner1')`,
+		`INSERT INTO plans(id, kind, owner_account_id) VALUES ('plans/owner1', 'private', 'user:owner1')`,
+		`INSERT INTO accounts(plan_id, id, position, name, kind, enabled) VALUES ('plans/owner1', 'checking', 0, 'Checking', 'cash', 1)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("legacy ddl: %v: %s", err, stmt)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	if code := run([]string{"--db", path}, &out, &errOut); code != 0 {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, out.String(), errOut.String())
+	}
+	if !strings.Contains(out.String(), "migration complete") || !strings.Contains(out.String(), "setup complete") {
+		t.Fatalf("unexpected output: %q", out.String())
+	}
+	// Repeat run is a no-op migration with successful setup.
+	out.Reset()
+	if code := run([]string{"--db", path}, &out, &errOut); code != 0 {
+		t.Fatalf("repeat code=%d stderr=%q", code, errOut.String())
+	}
+	if strings.Contains(out.String(), "migration complete") {
+		t.Fatalf("repeat migrated again: %q", out.String())
+	}
+	opened, err := sqlite.OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("open after setup: %v", err)
+	}
+	var name string
+	if err := opened.SQL().QueryRow(`SELECT name FROM accounts WHERE user_id='user:owner1'`).Scan(&name); err != nil || name != "Checking" {
+		t.Fatalf("migrated rows: %v", err)
+	}
+	if err := opened.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestRequiresExplicitDatabase(t *testing.T) {
 	t.Setenv("NET_WORTH_ESTIMATOR_DB", filepath.Join(t.TempDir(), "implicit.db"))
