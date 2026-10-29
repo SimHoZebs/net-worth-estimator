@@ -38,18 +38,18 @@ func TestExplicitSetupMigratesInlineReceiptBlobs(t *testing.T) {
 	for _, statement := range []string{
 		`DROP TABLE receipts`, `DELETE FROM blob_data`, `DELETE FROM blob_objects`,
 		`CREATE TABLE receipts (
-			account_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL, posting_id TEXT NOT NULL, digest TEXT NOT NULL,
 			size INTEGER NOT NULL CHECK(size>0), image BLOB NOT NULL,
 			revision INTEGER NOT NULL, payload TEXT NOT NULL,
-			PRIMARY KEY(account_id,id), UNIQUE(account_id,posting_id,digest),
-			FOREIGN KEY(account_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE)`,
+			PRIMARY KEY(user_id,id), UNIQUE(user_id,posting_id,digest),
+			FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE)`,
 	} {
 		if _, err := d.db.Exec(statement); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := d.db.Exec(`INSERT INTO receipts(account_id,id,posting_id,digest,size,image,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, s.db.userID, r.ID, r.PostingID, r.Digest, r.Size, image.Bytes, r.Revision, payload); err != nil {
+	if _, err := d.db.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,image,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, s.db.userID, r.ID, r.PostingID, r.Digest, r.Size, image.Bytes, r.Revision, payload); err != nil {
 		t.Fatal(err)
 	}
 	if err := checkExistingSchema(d.db); !errors.Is(err, ErrSetupRequired) {
