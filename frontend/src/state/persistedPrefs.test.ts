@@ -161,6 +161,24 @@ describe("unified persisted prefs", () => {
 		expect(window.localStorage.getItem(financialKey())).toContain("999");
 	});
 
+	it("migrates a pre-cutover browser record forward once, then drops it", async () => {
+		const scope = getAccountScope();
+		const primary = financialKey(scope);
+		const legacy = primary
+			.replace(":account:", ":resource:")
+			.replaceAll("accounts%2F", "plans%2F");
+		expect(legacy).not.toBe(primary);
+		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
+		const storage = accountLocalStorage(scope);
+		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(primary)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(legacy)).toBeNull();
+	});
+
 	it("reports a failed save and retries the latest settings", async () => {
 		server.putErrors.push(new Error("Offline"));
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
