@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendAccountScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { ok } from "../mocks/fetch.ts";
 import { ApiHttpError, ApiNetworkError } from "./http.ts";
-import { AccountScopeError } from "./scopedRequest.ts";
+import { UserScopeError } from "./scopedRequest.ts";
 import type { BackendAccount, FinancialModelDocument } from "./contracts.ts";
 import {
 	importServerModel,
@@ -51,17 +51,17 @@ function rowResponse(row: unknown) {
 function setup(
 	preconditions: Partial<ServerModelImportOptions["preconditions"]> = {},
 ) {
-	acceptAccountScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: `accounts/${"a".repeat(64)}`,
+				id: `users/${"a".repeat(64)}`,
 				kind: "private",
-				permissions: ["account:read", "account:write", "account:project"],
+				permissions: ["user:read", "user:write", "user:project"],
 			},
 			subject: "account-a",
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	);
 	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 		const path = String(url);
@@ -95,7 +95,7 @@ function setup(
 }
 
 afterEach(() => {
-	suspendAccountScope();
+	suspendUserScope();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
@@ -104,10 +104,10 @@ describe("server model replacement", () => {
 	it("does not start writes if the resource changes after the initial read", async () => {
 		const { run, fetcher, reload } = setup();
 		fetcher.mockImplementationOnce(async () => {
-			suspendAccountScope();
+			suspendUserScope();
 			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
-		expect(await run()).toBeInstanceOf(AccountScopeError);
+		expect(await run()).toBeInstanceOf(UserScopeError);
 		expect(
 			fetcher.mock.calls.filter(([, init]) => init?.method === "POST"),
 		).toHaveLength(0);
@@ -121,12 +121,12 @@ describe("server model replacement", () => {
 				String(url).endsWith("/v1/accounts") &&
 				(init?.method ?? "GET") === "POST"
 			) {
-				suspendAccountScope();
+				suspendUserScope();
 				return ok(rowResponse(account));
 			}
 			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
-		expect(await run()).toBeInstanceOf(AccountScopeError);
+		expect(await run()).toBeInstanceOf(UserScopeError);
 		expect(reload).not.toHaveBeenCalled();
 	});
 

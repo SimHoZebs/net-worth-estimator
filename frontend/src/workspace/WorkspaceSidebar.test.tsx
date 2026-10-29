@@ -192,7 +192,7 @@ describe("sidebar sync signals", () => {
 	});
 });
 
-describe("sidebar account placement", () => {
+describe("sidebar user placement", () => {
 	afterEach(cleanup);
 
 	function renderSession(session: Session) {
@@ -211,16 +211,16 @@ describe("sidebar account placement", () => {
 		);
 	}
 
-	it("keeps session account content out of the navigation sidebar", () => {
+	it("keeps session user content out of the navigation sidebar", () => {
 		const view = renderSession({
 			enabled: true,
 			authenticated: true,
 			allowed: true,
 			accountURL: "https://identity.example/account",
 			resource: {
-				id: `accounts/${"a".repeat(64)}`,
+				id: `users/${"a".repeat(64)}`,
 				kind: "private",
-				permissions: ["account:read", "account:write"],
+				permissions: ["user:read", "user:write"],
 			},
 			user: { subject: "editor", name: "Sam Lee" },
 		});

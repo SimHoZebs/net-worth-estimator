@@ -9,8 +9,8 @@ import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { stageAndSave } from "../../state/workspaceWrites.ts";
 import {
 	useDraftConflict,
-	useAccountReadOnly,
-} from "../../state/useAccountScope.ts";
+	useUserReadOnly,
+} from "../../state/useUserScope.ts";
 import { WishListEditor } from "./WishListEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";
@@ -32,7 +32,7 @@ export function WishListPanel({
 }) {
 	const onUpdate = stageAndSave;
 	const applyError = useWorkspaceStore((state) => state.error);
-	const blocked = useAccountReadOnly();
+	const blocked = useUserReadOnly();
 	const draftConflict = useDraftConflict();
 	const years = useUiStore((state) => state.years);
 	const locked = blocked || Boolean(draftConflict) || plan.readOnly;

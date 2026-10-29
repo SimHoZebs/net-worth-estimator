@@ -8,17 +8,17 @@ import {
 	serverQueryClient,
 } from "./serverQuery.ts";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	getAccountScope,
-	suspendAccountScope,
+	getUserScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 
 function stubSync(lastSyncAt = "after") {
 	const fetcher = vi.fn(async (url: unknown, _init?: RequestInit) => {
 		const headers = new Headers({ "content-type": "application/json" });
-		const resource = getAccountScope().resource?.id;
+		const resource = getUserScope().resource?.id;
 		if (resource) headers.set("Waypoint-Resource", resource);
 		const path = String(url);
 		if (path.endsWith("/v1/status"))
@@ -79,21 +79,21 @@ it("refreshes the model and invalidates only the current resource's financial ca
 	);
 });
 
-it("re-arms the poll after an account switch", async () => {
+it("re-arms the poll after a user switch", async () => {
 	const fetcher = stubSync();
-	const nextId = `accounts/${"b".repeat(64)}`;
+	const nextId = `users/${"b".repeat(64)}`;
 	const rendered = renderHook(() => useWorkspaceSyncMonitor(true));
-	acceptAccountScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: nextId,
 				kind: "private",
-				permissions: ["account:read", "account:write", "account:project"],
+				permissions: ["user:read", "user:write", "user:project"],
 			},
 			subject: nextId,
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	);
 	rendered.rerender();
 	act(() => {

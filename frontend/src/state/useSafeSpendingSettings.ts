@@ -3,9 +3,9 @@ import { useSyncExternalStore } from "react";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import {
-	getAccountScope,
-	subscribeAccountScope,
-	type AccountScope,
+	getUserScope,
+	subscribeUserScope,
+	type UserScope,
 } from "@/auth/resourceScope.ts";
 import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
@@ -99,13 +99,13 @@ interface SafeSpendingSettingsState extends TotalCycleSettings {
 	updateSettings: (next: Partial<TotalCycleSettings>) => void;
 }
 
-export function safeSpendingSettingsKey(scope = getAccountScope()) {
+export function safeSpendingSettingsKey(scope = getUserScope()) {
 	return ["safe-spending-settings", scope.key] as const;
 }
 
 const defaults = defaultSafeSpendingSettings();
 
-function settingsOptions(scope = getAccountScope()) {
+function settingsOptions(scope = getUserScope()) {
 	return {
 		queryKey: safeSpendingSettingsKey(scope),
 		staleTime: Infinity,
@@ -119,7 +119,7 @@ function settingsOptions(scope = getAccountScope()) {
 }
 
 export function getSafeSpendingSettings(
-	scope = getAccountScope(),
+	scope = getUserScope(),
 ): TotalCycleSettings {
 	return scope.status === "pending"
 		? defaults
@@ -133,11 +133,11 @@ function subscribeSettings(listener: () => void) {
 }
 
 export function updateSettingsForScope(
-	scope: AccountScope = getAccountScope(),
+	scope: UserScope = getUserScope(),
 ) {
 	return (next: Partial<TotalCycleSettings>) => {
 		if (
-			scope !== getAccountScope() ||
+			scope !== getUserScope() ||
 			scope.status !== "ready" ||
 			serverQueryClient().getQueryState(safeSpendingSettingsKey(scope))
 				?.status !== "success"
@@ -173,9 +173,9 @@ export function updateSettingsForScope(
 			mutationKey: key,
 			scope: { id: JSON.stringify(key) },
 			mutationFn: async () => {
-				if (scope !== getAccountScope()) return;
+				if (scope !== getUserScope()) return;
 				const data = (await setSafeSpendingSettings(snapshot as never)).data;
-				if (scope !== getAccountScope()) return;
+				if (scope !== getUserScope()) return;
 				if (cache.getQueryData(key) === optimistic)
 					cache.setQueryData(
 						key,
@@ -186,7 +186,7 @@ export function updateSettingsForScope(
 				dismissKey("safe-spending-settings");
 			},
 			onError: (error) => {
-				if (scope !== getAccountScope()) return;
+				if (scope !== getUserScope()) return;
 				notifyError(
 					"safe-spending-settings",
 					`Budget settings were not saved. ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -202,7 +202,7 @@ export function updateSettingsForScope(
 }
 
 export async function refreshSafeSpendingSettings() {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	if (scope.status === "pending") return;
 	const cache = serverQueryClient();
 	const key = safeSpendingSettingsKey(scope);
@@ -216,14 +216,14 @@ export async function refreshSafeSpendingSettings() {
 			});
 		});
 	}
-	if (scope !== getAccountScope()) return;
+	if (scope !== getUserScope()) return;
 	await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
 	await cache.fetchQuery(settingsOptions(scope));
 }
 
 /** Query owns both the saved response and its explicit optimistic updates. */
 export function useSafeSpendingSettings(): SafeSpendingSettingsState {
-	const scope = useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	useQuery(
 		{ ...settingsOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
@@ -239,7 +239,7 @@ export function useSafeSpendingSettings(): SafeSpendingSettingsState {
 }
 
 function bindFinancialPreferences(): void {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	void cache.cancelQueries({ queryKey: ["safe-spending-settings"] });
 	cache.removeQueries({ queryKey: ["safe-spending-settings"] });
@@ -249,24 +249,24 @@ function bindFinancialPreferences(): void {
 
 /** The session boundary waits for this owner before it mounts financial screens. */
 export async function hydrateFinancialPreferences(
-	scope: AccountScope,
+	scope: UserScope,
 ): Promise<boolean> {
-	if (scope !== getAccountScope() || scope.status !== "ready") return false;
+	if (scope !== getUserScope() || scope.status !== "ready") return false;
 	try {
 		await serverQueryClient().fetchQuery(settingsOptions(scope));
 	} catch (error) {
-		if (scope === getAccountScope()) throw error;
+		if (scope === getUserScope()) throw error;
 		else return false;
 	}
 	return (
-		scope === getAccountScope() &&
+		scope === getUserScope() &&
 		scope.status === "ready" &&
 		serverQueryClient().getQueryState(safeSpendingSettingsKey(scope))
 			?.status === "success"
 	);
 }
 
-subscribeAccountScope(bindFinancialPreferences);
+subscribeUserScope(bindFinancialPreferences);
 bindFinancialPreferences();
 
 /** Test hook: restores safe spending defaults between cases. */

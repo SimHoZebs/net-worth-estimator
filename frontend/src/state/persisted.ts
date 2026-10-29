@@ -4,9 +4,9 @@ import {
 	type StateStorage,
 } from "zustand/middleware";
 import {
-	getAccountScope,
-	accountStorageKey,
-	type AccountScope,
+	getUserScope,
+	userStorageKey,
+	type UserScope,
 } from "../auth/resourceScope.ts";
 
 export const THEME_STORAGE_KEY = "waypoint-theme";
@@ -77,23 +77,29 @@ export function appJsonStorage<T>() {
 }
 
 /**
- * One-time upgrade path for browser records written before the account
- * cutover. Old keys use `:resource:` plus `plans/*` ids; current keys use
- * `:account:` plus `accounts/*` ids. On a primary miss the legacy key is
- * read once, copied forward, and deleted. Nothing writes legacy keys.
+ * One-time upgrade path for browser records written before the user
+ * cutover. Current keys use `:user:` plus `users/*` ids. On a primary miss
+ * the `:account:` plus `accounts/*` generation is tried first, then the
+ * `:resource:` plus `plans/*` generation; the first hit is copied forward
+ * and deleted. Nothing writes legacy keys.
  */
-function legacyKeyFor(name: string, scope: AccountScope): string | null {
-	const primary = accountStorageKey(name, scope);
-	if (!primary) return null;
-	return primary
-		.replace(":account:", ":resource:")
-		.replaceAll("accounts%2F", "plans%2F");
+function legacyKeysFor(name: string, scope: UserScope): string[] {
+	const primary = userStorageKey(name, scope);
+	if (!primary) return [];
+	const accountGeneration = primary
+		.replace(":user:", ":account:")
+		.replaceAll("users%2F", "accounts%2F");
+	const resourceGeneration = primary
+		.replace(":user:", ":resource:")
+		.replaceAll("users%2F", "plans%2F");
+	const keys = [accountGeneration, resourceGeneration];
+	return keys.filter((key) => key !== primary);
 }
 
-/** Financial preferences bind to one verified account, including memory fallbacks. */
-export function accountLocalStorage(scope: AccountScope): StateStorage {
+/** Financial preferences bind to one verified user, including memory fallbacks. */
+export function accountLocalStorage(scope: UserScope): StateStorage {
 	const keyFor = (name: string) =>
-		scope === getAccountScope() ? accountStorageKey(name, scope) : null;
+		scope === getUserScope() ? userStorageKey(name, scope) : null;
 	const readThrough = (name: string): string | null => {
 		const key = keyFor(name);
 		if (!key) return null;
@@ -101,13 +107,14 @@ export function accountLocalStorage(scope: AccountScope): StateStorage {
 			const raw = appLocalStorage.getItem(key);
 			if (raw instanceof Promise) return null;
 			if (raw !== null) return raw;
-			const legacy = legacyKeyFor(name, scope);
-			if (!legacy) return null;
-			const migrated = appLocalStorage.getItem(legacy);
-			if (migrated === null || migrated instanceof Promise) return null;
-			appLocalStorage.setItem(key, migrated);
-			appLocalStorage.removeItem(legacy);
-			return migrated;
+			for (const legacy of legacyKeysFor(name, scope)) {
+				const migrated = appLocalStorage.getItem(legacy);
+				if (migrated === null || migrated instanceof Promise) continue;
+				appLocalStorage.setItem(key, migrated);
+				appLocalStorage.removeItem(legacy);
+				return migrated;
+			}
+			return null;
 		} catch {
 			return null;
 		}
@@ -120,9 +127,9 @@ export function accountLocalStorage(scope: AccountScope): StateStorage {
 		},
 		removeItem: (name) => {
 			const key = keyFor(name);
-			const legacy = legacyKeyFor(name, scope);
 			if (key) appLocalStorage.removeItem(key);
-			if (legacy) appLocalStorage.removeItem(legacy);
+			for (const legacy of legacyKeysFor(name, scope))
+				appLocalStorage.removeItem(legacy);
 		},
 	};
 }

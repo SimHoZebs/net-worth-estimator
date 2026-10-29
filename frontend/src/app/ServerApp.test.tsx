@@ -19,7 +19,7 @@ import { testAccount } from "../mocks/account.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { useAccountPlan } from "../state/useAccountScope.ts";
+import { useUserPlan } from "../state/useUserScope.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
 import { stubTestServer } from "../mocks/waypointServer.ts";
@@ -51,7 +51,7 @@ vi.mock("../WorkspaceShell.tsx", () => ({
 	),
 }));
 function Readout() {
-	return <p>{useAccountPlan()?.name}</p>;
+	return <p>{useUserPlan()?.name}</p>;
 }
 
 beforeEach(() => {

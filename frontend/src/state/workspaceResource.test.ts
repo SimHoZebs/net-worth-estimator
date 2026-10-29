@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	getAccountScope,
-	suspendAccountScope,
+	getUserScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
 	resetWorkspaceForResource,
@@ -13,7 +13,7 @@ import {
 import {
 	getServerModel,
 	modelOptions,
-	accountResourceKey,
+	userResourceKey,
 } from "./workspaceResources.ts";
 import {
 	cancelResourceQueries,
@@ -24,21 +24,21 @@ import { setServerModelFixture } from "../mocks/workspace.ts";
 import { testAccount } from "../mocks/account.ts";
 
 function owner(id: string) {
-	acceptAccountScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id,
 				kind: "private",
-				permissions: ["account:read", "account:write"],
+				permissions: ["user:read", "user:write"],
 			},
 			subject: id,
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	);
 }
 beforeEach(() => {
-	owner("accounts/a");
+	owner("users/a");
 	resetWorkspaceStore();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
@@ -46,31 +46,31 @@ beforeEach(() => {
 afterEach(() => {
 	resetWorkspaceStore();
 	resetServerQueryCache();
-	suspendAccountScope();
+	suspendUserScope();
 	vi.unstubAllGlobals();
 });
 
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
 	const model = setServerModelFixture();
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	useWorkspaceStore.setState({ draft: testAccount });
-	suspendAccountScope();
+	suspendUserScope();
 	await cancelResourceQueries();
 	expect(getServerModel()).toBeUndefined();
 	expect(
-		serverQueryClient().getQueryData(accountResourceKey("model", scope)),
+		serverQueryClient().getQueryData(userResourceKey("model", scope)),
 	).toEqual(model);
 	expect(useWorkspaceStore.getState().draft).toBe(testAccount);
 });
 
-it("does not publish a retired account's late model result", async () => {
+it("does not publish a retired user's late model result", async () => {
 	let finish!: (value: Response) => void;
 	const pending = new Promise<Response>((resolve) => {
 		finish = resolve;
 	});
 	const headers = () => {
 		const responseHeaders = new Headers({ "content-type": "application/json" });
-		const resource = getAccountScope().resource?.id;
+		const resource = getUserScope().resource?.id;
 		if (resource) responseHeaders.set("Waypoint-Resource", resource);
 		return responseHeaders;
 	};
@@ -91,7 +91,7 @@ it("does not publish a retired account's late model result", async () => {
 	const old = serverQueryClient()
 		.fetchQuery(modelOptions())
 		.catch(() => {});
-	owner("accounts/b");
+	owner("users/b");
 	resetWorkspaceForResource();
 	const current = setServerModelFixture(undefined, { revision: "b" });
 	finish(
