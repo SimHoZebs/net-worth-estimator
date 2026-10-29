@@ -3,14 +3,14 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
+import { getAccountScope } from "../auth/resourceScope.ts";
 import { displayPlanToBackendDocument } from "../api/adapter.ts";
 import type {
 	DeterministicProjectionRequest,
 	EvaluationResultTables,
 	ProjectionResult,
 } from "../api/contracts.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import {
 	PURCHASE_EVALUATIONS,
 	PURCHASE_EVALUATION_ID,
@@ -49,7 +49,7 @@ function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
 describe("isolated purchase evaluation", () => {
 	it("never derives a baseline start date from a planned purchase", () => {
 		const document = displayPlanToBackendDocument({
-			...testPlan,
+			...testAccount,
 			plannedPurchases: [
 				{
 					id: "purchase",
@@ -157,7 +157,7 @@ describe("isolated purchase evaluation", () => {
 		const wrapper = ({ children }: { children: ReactNode }) =>
 			createElement(QueryClientProvider, { client: queryClient }, children);
 		const document = displayPlanToBackendDocument({
-			...testPlan,
+			...testAccount,
 			plannedPurchases: [
 				{
 					id: "laptop",
@@ -175,7 +175,7 @@ describe("isolated purchase evaluation", () => {
 		let purchasesCalls = 0;
 		const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getAccountScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			if (String(url).endsWith("/v1/projections/deterministic")) {
 				const request = JSON.parse(

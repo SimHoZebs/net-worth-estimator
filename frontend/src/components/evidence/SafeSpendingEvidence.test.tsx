@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../mocks/plan.ts";
+import { testAccount } from "../../mocks/account.ts";
 import { movementFixture, projectionFixture } from "../../mocks/projection.ts";
 import { SafeSpendingEvidence } from "./SafeSpendingEvidence.tsx";
 
@@ -34,7 +34,7 @@ describe("SafeSpendingEvidence", () => {
 		});
 		const view = render(
 			<SafeSpendingEvidence
-				plan={testPlan}
+				plan={testAccount}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -67,7 +67,7 @@ describe("SafeSpendingEvidence", () => {
 	it("retains the empty-period explanation", () => {
 		const view = render(
 			<SafeSpendingEvidence
-				plan={testPlan}
+				plan={testAccount}
 				projection={projectionFixture()}
 				onClose={() => {}}
 			/>,

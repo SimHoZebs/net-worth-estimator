@@ -25,7 +25,7 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 	await expect(page).toHaveURL(/#accounts$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 
-	// Direct loads open the same modal once the plan arrives.
+	// Direct loads open the same modal once the account arrives.
 	await page.goto("/#accounts/everyday-checking");
 	await expect(page.getByRole("dialog")).toContainText("Everyday checking");
 	await expect(

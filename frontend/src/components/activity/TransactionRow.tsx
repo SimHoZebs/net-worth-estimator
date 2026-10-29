@@ -100,7 +100,7 @@ export function TransactionRow({
 						) : (
 							transaction.excluded && (
 								<Badge tone="warning" className={transactionBadgeStyles()}>
-									Excluded from plan
+									Excluded from account
 								</Badge>
 							)
 						)}
@@ -131,7 +131,7 @@ export function TransactionRow({
 					)}
 				</>
 			}
-			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from plan" : ""}`}
+			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}`}
 			onSelect={() => {
 				if (planTransaction) onEdit(planTransaction);
 			}}

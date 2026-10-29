@@ -4,7 +4,7 @@ import type {
 	Point,
 	Projection,
 } from "../domain/result.ts";
-import { testPlan } from "./plan.ts";
+import { testAccount } from "./account.ts";
 
 /**
  * A hand-built projection in the shape the Go engine returns. Unit tests used
@@ -63,7 +63,7 @@ export function evaluationFixture(
 	overrides: Partial<EvaluationResult> = {},
 ): EvaluationResult {
 	return {
-		evaluation: testPlan.evaluations[0]!,
+		evaluation: testAccount.evaluations[0]!,
 		firstDate: "2028-06-01",
 		current: 361200,
 		final: 1016195,
@@ -72,7 +72,7 @@ export function evaluationFixture(
 }
 
 function event(
-	plan: typeof testPlan,
+	plan: typeof testAccount,
 	movementId: string,
 	date: string,
 	requested: number,
@@ -115,7 +115,7 @@ function event(
  * scheduled payment continues at zero.
  */
 export function activityProjection(
-	plan: typeof testPlan = testPlan,
+	plan: typeof testAccount = testAccount,
 ): Projection {
 	const movements: MovementResult[] = [];
 	for (const transaction of plan.transactions) {

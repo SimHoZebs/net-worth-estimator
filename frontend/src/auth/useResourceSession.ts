@@ -13,12 +13,11 @@ import {
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
+	accountScopeKey,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	normalizeAccountId,
-	resourceScopeKey,
-	suspendResourceScope,
+	getAccountScope,
+	suspendAccountScope,
 } from "./resourceScope.ts";
 import {
 	announceSessionChange,
@@ -46,8 +45,7 @@ interface Verification {
 function sameOwner(a: SessionOwner, b: SessionOwner): boolean {
 	return (
 		canonicalApiBaseUrl(a.apiBaseUrl) === canonicalApiBaseUrl(b.apiBaseUrl) &&
-		normalizeAccountId(a.session.resource.id) ===
-			normalizeAccountId(b.session.resource.id) &&
+		a.session.resource.id === b.session.resource.id &&
 		a.session.user?.subject === b.session.user?.subject
 	);
 }
@@ -77,7 +75,7 @@ export function useResourceSession() {
 		// mounted until discovery proves the owner changed or denies access.
 		// Suspending upfront wiped the UI on every focus event and on
 		// transient outages, which flickered and hid usable data.
-		const pending = previous ? null : suspendResourceScope();
+		const pending = previous ? null : suspendAccountScope();
 		check.pending = (async () => {
 			try {
 				if (!previous) await cancelResourceQueries();
@@ -101,9 +99,9 @@ export function useResourceSession() {
 				const input = sessionScopeInput(next.session, apiBaseUrl);
 				const changed =
 					!previous ||
-					resourceScopeKey(
+					accountScopeKey(
 						sessionScopeInput(previous.session, previous.apiBaseUrl),
-					) !== resourceScopeKey(input);
+					) !== accountScopeKey(input);
 				if (!previous) {
 					if (changed) {
 						resetWorkspaceForResource({
@@ -121,7 +119,7 @@ export function useResourceSession() {
 						});
 						return;
 					}
-					const verified = acceptResourceScope(input, pending!);
+					const verified = acceptAccountScope(input, pending!);
 					if (
 						!verified ||
 						!(await hydrateFinancialPreferences(verified)) ||
@@ -135,10 +133,10 @@ export function useResourceSession() {
 					if (changed) announceSessionChange();
 					return;
 				}
-				// A rejected request needs a fresh scope even if the same plan returns.
-				if (!changed && getResourceScope().status === "ready") {
+				// A rejected request needs a fresh scope even if the same account returns.
+				if (!changed && getAccountScope().status === "ready") {
 					if (!next.session.allowed) {
-						suspendResourceScope();
+						suspendAccountScope();
 						await cancelResourceQueries();
 						if (signal.aborted) return;
 						const activeLogout = signingOut.current as LogoutAttempt | null;
@@ -164,7 +162,7 @@ export function useResourceSession() {
 					dismissKey("session");
 					return;
 				}
-				const hardPending = suspendResourceScope();
+				const hardPending = suspendAccountScope();
 				await cancelResourceQueries();
 				if (signal.aborted) return;
 				const activeLogout = signingOut.current as LogoutAttempt | null;
@@ -186,7 +184,7 @@ export function useResourceSession() {
 					});
 					return;
 				}
-				const verified = acceptResourceScope(input, hardPending);
+				const verified = acceptAccountScope(input, hardPending);
 				if (
 					!verified ||
 					!(await hydrateFinancialPreferences(verified)) ||
@@ -267,7 +265,7 @@ export function useResourceSession() {
 				if (response.status === 409) await refresh();
 				throw new Error("Sign-out failed. Please retry.");
 			}
-			suspendResourceScope();
+			suspendAccountScope();
 			resetWorkspaceForResource();
 			// Local logout can complete even when prior discovery failed.
 			if (verification.current) verification.current.error = undefined;
@@ -292,7 +290,7 @@ export function useResourceSession() {
 			signingOut.current = null;
 			const error = cause instanceof Error ? cause.message : "Sign-out failed.";
 			if (
-				getResourceScope().status === "pending" &&
+				getAccountScope().status === "pending" &&
 				!verification.current?.error
 			)
 				await refresh();
@@ -336,7 +334,7 @@ export function useResourceSession() {
 			verification.current?.controller.abort();
 			signingOut.current = null;
 			owner.current = null;
-			suspendResourceScope();
+			suspendAccountScope();
 			resetWorkspaceForResource();
 			void clearResourceQueryCache();
 		};

@@ -243,7 +243,7 @@ export function AccountDetailsModal({
 				{transactions.length > 0 && selected == null ? (
 					<span>
 						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
-						Recurring transactions show in the plan with their schedule. Dates
+						Recurring transactions show in the account with their schedule. Dates
 						shown {dateLabel(plan.startDate, true)} onward.
 					</span>
 				) : (

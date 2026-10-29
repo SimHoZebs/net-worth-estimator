@@ -14,23 +14,23 @@ import type {
 	ReceiptOutputBody,
 	ReceiptDetails,
 } from "@/api/generated/model/index.ts";
-import { ResourceScopeError } from "@/api/scopedRequest.ts";
+import { AccountScopeError } from "@/api/scopedRequest.ts";
 import {
-	getResourceScope,
-	subscribeResourceScope,
+	getAccountScope,
+	subscribeAccountScope,
 } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { useServerModel, workspaceResourceKey } from "./workspaceResources.ts";
+import { useServerModel, accountResourceKey } from "./workspaceResources.ts";
 
 export function useReceiptScope() {
-	return useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	return useSyncExternalStore(subscribeAccountScope, getAccountScope);
 }
 
 export const receiptCollectionKey = (
 	postingId: string,
-	scope = getResourceScope(),
+	scope = getAccountScope(),
 ) => ["receipts", scope.key, postingId] as const;
-export const receiptDetailKey = (id: string, scope = getResourceScope()) =>
+export const receiptDetailKey = (id: string, scope = getAccountScope()) =>
 	["receipt-detail", scope.key, id] as const;
 
 export function useReceipts(postingId: string, enabled: boolean) {
@@ -92,14 +92,14 @@ function useReceiptWrite<T>(
 			mutationKey: ["receipt-write", scope.key, postingId],
 			retry: false,
 			mutationFn: async (input: T) => {
-				if (scope !== getResourceScope() || scope.status !== "ready")
-					throw new ResourceScopeError();
+				if (scope !== getAccountScope() || scope.status !== "ready")
+					throw new AccountScopeError();
 				const result = await perform(input);
-				if (scope !== getResourceScope()) throw new ResourceScopeError();
+				if (scope !== getAccountScope()) throw new AccountScopeError();
 				return result;
 			},
 			onSuccess: async (result) => {
-				if (scope !== getResourceScope()) return;
+				if (scope !== getAccountScope()) return;
 				if (result)
 					cache.setQueryData(
 						receiptDetailKey(result.receipt.id, scope),
@@ -111,7 +111,7 @@ function useReceiptWrite<T>(
 				// Reverse lookup lives on the financial-model envelope, outside
 				// the document. Refresh it so posting badges follow mutations.
 				await cache.invalidateQueries({
-					queryKey: workspaceResourceKey("model", scope),
+					queryKey: accountResourceKey("model", scope),
 				});
 			},
 		},

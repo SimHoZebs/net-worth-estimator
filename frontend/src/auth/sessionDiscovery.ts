@@ -73,26 +73,24 @@ async function readSession(
 	)
 		throw new Error("Invalid authentication status.");
 	const resource: unknown = next.resource;
-	// Accept the canonical account ids (`accounts/*`, `user:<hash>`) and the
-	// legacy `plans/*` wire ids during migration. Sample is `accounts/sample`
-	// going forward, `plans/sample` on legacy servers.
+	// Only canonical account ids (`accounts/*`, `user:<hash>`). Sample is
+	// `accounts/sample`. Legacy plan ids are rejected: no legacy wire support.
 	const resourceId =
 		isRecord(resource) && typeof resource.id === "string"
 			? resource.id
 			: null;
 	const authenticatedId =
 		typeof resourceId === "string" &&
-		(/^(plans|accounts)\/[a-f0-9]{64}$/.test(resourceId) ||
+		(/^accounts\/[a-f0-9]{64}$/.test(resourceId) ||
 			/^user:[a-f0-9]{64}$/.test(resourceId));
-	const sampleId =
-		resourceId === "accounts/sample" || resourceId === "plans/sample";
+	const sampleId = resourceId === "accounts/sample";
 	if (
 		!isRecord(resource) ||
 		typeof resource.id !== "string" ||
 		(next.authenticated ? !authenticatedId : !sampleId) ||
 		resource.kind !== (next.authenticated ? "private" : "sample") ||
 		!Array.isArray(resource.permissions) ||
-		(next.allowed && !resource.permissions.includes("plan:read")) ||
+		(next.allowed && !resource.permissions.includes("account:read")) ||
 		!resource.permissions.every(
 			(permission) => typeof permission === "string" && permission.length > 0,
 		) ||

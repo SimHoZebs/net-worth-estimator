@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FinancialModelDocument } from "../api/contracts.ts";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	suspendResourceScope,
+	getAccountScope,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 import { useCurrentPosition } from "./useCurrentPosition.ts";
 import { resetWorkspaceStore } from "./workspaceStore.ts";
@@ -15,7 +15,7 @@ import { resetWorkspaceStore } from "./workspaceStore.ts";
 afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
-	suspendResourceScope();
+	suspendAccountScope();
 	vi.unstubAllGlobals();
 });
 
@@ -42,17 +42,17 @@ function wrapper({ children }: { children: ReactNode }) {
 let cache: QueryClient;
 
 function setup() {
-	acceptResourceScope(
+	acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: `plans/${"a".repeat(64)}`,
+				id: `accounts/${"a".repeat(64)}`,
 				kind: "private",
-				permissions: ["plan:read"],
+				permissions: ["account:read"],
 			},
-			subject: `plans/${"a".repeat(64)}`,
+			subject: `accounts/${"a".repeat(64)}`,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	)!;
 	cache = new QueryClient({
 		defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
@@ -72,7 +72,7 @@ function stubPosition(respond: (url: string, init?: RequestInit) => unknown) {
 		vi.fn(async (url: unknown, init?: RequestInit) => {
 			calls.push({ url: String(url), init });
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getAccountScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			const body = await respond(String(url), init);
 			return new Response(JSON.stringify(body), { headers });
@@ -171,7 +171,7 @@ it("requests the saved model", async () => {
 		vi.fn(async (_url: unknown, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body ?? "{}")));
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getAccountScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			return new Response(JSON.stringify({ result }), { headers });
 		}),
@@ -194,37 +194,37 @@ it("separates identical models by resource identity", async () => {
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async () => {
-			seen.push(getResourceScope().resource?.id ?? "");
+			seen.push(getAccountScope().resource?.id ?? "");
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getAccountScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			return new Response(JSON.stringify({ result }), { headers });
 		}),
 	);
 	const selectScope = (id: string) =>
-		acceptResourceScope(
+		acceptAccountScope(
 			{
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				subject: null,
 				resource: {
 					id,
 					kind: "sample",
-					permissions: ["plan:read", "plan:project"],
+					permissions: ["account:read", "account:project"],
 				},
 			},
-			suspendResourceScope(),
+			suspendAccountScope(),
 		);
-	selectScope("plans/one");
+	selectScope("accounts/one");
 	const hook = renderHook(
 		() => useCurrentPosition({ document: model() }),
 		{ wrapper },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	selectScope("plans/two");
+	selectScope("accounts/two");
 	hook.rerender();
 	expect(hook.result.current.data).toBeNull();
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	expect(seen).toEqual(["plans/one", "plans/two"]);
+	expect(seen).toEqual(["accounts/one", "accounts/two"]);
 });
 
 it("ignores workspace drafts and requests the saved model", async () => {
@@ -235,7 +235,7 @@ it("ignores workspace drafts and requests the saved model", async () => {
 		vi.fn(async (_url: unknown, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body ?? "{}")));
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getAccountScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			return new Response(JSON.stringify({ result }), { headers });
 		}),

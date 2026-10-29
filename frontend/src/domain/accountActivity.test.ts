@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testPlan as examplePlan } from "../mocks/plan.ts";
+import { testAccount as examplePlan } from "../mocks/account.ts";
 import { activityProjection } from "../mocks/projection.ts";
 import {
 	accountTransactions,

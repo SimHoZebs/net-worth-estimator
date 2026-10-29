@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
-import { testPlan } from "../mocks/plan.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
+import { testAccount } from "../mocks/account.ts";
+import { getAccountScope } from "../auth/resourceScope.ts";
 import {
 	checkpointsOptions,
 	getCheckpoints,
 	getServerModel,
 	modelOptions,
 	resolversOptions,
-	workspaceResourceKey,
+	accountResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
 import { resetWorkspaceStore, useWorkspaceStore } from "./workspaceStore.ts";
@@ -73,16 +73,16 @@ describe("direct Query ownership", () => {
 	it("removes server data independently of the local draft", () => {
 		setServerModelFixture();
 		useWorkspaceStore.setState({
-			draft: testPlan,
-			baseline: testPlan,
+			draft: testAccount,
+			baseline: testAccount,
 			baseRevision: "base",
 		});
 		serverQueryClient().removeQueries({
-			queryKey: workspaceResourceKey("model"),
+			queryKey: accountResourceKey("model"),
 			exact: true,
 		});
 		expect(getServerModel()).toBeUndefined();
-		expect(useWorkspaceStore.getState().draft).toBe(testPlan);
+		expect(useWorkspaceStore.getState().draft).toBe(testAccount);
 		expect(useWorkspaceStore.getState().baseRevision).toBe("base");
 	});
 	it("lists checkpoints through the narrow query with account filters", async () => {
@@ -92,7 +92,7 @@ describe("direct Query ownership", () => {
 		expect(all.checkpoints).toHaveLength(2);
 		expect(all.revision).toBe("current");
 		const cash = await serverQueryClient().fetchQuery(
-			checkpointsOptions(getResourceScope(), { accountId: "cash" }),
+			checkpointsOptions(getAccountScope(), { accountId: "cash" }),
 		);
 		expect(cash.checkpoints).toHaveLength(1);
 		expect(cash.checkpoints[0]).toMatchObject({
@@ -100,7 +100,7 @@ describe("direct Query ownership", () => {
 			Balance: 100,
 		});
 		expect(getCheckpoints()).toEqual(all);
-		expect(getCheckpoints(getResourceScope(), { accountId: "cash" })).toEqual(
+		expect(getCheckpoints(getAccountScope(), { accountId: "cash" })).toEqual(
 			cash,
 		);
 		const fetcher = server.fetcher;

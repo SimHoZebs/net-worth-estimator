@@ -1,57 +1,57 @@
 import { Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
-import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
-import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
-import { TablePagination } from "../components/DataTable.tsx";
-import { Button } from "../components/Button.tsx";
-import { SearchField } from "../components/Field.tsx";
-import { type TabItem, Tabs } from "../components/Tabs.tsx";
+import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
+import { BaseProjectionView } from "../../components/BaseProjectionView.tsx";
+import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
+import { TablePagination } from "../../components/DataTable.tsx";
+import { Button } from "../../components/Button.tsx";
+import { SearchField } from "../../components/Field.tsx";
+import { type TabItem, Tabs } from "../../components/Tabs.tsx";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
 	type TransactionOrder,
-} from "../domain/transactionSort.ts";
+} from "../../domain/transactionSort.ts";
 import {
 	type Plan,
 	visibleAccounts,
 	visibleTransactions,
 	type Account,
-} from "../domain/model.ts";
-import { parseUnion } from "../domain/guards.ts";
-import type { EditorTarget } from "../domain/planEdits.ts";
-import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
-import type { Projection } from "../domain/result.ts";
-import { performSave } from "../state/workspaceWrites.ts";
+} from "../../domain/model.ts";
+import { parseUnion } from "../../domain/guards.ts";
+import type { EditorTarget } from "../../domain/accountEdits.ts";
+import { resolveMovementAmounts } from "../../domain/resolvedMovementAmounts.ts";
+import type { Projection } from "../../domain/result.ts";
+import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshAccounts,
 	useAccountBalances,
 	useTransactions,
-} from "../state/workspaceResources.ts";
-import { transactionToPlan } from "../domain/transactionRows.ts";
+} from "../../state/workspaceResources.ts";
+import { transactionToPlan } from "../../domain/transactionRows.ts";
 import { deleteAccount } from "@/api/generated/endpoints.ts";
-import { usePlan } from "../state/useWorkspacePlan.ts";
-import { AccountsPanel } from "./plan/AccountsPanel.tsx";
-import { TransactionsPanel } from "./plan/TransactionsPanel.tsx";
+import { useAccountPlan } from "../../state/useAccountScope.ts";
+import { AccountsPanel } from "./AccountsPanel.tsx";
+import { TransactionsPanel } from "./TransactionsPanel.tsx";
 
-export type PlanView = "accounts" | "transactions";
+export type AccountSectionView = "accounts" | "transactions";
 
 type ScheduleFilter = "all" | "recurring";
 
 const TRANSACTIONS_PAGE_SIZE = 10;
 
-export function PlanPage({
+export function AccountSections({
 	view,
 	onEdit,
 	onAccount,
 }: {
-	view: PlanView;
+	view: AccountSectionView;
 	onEdit: (target: EditorTarget) => void;
 	onAccount: (id: string) => void;
 }) {
 	// Plan data and actions subscribe here; only the viewed tab and UI
 	// callbacks arrive as props.
-	const plan = usePlan();
+	const plan = useAccountPlan();
 	if (!plan) return null;
 	if (view === "accounts") {
 		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;

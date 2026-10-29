@@ -17,7 +17,7 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "../state/serverQuery.ts";
-import { acceptResourceScope, suspendResourceScope } from "./resourceScope.ts";
+import { acceptAccountScope, suspendAccountScope } from "./resourceScope.ts";
 import { sessionScopeInput } from "./sessionDiscovery.ts";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
@@ -28,9 +28,9 @@ const session: Session = {
 	allowed: true,
 	accountURL: "https://identity.example/account",
 	resource: {
-		id: `plans/${"a".repeat(64)}`,
+		id: `accounts/${"a".repeat(64)}`,
 		kind: "private",
-		permissions: ["plan:read", "plan:write"],
+		permissions: ["account:read", "account:write"],
 	},
 	user: { subject: "subject-1", name: "Sam Lee" },
 };
@@ -40,7 +40,7 @@ function renderPage(
 	next: Session = session,
 ) {
 	vi.stubGlobal("fetch", vi.fn(fetcher));
-	acceptResourceScope(sessionScopeInput(next), suspendResourceScope());
+	acceptAccountScope(sessionScopeInput(next), suspendAccountScope());
 	return render(
 		<SessionContext
 			value={{
@@ -65,7 +65,7 @@ function json(body: unknown, status = 200) {
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
-	suspendResourceScope();
+	suspendAccountScope();
 	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
@@ -115,7 +115,7 @@ describe("account page", () => {
 		await screen.findByText("Signed in as editor.");
 		expect(fetcher).toHaveBeenCalledTimes(2);
 		act(() => {
-			suspendResourceScope();
+			suspendAccountScope();
 		});
 		await waitFor(() =>
 			expect(screen.getByLabelText("Display name")).toBeTruthy(),
@@ -181,7 +181,7 @@ describe("account page", () => {
 				throw new Error(`unexpected ${url}`);
 			}),
 		);
-		acceptResourceScope(sessionScopeInput(session), suspendResourceScope());
+		acceptAccountScope(sessionScopeInput(session), suspendAccountScope());
 		render(
 			<SessionContext
 				value={{ session, logout, logoutPending: false }}

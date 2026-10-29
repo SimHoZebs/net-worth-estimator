@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "../../domain/model.ts";
-import { testPlan } from "../../mocks/plan.ts";
+import { testAccount } from "../../mocks/account.ts";
 import { WishListEditor } from "./WishListEditor.tsx";
 
 vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
@@ -18,12 +18,12 @@ describe("WishListEditor", () => {
 	it("shows the actual workspace rejection instead of a silent apply", () => {
 		const view = render(
 			<WishListEditor
-				plan={testPlan}
+				plan={testAccount}
 				item={null}
 				onApply={() => false}
 				onClose={() => {}}
 				readOnly={false}
-				applyError="The authoritative plan changed. Reload before editing."
+				applyError="The authoritative account changed. Reload before editing."
 			/>,
 		);
 		fireEvent.change(view.getByLabelText("Purchase name"), {
@@ -36,7 +36,7 @@ describe("WishListEditor", () => {
 			view.getByRole("button", { name: "Save changes" }).closest("form")!,
 		);
 		expect(view.getByRole("alert").textContent).toContain(
-			"The authoritative plan changed. Reload before editing.",
+			"The authoritative account changed. Reload before editing.",
 		);
 	});
 
@@ -45,7 +45,7 @@ describe("WishListEditor", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<WishListEditor
-				plan={testPlan}
+				plan={testAccount}
 				item={null}
 				onApply={onApply}
 				onClose={onClose}
@@ -76,7 +76,7 @@ describe("WishListEditor", () => {
 		const onClose = vi.fn();
 		const view = render(
 			<WishListEditor
-				plan={testPlan}
+				plan={testAccount}
 				item={null}
 				onApply={onApply}
 				onClose={onClose}
@@ -95,7 +95,7 @@ describe("WishListEditor", () => {
 			"Earliest purchase date",
 		) as HTMLInputElement;
 		expect(date.type).toBe("date");
-		expect(date.value).toBe(testPlan.startDate);
+		expect(date.value).toBe(testAccount.startDate);
 		const include = view.getByRole("checkbox", {
 			name: "Include in purchase queue",
 		}) as HTMLInputElement;
@@ -109,7 +109,7 @@ describe("WishListEditor", () => {
 			name: "Desk",
 			amount: 400.25,
 			fromId: "checking",
-			startDate: testPlan.startDate,
+			startDate: testAccount.startDate,
 			enabled: false,
 		});
 		expect(onClose).toHaveBeenCalledOnce();
@@ -119,7 +119,7 @@ describe("WishListEditor", () => {
 		const onApply = vi.fn<(plan: Plan) => boolean>(() => true);
 		const view = render(
 			<WishListEditor
-				plan={testPlan}
+				plan={testAccount}
 				item={null}
 				onApply={onApply}
 				onClose={() => {}}

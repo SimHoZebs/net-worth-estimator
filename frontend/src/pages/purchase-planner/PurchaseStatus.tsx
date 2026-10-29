@@ -7,7 +7,7 @@ import {
 	LockKeyhole,
 	PauseCircle,
 } from "lucide-react";
-import { dateLabel, money } from "../../../domain/format.ts";
+import { dateLabel, money } from "../../domain/format.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
 
 export function PurchaseStatus({

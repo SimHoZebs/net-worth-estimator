@@ -13,7 +13,7 @@ import {
 	type FinancialModelDocument,
 	type PlanPresentation,
 } from "../api/index.ts";
-import { getResourceScope, type ResourceScope } from "../auth/resourceScope.ts";
+import { getAccountScope, type AccountScope } from "../auth/resourceScope.ts";
 import { changesBetween, type Plan, validatePlan } from "../domain/model.ts";
 import {
 	getServerModel,
@@ -30,7 +30,7 @@ export interface DraftState {
 	draftPresentation: PlanPresentation | null;
 	baseFingerprint: string | null;
 	baseRevision: string | null;
-	scope: ResourceScope | null;
+	scope: AccountScope | null;
 	error: string | null;
 }
 
@@ -102,7 +102,7 @@ function conversion(
 }
 
 interface DraftActions {
-	restore: (scope: ResourceScope) => void;
+	restore: (scope: AccountScope) => void;
 	reconcile: (model: ServerModel) => void;
 	updatePlan: (next: Plan) => boolean;
 	discard: (allowStale?: boolean) => boolean;
@@ -182,7 +182,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 	return {
 		...initialData(),
 		restore: (scope) => {
-			if (scope !== getResourceScope() || scope.status !== "ready") return;
+			if (scope !== getAccountScope() || scope.status !== "ready") return;
 			set({
 				scope,
 				baseline: null,
