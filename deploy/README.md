@@ -18,7 +18,7 @@ identity-provider migrations are outside this contract.
 | Schema | Explicit `setupdb` operation with the API stopped |
 | Liveness | `GET /healthz` reports process availability |
 | Readiness | `GET /readyz` checks the database connection with a two-second deadline |
-| Probes | No session, proxy secret, or account header required; no private data returned |
+| Probes | No session, proxy secret, or user header required; no private data returned |
 | Shutdown | Deliver `SIGTERM`; allow at least 15 seconds for HTTP shutdown |
 
 Startup validates schema compatibility and OIDC discovery before it listens.
@@ -192,9 +192,9 @@ FRONTEND_URL=https://app.example.com sh scripts/smoke-compose.sh
 ```
 
 This smoke checks public proxy access, readiness, origin rejection, and final
-SSE completion. Also verify real Casdoor login/logout, account isolation, private
+SSE completion. Also verify real Casdoor login/logout, user isolation, private
 writes, passkeys, signed logout delivery, incremental streaming, and restarts
-with disposable accounts. Never use production financial data as a fixture.
+with disposable users. Never use production financial data as a fixture.
 
 ## Provider references
 
