@@ -21,6 +21,10 @@ e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 m = ((p.sub == "waypoint/plan-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "plans/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
 `;
 
+// Account scope: action strings stay plan:* so the Casdoor model needs no
+// migration. Permission resources move from plans/* to accounts/*; the seed
+// keeps legacy plans/* until the feat/account-scope-store DB rekey migrates
+// old rows. The guest sample stays plans/sample (global read-only).
 export function buildPermissionSeed() {
   const role = (name, displayName, description) => ({
     owner: "waypoint",
@@ -85,9 +89,9 @@ export function buildPermissionSeed() {
     permissions: [
       permission(
         "own-private-plan",
-        "Own private plan: read, project, write",
+        "Own private account: read, project, write",
         "plan-owner",
-        ["plans/*"],
+        ["accounts/*", "plans/*"],
         [...planActions],
       ),
       permission(

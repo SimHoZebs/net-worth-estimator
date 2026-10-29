@@ -54,7 +54,7 @@ test("contextual role grants need no per-account signup writes", () => {
     [
       {
         roles: ["waypoint/plan-owner"],
-        resources: ["plans/*"],
+        resources: ["accounts/*", "plans/*"],
         actions: ["plan:read", "plan:project", "plan:write"],
       },
       {

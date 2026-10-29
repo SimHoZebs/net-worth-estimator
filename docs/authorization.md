@@ -1,4 +1,4 @@
-# Plan-scoped authorization
+# Account-scoped authorization
 
 Casdoor authenticates accounts and hosts the Casbin authorization model. The Go
 API calls Casdoor's permission API with private application credentials. It does
@@ -6,25 +6,32 @@ not embed a second Casbin engine or evaluate a custom policy language.
 
 ## Resources, actions, and roles
 
-A plan is the permission boundary. Its accounts, postings, recurrence rules,
+An account is the permission boundary. Its model accounts, postings, recurrence rules,
 checkpoints, evaluations, presets, pinned results, sync links, and projection
 artifacts stay inside that boundary.
 
 | Principal             | Resource                    | Default capabilities                      |
 | --------------------- | --------------------------- | ----------------------------------------- |
 | Guest                 | `plans/sample`              | `plan:read`, `plan:project`               |
-| Verified account      | Its own `plans/<opaque-id>` | `plan:read`, `plan:project`, `plan:write` |
-| Any other combination | Another account's plan      | Denied                                    |
+| Verified account      | Its own `accounts/<opaque-id>` | `plan:read`, `plan:project`, `plan:write` |
+| Any other combination | Another account            | Denied                                    |
 
-Signed-in accounts use their private plan, not the sample. Signup does not ask
+Signed-in accounts use their private account, not the sample. Signup does not ask
 for a role. The owner relationship automatically supplies the plan-owner role.
 Casdoor policies define the actions that role permits. The global server
 read-only flag still overrides write permission.
 
+Action strings stay `plan:*` so the Casdoor model (`waypoint/plan-access`)
+needs no migration. Permission resources move from `plans/*` to
+`accounts/*`; the seed keeps legacy `plans/*` until the
+`feat/account-scope-store` DB rekey migrates old rows. The guest sample stays
+the global read-only `plans/sample` row until that rekey moves it to account
+storage.
+
 The resource ID derives from the exact OIDC issuer and immutable subject, not
 the display name, username, email, or browser input. A new account starts with
-an editable blank private plan with no import or administrator approval step.
-The plan router activates the empty model on first access. Initialization never
+an editable blank private account with no import or administrator approval step.
+The account router activates the empty model on first access. Initialization never
 replaces existing financial rows. Existing data stays with its
 verified owner. There is no first-login claim of existing data.
 
@@ -65,19 +72,21 @@ Replacing the sample requires another explicit publication.
 `GET /v1/auth/session` returns the selected resource ID, kind, and capabilities.
 Every financial request asserts that ID in `Waypoint-Resource`. The backend
 derives the current resource independently and rejects missing or stale assertions
-with 409 and problem code `RESOURCE_CHANGED`. The header does not let a caller
-select an arbitrary plan. Each save retains its original plan ID. A resource-change
+with 409 and problem code `RESOURCE_CHANGED`. The header name stays
+`Waypoint-Resource` for browser and CLI compatibility; the value is now an
+account resource. The header does not let a caller
+select an arbitrary account. Each save retains its original account ID. A resource-change
 error stops the save and triggers session discovery, never a retry under a new
-plan. Ordinary 409 operation conflicts do not trigger session discovery.
+account. Ordinary 409 operation conflicts do not trigger session discovery.
 
 Financial responses include the same resource header. The browser namespaces
 draft storage by resource and clears active model/projection state before a
 resource transition. It does not adopt an unscoped draft into an account's
-plan. Cross-tab login and logout cannot silently retarget an old tab's write.
+workspace. Cross-tab login and logout cannot silently retarget an old tab's write.
 API clients retain their verification scope. A new verification creates new
 clients, while old clients reject further calls before network access. Evaluation
 pins and financial preferences also reset and reload within the verified scope.
-The old-client check stops canceled work, including after the same plan returns.
+The old-client check stops canceled work, including after the same account returns.
 The backend alone validates access. Saves do not require a new session lookup.
 One browser session hook owns verification, account transitions, and logout.
 Rechecks keep the verified workspace mounted while discovery runs. Same-account
@@ -99,6 +108,11 @@ Before an existing authenticated deployment starts the new code:
 1. Stop API writes and sync. Back up the application database and Casdoor state.
 2. Retain the existing Casdoor issuer, subjects, model, roles, and permissions.
 3. Verify guest, owner, second-account, denial, and provider-outage cases.
+4. Update Casdoor permission resources from `plans/*` to `accounts/*`
+   (the seed applies both during the transition). Action strings are unchanged.
+5. Set `NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT` instead of the retired
+   `PLAN_OWNER_SUBJECT`. The server rejects the old variable with a pointer
+   to the new one.
 
 See [the shared database guide](shared-database.md) for backup and rollback.
 Runtime startup rejects legacy unscoped financial databases. It never merges files or guesses an owner.
