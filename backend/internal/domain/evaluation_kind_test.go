@@ -3,7 +3,9 @@ package domain
 import (
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -89,6 +91,9 @@ func kindTestPath(t *testing.T) *types.ProjectionPath {
 
 func TestReaderEvaluationCannotResimulate(t *testing.T) {
 	path := kindTestPath(t)
+	oldTries, oldPause := resimGuardTries, resimGuardPause
+	resimGuardTries, resimGuardPause = 3, time.Millisecond
+	defer func() { resimGuardTries, resimGuardPause = oldTries, oldPause }()
 	resimulating := &EvaluationDefinition{
 		Type: "test-resimulate",
 		Name: "test resimulate",
@@ -134,6 +139,32 @@ func TestReaderEvaluationCannotResimulate(t *testing.T) {
 	if !found {
 		t.Fatalf("reader resimulation must report a reader violation, got %+v", runtime.diagnostics)
 	}
+}
+
+func TestResimulationGuardToleratesBriefCrossRequestOverlap(t *testing.T) {
+	oldTries, oldPause := resimGuardTries, resimGuardPause
+	resimGuardTries, resimGuardPause = 50, time.Millisecond
+	defer func() { resimGuardTries, resimGuardPause = oldTries, oldPause }()
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		withReaderGuard(
+			&EvaluationDefinition{Type: "test-reader", Name: "test reader"},
+			"test-reader",
+			func() (PathResult, error) {
+				close(release)
+				time.Sleep(10 * time.Millisecond)
+				return &cannedResult{}, nil
+			},
+		)
+	}()
+	<-release
+	if err := requireResimulationAllowed("Simulate"); err != nil {
+		t.Fatalf("brief cross-request overlap must be retried, got %v", err)
+	}
+	wg.Wait()
 }
 
 func kindTestDocument() (*types.FinancialModelDocument, *types.ProjectionRuntimeSettings) {

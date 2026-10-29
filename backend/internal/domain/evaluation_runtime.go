@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -237,9 +238,38 @@ func orchestratedSimulate(request types.SimulationRequest) (run types.Simulation
 
 // requireResimulationAllowed reports a violation when a reader
 // evaluation attempts to rerun the base simulation.
+//
+// The guard counters are process-wide, so concurrent requests interleave:
+// a simulator branch in one request may start while another request holds
+// a short reader window. Reader windows are brief by contract (readers
+// answer from the cached path), so a blocked simulation waits briefly and
+// retries instead of failing at once. A genuine violation nests in the
+// same call stack, so the guard never clears and the call still fails
+// after the bound, preserving the diagnostic.
+//
+// resimGuardTries and resimGuardPause bound that wait. Tests shrink them;
+// production keeps the default 50x20ms (~1s ceiling).
+var resimGuardTries = 50
+var resimGuardPause = 20 * time.Millisecond
+
 func requireResimulationAllowed(caller string) error {
-	if evalType, blocked := readerSimulationBlocked(); blocked {
-		return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; mark Kind=simulator with explicit opt-in to run simulations", evalType, caller)
+	tries := resimGuardTries
+	if tries < 1 {
+		tries = 1
+	}
+	firstEval := ""
+	for attempt := 0; attempt < tries; attempt++ {
+		if evalType, blocked := readerSimulationBlocked(); blocked {
+			if firstEval == "" {
+				firstEval = evalType
+			}
+			if attempt+1 == tries {
+				return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; mark Kind=simulator with explicit opt-in to run simulations", firstEval, caller)
+			}
+			time.Sleep(resimGuardPause)
+			continue
+		}
+		return nil
 	}
 	return nil
 }
