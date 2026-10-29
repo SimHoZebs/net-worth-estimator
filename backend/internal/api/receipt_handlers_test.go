@@ -215,11 +215,11 @@ func TestReceiptAPIPlanIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	a, err := database.EnsurePrivatePlan("plans/a", "a", "issuer", "a")
+	a, err := database.EnsureAccount("a", "issuer", "a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := database.EnsurePrivatePlan("plans/b", "b", "issuer", "b")
+	b, err := database.EnsureAccount("b", "issuer", "b")
 	if err != nil {
 		t.Fatal(err)
 	}
