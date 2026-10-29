@@ -18,7 +18,7 @@ const ResourceHeader = "Waypoint-Resource"
 
 // WriteResourceChanged distinguishes a stale account assertion from an operation conflict.
 func WriteResourceChanged(w http.ResponseWriter) {
-	failureWithCode(w, http.StatusConflict, "The active account changed. Reload the session before this request.", "RESOURCE_CHANGED")
+	failureWithCode(w, http.StatusConflict, "The active plan changed. Reload the session before this request.", "RESOURCE_CHANGED")
 }
 
 type scopeKey struct{}

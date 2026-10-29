@@ -81,7 +81,7 @@ test("a resource-change error restores the workspace without replaying the save"
 	expect(writes).toBe(1);
 	expect(await readSavedServerPlan()).toEqual(saved);
 	await page.getByRole("button", { name: "Save changes" }).click();
-	await expect(page.getByText("Changes saved.")).toBeVisible();
+	await expect(page.getByText("Plan saved.")).toBeVisible();
 	expect(writes).toBe(2);
 	expect(
 		(await readSavedServerPlan()).recurrenceRules.find(

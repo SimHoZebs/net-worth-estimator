@@ -440,7 +440,7 @@ export function changesBetween({
 		});
 	if (saved.name !== current.name || saved.startDate !== current.startDate)
 		changes.push({
-			label: "Account details",
+			label: "Plan details",
 			kind: "Modified",
 			before: saved.name,
 			after: current.name,

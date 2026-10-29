@@ -115,7 +115,7 @@ export function useResourceSession() {
 						setSession(next.session);
 						setStatus({
 							phase: "denied",
-							error: "This account does not have access.",
+							error: "This account does not have access to this plan.",
 						});
 						return;
 					}
@@ -151,7 +151,7 @@ export function useResourceSession() {
 						setSession(next.session);
 						setStatus({
 							phase: "denied",
-							error: "This account does not have access.",
+							error: "This account does not have access to this plan.",
 						});
 						return;
 					}
@@ -180,7 +180,7 @@ export function useResourceSession() {
 					setSession(next.session);
 					setStatus({
 						phase: "denied",
-						error: "This account does not have access.",
+						error: "This account does not have access to this plan.",
 					});
 					return;
 				}

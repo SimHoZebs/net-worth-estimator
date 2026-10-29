@@ -79,9 +79,9 @@ it("keeps notification and draft-storage state out of the root's server loading 
 	});
 	await screen.findByText("Workspace screen");
 	const rootRenders = vi.mocked(useWorkspaceNavigation).mock.calls.length;
-	act(() => notifySuccess("workspace-notice", "Changes saved on the server."));
+	act(() => notifySuccess("workspace-notice", "Plan saved on the server."));
 	expect(screen.getByRole("status").textContent).toContain(
-		"Changes saved on the server.",
+		"Plan saved on the server.",
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
 	act(() => useWorkspaceStore.setState({ error: "transient" }));
