@@ -184,8 +184,8 @@ it("requests the saved model", async () => {
 	expect(bodies).toHaveLength(1);
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
 	expect(
-		(bodies[0] as { document?: { checkpoints?: unknown[] } }).document,
-	).toEqual(saved);
+		(bodies[0] as { document?: unknown }).document,
+	).toBeUndefined();
 });
 
 it("separates identical models by resource identity", async () => {
@@ -278,6 +278,7 @@ it("ignores workspace drafts and requests the saved model", async () => {
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
 	expect(
-		(bodies[0] as { document?: { checkpoints?: unknown[] } }).document,
-	).toEqual(saved);
+		(bodies[0] as { document?: unknown }).document,
+	).toBeUndefined();
+	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
 });
