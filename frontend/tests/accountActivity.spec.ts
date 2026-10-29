@@ -203,8 +203,8 @@ test("a shortfall can be inspected and edited while preserving account context a
 		page.getByRole("dialog", { name: "Home renovation" }),
 	).toBeVisible();
 	// Both settlement dates show: transacted inline, posted beneath it.
-	await expect(page.getByLabel("Date posted")).toHaveValue("2026-03-08");
-	await page.getByLabel("Date posted").fill("2026-03-10");
+	await expect(page.getByLabel("Posted")).toHaveValue("2026-03-08");
+	await page.getByLabel("Posted").fill("2026-03-10");
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("3000");
 	await page.getByRole("button", { name: "Save changes" }).click();
