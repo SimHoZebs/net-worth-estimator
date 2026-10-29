@@ -25,9 +25,9 @@ import {
 	type ServerStatus,
 } from "@/api/index.ts";
 import {
-	getResourceScope,
-	subscribeResourceScope,
-	type ResourceScope,
+	getUserScope,
+	subscribeUserScope,
+	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { serverDocumentFingerprint } from "@/state/remoteStorage.ts";
@@ -38,7 +38,7 @@ export interface ServerModel extends FinancialModelResponse {
 	fingerprint: string | null;
 }
 
-export function workspaceResourceKey(
+export function userResourceKey(
 	kind:
 		| "model"
 		| "status"
@@ -49,18 +49,14 @@ export function workspaceResourceKey(
 		| "catalog"
 		| "eval-summary"
 		| "checkpoints",
-	scope = getResourceScope(),
+	scope = getUserScope(),
 ) {
-	return ["workspace-resources", scope.key, kind] as const;
+	return ["user-resources", scope.key, kind] as const;
 }
 
-function current(scope: ResourceScope, signal?: AbortSignal) {
-	if (
-		scope !== getResourceScope() ||
-		scope.status !== "ready" ||
-		signal?.aborted
-	)
-		throw new Error("The active resource changed or the request was canceled.");
+function current(scope: UserScope, signal?: AbortSignal) {
+	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
+		throw new Error("The active user changed or the request was canceled.");
 }
 
 const defaults = {
@@ -69,17 +65,17 @@ const defaults = {
 	retry: false as const,
 };
 
-export function statusOptions(scope = getResourceScope()) {
+export function statusOptions(scope = getUserScope()) {
 	return queryOptions({
 		...defaults,
-		queryKey: workspaceResourceKey("status", scope),
+		queryKey: userResourceKey("status", scope),
 		queryFn: async ({ signal }) => {
 			const previousStatus = getServerStatus(scope);
 			const result: ServerStatus = (await fetchServerStatus({ signal })).data;
 			current(scope, signal);
 			if (previousStatus?.readOnly !== result.readOnly)
 				serverQueryClient().setQueryData<ServerModel>(
-					workspaceResourceKey("model", scope),
+					userResourceKey("model", scope),
 					(model) =>
 						model?.document
 							? {
@@ -96,10 +92,10 @@ export function statusOptions(scope = getResourceScope()) {
 	});
 }
 
-export function modelOptions(scope = getResourceScope()) {
+export function modelOptions(scope = getUserScope()) {
 	return queryOptions({
 		...defaults,
-		queryKey: workspaceResourceKey("model", scope),
+		queryKey: userResourceKey("model", scope),
 		queryFn: async ({ signal }): Promise<ServerModel> => {
 			try {
 				const [result, status] = await Promise.all([
@@ -121,7 +117,7 @@ export function modelOptions(scope = getResourceScope()) {
 						: null,
 				};
 			} catch (error) {
-				if (scope === getResourceScope() && !signal.aborted)
+				if (scope === getUserScope() && !signal.aborted)
 					notifyError(
 						"workspace",
 						error instanceof Error
@@ -138,17 +134,17 @@ export function modelOptions(scope = getResourceScope()) {
 	});
 }
 
-export function presetsOptions(scope = getResourceScope()) {
+export function presetsOptions(scope = getUserScope()) {
 	return queryOptions({
 		...defaults,
-		queryKey: workspaceResourceKey("presets", scope),
+		queryKey: userResourceKey("presets", scope),
 		queryFn: async ({ signal }) => {
 			try {
 				const result = (await listAmountPresets({ signal })).data;
 				current(scope, signal);
 				return (result.presets ?? []) as unknown as AmountPreset[];
 			} catch (error) {
-				if (scope === getResourceScope() && !signal.aborted)
+				if (scope === getUserScope() && !signal.aborted)
 					notifyError(
 						"amount-presets",
 						error instanceof Error
@@ -161,10 +157,10 @@ export function presetsOptions(scope = getResourceScope()) {
 	});
 }
 
-export function resolversOptions(scope = getResourceScope()) {
+export function resolversOptions(scope = getUserScope()) {
 	return queryOptions({
 		...defaults,
-		queryKey: workspaceResourceKey("resolvers", scope),
+		queryKey: userResourceKey("resolvers", scope),
 		queryFn: async ({ signal }) => {
 			current(scope, signal);
 			const result = (await getAmountResolvers({ signal })).data;
@@ -175,7 +171,7 @@ export function resolversOptions(scope = getResourceScope()) {
 }
 
 export function useAmountResolvers() {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...resolversOptions(scope),
@@ -185,22 +181,22 @@ export function useAmountResolvers() {
 	);
 }
 
-export function getServerModel(scope = getResourceScope()) {
+export function getServerModel(scope = getUserScope()) {
 	return scope.status === "ready"
 		? serverQueryClient().getQueryData<ServerModel>(
-				workspaceResourceKey("model", scope),
+				userResourceKey("model", scope),
 			)
 		: undefined;
 }
-export function getServerStatus(scope = getResourceScope()) {
+export function getServerStatus(scope = getUserScope()) {
 	return scope.status === "ready"
 		? serverQueryClient().getQueryData<ServerStatus>(
-				workspaceResourceKey("status", scope),
+				userResourceKey("status", scope),
 			)
 		: undefined;
 }
 export function useServerModel(options: { enabled?: boolean } = {}) {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...modelOptions(scope),
@@ -211,7 +207,7 @@ export function useServerModel(options: { enabled?: boolean } = {}) {
 	);
 }
 export function useServerStatus(options: { enabled?: boolean } = {}) {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...statusOptions(scope),
@@ -222,7 +218,7 @@ export function useServerStatus(options: { enabled?: boolean } = {}) {
 	);
 }
 export function useAmountPresets(options: { enabled?: boolean } = {}) {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...presetsOptions(scope),
@@ -236,16 +232,16 @@ export function useAmountPresets(options: { enabled?: boolean } = {}) {
 export function workspaceIsBusy() {
 	const cache = serverQueryClient();
 	return (
-		cache.isFetching({ queryKey: workspaceResourceKey("model") }) > 0 ||
+		cache.isFetching({ queryKey: userResourceKey("model") }) > 0 ||
 		cache.isMutating({
-			mutationKey: ["workspace-write", getResourceScope().key, "model"],
+			mutationKey: ["workspace-write", getUserScope().key, "model"],
 		}) > 0
 	);
 }
 
 /** Explicit refreshes retain Query's last good data. A save completes before a refresh starts. */
 export async function reloadWorkspace() {
-	const scope = getResourceScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	const mutationKey = ["workspace-write", scope.key, "model"];
 	if (cache.isMutating({ mutationKey }))
@@ -257,9 +253,9 @@ export async function reloadWorkspace() {
 				}
 			});
 		});
-	if (scope !== getResourceScope() || scope.status !== "ready") return;
+	if (scope !== getUserScope() || scope.status !== "ready") return;
 	await cache.invalidateQueries({
-		queryKey: ["workspace-resources", scope.key],
+		queryKey: ["user-resources", scope.key],
 		refetchType: "none",
 	});
 	const results = await Promise.allSettled([
@@ -271,7 +267,7 @@ export async function reloadWorkspace() {
 		cache.fetchQuery(evalSummaryOptions(scope)),
 		cache.fetchQuery(transactionsOptions(scope)),
 	]);
-	if (scope === getResourceScope() && results[1]?.status === "fulfilled") {
+	if (scope === getUserScope() && results[1]?.status === "fulfilled") {
 		// A successful explicit reload resets a temporary permission guard. Other save failures stay visible.
 		for (const mutation of cache
 			.getMutationCache()
@@ -310,10 +306,10 @@ export interface EvaluationSummary {
 	revision: string | null;
 }
 
-export function balancesOptions(scope = getResourceScope(), asOf?: string) {
+export function balancesOptions(scope = getUserScope(), asOf?: string) {
 	return queryOptions({
 		...defaults,
-		queryKey: [...workspaceResourceKey("balances", scope), asOf ?? "latest"],
+		queryKey: [...userResourceKey("balances", scope), asOf ?? "latest"],
 		queryFn: async ({ signal }): Promise<AccountBalances> => {
 			const result = (
 				await listAccountBalances(asOf ? { asOf } : undefined, { signal })
@@ -333,7 +329,7 @@ export function balancesOptions(scope = getResourceScope(), asOf?: string) {
 }
 
 export function transactionsOptions(
-	scope = getResourceScope(),
+	scope = getUserScope(),
 	filters: {
 		accountId?: string;
 		recurring?: "once" | "recurring" | "all";
@@ -343,7 +339,7 @@ export function transactionsOptions(
 	return queryOptions({
 		...defaults,
 		queryKey: [
-			...workspaceResourceKey("transactions", scope),
+			...userResourceKey("transactions", scope),
 			accountId ?? "",
 			recurring ?? "all",
 		],
@@ -369,10 +365,10 @@ export function transactionsOptions(
 	});
 }
 
-export function catalogOptions(scope = getResourceScope()) {
+export function catalogOptions(scope = getUserScope()) {
 	return queryOptions({
 		...defaults,
-		queryKey: workspaceResourceKey("catalog", scope),
+		queryKey: userResourceKey("catalog", scope),
 		queryFn: async ({ signal }): Promise<TransactionCatalog> => {
 			const result = (await listTransactionCatalog({ signal }))
 				.data as unknown as {
@@ -389,7 +385,7 @@ export function catalogOptions(scope = getResourceScope()) {
 }
 
 export function useAccountBalances(options: { asOf?: string } = {}) {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...balancesOptions(scope, options.asOf),
@@ -400,10 +396,10 @@ export function useAccountBalances(options: { asOf?: string } = {}) {
 	);
 }
 
-export function getAccountBalances(scope = getResourceScope()) {
+export function getAccountBalances(scope = getUserScope()) {
 	return scope.status === "ready"
 		? serverQueryClient().getQueryData<AccountBalances>([
-				...workspaceResourceKey("balances", scope),
+				...userResourceKey("balances", scope),
 				"latest",
 			])
 		: undefined;
@@ -416,19 +412,19 @@ export function getAccountBalances(scope = getResourceScope()) {
  * refetches it until the next remount.
  */
 export async function refreshAccounts(): Promise<void> {
-	const scope = getResourceScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("balances", scope),
+		queryKey: userResourceKey("balances", scope),
 	});
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("checkpoints", scope),
+		queryKey: userResourceKey("checkpoints", scope),
 	});
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("model", scope),
+		queryKey: userResourceKey("model", scope),
 		refetchType: "none",
 	});
-	if (scope !== getResourceScope() || scope.status !== "ready") return;
+	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// Refetch the list so the new row is visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
 	await cache.fetchQuery(balancesOptions(scope)).catch(() => {});
@@ -441,7 +437,7 @@ export function useTransactions(
 		recurring?: "once" | "recurring" | "all";
 	} = {},
 ) {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...transactionsOptions(scope, filters),
@@ -453,7 +449,7 @@ export function useTransactions(
 }
 
 export function useTransactionCatalog() {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...catalogOptions(scope),
@@ -471,19 +467,19 @@ export function useTransactionCatalog() {
  * refetches it until the next remount.
  */
 export async function refreshTransactions(): Promise<void> {
-	const scope = getResourceScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("transactions", scope),
+		queryKey: userResourceKey("transactions", scope),
 	});
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("catalog", scope),
+		queryKey: userResourceKey("catalog", scope),
 	});
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("model", scope),
+		queryKey: userResourceKey("model", scope),
 		refetchType: "none",
 	});
-	if (scope !== getResourceScope() || scope.status !== "ready") return;
+	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// Refetch the list so the new row is visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
 	await cache.fetchQuery(transactionsOptions(scope)).catch(() => {});
@@ -491,14 +487,14 @@ export async function refreshTransactions(): Promise<void> {
 }
 
 export function checkpointsOptions(
-	scope = getResourceScope(),
+	scope = getUserScope(),
 	filters: ListCheckpointsParams = {},
 ) {
 	const { accountId, since, until } = filters;
 	return queryOptions({
 		...defaults,
 		queryKey: [
-			...workspaceResourceKey("checkpoints", scope),
+			...userResourceKey("checkpoints", scope),
 			accountId ?? "",
 			since ?? "",
 			until ?? "",
@@ -526,10 +522,10 @@ export function checkpointsOptions(
 	});
 }
 
-export function evalSummaryOptions(scope = getResourceScope()) {
+export function evalSummaryOptions(scope = getUserScope()) {
 	return queryOptions({
 		...defaults,
-		queryKey: workspaceResourceKey("eval-summary", scope),
+		queryKey: userResourceKey("eval-summary", scope),
 		queryFn: async ({ signal }): Promise<EvaluationSummary> => {
 			const result = (await listEvaluationSummary({ signal }))
 				.data as unknown as {
@@ -560,7 +556,7 @@ export function evalSummaryOptions(scope = getResourceScope()) {
 }
 
 export function useCheckpoints(filters: ListCheckpointsParams = {}) {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...checkpointsOptions(scope, filters),
@@ -572,13 +568,13 @@ export function useCheckpoints(filters: ListCheckpointsParams = {}) {
 }
 
 export function getCheckpoints(
-	scope = getResourceScope(),
+	scope = getUserScope(),
 	filters: ListCheckpointsParams = {},
 ) {
 	const { accountId, since, until } = filters;
 	return scope.status === "ready"
 		? serverQueryClient().getQueryData<CheckpointList>([
-				...workspaceResourceKey("checkpoints", scope),
+				...userResourceKey("checkpoints", scope),
 				accountId ?? "",
 				since ?? "",
 				until ?? "",
@@ -587,7 +583,7 @@ export function getCheckpoints(
 }
 
 export function useEvaluationSummary() {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	return useQuery(
 		{
 			...evalSummaryOptions(scope),
@@ -598,10 +594,10 @@ export function useEvaluationSummary() {
 	);
 }
 
-export function getEvaluationSummary(scope = getResourceScope()) {
+export function getEvaluationSummary(scope = getUserScope()) {
 	return scope.status === "ready"
 		? serverQueryClient().getQueryData<EvaluationSummary>(
-				workspaceResourceKey("eval-summary", scope),
+				userResourceKey("eval-summary", scope),
 			)
 		: undefined;
 }
@@ -613,16 +609,16 @@ export function getEvaluationSummary(scope = getResourceScope()) {
  * until the next remount.
  */
 export async function refreshEvaluations(): Promise<void> {
-	const scope = getResourceScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("eval-summary", scope),
+		queryKey: userResourceKey("eval-summary", scope),
 	});
 	await cache.invalidateQueries({
-		queryKey: workspaceResourceKey("model", scope),
+		queryKey: userResourceKey("model", scope),
 		refetchType: "none",
 	});
-	if (scope !== getResourceScope() || scope.status !== "ready") return;
+	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// Refetch the summary so the new row is visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
 	await cache.fetchQuery(evalSummaryOptions(scope)).catch(() => {});

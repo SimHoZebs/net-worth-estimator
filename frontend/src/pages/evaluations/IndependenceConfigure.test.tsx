@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendResourceScope,
+	suspendUserScope,
 } from "@/auth/resourceScope.ts";
 import {
 	buildFiConfig,
@@ -84,22 +84,22 @@ afterEach(() => {
 	statusState.readOnly = false;
 	writesState.saved.length = 0;
 	writesState.result = true;
-	suspendResourceScope();
+	suspendUserScope();
 	vi.clearAllMocks();
 });
 
 function seedServerState() {
-	acceptResourceScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: "plans/a",
+				id: "users/a",
 				kind: "private",
-				permissions: ["plan:read", "plan:write"],
+				permissions: ["user:read", "user:write"],
 			},
-			subject: "plans/a",
+			subject: "users/a",
 		},
-		suspendResourceScope(),
+		suspendUserScope(),
 	);
 	summaryState.summary = {
 		evaluations: {

@@ -110,7 +110,7 @@ export function EvaluationCard({
 					) : !evaluation.enabled ? (
 						"Excluded from evaluation"
 					) : met ? (
-						"Met at the start of this plan"
+						"Met at the start of this model"
 					) : result?.firstDate ? (
 						"First reached in the base case"
 					) : (

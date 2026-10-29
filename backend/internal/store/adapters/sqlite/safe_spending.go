@@ -9,7 +9,7 @@ import (
 
 func (s *sqliteStore) GetSafeSpendingSettings() (*types.SafeSpendingSettings, error) {
 	var raw string
-	if err := s.db.QueryRow(`SELECT settings_json FROM safe_spending_settings WHERE id = 1 AND plan_id = :plan_id`).Scan(&raw); err != nil {
+	if err := s.db.QueryRow(`SELECT settings_json FROM safe_spending_settings WHERE id = 1 AND user_id = :user_id`).Scan(&raw); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -27,7 +27,7 @@ func (s *sqliteStore) SetSafeSpendingSettings(settings types.SafeSpendingSetting
 	if err != nil {
 		return err
 	}
-	_, err = s.db.Exec(`INSERT INTO safe_spending_settings (id, settings_json, plan_id) VALUES (1, ?, :plan_id)
-		ON CONFLICT(plan_id, id) DO UPDATE SET settings_json = excluded.settings_json`, string(raw))
+	_, err = s.db.Exec(`INSERT INTO safe_spending_settings (id, settings_json, user_id) VALUES (1, ?, :user_id)
+		ON CONFLICT(user_id, id) DO UPDATE SET settings_json = excluded.settings_json`, string(raw))
 	return err
 }

@@ -58,7 +58,7 @@ func (f *fakeDevice) handler(t *testing.T) http.Handler {
 				write(http.StatusUnauthorized, map[string]any{"detail": "auth"})
 				return
 			}
-			write(http.StatusOK, map[string]any{"resource": map[string]any{"id": "plans/test"}})
+			write(http.StatusOK, map[string]any{"resource": map[string]any{"id": "users/test"}})
 		case "/echo":
 			write(http.StatusOK, map[string]any{"authorization": r.Header.Get("Authorization"), "resource": r.Header.Get("Waypoint-Resource")})
 		default:
@@ -81,7 +81,7 @@ func TestCLILoginCachesTokensAndResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.AccessToken != "access-1" || got.RefreshToken != "refresh-1" || got.Subject != "editor" || got.ResourceID != "plans/test" {
+	if got.AccessToken != "access-1" || got.RefreshToken != "refresh-1" || got.Subject != "editor" || got.ResourceID != "users/test" {
 		t.Fatalf("cached=%+v", got)
 	}
 	if got.Expiry.IsZero() {
@@ -120,7 +120,7 @@ func TestCLIAPIForwardsHeadersAndRefreshes(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	if !strings.Contains(out, "Bearer access-1") || !strings.Contains(out, "plans/test") {
+	if !strings.Contains(out, "Bearer access-1") || !strings.Contains(out, "users/test") {
 		t.Fatalf("headers not forwarded: %s", out)
 	}
 }
@@ -163,14 +163,14 @@ func TestCLIApiRecoversStaleResource(t *testing.T) {
 	staleServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/v1/auth/session") {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"resource":{"id":"plans/fresh"}}`))
+			_, _ = w.Write([]byte(`{"resource":{"id":"users/fresh"}}`))
 			return
 		}
-		w.Header().Set("Waypoint-Resource", "plans/fresh")
+		w.Header().Set("Waypoint-Resource", "users/fresh")
 		w.WriteHeader(http.StatusConflict)
 	}))
 	defer staleServer.Close()
-	if err := saveCredentials(credentials{Subject: "editor", ResourceID: "plans/stale", AccessToken: "access-1", RefreshToken: "refresh-1", Expiry: time.Now().Add(time.Hour)}); err != nil {
+	if err := saveCredentials(credentials{Subject: "editor", ResourceID: "users/stale", AccessToken: "access-1", RefreshToken: "refresh-1", Expiry: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
 	if err := run([]string{"api", "--api", staleServer.URL, "GET", "/echo"}); err == nil {
@@ -180,7 +180,7 @@ func TestCLIApiRecoversStaleResource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ResourceID != "plans/fresh" {
-		t.Fatalf("resource=%q want plans/fresh", got.ResourceID)
+	if got.ResourceID != "users/fresh" {
+		t.Fatalf("resource=%q want users/fresh", got.ResourceID)
 	}
 }

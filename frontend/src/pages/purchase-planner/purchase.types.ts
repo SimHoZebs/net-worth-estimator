@@ -1,4 +1,4 @@
-import type { PlannedPurchase } from "../../../domain/model.ts";
+import type { PlannedPurchase } from "../../domain/model.ts";
 
 /** No additional scheduling rules are inferred from startDate. */
 export type PurchaseTiming =

@@ -64,7 +64,7 @@ func TestResourceAssertionsPreventCrossIdentityRequests(t *testing.T) {
 	check("GET", ownerID, 204)
 	check("POST", ownerID, 204)
 	check("POST", guestID, 409)
-	check("POST", authorization.ResourceFor(p.server.URL, "another-account").ID, 409)
+	check("POST", authorization.ResourceFor(p.server.URL, "another-user").ID, 409)
 	staleLogout, _ := http.NewRequest("POST", server.URL+prefix+"logout", nil)
 	staleLogout.Header.Set(ResourceHeader, guestID)
 	r, _ = client.Do(staleLogout)
@@ -111,13 +111,13 @@ func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
 	resolver := s.config.ResolveAccess
 	s.config.ResolveAccess = func(ctx context.Context, subject string) (authorization.Scope, error) {
 		scope, err := resolver(ctx, subject)
-		scope.Permissions = []string{"plan:read"}
+		scope.Permissions = []string{"user:read"}
 		return scope, err
 	}
 	r, _ = client.Post(server.URL+"/v1/accounts", "application/json", nil)
 	r.Body.Close()
 	if r.StatusCode != 403 {
-		t.Fatalf("signed-in account bypassed denied write=%d", r.StatusCode)
+		t.Fatalf("signed-in user bypassed denied write=%d", r.StatusCode)
 	}
 	r, _ = client.Get(server.URL + prefix + "session")
 	var session struct {

@@ -190,7 +190,7 @@ func runLogin(args []string) error {
 	}
 }
 
-// fetchResource reports the caller's plan so later requests can assert it.
+// fetchResource reports the caller's user so later requests can assert it.
 func fetchResource(client *http.Client, base string, credentials credentials) (string, error) {
 	request, err := http.NewRequest(http.MethodGet, base+"/v1/auth/session", nil)
 	if err != nil {
@@ -215,7 +215,7 @@ func fetchResource(client *http.Client, base string, credentials credentials) (s
 		} `json:"resource"`
 	}
 	if err := json.Unmarshal(payload, &session); err != nil || session.Resource.ID == "" {
-		return "", errors.New("session lookup returned no plan")
+		return "", errors.New("session lookup returned no user")
 	}
 	return session.Resource.ID, nil
 }
@@ -275,7 +275,7 @@ func runAPI(args []string) error {
 	}
 	dataSet := flag.NewFlagSet("api-data", flag.ContinueOnError)
 	data := dataSet.String("data", "", "request body (@file for a file, - for stdin)")
-	resource := dataSet.String("resource", "", "plan resource ID (default cached)")
+	resource := dataSet.String("resource", "", "user resource ID (default cached)")
 	if err := dataSet.Parse(rest[2:]); err != nil {
 		return err
 	}
@@ -348,15 +348,15 @@ func runAPI(args []string) error {
 		return err
 	}
 	if status == http.StatusConflict && *resource == "" {
-		// The cached plan assertion went stale (plan recreated or
+		// The cached user assertion went stale (user recreated or
 		// switched). Re-resolve once and retry before giving up.
 		refreshed, ferr := fetchResource(client, base, credentials)
 		if ferr != nil {
-			return fmt.Errorf("plan changed and re-resolution failed (%v); run nwe login again", ferr)
+			return fmt.Errorf("user changed and re-resolution failed (%v); run nwe login again", ferr)
 		}
 		credentials.ResourceID = refreshed
 		if err := saveCredentials(credentials); err != nil {
-			return fmt.Errorf("plan changed; could not update cache: %w", err)
+			return fmt.Errorf("user changed; could not update cache: %w", err)
 		}
 		status, payload, err = send(refreshed)
 		if err != nil {

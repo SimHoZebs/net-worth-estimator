@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deriveFundingGaps } from "../domain/fundingGaps.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import { projectionFixture } from "../mocks/projection.ts";
 import type {
 	FinancialModelDocument,
@@ -59,7 +59,7 @@ describe("projection movement evidence", () => {
 			fulfillment: { unfulfilledAmount: 100, destinationLimitedAmount: 0 },
 		});
 		const gaps = deriveFundingGaps({
-			plan: testPlan,
+			plan: testAccount,
 			projection: projectionFixture({ movements }),
 		});
 		expect(gaps).toHaveLength(1);
@@ -81,7 +81,7 @@ describe("projection movement evidence", () => {
 		expect(movements[0]?.constraintTypes).toEqual(["destination-ceiling"]);
 		expect(
 			deriveFundingGaps({
-				plan: testPlan,
+				plan: testAccount,
 				projection: projectionFixture({ movements }),
 			}),
 		).toEqual([]);

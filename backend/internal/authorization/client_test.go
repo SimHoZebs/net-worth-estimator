@@ -75,14 +75,14 @@ func TestResolveGuestUsesOnlySample(t *testing.T) {
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		var batch [][]string
 		_ = json.NewDecoder(r.Body).Decode(&batch)
-		expected := [][]string{{"guest", "plans/sample", Read, ""}, {"guest", "plans/sample", Project, ""}, {"guest", "plans/sample", Write, ""}}
+		expected := [][]string{{"guest", "users/sample", Read, ""}, {"guest", "users/sample", Project, ""}, {"guest", "users/sample", Write, ""}}
 		if !reflect.DeepEqual(batch, expected) {
 			t.Errorf("unexpected guest inputs: %#v", batch)
 		}
 		result(w, []bool{true, true, false})
 	})
 	scope, err := client.Resolve(context.Background(), "")
-	if err != nil || scope.Resource != (Resource{ID: "plans/sample", Kind: "sample"}) || !scope.Allows(Read) || !scope.Allows(Project) || scope.Allows(Write) || scope.Allows("plan:admin") {
+	if err != nil || scope.Resource != (Resource{ID: "users/sample", Kind: "sample"}) || !scope.Allows(Read) || !scope.Allows(Project) || scope.Allows(Write) || scope.Allows("user:admin") {
 		t.Fatalf("unexpected guest scope: %+v, %v", scope, err)
 	}
 }
@@ -104,7 +104,7 @@ func TestCheckPreservesCrossOwnerAndSampleMetadata(t *testing.T) {
 		}
 	}
 	actor := ActorKey(client.config.Issuer, "alice")
-	if !reflect.DeepEqual(received, [][]string{{actor, other.ID, Read, other.Owner}, {actor, "plans/sample", Read, ""}}) {
+	if !reflect.DeepEqual(received, [][]string{{actor, other.ID, Read, other.Owner}, {actor, "users/sample", Read, ""}}) {
 		t.Fatalf("caller overwrote resource ownership: %#v", received)
 	}
 }
@@ -123,7 +123,7 @@ func TestUnexpectedResponsesFailClosed(t *testing.T) {
 		"string boolean":      `{"status":"ok","data":[[true,"true",true]],"data2":["` + group + `"]}`,
 		"short":               `{"status":"ok","data":[[true,true]],"data2":["` + group + `"]}`,
 		"long":                `{"status":"ok","data":[[true,true,true,true]],"data2":["` + group + `"]}`,
-		"wrong model":         `{"status":"ok","data":[[true,true,true]],"data2":["elsewhere/model/plan-policy-store"]}`,
+		"wrong model":         `{"status":"ok","data":[[true,true,true]],"data2":["elsewhere/model/user-policy-store"]}`,
 		"wrong adapter":       `{"status":"ok","data":[[true,true,true]],"data2":["` + DefaultModelID + `/unknown"]}`,
 		"multiple deny allow": `{"status":"ok","data":[[false,false,false],[true,true,true]],"data2":["` + group + `","` + group + `"]}`,
 		"mismatched groups":   `{"status":"ok","data":[],"data2":["` + group + `"]}`,
@@ -229,9 +229,9 @@ func TestConfigAndRequestValidation(t *testing.T) {
 		actions  []string
 	}{
 		{"bad\x00subject", ResourceFor(base.Issuer, "alice"), []string{Read}},
-		{"alice", Resource{ID: "plans/sample", Kind: "sample", Owner: ActorKey(base.Issuer, "alice")}, []string{Read}},
-		{"alice", Resource{ID: "plans/sample", Kind: "private", Owner: ActorKey(base.Issuer, "alice")}, []string{Read}},
-		{"alice", ResourceFor(base.Issuer, "alice"), []string{"plan:admin"}},
+		{"alice", Resource{ID: "users/sample", Kind: "sample", Owner: ActorKey(base.Issuer, "alice")}, []string{Read}},
+		{"alice", Resource{ID: "users/sample", Kind: "private", Owner: ActorKey(base.Issuer, "alice")}, []string{Read}},
+		{"alice", ResourceFor(base.Issuer, "alice"), []string{"user:admin"}},
 		{"alice", ResourceFor(base.Issuer, "alice"), nil},
 	} {
 		if _, err := client.Check(context.Background(), request.subject, request.resource, request.actions); err == nil {

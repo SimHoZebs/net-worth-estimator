@@ -1,10 +1,11 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
-import type { EditorTarget } from "../components/PlanEditor.tsx";
+import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { GroupsPage } from "../pages/GroupsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { PlanPage } from "../pages/PlanPage.tsx";
+import { AccountsPage } from "../pages/AccountsPage.tsx";
+import { TransactionsPage } from "../pages/TransactionsPage.tsx";
 import { PurchasesPage } from "../pages/PurchasesPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
 import type { Page } from "./navigation.ts";
@@ -44,18 +45,16 @@ export function WorkspacePage({
 			);
 		case "accounts":
 			return (
-				<PlanPage
+				<AccountsPage
 					key="accounts"
-					view="accounts"
 					onEdit={onEdit}
 					onAccount={(id) => onEvidence({ kind: "account", id })}
 				/>
 			);
 		case "transactions":
 			return (
-				<PlanPage
+				<TransactionsPage
 					key="transactions"
-					view="transactions"
 					onEdit={onEdit}
 					onAccount={(id) => onEvidence({ kind: "account", id })}
 				/>

@@ -3,11 +3,11 @@ import { ApiNetworkError } from "../api/http.ts";
 import { useNotifications } from "./notifications.ts";
 import type { SafeSpendingSettings } from "../api/contracts.ts";
 import {
-	acceptResourceScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	resourceStorageKey,
-	suspendResourceScope,
+	getUserScope,
+	userStorageKey,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
 	THEME_STORAGE_KEY,
@@ -16,7 +16,7 @@ import {
 	SAFE_SPENDING_LEGACY_KEYS,
 	appLocalStorage,
 	clearPersistedMemory,
-	resourceLocalStorage,
+	accountLocalStorage,
 } from "./persisted.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import { useThemeStore } from "./useTheme.ts";
@@ -30,21 +30,21 @@ import {
 import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../mocks/safeSpendingSettings.ts";
 import { memoryStorage, stubStorage } from "../mocks/storage.ts";
 
-const A = `plans/${"a".repeat(64)}`;
-const B = `plans/${"b".repeat(64)}`;
+const A = `users/${"a".repeat(64)}`;
+const B = `users/${"b".repeat(64)}`;
 
 function acceptOwner(id: string = A, apiBaseUrl = canonicalApiBaseUrl("")) {
-	const scope = acceptResourceScope(
+	const scope = acceptUserScope(
 		{
 			apiBaseUrl,
 			resource: {
 				id,
-				kind: id === "plans/sample" ? "sample" : "private",
-				permissions: ["plan:read", "plan:write"],
+				kind: id === "users/sample" ? "sample" : "private",
+				permissions: ["user:read", "user:write"],
 			},
-			subject: id !== "plans/sample" ? id : null,
+			subject: id !== "users/sample" ? id : null,
 		},
-		suspendResourceScope(),
+		suspendUserScope(),
 	);
 	if (!scope) throw new Error("The fixture scope could not be verified.");
 	return scope;
@@ -59,8 +59,8 @@ async function verifyOwner(
 	return scope;
 }
 
-function financialKey(scope = getResourceScope()) {
-	const key = resourceStorageKey(SAFE_SPENDING_STORAGE_KEY, scope);
+function financialKey(scope = getUserScope()) {
+	const key = userStorageKey(SAFE_SPENDING_STORAGE_KEY, scope);
 	if (!key) throw new Error("A verified fixture resource is required.");
 	return key;
 }
@@ -90,11 +90,11 @@ const server = {
 };
 
 function backendKey() {
-	return `${getResourceScope().apiBaseUrl}:${getResourceScope().resource?.id}`;
+	return `${getUserScope().apiBaseUrl}:${getUserScope().resource?.id}`;
 }
 
 function stubSettingsFetch() {
-	const resource = () => getResourceScope().resource?.id ?? null;
+	const resource = () => getUserScope().resource?.id ?? null;
 	return vi.fn(async (url: unknown, init?: RequestInit) => {
 		if (!String(url).endsWith("/v1/safe-spending-settings"))
 			return ok({}, resource());
@@ -117,7 +117,7 @@ function stubSettingsFetch() {
 
 beforeEach(async () => {
 	vi.unstubAllGlobals();
-	suspendResourceScope();
+	suspendUserScope();
 	stubStorage(memoryStorage());
 	clearPersistedMemory();
 	useUiStore.persist.setOptions({
@@ -141,7 +141,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-	suspendResourceScope();
+	suspendUserScope();
 	clearPersistedMemory();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
@@ -159,6 +159,46 @@ describe("unified persisted prefs", () => {
 			defaultSafeSpendingSettings().reserve,
 		);
 		expect(window.localStorage.getItem(financialKey())).toContain("999");
+	});
+
+	it("migrates an account-generation browser record forward once, then drops it", async () => {
+		const scope = getUserScope();
+		const primary = financialKey(scope);
+		const legacy = primary
+			.replace(":user:", ":account:")
+			.replaceAll("users%2F", "accounts%2F");
+		expect(legacy).not.toBe(primary);
+		expect(legacy).toContain(":account:");
+		expect(legacy).toContain("accounts%2F");
+		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
+		const storage = accountLocalStorage(scope);
+		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(primary)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(legacy)).toBeNull();
+	});
+
+	it("migrates a resource-generation browser record forward once, then drops it", async () => {
+		const scope = getUserScope();
+		const primary = financialKey(scope);
+		const legacy = primary
+			.replace(":user:", ":resource:")
+			.replaceAll("users%2F", "plans%2F");
+		expect(legacy).not.toBe(primary);
+		expect(legacy).toContain(":resource:");
+		expect(legacy).toContain("plans%2F");
+		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
+		const storage = accountLocalStorage(scope);
+		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(primary)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(legacy)).toBeNull();
 	});
 
 	it("reports a failed save and retries the latest settings", async () => {
@@ -340,7 +380,7 @@ describe("unified persisted prefs", () => {
 });
 
 describe("financial preference owner isolation", () => {
-	it("keeps every financial amount, date, and selected resource ID isolated across accounts and sample data", async () => {
+	it("keeps every financial amount, date, and selected resource ID isolated across users and sample data", async () => {
 		const settingsA = {
 			statementDay: 8,
 			statementDaySet: true,
@@ -367,7 +407,7 @@ describe("financial preference owner isolation", () => {
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
 		await refreshSafeSpendingSettings();
-		await verifyOwner("plans/sample");
+		await verifyOwner("users/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
@@ -379,7 +419,7 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsB);
-		await verifyOwner("plans/sample");
+		await verifyOwner("users/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 42,
 			incomeRuleIds: ["sample-income"],
@@ -392,7 +432,7 @@ describe("financial preference owner isolation", () => {
 		await refreshSafeSpendingSettings();
 		const keyA = financialKey();
 		const rawA = window.localStorage.getItem(keyA);
-		suspendResourceScope();
+		suspendUserScope();
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
@@ -425,7 +465,7 @@ describe("financial preference owner isolation", () => {
 		});
 		for (const key of keys) window.localStorage.setItem(key, raw);
 		const read = vi.spyOn(window.localStorage, "getItem");
-		for (const id of [A, B, "plans/sample"]) {
+		for (const id of [A, B, "users/sample"]) {
 			await verifyOwner(id);
 			expect(useSafeSpendingSettings.getState()).toMatchObject(
 				defaultSafeSpendingSettings(),
@@ -452,19 +492,19 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);
-		await verifyOwner("plans/sample");
+		await verifyOwner("users/sample");
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
-		await verifyOwner("plans/sample");
+		await verifyOwner("users/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 200,
 			incomeRuleIds: ["sample-income"],
 		});
-		suspendResourceScope();
+		suspendUserScope();
 		expect(useThemeStore.getState().preference).toBe("dark");
 		expect(useUiStore.getState()).toMatchObject({ years: 30, ranges: false });
 		expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toContain("dark");
@@ -501,8 +541,8 @@ describe("financial preference owner isolation", () => {
 	});
 
 	it("rejects writes through a captured storage owner after verification changes", async () => {
-		const oldScope = getResourceScope();
-		const oldStorage = resourceLocalStorage(oldScope);
+		const oldScope = getUserScope();
+		const oldStorage = accountLocalStorage(oldScope);
 		const oldKey = financialKey();
 		await verifyOwner(B);
 		oldStorage.setItem(SAFE_SPENDING_STORAGE_KEY, "private-a-stale-write");

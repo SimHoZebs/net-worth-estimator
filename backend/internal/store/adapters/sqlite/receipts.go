@@ -11,7 +11,7 @@ import (
 )
 
 func receiptPosting(q queryer, id string) (types.Posting, error) {
-	rows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, id)
+	rows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE id = ? AND user_id = :user_id`, id)
 	if err != nil {
 		return types.Posting{}, err
 	}
@@ -36,9 +36,9 @@ func parsePostingReceiptIDs(raw string) []string {
 	return ids
 }
 
-func addPostingReceiptID(tx *planTx, postingID, receiptID string) error {
+func addPostingReceiptID(tx *userTx, postingID, receiptID string) error {
 	var raw string
-	if err := tx.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND plan_id = :plan_id`, postingID).Scan(&raw); err != nil {
+	if err := tx.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND user_id = :user_id`, postingID).Scan(&raw); err != nil {
 		return err
 	}
 	for _, id := range parsePostingReceiptIDs(raw) {
@@ -50,13 +50,13 @@ func addPostingReceiptID(tx *planTx, postingID, receiptID string) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND plan_id = :plan_id`, string(data), postingID)
+	_, err = tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND user_id = :user_id`, string(data), postingID)
 	return err
 }
 
-func removePostingReceiptID(tx *planTx, postingID, receiptID string) error {
+func removePostingReceiptID(tx *userTx, postingID, receiptID string) error {
 	var raw string
-	if err := tx.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND plan_id = :plan_id`, postingID).Scan(&raw); err == sql.ErrNoRows {
+	if err := tx.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND user_id = :user_id`, postingID).Scan(&raw); err == sql.ErrNoRows {
 		return nil
 	} else if err != nil {
 		return err
@@ -75,7 +75,7 @@ func removePostingReceiptID(tx *planTx, postingID, receiptID string) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND plan_id = :plan_id`, string(data), postingID)
+	_, err = tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND user_id = :user_id`, string(data), postingID)
 	return err
 }
 
@@ -111,7 +111,7 @@ func migratePostingReceiptIDs(tx *sql.Tx) error {
 	if _, err := tx.Exec(`UPDATE postings SET receipt_ids = '[]'`); err != nil {
 		return err
 	}
-	rows, err = tx.Query(`SELECT plan_id, posting_id, id FROM receipts ORDER BY plan_id, posting_id, id`)
+	rows, err = tx.Query(`SELECT user_id, posting_id, id FROM receipts ORDER BY user_id, posting_id, id`)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func migratePostingReceiptIDs(tx *sql.Tx) error {
 		if sep < 0 {
 			return fmt.Errorf("migrate receipt back-references: invalid key")
 		}
-		if _, err := tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE plan_id = ? AND id = ?`, string(data), key[:sep], key[sep+1:]); err != nil {
+		if _, err := tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE user_id = ? AND id = ?`, string(data), key[:sep], key[sep+1:]); err != nil {
 			return err
 		}
 	}
@@ -166,7 +166,7 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 	if err != nil {
 		return out, err
 	}
-	check := func(tx *planTx) error {
+	check := func(tx *userTx) error {
 		posting, err := receiptPosting(tx, postingID)
 		if err != nil {
 			return err
@@ -178,13 +178,13 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 			return ErrReceiptIneligible
 		}
 		var existing string
-		if err := tx.QueryRow(`SELECT payload FROM receipts WHERE posting_id = ? AND digest = ? AND plan_id = :plan_id`, postingID, image.Digest).Scan(&existing); err == nil {
+		if err := tx.QueryRow(`SELECT payload FROM receipts WHERE posting_id = ? AND digest = ? AND user_id = :user_id`, postingID, image.Digest).Scan(&existing); err == nil {
 			return json.Unmarshal([]byte(existing), &out)
 		} else if err != sql.ErrNoRows {
 			return err
 		}
 		var used, count int64
-		if err := tx.QueryRow(`SELECT COALESCE(SUM(size),0), COUNT(*) FROM receipts WHERE plan_id = :plan_id`).Scan(&used, &count); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(SUM(size),0), COUNT(*) FROM receipts WHERE user_id = :user_id`).Scan(&used, &count); err != nil {
 			return err
 		}
 		if used+int64(len(image.Bytes)) > ReceiptStorageLimit || count >= 500 {
@@ -202,7 +202,7 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		return types.Receipt{}, err
 	}
 	defer s.application.finishBlobWrite(key)
-	err = withRowTx(s.db, func(tx *planTx) error {
+	err = withRowTx(s.db, func(tx *userTx) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -221,7 +221,7 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		if err := publishBlob(tx.Tx, key); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, plan_id) VALUES (?,?,?,?,?,?,?, :plan_id)`, out.ID, postingID, image.Digest, out.Size, key, out.Revision, string(payload)); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, user_id) VALUES (?,?,?,?,?,?,?, :user_id)`, out.ID, postingID, image.Digest, out.Size, key, out.Revision, string(payload)); err != nil {
 			return err
 		}
 		return addPostingReceiptID(tx, postingID, out.ID)
@@ -233,7 +233,7 @@ func (s *sqliteStore) ListReceipts(postingID string) ([]types.Receipt, error) {
 	if _, err := receiptPosting(s.db, postingID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(`SELECT payload FROM receipts WHERE posting_id = ? AND plan_id = :plan_id ORDER BY id`, postingID)
+	rows, err := s.db.Query(`SELECT payload FROM receipts WHERE posting_id = ? AND user_id = :user_id ORDER BY id`, postingID)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (s *sqliteStore) ListReceipts(postingID string) ([]types.Receipt, error) {
 // ListPostingReceiptIDs reads the stored back-reference from each posting row.
 // Only postings with at least one receipt appear in the map.
 func (s *sqliteStore) ListPostingReceiptIDs() (map[string][]string, error) {
-	rows, err := s.db.Query(`SELECT id, receipt_ids FROM postings WHERE plan_id = :plan_id`)
+	rows, err := s.db.Query(`SELECT id, receipt_ids FROM postings WHERE user_id = :user_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func (s *sqliteStore) ListPostingReceiptIDs() (map[string][]string, error) {
 
 func (s *sqliteStore) GetReceipt(id string) (out types.Receipt, err error) {
 	var payload string
-	err = s.db.QueryRow(`SELECT payload FROM receipts WHERE id = ? AND plan_id = :plan_id`, id).Scan(&payload)
+	err = s.db.QueryRow(`SELECT payload FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&payload)
 	if err == sql.ErrNoRows {
 		return out, ErrReceiptNotFound
 	}
@@ -296,9 +296,9 @@ func (s *sqliteStore) SaveReceipt(receipt types.Receipt, expectedRevision int64)
 			}
 		}
 	}
-	err := withRowTx(s.db, func(tx *planTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		var payload string
-		if err := tx.QueryRow(`SELECT payload FROM receipts WHERE id = ? AND plan_id = :plan_id`, receipt.ID).Scan(&payload); err == sql.ErrNoRows {
+		if err := tx.QueryRow(`SELECT payload FROM receipts WHERE id = ? AND user_id = :user_id`, receipt.ID).Scan(&payload); err == sql.ErrNoRows {
 			return ErrReceiptNotFound
 		} else if err != nil {
 			return err
@@ -320,7 +320,7 @@ func (s *sqliteStore) SaveReceipt(receipt types.Receipt, expectedRevision int64)
 		if err != nil {
 			return err
 		}
-		result, err := tx.Exec(`UPDATE receipts SET payload = ?, revision = ? WHERE id = ? AND revision = ? AND plan_id = :plan_id`, string(data), receipt.Revision, receipt.ID, expectedRevision)
+		result, err := tx.Exec(`UPDATE receipts SET payload = ?, revision = ? WHERE id = ? AND revision = ? AND user_id = :user_id`, string(data), receipt.Revision, receipt.ID, expectedRevision)
 		if err != nil {
 			return err
 		}
@@ -337,14 +337,14 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	err := withRowTx(s.db, func(tx *planTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		var postingID string
-		if err := tx.QueryRow(`SELECT posting_id FROM receipts WHERE id = ? AND plan_id = :plan_id`, id).Scan(&postingID); err == sql.ErrNoRows {
+		if err := tx.QueryRow(`SELECT posting_id FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&postingID); err == sql.ErrNoRows {
 			return ErrReceiptNotFound
 		} else if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`DELETE FROM receipts WHERE id = ? AND plan_id = :plan_id`, id); err != nil {
+		if _, err := tx.Exec(`DELETE FROM receipts WHERE id = ? AND user_id = :user_id`, id); err != nil {
 			return err
 		}
 		return removePostingReceiptID(tx, postingID, id)
@@ -371,10 +371,10 @@ type preservedReceipt struct {
 
 // loadReceiptsForPostings snapshots receipt rows so CSV replacement can
 // restore evidence for preserved postings after row deletion cascades.
-func loadReceiptsForPostings(tx *planTx, postingIDs []string) ([]preservedReceipt, error) {
+func loadReceiptsForPostings(tx *userTx, postingIDs []string) ([]preservedReceipt, error) {
 	var out []preservedReceipt
 	for _, postingID := range postingIDs {
-		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id = ? AND plan_id = :plan_id ORDER BY id`, postingID)
+		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id = ? AND user_id = :user_id ORDER BY id`, postingID)
 		if err != nil {
 			return nil, err
 		}
@@ -395,14 +395,14 @@ func loadReceiptsForPostings(tx *planTx, postingIDs []string) ([]preservedReceip
 	return out, nil
 }
 
-func restoreReceipts(tx *planTx, receipts []preservedReceipt) error {
+func restoreReceipts(tx *userTx, receipts []preservedReceipt) error {
 	for _, receipt := range receipts {
 		// Row deletion cascades to receipts and queues their blobs for
 		// cleanup; reviving the reference must unqueue the object first.
 		if _, err := tx.Exec(`UPDATE blob_objects SET state = 'live', expires_at = 0 WHERE key = ?`, receipt.blobKey); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, plan_id) VALUES (?, ?, ?, ?, ?, ?, ?, :plan_id)`,
+		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			receipt.id, receipt.postingID, receipt.digest, receipt.size, receipt.blobKey, receipt.revision, receipt.payload); err != nil {
 			return err
 		}

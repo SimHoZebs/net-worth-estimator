@@ -11,17 +11,11 @@ import {
 	useWorkspaceStore,
 } from "@/state/workspaceStore.ts";
 import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
-import {
-	useServerModel,
-	workspaceResourceKey,
-} from "@/state/workspaceResources.ts";
+import { useServerModel, userResourceKey } from "@/state/workspaceResources.ts";
 import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
-import {
-	getResourceScope,
-	suspendResourceScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, suspendUserScope } from "@/auth/resourceScope.ts";
 import { ok } from "@/mocks/fetch.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { clearPersistedMemory } from "@/state/persisted.ts";
@@ -32,25 +26,25 @@ import {
 import { safeSpendingSettingsObserver } from "@/mocks/safeSpendingSettings.ts";
 import { canonicalApiBaseUrl } from "@/auth/resourceScope.ts";
 
-const A = `plans/${"a".repeat(64)}`;
-const B = `plans/${"b".repeat(64)}`;
+const A = `users/${"a".repeat(64)}`;
+const B = `users/${"b".repeat(64)}`;
 
 function session(id = A) {
 	return {
 		enabled: true,
-		authenticated: id !== "plans/sample",
+		authenticated: id !== "users/sample",
 		allowed: true,
 		resource: {
 			id,
-			kind: id === "plans/sample" ? "sample" : "private",
+			kind: id === "users/sample" ? "sample" : "private",
 			permissions: [
-				"plan:read",
-				"plan:project",
-				...(id === "plans/sample" ? [] : ["plan:write"]),
+				"user:read",
+				"user:project",
+				...(id === "users/sample" ? [] : ["user:write"]),
 			],
 		},
 		user: {
-			subject: id === "plans/sample" ? "" : id,
+			subject: id === "users/sample" ? "" : id,
 			name: "Account",
 		},
 	};
@@ -72,7 +66,7 @@ function route(input: RequestInfo | URL, init?: RequestInit) {
 	const requested = init?.headers
 		? new Headers(init.headers).get("Waypoint-Resource")
 		: null;
-	const resource = requested ?? getResourceScope().resource?.id ?? "";
+	const resource = requested ?? getUserScope().resource?.id ?? "";
 	if (url.endsWith("/v1/safe-spending-settings")) {
 		if ((init?.method ?? "GET") !== "GET") {
 			const body = JSON.parse(String(init?.body ?? "{}")) as {
@@ -120,7 +114,7 @@ function renderWorkspace() {
 beforeEach(() => {
 	vi.stubGlobal("BroadcastChannel", undefined);
 	settingsByResource.clear();
-	suspendResourceScope();
+	suspendUserScope();
 	clearPersistedMemory();
 	resetWorkspaceStore();
 });
@@ -232,7 +226,7 @@ describe("authentication resource isolation", () => {
 			"123456:private-a-income",
 		);
 		await act(async () => finish(response(session(B), B)));
-		await waitFor(() => expect(getResourceScope().resource?.id).toBe(B));
+		await waitFor(() => expect(getUserScope().resource?.id).toBe(B));
 		expect(safeSpendingSettingsObserver.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);
@@ -243,9 +237,9 @@ describe("authentication resource isolation", () => {
 		);
 	});
 
-	it("clears live model and projection state before it first mounts a verified workspace", async () => {
+	it("clears live model and projection state before it first mounts a verified user", async () => {
 		setServerRevisionFixture("previous-account-private-revision");
-		serverQueryClient().setQueryData(workspaceResourceKey("presets"), [
+		serverQueryClient().setQueryData(userResourceKey("presets"), [
 			{ id: "previous-private-recipe" },
 		]);
 		serverQueryClient().setQueryData(
@@ -261,7 +255,7 @@ describe("authentication resource isolation", () => {
 			`${A}:empty`,
 		);
 		expect(
-			serverQueryClient().getQueryData(workspaceResourceKey("presets")),
+			serverQueryClient().getQueryData(userResourceKey("presets")),
 		).toBeUndefined();
 		expect(
 			serverQueryClient().getQueryData(["old-projection"]),
@@ -278,7 +272,7 @@ describe("authentication resource isolation", () => {
 		).toBe(true);
 	});
 
-	it.each([B, "plans/sample"])(
+	it.each([B, "users/sample"])(
 		"keeps the old workspace during a cross-tab check and clears it before resource %s mounts",
 		async (nextId) => {
 			const fetcher = vi.fn(
@@ -311,7 +305,7 @@ describe("authentication resource isolation", () => {
 			);
 			// Stale-while-revalidate: the previous workspace stays mounted
 			// with its scope until the new resource is verified.
-			expect(getResourceScope().status).toBe("ready");
+			expect(getUserScope().status).toBe("ready");
 			await waitFor(() =>
 				expect(screen.getByTestId("active-workspace").textContent).toBe(
 					`${A}:account-a-private-revision`,
@@ -370,10 +364,10 @@ describe("authentication resource isolation", () => {
 		expect(screen.getByTestId("active-workspace").textContent).toBe(
 			`${B}:empty`,
 		);
-		expect(getResourceScope().resource?.id).toBe(B);
+		expect(getUserScope().resource?.id).toBe(B);
 	});
 
-	it("preserves workspace data, recovery, and completed results across a same-account check", async () => {
+	it("preserves user data, recovery, and completed results across a same-user check", async () => {
 		const fetcher = vi.fn(async () => response(session()));
 		vi.stubGlobal("fetch", fetcher);
 		renderWorkspace();
@@ -391,7 +385,7 @@ describe("authentication resource isolation", () => {
 			serverQueryClient().setQueryData(key, "private-a-result");
 			window.dispatchEvent(new Event("focus"));
 		});
-		// Same-account revalidation never unmounts the workspace.
+		// Same-user revalidation never unmounts the workspace.
 		await waitFor(() =>
 			expect(screen.getByTestId("active-workspace").textContent).toBe(
 				`${A}:private-a-revision`,
@@ -431,12 +425,12 @@ describe("authentication resource isolation", () => {
 			// Transient outages keep the verified workspace mounted with a
 			// retry toast instead of wiping the UI.
 			expect(screen.getByTestId("active-workspace")).toBeTruthy();
-			expect(getResourceScope().status).toBe("ready");
+			expect(getUserScope().status).toBe("ready");
 			expect(useWorkspaceStore.getState().draft).toBe(recovery.draft);
 			fetcher.mockImplementation(async () => response(session(nextId), nextId));
 			act(() => window.dispatchEvent(new Event("focus")));
 			await screen.findByTestId("active-workspace");
-			expect(getResourceScope().resource?.id).toBe(nextId);
+			expect(getUserScope().resource?.id).toBe(nextId);
 			expect(useWorkspaceStore.getState().draft).toBe(
 				nextId === A ? recovery.draft : null,
 			);
@@ -454,7 +448,7 @@ describe("authentication resource isolation", () => {
 		fetcher.mockImplementation(async () =>
 			response({
 				...session(),
-				resource: { ...session().resource, permissions: ["plan:read"] },
+				resource: { ...session().resource, permissions: ["user:read"] },
 			}),
 		);
 		act(() => window.dispatchEvent(new Event("focus")));
@@ -464,10 +458,10 @@ describe("authentication resource isolation", () => {
 			),
 		);
 		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
-		expect(getResourceScope().resource?.permissions).toEqual(["plan:read"]);
+		expect(getUserScope().resource?.permissions).toEqual(["user:read"]);
 	});
 
-	it("does not reuse data or recovery when the API address changes for the same account", async () => {
+	it("does not reuse data or recovery when the API address changes for the same user", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => response(session())),
@@ -491,9 +485,7 @@ describe("authentication resource isolation", () => {
 				`${A}:empty`,
 			),
 		);
-		expect(getResourceScope().apiBaseUrl).toBe(
-			canonicalApiBaseUrl("/second-api"),
-		);
+		expect(getUserScope().apiBaseUrl).toBe(canonicalApiBaseUrl("/second-api"));
 		expect(useWorkspaceStore.getState().draft).toBeNull();
 		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
 	});
@@ -515,7 +507,23 @@ describe("authentication resource isolation", () => {
 			"The API address changed. Retry the session check.",
 		);
 		expect(screen.queryByTestId("active-workspace")).toBeNull();
-		expect(getResourceScope().status).toBe("pending");
+		expect(getUserScope().status).toBe("pending");
+	});
+
+	it("mounts when the grant list is unusual and leaves enforcement to the server", async () => {
+		const body = {
+			...session(),
+			resource: { ...session().resource, permissions: ["user:write"] },
+		};
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => response(body, A)),
+		);
+		renderWorkspace();
+		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
+			`${A}:empty`,
+		);
+		expect(getUserScope().status).toBe("ready");
 	});
 
 	it.each([
@@ -526,16 +534,11 @@ describe("authentication resource isolation", () => {
 		["missing private subject", { ...session(), user: undefined }, A],
 		[
 			"invalid private resource ID",
-			{ ...session(), resource: { ...session().resource, id: "plans/sample" } },
-			"plans/sample",
-		],
-		[
-			"missing read permission",
 			{
 				...session(),
-				resource: { ...session().resource, permissions: ["plan:write"] },
+				resource: { ...session().resource, id: "users/sample" },
 			},
-			A,
+			"users/sample",
 		],
 	])("fails closed on %s", async (_name, body, header) => {
 		vi.stubGlobal(
@@ -545,7 +548,7 @@ describe("authentication resource isolation", () => {
 		renderWorkspace();
 		await screen.findByRole("alert");
 		expect(screen.queryByTestId("active-workspace")).toBeNull();
-		expect(getResourceScope().status).toBe("pending");
+		expect(getUserScope().status).toBe("pending");
 	});
 
 	it("verifies the resource across a strict-mode remount", async () => {
@@ -563,6 +566,6 @@ describe("authentication resource isolation", () => {
 		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
 			`${A}:empty`,
 		);
-		expect(getResourceScope().status).toBe("ready");
+		expect(getUserScope().status).toBe("ready");
 	});
 });

@@ -116,7 +116,7 @@ type Principal = authcontract.Principal
 
 func CanWrite(ctx context.Context) bool {
 	scope, ok := Scope(ctx)
-	return ok && slices.Contains(scope.Permissions, "plan:write")
+	return ok && slices.Contains(scope.Permissions, "user:write")
 }
 
 func (s *Service) principal(r *http.Request) (Principal, error) {
@@ -152,7 +152,7 @@ func (s *Service) sessionPrincipal(r *http.Request) (Principal, error) {
 	return Principal{Subject: g.Subject, Name: g.Name}, nil
 }
 
-// Wrap verifies sessions and enforces Casdoor decisions for the selected plan.
+// Wrap verifies sessions and enforces Casdoor decisions for the selected user.
 func (s *Service) Wrap(next http.Handler) http.Handler {
 	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w = flushWriter{w}
@@ -198,9 +198,9 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			if !slices.Contains(scope.Permissions, requestAction(r)) {
 				if p.Subject == "" {
 					w.Header().Set("WWW-Authenticate", "Session")
-					failure(w, 401, "Sign in to edit your own plan.")
+					failure(w, 401, "Sign in to edit your data.")
 				} else {
-					failure(w, 403, "This action is not permitted on this plan.")
+					failure(w, 403, "This action is not permitted.")
 				}
 				return
 			}
@@ -268,7 +268,7 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set(ResourceHeader, scope.Resource.ID)
-		respond(w, authcontract.SessionResponse{Enabled: true, Provider: s.config.Provider, Authenticated: p.Subject != "", Allowed: slices.Contains(scope.Permissions, "plan:read"), User: p, AccountURL: s.browserProviderURL(s.config.AccountURL, endpoint),
+		respond(w, authcontract.SessionResponse{Enabled: true, Provider: s.config.Provider, Authenticated: p.Subject != "", Allowed: slices.Contains(scope.Permissions, "user:read"), User: p, AccountURL: s.browserProviderURL(s.config.AccountURL, endpoint),
 			Resource: authcontract.SessionResource{ID: scope.Resource.ID, Kind: scope.Resource.Kind, Permissions: scope.Permissions}})
 	case "GET " + prefix + "login":
 		s.login(w, r)

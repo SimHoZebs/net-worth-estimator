@@ -6,7 +6,7 @@ import { compose } from "./compose.mjs";
 import { run } from "./shell.mjs";
 import { snapshot } from "./snapshot.mjs";
 
-export async function refreshData({ config, stateDir, slot, source, sourcePlan, plan, publishing }) {
+export async function refreshData({ config, stateDir, slot, source, sourceUser, user, publishing }) {
   const incoming = await snapshot(
     {
       ...config,
@@ -38,17 +38,17 @@ export async function refreshData({ config, stateDir, slot, source, sourcePlan, 
       destination,
       "--source",
       incoming,
-      "--source-plan",
-      sourcePlan,
-      ...(publishing ? ["--sample"] : ["--plan", plan]),
+      "--source-user",
+      sourceUser,
+      ...(publishing ? ["--sample"] : ["--user", user]),
     ]);
   } finally {
     compose(config, ["start", "--wait", "backend"]);
   }
   console.log(
     publishing
-      ? "Sample published in the application database. Private plans and all identity state remain unchanged."
-      : "Selected dev plan refreshed. Other plans and all identity state remain unchanged.",
+      ? "Sample published in the application database. Private users and all identity state remain unchanged."
+      : "Selected dev user refreshed. Other users and all identity state remain unchanged.",
   );
   console.log(
     `The prior application database is in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/backups/.`,

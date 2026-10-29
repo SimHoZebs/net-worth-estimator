@@ -16,7 +16,7 @@ import { performSave } from "@/state/workspaceWrites.ts";
 import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
 
-import { usePlan } from "@/state/useWorkspacePlan.ts";
+import { useUserPlan } from "@/state/useUserScope.ts";
 import {
 	refreshEvaluations,
 	useAccountBalances,
@@ -32,7 +32,7 @@ export function EvaluationsPage({
 }) {
 	// Plan, actions, and projection subscribe where the query is declared;
 	// only UI callbacks arrive as props.
-	const plan = usePlan();
+	const plan = useUserPlan();
 	const summary = useEvaluationSummary().data;
 	const savedEvaluations = useMemo(
 		() => summaryEvaluations(summary),

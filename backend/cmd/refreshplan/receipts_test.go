@@ -18,7 +18,7 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := db.Plan("plans/other")
+	s, err := db.User("other")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,19 +32,19 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.Close()
-	if err := refresh(target, source, "plans/other", "plans/owner", false); err != nil {
+	if err := refresh(target, source, "other", "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT CAST(b.data AS TEXT) FROM receipts r JOIN blob_data b ON b.key=r.blob_key WHERE r.plan_id='plans/owner' AND r.id=?", r.ID); got != "private image" {
+	if got := query(t, target, "SELECT CAST(b.data AS TEXT) FROM receipts r JOIN blob_data b ON b.key=r.blob_key WHERE r.user_id='owner' AND r.id=?", r.ID); got != "private image" {
 		t.Fatal("refresh dropped receipt image")
 	}
-	if err := refresh(target, source, "plans/other", "", true); err != nil {
+	if err := refresh(target, source, "other", "", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE plan_id='plans/sample'"); got != "0" {
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='sample'"); got != "0" {
 		t.Fatal("published private receipt", got)
 	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE plan_id='plans/owner'"); got != "1" {
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner'"); got != "1" {
 		t.Fatal("sample publication changed private receipts", got)
 	}
 }
@@ -58,7 +58,7 @@ func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForSample(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := db.Plan("plans/other")
+	s, err := db.User("other")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,19 +72,19 @@ func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForSample(t *tes
 		t.Fatal(err)
 	}
 	db.Close()
-	if err := refresh(target, source, "plans/other", "plans/owner", false); err != nil {
+	if err := refresh(target, source, "other", "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE plan_id='plans/owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
 		t.Fatalf("private posting field = %s", got)
 	}
-	if err := refresh(target, source, "plans/other", "", true); err != nil {
+	if err := refresh(target, source, "other", "", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE plan_id='plans/sample' AND id=?", p.ID); got != `[]` {
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='sample' AND id=?", p.ID); got != `[]` {
 		t.Fatalf("sample posting field = %s", got)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE plan_id='plans/owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
 		t.Fatalf("sample publication changed private posting field = %s", got)
 	}
 }

@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { PlannedPurchase, Plan } from "../../domain/model.ts";
 import { visibleAccounts } from "../../domain/model.ts";
-import { upsertItem } from "../../domain/planEdits.ts";
+import { upsertItem } from "../../domain/accountEdits.ts";
 import { Checkbox, InputField, SelectField } from "../../components/Field.tsx";
 import { AccountOptions } from "../../components/editors/AccountOptions.tsx";
 import { EditorForm } from "../../components/editors/EditorForm.tsx";

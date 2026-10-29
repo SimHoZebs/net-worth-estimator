@@ -41,7 +41,7 @@ func serviceFixture(t *testing.T, source *receipts.Source) (store.Store, *receip
 	if _, err := db.CreatePosting(types.Posting{ID: postingID, Name: "Expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "12.34"}, Inputs: map[string]types.AmountInputBinding{}}, PostedTime: 1, TransactionTime: 1, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	svc := receipts.NewService(db, source, "plans/test")
+	svc := receipts.NewService(db, source, "users/test")
 	image, err := receipts.NormalizeImage(bytes.NewReader(receiptmock.SampleImage))
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestExtractorContractAndSourceSwap(t *testing.T) {
 		t.Fatal(err)
 	}
 	second, _ := receipts.NewSource(types.ReceiptProvenance{Producer: "replacement", Version: "1"}, other)
-	svc = receipts.NewService(db, second, "plans/test")
+	svc = receipts.NewService(db, second, "users/test")
 	before := calls.Load()
 	r, err = svc.Extract(context.Background(), r.ID)
 	if err != nil || calls.Load() != before+1 {
@@ -103,7 +103,7 @@ func TestExtractorContractAndSourceSwap(t *testing.T) {
 		t.Fatal("same source result not reused")
 	}
 	third, _ := receipts.NewSource(types.ReceiptProvenance{Producer: "replacement", Version: "2"}, other)
-	if _, err := receipts.NewService(db, third, "plans/test").Extract(context.Background(), r.ID); err != nil || calls.Load() != before+2 {
+	if _, err := receipts.NewService(db, third, "users/test").Extract(context.Background(), r.ID); err != nil || calls.Load() != before+2 {
 		t.Fatal("version change reused stale extraction")
 	}
 }
@@ -212,7 +212,7 @@ func TestExtractionRecoveryReadsDoNotStartOrPersistAnAttempt(t *testing.T) {
 	var calls atomic.Int32
 	source, err := receipts.NewSource(types.ReceiptProvenance{Producer: "recovery", Version: "1"}, extractorFunc(func(ctx context.Context, input receipts.ExtractionInput) (receipts.ExtractionResult, error) {
 		calls.Add(1)
-		if input.ScopeID != "plans/test" || input.RequestID == "" {
+		if input.ScopeID != "users/test" || input.RequestID == "" {
 			t.Error("missing scoped extraction identity")
 		}
 		return receipts.ExtractionResult{Details: types.ReceiptDetails{Merchant: "Recovered"}}, nil

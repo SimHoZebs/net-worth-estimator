@@ -101,7 +101,7 @@ test("ps-all and slot options validate before any service operation", () => {
   assert.doesNotThrow(() => validateStatus({}, []));
   assert.throws(() => validateStatus({ slot: "shots" }, []), /bare/);
   assert.doesNotThrow(() =>
-    validateSetup({ slot: "shots", "source-plan": "plans/owner" }, []),
+    validateSetup({ slot: "shots", "source-user": "users/owner" }, []),
   );
   assert.throws(() => validateSetup({ slot: "Bad Name" }, []), /Slot names/);
 });

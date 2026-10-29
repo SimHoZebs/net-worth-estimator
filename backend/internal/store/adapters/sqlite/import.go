@@ -21,17 +21,17 @@ func (s *sqliteStore) ImportDocument(document *types.FinancialModelDocument) (*t
 	}
 	// Rebuild the ID registry from the seed; account links survive a
 	// reseed so bridge bindings are not lost.
-	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE plan_id = :plan_id`); err != nil {
+	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE user_id = :user_id`); err != nil {
 		return nil, fmt.Errorf("import clear entity ids: %w", err)
 	}
 	for _, seed := range []struct {
 		kind  string
 		query string
 	}{
-		{"account", `INSERT INTO entity_ids (id, kind, plan_id) SELECT id, 'account', :plan_id FROM accounts WHERE plan_id = :plan_id`},
-		{"posting", `INSERT INTO entity_ids (id, kind, plan_id) SELECT id, 'posting', :plan_id FROM postings WHERE plan_id = :plan_id`},
-		{"rule", `INSERT INTO entity_ids (id, kind, plan_id) SELECT id, 'rule', :plan_id FROM recurrence_rules WHERE plan_id = :plan_id`},
-		{"evaluation", `INSERT INTO entity_ids (id, kind, plan_id) SELECT instance_id, 'evaluation', :plan_id FROM evaluations WHERE plan_id = :plan_id`},
+		{"account", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'account', :user_id FROM accounts WHERE user_id = :user_id`},
+		{"posting", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'posting', :user_id FROM postings WHERE user_id = :user_id`},
+		{"rule", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'rule', :user_id FROM recurrence_rules WHERE user_id = :user_id`},
+		{"evaluation", `INSERT INTO entity_ids (id, kind, user_id) SELECT instance_id, 'evaluation', :user_id FROM evaluations WHERE user_id = :user_id`},
 	} {
 		if _, err := tx.Exec(seed.query); err != nil {
 			return nil, fmt.Errorf("import seed entity ids %s: %w", seed.kind, err)

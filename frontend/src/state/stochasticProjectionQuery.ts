@@ -5,8 +5,8 @@ import {
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
-import { ResourceScopeError } from "../api/scopedRequest.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
+import { UserScopeError } from "../api/scopedRequest.ts";
+import { getUserScope } from "../auth/resourceScope.ts";
 import type { RangeResult } from "../domain/result.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
 
@@ -34,7 +34,7 @@ export function stochasticProjectionOptions({
 		staleTime: (query) => (query.state.data?.complete ? Infinity : 0),
 		queryFn: async ({ signal, client }): Promise<StreamSnapshot> => {
 			if (!request) throw new Error("No scenario calculation was requested.");
-			const scope = getResourceScope();
+			const scope = getUserScope();
 			let snapshot: StreamSnapshot = {
 				range: null,
 				progress: 0,
@@ -42,7 +42,7 @@ export function stochasticProjectionOptions({
 			};
 			const assertCurrent = () => {
 				signal.throwIfAborted();
-				if (getResourceScope() !== scope) throw new ResourceScopeError();
+				if (getUserScope() !== scope) throw new UserScopeError();
 			};
 			const publish = (update: Partial<StreamSnapshot>) => {
 				assertCurrent();
@@ -95,7 +95,7 @@ export function stochasticProjectionOptions({
 					cause instanceof Error
 						? cause
 						: new Error("The range request failed. Retry the calculation.");
-				if (!(error instanceof ResourceScopeError))
+				if (!(error instanceof UserScopeError))
 					notifyError("projection-range", error.message, {
 						label: "Retry scenario calculation",
 						onAction: () => {

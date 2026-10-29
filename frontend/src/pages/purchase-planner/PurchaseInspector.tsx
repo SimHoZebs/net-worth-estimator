@@ -1,7 +1,7 @@
 import { AlertTriangle, CalendarDays, LockKeyhole } from "lucide-react";
-import { Button } from "../../../components/Button.tsx";
-import { Modal } from "../../../components/Modal.tsx";
-import { dateLabel, money } from "../../../domain/format.ts";
+import { Button } from "../../components/Button.tsx";
+import { Modal } from "../../components/Modal.tsx";
+import { dateLabel, money } from "../../domain/format.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
 import { PurchaseStatus } from "./PurchaseStatus.tsx";
 

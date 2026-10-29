@@ -22,7 +22,7 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 			redirectToSignIn();
 		}
 	}, [phase, session]);
-	// Stale-while-revalidate: a verified workspace stays mounted while a
+	// Stale-while-revalidate: a verified account stays mounted while a
 	// later check runs or fails transiently. Only an explicit denial or a
 	// first load without any verified session takes over the full screen.
 	// Transient outages float a retry toast instead of wiping the UI.
@@ -44,8 +44,8 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 				{session?.authenticated
 					? "Session access is unavailable"
 					: failed
-						? "Cannot reach your plan"
-						: "Your plan. Your access."}
+						? "Cannot reach your data."
+						: "Your data. Your access."}
 			</h1>
 			<p className="mb-6 text-muted">
 				{session?.authenticated

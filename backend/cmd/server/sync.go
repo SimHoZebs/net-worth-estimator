@@ -13,30 +13,30 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
-// ownerSyncStore returns the owner plan when it exists, or nil when the
-// plan has not been provisioned yet (before first login). It never fails
-// for a missing plan and never provisions one, so a fresh deployment
+// ownerSyncStore returns the owner user's store when it exists, or nil when
+// the user has not been provisioned yet (before first login). It never fails
+// for a missing user and never provisions one, so a fresh deployment
 // starts unconfigured and picks up a stored key once the owner connects.
-// The Bridge credential lives only in that plan's database rows, never in
+// The Bridge credential lives only in that user's database rows, never in
 // the environment.
 func ownerSyncStore(database *sqlite.Database, issuer, subject string) (store.Store, error) {
 	if subject == "" {
 		return nil, nil
 	}
-	planID := authorization.ResourceFor(issuer, subject).ID
-	exists, err := database.HasPlan(planID)
+	userID := authorization.ActorKey(issuer, subject)
+	exists, err := database.HasUser(userID)
 	if err != nil || !exists {
 		return nil, err
 	}
-	return database.Plan(planID)
+	return database.User(userID)
 }
 
-// configureSync builds the SimpleFIN runner on the owner plan's scoped
-// store. The credential and card selection come only from that plan's
+// configureSync builds the SimpleFIN runner on the owner user's scoped
+// store. The credential and card selection come only from that user's
 // database rows: an empty credential leaves the runner unconfigured and
-// the trigger returns 503. A nil store (no owner plan provisioned yet at
+// the trigger returns 503. A nil store (no owner user provisioned yet at
 // boot) disables the sync the same way. After first login provisions the
-// plan and the key is connected, restart once so startup can scope the
+// user and the key is connected, restart once so startup can scope the
 // runner.
 //
 // Throttling matches the Bridge daily-update quota (24 requests or fewer
@@ -62,7 +62,7 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 		log.Fatalf("invalid simplefin rate-limit cooldown: %v", err)
 	}
 	if database == nil {
-		log.Print("simplefin sync is not configured: no owner plan provisioned yet")
+		log.Print("simplefin sync is not configured: no owner user provisioned yet")
 		return nil, func() {}
 	}
 	config := simplefin.Config{
@@ -75,7 +75,7 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 }
 
 // newDynamicRunner builds a runner whose credential and card selection
-// resolve per run from the plan's stored BYOK rows, so connecting,
+// resolve per run from the user's stored BYOK rows, so connecting,
 // rotating, or disconnecting a key takes effect without a restart.
 func newDynamicRunner(database store.Store, config simplefin.Config) *simplefin.Runner {
 	provider := func() (string, map[string]struct{}) {

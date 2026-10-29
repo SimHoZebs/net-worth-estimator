@@ -178,11 +178,11 @@ func TestSyncCredentialIsolatedBetweenPlans(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
-	planA, err := database.EnsurePrivatePlan("plans/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "account-a", "https://issuer.invalid", "alice")
+	planA, err := database.EnsureUser("user-a", "https://issuer.invalid", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
-	planB, err := database.EnsurePrivatePlan("plans/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "account-b", "https://issuer.invalid", "bob")
+	planB, err := database.EnsureUser("user-b", "https://issuer.invalid", "bob")
 	if err != nil {
 		t.Fatal(err)
 	}

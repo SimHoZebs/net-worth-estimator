@@ -109,7 +109,7 @@ test("native Compose consumes the exported environment and isolates dev from pro
     );
     // Compose escapes dollars when it serializes a reusable Compose document.
     assert.equal(
-      backend.environment.NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT,
+      backend.environment.NET_WORTH_ESTIMATOR_OWNER_SUBJECT,
       config.ownerSubject.replaceAll("$", () => "$$"),
     );
     const interpolation = spawnSync("docker", [...args, "--environment"], options);
@@ -137,7 +137,7 @@ test("native Compose consumes the exported environment and isolates dev from pro
       assert.equal(
         backend.environment[key],
         undefined,
-        `${key} is retired; the Bridge key lives in the plan database`,
+        `${key} is retired; the Bridge key lives in the user database`,
       );
     }
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_TOKEN, undefined);
@@ -161,7 +161,7 @@ test("access needs no role configuration and retired grants do not reach the bac
   const example = await readFile(resolve(".env.example"), "utf8");
   assert.ok(!example.includes("NET_WORTH_ESTIMATOR_AUTH_EDITORS="));
   assert.ok(!example.includes("NET_WORTH_ESTIMATOR_AUTH_READERS="));
-  assert.ok(example.includes("NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT="));
+  assert.ok(example.includes("NET_WORTH_ESTIMATOR_OWNER_SUBJECT="));
   const config = newConfig();
   assert.equal(Object.hasOwn(config, "editors"), false);
   assert.equal(Object.hasOwn(config, "readers"), false);

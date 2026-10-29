@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	DefaultModelID = "waypoint/plan-access"
-	DefaultAdapter = "plan-policy-store"
+	DefaultModelID = "waypoint/user-access"
+	DefaultAdapter = "user-policy-store"
 	maxResponse    = 32 << 10
 )
 
@@ -97,10 +97,10 @@ func providerURL(raw string, origin bool) (*url.URL, error) {
 	return u, nil
 }
 
-// Resolve checks all plan actions for the caller's single server-selected plan.
-// Sequential invocations always contact Casdoor, including guest and denied
-// invocations. Overlapping invocations for one subject share one provider
-// call and receive the same fresh decision.
+// Resolve checks all user actions for the caller's single server-selected
+// user. Sequential invocations always contact Casdoor, including guest and
+// denied invocations. Overlapping invocations for one subject share one
+// provider call and receive the same fresh decision.
 func (c *Client) Resolve(ctx context.Context, subject string) (Scope, error) {
 	value, err, _ := c.inFlight.Do(subject, func() (any, error) {
 		return c.resolveUnshared(ctx, subject)
@@ -136,7 +136,7 @@ func (c *Client) Check(ctx context.Context, subject string, resource Resource, a
 	requests := make([][]string, 0, len(actions))
 	for _, action := range actions {
 		if action != Read && action != Project && action != Write {
-			return nil, errors.New("unknown plan action")
+			return nil, errors.New("unknown user action")
 		}
 		requests = append(requests, []string{ActorKey(c.config.Issuer, subject), resource.ID, action, resource.Owner})
 	}

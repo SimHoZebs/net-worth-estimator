@@ -10,14 +10,14 @@ import {
 } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
-import { useAccountResources } from "./accountApi.ts";
+import { useUserResources } from "./userApi.ts";
 
 export function AccountPage() {
 	const account = useSession();
 	const session = account?.session ?? null;
 	const logout = account?.logout ?? (async () => {});
 	const logoutPending = account?.logoutPending ?? false;
-	const resources = useAccountResources(session);
+	const resources = useUserResources(session);
 	const profile = resources.details.data?.profile ?? null;
 	const sessions = resources.details.data?.sessions ?? [];
 	const [nameDraft, setNameDraft] = useState<{
@@ -47,7 +47,7 @@ export function AccountPage() {
 		return (
 			<section aria-labelledby="account-heading">
 				<h2 id="account-heading">Account</h2>
-				<p className="text-sm text-muted">Sign in to manage your account.</p>
+				<p className="text-sm text-muted">Sign in to manage your data.</p>
 				<Button variant="primary" onClick={redirectToSignIn}>
 					Sign in
 				</Button>
@@ -128,8 +128,7 @@ export function AccountPage() {
 						Account
 					</h2>
 					<p className="mb-0 text-sm text-muted">
-						Signed in as{" "}
-						{profile?.name ?? session.user?.name ?? "your account"}.
+						Signed in as {profile?.name ?? session.user?.name ?? "you"}.
 					</p>
 				</div>
 				<Button

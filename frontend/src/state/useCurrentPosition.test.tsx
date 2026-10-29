@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FinancialModelDocument } from "../api/contracts.ts";
 import {
-	acceptResourceScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	suspendResourceScope,
+	getUserScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { useCurrentPosition } from "./useCurrentPosition.ts";
 import { resetWorkspaceStore } from "./workspaceStore.ts";
@@ -15,7 +15,7 @@ import { resetWorkspaceStore } from "./workspaceStore.ts";
 afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
-	suspendResourceScope();
+	suspendUserScope();
 	vi.unstubAllGlobals();
 });
 
@@ -42,17 +42,17 @@ function wrapper({ children }: { children: ReactNode }) {
 let cache: QueryClient;
 
 function setup() {
-	acceptResourceScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: `plans/${"a".repeat(64)}`,
+				id: `users/${"a".repeat(64)}`,
 				kind: "private",
-				permissions: ["plan:read"],
+				permissions: ["user:read"],
 			},
-			subject: `plans/${"a".repeat(64)}`,
+			subject: `users/${"a".repeat(64)}`,
 		},
-		suspendResourceScope(),
+		suspendUserScope(),
 	)!;
 	cache = new QueryClient({
 		defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
@@ -72,7 +72,7 @@ function stubPosition(respond: (url: string, init?: RequestInit) => unknown) {
 		vi.fn(async (url: unknown, init?: RequestInit) => {
 			calls.push({ url: String(url), init });
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getUserScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			const body = await respond(String(url), init);
 			return new Response(JSON.stringify(body), { headers });
@@ -92,10 +92,9 @@ it("exposes pending then success without any forecast request", async () => {
 		calls += 1;
 		return calls === 1 ? pending : { result };
 	});
-	const hook = renderHook(
-		() => useCurrentPosition({ document: model() }),
-		{ wrapper },
-	);
+	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+		wrapper,
+	});
 	expect(hook.result.current.status).toBe("pending");
 	await act(async () => {
 		finish({ result });
@@ -111,10 +110,10 @@ it("clears previous-input data while the new position is pending", async () => {
 		if (!gate) return { result };
 		return new Promise(() => {});
 	});
-	const hook = renderHook(
-		({ document }) => useCurrentPosition({ document }),
-		{ wrapper, initialProps: { document: model() } },
-	);
+	const hook = renderHook(({ document }) => useCurrentPosition({ document }), {
+		wrapper,
+		initialProps: { document: model() },
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	gate = true;
 	hook.rerender({ document: model(200) });
@@ -131,10 +130,9 @@ it("exposes errors and retries explicitly", async () => {
 			return { issues: [{ severity: "error", message: "Invalid history" }] };
 		return { result };
 	});
-	const hook = renderHook(
-		() => useCurrentPosition({ document: model() }),
-		{ wrapper },
-	);
+	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+		wrapper,
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("error"));
 	expect(hook.result.current.error).toBe("Invalid history");
 	act(() => hook.result.current.retry());
@@ -171,7 +169,7 @@ it("requests the saved model", async () => {
 		vi.fn(async (_url: unknown, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body ?? "{}")));
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getUserScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			return new Response(JSON.stringify({ result }), { headers });
 		}),
@@ -183,9 +181,7 @@ it("requests the saved model", async () => {
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
-	expect(
-		(bodies[0] as { document?: unknown }).document,
-	).toBeUndefined();
+	expect((bodies[0] as { document?: unknown }).document).toBeUndefined();
 });
 
 it("separates identical models by resource identity", async () => {
@@ -194,37 +190,36 @@ it("separates identical models by resource identity", async () => {
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async () => {
-			seen.push(getResourceScope().resource?.id ?? "");
+			seen.push(getUserScope().resource?.id ?? "");
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getUserScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			return new Response(JSON.stringify({ result }), { headers });
 		}),
 	);
 	const selectScope = (id: string) =>
-		acceptResourceScope(
+		acceptUserScope(
 			{
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				subject: null,
 				resource: {
 					id,
 					kind: "sample",
-					permissions: ["plan:read", "plan:project"],
+					permissions: ["user:read", "user:project"],
 				},
 			},
-			suspendResourceScope(),
+			suspendUserScope(),
 		);
-	selectScope("plans/one");
-	const hook = renderHook(
-		() => useCurrentPosition({ document: model() }),
-		{ wrapper },
-	);
+	selectScope("users/one");
+	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+		wrapper,
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	selectScope("plans/two");
+	selectScope("users/two");
 	hook.rerender();
 	expect(hook.result.current.data).toBeNull();
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
-	expect(seen).toEqual(["plans/one", "plans/two"]);
+	expect(seen).toEqual(["users/one", "users/two"]);
 });
 
 it("ignores workspace drafts and requests the saved model", async () => {
@@ -235,7 +230,7 @@ it("ignores workspace drafts and requests the saved model", async () => {
 		vi.fn(async (_url: unknown, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body ?? "{}")));
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getResourceScope().resource?.id;
+			const resource = getUserScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			return new Response(JSON.stringify({ result }), { headers });
 		}),
@@ -277,8 +272,6 @@ it("ignores workspace drafts and requests the saved model", async () => {
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
-	expect(
-		(bodies[0] as { document?: unknown }).document,
-	).toBeUndefined();
+	expect((bodies[0] as { document?: unknown }).document).toBeUndefined();
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
 });

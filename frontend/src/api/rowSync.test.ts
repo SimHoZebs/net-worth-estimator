@@ -7,9 +7,9 @@ import type {
 	FinancialModelDocument,
 } from "@/api/contracts.ts";
 import {
-	acceptResourceScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendResourceScope,
+	suspendUserScope,
 } from "@/auth/resourceScope.ts";
 import {
 	applyRowOperations,
@@ -211,7 +211,10 @@ describe("applyRowOperations", () => {
 	it("diffs planned purchases with moves and translates writes to legacy postings", async () => {
 		const base: FinancialModelDocument = {
 			...emptyDocument(),
-			plannedPurchases: [plannedPurchase("keep", 0), plannedPurchase("drop", 1)],
+			plannedPurchases: [
+				plannedPurchase("keep", 0),
+				plannedPurchase("drop", 1),
+			],
 		};
 		const next: FinancialModelDocument = {
 			...emptyDocument(),
@@ -252,23 +255,23 @@ describe("applyRowOperations", () => {
 		});
 	});
 
-	const scopeId = `plans/${"a".repeat(64)}`;
+	const scopeId = `users/${"a".repeat(64)}`;
 	beforeEach(() => {
-		acceptResourceScope(
+		acceptUserScope(
 			{
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				resource: {
 					id: scopeId,
 					kind: "private",
-					permissions: ["plan:read", "plan:project", "plan:write"],
+					permissions: ["user:read", "user:project", "user:write"],
 				},
 				subject: scopeId,
 			},
-			suspendResourceScope(),
+			suspendUserScope(),
 		);
 	});
 	afterEach(() => {
-		suspendResourceScope();
+		suspendUserScope();
 		vi.unstubAllGlobals();
 	});
 

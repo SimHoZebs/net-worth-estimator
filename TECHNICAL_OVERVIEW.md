@@ -1,6 +1,6 @@
 # Technical Overview: Net Worth Estimator Backend
 
-The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds plan-scoped financial data and application identity state.
+The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds account-scoped financial data and application identity state.
 
 `PRODUCT_INTENT.md` defines the product experience. This document defines only the current Go contracts and domain behavior.
 
@@ -27,7 +27,7 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 
 ### Shared persistence and ownership
 
-Receipt evidence has its own plan-scoped storage and a provider-neutral extraction
+Receipt evidence has its own account-scoped storage and a provider-neutral extraction
 interface. Images and metadata never enter `FinancialModelDocument` or projection
 identity. See [receipt contracts and source adapters](docs/receipts.md).
 Image bytes also have a separate blob storage port (`backend/internal/blobstore`,
@@ -46,7 +46,7 @@ sync state, default presets, and artifact eviction operate within one plan.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
-Casdoor retains its own external provider database. Legacy per-plan files are
+Casdoor retains its own external provider database. Legacy per-account files are
 unsupported.
 
 ## 2. HTTP Contracts
@@ -250,17 +250,17 @@ The current schema stores:
 | `accounts`               | ordered account definitions                                                                                   |
 | `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |
 | `postings`               | ordered UUID posting definitions with owner and explicit pending state                                        |
-| `purchase_policies`      | plan-scoped purchase priorities attached to posting identities                                                |
+| `purchase_policies`      | account-scoped purchase priorities attached to posting identities                                                |
 | `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
 | `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
 | `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
 | `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
-| `evaluations`            | type, plan-scoped instance ID, order, label, enablement, and JSON config                                      |
+| `evaluations`            | type, account-scoped instance ID, order, label, enablement, and JSON config                                      |
 | `entity_ids`             | shared ID registry across accounts, postings, rules, and evaluations                                          |
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
-| `safe_spending_settings` | plan-scoped safe-spending preferences                                                                         |
+| `safe_spending_settings` | account-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
 | `projection_artifacts`   | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
@@ -270,9 +270,9 @@ The current schema stores:
 
 ### First boot and import
 
-The authenticated plan router initializes a blank private plan on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected plan's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
+The authenticated plan router initializes a blank private account on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected account's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
 
-`cmd/importcsv` requires both an existing shared database and an explicit existing plan resource ID. It invokes the same import path for operator-controlled replacement within that plan.
+`cmd/importcsv` requires both an existing shared database and an explicit existing account resource ID. It invokes the same import path for operator-controlled replacement within that plan.
 
 ### Row writes and ownership
 
