@@ -3,12 +3,12 @@ import {
 	type AccountTransaction,
 } from "./accountActivity.ts";
 import { dateLabel, money, monthDay } from "./format.ts";
-import type { Account, Movement, Plan } from "./model.ts";
+import type { Account, Transaction, Plan } from "./model.ts";
 import type { MovementResult, Projection } from "./result.ts";
 
 export interface LedgerRow {
 	transaction: AccountTransaction;
-	movement: Movement | null;
+	planTransaction: Transaction | null;
 	failing: boolean;
 }
 
@@ -22,7 +22,7 @@ export interface FailureLedger {
 }
 
 // Peers past this count collapse into "+N more": the list stays a glance,
-// and the failing movement is always shown.
+// and the failing transaction is always shown.
 const PEER_CAP = 5;
 
 function monthKey(date: string): string {
@@ -43,7 +43,7 @@ function byTime(
 }
 
 // The failure month as real transaction rows: the same figures the account
-// dialog shows, with the failing movement riding inline. Selection, cap,
+// dialog shows, with the failing transaction riding inline. Selection, cap,
 // and order live here so the component stays a thin table.
 export function failureLedger({
 	plan,
@@ -89,13 +89,15 @@ export function failureLedger({
 					)
 					.slice(0, PEER_CAP)
 			: peers;
-	const movements = new Map(plan.movements.map((item) => [item.id, item]));
+	const transactions = new Map(
+		plan.transactions.map((item) => [item.id, item]),
+	);
 	const toRow = (
 		transaction: AccountTransaction,
 		isFailing: boolean,
 	): LedgerRow => ({
 		transaction,
-		movement: movements.get(transaction.movementId) ?? null,
+		planTransaction: transactions.get(transaction.movementId) ?? null,
 		failing: isFailing,
 	});
 	const rows = [

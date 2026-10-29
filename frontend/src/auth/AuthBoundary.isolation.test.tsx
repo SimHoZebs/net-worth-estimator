@@ -387,9 +387,6 @@ describe("authentication resource isolation", () => {
 		const key = deterministicQueryKey("private-a-document", 10);
 		act(() => {
 			useWorkspaceStore.setState({ draft: recovery.draft });
-			useWorkspaceStore.setState({
-				volatile: true,
-			});
 			setServerRevisionFixture("private-a-revision");
 			serverQueryClient().setQueryData(key, "private-a-result");
 			window.dispatchEvent(new Event("focus"));
@@ -406,7 +403,6 @@ describe("authentication resource isolation", () => {
 			),
 		);
 		expect(useWorkspaceStore.getState().draft).toBe(recovery.draft);
-		expect(useWorkspaceStore.getState().volatile).toBe(true);
 		expect(deterministicQueryKey("private-a-document", 10)).toEqual(key);
 		expect(serverQueryClient().getQueryData(key)).toBe("private-a-result");
 	});
@@ -426,7 +422,6 @@ describe("authentication resource isolation", () => {
 			};
 			act(() => {
 				useWorkspaceStore.setState({ draft: recovery.draft });
-				useWorkspaceStore.setState({ volatile: true });
 			});
 			fetcher.mockImplementationOnce(
 				async () => new Response("", { status: 503 }),

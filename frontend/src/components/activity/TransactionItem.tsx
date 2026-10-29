@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { mergeStyles } from "../mergeStyles.ts";
 import { TableCell, TableHeader, TableRow } from "../DataTable.tsx";
 import {
-	movementIconStyles,
+	transactionIconStyles,
 	transactionCellStyles,
 	transactionRowStyles,
 	type TransactionTone,
@@ -62,7 +62,7 @@ export function TransactionItemRow({
 				>
 					<span
 						className={mergeStyles(
-							movementIconStyles({ tone }),
+							transactionIconStyles({ tone }),
 							"max-sm:hidden",
 						)}
 					>

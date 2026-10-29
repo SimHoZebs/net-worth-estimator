@@ -24,6 +24,7 @@ func readOnlyMiddleware(readOnly bool) func(http.Handler) http.Handler {
 		http.MethodPost + " /v1/postings",
 		http.MethodPatch + " /v1/postings/",
 		http.MethodDelete + " /v1/postings/",
+		http.MethodPost + " /v1/transactions/",
 		http.MethodPost + " /v1/recurrence-rules",
 		http.MethodPatch + " /v1/recurrence-rules/",
 		http.MethodDelete + " /v1/recurrence-rules/",

@@ -1,8 +1,8 @@
 import { shiftDate } from "./format.ts";
 import {
-	isHistoricalMovement,
-	isPendingMovement,
-	type Movement,
+	isHistoricalTransaction,
+	isPendingTransaction,
+	type Transaction,
 	type Plan,
 } from "./model.ts";
 import type { Projection } from "./result.ts";
@@ -130,41 +130,43 @@ export function accountTransactions({
 	};
 	// Pending charges are bank evidence even after the latest checkpoint.
 	// They stay disabled for projections, so no projected event supplies them.
-	const recorded: AccountTransaction[] = plan.movements
+	const recorded: AccountTransaction[] = plan.transactions
 		.filter(
-			(movement) =>
-				(isHistoricalMovement(movement, plan.startDate) ||
-					isPendingMovement(movement)) &&
-				(movement.fromId === accountId || movement.toId === accountId),
+			(transaction) =>
+				(isHistoricalTransaction(transaction, plan.startDate) ||
+					isPendingTransaction(transaction)) &&
+				(transaction.fromId === accountId || transaction.toId === accountId),
 		)
-		.map((movement) => ({
-			id: `recorded-${movement.id}`,
-			movementId: movement.id,
-			date: movement.startDate,
-			name: movement.name,
+		.map((transaction) => ({
+			id: `recorded-${transaction.id}`,
+			movementId: transaction.id,
+			date: transaction.startDate,
+			name: transaction.name,
 			source: "historical",
 			...connection({
-				fromId: movement.fromId,
-				toId: movement.toId,
+				fromId: transaction.fromId,
+				toId: transaction.toId,
 				accountDeltas: [],
-				requested: movement.amount,
-				realized: movement.amount,
+				requested: transaction.amount,
+				realized: transaction.amount,
 			}),
-			amount: movement.amount,
-			requested: movement.amount,
+			amount: transaction.amount,
+			requested: transaction.amount,
 			shortfall: 0,
 			constraint: null,
-			excluded: !movement.enabled,
-			pending: isPendingMovement(movement),
-			void: movement.void === true,
+			excluded: !transaction.enabled,
+			pending: isPendingTransaction(transaction),
+			void: transaction.void === true,
 		}));
 	const pendingIds = new Set(
-		plan.movements.filter(isPendingMovement).map((movement) => movement.id),
+		plan.transactions
+			.filter(isPendingTransaction)
+			.map((transaction) => transaction.id),
 	);
 	const voidIds = new Set(
-		plan.movements
-			.filter((movement) => movement.void === true)
-			.map((movement) => movement.id),
+		plan.transactions
+			.filter((transaction) => transaction.void === true)
+			.map((transaction) => transaction.id),
 	);
 	const startDateHasCheckpoint = projection.startDateHasCheckpoint ?? true;
 	const projected: AccountTransaction[] = projection.movements
@@ -215,50 +217,51 @@ export function accountTransactions({
 }
 
 /**
- * Single rule-to-occurrence adapter for plan-level detail views.
- * MovementsPanel and RecurringRules list rules, not occurrences, but the
+ * Single rule-to-transaction adapter for plan-level detail views.
+ * TransactionsPanel and RecurringRules list rules, not occurrences, but the
  * detail modal is the shared occurrence view (TransactionDetail). This
  * synthesizes the representative occurrence so every entry point renders
  * the identical modal instead of maintaining a second implementation.
  */
-export function movementRuleTransaction({
-	movement,
+export function ruleTransaction({
+	transaction,
 	plan,
 	resolved,
 }: {
-	movement: Movement;
+	transaction: Transaction;
 	plan: Plan;
 	resolved?: { amount: number; requested: number; date: string };
 }): AccountTransaction {
 	const names = new Map(
 		plan.accounts.map((account) => [account.id, account.name]),
 	);
-	const pending = isPendingMovement(movement);
-	const historical = isHistoricalMovement(movement, plan.startDate) || pending;
-	const direction = movement.fromId ? ("out" as const) : ("in" as const);
+	const pending = isPendingTransaction(transaction);
+	const historical =
+		isHistoricalTransaction(transaction, plan.startDate) || pending;
+	const direction = transaction.fromId ? ("out" as const) : ("in" as const);
 	const category =
-		movement.fromId && movement.toId
+		transaction.fromId && transaction.toId
 			? ("transfer" as const)
-			: movement.fromId
+			: transaction.fromId
 				? ("expense" as const)
 				: ("income" as const);
-	const from = movement.fromId
-		? (names.get(movement.fromId) ?? "Unknown account")
+	const from = transaction.fromId
+		? (names.get(transaction.fromId) ?? "Unknown account")
 		: externalCounterpartyName("in");
-	const to = movement.toId
-		? (names.get(movement.toId) ?? "Unknown account")
+	const to = transaction.toId
+		? (names.get(transaction.toId) ?? "Unknown account")
 		: externalCounterpartyName("out");
-	const amount = movement.amountKnown
-		? movement.amount
+	const amount = transaction.amountKnown
+		? transaction.amount
 		: (resolved?.amount ?? 0);
-	const requested = movement.amountKnown
-		? movement.amount
+	const requested = transaction.amountKnown
+		? transaction.amount
 		: (resolved?.requested ?? amount);
 	return {
-		id: `rule-${movement.id}`,
-		movementId: movement.id,
-		date: resolved?.date ?? movement.startDate,
-		name: movement.name,
+		id: `rule-${transaction.id}`,
+		movementId: transaction.id,
+		date: resolved?.date ?? transaction.startDate,
+		name: transaction.name,
 		source: historical ? "historical" : "projected",
 		direction,
 		category,
@@ -269,9 +272,9 @@ export function movementRuleTransaction({
 		requested,
 		shortfall: Math.max(0, requested - amount),
 		constraint: null,
-		excluded: !movement.enabled,
+		excluded: !transaction.enabled,
 		pending,
-		void: movement.void === true,
+		void: transaction.void === true,
 	};
 }
 

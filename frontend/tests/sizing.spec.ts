@@ -95,14 +95,38 @@ for (const width of [320, 390, 768, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
 		await page.goto("/#accounts");
 		await page.getByRole("button", { name: "Add account" }).click();
-		const dialog = page.getByRole("dialog");
+		const dialog = page.getByRole("dialog", { name: "Add account" });
 		await expect(dialog).toBeVisible();
 		await expectWithinViewport(dialog, page);
 		await page.getByLabel("Account name").fill("Sizing regression");
 		await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
 		// Submit through the native form interaction, not an internal event handler.
+		// Accounts save straight to the server, so the dialog closes with no draft.
 		await page.getByLabel("Account name").press("Enter");
 		await expect(dialog).not.toBeVisible();
+		await expect(
+			page.getByRole("row", { name: /Sizing regression/ }),
+		).toBeVisible();
+		// Stage a transaction edit and hold its save: the retained draft
+		// keeps the banner mounted for the layout checks below. Edits save
+		// immediately now, so only a failed save leaves a banner behind.
+		await page.route("**/v1/recurrence-rules/*", async (route) => {
+			if (route.request().method() !== "PATCH") return route.continue();
+			return route.fulfill({
+				status: 409,
+				contentType: "application/problem+json",
+				json: { status: 409, detail: "Sizing check holds the save." },
+			});
+		});
+		await page.goto("/#transactions");
+		await page.getByRole("tab", { name: /Recurring/ }).click();
+		await page.getByRole("button", { name: "Monthly investing" }).click();
+		await page.getByLabel("Amount (USD)").click();
+		await page.getByLabel("Amount (USD)").fill("900");
+		await page.getByRole("button", { name: "Save changes" }).click();
+		await expect(
+			page.getByRole("dialog", { name: "Monthly investing" }),
+		).not.toBeVisible();
 		const bar = page.locator("[data-draft-bar]");
 		await expect(bar).toBeVisible();
 		await expectWithinViewport(bar, page);
@@ -128,11 +152,14 @@ for (const width of [320, 390, 768, 1440]) {
 		expect(fieldBox!.y + fieldBox!.height).toBeLessThanOrEqual(barBox!.y + 1);
 		await lastField.click();
 		await expect(lastField).toBeFocused();
+		// Release the held save and persist the retained draft from the
+		// banner; the bar unmounts once the save lands.
+		await page.unroute("**/v1/recurrence-rules/*");
 		await page.getByRole("button", { name: "Save changes" }).click();
-		await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+		await expect(page.getByText("Changes saved.")).toBeVisible();
 		await expect(bar).toHaveCount(0);
 		await expectWithinViewport(
-			page.getByRole("status").filter({ hasText: "Plan saved on the server." }),
+			page.getByRole("status").filter({ hasText: "Changes saved." }),
 			page,
 		);
 	});

@@ -1,15 +1,24 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { testPlan } from "../../mocks/plan.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
+import { stubTestServer } from "../../mocks/waypointServer.ts";
+import { resetServerQueryCache } from "../../state/serverQuery.ts";
 import { resetWorkspaceStore } from "../../state/workspaceStore.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { movementRuleTransaction } from "../../domain/accountActivity.ts";
+import { ruleTransaction } from "../../domain/accountActivity.ts";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 
-function calculatedMovement() {
+function calculatedTransaction() {
 	return {
-		...testPlan.movements[0]!,
+		...testPlan.transactions[0]!,
 		id: "sapphire-payoff",
 		name: "Sapphire Statement Payoff",
 		amount: 0,
@@ -29,32 +38,40 @@ function calculatedMovement() {
 }
 
 beforeEach(() => {
-	if (!window.HTMLDialogElement.prototype.showModal) {
-		window.HTMLDialogElement.prototype.showModal = function () {};
-	}
-	if (!window.HTMLDialogElement.prototype.close) {
-		window.HTMLDialogElement.prototype.close = function () {};
-	}
+	window.HTMLDialogElement.prototype.showModal = function (
+		this: HTMLDialogElement,
+	) {
+		this.setAttribute("open", "");
+	};
+	window.HTMLDialogElement.prototype.close = function (
+		this: HTMLDialogElement,
+	) {
+		this.removeAttribute("open");
+	};
 	acceptTestResource();
 	resetWorkspaceStore();
+	resetServerQueryCache();
+	vi.unstubAllGlobals();
 });
 
 afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
+	resetServerQueryCache();
+	vi.unstubAllGlobals();
 });
 
 it("shows the resolved figure with a single Calculated label", () => {
-	const movement = calculatedMovement();
-	const plan = { ...testPlan, movements: [movement] };
+	const planTransaction = calculatedTransaction();
+	const plan = { ...testPlan, transactions: [planTransaction] };
 	render(
 		<TransactionDetail
-			transaction={movementRuleTransaction({
-				movement,
+			transaction={ruleTransaction({
+				transaction: planTransaction,
 				plan,
 				resolved: { amount: 2881, requested: 2881, date: "2026-10-31" },
 			})}
-			movement={movement}
+			planTransaction={planTransaction}
 			accounts={testPlan.accounts}
 			plan={plan}
 			claimRuleName={null}
@@ -72,12 +89,12 @@ it("shows the resolved figure with a single Calculated label", () => {
 });
 
 it("shows only the Calculated label when no resolved amount exists", () => {
-	const movement = calculatedMovement();
-	const plan = { ...testPlan, movements: [movement] };
+	const planTransaction = calculatedTransaction();
+	const plan = { ...testPlan, transactions: [planTransaction] };
 	render(
 		<TransactionDetail
-			transaction={movementRuleTransaction({ movement, plan })}
-			movement={movement}
+			transaction={ruleTransaction({ transaction: planTransaction, plan })}
+			planTransaction={planTransaction}
 			accounts={testPlan.accounts}
 			plan={plan}
 			claimRuleName={null}
@@ -90,12 +107,12 @@ it("shows only the Calculated label when no resolved amount exists", () => {
 });
 
 it("shows the resolved occurrence amount with a Calculated label", () => {
-	const movement = calculatedMovement();
+	const planTransaction = calculatedTransaction();
 	const transaction: AccountTransaction = {
 		id: "projected-sapphire-payoff-2026-10-31-0",
-		movementId: movement.id,
+		movementId: planTransaction.id,
 		date: "2026-10-31",
-		name: movement.name,
+		name: planTransaction.name,
 		source: "projected",
 		direction: "out",
 		category: "transfer",
@@ -113,9 +130,9 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 	render(
 		<TransactionDetail
 			transaction={transaction}
-			movement={movement}
+			planTransaction={planTransaction}
 			accounts={testPlan.accounts}
-			plan={{ ...testPlan, movements: [movement] }}
+			plan={{ ...testPlan, transactions: [planTransaction] }}
 			claimRuleName={null}
 			onClose={() => {}}
 		/>,
@@ -128,9 +145,50 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 	expect(screen.queryByText(/calculated each time/i)).toBeNull();
 });
 
+it("deletes the transaction through the row endpoint", async () => {
+	const server = stubTestServer();
+	const planTransaction = {
+		...testPlan.transactions[0]!,
+		id: "renovation-once",
+		name: "Home renovation",
+		frequency: "once" as const,
+		amountKnown: true,
+		readOnly: false,
+	};
+	const plan = { ...testPlan, transactions: [planTransaction] };
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={ruleTransaction({ transaction: planTransaction, plan })}
+			planTransaction={planTransaction}
+			accounts={testPlan.accounts}
+			plan={plan}
+			claimRuleName={null}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Delete transaction" }));
+	const confirm = screen.getByRole("dialog", {
+		name: "Delete Home renovation?",
+	});
+	fireEvent.click(
+		within(confirm).getByRole("button", { name: "Delete transaction" }),
+	);
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "DELETE" &&
+					call.url === "/v1/postings/renovation-once",
+			),
+		).toBe(true),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+});
+
 it("marks holds that did not post instead of posted", () => {
-	const movement = {
-		...testPlan.movements[0]!,
+	const planTransaction = {
+		...testPlan.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000099",
 		name: "Hold that did not post",
 		amount: 42.1,
@@ -151,9 +209,9 @@ it("marks holds that did not post instead of posted", () => {
 	};
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000099",
-		movementId: movement.id,
+		movementId: planTransaction.id,
 		date: "2026-10-20",
-		name: movement.name,
+		name: planTransaction.name,
 		source: "historical",
 		direction: "out",
 		category: "expense",
@@ -171,9 +229,9 @@ it("marks holds that did not post instead of posted", () => {
 	render(
 		<TransactionDetail
 			transaction={transaction}
-			movement={movement}
+			planTransaction={planTransaction}
 			accounts={testPlan.accounts}
-			plan={{ ...testPlan, movements: [movement] }}
+			plan={{ ...testPlan, transactions: [planTransaction] }}
 			claimRuleName={null}
 			onClose={() => {}}
 		/>,

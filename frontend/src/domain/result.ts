@@ -13,7 +13,7 @@ export interface Point {
 }
 export interface Occurrence {
 	date: string;
-	movement: import("./model.ts").Movement;
+	transaction: import("./model.ts").Transaction;
 	amount: number;
 }
 export interface MovementAccountDelta {

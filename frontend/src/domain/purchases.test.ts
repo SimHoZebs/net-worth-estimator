@@ -5,7 +5,7 @@ import {
 } from "../api/adapter.ts";
 import { accountTransactions } from "./accountActivity.ts";
 import {
-	isHistoricalMovement,
+	isHistoricalTransaction,
 	validatePlan,
 	type PlannedPurchase,
 } from "./model.ts";
@@ -38,7 +38,7 @@ describe("purchase queue", () => {
 		expect(purchaseQueue(plan.plannedPurchases).map((item) => item.id)).toEqual(
 			["laptop", "chair"],
 		);
-		expect(next.movements[0]).toBe(plan.movements[0]);
+		expect(next.transactions[0]).toBe(plan.transactions[0]);
 		expect(movePurchase(next, "chair", -1)).toBe(next);
 		expect(movePurchase(next, "missing", 1)).toBe(next);
 	});
@@ -56,7 +56,7 @@ describe("purchase queue", () => {
 				revision: plan.revision,
 				assumptions: plan.assumptions,
 				accounts: {},
-				movements: {},
+				transactions: {},
 				plannedPurchases: {},
 			},
 		});
@@ -81,9 +81,9 @@ describe("purchase queue", () => {
 			(item) => item.id === "laptop",
 		)!;
 		expect(purchase.amount).toBe(1500);
-		expect(isHistoricalMovement(loaded.plan.movements[0]!, "2030-01-01")).toBe(
-			false,
-		);
+		expect(
+			isHistoricalTransaction(loaded.plan.transactions[0]!, "2030-01-01"),
+		).toBe(false);
 		const roundTrip = displayPlanToBackendDocument(loaded.plan, {
 			sourceDocument: converted.document,
 			presentation: loaded.presentation,
@@ -99,7 +99,7 @@ describe("purchase queue", () => {
 	it("never manufactures historical purchase activity", () => {
 		const plan = {
 			...testPlan,
-			movements: [],
+			transactions: [],
 			plannedPurchases: [wish("laptop")],
 		};
 		const activity = accountTransactions({
@@ -119,13 +119,15 @@ describe("purchase queue", () => {
 		).toBeInstanceOf(Error);
 	});
 
-	it("migrates legacy purchase movements into the wishlist slice", () => {
+	it("migrates legacy purchase transactions into the wishlist slice", () => {
+		// Intentionally the pre-rename shape: old drafts stored wishlist
+		// items in `movements` with a purchasePriority field.
 		const legacy = {
 			...testPlan,
 			movements: [
-				...testPlan.movements,
+				...testPlan.transactions,
 				{
-					...testPlan.movements[0]!,
+					...testPlan.transactions[0]!,
 					id: "laptop",
 					name: "laptop",
 					amount: 500,
@@ -140,6 +142,8 @@ describe("purchase queue", () => {
 		expect(parsed).not.toBeInstanceOf(Error);
 		if (parsed instanceof Error) throw parsed;
 		expect(parsed.plannedPurchases.map((item) => item.id)).toEqual(["laptop"]);
-		expect(parsed.movements.some((item) => item.id === "laptop")).toBe(false);
+		expect(parsed.transactions.some((item) => item.id === "laptop")).toBe(
+			false,
+		);
 	});
 });

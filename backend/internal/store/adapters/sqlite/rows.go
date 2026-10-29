@@ -203,6 +203,65 @@ func withRowTx(db *planDB, fn func(tx *planTx) error) error {
 }
 
 // CreateAccount inserts one owner account. An empty ID gets a UUIDv7.
+func insertAccountTx(tx *planTx, account *types.Account) error {
+	if err := claimRowID(tx, account.ID, "account"); err != nil {
+		return err
+	}
+	position, err := nextTablePosition(tx, "accounts")
+	if err != nil {
+		return err
+	}
+	minBalance := valueOr(account.MinBalance, types.NoFloor)
+	maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
+	color := nullable(account.Color)
+	if _, err := tx.Exec(
+		`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, plan_id) VALUES (?,?,?,?,?,?,?,?, :plan_id)`,
+		account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
+	); err != nil {
+		return fmt.Errorf("insert account %s: %w", account.ID, err)
+	}
+	return nil
+}
+
+func updateAccountTx(tx *planTx, account *types.Account) error {
+	var position int
+	if err := tx.QueryRow(`SELECT position FROM accounts WHERE id = ? AND plan_id = :plan_id`, account.ID).Scan(&position); err != nil {
+		if err == sql.ErrNoRows {
+			return NotFound(account.ID)
+		}
+		return fmt.Errorf("read account %s: %w", account.ID, err)
+	}
+	minBalance := valueOr(account.MinBalance, types.NoFloor)
+	maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
+	color := nullable(account.Color)
+	if _, err := tx.Exec(
+		`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, enabled = ? WHERE id = ? AND plan_id = :plan_id`,
+		account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled), account.ID,
+	); err != nil {
+		return fmt.Errorf("update account %s: %w", account.ID, err)
+	}
+	return nil
+}
+
+// upsertCheckpointTx writes one owner checkpoint by account/date. An owner
+// write wins over a sync-owned row on the same key.
+func upsertCheckpointTx(tx *planTx, checkpoint types.Checkpoint) error {
+	position, err := nextTablePosition(tx, "checkpoints")
+	if err != nil {
+		return err
+	}
+	result, err := tx.Exec(
+		`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))
+		 ON CONFLICT(plan_id, account_id, date) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
+		position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceUser,
+	)
+	if err != nil {
+		return fmt.Errorf("save checkpoint %s %s: %w", checkpoint.AccountID, checkpoint.Date, err)
+	}
+	_ = result
+	return nil
+}
+
 func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error) {
 	if account.ID == "" {
 		id, err := newRowID()
@@ -212,23 +271,33 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 		account.ID = id
 	}
 	err := withRowTx(s.db, func(tx *planTx) error {
-		if err := claimRowID(tx, account.ID, "account"); err != nil {
-			return err
-		}
-		position, err := nextTablePosition(tx, "accounts")
+		return insertAccountTx(tx, &account)
+	})
+	if err != nil {
+		return types.Account{}, err
+	}
+	return account, nil
+}
+
+// CreateAccountWithBalance creates one account and records its opening
+// balance observation in the same transaction: a caller that only wants
+// "an account with this balance" never sees a half-written pair.
+func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error) {
+	if account.ID == "" {
+		id, err := newRowID()
 		if err != nil {
+			return types.Account{}, err
+		}
+		account.ID = id
+	}
+	err := withRowTx(s.db, func(tx *planTx) error {
+		if err := insertAccountTx(tx, &account); err != nil {
 			return err
 		}
-		minBalance := valueOr(account.MinBalance, types.NoFloor)
-		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
-		color := nullable(account.Color)
-		if _, err := tx.Exec(
-			`INSERT INTO accounts (id, position, name, kind, min_balance, max_balance, color, enabled, plan_id) VALUES (?,?,?,?,?,?,?,?, :plan_id)`,
-			account.ID, position, account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled),
-		); err != nil {
-			return fmt.Errorf("insert account %s: %w", account.ID, err)
+		if balance == nil {
+			return nil
 		}
-		return nil
+		return upsertCheckpointTx(tx, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: SourceUser})
 	})
 	if err != nil {
 		return types.Account{}, err
@@ -242,23 +311,28 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 		return types.Account{}, NotFound("")
 	}
 	err := withRowTx(s.db, func(tx *planTx) error {
-		var position int
-		if err := tx.QueryRow(`SELECT position FROM accounts WHERE id = ? AND plan_id = :plan_id`, account.ID).Scan(&position); err != nil {
-			if err == sql.ErrNoRows {
-				return NotFound(account.ID)
-			}
-			return fmt.Errorf("read account %s: %w", account.ID, err)
+		return updateAccountTx(tx, &account)
+	})
+	if err != nil {
+		return types.Account{}, err
+	}
+	return account, nil
+}
+
+// UpdateAccountWithBalance replaces one account and, when a balance is
+// given, records the balance observation in the same transaction.
+func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error) {
+	if account.ID == "" {
+		return types.Account{}, NotFound("")
+	}
+	err := withRowTx(s.db, func(tx *planTx) error {
+		if err := updateAccountTx(tx, &account); err != nil {
+			return err
 		}
-		minBalance := valueOr(account.MinBalance, types.NoFloor)
-		maxBalance := valueOr(account.MaxBalance, types.NoCeiling)
-		color := nullable(account.Color)
-		if _, err := tx.Exec(
-			`UPDATE accounts SET name = ?, kind = ?, min_balance = ?, max_balance = ?, color = ?, enabled = ? WHERE id = ? AND plan_id = :plan_id`,
-			account.Name, string(account.Kind), minBalance, maxBalance, color, boolToInt(account.Enabled), account.ID,
-		); err != nil {
-			return fmt.Errorf("update account %s: %w", account.ID, err)
+		if balance == nil {
+			return nil
 		}
-		return nil
+		return upsertCheckpointTx(tx, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: SourceUser})
 	})
 	if err != nil {
 		return types.Account{}, err
@@ -376,20 +450,7 @@ func (s *sqliteStore) MoveRule(id, beforeID string) error {
 func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error) {
 	checkpoint.Source = SourceUser
 	err := withRowTx(s.db, func(tx *planTx) error {
-		position, err := nextTablePosition(tx, "checkpoints")
-		if err != nil {
-			return err
-		}
-		result, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, account_id, balance, source, plan_id, id) VALUES (?,?,?,?,?, :plan_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE plan_id = :plan_id))
-			 ON CONFLICT(plan_id, account_id, date) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceUser,
-		)
-		if err != nil {
-			return fmt.Errorf("save checkpoint %s %s: %w", checkpoint.AccountID, checkpoint.Date, err)
-		}
-		_ = result
-		return nil
+		return upsertCheckpointTx(tx, checkpoint)
 	})
 	if err != nil {
 		return types.Checkpoint{}, err
@@ -459,8 +520,10 @@ func (s *sqliteStore) CreateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 	return item, nil
 }
 
-// UpdateEvaluation replaces one evaluation instance. The type and
-// instance ID are immutable.
+// UpdateEvaluation replaces one evaluation instance. The instance ID is
+// immutable; the type may move across tables, which deletes the old row and
+// inserts into the new type in one transaction. Pins key on the instance ID,
+// so a moved evaluation keeps its pin.
 func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error) {
 	if item.InstanceID == "" {
 		return EvaluationUpdate{}, NotFound("")
@@ -478,7 +541,50 @@ func (s *sqliteStore) UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate,
 			return fmt.Errorf("read evaluation %s: %w", item.InstanceID, err)
 		}
 		if item.Type != "" && item.Type != storedType {
-			return fmt.Errorf("evaluation %s type is immutable", item.InstanceID)
+			if !validEvaluationType(item.Type) {
+				return fmt.Errorf("unknown evaluation type %q", item.Type)
+			}
+			// The pin keys on the instance ID, but the row delete cascades
+			// it away: capture and restore it so a move keeps the pin.
+			type pinnedRow struct {
+				id       string
+				position int
+			}
+			var pinned []pinnedRow
+			pinRows, err := tx.Query(`SELECT instance_id, position FROM pinned_evaluations WHERE instance_id = ? AND plan_id = :plan_id`, item.InstanceID)
+			if err != nil {
+				return fmt.Errorf("read pin %s: %w", item.InstanceID, err)
+			}
+			for pinRows.Next() {
+				var row pinnedRow
+				if err := pinRows.Scan(&row.id, &row.position); err != nil {
+					pinRows.Close()
+					return fmt.Errorf("scan pin %s: %w", item.InstanceID, err)
+				}
+				pinned = append(pinned, row)
+			}
+			pinRows.Close()
+			if err := pinRows.Err(); err != nil {
+				return fmt.Errorf("read pins %s: %w", item.InstanceID, err)
+			}
+			if _, err := tx.Exec(`DELETE FROM evaluations WHERE instance_id = ? AND plan_id = :plan_id`, item.InstanceID); err != nil {
+				return fmt.Errorf("move evaluation %s: %w", item.InstanceID, err)
+			}
+			var moved int
+			if err := tx.QueryRow(`SELECT COALESCE(MAX(position), -1) + 1 FROM evaluations WHERE type = ? AND plan_id = :plan_id`, item.Type).Scan(&moved); err != nil {
+				return fmt.Errorf("next evaluation position: %w", err)
+			}
+			if err := saveEvaluationTable(tx, item.Type, []evaluationRow{{
+				instanceID: item.InstanceID, position: moved, name: item.Name, enabled: item.Enabled, configValue: item.Config,
+			}}); err != nil {
+				return err
+			}
+			for _, pin := range pinned {
+				if _, err := tx.Exec(`INSERT INTO pinned_evaluations (instance_id, position, plan_id) VALUES (?,?, :plan_id)`, pin.id, pin.position); err != nil {
+					return fmt.Errorf("restore pin %s: %w", pin.id, err)
+				}
+			}
+			return nil
 		}
 		configJSON, err := json.Marshal(item.Config)
 		if err != nil {

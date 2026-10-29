@@ -55,28 +55,6 @@ export async function resetFixture(
 	}
 }
 
-/**
- * Server mode keeps unsaved changes in this browser and the saved plan on
- * the server, so a test that needs both has to read both.
- */
-export async function readTemporaryVersion(
-	page: Page,
-	resource?: FixtureResource,
-) {
-	return page.evaluate(
-		({ prefix, resource }) => {
-			const owner = `${resource.kind}:${encodeURIComponent(resource.id)}`;
-			const key = `${prefix}:resource:${encodeURIComponent(window.location.origin)}:${owner}`;
-			const raw = window.localStorage.getItem(key);
-			return raw ? JSON.parse(raw).draft : null;
-		},
-		{
-			prefix: REMOTE_STORAGE_KEY,
-			resource: resource ?? (await fixtureResource(page)),
-		},
-	);
-}
-
 export async function readSavedServerPlan() {
 	const api = await request.newContext();
 	try {
@@ -84,14 +62,14 @@ export async function readSavedServerPlan() {
 		if (!response.ok())
 			throw new Error(`model read failed: ${response.status()}`);
 		const body = await response.json();
-		type movement = {
+		type transaction = {
 			id: string;
 			name: string;
 			amount: { config: { expression?: string } };
 		};
 		return {
-			postings: body.document.postings as movement[],
-			recurrenceRules: (body.document.recurrenceRules ?? []) as movement[],
+			postings: body.document.postings as transaction[],
+			recurrenceRules: (body.document.recurrenceRules ?? []) as transaction[],
 		};
 	} finally {
 		await api.dispose();
