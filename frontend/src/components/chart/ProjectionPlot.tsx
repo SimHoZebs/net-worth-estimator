@@ -12,12 +12,14 @@ export function ProjectionPlot({
 	inspected,
 	selectedIndex,
 	onInspect,
+	onPin,
 }: {
 	model: ChartModel;
 	id: string;
 	inspected: number | null;
 	selectedIndex: number;
 	onInspect: (value: number | null) => void;
+	onPin: (value: number) => void;
 }) {
 	const {
 		width,
@@ -37,17 +39,37 @@ export function ProjectionPlot({
 		basePath,
 		filledBasePath,
 	} = model;
+	const selectedPoint = points[selectedIndex];
+	const selectedValue = values[selectedIndex] ?? 0;
+	const pointAt = (clientX: number, bounds: DOMRect) =>
+		model.indexAt((clientX - bounds.left) / bounds.width);
+	// The badge sits beside the dot and flips inside the plot bounds: right
+	// of the dot when it fits, otherwise left; above unless the top margin
+	// would clip it.
+	const badgeWidth = 132;
+	const badgeHeight = 46;
+	const dotX = x(selectedIndex);
+	const dotY = y(selectedValue);
+	const badgeX =
+		dotX + 14 + badgeWidth <= width - right
+			? dotX + 14
+			: dotX - 14 - badgeWidth;
+	const badgeY =
+		dotY - 14 - badgeHeight >= top ? dotY - 14 - badgeHeight : dotY + 14;
 	return (
 		<svg
-			className="col-span-full col-start-1 row-start-1 block min-h-48 w-full overflow-visible sm:min-h-64 md:min-h-60 2xl:min-h-72"
+			className="col-span-full col-start-1 row-start-1 block min-h-48 w-full cursor-crosshair overflow-visible sm:min-h-64 md:min-h-60 2xl:min-h-72"
 			viewBox={`0 0 ${width} ${height}`}
 			role="img"
 			aria-labelledby={`${id}-description`}
 			onPointerMove={(event) => {
 				const bounds = event.currentTarget.getBoundingClientRect();
-				onInspect(model.indexAt((event.clientX - bounds.left) / bounds.width));
+				onInspect(pointAt(event.clientX, bounds));
 			}}
 			onPointerLeave={() => onInspect(null)}
+			onClick={(event) => {
+				onPin(pointAt(event.clientX, event.currentTarget.getBoundingClientRect()));
+			}}
 		>
 			<desc id={`${id}-description`}>
 				Trailing {points.length}-day net worth ends at {money(last.total)} on{" "}
@@ -144,13 +166,21 @@ export function ProjectionPlot({
 				className="fill-primary stroke-surface"
 				strokeWidth="3"
 			/>
-			{inspected !== null && (
+			{inspected !== null && selectedPoint && (
 				<g>
 					<line
 						x1={x(selectedIndex)}
 						x2={x(selectedIndex)}
 						y1={top}
 						y2={height - bottom}
+						className="stroke-muted"
+						strokeDasharray="4 4"
+					/>
+					<line
+						x1={left}
+						x2={width - right}
+						y1={y(selectedValue)}
+						y2={y(selectedValue)}
 						className="stroke-muted"
 						strokeDasharray="4 4"
 					/>
@@ -161,6 +191,33 @@ export function ProjectionPlot({
 						className="fill-primary stroke-surface"
 						strokeWidth="2"
 					/>
+					<g>
+						<rect
+							x={badgeX}
+							y={badgeY}
+							width={badgeWidth}
+							height={badgeHeight}
+							rx="8"
+							className="fill-surface stroke-line"
+							strokeWidth="1"
+						/>
+						<text
+							x={badgeX + badgeWidth / 2}
+							y={badgeY + 19}
+							textAnchor="middle"
+							className="fill-muted text-xs"
+						>
+							{dateLabel(selectedPoint.date, true)}
+						</text>
+						<text
+							x={badgeX + badgeWidth / 2}
+							y={badgeY + 36}
+							textAnchor="middle"
+							className="fill-ink text-xs font-bold tabular-nums"
+						>
+							{money(selectedValue)}
+						</text>
+					</g>
 				</g>
 			)}
 		</svg>

@@ -72,6 +72,60 @@ describe("projection chart inspection", () => {
 		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
 	});
 
+	it("follows the dot with a badge and crosshair lines", () => {
+		show();
+		const plot = screen.getByRole("img");
+		vi.spyOn(plot, "getBoundingClientRect").mockReturnValue(
+			new DOMRect(0, 0, 100, 100),
+		);
+		// No badge or crosshair before inspection.
+		expect(screen.queryByText("Jun 2, 2026")).toBeNull();
+		expect(
+			plot.querySelectorAll('line[stroke-dasharray="4 4"]').length,
+		).toBe(0);
+		fireEvent(
+			plot,
+			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
+		);
+		// Badge tracks the inspected dot with the full date and value.
+		expect(screen.getByText("Jun 2, 2026")).toBeTruthy();
+		expect(screen.getAllByText("$1,000").length).toBeGreaterThanOrEqual(1);
+		// Dotted guides run across both axes through the dot.
+		expect(
+			plot.querySelectorAll('line[stroke-dasharray="4 4"]').length,
+		).toBe(2);
+	});
+
+	it("persists the dot on click and toggles off on a second click", () => {
+		show();
+		const plot = screen.getByRole("img");
+		vi.spyOn(plot, "getBoundingClientRect").mockReturnValue(
+			new DOMRect(0, 0, 100, 100),
+		);
+		fireEvent(
+			plot,
+			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
+		);
+		fireEvent(plot, new MouseEvent("click", { bubbles: true, clientX: 0 }));
+		// Leaving keeps the pinned dot, badge, and readout in place.
+		fireEvent.pointerLeave(plot);
+		const slider = screen.getByRole("slider");
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
+		expect(screen.getByText("Jun 2, 2026")).toBeTruthy();
+		expect(
+			plot.querySelectorAll('line[stroke-dasharray="4 4"]').length,
+		).toBe(2);
+		// Clicking the pinned spot again releases it.
+		fireEvent(plot, new MouseEvent("click", { bubbles: true, clientX: 0 }));
+		fireEvent(
+			plot,
+			new MouseEvent("pointermove", { bubbles: true, clientX: 99 }),
+		);
+		fireEvent.pointerLeave(plot);
+		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
+		expect(screen.queryByText("Jun 2, 2026")).toBeNull();
+	});
+
 	it("opens the evidence action from the graph", () => {
 		const { onEvidence } = show();
 		fireEvent.click(
