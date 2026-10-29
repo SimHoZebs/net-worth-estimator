@@ -3,7 +3,6 @@ export const simplefinLinks = {
 	home: "https://bridge.simplefin.org/",
 	createToken: "https://beta-bridge.simplefin.org/my-account/tokens/create",
 	// The public host currently redirects subpages to the beta host's home page.
-	// Link these resources on the serving host so their paths are preserved.
+	// Link this resource on the serving host so its path is preserved.
 	institutions: "https://beta-bridge.simplefin.org/search-institutions",
-	security: "https://beta-bridge.simplefin.org/info/security",
 } as const;

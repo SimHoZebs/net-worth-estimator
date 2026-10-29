@@ -204,7 +204,7 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 	provider.releaseConnect();
 	await expect(bankSync.getByText("Connected", { exact: true })).toBeVisible();
 	await expect(
-		bankSync.getByRole("heading", { name: "SimpleFIN connection" }),
+		bankSync.getByRole("heading", { name: "SimpleFIN" }),
 	).toBeFocused();
 	await expect(
 		bankSync.getByRole("list", { name: "Synced accounts" }),

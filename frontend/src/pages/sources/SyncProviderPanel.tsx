@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Landmark, RefreshCw } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { buttonStyles } from "../../components/buttonStyles.ts";
@@ -45,13 +45,23 @@ export function SyncProviderPanel({
 	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const headingRef = useRef<HTMLHeadingElement>(null);
+	const wasConfigured = useRef(configured);
+	useEffect(() => {
+		// The credential refetch lands after the onboarding and disconnect
+		// forms report, so move focus once the next container mounts.
+		if (configured !== wasConfigured.current) headingRef.current?.focus();
+		wasConfigured.current = configured;
+	}, [configured]);
 	const since = formatSyncTime(credential.data?.updatedAt);
 	const lastSynced = formatSyncTime(status.data?.lastSyncAt);
 	const syncUnavailable = status.data?.syncConfigured === false;
-	const quota =
-		typeof status.data?.syncQuotaUsed === "number" &&
+	const quotaLimit =
 		typeof status.data?.syncQuotaLimit === "number"
-			? `${status.data.syncQuotaUsed} of ${status.data.syncQuotaLimit} used in the last 24 hours`
+			? status.data.syncQuotaLimit
+			: null;
+	const quotaRemaining =
+		typeof status.data?.syncQuotaUsed === "number" && quotaLimit !== null
+			? quotaLimit - status.data.syncQuotaUsed
 			: null;
 
 	async function handleSyncNow() {
@@ -78,25 +88,23 @@ export function SyncProviderPanel({
 			setMessage(
 				"SimpleFIN disconnected. Your accounts and imported history are kept.",
 			);
-			headingRef.current?.focus();
 		} else setError("Could not disconnect. Try again.");
 	}
 
 	return (
 		<div className="grid gap-6">
-			<header className="flex flex-wrap items-start justify-between gap-4">
-				<h2
-					ref={headingRef}
-					tabIndex={-1}
-					className="m-0 text-xl font-semibold sm:text-2xl"
-				>
-					{configured ? "SimpleFIN connection" : "Connect bank accounts"}
-				</h2>
-				<Badge tone={configured ? "success" : "neutral"}>
-					{configured && <Check size={14} aria-hidden="true" />}
-					{configured ? "Connected" : "Not connected"}
-				</Badge>
-			</header>
+			{!configured && (
+				<header className="flex flex-wrap items-start justify-between gap-4">
+					<h2
+						ref={headingRef}
+						tabIndex={-1}
+						className="m-0 text-xl font-semibold sm:text-2xl"
+					>
+						Connect bank accounts
+					</h2>
+					<Badge tone="neutral">Not connected</Badge>
+				</header>
+			)}
 
 			{readOnly && (
 				<p className="m-0 rounded-control border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
@@ -122,16 +130,22 @@ export function SyncProviderPanel({
 										<Landmark size={22} aria-hidden="true" />
 									</span>
 									<div className="min-w-0">
-										<h3 className="m-0 text-lg">SimpleFIN</h3>
-										{since && (
-											<p className="mt-1 mb-0 text-xs text-muted">
-												Connected since {since}.
-											</p>
-										)}
+										<h3
+											ref={headingRef}
+											tabIndex={-1}
+											className="m-0 flex items-center gap-2 text-lg"
+										>
+											SimpleFIN
+											<Badge tone="success">
+												<Check size={14} aria-hidden="true" />
+												Connected
+											</Badge>
+										</h3>
 									</div>
 								</div>
 								<div className="my-5 rounded-control border border-line bg-surface-2 p-4">
-									<p className="mt-0 mb-2 text-sm font-semibold">
+									<p className="m-0 text-sm leading-relaxed text-muted">
+										{since && <>Connected since {since}, </>}
 										{lastSynced ? (
 											<>
 												Last synced{" "}
@@ -140,18 +154,15 @@ export function SyncProviderPanel({
 												</time>
 											</>
 										) : (
-											"No successful sync yet."
+											"No successful sync yet"
 										)}
+										{quotaRemaining !== null && quotaLimit !== null && (
+											<>
+												, {quotaRemaining} out of {quotaLimit} syncs available
+											</>
+										)}
+										.
 									</p>
-									<p className="m-0 text-sm leading-relaxed text-muted">
-										When sync is enabled, Waypoint checks for new data about
-										every six hours. Bank updates can take longer.
-									</p>
-									{quota && (
-										<p className="mt-3 mb-0 text-xs text-muted">
-											Bridge quota: {quota}.
-										</p>
-									)}
 								</div>
 								{status.isError && (
 									<ErrorNotice
@@ -185,7 +196,8 @@ export function SyncProviderPanel({
 											"hover:bg-hover",
 										)}
 									>
-										Open SimpleFIN <ExternalLink size={14} aria-hidden="true" />
+										Open SimpleFIN Bridge{" "}
+										<ExternalLink size={14} aria-hidden="true" />
 										<span className="sr-only"> (opens in a new tab)</span>
 									</a>
 								</div>
@@ -233,12 +245,11 @@ export function SyncProviderPanel({
 							readOnly={readOnly}
 							onConnected={() => {
 								setMessage("SimpleFIN connected.");
-								headingRef.current?.focus();
 							}}
 						/>
 					)}
 				</div>
-				<SyncHelp />
+				{!lastSynced && <SyncHelp />}
 			</div>
 		</div>
 	);
