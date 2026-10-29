@@ -245,8 +245,8 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 	seed(t, source)
 	seed(t, target)
 	for _, args := range []struct {
-		source, sourcePlan, plan string
-		sample                   bool
+		source, sourceAccount, account string
+		sample                         bool
 	}{
 		{target, "owner", "owner", false},
 		{source, "missing", "owner", false},
@@ -254,7 +254,7 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 		{source, "owner", "sample", false},
 		{source, "owner", "owner", true},
 	} {
-		if err := refresh(target, args.source, args.sourcePlan, args.plan, args.sample); err == nil {
+		if err := refresh(target, args.source, args.sourceAccount, args.account, args.sample); err == nil {
 			t.Fatal("unsafe operation accepted", args)
 		}
 	}
