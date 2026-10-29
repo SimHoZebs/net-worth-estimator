@@ -7,7 +7,7 @@ import {
 import { getApiBaseUrl } from "@/api/runtime.ts";
 import { getResourceScope } from "@/auth/resourceScope.ts";
 import {
-	ResourceScopeError,
+	AccountScopeError,
 	scopedRequest,
 	scopedResponseError,
 	responseScopeError,
@@ -17,7 +17,7 @@ export interface WaypointRequestOptions extends RequestInit {
 	baseUrl?: string;
 }
 
-/** Identity requests precede resource verification and do not assert a plan. */
+/** Identity requests precede account verification and do not assert an account. */
 export async function waypointAuthFetch<T>(
 	url: string,
 	options?: WaypointRequestOptions,
@@ -71,7 +71,7 @@ export async function waypointBlobFetch<T>(
 ): Promise<T> {
 	const response = await resourceRequest(url, options);
 	const data = await response.blob().catch((cause: unknown) => {
-		if (cause instanceof ResourceScopeError) throw cause;
+		if (cause instanceof AccountScopeError) throw cause;
 		throw new ApiNetworkError(cause);
 	});
 	return { data, status: response.status, headers: response.headers } as T;
@@ -83,7 +83,7 @@ export async function waypointBlobFetch<T>(
  * shared error taxonomy stay in one place instead of forking a second
  * client. Application requests flow query/mutation -> generated endpoint ->
  * mutator; only the mutator uses the network transport
- * (clientBoundary.test.ts). Resolves the full response envelope; throws ResourceScopeError or
+ * (clientBoundary.test.ts). Resolves the full response envelope; throws AccountScopeError or
  * ApiError; never resolves to Error.
  */
 export async function waypointFetch<T>(
@@ -95,7 +95,7 @@ export async function waypointFetch<T>(
 	const status = response.status;
 	if (status === 204) return { data: undefined, status, headers } as T;
 	const text = await response.text().catch((cause: unknown) => {
-		if (cause instanceof ResourceScopeError) throw cause;
+		if (cause instanceof AccountScopeError) throw cause;
 		throw new ApiNetworkError(cause);
 	});
 	if (!text.trim()) return { data: undefined, status, headers } as T;

@@ -370,13 +370,13 @@ describe("resource assertion at the API boundary", () => {
 		expect(getResourceScope()).toBe(scope);
 	});
 
-	it("does not invalidate a new workspace for an old resource-change error", () => {
+	it("does not invalidate a new account scope for an old resource-change error", () => {
 		const oldScope = getResourceScope();
 		const current = owner(B);
 		const result = scopedResponseError(
 			oldScope,
 			new ApiHttpError({
-				message: "The active plan changed.",
+				message: "The active account changed.",
 				status: 409,
 				problem: { status: 409, code: "RESOURCE_CHANGED" },
 			}),
