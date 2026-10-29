@@ -83,7 +83,7 @@ func main() {
 	defer stopBlobCleanup()
 	database, err := application.EnsurePrivatePlan(fixtureResource.ID, "fixture-browser-test", "http://fixture.invalid", "browser-test")
 	if err != nil {
-		log.Fatalf("ensure fixture plan: %v", err)
+		log.Fatalf("ensure fixture account: %v", err)
 	}
 
 	readOnly := parseBool(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
