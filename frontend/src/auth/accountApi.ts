@@ -17,6 +17,7 @@ import { serverQueryClient } from "../state/serverQuery.ts";
 import {
 	canonicalApiBaseUrl,
 	getResourceScope,
+	normalizeAccountId,
 	subscribeResourceScope,
 } from "./resourceScope.ts";
 import type { Session } from "./sessionContext.ts";
@@ -56,7 +57,9 @@ function isAccountScope(
 		scope.status === "ready" &&
 		session?.authenticated === true &&
 		scope.subject === session.user?.subject &&
-		scope.resource?.id === session.resource.id &&
+		scope.resource != null &&
+		normalizeAccountId(scope.resource.id) ===
+			normalizeAccountId(session.resource.id) &&
 		scope.apiBaseUrl === canonicalApiBaseUrl(getApiBaseUrl())
 	);
 }

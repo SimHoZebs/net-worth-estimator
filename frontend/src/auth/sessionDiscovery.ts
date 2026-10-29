@@ -6,13 +6,13 @@ import { isRecord } from "@/domain/guards.ts";
 import type { Session } from "@/auth/sessionContext.ts";
 import {
 	canonicalApiBaseUrl,
-	type ResourceScopeInput,
+	type AccountScopeInput,
 } from "@/auth/resourceScope.ts";
 
 export function sessionScopeInput(
 	session: Session,
 	baseUrl = getApiBaseUrl(),
-): ResourceScopeInput {
+): AccountScopeInput {
 	return {
 		apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 		resource: session.resource,
@@ -72,13 +72,24 @@ async function readSession(
 		typeof next.allowed !== "boolean"
 	)
 		throw new Error("Invalid authentication status.");
-	const resource = next.resource;
+	const resource: unknown = next.resource;
+	// Accept the canonical account ids (`accounts/*`, `user:<hash>`) and the
+	// legacy `plans/*` wire ids during migration. Sample is `accounts/sample`
+	// going forward, `plans/sample` on legacy servers.
+	const resourceId =
+		isRecord(resource) && typeof resource.id === "string"
+			? resource.id
+			: null;
+	const authenticatedId =
+		typeof resourceId === "string" &&
+		(/^(plans|accounts)\/[a-f0-9]{64}$/.test(resourceId) ||
+			/^user:[a-f0-9]{64}$/.test(resourceId));
+	const sampleId =
+		resourceId === "accounts/sample" || resourceId === "plans/sample";
 	if (
 		!isRecord(resource) ||
 		typeof resource.id !== "string" ||
-		(next.authenticated
-			? !/^plans\/[a-f0-9]{64}$/.test(resource.id)
-			: resource.id !== "plans/sample") ||
+		(next.authenticated ? !authenticatedId : !sampleId) ||
 		resource.kind !== (next.authenticated ? "private" : "sample") ||
 		!Array.isArray(resource.permissions) ||
 		(next.allowed && !resource.permissions.includes("plan:read")) ||
@@ -92,7 +103,7 @@ async function readSession(
 				!next.user.subject.trim()))
 	)
 		throw new Error(
-			"The server returned an invalid workspace resource. Retry the session check.",
+			"The server returned an invalid account resource. Retry the session check.",
 		);
 	return next as unknown as Session;
 }

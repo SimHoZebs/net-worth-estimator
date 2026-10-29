@@ -16,6 +16,7 @@ import {
 	acceptResourceScope,
 	canonicalApiBaseUrl,
 	getResourceScope,
+	normalizeAccountId,
 	resourceScopeKey,
 	suspendResourceScope,
 } from "./resourceScope.ts";
@@ -45,7 +46,8 @@ interface Verification {
 function sameOwner(a: SessionOwner, b: SessionOwner): boolean {
 	return (
 		canonicalApiBaseUrl(a.apiBaseUrl) === canonicalApiBaseUrl(b.apiBaseUrl) &&
-		a.session.resource.id === b.session.resource.id &&
+		normalizeAccountId(a.session.resource.id) ===
+			normalizeAccountId(b.session.resource.id) &&
 		a.session.user?.subject === b.session.user?.subject
 	);
 }
@@ -115,7 +117,7 @@ export function useResourceSession() {
 						setSession(next.session);
 						setStatus({
 							phase: "denied",
-							error: "This account does not have access to this plan.",
+							error: "This account does not have access.",
 						});
 						return;
 					}
@@ -151,7 +153,7 @@ export function useResourceSession() {
 						setSession(next.session);
 						setStatus({
 							phase: "denied",
-							error: "This account does not have access to this plan.",
+							error: "This account does not have access.",
 						});
 						return;
 					}
@@ -180,7 +182,7 @@ export function useResourceSession() {
 					setSession(next.session);
 					setStatus({
 						phase: "denied",
-						error: "This account does not have access to this plan.",
+						error: "This account does not have access.",
 					});
 					return;
 				}
@@ -204,7 +206,7 @@ export function useResourceSession() {
 						: "Authentication status is unavailable.";
 				setStatus({ phase: "unavailable", error: check.error });
 				// First-load outages use the full-screen fallback; only a
-				// revalidation floats, since a verified workspace is mounted.
+				// revalidation floats, since a verified account is mounted.
 				if (previous)
 					notifyError("session", check.error, {
 						label: "Retry access check",
@@ -219,7 +221,7 @@ export function useResourceSession() {
 		return check.pending;
 	}, []);
 	const refresh = useCallback(() => {
-		// Background revalidation keeps the verified workspace mounted.
+		// Background revalidation keeps the verified account mounted.
 		// Only the first check (no owner yet) uses the full-screen
 		// checking state; later checks stay silent until discovery proves
 		// a new owner, a denial, or an outage that keeps stale data visible.
