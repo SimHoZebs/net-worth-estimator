@@ -287,22 +287,20 @@ func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, contin
 }
 
 func initializeBranchSimulationState(balances map[string]float64, events []types.MovementEvent, candidateDate IsoDate, startState *types.ProjectionPath) SimulationState {
-	latest := make(map[string]float64, len(startState.ProjectionStartPostingState.LatestRealizedPostingAmounts))
-	for id, amount := range startState.ProjectionStartPostingState.LatestRealizedPostingAmounts {
-		latest[id] = amount
-	}
-	dates := make(map[string]string, len(startState.ProjectionStartPostingState.LatestRealizedPostingDates))
-	for id, date := range startState.ProjectionStartPostingState.LatestRealizedPostingDates {
-		dates[id] = date
-	}
-	byYear := make(map[string]map[string]float64, len(startState.ProjectionStartPostingState.RealizedPostingAmountsByYear))
-	for postingID, years := range startState.ProjectionStartPostingState.RealizedPostingAmountsByYear {
-		yearMap := make(map[string]float64, len(years))
-		for year, amount := range years {
-			yearMap[year] = amount
-		}
-		byYear[postingID] = yearMap
-	}
+	// Deep-copy the prepared projection-start posting ledger through the
+	// shared cloner (the same copy the purchases candidate rebuilds from),
+	// then replay base-path events up to the candidate date. Losses are
+	// balance adjustments, not cap consumption: only non-negative
+	// realizations accrue against the annual cap.
+	state := CloneSimulationState(SimulationState{
+		Balances:                     balances,
+		LatestRealizedPostingAmounts: startState.ProjectionStartPostingState.LatestRealizedPostingAmounts,
+		LatestRealizedPostingDates:   startState.ProjectionStartPostingState.LatestRealizedPostingDates,
+		RealizedPostingAmountsByYear: startState.ProjectionStartPostingState.RealizedPostingAmountsByYear,
+	})
+	latest := state.LatestRealizedPostingAmounts
+	dates := state.LatestRealizedPostingDates
+	byYear := state.RealizedPostingAmountsByYear
 	for index := range events {
 		event := &events[index]
 		if event.Date > candidateDate {
@@ -320,12 +318,7 @@ func initializeBranchSimulationState(balances map[string]float64, events []types
 		// non-negative realizations accrue against the annual cap.
 		yearMap[event.Date[:4]] += math.Max(0, event.RealizedAmount)
 	}
-	return SimulationState{
-		Balances:                     balances,
-		LatestRealizedPostingAmounts: latest,
-		LatestRealizedPostingDates:   dates,
-		RealizedPostingAmountsByYear: byYear,
-	}
+	return state
 }
 
 type branchEventGroup struct {

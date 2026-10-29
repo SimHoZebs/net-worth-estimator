@@ -32,7 +32,7 @@ describe("AccountDetails", () => {
 		expect(
 			(
 				screen.getByRole("button", {
-					name: "Apply unsaved changes",
+					name: "Save changes",
 				}) as HTMLButtonElement
 			).disabled,
 		).toBe(true);
@@ -58,9 +58,7 @@ describe("AccountDetails", () => {
 		view.rerender(
 			<AccountDetails {...props} account={{ ...home, name: "Another name" }} />,
 		);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Apply unsaved changes" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onApply).not.toHaveBeenCalled();
 		fireEvent.click(
 			screen.getByRole("button", {
@@ -98,7 +96,7 @@ describe("AccountDetails", () => {
 		expect(input("Maximum balance in USD").disabled).toBe(true);
 		expect(input("No ceiling").checked).toBe(true);
 		const apply = screen.getByRole("button", {
-			name: "Apply unsaved changes",
+			name: "Save changes",
 		}) as HTMLButtonElement;
 		expect(apply.disabled).toBe(true);
 		fireEvent.change(input("Protected balance in USD"), {
@@ -133,9 +131,7 @@ describe("AccountDetails", () => {
 		expect(ceiling.disabled).toBe(false);
 		expect(ceiling.value).toBe("0");
 		fireEvent.change(ceiling, { target: { value: "100000" } });
-		fireEvent.click(
-			screen.getByRole("button", { name: "Apply unsaved changes" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(
 			applied.plan?.accounts.find((account) => account.id === "home")
 				?.maxBalance,
@@ -155,9 +151,7 @@ describe("AccountDetails", () => {
 		// assert the attribute on the group itself: real browsers lock all
 		// descendants behind it.
 		expect(container.querySelector("fieldset[disabled]")).toBeTruthy();
-		expect(
-			screen.queryByRole("button", { name: "Apply unsaved changes" }),
-		).toBeNull();
-		expect(screen.getByText(/refreshed plan/)).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+		expect(screen.getByText(/refreshed copy/)).toBeTruthy();
 	});
 });

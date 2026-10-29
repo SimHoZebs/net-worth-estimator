@@ -67,8 +67,7 @@ export function markAsInstallment(
 		return new Error("Choose between 2 and 600 payments for an installment.");
 	}
 	const source = plan.transactions.find((item) => item.id === movementId);
-	if (!source)
-		return new Error("That transaction no longer exists in the plan.");
+	if (!source) return new Error("That transaction no longer exists.");
 	const frequency: SubscriptionFrequency = options.frequency ?? "monthly";
 	const step = frequency === "monthly" ? 1 : 12;
 	return markAsRecurring(plan, movementId, {
@@ -85,7 +84,7 @@ function markAsRecurring(
 ): Plan | Error {
 	const source = plan.transactions.find((item) => item.id === movementId);
 	if (!source) {
-		return new Error("That transaction no longer exists in the plan.");
+		return new Error("That transaction no longer exists.");
 	}
 	if (source.frequency !== "once") {
 		return new Error("Only one-time transactions can be marked as recurring.");

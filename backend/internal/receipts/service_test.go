@@ -15,6 +15,7 @@ import (
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts/extractortest"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -28,7 +29,7 @@ const postingID = "01900000-0000-7000-8000-000000000088"
 
 func serviceFixture(t *testing.T, source *receipts.Source) (store.Store, *receipts.Service, types.Receipt) {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "receipts.db"))
+	db, err := sqlite.Open(filepath.Join(t.TempDir(), "receipts.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

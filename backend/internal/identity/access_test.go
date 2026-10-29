@@ -10,14 +10,14 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 	p := newIDP(t)
 	p.subject = "new-account-with-no-grant"
 	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
-	database, err := store.Open(filepath.Join(t.TempDir(), "financial.db"))
+	database, err := sqlite.Open(filepath.Join(t.TempDir(), "financial.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

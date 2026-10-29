@@ -8,6 +8,7 @@ import {
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import { usePlan } from "../state/useWorkspacePlan.ts";
+import { stageAndSave } from "../state/workspaceWrites.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
 const EvidenceDialog = lazy(() =>
@@ -46,7 +47,6 @@ function WorkspaceEvidenceLoaded({
 }) {
 	const plan = usePlan();
 	const hasDraft = useWorkspaceStore((state) => state.draft != null);
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const projection = useRemoteProjection({ ranges: false });
 	const base =
 		projection.base instanceof Error || projection.base === null
@@ -68,7 +68,7 @@ function WorkspaceEvidenceLoaded({
 				temporary={hasDraft}
 				onClose={overlays.closeEvidence}
 				onEdit={overlays.editFromEvidence}
-				onApply={updatePlan}
+				onApply={stageAndSave}
 			/>
 		</Suspense>
 	);
@@ -80,7 +80,6 @@ export function WorkspaceDialogs({
 	overlays: WorkspaceOverlays;
 }) {
 	const plan = usePlan();
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const applyError = useWorkspaceStore((state) => state.error);
 	const changeCount = useWorkspaceStore(selectDraftChangeCount);
 	if (!plan) return null;
@@ -90,14 +89,14 @@ export function WorkspaceDialogs({
 				<PlanEditor
 					target={overlays.editor}
 					plan={plan}
-					onApply={updatePlan}
+					onApply={stageAndSave}
 					applyError={applyError}
 					onClose={overlays.closeEditor}
 				/>
 			)}
 			{overlays.discardOpen && (
 				<ConfirmDialog
-					title="Return to your saved plan?"
+					title="Return to your last save?"
 					eyebrow="Discard unsaved changes"
 					onCancel={overlays.closeDiscard}
 					onConfirm={() => void overlays.confirmDiscard()}
@@ -109,7 +108,7 @@ export function WorkspaceDialogs({
 					<p>
 						Your {changeCount} unsaved{" "}
 						{changeCount === 1 ? "change will" : "changes will"} be removed.
-						Your saved plan stays intact.
+						Your last save stays intact.
 					</p>
 				</ConfirmDialog>
 			)}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 func TestRequiresExplicitDatabase(t *testing.T) {
@@ -33,7 +33,7 @@ func TestSetupCreatesParentAndSupportsRepeatProvisioning(t *testing.T) {
 		if code := run([]string{"--db", path}, &out, &errOut); code != 0 {
 			t.Fatalf("attempt=%d code=%d stderr=%s", attempt, code, errOut.String())
 		}
-		db, err := store.OpenDatabase(path)
+		db, err := sqlite.OpenDatabase(path)
 		if err != nil {
 			t.Fatal(err)
 		}

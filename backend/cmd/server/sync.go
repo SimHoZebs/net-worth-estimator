@@ -10,6 +10,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 // ownerSyncStore returns the owner plan when it exists, or nil when the
@@ -18,7 +19,7 @@ import (
 // starts unconfigured and picks up a stored key once the owner connects.
 // The Bridge credential lives only in that plan's database rows, never in
 // the environment.
-func ownerSyncStore(database *store.Database, issuer, subject string) (store.Store, error) {
+func ownerSyncStore(database *sqlite.Database, issuer, subject string) (store.Store, error) {
 	if subject == "" {
 		return nil, nil
 	}

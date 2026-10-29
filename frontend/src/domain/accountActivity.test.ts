@@ -170,11 +170,11 @@ describe("account-scoped transactions", () => {
 		});
 	});
 
-	it("marks voided bank charges without pending status", () => {
+	it("marks holds that did not post without pending status", () => {
 		const plan = structuredClone(examplePlan);
 		plan.transactions.push({
 			id: "01900000-0000-7000-8000-000000000002",
-			name: "Voided authorization",
+			name: "Hold that did not post",
 			pending: false,
 			void: true,
 			amount: 42.1,
