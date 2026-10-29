@@ -45,7 +45,8 @@ The default signup form does not collect email or require a mail service.
 | `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL`      | Optional account/passkey page on the issuer origin                              |
 | `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/plan-access`                                |
 | `NET_WORTH_ESTIMATOR_DB`                    | Shared application database for financial plans and application identity state  |
-| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT`    | Verified account whose plan may use server-level SimpleFIN credentials          |
+| `NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT` | Verified account whose account may use server-level SimpleFIN credentials       |
+| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` (retired)  | Rejected with a deprecation error pointing at `ACCOUNT_OWNER_SUBJECT` |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h`                                   |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m`                       |
 | `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP`    | `1` opts into plain-HTTP origins on a trusted LAN; default requires HTTPS outside loopback |
