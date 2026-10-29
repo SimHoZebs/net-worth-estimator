@@ -145,6 +145,7 @@ func TestWriteGuardCoversRowPrefixes(t *testing.T) {
 		{http.MethodPatch, "/v1/postings/x", `{"name":"x"}`},
 		{http.MethodDelete, "/v1/postings/x", ""},
 		{http.MethodPost, "/v1/postings/reorder", `{"id":"x"}`},
+		{http.MethodPost, "/v1/transactions/x/convert", `{"kind":"posting"}`},
 		{http.MethodPost, "/v1/recurrence-rules", `{"name":"x"}`},
 		{http.MethodPatch, "/v1/recurrence-rules/x", `{"name":"x"}`},
 		{http.MethodDelete, "/v1/recurrence-rules/x", ""},

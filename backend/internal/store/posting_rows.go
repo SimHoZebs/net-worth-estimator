@@ -86,6 +86,18 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		if err := tx.QueryRow(`SELECT execution_order FROM postings WHERE id = ? AND plan_id = :plan_id`, posting.ID).Scan(&posting.ExecutionOrder); err != nil {
 			return err
 		}
+		if posting.Purchase == nil {
+			// The editor never models the wishlist link: an omitted policy
+			// keeps the stored one instead of dropping it.
+			var priority int
+			if err := tx.QueryRow(`SELECT priority FROM purchase_policies WHERE posting_id = ? AND plan_id = :plan_id`, posting.ID).Scan(&priority); err != nil {
+				if err != sql.ErrNoRows {
+					return fmt.Errorf("read purchase policy %s: %w", posting.ID, err)
+				}
+			} else {
+				posting.Purchase = &types.PurchasePolicy{Priority: priority}
+			}
+		}
 		destinations, err := json.Marshal(posting.Destinations)
 		if err != nil {
 			return err
@@ -133,4 +145,63 @@ func (s *sqliteStore) DeletePosting(id string) error {
 
 func (s *sqliteStore) MovePosting(id, beforeID string) error {
 	return withRowTx(s.db, func(tx *planTx) error { return moveRow(tx, RowPosting, "", id, beforeID) })
+}
+
+// ConvertPostingToRule moves one posting across to a recurrence rule in a
+// single transaction. The entity ID stays claimed, the rule appends at the
+// end of the execution order, and the posting's purchase policy (if any)
+// cascades away with its row. Sync-owned bank rows stay put: convert, like
+// delete, refuses live pending and void rows.
+func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error) {
+	rule.ID = postingID
+	err := withRowTx(s.db, func(tx *planTx) error {
+		lifecycle, err := postingLifecycleOf(tx, postingID)
+		if err != nil {
+			return err
+		}
+		if !lifecycle.ownerEditable() {
+			return &rowError{code: "sync-owned", id: postingID}
+		}
+		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND plan_id = :plan_id`, postingID); err != nil {
+			return fmt.Errorf("convert posting %s: %w", postingID, err)
+		}
+		position, err := nextTablePosition(tx, "recurrence_rules")
+		if err != nil {
+			return err
+		}
+		return insertRule(tx, position, &rule)
+	})
+	if err != nil {
+		return types.RecurrenceRule{}, err
+	}
+	return rule, nil
+}
+
+// ConvertRuleToPosting moves one recurrence rule across to a posting in a
+// single transaction. The entity ID stays claimed and the posting appends
+// at the end. The new posting is owner-authored, like a created posting.
+func (s *sqliteStore) ConvertRuleToPosting(ruleID string, posting types.Posting) (types.Posting, error) {
+	posting.ID = ruleID
+	posting.Source, posting.Pending, posting.Void, posting.ExecutionOrder = SourceUser, false, false, 0
+	err := withRowTx(s.db, func(tx *planTx) error {
+		var present int
+		if err := tx.QueryRow(`SELECT 1 FROM recurrence_rules WHERE id = ? AND plan_id = :plan_id`, ruleID).Scan(&present); err != nil {
+			if err == sql.ErrNoRows {
+				return &rowError{code: "not-found", id: ruleID}
+			}
+			return fmt.Errorf("read rule %s: %w", ruleID, err)
+		}
+		if _, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND plan_id = :plan_id`, ruleID); err != nil {
+			return fmt.Errorf("convert rule %s: %w", ruleID, err)
+		}
+		rulePos, err := nextTablePosition(tx, "postings")
+		if err != nil {
+			return err
+		}
+		return insertPosting(tx, rulePos, &posting, SourceUser)
+	})
+	if err != nil {
+		return types.Posting{}, err
+	}
+	return posting, nil
 }

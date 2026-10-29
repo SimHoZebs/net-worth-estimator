@@ -5,46 +5,48 @@ import { EmptyState } from "../../components/EmptyState.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
-import { movementRuleTransaction } from "../../domain/accountActivity.ts";
+import { ruleTransaction } from "../../domain/accountActivity.ts";
 import {
 	transactionAmountStyles,
 	transactionBadgeStyles,
 } from "../../components/activity/activityStyles.ts";
 import { dateLabel, money } from "../../domain/format.ts";
 import {
-	isPendingMovement,
+	isPendingTransaction,
 	type Account,
-	type Movement,
+	type Transaction,
 	type Plan,
 } from "../../domain/model.ts";
 import type { ResolvedMovementAmount } from "../../domain/resolvedMovementAmounts.ts";
 
-export function MovementsPanel({
-	movements,
+export function TransactionsPanel({
+	transactions,
 	accounts,
 	plan,
 	resolvedAmounts,
 	showHeaders = false,
 }: {
-	movements: Movement[];
+	transactions: Transaction[];
 	accounts: Account[];
 	plan: Plan;
 	resolvedAmounts?: Map<string, ResolvedMovementAmount>;
 	showHeaders?: boolean;
 }) {
-	if (!movements.length)
+	if (!transactions.length)
 		return <EmptyState icon={ArrowRight} title="No matching transactions" />;
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const selected = selectedId
-		? (movements.find((movement) => movement.id === selectedId) ?? null)
+		? (transactions.find((transaction) => transaction.id === selectedId) ??
+			null)
 		: null;
 	const selectedResolved = selected
 		? resolvedAmounts?.get(selected.id)
 		: undefined;
 	const selectedClaimRuleName = selected?.claimRuleId
-		? (movements.find((movement) => movement.id === selected.claimRuleId)
-				?.name ?? null)
+		? (transactions.find(
+				(transaction) => transaction.id === selected.claimRuleId,
+			)?.name ?? null)
 		: null;
 	return (
 		<>
@@ -52,39 +54,39 @@ export function MovementsPanel({
 				caption="Planned transactions with dates and amounts."
 				showHeaders={showHeaders}
 			>
-				{movements.map((movement) => {
-					const pending = isPendingMovement(movement);
+				{transactions.map((transaction) => {
+					const pending = isPendingTransaction(transaction);
 					// External endpoints only restate the direction, so the route
 					// names real accounts only. The date lives in its own column.
-					const route = [movement.fromId, movement.toId]
+					const route = [transaction.fromId, transaction.toId]
 						.map((id) => (id ? names.get(id) : null))
 						.filter((name): name is string => Boolean(name))
 						.join(" → ");
-					const tone = movement.fromId
-						? movement.toId
+					const tone = transaction.fromId
+						? transaction.toId
 							? ("transfer" as const)
 							: ("outflow" as const)
 						: ("inflow" as const);
 					const dateText =
-						movement.frequency === "once"
-							? dateLabel(movement.startDate, true)
-							: movement.frequency === "monthly"
+						transaction.frequency === "once"
+							? dateLabel(transaction.startDate, true)
+							: transaction.frequency === "monthly"
 								? "Monthly"
 								: "Yearly";
 					return (
 						<TransactionItemRow
-							key={movement.id}
-							dimmed={!movement.enabled && !pending}
+							key={transaction.id}
+							dimmed={!transaction.enabled && !pending}
 							date={
-								movement.frequency === "once" ? (
-									<time dateTime={movement.startDate}>{dateText}</time>
+								transaction.frequency === "once" ? (
+									<time dateTime={transaction.startDate}>{dateText}</time>
 								) : (
 									dateText
 								)
 							}
 							icon={
-								movement.fromId ? (
-									movement.toId ? (
+								transaction.fromId ? (
+									transaction.toId ? (
 										<ArrowRight size={16} aria-hidden="true" />
 									) : (
 										<ArrowUpRight size={16} aria-hidden="true" />
@@ -94,11 +96,11 @@ export function MovementsPanel({
 								)
 							}
 							tone={tone}
-							title={movement.name}
+							title={transaction.name}
 							slots={{
 								subtitle: route ? <span>{route}</span> : undefined,
 								mobile: <span>{dateText}</span>,
-								badges: (pending || !movement.enabled) && (
+								badges: (pending || !transaction.enabled) && (
 									<>
 										{pending ? (
 											<Badge
@@ -108,7 +110,7 @@ export function MovementsPanel({
 												Pending
 											</Badge>
 										) : (
-											!movement.enabled && (
+											!transaction.enabled && (
 												<Badge
 													tone="warning"
 													className={transactionBadgeStyles()}
@@ -122,31 +124,31 @@ export function MovementsPanel({
 							}}
 							amount={
 								<>
-									<MovementAmount
-										movement={movement}
-										resolved={resolvedAmounts?.get(movement.id)}
+									<TransactionAmount
+										transaction={transaction}
+										resolved={resolvedAmounts?.get(transaction.id)}
 									/>
-									{movement.claimRuleId && (
+									{transaction.claimRuleId && (
 										<Badge tone="neutral">
-											Records {movement.claimOccurrenceDate}
+											Records {transaction.claimOccurrenceDate}
 										</Badge>
 									)}
 								</>
 							}
-							actionLabel={`View ${movement.name} on ${movement.frequency === "once" ? dateText : movement.frequency}`}
-							onSelect={() => setSelectedId(movement.id)}
+							actionLabel={`View ${transaction.name} on ${transaction.frequency === "once" ? dateText : transaction.frequency}`}
+							onSelect={() => setSelectedId(transaction.id)}
 						/>
 					);
 				})}
 			</TransactionTable>
 			{selected && (
 				<TransactionDetail
-					transaction={movementRuleTransaction({
-						movement: selected,
+					transaction={ruleTransaction({
+						transaction: selected,
 						plan,
 						resolved: selectedResolved,
 					})}
-					movement={selected}
+					planTransaction={selected}
 					accounts={accounts}
 					plan={plan}
 					claimRuleName={selectedClaimRuleName}
@@ -157,22 +159,22 @@ export function MovementsPanel({
 	);
 }
 
-function MovementAmount({
-	movement,
+function TransactionAmount({
+	transaction,
 	resolved,
 }: {
-	movement: Movement;
+	transaction: Transaction;
 	resolved: ResolvedMovementAmount | undefined;
 }) {
-	if (movement.amountKnown)
+	if (transaction.amountKnown)
 		return (
 			<strong className={transactionAmountStyles()}>
-				{money(movement.amount)}
+				{money(transaction.amount)}
 			</strong>
 		);
 	if (resolved) {
 		const label =
-			movement.frequency === "once"
+			transaction.frequency === "once"
 				? `Calculated for ${dateLabel(resolved.date, true)}`
 				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
 		return (

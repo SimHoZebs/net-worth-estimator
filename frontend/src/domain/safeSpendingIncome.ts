@@ -1,4 +1,4 @@
-import type { Movement, Plan } from "./model.ts";
+import type { Transaction, Plan } from "./model.ts";
 import { nextProjectedPayments } from "./nextProjectedPayment.ts";
 import type { MovementResult } from "./result.ts";
 
@@ -11,7 +11,7 @@ export interface SafeSpendingIncome {
 	candidates: {
 		id: string;
 		name: string;
-		frequency: Movement["frequency"];
+		frequency: Transaction["frequency"];
 		amount: number;
 		nextPayment: IncomePayment | null;
 	}[];
@@ -47,7 +47,7 @@ export function safeSpendingIncome({
 	const destinations = new Set(
 		incomeAccountIds.filter((id) => availableAccounts.has(id)),
 	);
-	const rules = plan.movements.filter(
+	const rules = plan.transactions.filter(
 		(rule) =>
 			rule.enabled &&
 			rule.frequency !== "once" &&

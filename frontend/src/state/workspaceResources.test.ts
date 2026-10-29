@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { testPlan } from "../mocks/plan.ts";
+import { getResourceScope } from "../auth/resourceScope.ts";
 import {
+	checkpointsOptions,
+	getCheckpoints,
 	getServerModel,
 	modelOptions,
 	resolversOptions,
@@ -81,6 +84,31 @@ describe("direct Query ownership", () => {
 		expect(getServerModel()).toBeUndefined();
 		expect(useWorkspaceStore.getState().draft).toBe(testPlan);
 		expect(useWorkspaceStore.getState().baseRevision).toBe("base");
+	});
+	it("lists checkpoints through the narrow query with account filters", async () => {
+		const server = stubTestServer();
+		server.setRevision("current");
+		const all = await serverQueryClient().fetchQuery(checkpointsOptions());
+		expect(all.checkpoints).toHaveLength(2);
+		expect(all.revision).toBe("current");
+		const cash = await serverQueryClient().fetchQuery(
+			checkpointsOptions(getResourceScope(), { accountId: "cash" }),
+		);
+		expect(cash.checkpoints).toHaveLength(1);
+		expect(cash.checkpoints[0]).toMatchObject({
+			AccountId: "cash",
+			Balance: 100,
+		});
+		expect(getCheckpoints()).toEqual(all);
+		expect(getCheckpoints(getResourceScope(), { accountId: "cash" })).toEqual(
+			cash,
+		);
+		const fetcher = server.fetcher;
+		expect(
+			fetcher.mock.calls.filter(([url]) =>
+				String(url).startsWith("/v1/checkpoints"),
+			),
+		).toHaveLength(2);
 	});
 	it("does not let a canceled request overwrite a newer same-resource result", async () => {
 		let finish!: (value: Response) => void;

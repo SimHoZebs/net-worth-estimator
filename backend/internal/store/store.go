@@ -40,10 +40,19 @@ type Store interface {
 	UpdateAccount(account types.Account) (types.Account, error)
 	DeleteAccount(id string) error
 	MoveAccount(id, beforeID string) error
+	// CreateAccountWithBalance stores an account and, when balance is set,
+	// its opening balance observation in one transaction. UpdateAccountWithBalance
+	// does the same for an account edit plus a moved observation.
+	CreateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error)
+	UpdateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error)
 	CreatePosting(posting types.Posting) (types.Posting, error)
 	UpdatePosting(posting types.Posting) (types.Posting, error)
 	DeletePosting(id string) error
 	MovePosting(id, beforeID string) error
+	// ConvertPostingToRule and ConvertRuleToPosting move one movement
+	// across the posting/rule tables in one transaction, keeping its ID.
+	ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error)
+	ConvertRuleToPosting(ruleID string, posting types.Posting) (types.Posting, error)
 	CreateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)
 	UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)
 	DeleteRule(id string) error

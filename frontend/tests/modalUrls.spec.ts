@@ -49,9 +49,13 @@ test("editors have URLs and unknown editor ids normalize", async ({ page }) => {
 	await expect(page).toHaveURL(/#accounts$/);
 
 	await page.goto("/#transactions/invest/edit");
-	await expect(page.getByRole("dialog")).toContainText("Monthly investing");
+	const editor = page.getByRole("dialog", { name: "Edit planned transaction" });
+	await expect(editor).toBeVisible();
+	await expect(editor.getByLabel("Transaction name")).toHaveValue(
+		"Monthly investing",
+	);
 
-	await page.goto("/#transactions/no-such-movement/edit");
+	await page.goto("/#transactions/no-such-transaction/edit");
 	await expect(page).toHaveURL(/#transactions$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });

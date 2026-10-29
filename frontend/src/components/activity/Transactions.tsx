@@ -45,12 +45,12 @@ export function Transactions({
 		currentPage * PAGE_SIZE,
 		(currentPage + 1) * PAGE_SIZE,
 	);
-	const movements = new Map(
-		plan.movements.map((movement) => [movement.id, movement]),
+	const planTransactions = new Map(
+		plan.transactions.map((transaction) => [transaction.id, transaction]),
 	);
 	const { selected, inspect, close } = useTransactionSelection(
 		transactions,
-		movements,
+		planTransactions,
 	);
 	const update = (change: Partial<ActivityFilters>) => {
 		setFilters((previous) => ({ ...previous, ...change }));
@@ -68,7 +68,7 @@ export function Transactions({
 				icon={ArrowRightLeft}
 				title="No transactions for this account yet"
 				action="Add a planned transaction"
-				onAction={() => onEdit({ kind: "movement", item: null })}
+				onAction={() => onEdit({ kind: "transaction", item: null })}
 			/>
 		);
 	return (
@@ -86,7 +86,7 @@ export function Transactions({
 			{filtered.length ? (
 				<>
 					<TransactionTable
-						caption="Transactions involving this account, separated into recorded facts and projected movements."
+						caption="Transactions involving this account, separated into recorded facts and projected transactions."
 						showHeaders={showHeaders}
 						scrollId={`${id}-table`}
 					>
@@ -94,10 +94,14 @@ export function Transactions({
 							<TransactionRow
 								key={transaction.id}
 								transaction={transaction}
-								movement={movements.get(transaction.movementId) ?? null}
+								planTransaction={
+									planTransactions.get(transaction.movementId) ?? null
+								}
 								onEdit={() => {
-									const movement = movements.get(transaction.movementId);
-									if (movement) inspect(transaction);
+									const planTransaction = planTransactions.get(
+										transaction.movementId,
+									);
+									if (planTransaction) inspect(transaction);
 								}}
 							/>
 						))}
@@ -112,13 +116,14 @@ export function Transactions({
 					{selected && (
 						<TransactionDetail
 							transaction={selected.transaction}
-							movement={selected.movement}
+							planTransaction={selected.planTransaction}
 							accounts={plan.accounts}
 							plan={plan}
 							claimRuleName={
-								selected.movement.claimRuleId
-									? (plan.movements.find(
-											(item) => item.id === selected.movement.claimRuleId,
+								selected.planTransaction.claimRuleId
+									? (plan.transactions.find(
+											(item) =>
+												item.id === selected.planTransaction.claimRuleId,
 										)?.name ?? null)
 									: null
 							}

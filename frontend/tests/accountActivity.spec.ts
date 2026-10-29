@@ -1,10 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import {
-	readSavedServerPlan,
-	readTemporaryVersion,
-	resetFixture,
-} from "./fixture.ts";
+import type { FinancialModelDocument } from "../src/api/contracts.ts";
+import { FIXTURE_API, readSavedServerPlan, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
 	await resetFixture();
@@ -87,7 +84,7 @@ test("account names in the plan open incoming transfers with the correct other a
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–1 of 1 transactions",
 	);
-	// The only incoming movement to savings is the monthly contribution.
+	// The only incoming transaction to savings is the monthly contribution.
 	await expect(dialog.getByText("+$400.00", { exact: true })).toBeVisible();
 	await dialog
 		.getByRole("button", {
@@ -221,15 +218,10 @@ test("a shortfall can be inspected and edited while preserving account context a
 		.fill("renovation");
 	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
-	// The saved plan is untouched: only the unsaved changes changed.
+	// The editor wrote a draft: the dialog shows the edited −$3,000.00 with
+	// no Shortfall (asserted above) while the saved plan is untouched.
 	// Posting CSV ids are replaced with server UUIDs on import, so the
-	// renovation is located by name on both sides.
-	const draft = await readTemporaryVersion(page);
-	const renovation = (plan: {
-		movements: { name: string; amount: number; postedDate: string | null }[];
-	}) => plan.movements.find((movement) => movement.name === "Home renovation");
-	expect(renovation(draft)?.amount).toBe(3000);
-	expect(renovation(draft)?.postedDate).toBe("2026-03-10");
+	// renovation is located by name on the saved side.
 	const saved = await readSavedServerPlan();
 	const savedExpression = saved.postings.find(
 		(posting) => posting.name === "Home renovation",
@@ -332,12 +324,17 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
 		"5000",
 	);
-	// The inline edit changed the draft only; the saved plan is untouched.
-	const draft = await readTemporaryVersion(page);
-	const home = (
-		draft as { accounts: { id: string; minBalance: number }[] }
-	).accounts.find((account) => account.id === "home");
-	expect(home?.minBalance).toBe(5000);
+	// The inline edit changed the draft only; the saved plan keeps the
+	// fixture's no-floor bound while the dialog shows the staged 5000.
+	const savedModel = await page.request
+		.get(`${FIXTURE_API}/v1/financial-model`)
+		.then(async (response) => {
+			expect(response.ok()).toBe(true);
+			return ((await response.json()) as { document: FinancialModelDocument })
+				.document;
+		});
+	const home = savedModel.accounts.find((account) => account.id === "home");
+	expect(home?.minBalance).toBe(-1e13);
 });
 
 test("account transactions and editor evidence are accessible on desktop and mobile", async ({

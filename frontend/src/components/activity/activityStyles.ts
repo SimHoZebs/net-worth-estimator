@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 
-export const movementIconStyles = cva("grid shrink-0 place-items-center", {
+export const transactionIconStyles = cva("grid shrink-0 place-items-center", {
 	variants: {
 		tone: {
 			transfer: "bg-surface-3 text-muted",
@@ -13,7 +13,7 @@ export const movementIconStyles = cva("grid shrink-0 place-items-center", {
 });
 
 export type TransactionTone = NonNullable<
-	VariantProps<typeof movementIconStyles>["tone"]
+	VariantProps<typeof transactionIconStyles>["tone"]
 >;
 
 export const transactionRowStyles = cva("hover:bg-surface-2", {

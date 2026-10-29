@@ -70,9 +70,15 @@ export function AccountDetailsModal({
 				: [],
 		[card.id, plan, projection],
 	);
-	const movements = useMemo(
-		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
-		[plan.movements],
+	const planTransactions = useMemo(
+		() =>
+			new Map(
+				plan.transactions.map((planTransaction) => [
+					planTransaction.id,
+					planTransaction,
+				]),
+			),
+		[plan.transactions],
 	);
 	const shown = useMemo(() => {
 		const needle = query.trim().toLowerCase();
@@ -108,8 +114,8 @@ export function AccountDetailsModal({
 		? (transactions.find((transaction) => transaction.id === selectedId) ??
 			null)
 		: null;
-	const selectedMovement = selected
-		? (movements.get(selected.movementId) ?? null)
+	const selectedPlanTransaction = selected
+		? (planTransactions.get(selected.movementId) ?? null)
 		: null;
 	return (
 		<Modal
@@ -209,7 +215,9 @@ export function AccountDetailsModal({
 							<TransactionRow
 								key={transaction.id}
 								transaction={transaction}
-								movement={movements.get(transaction.movementId) ?? null}
+								planTransaction={
+									planTransactions.get(transaction.movementId) ?? null
+								}
 								onEdit={() => setSelectedId(transaction.id)}
 							/>
 						))}
@@ -235,7 +243,7 @@ export function AccountDetailsModal({
 				{transactions.length > 0 && selected == null ? (
 					<span>
 						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
-						Recurring movements show in the plan with their schedule. Dates
+						Recurring transactions show in the plan with their schedule. Dates
 						shown {dateLabel(plan.startDate, true)} onward.
 					</span>
 				) : (
@@ -244,10 +252,10 @@ export function AccountDetailsModal({
 					</span>
 				)}
 			</p>
-			{selected && selectedMovement && (
+			{selected && selectedPlanTransaction && (
 				<TransactionDetail
 					transaction={selected}
-					movement={selectedMovement}
+					planTransaction={selectedPlanTransaction}
 					accounts={plan.accounts}
 					plan={plan}
 					onClose={() => setSelectedId(null)}

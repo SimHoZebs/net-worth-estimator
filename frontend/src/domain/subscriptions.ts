@@ -1,4 +1,4 @@
-import type { Movement, Plan } from "./model.ts";
+import type { Transaction, Plan } from "./model.ts";
 
 export type SubscriptionFrequency = "monthly" | "yearly";
 
@@ -66,7 +66,7 @@ export function markAsInstallment(
 	if (!Number.isInteger(payments) || payments < 2 || payments > 600) {
 		return new Error("Choose between 2 and 600 payments for an installment.");
 	}
-	const source = plan.movements.find((item) => item.id === movementId);
+	const source = plan.transactions.find((item) => item.id === movementId);
 	if (!source)
 		return new Error("That transaction no longer exists in the plan.");
 	const frequency: SubscriptionFrequency = options.frequency ?? "monthly";
@@ -83,7 +83,7 @@ function markAsRecurring(
 	movementId: string,
 	options: MarkAsRecurringOptions,
 ): Plan | Error {
-	const source = plan.movements.find((item) => item.id === movementId);
+	const source = plan.transactions.find((item) => item.id === movementId);
 	if (!source) {
 		return new Error("That transaction no longer exists in the plan.");
 	}
@@ -110,10 +110,10 @@ function markAsRecurring(
 	}
 	const generateId = options.generateId ?? (() => crypto.randomUUID());
 	const ruleId = options.ruleId ?? generateId();
-	if (plan.movements.some((item) => item.id === ruleId)) {
+	if (plan.transactions.some((item) => item.id === ruleId)) {
 		return new Error("A transaction with that id already exists. Try again.");
 	}
-	const rule: Movement = {
+	const rule: Transaction = {
 		id: ruleId,
 		name: source.name,
 		amount: source.amount,
@@ -131,14 +131,14 @@ function markAsRecurring(
 		postedDate: null,
 		void: false,
 	};
-	const claimed: Movement = {
+	const claimed: Transaction = {
 		...source,
 		claimRuleId: ruleId,
 		claimOccurrenceDate: source.startDate,
 	};
 	return {
 		...plan,
-		movements: plan.movements
+		transactions: plan.transactions
 			.map((item) => (item.id === movementId ? claimed : item))
 			.concat([rule]),
 	};

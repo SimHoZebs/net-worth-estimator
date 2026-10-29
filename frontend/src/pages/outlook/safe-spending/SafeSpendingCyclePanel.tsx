@@ -23,13 +23,19 @@ export function SafeSpendingCyclePanel({
 	onTransactionOrderChange: (order: TransactionOrder) => void;
 	showHeaders?: boolean;
 }) {
-	const movements = useMemo(
-		() => new Map(plan.movements.map((movement) => [movement.id, movement])),
-		[plan.movements],
+	const planTransactions = useMemo(
+		() =>
+			new Map(
+				plan.transactions.map((planTransaction) => [
+					planTransaction.id,
+					planTransaction,
+				]),
+			),
+		[plan.transactions],
 	);
 	const { selected, inspect, close } = useTransactionSelection(
 		cycle.transactions,
-		movements,
+		planTransactions,
 	);
 	return (
 		<div className="grid content-start gap-4">
@@ -54,7 +60,7 @@ export function SafeSpendingCyclePanel({
 				transactions={cycle.transactions}
 				caption={cycle.title}
 				emptyMessage={cycle.emptyMessage}
-				movements={movements}
+				planTransactions={planTransactions}
 				onInspect={inspect}
 				order={transactionOrder}
 				showHeaders={showHeaders}
@@ -62,13 +68,13 @@ export function SafeSpendingCyclePanel({
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}
-					movement={selected.movement}
+					planTransaction={selected.planTransaction}
 					accounts={plan.accounts}
 					plan={plan}
 					claimRuleName={
-						selected.movement.claimRuleId
-							? (plan.movements.find(
-									(item) => item.id === selected.movement.claimRuleId,
+						selected.planTransaction.claimRuleId
+							? (plan.transactions.find(
+									(item) => item.id === selected.planTransaction.claimRuleId,
 								)?.name ?? null)
 							: null
 					}

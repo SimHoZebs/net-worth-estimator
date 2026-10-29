@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { testPlan } from "../mocks/plan.ts";
 import { movementFixture } from "../mocks/projection.ts";
-import type { Movement, Plan } from "./model.ts";
+import type { Transaction, Plan } from "./model.ts";
 import { safeSpendingIncome } from "./safeSpendingIncome.ts";
 
-function rule(id: string, overrides: Partial<Movement> = {}): Movement {
+function rule(id: string, overrides: Partial<Transaction> = {}): Transaction {
 	return {
-		...testPlan.movements[0]!,
+		...testPlan.transactions[0]!,
 		id,
 		name: id,
 		startDate: "2026-01-01",
@@ -27,7 +27,7 @@ function payment(movementId: string, date: string, amount: number) {
 
 const plan: Plan = {
 	...testPlan,
-	movements: [
+	transactions: [
 		rule("salary"),
 		rule("partner", { fromId: "savings", readOnly: true, amountKnown: false }),
 		rule("unselected"),
@@ -118,7 +118,7 @@ describe("safeSpendingIncome", () => {
 		];
 		const result = safeSpendingIncome({
 			...input,
-			plan: { ...plan, movements: rules },
+			plan: { ...plan, transactions: rules },
 			incomeRuleIds: rules.map((item) => item.id),
 			movements: rules.map((item) => payment(item.id, "2026-10-15", 100)),
 		});

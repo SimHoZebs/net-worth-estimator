@@ -15,6 +15,7 @@ import {
 	Repeat,
 	RotateCcw,
 	Save,
+	Trash2,
 	TriangleAlert,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -32,23 +33,27 @@ import {
 	validatePlan,
 	visibleAccounts,
 	type Account,
-	type Movement,
+	type Transaction,
 	type Plan,
 } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { Badge } from "../Badge.tsx";
+import { ConfirmDialog } from "../ConfirmDialog.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 import { Button, IconButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
-import { movementIconStyles } from "./activityStyles.ts";
+import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
+import { deletePosting, deleteRule } from "@/api/generated/endpoints.ts";
+import { performSave } from "../../state/workspaceWrites.ts";
+import { refreshTransactions } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
-import { buildMovementPlan } from "../editors/MovementEditor.tsx";
+import { buildTransactionPlan } from "../editors/TransactionEditor.tsx";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
@@ -63,7 +68,7 @@ function DetailPortal({ children }: { children: ReactNode }) {
 	return createPortal(children, document.body);
 }
 
-function frequencyLabel(frequency: Movement["frequency"]): string {
+function frequencyLabel(frequency: Transaction["frequency"]): string {
 	switch (frequency) {
 		case "monthly":
 			return "Monthly";
@@ -140,24 +145,24 @@ function FrequencyOptions() {
 }
 
 function MoreOptions({
-	movement,
+	planTransaction,
 	plan,
 	draft,
 	updateDraft,
 	locked,
 }: {
-	movement: Movement;
+	planTransaction: Transaction;
 	plan: Plan;
-	draft: MovementDraft;
-	updateDraft: (patch: Partial<MovementDraft>, field: EditField) => void;
+	draft: TransactionDraft;
+	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	locked: boolean;
 }) {
 	const id = useId();
 	const frequency = draft.frequency;
-	const onFrequency = (next: Movement["frequency"]) =>
+	const onFrequency = (next: Transaction["frequency"]) =>
 		updateDraft({ frequency: next }, "schedule");
-	const claimRules = plan.movements.filter(
-		(item) => item.frequency !== "once" && item.id !== movement.id,
+	const claimRules = plan.transactions.filter(
+		(item) => item.frequency !== "once" && item.id !== planTransaction.id,
 	);
 	return (
 		<details className="group mt-4">
@@ -254,14 +259,14 @@ function MoreOptions({
 }
 
 /**
- * Schedule stated only for recurring rules: one-time movements need no
+ * Schedule stated only for recurring rules: one-time transactions need no
  * label. Defaults stay silent: yearly change of zero, an open end date, and
  * "included" never render. In edit mode the same sentence carries date
  * controls in the same positions; structural settings live under More
  * options so the collapsed edit view matches the read view line for line.
  */
 /**
- * Schedule stated only for recurring rules: one-time movements need no
+ * Schedule stated only for recurring rules: one-time transactions need no
  * label. The sentence is always the same elements: frequency text, date
  * controls, and the growth note. Read mode is an attribute flip
  * (readOnly/disabled/armed styling); only the end-date control collapses
@@ -276,8 +281,8 @@ function ScheduleCapsule({
 	locked,
 	scheduleControlId,
 }: {
-	draft: MovementDraft;
-	updateDraft: (patch: Partial<MovementDraft>, field: EditField) => void;
+	draft: TransactionDraft;
+	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	claimRuleName?: string | null;
 	editing: boolean;
 	locked: boolean;
@@ -404,8 +409,8 @@ function ScheduleCapsule({
 	);
 }
 
-function ReadOnlyNotice({ movement }: { movement: Movement }) {
-	if (movement.readOnly) {
+function ReadOnlyNotice({ planTransaction }: { planTransaction: Transaction }) {
+	if (planTransaction.readOnly) {
 		return (
 			<Notice className="my-4">
 				<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
@@ -416,10 +421,10 @@ function ReadOnlyNotice({ movement }: { movement: Movement }) {
 	return null;
 }
 
-function readOnlyReasonFor(movement: Movement): string | undefined {
-	return movement.amountKnown === false
+function readOnlyReasonFor(planTransaction: Transaction): string | undefined {
+	return planTransaction.amountKnown === false
 		? "This amount is calculated each time. See the transaction list for the resolved amounts."
-		: movement.readOnly
+		: planTransaction.readOnly
 			? sourceReadOnlyReason
 			: undefined;
 }
@@ -433,12 +438,12 @@ function readOnlyReasonFor(movement: Movement): string | undefined {
  */
 type EditField = "name" | "amount" | "from" | "to" | "schedule" | "posted";
 
-type MovementDraft = {
+type TransactionDraft = {
 	name: string;
 	amount: string;
 	fromId: string;
 	toId: string;
-	frequency: Movement["frequency"];
+	frequency: Transaction["frequency"];
 	startDate: string;
 	endDate: string;
 	noEndDate: boolean;
@@ -449,29 +454,29 @@ type MovementDraft = {
 	postedDate: string;
 };
 
-function draftFromMovement(movement: Movement): MovementDraft {
+function draftFromTransaction(planTransaction: Transaction): TransactionDraft {
 	return {
-		name: movement.name,
-		amount: String(movement.amount),
-		fromId: movement.fromId ?? "",
-		toId: movement.toId ?? "",
-		frequency: movement.frequency,
-		startDate: movement.startDate,
-		endDate: movement.endDate ?? "",
-		noEndDate: movement.endDate == null,
-		annualIncrease: String(movement.annualIncrease),
-		enabled: movement.enabled,
-		claimRuleId: movement.claimRuleId ?? "",
-		claimOccurrenceDate: movement.claimOccurrenceDate ?? "",
-		postedDate: movement.postedDate ?? "",
+		name: planTransaction.name,
+		amount: String(planTransaction.amount),
+		fromId: planTransaction.fromId ?? "",
+		toId: planTransaction.toId ?? "",
+		frequency: planTransaction.frequency,
+		startDate: planTransaction.startDate,
+		endDate: planTransaction.endDate ?? "",
+		noEndDate: planTransaction.endDate == null,
+		annualIncrease: String(planTransaction.annualIncrease),
+		enabled: planTransaction.enabled,
+		claimRuleId: planTransaction.claimRuleId ?? "",
+		claimOccurrenceDate: planTransaction.claimOccurrenceDate ?? "",
+		postedDate: planTransaction.postedDate ?? "",
 	};
 }
-function useMovementEdit({
-	movement,
+function useTransactionEdit({
+	planTransaction,
 	plan,
 	onClose,
 }: {
-	movement: Movement;
+	planTransaction: Transaction;
 	plan: Plan;
 	onClose: () => void;
 }) {
@@ -481,12 +486,15 @@ function useMovementEdit({
 	const [touched, setTouched] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const edit = useEditDraft(movement.id, draftFromMovement(movement));
+	const edit = useEditDraft(
+		planTransaction.id,
+		draftFromTransaction(planTransaction),
+	);
 	const draft = edit.value;
 	const formId = useId();
-	const readOnlyReason = readOnlyReasonFor(movement);
+	const readOnlyReason = readOnlyReasonFor(planTransaction);
 	useBeforeUnload(activeField !== null && touched);
-	const updateDraft = (patch: Partial<MovementDraft>, field: EditField) => {
+	const updateDraft = (patch: Partial<TransactionDraft>, field: EditField) => {
 		if (readOnlyReason) return;
 		edit.update(patch);
 		if (activeField !== field) setActiveField(field);
@@ -494,7 +502,7 @@ function useMovementEdit({
 		setError(null);
 		setConfirmCancel(false);
 	};
-	// Discard restores the read view with the movement's own values.
+	// Discard restores the read view with the planTransaction's own values.
 	const exitEdit = () => {
 		const field = activeField;
 		edit.reset();
@@ -516,7 +524,7 @@ function useMovementEdit({
 	};
 	// The visible form holds only the active control, so the draft (kept in
 	// the exact shape a full form would submit) is synthesized into FormData
-	// for the shared movement builder.
+	// for the shared planTransaction builder.
 	const submit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (readOnlyReason) return;
@@ -541,9 +549,9 @@ function useMovementEdit({
 		data.append("claimOccurrenceDate", draft.claimOccurrenceDate);
 		data.append("postedDate", draft.postedDate);
 		const validated = validatePlan(
-			buildMovementPlan({
+			buildTransactionPlan({
 				plan,
-				item: movement,
+				item: planTransaction,
 				data,
 			}),
 		);
@@ -592,22 +600,26 @@ function useMovementEdit({
 }
 
 function MarkAsSubscriptionAction({
-	movement,
+	planTransaction,
 	plan,
 	locked,
 	onDone,
 }: {
-	movement: Movement;
+	planTransaction: Transaction;
 	plan: Plan;
 	locked: boolean;
 	onDone: () => void;
 }) {
 	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const [error, setError] = useState<string | null>(null);
-	if (movement.frequency !== "once" || movement.claimRuleId || locked)
+	if (
+		planTransaction.frequency !== "once" ||
+		planTransaction.claimRuleId ||
+		locked
+	)
 		return null;
 	const mark = () => {
-		const next = markAsSubscription(plan, movement.id);
+		const next = markAsSubscription(plan, planTransaction.id);
 		if (next instanceof Error) {
 			setError(next.message);
 			return;
@@ -667,7 +679,7 @@ function fromAccountOptions(plan: Plan): Account[] {
  */
 export function TransactionDetail({
 	transaction,
-	movement,
+	planTransaction,
 	accounts,
 	plan,
 	claimRuleName,
@@ -675,7 +687,7 @@ export function TransactionDetail({
 	onClose,
 }: {
 	transaction: AccountTransaction;
-	movement: Movement;
+	planTransaction: Transaction;
 	accounts: AccountRef[];
 	plan: Plan;
 	claimRuleName?: string | null;
@@ -686,14 +698,17 @@ export function TransactionDetail({
 		transaction.category === "transfer"
 			? ("transfer" as const)
 			: transaction.direction;
-	const edit = useMovementEdit({ movement, plan, onClose });
-	const once = movement.frequency === "once";
+	const edit = useTransactionEdit({ planTransaction, plan, onClose });
+	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	const [deleting, setDeleting] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
+	const once = planTransaction.frequency === "once";
 	const canEdit = !edit.readOnlyReason;
 	const showShortfall = transaction.shortfall > 0.01;
 	const showExcluded = transaction.excluded && !transaction.pending;
 	const postedDiffers =
-		movement.postedDate !== null &&
-		movement.postedDate !== edit.draft.startDate;
+		planTransaction.postedDate !== null &&
+		planTransaction.postedDate !== edit.draft.startDate;
 	const fromAccount = accountFor(accounts, edit.draft.fromId || null);
 	const toAccount = accountFor(accounts, edit.draft.toId || null);
 	const hasStatusPill =
@@ -701,21 +716,37 @@ export function TransactionDetail({
 		transaction.source === "historical" ||
 		showExcluded ||
 		showShortfall ||
-		movement.amountKnown === false ||
-		(!movement.enabled && !transaction.pending && !showExcluded);
+		planTransaction.amountKnown === false ||
+		(!planTransaction.enabled && !transaction.pending && !showExcluded);
 	// Formula-driven rules without a resolved figure carry no amount to show:
 	// the Calculated badge says it all. Real zero-amount occurrences always
 	// carry a requested figure or shortfall, so they still render.
 	const showAmount =
-		movement.amountKnown ||
+		planTransaction.amountKnown ||
 		transaction.amount !== 0 ||
 		transaction.requested !== 0;
+	const removeTransaction = async () => {
+		if (deleting) return;
+		setDeleting(true);
+		setDeleteError(null);
+		const ok = await performSave({
+			call: () =>
+				planTransaction.frequency === "once"
+					? deletePosting(planTransaction.id)
+					: deleteRule(planTransaction.id),
+			refresh: refreshTransactions,
+			failureMessage: "The transaction could not be removed.",
+		});
+		setDeleting(false);
+		if (ok) onClose();
+		else setDeleteError("The transaction could not be removed.");
+	};
 	const editHeading = (
 		<>
 			<span className="sr-only">{edit.draft.name}</span>
 			<span className="flex items-center gap-3">
 				<span
-					className={movementIconStyles({
+					className={transactionIconStyles({
 						tone:
 							kind === "transfer"
 								? "transfer"
@@ -759,7 +790,7 @@ export function TransactionDetail({
 							form={edit.formId}
 							className={transactionControlStyles({ shape: "name" })}
 						/>
-						{movement.frequency !== "once" && (
+						{planTransaction.frequency !== "once" && (
 							<span
 								title="Recurring transaction"
 								aria-label="Recurring transaction"
@@ -794,7 +825,7 @@ export function TransactionDetail({
 										max="10000000000"
 										step="0.01"
 										value={
-											movement.amountKnown
+											planTransaction.amountKnown
 												? edit.draft.amount
 												: String(transaction.amount)
 										}
@@ -830,10 +861,10 @@ export function TransactionDetail({
 								{shortfallLabel ?? "Shortfall"}
 							</Badge>
 						)}
-						{!movement.enabled && !transaction.pending && !showExcluded && (
-							<Badge tone="warning">Excluded</Badge>
-						)}
-						{movement.amountKnown === false && (
+						{!planTransaction.enabled &&
+							!transaction.pending &&
+							!showExcluded && <Badge tone="warning">Excluded</Badge>}
+						{planTransaction.amountKnown === false && (
 							<Badge tone="neutral">Calculated</Badge>
 						)}
 						{hasStatusPill && (
@@ -986,18 +1017,34 @@ export function TransactionDetail({
 						scheduleControlId={`${edit.formId}-schedule`}
 					/>
 					<MarkAsSubscriptionAction
-						movement={movement}
+						planTransaction={planTransaction}
 						plan={plan}
 						locked={!canEdit}
 						onDone={onClose}
 					/>
 					<MoreOptions
-						movement={movement}
+						planTransaction={planTransaction}
 						plan={plan}
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}
 					/>
+					{canEdit && (
+						<div className="mt-4">
+							<Button
+								type="button"
+								variant="danger"
+								size="sm"
+								onClick={() => {
+									setDeleteError(null);
+									setConfirmingDelete(true);
+								}}
+							>
+								<Trash2 size={16} aria-hidden="true" />
+								Delete transaction
+							</Button>
+						</div>
+					)}
 					{edit.error && <ErrorNotice message={edit.error} />}
 					{edit.confirmCancel && (
 						<DiscardConfirm
@@ -1005,12 +1052,38 @@ export function TransactionDetail({
 							onDiscard={edit.discardAndClose}
 						/>
 					)}
-					<ReadOnlyNotice movement={movement} />
+					<ReadOnlyNotice planTransaction={planTransaction} />
 				</form>
 				{once && (
-					<ReceiptPanel postingId={movement.id} readOnly={plan.readOnly} />
+					<ReceiptPanel
+						postingId={planTransaction.id}
+						readOnly={plan.readOnly}
+					/>
 				)}
 			</Modal>
+			{confirmingDelete && (
+				<ConfirmDialog
+					title={`Delete ${planTransaction.name}?`}
+					eyebrow="Changes"
+					onCancel={() => {
+						if (!deleting) {
+							setConfirmingDelete(false);
+							setDeleteError(null);
+						}
+					}}
+					onConfirm={() => void removeTransaction()}
+					cancelLabel="Keep transaction"
+					confirmLabel="Delete transaction"
+					busyLabel="Deleting…"
+					busy={deleting}
+					error={deleteError}
+				>
+					<p>
+						This deletes the transaction immediately. It is removed from the
+						saved plan.
+					</p>
+				</ConfirmDialog>
+			)}
 		</DetailPortal>
 	);
 }
