@@ -100,29 +100,16 @@ test("saved target pins control Outlook without an evidence dialog", async ({
 	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(0);
 });
 
-test("edits remain temporary, persist across reload, and save deliberately", async ({
-	page,
-}) => {
+test("edits save immediately and persist across reload", async ({ page }) => {
 	await page.goto("/");
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.reload();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.getByRole("button", { name: "Save changes" }).click();
-	// Synchronize on save completion, not on the banner flipping to its
-	// loading text: the "unsaved change" copy disappears the moment the
-	// save starts, while the draft is only cleared after the server
-	// roundtrips finish. Reloading on the loading text races the save and
-	// restores a stale draft.
+	// Stored-only: Apply saves immediately, so the change reaches the
+	// server without a separate save step.
 	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 	await page.reload();
-	// The save reached the server, and the unsaved changes are gone.
+	// The save reached the server, and no temporary version remains.
 	const saved = await readSavedServerPlan();
 	expect(
 		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
@@ -131,26 +118,24 @@ test("edits remain temporary, persist across reload, and save deliberately", asy
 	expect(await readTemporaryVersion(page)).toBeNull();
 });
 
-test("discard is explicit and restores the saved plan", async ({ page }) => {
+test("discarding an unapplied edit restores the saved value", async ({
+	page,
+}) => {
 	await page.goto("/");
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("999");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await page.getByRole("button", { name: "Discard", exact: true }).click();
-	await expect(page.getByRole("dialog")).toContainText(
-		"Return to your saved plan?",
-	);
-	await page.getByRole("button", { name: "Keep exploring" }).click();
+	// Discard the unapplied form edit without touching the server.
+	await page.getByRole("button", { name: "Discard changes" }).click();
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.getByRole("button", { name: "Discard", exact: true }).click();
-	await page
-		.getByRole("button", { name: "Discard changes", exact: true })
-		.click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).not.toBeVisible();
+		page.getByRole("button", { name: "Apply unsaved changes" }),
+	).toHaveCount(0);
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
+	await expect(await readTemporaryVersion(page)).toBeNull();
+	const saved = await readSavedServerPlan();
+	expect(
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("600");
 });
 
 test("account, movement and evaluation maintenance plus search work", async ({
@@ -181,10 +166,7 @@ test("account, movement and evaluation maintenance plus search work", async ({
 
 test("failed saves retain the intended plan", async ({ page }) => {
 	await page.goto("/#sources");
-	await openInvestingMovementEditor(page);
-	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	// The server rejects the write, so the unsaved changes must survive.
+	// Fail the immediate save before applying the edit.
 	await page.route("**/v1/recurrence-rules/*", async (route) => {
 		if (route.request().method() === "PATCH")
 			return route.fulfill({
@@ -194,7 +176,10 @@ test("failed saves retain the intended plan", async ({ page }) => {
 			});
 		return route.continue();
 	});
-	await page.getByRole("button", { name: "Save changes" }).click();
+	await openInvestingMovementEditor(page);
+	await page.getByLabel("Amount (USD)").fill("900");
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	// The server rejects the write, so the unsaved changes must survive.
 	await expect(
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
@@ -436,28 +421,35 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	).toBeDisabled();
 });
 
-test("a second tab cannot overwrite newer financial work", async ({
+test("a second tab saves over older financial work with last-write-wins", async ({
 	page,
-	context,
+	browser,
 }) => {
 	await page.goto("/");
-	const other = await context.newPage();
+	// Isolated storage: no cross-tab draft sync interferes.
+	const otherContext = await browser.newContext();
+	const other = await otherContext.newPage();
 	await other.goto("/");
 	await openInvestingMovementEditor(other);
 	await other.getByLabel("Amount (USD)").fill("1200");
 	await other.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await expect(
+		other.getByText("Plan saved on the server."),
+	).toBeVisible();
 	await openInvestingMovementEditor(page);
 	await page.getByLabel("Amount (USD)").fill("1300");
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(page.getByRole("alert")).toContainText("another tab");
-	const stored = await readTemporaryVersion(page);
-	// The newer write from the other tab is what survives.
+	await expect(
+		page.getByText("Plan saved on the server."),
+	).toBeVisible();
+	// Row writes carry no preconditions: the newer write wins.
+	const saved = await readSavedServerPlan();
 	expect(
-		stored.movements.find(
-			(movement: { id: string }) => movement.id === "invest",
-		).amount,
-	).toBe(1200);
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("1300");
 	await other.close();
+	await otherContext.close();
 });
 
 test("tabs use arrow-key navigation and all main pages fit narrow screens", async ({

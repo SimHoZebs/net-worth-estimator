@@ -13,10 +13,6 @@ async function editInvestingAmount(page: Page) {
 	await page.getByRole("button", { name: "Monthly investing" }).click();
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
 }
 
 test("an ordinary save conflict preserves edits without another session check", async ({
@@ -41,7 +37,7 @@ test("an ordinary save conflict preserves edits without another session check", 
 			json: { status: 409, detail: "That change conflicts with server data." },
 		});
 	});
-	await page.getByRole("button", { name: "Save changes" }).click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(
 		page.getByRole("alert").filter({ hasText: "That change conflicts" }),
 	).toBeVisible();
@@ -79,7 +75,7 @@ test("a resource-change error restores the workspace without replaying the save"
 			json: { status: 409, code: "RESOURCE_CHANGED" },
 		});
 	});
-	await page.getByRole("button", { name: "Save changes" }).click();
+	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect.poll(() => sessionChecks).toBe(1);
 	await expect(
 		page.getByRole("button", { name: "Save changes" }),
