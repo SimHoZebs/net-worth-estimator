@@ -271,7 +271,7 @@ test("distinguishes a saved credential from unavailable sync and missing account
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
 	await expect(
-		bankSync.getByText(/the server has not enabled sync for this account/),
+		bankSync.getByText(/the server has not enabled sync for this user/),
 	).toBeVisible();
 	await expect(bankSync.getByText("No synced accounts yet.")).toBeVisible();
 	await expect(

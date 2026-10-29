@@ -814,7 +814,7 @@ function buildPresentationPosting(
 
 function defaultPlanName(document: FinancialModelDocument): string {
 	const value = document.sourcePath.split("/").filter(Boolean).at(-1);
-	return value || "Waypoint account";
+	return value || "Waypoint model";
 }
 
 export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
@@ -1750,7 +1750,7 @@ export function displayPlanToBackendDocument(
 	);
 	const previousName =
 		options.presentation?.name ??
-		(sourceDocument ? defaultPlanName(sourceDocument) : "Waypoint account");
+		(sourceDocument ? defaultPlanName(sourceDocument) : "Waypoint model");
 	const previousOrigin = options.presentation?.origin ?? "personal";
 	const previousUpdatedAt =
 		options.presentation?.updatedAt ?? new Date(0).toISOString();

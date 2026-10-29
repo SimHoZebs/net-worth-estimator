@@ -706,8 +706,7 @@ describe("remote workspace state", () => {
 		)?.signal as AbortSignal | undefined;
 		rendered.rerender();
 		expect(
-			serverQueryClient().getQueryState(userResourceKey("model"))
-				?.fetchStatus,
+			serverQueryClient().getQueryState(userResourceKey("model"))?.fetchStatus,
 		).toBe("fetching");
 		expect(signal?.aborted).toBe(false);
 		await act(async () => {

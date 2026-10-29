@@ -289,10 +289,7 @@ export function useResourceSession() {
 			if (signingOut.current !== attempt) return;
 			signingOut.current = null;
 			const error = cause instanceof Error ? cause.message : "Sign-out failed.";
-			if (
-				getUserScope().status === "pending" &&
-				!verification.current?.error
-			)
+			if (getUserScope().status === "pending" && !verification.current?.error)
 				await refresh();
 			if (mounted.current) setStatus((previous) => ({ ...previous, error }));
 			// Notify last: the refresh above can drive a scope transition

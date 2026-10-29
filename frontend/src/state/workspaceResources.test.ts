@@ -100,9 +100,7 @@ describe("direct Query ownership", () => {
 			Balance: 100,
 		});
 		expect(getCheckpoints()).toEqual(all);
-		expect(getCheckpoints(getUserScope(), { accountId: "cash" })).toEqual(
-			cash,
-		);
+		expect(getCheckpoints(getUserScope(), { accountId: "cash" })).toEqual(cash);
 		const fetcher = server.fetcher;
 		expect(
 			fetcher.mock.calls.filter(([url]) =>

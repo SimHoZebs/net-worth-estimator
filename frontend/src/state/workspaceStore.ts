@@ -149,7 +149,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			return fail(
 				error instanceof Error
 					? error.message
-					: "The account data could not be converted.",
+					: "The model could not be converted.",
 			);
 		}
 		const changed =
@@ -174,8 +174,8 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 		notifySuccess(
 			"workspace-notice",
 			replacing
-				? "Imported account data is ready for review and save."
-				: "Unsaved changes updated. Saved account unchanged.",
+				? "Imported model data is ready for review and save."
+				: "Unsaved changes updated. Saved model unchanged.",
 		);
 		return true;
 	};

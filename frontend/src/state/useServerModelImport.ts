@@ -1,10 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import type { FinancialModelDocument } from "../api/contracts.ts";
 import { responseScopeError } from "../api/scopedRequest.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-} from "../auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "../auth/resourceScope.ts";
 import {
 	importServerModel,
 	type ServerModelImportOptions,

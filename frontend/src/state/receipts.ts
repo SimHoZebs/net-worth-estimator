@@ -15,10 +15,7 @@ import type {
 	ReceiptDetails,
 } from "@/api/generated/model/index.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import { useServerModel, userResourceKey } from "./workspaceResources.ts";
 

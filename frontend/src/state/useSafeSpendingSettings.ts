@@ -132,9 +132,7 @@ function subscribeSettings(listener: () => void) {
 	return serverQueryClient().getQueryCache().subscribe(listener);
 }
 
-export function updateSettingsForScope(
-	scope: UserScope = getUserScope(),
-) {
+export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 	return (next: Partial<TotalCycleSettings>) => {
 		if (
 			scope !== getUserScope() ||

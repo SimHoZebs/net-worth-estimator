@@ -7,10 +7,7 @@ import type { PurchaseSchedule } from "../../domain/result.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { stageAndSave } from "../../state/workspaceWrites.ts";
-import {
-	useDraftConflict,
-	useUserReadOnly,
-} from "../../state/useUserScope.ts";
+import { useDraftConflict, useUserReadOnly } from "../../state/useUserScope.ts";
 import { WishListEditor } from "./WishListEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";

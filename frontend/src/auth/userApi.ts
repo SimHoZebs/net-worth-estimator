@@ -28,15 +28,15 @@ async function userRequest<T>(
 	fallback = "Account details are unavailable.",
 ): Promise<T> {
 	if (scope !== getUserScope() || !isUserScope(scope, session))
-		throw new Error("The active account changed.");
+		throw new Error("The active user changed.");
 	try {
 		const result = await perform();
 		if (scope !== getUserScope() || !isUserScope(scope, session))
-			throw new Error("The active account changed.");
+			throw new Error("The active user changed.");
 		return result;
 	} catch (cause) {
 		if (cause instanceof ApiHttpError && cause.status === 401)
-			throw new Error("Sign in to manage your account.");
+			throw new Error("Sign in to manage your data.");
 		// A missing endpoint means the account service is not serving the
 		// request. The raw transport body ("404 page not found") names a
 		// route, not the account, so it never reaches the UI.

@@ -72,14 +72,14 @@ test("application snapshot includes multiple users and identity state in one fil
   const source = resolve(dir, "app.db");
   const writer = new DatabaseSync(source);
   writer.exec(
-    "PRAGMA journal_mode=WAL; CREATE TABLE app_accounts(id TEXT); INSERT INTO app_accounts VALUES('owner'),('second'),('sample'); CREATE TABLE model_metadata(account_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('sample',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');",
+    "PRAGMA journal_mode=WAL; CREATE TABLE users(id TEXT); INSERT INTO users VALUES('owner'),('second'),('sample'); CREATE TABLE model_metadata(user_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('sample',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');",
   );
   try {
     const target = resolve(dir, "snapshot.db");
     await snapshotFile(source, target);
     const sample = new DatabaseSync(target, { readOnly: true });
     try {
-      assert.equal(sample.prepare("SELECT COUNT(*) AS n FROM app_accounts").get().n, 3);
+      assert.equal(sample.prepare("SELECT COUNT(*) AS n FROM users").get().n, 3);
       assert.equal(sample.prepare("SELECT data FROM identity_grants").get().data, "sealed grant");
     } finally {
       sample.close();
@@ -100,7 +100,7 @@ test("explicit setup provisions an empty application snapshot and repeat setup p
     assert.equal(validateSnapshot(source), "application");
     const first = new DatabaseSync(source);
     try {
-      assert.equal(first.prepare("SELECT COUNT(*) AS n FROM app_accounts").get().n, 0);
+      assert.equal(first.prepare("SELECT COUNT(*) AS n FROM users").get().n, 0);
       for (const table of [
         "sessions",
         "identity_grants",

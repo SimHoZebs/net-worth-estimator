@@ -69,7 +69,7 @@ export function ServerWorkspaceRecovery() {
 				title={
 					missingModel
 						? "No financial model is stored on this server"
-						: "Your account workspace needs attention"
+						: "Your workspace needs attention"
 				}
 				onRetry={() => {
 					void retry();

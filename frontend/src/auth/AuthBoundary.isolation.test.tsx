@@ -11,10 +11,7 @@ import {
 	useWorkspaceStore,
 } from "@/state/workspaceStore.ts";
 import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
-import {
-	useServerModel,
-	userResourceKey,
-} from "@/state/workspaceResources.ts";
+import { useServerModel, userResourceKey } from "@/state/workspaceResources.ts";
 import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
@@ -488,9 +485,7 @@ describe("authentication resource isolation", () => {
 				`${A}:empty`,
 			),
 		);
-		expect(getUserScope().apiBaseUrl).toBe(
-			canonicalApiBaseUrl("/second-api"),
-		);
+		expect(getUserScope().apiBaseUrl).toBe(canonicalApiBaseUrl("/second-api"));
 		expect(useWorkspaceStore.getState().draft).toBeNull();
 		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
 	});

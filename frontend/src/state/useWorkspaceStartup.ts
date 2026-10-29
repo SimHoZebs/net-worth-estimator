@@ -1,8 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import {
-	getUserScope,
-	subscribeUserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { useWorkspaceStore } from "@/state/workspaceStore.ts";
 import {

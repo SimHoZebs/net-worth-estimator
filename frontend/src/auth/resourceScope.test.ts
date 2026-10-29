@@ -27,9 +27,7 @@ describe("verified user scope", () => {
 		const newer = suspendUserScope();
 		expect(acceptUserScope(input, pending)).toBeNull();
 		expect(getUserScope()).toBe(newer);
-		expect(acceptUserScope(input, newer)?.resource?.id).toBe(
-			input.resource.id,
-		);
+		expect(acceptUserScope(input, newer)?.resource?.id).toBe(input.resource.id);
 	});
 
 	it("includes resource, subject, API, and permissions in a stable identity", () => {
@@ -68,9 +66,7 @@ describe("verified user scope", () => {
 
 	it("invalidates captured requests before it requests a session recheck", () => {
 		const captured = acceptUserScope(input, suspendUserScope());
-		const listener = vi.fn(() =>
-			expect(getUserScope().status).toBe("pending"),
-		);
+		const listener = vi.fn(() => expect(getUserScope().status).toBe("pending"));
 		window.addEventListener("waypoint:authentication-required", listener);
 		requireUserRecheck();
 		expect(getUserScope()).not.toBe(captured);

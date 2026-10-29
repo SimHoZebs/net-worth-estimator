@@ -10,7 +10,7 @@ import type { ApiHttpError, FetchLike } from "./http.ts";
 export class UserScopeError extends Error {
 	readonly status = 409;
 	constructor(
-		message = "The active account changed. Verify your session before continuing.",
+		message = "The active user changed. Verify your session before continuing.",
 	) {
 		super(message);
 		this.name = "UserScopeError";
@@ -22,9 +22,7 @@ export interface ScopedResponse {
 	scope: UserScope;
 }
 
-export function responseScopeError(
-	scope: UserScope,
-): UserScopeError | null {
+export function responseScopeError(scope: UserScope): UserScopeError | null {
 	return scope === getUserScope() ? null : new UserScopeError();
 }
 
