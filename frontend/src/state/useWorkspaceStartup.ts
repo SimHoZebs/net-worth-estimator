@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import {
-	getAccountScope,
-	subscribeAccountScope,
+	getUserScope,
+	subscribeUserScope,
 } from "@/auth/resourceScope.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { useWorkspaceStore } from "@/state/workspaceStore.ts";
@@ -13,7 +13,7 @@ import {
 import { useWorkspaceSyncMonitor } from "@/state/useWorkspaceSyncMonitor.ts";
 
 export function useWorkspaceStartup(): void {
-	const scope = useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	const resourceId = useSession()?.session.resource.id;
 	const enabled =
 		scope.status === "ready" &&

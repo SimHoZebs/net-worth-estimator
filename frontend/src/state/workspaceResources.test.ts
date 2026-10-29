@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { testAccount } from "../mocks/account.ts";
-import { getAccountScope } from "../auth/resourceScope.ts";
+import { getUserScope } from "../auth/resourceScope.ts";
 import {
 	checkpointsOptions,
 	getCheckpoints,
 	getServerModel,
 	modelOptions,
 	resolversOptions,
-	accountResourceKey,
+	userResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
 import { resetWorkspaceStore, useWorkspaceStore } from "./workspaceStore.ts";
@@ -78,7 +78,7 @@ describe("direct Query ownership", () => {
 			baseRevision: "base",
 		});
 		serverQueryClient().removeQueries({
-			queryKey: accountResourceKey("model"),
+			queryKey: userResourceKey("model"),
 			exact: true,
 		});
 		expect(getServerModel()).toBeUndefined();
@@ -92,7 +92,7 @@ describe("direct Query ownership", () => {
 		expect(all.checkpoints).toHaveLength(2);
 		expect(all.revision).toBe("current");
 		const cash = await serverQueryClient().fetchQuery(
-			checkpointsOptions(getAccountScope(), { accountId: "cash" }),
+			checkpointsOptions(getUserScope(), { accountId: "cash" }),
 		);
 		expect(cash.checkpoints).toHaveLength(1);
 		expect(cash.checkpoints[0]).toMatchObject({
@@ -100,7 +100,7 @@ describe("direct Query ownership", () => {
 			Balance: 100,
 		});
 		expect(getCheckpoints()).toEqual(all);
-		expect(getCheckpoints(getAccountScope(), { accountId: "cash" })).toEqual(
+		expect(getCheckpoints(getUserScope(), { accountId: "cash" })).toEqual(
 			cash,
 		);
 		const fetcher = server.fetcher;

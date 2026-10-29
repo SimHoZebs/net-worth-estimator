@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { getAccountScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import {
 	financialQueryFilter,
 	serverQueryClient,
@@ -9,7 +9,7 @@ import {
 	reloadWorkspace,
 	statusOptions,
 	workspaceIsBusy,
-	accountResourceKey,
+	userResourceKey,
 } from "@/state/workspaceResources.ts";
 
 export function useWorkspaceSyncMonitor(enabled: boolean): void {
@@ -17,17 +17,17 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 	// ready-to-ready plan switch re-runs the effect and recaptures scope.
 	// Keying on `enabled` alone left a stale capture whose guard bailed on
 	// every poll after a plan switch.
-	const scopeKey = getAccountScope().key;
+	const scopeKey = getUserScope().key;
 	useEffect(() => {
 		if (!enabled) return;
-		const scope = getAccountScope();
+		const scope = getUserScope();
 		const cache = serverQueryClient();
 		const check = async () => {
 			if (
-				scope !== getAccountScope() ||
+				scope !== getUserScope() ||
 				document.visibilityState === "hidden" ||
 				workspaceIsBusy() ||
-				cache.isFetching({ queryKey: accountResourceKey("status", scope) })
+				cache.isFetching({ queryKey: userResourceKey("status", scope) })
 			)
 				return;
 			const before = getServerStatus(scope)?.lastSyncAt ?? "";
@@ -37,7 +37,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 					staleTime: 0,
 				});
 				if (
-					scope !== getAccountScope() ||
+					scope !== getUserScope() ||
 					workspaceIsBusy() ||
 					before === (status.lastSyncAt ?? "")
 				)
@@ -45,7 +45,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 				const filter = financialQueryFilter(scope.key);
 				await cache.invalidateQueries({ ...filter, refetchType: "none" });
 				await reloadWorkspace();
-				if (scope === getAccountScope())
+				if (scope === getUserScope())
 					await cache.refetchQueries({
 						...filter,
 						type: "active",

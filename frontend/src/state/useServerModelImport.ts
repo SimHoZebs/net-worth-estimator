@@ -2,8 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import type { FinancialModelDocument } from "../api/contracts.ts";
 import { responseScopeError } from "../api/scopedRequest.ts";
 import {
-	getAccountScope,
-	subscribeAccountScope,
+	getUserScope,
+	subscribeUserScope,
 } from "../auth/resourceScope.ts";
 import {
 	importServerModel,
@@ -17,12 +17,12 @@ import { serverQueryClient } from "./serverQuery.ts";
 // shared flag resets on publish instead of sticking until reload. This does
 // not restore the old unmount cleanup, which cleared the flag while a
 // different import on the same scope was still running.
-subscribeAccountScope(() => {
+subscribeUserScope(() => {
 	useUiStore.getState().setImporting(false);
 });
 
 export function useServerModelImport(options: ServerModelImportOptions) {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const mutation = useMutation(
 		{
 			mutationKey: ["server-model-import", scope.key],

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptAccountScope,
-	suspendAccountScope,
+	acceptUserScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
 	clearResourceQueryCache,
@@ -15,28 +15,28 @@ import {
 } from "./serverQuery.ts";
 
 function owner(id: string) {
-	acceptAccountScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: "https://plan.example",
 			resource: {
 				id,
 				kind: "private",
-				permissions: ["account:read", "account:project"],
+				permissions: ["user:read", "user:project"],
 			},
 			subject: id,
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	);
 }
 
 afterEach(() => {
 	resetServerQueryCache();
-	suspendAccountScope();
+	suspendUserScope();
 });
 
 describe("resource-scoped projection cache", () => {
 	it("filters calculations by resource without matching session data", () => {
-		owner("accounts/a");
+		owner("users/a");
 		const keys = [
 			deterministicQueryKey("doc", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
@@ -46,7 +46,7 @@ describe("resource-scoped projection cache", () => {
 		for (const queryKey of keys)
 			expect(filter.predicate({ queryKey })).toBe(true);
 		expect(filter.predicate({ queryKey: ["session"] })).toBe(false);
-		owner("accounts/b");
+		owner("users/b");
 		for (const queryKey of [
 			deterministicQueryKey("doc", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
@@ -55,7 +55,7 @@ describe("resource-scoped projection cache", () => {
 			expect(filter.predicate({ queryKey })).toBe(false);
 	});
 	it("keeps calculations fresh beyond a minute but supports explicit invalidation", async () => {
-		owner("accounts/a");
+		owner("users/a");
 		const client = serverQueryClient();
 		for (const queryKey of [
 			deterministicQueryKey("doc", 10),
@@ -77,13 +77,13 @@ describe("resource-scoped projection cache", () => {
 			expect(queryFn).toHaveBeenCalledOnce();
 		}
 	});
-	it("never reuses identical deterministic or stochastic inputs across accounts", () => {
-		owner("accounts/a");
+	it("never reuses identical deterministic or stochastic inputs across users", () => {
+		owner("users/a");
 		const deterministicA = deterministicQueryKey("same-document", 10);
 		const stochasticA = stochasticQueryKey("same-document", 10, 100, 42, 0);
 		serverQueryClient().setQueryData(deterministicA, "private-a-result");
 		serverQueryClient().setQueryData(stochasticA, "private-a-bands");
-		owner("accounts/b");
+		owner("users/b");
 		const deterministicB = deterministicQueryKey("same-document", 10);
 		const stochasticB = stochasticQueryKey("same-document", 10, 100, 42, 0);
 		expect(deterministicB).not.toEqual(deterministicA);
@@ -92,16 +92,16 @@ describe("resource-scoped projection cache", () => {
 		expect(serverQueryClient().getQueryData(stochasticB)).toBeUndefined();
 	});
 
-	it("reuses results after a same-account verification", () => {
-		owner("accounts/a");
+	it("reuses results after a same-user verification", () => {
+		owner("users/a");
 		const before = deterministicQueryKey("same-document", 10);
 		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
-		owner("accounts/a");
+		owner("users/a");
 		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
 	});
 
 	it("isolates deterministic cache entries by range", () => {
-		owner("accounts/a");
+		owner("users/a");
 		const full = deterministicQueryKey("same-document", 10, "..2028-01-31");
 		const narrowed = deterministicQueryKey(
 			"same-document",
@@ -116,7 +116,7 @@ describe("resource-scoped projection cache", () => {
 	});
 
 	it("aborts old fetches, removes data, and ignores late non-cooperative results", async () => {
-		owner("accounts/a");
+		owner("users/a");
 		const client = serverQueryClient();
 		const key = deterministicQueryKey("same-document", 10);
 		let signal: AbortSignal | undefined;
@@ -141,8 +141,8 @@ describe("resource-scoped projection cache", () => {
 		expect(client.getQueryCache().getAll()).toHaveLength(0);
 	});
 
-	it("cancels verification-era work without losing completed same-account results", async () => {
-		owner("accounts/a");
+	it("cancels verification-era work without losing completed same-user results", async () => {
+		owner("users/a");
 		const client = serverQueryClient();
 		const key = deterministicQueryKey("same-document", 10);
 		client.setQueryData(key, "completed-result");
@@ -161,7 +161,7 @@ describe("resource-scoped projection cache", () => {
 			})
 			.catch(() => null);
 		await cancelResourceQueries();
-		owner("accounts/a");
+		owner("users/a");
 		finish("late-result");
 		await pending;
 		expect(signal?.aborted).toBe(true);

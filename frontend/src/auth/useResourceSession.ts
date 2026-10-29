@@ -13,11 +13,11 @@ import {
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
 import {
-	acceptAccountScope,
-	accountScopeKey,
+	acceptUserScope,
+	userScopeKey,
 	canonicalApiBaseUrl,
-	getAccountScope,
-	suspendAccountScope,
+	getUserScope,
+	suspendUserScope,
 } from "./resourceScope.ts";
 import {
 	announceSessionChange,
@@ -75,7 +75,7 @@ export function useResourceSession() {
 		// mounted until discovery proves the owner changed or denies access.
 		// Suspending upfront wiped the UI on every focus event and on
 		// transient outages, which flickered and hid usable data.
-		const pending = previous ? null : suspendAccountScope();
+		const pending = previous ? null : suspendUserScope();
 		check.pending = (async () => {
 			try {
 				if (!previous) await cancelResourceQueries();
@@ -99,9 +99,9 @@ export function useResourceSession() {
 				const input = sessionScopeInput(next.session, apiBaseUrl);
 				const changed =
 					!previous ||
-					accountScopeKey(
+					userScopeKey(
 						sessionScopeInput(previous.session, previous.apiBaseUrl),
-					) !== accountScopeKey(input);
+					) !== userScopeKey(input);
 				if (!previous) {
 					if (changed) {
 						resetWorkspaceForResource({
@@ -115,11 +115,11 @@ export function useResourceSession() {
 						setSession(next.session);
 						setStatus({
 							phase: "denied",
-							error: "This account does not have access.",
+							error: "This user does not have access.",
 						});
 						return;
 					}
-					const verified = acceptAccountScope(input, pending!);
+					const verified = acceptUserScope(input, pending!);
 					if (
 						!verified ||
 						!(await hydrateFinancialPreferences(verified)) ||
@@ -134,9 +134,9 @@ export function useResourceSession() {
 					return;
 				}
 				// A rejected request needs a fresh scope even if the same account returns.
-				if (!changed && getAccountScope().status === "ready") {
+				if (!changed && getUserScope().status === "ready") {
 					if (!next.session.allowed) {
-						suspendAccountScope();
+						suspendUserScope();
 						await cancelResourceQueries();
 						if (signal.aborted) return;
 						const activeLogout = signingOut.current as LogoutAttempt | null;
@@ -151,7 +151,7 @@ export function useResourceSession() {
 						setSession(next.session);
 						setStatus({
 							phase: "denied",
-							error: "This account does not have access.",
+							error: "This user does not have access.",
 						});
 						return;
 					}
@@ -162,7 +162,7 @@ export function useResourceSession() {
 					dismissKey("session");
 					return;
 				}
-				const hardPending = suspendAccountScope();
+				const hardPending = suspendUserScope();
 				await cancelResourceQueries();
 				if (signal.aborted) return;
 				const activeLogout = signingOut.current as LogoutAttempt | null;
@@ -180,11 +180,11 @@ export function useResourceSession() {
 					setSession(next.session);
 					setStatus({
 						phase: "denied",
-						error: "This account does not have access.",
+						error: "This user does not have access.",
 					});
 					return;
 				}
-				const verified = acceptAccountScope(input, hardPending);
+				const verified = acceptUserScope(input, hardPending);
 				if (
 					!verified ||
 					!(await hydrateFinancialPreferences(verified)) ||
@@ -265,7 +265,7 @@ export function useResourceSession() {
 				if (response.status === 409) await refresh();
 				throw new Error("Sign-out failed. Please retry.");
 			}
-			suspendAccountScope();
+			suspendUserScope();
 			resetWorkspaceForResource();
 			// Local logout can complete even when prior discovery failed.
 			if (verification.current) verification.current.error = undefined;
@@ -290,7 +290,7 @@ export function useResourceSession() {
 			signingOut.current = null;
 			const error = cause instanceof Error ? cause.message : "Sign-out failed.";
 			if (
-				getAccountScope().status === "pending" &&
+				getUserScope().status === "pending" &&
 				!verification.current?.error
 			)
 				await refresh();
@@ -334,7 +334,7 @@ export function useResourceSession() {
 			verification.current?.controller.abort();
 			signingOut.current = null;
 			owner.current = null;
-			suspendAccountScope();
+			suspendUserScope();
 			resetWorkspaceForResource();
 			void clearResourceQueryCache();
 		};

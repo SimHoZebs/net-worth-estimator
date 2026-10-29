@@ -6,13 +6,13 @@ import { isRecord } from "@/domain/guards.ts";
 import type { Session } from "@/auth/sessionContext.ts";
 import {
 	canonicalApiBaseUrl,
-	type AccountScopeInput,
+	type UserScopeInput,
 } from "@/auth/resourceScope.ts";
 
 export function sessionScopeInput(
 	session: Session,
 	baseUrl = getApiBaseUrl(),
-): AccountScopeInput {
+): UserScopeInput {
 	return {
 		apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 		resource: session.resource,
@@ -73,15 +73,13 @@ async function readSession(
 	)
 		throw new Error("Invalid authentication status.");
 	const resource: unknown = next.resource;
-	// Only canonical account ids (`accounts/*`, `user:<hash>`). Sample is
-	// `accounts/sample`. Legacy plan ids are rejected: no legacy wire support.
+	// Only canonical user ids (`users/*`). Sample is
+	// `users/sample`. Legacy plan ids are rejected: no legacy wire support.
 	const resourceId =
 		isRecord(resource) && typeof resource.id === "string" ? resource.id : null;
 	const authenticatedId =
-		typeof resourceId === "string" &&
-		(/^accounts\/[a-f0-9]{64}$/.test(resourceId) ||
-			/^user:[a-f0-9]{64}$/.test(resourceId));
-	const sampleId = resourceId === "accounts/sample";
+		typeof resourceId === "string" && /^users\/[a-f0-9]{64}$/.test(resourceId);
+	const sampleId = resourceId === "users/sample";
 	if (
 		!isRecord(resource) ||
 		typeof resource.id !== "string" ||
@@ -98,7 +96,7 @@ async function readSession(
 				!next.user.subject.trim()))
 	)
 		throw new Error(
-			"The server returned an invalid account resource. Retry the session check.",
+			"The server returned an invalid user resource. Retry the session check.",
 		);
 	return next as unknown as Session;
 }

@@ -9,7 +9,7 @@ import {
 	useAmountPresets,
 	useAmountResolvers,
 } from "../../state/workspaceResources.ts";
-import { useAccountReadOnly } from "../../state/useAccountScope.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
 import {
 	createPreset,
 	updatePreset,
@@ -93,7 +93,7 @@ export function AmountCatalog({
 	const remote = useAmountResolvers().data;
 	const serverPresets = useAmountPresets().data ?? null;
 	const presetThunks = { createPreset, updatePreset, deletePreset, movePreset };
-	const readOnly = useAccountReadOnly();
+	const readOnly = useUserReadOnly();
 
 	// Server presets are the source of truth; the hook covers the offline gap.
 	const templates = useAmountTemplates();
