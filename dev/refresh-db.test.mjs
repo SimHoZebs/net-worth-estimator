@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { validateRefresh } from "./refresh-db.mjs";
 
 test("refresh requires explicit source and destination scopes before any service operation", () => {
-  assert.throws(() => validateRefresh({}), /source-plan/);
-  assert.throws(() => validateRefresh({ "source-plan": "plans/source" }), /--plan/);
+  assert.throws(() => validateRefresh({}), /source-account/);
+  assert.throws(() => validateRefresh({ "source-account": "accounts/source" }), /--account/);
   assert.throws(
-    () => validateRefresh({ "source-plan": "plans/source", plan: "plans/sample" }),
-    /private plan/,
+    () => validateRefresh({ "source-account": "accounts/source", account: "accounts/sample" }),
+    /private account/,
   );
   assert.doesNotThrow(() =>
-    validateRefresh({ "source-plan": "plans/source", plan: "plans/owner" }),
+    validateRefresh({ "source-account": "accounts/source", account: "accounts/owner" }),
   );
 });
