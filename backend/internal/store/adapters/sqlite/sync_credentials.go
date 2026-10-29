@@ -12,7 +12,7 @@ import (
 // credential when no key has been connected.
 func (s *sqliteStore) GetSyncCredential() (SyncCredential, error) {
 	var accessURL, bridgeHost, updatedAt, cardsJSON string
-	err := s.db.QueryRow(`SELECT access_url, bridge_host, updated_at, cards_json FROM sync_credentials WHERE id = 1 AND plan_id = :plan_id`).Scan(&accessURL, &bridgeHost, &updatedAt, &cardsJSON)
+	err := s.db.QueryRow(`SELECT access_url, bridge_host, updated_at, cards_json FROM sync_credentials WHERE id = 1 AND account_id = :account_id`).Scan(&accessURL, &bridgeHost, &updatedAt, &cardsJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return SyncCredential{}, nil
@@ -39,9 +39,9 @@ func (s *sqliteStore) SetSyncCredential(accessURL, bridgeHost string) (SyncCrede
 		return s.clearCredentialLocked()
 	}
 	updatedAt := time.Now().UTC().Format(time.RFC3339)
-	if _, err := s.db.Exec(`INSERT INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, plan_id)
-		VALUES (1, ?, ?, ?, '[]', :plan_id)
-		ON CONFLICT(plan_id, id) DO UPDATE SET access_url = excluded.access_url, bridge_host = excluded.bridge_host, updated_at = excluded.updated_at`,
+	if _, err := s.db.Exec(`INSERT INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, account_id)
+		VALUES (1, ?, ?, ?, '[]', :account_id)
+		ON CONFLICT(account_id, id) DO UPDATE SET access_url = excluded.access_url, bridge_host = excluded.bridge_host, updated_at = excluded.updated_at`,
 		accessURL, bridgeHost, updatedAt); err != nil {
 		return SyncCredential{}, fmt.Errorf("store sync credential: %w", err)
 	}
@@ -56,9 +56,9 @@ func (s *sqliteStore) ClearSyncCredential() error {
 }
 
 func (s *sqliteStore) clearCredentialLocked() (SyncCredential, error) {
-	if _, err := s.db.Exec(`INSERT INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, plan_id)
-		VALUES (1, '', '', '', '[]', :plan_id)
-		ON CONFLICT(plan_id, id) DO UPDATE SET access_url = '', bridge_host = '', updated_at = ''`); err != nil {
+	if _, err := s.db.Exec(`INSERT INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, account_id)
+		VALUES (1, '', '', '', '[]', :account_id)
+		ON CONFLICT(account_id, id) DO UPDATE SET access_url = '', bridge_host = '', updated_at = ''`); err != nil {
 		return SyncCredential{}, fmt.Errorf("clear sync credential: %w", err)
 	}
 	return s.GetSyncCredential()
@@ -82,9 +82,9 @@ func (s *sqliteStore) SetSyncCards(cards []string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encode sync cards: %w", err)
 	}
-	if _, err := s.db.Exec(`INSERT INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, plan_id)
-		VALUES (1, '', '', '', ?, :plan_id)
-		ON CONFLICT(plan_id, id) DO UPDATE SET cards_json = excluded.cards_json`, string(payload)); err != nil {
+	if _, err := s.db.Exec(`INSERT INTO sync_credentials (id, access_url, bridge_host, updated_at, cards_json, account_id)
+		VALUES (1, '', '', '', ?, :account_id)
+		ON CONFLICT(account_id, id) DO UPDATE SET cards_json = excluded.cards_json`, string(payload)); err != nil {
 		return nil, fmt.Errorf("store sync cards: %w", err)
 	}
 	return cards, nil

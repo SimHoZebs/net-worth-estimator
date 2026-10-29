@@ -36,7 +36,8 @@ func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 	}{
 		{"empty", "", ErrSetupRequired},
 		{"legacy", `CREATE TABLE accounts(id TEXT PRIMARY KEY); INSERT INTO accounts VALUES ('private')`, ErrLegacyDatabase},
-		{"marker-only", `CREATE TABLE schema_migrations(name TEXT PRIMARY KEY); INSERT INTO schema_migrations VALUES ('shared-plans-v1')`, ErrSetupRequired},
+		{"marker-only", `CREATE TABLE schema_migrations(name TEXT PRIMARY KEY); INSERT INTO schema_migrations VALUES ('shared-plans-v1')`, ErrLegacyDatabase},
+		{"marker-accounts-only", `CREATE TABLE schema_migrations(name TEXT PRIMARY KEY); INSERT INTO schema_migrations VALUES ('shared-accounts-v1')`, ErrSetupRequired},
 		{"missing-identity", `DROP TABLE sessions`, ErrSetupRequired},
 		{"missing-groups", `DROP TABLE group_members`, ErrSetupRequired},
 		{"missing-financial", `DROP TABLE account_links`, ErrSetupRequired},
@@ -45,7 +46,7 @@ func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "source.db")
-			if tc.name != "empty" && tc.name != "legacy" && tc.name != "marker-only" {
+			if tc.name != "empty" && tc.name != "legacy" && tc.name != "marker-only" && tc.name != "marker-accounts-only" {
 				d, err := SetupDatabase(path)
 				if err != nil {
 					t.Fatal(err)
@@ -130,8 +131,8 @@ func TestSetupDatabaseAndRepeatedOpenPreserveSchemaAndData(t *testing.T) {
 		if err := d.SQL().QueryRow(`SELECT token FROM sessions`).Scan(&token); err != nil || token != "session" {
 			t.Fatalf("session = %q, %v", token, err)
 		}
-		if exists, err := d.HasPlan("plans/a"); err != nil || !exists {
-			t.Fatalf("plan = %v, %v", exists, err)
+		if exists, err := d.HasAccount("a"); err != nil || !exists {
+			t.Fatalf("account = %v, %v", exists, err)
 		}
 		if err := d.Close(); err != nil {
 			t.Fatal(err)
@@ -196,8 +197,8 @@ func TestSetupDatabaseAcceptsEmptyFileAndCompletesSharedSchema(t *testing.T) {
 			t.Fatal(err)
 		}
 		var count int
-		if err := d.SQL().QueryRow(`SELECT (SELECT COUNT(*) FROM plans) + (SELECT COUNT(*) FROM app_accounts)`).Scan(&count); err != nil || count != 0 {
-			t.Fatalf("setup provisioned accounts/plans: %d, %v", count, err)
+		if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM app_accounts`).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("setup provisioned accounts: %d, %v", count, err)
 		}
 		if err := d.Close(); err != nil {
 			t.Fatal(err)

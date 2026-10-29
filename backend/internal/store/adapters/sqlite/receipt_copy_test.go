@@ -24,7 +24,7 @@ func TestReceiptCopyUsesBlobPortsAndRollsBackUnpublishedObjects(t *testing.T) {
 	}
 	d, target, blobs, _ := externalBlobFixture(t)
 	for _, commit := range []bool{false, true} {
-		copy, err := d.PrepareReceiptCopy(t.Context(), source.SQL(), blobsqlite.New(source.SQL()), s.db.planID)
+		copy, err := d.PrepareReceiptCopy(t.Context(), source.SQL(), blobsqlite.New(source.SQL()), s.db.accountID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -33,7 +33,7 @@ func TestReceiptCopyUsesBlobPortsAndRollsBackUnpublishedObjects(t *testing.T) {
 			copy.Close()
 			t.Fatal(err)
 		}
-		if err := copy.Apply(tx, target.db.planID); err != nil {
+		if err := copy.Apply(tx, target.db.accountID); err != nil {
 			tx.Rollback()
 			copy.Close()
 			t.Fatal(err)
