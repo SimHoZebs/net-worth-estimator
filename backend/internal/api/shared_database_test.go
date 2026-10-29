@@ -17,7 +17,7 @@ import (
 
 // These tests use the HTTP API over two scopes of one physical database. Router
 // authorization tests separately prove that the caller cannot choose a scope.
-func TestSharedDatabaseAPICanonicalReadsRemainPlanScoped(t *testing.T) {
+func TestSharedDatabaseAPICanonicalReadsRemainAccountScoped(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainPlanScoped(t *testing.T) {
 	handlers := make([]http.Handler, 2)
 	for i, subject := range []string{"alice", "bob"} {
 		resource := authorization.ResourceFor(issuer, subject)
-		stores[i], err = database.EnsurePrivatePlan(resource.ID, authorization.ActorKey(issuer, subject), issuer, subject)
+		stores[i], err = database.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -55,7 +55,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainPlanScoped(t *testing.T) {
 	for i, name := range []string{"alice", "bob"} {
 		document := read(handlers[i])
 		if document == nil || len(document.Accounts) != 1 || document.Accounts[0].Name != name {
-			t.Fatalf("plan %s read another scope: %+v", name, document)
+			t.Fatalf("account %s read another scope: %+v", name, document)
 		}
 	}
 	request := httptest.NewRequest(http.MethodPatch, "/v1/accounts/same-id", bytes.NewBufferString(`{"name":"Alice edited","kind":"cash","enabled":true}`))
@@ -100,7 +100,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainPlanScoped(t *testing.T) {
 	}
 }
 
-func TestSharedDatabaseAPIProjectionResultsRemainPlanScoped(t *testing.T) {
+func TestSharedDatabaseAPIProjectionResultsRemainAccountScoped(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "shared.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestSharedDatabaseAPIProjectionResultsRemainPlanScoped(t *testing.T) {
 	const issuer = "https://identity.example"
 	for _, subject := range []string{"alice", "bob"} {
 		resource := authorization.ResourceFor(issuer, subject)
-		plan, err := database.EnsurePrivatePlan(resource.ID, authorization.ActorKey(issuer, subject), issuer, subject)
+		plan, err := database.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -135,13 +135,13 @@ func TestSharedDatabaseAPIProjectionResultsRemainPlanScoped(t *testing.T) {
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, request)
 			if response.Code != http.StatusOK || response.Header().Get("Projection-Source") != source {
-				t.Fatalf("plan %s wanted %s: %d %s", subject, source, response.Code, response.Body.String())
+				t.Fatalf("account %s wanted %s: %d %s", subject, source, response.Code, response.Body.String())
 			}
 			var payload struct {
 				Result *types.ProjectionResult `json:"result"`
 			}
 			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil || payload.Result == nil {
-				t.Fatalf("plan %s missing successful result: %v %s", subject, err, response.Body.String())
+				t.Fatalf("account %s missing successful result: %v %s", subject, err, response.Body.String())
 			}
 		}
 	}

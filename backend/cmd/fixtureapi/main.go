@@ -81,7 +81,7 @@ func main() {
 	defer application.Close()
 	stopBlobCleanup := application.StartBlobCleanup(context.Background(), func(err error) { log.Printf("blob cleanup: %v", err) })
 	defer stopBlobCleanup()
-	database, err := application.EnsurePrivatePlan(fixtureResource.ID, "fixture-browser-test", "http://fixture.invalid", "browser-test")
+	database, err := application.EnsureAccount("fixture-browser-test", "http://fixture.invalid", "browser-test")
 	if err != nil {
 		log.Fatalf("ensure fixture account: %v", err)
 	}
