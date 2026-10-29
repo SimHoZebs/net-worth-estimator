@@ -33,10 +33,7 @@ export function ReceiptPanel({
 		scope: string;
 		id: string;
 	} | null>(null);
-	const locked =
-		readOnly ||
-		status.data?.readOnly !== false ||
-		!scope.resource?.permissions.includes("account:write");
+	const locked = readOnly || status.data?.readOnly !== false;
 	const eligible = Boolean(
 		saved &&
 		(saved.sourceAccountId || saved.destinations?.length) &&
