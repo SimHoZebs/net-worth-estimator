@@ -42,7 +42,7 @@ func TestLegacyDatabaseRejectedWithoutChanges(t *testing.T) {
 		t.Fatalf("source changed: %q, %v", id, err)
 	}
 	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE name IN ('plans', 'app_accounts')`).Scan(&count); err != nil || count != 0 {
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE name IN ('app_accounts')`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("partial shared schema: %d, %v", count, err)
 	}
 }

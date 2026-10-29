@@ -94,7 +94,7 @@ func openTestStore(t *testing.T) store.Store {
 	return openSQLiteStore(t)
 }
 
-func seedAccount(t *testing.T, store store.Store, id string) {
+func seedModelAccount(t *testing.T, store store.Store, id string) {
 	t.Helper()
 	if _, err := store.CreateAccount(types.Account{ID: id, Name: id, Enabled: true}); err != nil {
 		t.Fatal(err)

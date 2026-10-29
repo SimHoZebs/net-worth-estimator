@@ -24,7 +24,7 @@ func openSharedTestDatabase(t *testing.T) *Database {
 
 func privateTestPlan(t *testing.T, d *Database, name string) *sqliteStore {
 	t.Helper()
-	s, err := d.EnsurePrivatePlan("plans/"+name, name, "https://issuer.test", name)
+	s, err := d.EnsurePrivateAccount(name, "https://issuer.test", name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	for _, table := range expectedSchemaTables() {
-		if table == "plans" || table == "app_accounts" || table == "schema_migrations" || table == "blob_objects" || table == "blob_data" {
+		if table == "app_accounts" || table == "schema_migrations" || table == "blob_objects" || table == "blob_data" {
 			continue
 		}
 		if table == "user_groups" || table == "group_members" || table == "group_invites" {
@@ -46,7 +46,7 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 		if table == "sessions" || table == "identity_grants" || table == "identity_logout_marks" || table == "identity_logout_tokens" {
 			continue
 		}
-		rows, err := s.db.Query(`SELECT * FROM ` + table + ` WHERE plan_id = :plan_id ORDER BY rowid`)
+		rows, err := s.db.Query(`SELECT * FROM ` + table + ` WHERE account_id = :account_id ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -91,8 +91,8 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 	preset.ID = "same-preset"
 	eval := EvaluationUpdate{Type: "netWorthThreshold", InstanceID: "same-evaluation", Name: "Same evaluation", Config: map[string]any{}}
 	for _, s := range []*sqliteStore{a, b} {
-		seedAccount(t, s, "checking")
-		seedAccount(t, s, "second")
+		seedModelAccount(t, s, "checking")
+		seedModelAccount(t, s, "second")
 		if _, err := s.CreatePosting(testPostingFixture(postingID)); err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +131,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if err := s.SetLastSyncTime("before"); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.PutArtifact("same-artifact", "deterministic", s.db.planID); err != nil {
+		if err := s.PutArtifact("same-artifact", "deterministic", s.db.accountID); err != nil {
 			t.Fatal(err)
 		}
 		// Migrated sources may contain the exact same local sync UUID.
@@ -225,7 +225,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		}
 		checkOther()
 	}
-	if payload, ok, err := b.GetArtifact("same-artifact"); err != nil || !ok || payload != "plans/b" {
+	if payload, ok, err := b.GetArtifact("same-artifact"); err != nil || !ok || payload != "b" {
 		t.Fatalf("artifact = %q, %v, %v", payload, ok, err)
 	}
 	if exists, err := a.DocumentExists(); err != nil || exists {
@@ -236,26 +236,86 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 	}
 }
 
+func TestNormalizeAccountIDMapsOnlyUnambiguousLegacyShapes(t *testing.T) {
+	hash := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	if got := NormalizeAccountID("plans/" + hash); got != "user:"+hash {
+		t.Fatalf("hash = %q", got)
+	}
+	if got := NormalizeAccountID("plans/" + hash[:63]); got != "plans/"+hash[:63] {
+		t.Fatalf("63-char = %q", got)
+	}
+	if got := NormalizeAccountID("plans/" + hash + "0"); got != "plans/"+hash+"0" {
+		t.Fatalf("65-char = %q", got)
+	}
+	if got := NormalizeAccountID("plans/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"); got != "plans/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" {
+		t.Fatalf("non-hex = %q", got)
+	}
+	for plan, want := range map[string]string{
+		"plans/sample": "sample", "plans/fixture": "fixture", "plans/a": "plans/a",
+		"sample": "sample", "user:abc": "user:abc", "owner": "owner",
+	} {
+		if got := NormalizeAccountID(plan); got != want {
+			t.Fatalf("normalize %q = %q, want %q", plan, got, want)
+		}
+	}
+}
+
 func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 	d := openSharedTestDatabase(t)
-	if _, err := d.Plan("plans/missing"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("missing plan = %v", err)
+	if _, err := d.Account("missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing account = %v", err)
 	}
 	a := privateTestPlan(t, d, "a")
-	if _, err := d.EnsurePrivatePlan("plans/a", "other", "https://issuer.test", "other"); err == nil {
-		t.Fatal("changed plan owner")
+	// Legacy plan pairs still resolve: a matching plans/<name> ID owned by
+	// the same account name ensures the same scope.
+	if _, err := d.EnsurePrivatePlan("plans/a", "a", "https://issuer.test", "a"); err != nil {
+		t.Fatalf("legacy plan pair = %v", err)
 	}
-	if _, err := d.EnsurePrivatePlan("plans/new", "a", "https://issuer.test", "a"); err == nil {
-		t.Fatal("created second private plan for owner")
+	// Mismatched pairs stay conflicts, as under the retired plan rule.
+	for _, pair := range [][2]string{{"plans/a", "other"}, {"plans/a", "user:a"}, {"other", "a"}} {
+		if _, err := d.EnsurePrivatePlan(pair[0], pair[1], "https://issuer.test", pair[1]); err == nil {
+			t.Fatalf("mismatched pair %v accepted", pair)
+		}
 	}
-	if _, err := d.EnsurePrivatePlan("plans/a", "a", "https://issuer.test", "different"); err == nil {
+	// A legacy plans/<name> ID resolves to the bare-owner scope and binds it.
+	resolved, err := d.Plan("plans/a")
+	if err != nil {
+		t.Fatalf("legacy plan ID = %v", err)
+	}
+	if _, err := resolved.CreateAccount(types.Account{ID: "legacy-bind", Name: "bind"}); err != nil {
+		t.Fatalf("legacy-bound write = %v", err)
+	}
+	if _, err := a.LoadDocument(); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := a.LoadDocument()
+	if err != nil || loaded == nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, account := range loaded.Accounts {
+		if account.ID == "legacy-bind" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("legacy plan ID did not bind the owner scope")
+	}
+	if _, err := d.EnsurePrivateAccount("a", "https://issuer.test", "different"); err == nil {
 		t.Fatal("changed account identity")
 	}
-	if _, err := d.EnsurePrivatePlan("plans/duplicate-identity", "different", "https://issuer.test", "a"); err == nil {
+	if _, err := d.EnsurePrivateAccount("different", "https://issuer.test", "a"); err == nil {
 		t.Fatal("duplicated issuer/subject")
 	}
-	if exists, err := d.HasPlan("plans/new"); err != nil || exists {
-		t.Fatalf("failed creation persisted plan: %v, %v", exists, err)
+	// Reserved scopes reject private ownership.
+	if _, err := d.EnsurePrivateAccount("sample", "https://issuer.test", "a"); err == nil {
+		t.Fatal("sample accepted a private owner")
+	}
+	if _, err := d.EnsurePrivateAccount("fixture", "https://issuer.test", "a"); err == nil {
+		t.Fatal("fixture accepted a private owner")
+	}
+	if exists, err := d.HasAccount("new"); err != nil || exists {
+		t.Fatalf("failed creation persisted account: %v, %v", exists, err)
 	}
 	presets, err := a.ListAmountPresets()
 	if err != nil {
@@ -276,19 +336,22 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 			t.Fatalf("deleted presets reseeded = %d, %v", len(got), err)
 		}
 	}
-	sample, err := d.EnsureSamplePlan()
+	sample, err := d.EnsureSampleAccount()
 	if err != nil {
 		t.Fatal(err)
 	}
-	seedAccount(t, sample, "checking")
+	seedModelAccount(t, sample, "checking")
 	if err := sample.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if exists, err := d.HasPlan("plans/a"); err != nil || !exists {
+	if exists, err := d.HasAccount("a"); err != nil || !exists {
 		t.Fatalf("scoped close closed database: %v, %v", exists, err)
+	}
+	if exists, err := d.HasPlan("plans/a"); err != nil || !exists {
+		t.Fatalf("legacy plan ID stopped resolving: %v, %v", exists, err)
 	}
 }
 
@@ -315,7 +378,7 @@ func TestSharedDatabaseArtifactEvictionIsPlanLocal(t *testing.T) {
 func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
-	seedAccount(t, b, "checking")
+	seedModelAccount(t, b, "checking")
 	if _, err := a.CreatePosting(testPostingFixture("01900000-0000-7000-8000-000000000099")); err == nil {
 		t.Fatal("posting referenced another plan's account")
 	}

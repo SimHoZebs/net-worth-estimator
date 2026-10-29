@@ -6,7 +6,7 @@ import (
 
 func TestPostingExecutionOrderSurvivesOwnerUpdatesAndDisplayMoves(t *testing.T) {
 	database := openTestStore(t)
-	seedAccount(t, database, "checking")
+	seedModelAccount(t, database, "checking")
 	first := testPostingFixture("01900000-0000-7000-8000-000000000001")
 	first.ExecutionOrder = 999
 	first, err := database.CreatePosting(first)

@@ -44,7 +44,7 @@ func applyDirectives(t *testing.T, database store.Store, directives []BankDirect
 
 func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
+	seedModelAccount(t, database, "prime_card")
 	upsert := BankDirective{Upsert: &BankUpsert{
 		Posting: bankSeedPosting("Corner Store", "prime_card", "42.10", true),
 		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
@@ -83,7 +83,7 @@ func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 
 func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
+	seedModelAccount(t, database, "prime_card")
 	applyDirectives(t, database, []BankDirective{{Upsert: &BankUpsert{
 		Posting: bankSeedPosting("Pending", "prime_card", "10", true),
 		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
@@ -118,7 +118,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 
 func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
+	seedModelAccount(t, database, "prime_card")
 	applyDirectives(t, database, []BankDirective{{Upsert: &BankUpsert{
 		Posting: bankSeedPosting("Pending", "prime_card", "10", true),
 		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
@@ -144,7 +144,7 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 
 func TestBankDirectivesRejectInvalidInput(t *testing.T) {
 	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
+	seedModelAccount(t, database, "prime_card")
 	for name, directives := range map[string][]BankDirective{
 		"empty":   {{}},
 		"no keys": {{Upsert: &BankUpsert{Posting: bankSeedPosting("C", "prime_card", "10", true)}}},

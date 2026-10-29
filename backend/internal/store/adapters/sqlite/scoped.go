@@ -5,47 +5,47 @@ import (
 	"database/sql"
 )
 
-// planDB and planTx bind the scope explicitly named in every financial SQL
+// accountDB and accountTx bind the scope explicitly named in every financial SQL
 // statement. They never rewrite SQL or infer a tenant from request state.
-type planDB struct {
+type accountDB struct {
 	*sql.DB
-	planID string
+	accountID string
 }
 
-type planTx struct {
+type accountTx struct {
 	*sql.Tx
-	planID string
+	accountID string
 }
 
-func planArgs(planID string, args []any) []any {
-	return append(args, sql.Named("plan_id", planID))
+func accountArgs(accountID string, args []any) []any {
+	return append(args, sql.Named("account_id", accountID))
 }
 
-func (d *planDB) Exec(q string, args ...any) (sql.Result, error) {
-	return d.DB.Exec(q, planArgs(d.planID, args)...)
+func (d *accountDB) Exec(q string, args ...any) (sql.Result, error) {
+	return d.DB.Exec(q, accountArgs(d.accountID, args)...)
 }
-func (d *planDB) Query(q string, args ...any) (*sql.Rows, error) {
-	return d.DB.Query(q, planArgs(d.planID, args)...)
+func (d *accountDB) Query(q string, args ...any) (*sql.Rows, error) {
+	return d.DB.Query(q, accountArgs(d.accountID, args)...)
 }
-func (d *planDB) QueryRow(q string, args ...any) *sql.Row {
-	return d.DB.QueryRow(q, planArgs(d.planID, args)...)
+func (d *accountDB) QueryRow(q string, args ...any) *sql.Row {
+	return d.DB.QueryRow(q, accountArgs(d.accountID, args)...)
 }
-func (d *planDB) Begin() (*planTx, error) {
+func (d *accountDB) Begin() (*accountTx, error) {
 	return d.BeginTx(context.Background(), nil)
 }
-func (d *planDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*planTx, error) {
+func (d *accountDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*accountTx, error) {
 	tx, err := d.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return &planTx{Tx: tx, planID: d.planID}, nil
+	return &accountTx{Tx: tx, accountID: d.accountID}, nil
 }
-func (t *planTx) Exec(q string, args ...any) (sql.Result, error) {
-	return t.Tx.Exec(q, planArgs(t.planID, args)...)
+func (t *accountTx) Exec(q string, args ...any) (sql.Result, error) {
+	return t.Tx.Exec(q, accountArgs(t.accountID, args)...)
 }
-func (t *planTx) Query(q string, args ...any) (*sql.Rows, error) {
-	return t.Tx.Query(q, planArgs(t.planID, args)...)
+func (t *accountTx) Query(q string, args ...any) (*sql.Rows, error) {
+	return t.Tx.Query(q, accountArgs(t.accountID, args)...)
 }
-func (t *planTx) QueryRow(q string, args ...any) *sql.Row {
-	return t.Tx.QueryRow(q, planArgs(t.planID, args)...)
+func (t *accountTx) QueryRow(q string, args ...any) *sql.Row {
+	return t.Tx.QueryRow(q, accountArgs(t.accountID, args)...)
 }

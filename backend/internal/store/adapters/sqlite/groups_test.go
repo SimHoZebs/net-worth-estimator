@@ -214,7 +214,7 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	}
 	_ = bobInvite
 
-	if _, err := d.EnsurePrivatePlan("plans/bob", bob, "https://issuer.test", "bob"); err != nil {
+	if _, err := d.EnsurePrivateAccount(bob, "https://issuer.test", "bob"); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.RemoveGroupMembershipsForAccount(bob); err != nil {
@@ -225,7 +225,7 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM app_accounts WHERE id = ?`, bob).Scan(&accounts); err != nil || accounts != 1 {
 		t.Fatalf("app_accounts for bob = %d, %v", accounts, err)
 	}
-	if exists, err := d.HasPlan("plans/bob"); err != nil || !exists {
+	if exists, err := d.HasAccount(bob); err != nil || !exists {
 		t.Fatalf("private plan lost: %v, %v", exists, err)
 	}
 	if _, err := d.GetGroup(solo.ID, bob); err != ErrNotFound {
@@ -328,7 +328,7 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 	d := openGroupTestDB(t)
 	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
 	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
-	plan, err := d.EnsurePrivatePlan("plans/alice", alice, "https://issuer.test", "alice")
+	plan, err := d.EnsurePrivateAccount(alice, "https://issuer.test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 		t.Fatalf("document presence changed: %+v -> %+v", before, after)
 	}
 	var counts [2]int
-	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE plan_id = 'plans/alice'`).Scan(&counts[0]); err != nil {
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE account_id = 'alice'`).Scan(&counts[0]); err != nil {
 		t.Fatal(err)
 	}
 	if counts[0] != 0 {

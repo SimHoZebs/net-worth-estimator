@@ -16,7 +16,7 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
-	other, err := store.owned.EnsurePrivatePlan("plans/other", "other", "https://issuer.test", "other")
+	other, err := store.owned.EnsurePrivateAccount("other", "https://issuer.test", "other")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	// Missing binding is a safe no-op. Exercise the raw connection because a
 	// scoped store always supplies its own binding.
 	if _, err := store.owned.SQL().Exec(string(raw)); err != nil {
-		if !strings.Contains(err.Error(), `missing named argument "plan_id"`) {
+		if !strings.Contains(err.Error(), `missing named argument "account_id"`) {
 			t.Fatalf("unbound purge: %v", err)
 		}
 		// database/sql rejects the missing name after the script starts BEGIN.
@@ -49,13 +49,13 @@ func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	}
 	// SQLite CLI leaves an omitted parameter NULL. Prove that path also
 	// matches no rows, independent of database/sql's fail-closed check.
-	if _, err := store.owned.SQL().Exec(string(raw), sql.Named("plan_id", nil)); err != nil {
+	if _, err := store.owned.SQL().Exec(string(raw), sql.Named("account_id", nil)); err != nil {
 		t.Fatal(err)
 	}
 	if got := countRows(t, store, "postings", "source = 'simplefin'"); got != 1 {
 		t.Fatal("unbound purge deleted financial data")
 	}
-	if _, err := store.owned.SQL().Exec(string(raw), sql.Named("plan_id", store.db.planID)); err != nil {
+	if _, err := store.owned.SQL().Exec(string(raw), sql.Named("account_id", store.db.accountID)); err != nil {
 		t.Fatalf("purge transaction: %v", err)
 	}
 
