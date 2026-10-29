@@ -1,18 +1,18 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import type { Movement } from "../../domain/model.ts";
+import type { Transaction } from "../../domain/model.ts";
 import { TransactionRow } from "./TransactionRow.tsx";
 
 afterEach(cleanup);
 
 function voidTransaction(): {
 	transaction: AccountTransaction;
-	movement: Movement;
+	planTransaction: Transaction;
 } {
-	const movement = {
+	const planTransaction = {
 		id: "01900000-0000-7000-8000-000000000099",
-		name: "Voided authorization",
+		name: "Hold that did not post",
 		amount: 42.1,
 		amountKnown: true,
 		fromId: "checking",
@@ -28,12 +28,12 @@ function voidTransaction(): {
 		postedDate: null,
 		pending: false,
 		void: true,
-	} as Movement;
+	} as Transaction;
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000099",
-		movementId: movement.id,
+		movementId: planTransaction.id,
 		date: "2026-10-20",
-		name: movement.name,
+		name: planTransaction.name,
 		source: "historical",
 		direction: "out",
 		category: "expense",
@@ -48,31 +48,32 @@ function voidTransaction(): {
 		pending: false,
 		void: true,
 	};
-	return { transaction, movement };
+	return { transaction, planTransaction };
 }
 
-it("marks voided bank authorizations instead of pending", () => {
-	const { transaction, movement } = voidTransaction();
+it("marks holds that did not post instead of pending", () => {
+	const { transaction, planTransaction } = voidTransaction();
 	render(
 		<TransactionRow
 			transaction={transaction}
-			movement={movement}
+			planTransaction={planTransaction}
 			onEdit={() => {}}
 		/>,
 	);
-	expect(screen.getByText("Void")).toBeTruthy();
+	expect(screen.getByText("Did not post")).toBeTruthy();
 	expect(screen.queryByText("Pending")).toBeNull();
-	expect(screen.getByText("voided bank authorization")).toBeTruthy();
+	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
+	expect(screen.getByRole("button", { name: /did not post/i })).toBeTruthy();
 });
 
 it("does not render any badge without status", () => {
-	const { transaction, movement } = voidTransaction();
+	const { transaction, planTransaction } = voidTransaction();
 	render(
 		<TransactionRow
 			transaction={{ ...transaction, void: false }}
-			movement={movement}
+			planTransaction={planTransaction}
 			onEdit={() => {}}
 		/>,
 	);
-	expect(screen.queryByText("Void")).toBeNull();
+	expect(screen.queryByText("Did not post")).toBeNull();
 });

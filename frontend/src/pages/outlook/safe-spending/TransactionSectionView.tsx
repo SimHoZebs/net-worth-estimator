@@ -2,7 +2,7 @@ import { TransactionRow } from "../../../components/activity/TransactionRow.tsx"
 import { TransactionTable } from "../../../components/activity/TransactionTable.tsx";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { exactMoney } from "../../../domain/format.ts";
-import type { Movement } from "../../../domain/model.ts";
+import type { Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 
 export function SafeSpendingSectionHeader({
@@ -35,7 +35,7 @@ export function TransactionSectionView({
 	transactions,
 	caption,
 	emptyMessage,
-	movements,
+	planTransactions,
 	onInspect,
 	order,
 	showHeaders = false,
@@ -43,8 +43,11 @@ export function TransactionSectionView({
 	transactions: AccountTransaction[];
 	caption: string;
 	emptyMessage: string;
-	movements: Map<string, Movement>;
-	onInspect: (transaction: AccountTransaction, movement: Movement) => void;
+	planTransactions: Map<string, Transaction>;
+	onInspect: (
+		transaction: AccountTransaction,
+		planTransaction: Transaction,
+	) => void;
 	order: TransactionOrder;
 	showHeaders?: boolean;
 }) {
@@ -65,8 +68,8 @@ export function TransactionSectionView({
 				<TransactionRow
 					key={transaction.id}
 					transaction={transaction}
-					movement={movements.get(transaction.movementId) ?? null}
-					onEdit={(movement) => onInspect(transaction, movement)}
+					planTransaction={planTransactions.get(transaction.movementId) ?? null}
+					onEdit={(planTransaction) => onInspect(transaction, planTransaction)}
 				/>
 			))}
 		</TransactionTable>

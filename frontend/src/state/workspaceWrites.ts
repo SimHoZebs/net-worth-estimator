@@ -16,6 +16,7 @@ import {
 	type FinancialModelDocument,
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
+import type { Plan } from "@/domain/model.ts";
 import {
 	getResourceScope,
 	subscribeResourceScope,
@@ -27,6 +28,7 @@ import {
 	modelOptions,
 	presetsOptions,
 	reloadWorkspace,
+	workspaceIsBusy,
 	workspaceResourceKey,
 } from "@/state/workspaceResources.ts";
 import {
@@ -41,6 +43,67 @@ import {
 
 export function workspaceWriteKey(kind: "model" | "presets") {
 	return ["workspace-write", getResourceScope().key, kind] as const;
+}
+
+/** Backend save envelope: persisted with issues, or rejected with reasons. */
+export interface SaveResult {
+	issues?: { severity: string; message?: string | null }[] | null;
+	persisted?: boolean;
+}
+
+function saveRejection(envelope: SaveResult): string | null {
+	if (envelope.persisted === false) {
+		const messages = (envelope.issues ?? [])
+			.map((issue) => issue.message)
+			.filter(Boolean);
+		return messages.length
+			? messages.join(" ")
+			: "The server rejected the change.";
+	}
+	const errors = (envelope.issues ?? []).filter(
+		(issue) => issue.severity === "error",
+	);
+	if (errors.length) return errors.map((issue) => issue.message).join(" ");
+	return null;
+}
+
+/**
+ * One immediate save behind a form action: guard the workspace, run the
+ * call, surface a rejection notice, then refresh the given queries.
+ * Returns true only when the server persisted the change.
+ */
+export async function performSave(options: {
+	call: () => Promise<{ data: unknown }>;
+	refresh: () => Promise<void>;
+	failureMessage: string;
+}): Promise<boolean> {
+	if (workspaceIsBusy()) {
+		notifyError(
+			"workspace",
+			"Wait for the current server operation to finish before editing the plan.",
+		);
+		return false;
+	}
+	if (getResourceScope().status !== "ready") {
+		notifyError("workspace", "Load the server workspace before editing it.");
+		return false;
+	}
+	try {
+		const envelope = (await options.call()).data as unknown as SaveResult;
+		const rejection = saveRejection(envelope);
+		if (rejection) {
+			notifyError("workspace", rejection);
+			return false;
+		}
+		await options.refresh();
+		return true;
+	} catch (cause) {
+		notifyError(
+			"workspace",
+			cause instanceof Error ? cause.message : options.failureMessage,
+		);
+		return false;
+	}
 }
 
 async function write<T>(
@@ -134,7 +197,7 @@ export async function saveWorkspace(): Promise<boolean> {
 			if (!response.ok)
 				throw new Error(
 					response.issues.map((issue) => issue.message).join(" ") ||
-						"The server rejected the save. Your temporary plan remains unsaved.",
+						"The server rejected the save. Your changes remain unsaved.",
 				);
 			const errors = response.issues.filter(
 				(issue) => issue.severity === "error",
@@ -150,16 +213,28 @@ export async function saveWorkspace(): Promise<boolean> {
 			if (scope !== getResourceScope()) return false;
 			if (!authoritative.document)
 				throw new Error(
-					"The save completed, but the server returned no authoritative model. Your temporary plan remains available locally.",
+					"The save completed, but the server returned no saved data. Your unsaved changes remain available locally.",
 				);
 			const saved = useWorkspaceStore.getState().acknowledgeSave(draft);
 			if (saved) {
 				dismissKey("workspace");
-				notifySuccess("workspace-notice", "Plan saved on the server.");
+				notifySuccess("workspace-notice", "Changes saved.");
 			}
 			return saved;
 		})) === true
 	);
+}
+
+/**
+ * Stage an edit and persist it immediately, so one Save press means saved.
+ * Returns false (and saves nothing) when the edit is rejected or changes
+ * nothing. A failed save keeps the staged draft; retry it from the banner.
+ */
+export function stageAndSave(next: Plan): boolean {
+	const staged = useWorkspaceStore.getState().updatePlan(next);
+	if (!staged || !useWorkspaceStore.getState().draft) return staged;
+	void saveWorkspace();
+	return true;
 }
 
 export async function importServerDocument(

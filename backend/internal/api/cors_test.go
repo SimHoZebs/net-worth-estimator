@@ -344,3 +344,48 @@ func TestCORSMiddlewareAllowsRequestsWithoutOrigin(t *testing.T) {
 		t.Fatalf("Vary = %v", vary)
 	}
 }
+
+func TestCanonicalOriginSingleChecker(t *testing.T) {
+	bare, err := CanonicalOrigin("https://app.example.com")
+	if err != nil {
+		t.Fatalf("canonical bare: %v", err)
+	}
+	slashed, err := CanonicalOrigin("https://app.example.com/")
+	if err != nil {
+		t.Fatalf("canonical slashed: %v", err)
+	}
+	if bare != "https://app.example.com" || slashed != bare {
+		t.Fatalf("trailing slash did not normalize identically: %q vs %q", bare, slashed)
+	}
+	bareList, err := ParseAllowedOrigins("https://app.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	slashedList, err := ParseAllowedOrigins("https://app.example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bareList) != 1 || len(slashedList) != 1 || bareList[0] != slashedList[0] || bareList[0] != bare {
+		t.Fatalf("allowlist slash parity: %v vs %v", bareList, slashedList)
+	}
+	for _, raw := range []string{"https://app.test/v1", "https://user:pass@app.test", "https://app.test.", "https://app.test./"} {
+		if _, err := CanonicalOrigin(raw); err == nil {
+			t.Fatalf("CanonicalOrigin(%q) accepted", raw)
+		}
+		if _, err := ParseAllowedOrigins(raw); err == nil {
+			t.Fatalf("ParseAllowedOrigins(%q) accepted", raw)
+		}
+	}
+	handler := corsMiddleware([]string{"https://app.example.com"})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	for _, origin := range []string{"https://app.test/v1", "https://user:pass@app.test", "https://app.test."} {
+		request := httptest.NewRequest(http.MethodGet, "https://server.example.com/v1/financial-model", nil)
+		request.Header.Set("Origin", origin)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("middleware accepted %q: status=%d", origin, response.Code)
+		}
+	}
+}

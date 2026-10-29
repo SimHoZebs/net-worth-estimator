@@ -3,6 +3,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"net/http"
 	"strings"
 )
@@ -34,7 +35,7 @@ func bearerToken(r *http.Request) (string, bool) {
 func (s *Service) bearerPrincipal(ctx context.Context, token string) (Principal, error) {
 	result, err := s.postIntrospection(ctx, token)
 	if err != nil {
-		if errors.Is(err, errGrantRevoked) {
+		if errors.Is(err, store.ErrGrantRevoked) {
 			return Principal{}, nil
 		}
 		return Principal{}, err

@@ -1,6 +1,6 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Movement, Plan } from "../../../domain/model.ts";
+import type { Transaction, Plan } from "../../../domain/model.ts";
 import { testPlan } from "../../../mocks/plan.ts";
 import { projectionFixture } from "../../../mocks/projection.ts";
 import { useCardCycleActivity } from "./useCardCycleActivity.ts";
@@ -18,10 +18,10 @@ function purchase(
 	id: string,
 	date: string,
 	amount: number,
-	overrides: Partial<Movement> = {},
-): Movement {
+	overrides: Partial<Transaction> = {},
+): Transaction {
 	return {
-		...testPlan.movements[0]!,
+		...testPlan.transactions[0]!,
 		id,
 		name: id,
 		startDate: date,
@@ -37,7 +37,7 @@ const plan: Plan = {
 	...testPlan,
 	startDate: "2026-10-21",
 	accounts: [...testPlan.accounts, card, otherCard],
-	movements: [
+	transactions: [
 		purchase("before-closed", "2026-09-19", 999),
 		purchase("closed-start", "2026-09-20", 100),
 		purchase("closed-end", "2026-10-19", 200),
@@ -143,7 +143,7 @@ describe("useCardCycleActivity", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
-				plan: { ...plan, movements: [...plan.movements, ...pending] },
+				plan: { ...plan, transactions: [...plan.transactions, ...pending] },
 				displayToday: "2026-10-22",
 			}),
 		);
@@ -164,7 +164,7 @@ describe("useCardCycleActivity", () => {
 			),
 		).toEqual(["closed-start", "closed-end", "pending-closed"]);
 		expect(result.current.closedCycle.total).toBe(500);
-		expect(pending.every((movement) => !movement.enabled)).toBe(true);
+		expect(pending.every((transaction) => !transaction.enabled)).toBe(true);
 		expect(input.projection).toEqual(projectionBefore);
 	});
 

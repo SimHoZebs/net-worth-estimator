@@ -21,6 +21,7 @@ import (
 	"time"
 
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
 // errAccountRevoked marks a Casdoor answer that ends the local session: the
@@ -31,22 +32,22 @@ var errAccountRevoked = errors.New("provider account is no longer active")
 
 type casdoorAccount = authcontract.AccountProfile
 
-func (s *Service) currentGrant(r *http.Request) (grant, string, error) {
+func (s *Service) currentGrant(r *http.Request) (store.Grant, string, error) {
 	id := s.sessions.GetString(r.Context(), "grant_id")
 	if id == "" {
-		return grant{}, "", nil
+		return store.Grant{}, "", nil
 	}
 	g, err := s.validateGrant(r.Context(), id)
 	if err != nil {
-		return grant{}, "", err
+		return store.Grant{}, "", err
 	}
 	if g.ID == "" {
-		return grant{}, "", nil
+		return store.Grant{}, "", nil
 	}
 	return g, id, nil
 }
 
-func (s *Service) casdoorUserCall(ctx context.Context, g grant, method, apiPath string, body io.Reader, contentType string) (*http.Response, error) {
+func (s *Service) casdoorUserCall(ctx context.Context, g store.Grant, method, apiPath string, body io.Reader, contentType string) (*http.Response, error) {
 	target := strings.TrimRight(s.config.Issuer, "/") + apiPath
 	req, err := http.NewRequestWithContext(ctx, method, target, body)
 	if err != nil {
@@ -73,7 +74,7 @@ func decodeCasdoorResponse(resp *http.Response) (map[string]any, error) {
 
 // resolveSelf asks Casdoor who the access token belongs to and binds it to the
 // local grant subject. Owner and name never come from the request body.
-func (s *Service) resolveSelf(r *http.Request, g grant) (casdoorAccount, error) {
+func (s *Service) resolveSelf(r *http.Request, g store.Grant) (casdoorAccount, error) {
 	resp, err := s.casdoorUserCall(r.Context(), g, http.MethodGet, "/api/get-account", nil, "")
 	if err != nil {
 		return casdoorAccount{}, err
@@ -107,9 +108,9 @@ func (s *Service) resolveSelf(r *http.Request, g grant) (casdoorAccount, error) 
 
 // revoked ends the local session when Casdoor reports the account gone.
 // Transport errors stay 503s; only revoked semantics force re-login.
-func (s *Service) revoked(w http.ResponseWriter, r *http.Request, g grant) {
-	_ = s.store.deleteGrant(g.ID, s.config.Issuer)
-	_ = s.store.removeGroupMemberships(s.config.Issuer, g.Subject)
+func (s *Service) revoked(w http.ResponseWriter, r *http.Request, g store.Grant) {
+	_ = s.store.DeleteGrant(g.ID, s.config.Issuer)
+	_ = s.store.RemoveGroupMemberships(s.config.Issuer, g.Subject)
 	_ = s.sessions.Destroy(r.Context())
 	failure(w, 401, "The account is no longer active. Start sign-in again.")
 }
@@ -262,7 +263,7 @@ func (s *Service) accountChangePassword(w http.ResponseWriter, r *http.Request) 
 	// Casdoor expires the changed user's tokens. Drop every local grant for
 	// the subject so all devices sign out at once, then end this app session
 	// so the caller signs in again with the new password.
-	_ = s.store.deleteSubjectGrants(g.Issuer, g.Subject)
+	_ = s.store.DeleteSubjectGrants(g.Issuer, g.Subject)
 	_ = s.sessions.Destroy(r.Context())
 	respond(w, authcontract.AccountPasswordChanged{Reauth: true})
 }
@@ -277,7 +278,7 @@ func (s *Service) accountSessions(w http.ResponseWriter, r *http.Request) {
 		failure(w, 401, "Sign in to manage your account.")
 		return
 	}
-	grants, err := s.store.listGrants(s.config.Issuer, g.Subject)
+	grants, err := s.store.ListGrants(s.config.Issuer, g.Subject)
 	if err != nil {
 		failure(w, 503, "The session list is temporarily unavailable.")
 		return
@@ -313,12 +314,12 @@ func (s *Service) accountRevokeSession(w http.ResponseWriter, r *http.Request) {
 		failure(w, 400, "Sign out instead of revoking the current session.")
 		return
 	}
-	victim, err := s.store.findGrant(target, s.config.Issuer)
+	victim, err := s.store.FindGrant(target, s.config.Issuer)
 	if err != nil || victim.ID == "" || victim.Subject != g.Subject {
 		failure(w, 404, "That session was not found.")
 		return
 	}
-	if err := s.store.deleteGrant(target, s.config.Issuer); err != nil {
+	if err := s.store.DeleteGrant(target, s.config.Issuer); err != nil {
 		failure(w, 503, "The session list is temporarily unavailable.")
 		return
 	}

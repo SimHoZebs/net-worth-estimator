@@ -37,7 +37,7 @@ export const plannedPurchaseSchema = z.object({
 	readOnly: z.boolean(),
 });
 
-export const movementSchema = z.object({
+export const transactionSchema = z.object({
 	id,
 	name,
 	amount: money,
@@ -51,7 +51,7 @@ export const movementSchema = z.object({
 	enabled: z.boolean(),
 	readOnly: z.boolean(),
 	// Manual link to a recurrence rule occurrence. Only meaningful for
-	// one-time movements; the server validates the named occurrence.
+	// one-time transactions; the server validates the named occurrence.
 	claimRuleId: id.nullable().default(null),
 	claimOccurrenceDate: date.nullable().default(null),
 	// Display-only day the one-time posting settled, when it differs from
@@ -61,31 +61,32 @@ export const movementSchema = z.object({
 	postedDate: date.nullable().default(null),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
-	// Void marks a bank authorization that vanished without settling. Every
-	// movement carries it explicitly; stored drafts without it migrate to
-	// false on load.
+	// Void marks a bank hold that vanished without posting. The UI shows
+	// it as "Did not post". Every transaction carries it explicitly;
+	// stored drafts without it migrate to false on load.
 	void: z.boolean(),
 });
 
 /**
- * A movement is historical when it is a one-time dated record at or before the
- * projection start. Recurring rules and later-dated movements are projected.
+ * A transaction is historical when it is a one-time dated record at or before the
+ * projection start. Recurring rules and later-dated transactions are projected.
  * Planned purchases live in their own slice and never count as history.
  */
-export function isHistoricalMovement(
-	movement: Movement,
+export function isHistoricalTransaction(
+	transaction: Transaction,
 	projectionStartDate: string,
 ): boolean {
 	return (
-		movement.frequency === "once" && movement.startDate <= projectionStartDate
+		transaction.frequency === "once" &&
+		transaction.startDate <= projectionStartDate
 	);
 }
 
 /** Pending state comes from bank metadata, never the posting ID. */
-export function isPendingMovement(
-	movement: Pick<Movement, "pending">,
+export function isPendingTransaction(
+	transaction: Pick<Transaction, "pending">,
 ): boolean {
-	return movement.pending === true;
+	return transaction.pending === true;
 }
 
 export const evaluationSchema = z.object({
@@ -172,9 +173,27 @@ function migrateLegacyPurchases(value: unknown): unknown {
 	return { ...record, movements, plannedPurchases: planned };
 }
 
+/**
+ * Legacy drafts stored the union under `movements`. The display name is now
+ * `transactions`, so lift the array across after the older migrations (which
+ * still read `movements`) have run. Unknown keys are stripped on parse, but
+ * an explicit rename keeps the intent readable in stored payloads.
+ */
+function migrateLegacyMovementsField(value: unknown): unknown {
+	if (typeof value !== "object" || value === null || Array.isArray(value))
+		return value;
+	const record = value as Record<string, unknown>;
+	if (Array.isArray(record.transactions) || !Array.isArray(record.movements))
+		return value;
+	const { movements, ...rest } = record;
+	return { ...rest, transactions: movements };
+}
+
 function migrateLegacyPlan(value: unknown): unknown {
-	return migrateLegacyVoidFlag(
-		migrateLegacyPurchases(migrateLegacyEvaluations(value)),
+	return migrateLegacyMovementsField(
+		migrateLegacyVoidFlag(
+			migrateLegacyPurchases(migrateLegacyEvaluations(value)),
+		),
 	);
 }
 
@@ -190,7 +209,7 @@ export const planSchema = z.preprocess(
 			revision: z.number().int().min(1),
 			readOnly: z.boolean(),
 			accounts: z.array(accountSchema).max(50),
-			movements: z.array(movementSchema).max(300),
+			transactions: z.array(transactionSchema).max(300),
 			plannedPurchases: z.array(plannedPurchaseSchema).max(100).default([]),
 			evaluations: z.array(evaluationSchema).max(30),
 			assumptions: z.object({
@@ -230,36 +249,39 @@ export const planSchema = z.preprocess(
 						"A balance cannot be dated after the projection start.",
 					);
 			}
-			const movementIds = new Set<string>();
-			for (const [index, movement] of plan.movements.entries()) {
-				if (movementIds.has(movement.id))
-					issue(["movements", index, "id"], "Transaction IDs must be unique.");
-				movementIds.add(movement.id);
-				if (!movement.fromId && !movement.toId)
+			const transactionIds = new Set<string>();
+			for (const [index, transaction] of plan.transactions.entries()) {
+				if (transactionIds.has(transaction.id))
 					issue(
-						["movements", index],
+						["transactions", index, "id"],
+						"Transaction IDs must be unique.",
+					);
+				transactionIds.add(transaction.id);
+				if (!transaction.fromId && !transaction.toId)
+					issue(
+						["transactions", index],
 						"Choose a source or destination account.",
 					);
-				if (movement.fromId && movement.fromId === movement.toId)
-					issue(["movements", index], "Source and destination must differ.");
+				if (transaction.fromId && transaction.fromId === transaction.toId)
+					issue(["transactions", index], "Source and destination must differ.");
 				for (const key of ["fromId", "toId"] as const) {
-					if (movement[key] && !ids.has(movement[key]))
-						issue(["movements", index, key], "Choose an existing account.");
+					if (transaction[key] && !ids.has(transaction[key]))
+						issue(["transactions", index, key], "Choose an existing account.");
 				}
 
-				if (movement.endDate && movement.endDate < movement.startDate)
+				if (transaction.endDate && transaction.endDate < transaction.startDate)
 					issue(
-						["movements", index, "endDate"],
+						["transactions", index, "endDate"],
 						"End date must follow the first occurrence.",
 					);
 			}
 			for (const [index, purchase] of plan.plannedPurchases.entries()) {
-				if (movementIds.has(purchase.id))
+				if (transactionIds.has(purchase.id))
 					issue(
 						["plannedPurchases", index, "id"],
 						"Planned purchase IDs must be unique across transactions and purchases.",
 					);
-				movementIds.add(purchase.id);
+				transactionIds.add(purchase.id);
 				if (purchase.fromId === null || !ids.has(purchase.fromId))
 					issue(
 						["plannedPurchases", index, "fromId"],
@@ -284,7 +306,7 @@ export const planSchema = z.preprocess(
 );
 
 export type Account = z.infer<typeof accountSchema>;
-export type Movement = z.infer<typeof movementSchema>;
+export type Transaction = z.infer<typeof transactionSchema>;
 export type PlannedPurchase = z.infer<typeof plannedPurchaseSchema>;
 export type Evaluation = z.infer<typeof evaluationSchema>;
 export type Plan = z.infer<typeof planSchema>;
@@ -314,21 +336,21 @@ export function visibleAccounts(accounts: Account[]): Account[] {
 	return accounts.filter((account) => !account.archived);
 }
 
-export function visibleMovements({
-	movements,
+export function visibleTransactions({
+	transactions,
 	accounts,
 }: {
-	movements: Movement[];
+	transactions: Transaction[];
 	accounts: Account[];
-}): Movement[] {
+}): Transaction[] {
 	const archivedIds = new Set(
 		accounts.filter((account) => account.archived).map((account) => account.id),
 	);
-	if (!archivedIds.size) return movements;
-	return movements.filter(
-		(movement) =>
-			!(movement.fromId && archivedIds.has(movement.fromId)) &&
-			!(movement.toId && archivedIds.has(movement.toId)),
+	if (!archivedIds.size) return transactions;
+	return transactions.filter(
+		(transaction) =>
+			!(transaction.fromId && archivedIds.has(transaction.fromId)) &&
+			!(transaction.toId && archivedIds.has(transaction.toId)),
 	);
 }
 
@@ -363,10 +385,25 @@ export function changesBetween({
 	}[] = [];
 	for (const key of [
 		"accounts",
-		"movements",
+		"transactions",
 		"plannedPurchases",
 		"evaluations",
 	] as const) {
+		// Order is meaningful (queue priority, execution order), so a pure
+		// reorder must stage a draft even when every record is unchanged.
+		const beforeIds = saved[key].map((item) => item.id);
+		const afterIds = current[key].map((item) => item.id);
+		if (
+			beforeIds.length === afterIds.length &&
+			beforeIds.some((id, index) => afterIds[index] !== id) &&
+			beforeIds.every((id) => afterIds.includes(id))
+		)
+			changes.push({
+				label: "Order",
+				kind: "Modified",
+				before: beforeIds.join(","),
+				after: afterIds.join(","),
+			});
 		for (const item of current[key]) {
 			const previous = saved[key].find((old) => old.id === item.id);
 			if (!previous)

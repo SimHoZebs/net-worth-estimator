@@ -112,3 +112,45 @@ func TestProxyConfiguration(t *testing.T) {
 		t.Fatal("accepted an empty public-origin allowlist")
 	}
 }
+
+func TestProxySingleCheckerParity(t *testing.T) {
+	for _, raw := range []string{"https://app.test/v1", "https://user:pass@app.test", "https://app.test.", "https://app.test./"} {
+		if _, err := New(testSecret, []string{raw}); err == nil {
+			t.Fatalf("proxy accepted %q", raw)
+		}
+	}
+	bare, err := New(testSecret, []string{"https://app.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slashed, err := New(testSecret, []string{"https://app.example.com/"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		wrap func(http.Handler) http.Handler
+	}{
+		{name: "bare", wrap: bare},
+		{name: "slashed", wrap: slashed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, header := range []string{"https://app.example.com", "https://app.example.com/"} {
+				r := httptest.NewRequest("GET", "https://app.example.com/v1/financial-model", nil)
+				r.Header.Set(SecretHeader, testSecret)
+				r.Header.Set(OriginHeader, header)
+				called := false
+				w := httptest.NewRecorder()
+				tc.wrap(http.HandlerFunc(func(_ http.ResponseWriter, got *http.Request) {
+					called = true
+					if got.Host != "app.example.com" {
+						t.Fatalf("wrong host %q", got.Host)
+					}
+				})).ServeHTTP(w, r)
+				if !called {
+					t.Fatalf("rejected canonical header %q", header)
+				}
+			}
+		})
+	}
+}

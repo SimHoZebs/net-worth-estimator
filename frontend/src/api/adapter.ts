@@ -1,7 +1,12 @@
 import { todayIso } from "../domain/format.ts";
 import { finite, isRecord } from "../domain/guards.ts";
 import { latestCheckpoint } from "./checkpoints.ts";
-import type { Account, Movement, PlannedPurchase, Plan } from "../domain/model.ts";
+import type {
+	Account,
+	Transaction,
+	PlannedPurchase,
+	Plan,
+} from "../domain/model.ts";
 import {
 	type AmountInputBinding,
 	type BackendAccount,
@@ -52,7 +57,7 @@ export interface AccountPresentation {
 	observedOn: IsoDate;
 }
 
-export interface MovementPresentation {
+export interface TransactionPresentation {
 	source?: string;
 	amount?: PostingAmountResolution;
 	amountValue?: number;
@@ -64,7 +69,7 @@ export interface MovementPresentation {
 	transactionTime?: number;
 
 	readOnly: boolean;
-	displayFrequency?: Movement["frequency"];
+	displayFrequency?: Transaction["frequency"];
 	displayToId?: string | null;
 	displayAnnualIncrease?: number;
 }
@@ -81,8 +86,8 @@ export interface PlanPresentation {
 	revision?: number;
 	assumptions?: Plan["assumptions"];
 	accounts: Record<string, AccountPresentation>;
-	movements: Record<string, MovementPresentation>;
-	plannedPurchases: Record<string, MovementPresentation>;
+	transactions: Record<string, TransactionPresentation>;
+	plannedPurchases: Record<string, TransactionPresentation>;
 }
 
 export interface DisplayPlanInput {
@@ -271,7 +276,7 @@ function numericExpression(value: string | undefined): number | null {
 }
 
 /**
- * Growth helpers: a movement's annual increase lives in its amount inputs
+ * Growth helpers: a transaction's annual increase lives in its amount inputs
  * as a growth-factor provider, the same descriptor one-time postings use.
  * These mirror the backend migration so the display plan reads and writes
  * growth without dedicated rule columns.
@@ -406,7 +411,7 @@ function postingAmountValue(
 
 function displayFrequency(
 	frequency: RecurrenceFrequency,
-): Movement["frequency"] {
+): Transaction["frequency"] {
 	return frequency === "annual" ? "yearly" : "monthly";
 }
 
@@ -417,7 +422,7 @@ const frequencyMap = {
 } as const;
 
 function backendFrequency(
-	frequency: Movement["frequency"],
+	frequency: Transaction["frequency"],
 ): RecurrenceFrequency {
 	return frequencyMap[frequency] ?? "monthly";
 }
@@ -498,11 +503,11 @@ function midnightOf(day: IsoDate): number {
 	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
 }
 
-function movementDisplayFromRule(
+function transactionDisplayFromRule(
 	rule: BackendRecurrenceRule,
 	amount: number | null,
-	previous?: MovementPresentation,
-): Movement {
+	previous?: TransactionPresentation,
+): Transaction {
 	const firstDestination = firstDestinationOf(rule.destinations);
 	return {
 		id: rule.id,
@@ -526,11 +531,11 @@ function movementDisplayFromRule(
 	};
 }
 
-function movementDisplayFromPosting(
+function transactionDisplayFromPosting(
 	posting: BackendPosting,
 	amount: number | null,
-	previous?: MovementPresentation,
-): Movement {
+	previous?: TransactionPresentation,
+): Transaction {
 	const firstDestination = firstDestinationOf(posting.destinations);
 	return {
 		id: posting.id,
@@ -560,7 +565,7 @@ function movementDisplayFromPosting(
  */
 function plannedPurchaseDisplayFromRow(
 	row: BackendPlannedPurchase,
-	previous?: MovementPresentation,
+	previous?: TransactionPresentation,
 ): PlannedPurchase {
 	return {
 		id: row.id,
@@ -675,7 +680,7 @@ function addForwardRuleWarnings(
 		warn(
 			target,
 			"multiple-destinations",
-			"The display movement can show one destination; additional backend destinations remain in the presentation state.",
+			"The display transaction can show one destination; additional backend destinations remain in the presentation state.",
 			`${path}.toId`,
 		);
 		provisional(target, `${path}.toId`);
@@ -710,7 +715,7 @@ function addForwardPostingWarnings(
 		warn(
 			target,
 			"multiple-destinations",
-			"The display movement can show one destination; additional backend destinations remain in the presentation state.",
+			"The display transaction can show one destination; additional backend destinations remain in the presentation state.",
 			`${path}.toId`,
 		);
 		provisional(target, `${path}.toId`);
@@ -744,8 +749,8 @@ function buildPresentationAccount(
 function buildPresentationRule(
 	rule: BackendRecurrenceRule,
 	amount: number | null,
-	previous?: MovementPresentation,
-): MovementPresentation {
+	previous?: TransactionPresentation,
+): TransactionPresentation {
 	const previousAmountMatches =
 		previous?.amountValue !== undefined &&
 		amount !== null &&
@@ -779,8 +784,8 @@ function buildPresentationRule(
 function buildPresentationPosting(
 	posting: BackendPosting,
 	amount: number | null,
-	previous?: MovementPresentation,
-): MovementPresentation {
+	previous?: TransactionPresentation,
+): TransactionPresentation {
 	const previousAmountMatches =
 		previous?.amountValue !== undefined &&
 		amount !== null &&
@@ -845,7 +850,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		return display;
 	});
 
-	// Wishlist rows live in their own display slice, never in movements.
+	// Wishlist rows live in their own display slice, never in transactions.
 	// Standalone planned-purchase rows come first, then legacy purchase
 	// postings for IDs no row covers. Both sort by priority, document order
 	// breaking ties; the display slice keeps that order as the priority.
@@ -854,14 +859,12 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 	);
 	const legacyPurchases = document.postings
 		.map((posting, order) => ({ posting, order }))
-		.filter(
-			({ posting }) => posting.purchase && !rowById.has(posting.id),
-		)
+		.filter(({ posting }) => posting.purchase && !rowById.has(posting.id))
 		.sort(
 			(left, right) =>
 				left.posting.purchase!.priority - right.posting.purchase!.priority ||
 				left.order - right.order,
-			);
+		);
 	const orderedRows = (document.plannedPurchases ?? [])
 		.map((row, order) => ({ row, order }))
 		.sort(
@@ -871,7 +874,10 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		.map(({ row }) => row);
 	const plannedPurchases: PlannedPurchase[] = [
 		...orderedRows.map((row) =>
-			plannedPurchaseDisplayFromRow(row, previousPresentation?.plannedPurchases?.[row.id]),
+			plannedPurchaseDisplayFromRow(
+				row,
+				previousPresentation?.plannedPurchases?.[row.id],
+			),
 		),
 		...legacyPurchases.map(({ posting }) => {
 			const amount = postingAmountValue(posting, projection);
@@ -885,29 +891,29 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		}),
 	];
 	// Every purchase posting is wishlist, whether or not a row covers it:
-	// the slice already represents covered IDs, so none stay in movements.
+	// the slice already represents covered IDs, so none stay in transactions.
 	const ordinaryPostings = document.postings.filter(
 		(posting) => !posting.purchase,
 	);
 
-	const movements: Movement[] = [
+	const transactions: Transaction[] = [
 		...(document.recurrenceRules ?? []).map((rule, index) => {
 			const amount = postingAmountValue(rule, projection);
-			const previous = previousPresentation?.movements[rule.id];
+			const previous = previousPresentation?.transactions[rule.id];
 			addForwardRuleWarnings(
 				conversionReport,
 				rule,
 				amount,
-				`movements.${index}`,
+				`transactions.${index}`,
 			);
-			return movementDisplayFromRule(rule, amount, previous);
+			return transactionDisplayFromRule(rule, amount, previous);
 		}),
 		...ordinaryPostings.map((posting, index) => {
-			const path = `movements.${(document.recurrenceRules ?? []).length + index}`;
+			const path = `transactions.${(document.recurrenceRules ?? []).length + index}`;
 			const amount = postingAmountValue(posting, projection);
-			const previous = previousPresentation?.movements[posting.id];
+			const previous = previousPresentation?.transactions[posting.id];
 			addForwardPostingWarnings(conversionReport, posting, amount, path);
-			return movementDisplayFromPosting(posting, amount, previous);
+			return transactionDisplayFromPosting(posting, amount, previous);
 		}),
 	];
 
@@ -1011,9 +1017,9 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			volatility: 0,
 		},
 		accounts: accountPresentations,
-		movements: Object.fromEntries([
+		transactions: Object.fromEntries([
 			...(document.recurrenceRules ?? []).map((rule) => {
-				const previous = previousPresentation?.movements[rule.id];
+				const previous = previousPresentation?.transactions[rule.id];
 				const amount = postingAmountValue(rule, projection);
 				return [
 					rule.id,
@@ -1021,7 +1027,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 				] as const;
 			}),
 			...ordinaryPostings.map((posting) => {
-				const previous = previousPresentation?.movements[posting.id];
+				const previous = previousPresentation?.transactions[posting.id];
 				const amount = postingAmountValue(posting, projection);
 				return [
 					posting.id,
@@ -1054,7 +1060,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 			...legacyPurchases.map(({ posting }) => {
 				const previous =
 					previousPresentation?.plannedPurchases?.[posting.id] ??
-					previousPresentation?.movements[posting.id];
+					previousPresentation?.transactions[posting.id];
 				const amount = postingAmountValue(posting, projection);
 				return [
 					posting.id,
@@ -1077,7 +1083,7 @@ export function backendToDisplayPlan(input: DisplayPlanInput): PlanConversion {
 		revision: previousPresentation?.revision ?? 1,
 		readOnly: status.readOnly,
 		accounts,
-		movements,
+		transactions,
 		plannedPurchases,
 		evaluations,
 		assumptions,
@@ -1117,7 +1123,7 @@ export function refreshDisplayPlanAccess(
 					{ ...account, readOnly: accountReadOnly(id, document, status) },
 				]),
 			),
-			movements: presentation?.movements ?? {},
+			transactions: presentation?.transactions ?? {},
 			plannedPurchases: presentation?.plannedPurchases ?? {},
 		},
 	};
@@ -1140,7 +1146,7 @@ export function displayPlanToBackendDocument(
 	const conversionReport = report();
 	const checkpointByAccount = new Map<string, BackendCheckpoint[]>();
 	const accountPresentations = options.presentation?.accounts ?? {};
-	const movementPresentations = options.presentation?.movements ?? {};
+	const transactionPresentations = options.presentation?.transactions ?? {};
 	const sourcePath =
 		options.sourcePath ?? sourceDocument?.sourcePath ?? "frontend";
 
@@ -1316,34 +1322,34 @@ export function displayPlanToBackendDocument(
 	const sourceRuleOrder = (sourceDocument?.recurrenceRules ?? []).map(
 		(rule) => rule.id,
 	);
-	const planRuleOrder = plan.movements
-		.filter((movement) => movement.frequency !== "once")
-		.map((movement) => movement.id);
+	const planRuleOrder = plan.transactions
+		.filter((transaction) => transaction.frequency !== "once")
+		.map((transaction) => transaction.id);
 	const ruleOrderKept =
 		sourceRuleOrder.length === planRuleOrder.length &&
 		sourceRuleOrder.every((id, position) => planRuleOrder[position] === id);
-	plan.movements.forEach((movement, index) => {
-		const storedExtras = movementPresentations[movement.id];
-		const storedPosting = sourcePostings.get(movement.id);
-		const storedRule = sourceRules.get(movement.id);
+	plan.transactions.forEach((transaction, index) => {
+		const storedExtras = transactionPresentations[transaction.id];
+		const storedPosting = sourcePostings.get(transaction.id);
+		const storedRule = sourceRules.get(transaction.id);
 		const storedAmount = storedPosting ?? storedRule;
-		if (Boolean(movement.pending) !== Boolean(storedPosting?.pending)) {
+		if (Boolean(transaction.pending) !== Boolean(storedPosting?.pending)) {
 			lose(
 				conversionReport,
-				`movements.${movement.id}.pending`,
+				`transactions.${transaction.id}.pending`,
 				"Pending status is server-owned bank metadata.",
-				`movements.${index}.pending`,
+				`transactions.${index}.pending`,
 			);
 		}
 		if (
 			isSyncOwned(storedPosting?.source) &&
-			(movement.readOnly !== true || movement.frequency !== "once")
+			(transaction.readOnly !== true || transaction.frequency !== "once")
 		) {
 			lose(
 				conversionReport,
-				`movements.${movement.id}.readOnly`,
+				`transactions.${transaction.id}.readOnly`,
 				"Synced postings cannot be edited through the display plan.",
-				`movements.${index}.readOnly`,
+				`transactions.${index}.readOnly`,
 			);
 		}
 		const originalAmountValue = storedAmount
@@ -1353,28 +1359,28 @@ export function displayPlanToBackendDocument(
 			storedExtras?.amountValue ?? originalAmountValue;
 		const sameAmount =
 			baselineAmountValue !== null &&
-			sameNumber(baselineAmountValue, movement.amount);
+			sameNumber(baselineAmountValue, transaction.amount);
 		const preservedAmount = storedExtras?.amount ?? storedAmount?.amount;
 		const amount: PostingAmountResolution =
-			movement.amountKnown === false
+			transaction.amountKnown === false
 				? (preservedAmount ?? {
 						resolver: "expression",
-						config: { expression: String(movement.amount) },
+						config: { expression: String(transaction.amount) },
 						inputs: {},
 					})
 				: sameAmount && preservedAmount
 					? preservedAmount
 					: {
 							resolver: "expression",
-							config: { expression: String(movement.amount) },
+							config: { expression: String(transaction.amount) },
 							inputs: {},
 						};
-		if (movement.amountKnown === false && !preservedAmount) {
+		if (transaction.amountKnown === false && !preservedAmount) {
 			lose(
 				conversionReport,
-				`movements.${movement.id}.amount`,
+				`transactions.${transaction.id}.amount`,
 				"An unresolved backend amount cannot be represented in the display plan.",
-				`movements.${index}.amount`,
+				`transactions.${index}.amount`,
 			);
 		}
 		const originalDestinations =
@@ -1383,13 +1389,13 @@ export function displayPlanToBackendDocument(
 				: storedAmount?.destinations;
 		const previousDisplayDestination =
 			storedExtras?.displayToId ?? storedAmount?.destinations?.[0] ?? null;
-		const sameDestination = previousDisplayDestination === movement.toId;
+		const sameDestination = previousDisplayDestination === transaction.toId;
 		const destinations =
 			sameDestination && originalDestinations !== undefined
 				? originalDestinations
-				: movement.toId === null
+				: transaction.toId === null
 					? null
-					: [movement.toId];
+					: [transaction.toId];
 		if (
 			storedAmount &&
 			originalDestinations &&
@@ -1398,28 +1404,28 @@ export function displayPlanToBackendDocument(
 		) {
 			lose(
 				conversionReport,
-				`movements.${movement.id}.destinations`,
-				"The display movement can represent only one destination from the stored backend movement.",
-				`movements.${index}.destinations`,
+				`transactions.${transaction.id}.destinations`,
+				"The display transaction can represent only one destination from the stored backend transaction.",
+				`transactions.${index}.destinations`,
 			);
 		}
 		const previousReadOnly =
 			storedExtras?.readOnly ?? isSyncOwned(storedPosting?.source);
-		if (movement.readOnly !== previousReadOnly)
+		if (transaction.readOnly !== previousReadOnly)
 			lose(
 				conversionReport,
-				`movements.${movement.id}.readOnly`,
-				"Display movement read-only state is not a backend posting field.",
-				`movements.${index}.readOnly`,
+				`transactions.${transaction.id}.readOnly`,
+				"Display transaction read-only state is not a backend posting field.",
+				`transactions.${index}.readOnly`,
 			);
-		provisional(conversionReport, `movements.${movement.id}.readOnly`);
+		provisional(conversionReport, `transactions.${transaction.id}.readOnly`);
 		warn(
 			conversionReport,
-			"movement-presentation-storedExtras",
+			"transaction-presentation-storedExtras",
 			"Transaction read-only state stays local and is not imported.",
-			`movements.${index}`,
+			`transactions.${index}`,
 		);
-		if (movement.frequency === "once") {
+		if (transaction.frequency === "once") {
 			const source = storedPosting?.source ?? storedExtras?.source;
 			const storedPostedTime =
 				storedExtras?.postedTime ?? storedPosting?.postedTime ?? null;
@@ -1429,10 +1435,10 @@ export function displayPlanToBackendDocument(
 				storedPostedTime !== null && storedTransactionTime !== null
 					? dayFromTimes(storedTransactionTime, storedPostedTime)
 					: null;
-			const midnight = midnightOf(movement.startDate);
+			const midnight = midnightOf(transaction.startDate);
 			// An explicitly set settlement day wins; a matching stored day
 			// keeps its exact time so edits never drop intraday precision.
-			const postedDay = movement.postedDate ?? null;
+			const postedDay = transaction.postedDate ?? null;
 			const postedTime =
 				postedDay !== null &&
 				storedPostedTime !== null &&
@@ -1440,36 +1446,36 @@ export function displayPlanToBackendDocument(
 					? storedPostedTime
 					: postedDay !== null
 						? midnightOf(postedDay)
-						: storedDay === movement.startDate && storedPostedTime !== null
+						: storedDay === transaction.startDate && storedPostedTime !== null
 							? storedPostedTime
 							: midnight;
 			const transactionTime =
-				storedDay === movement.startDate && storedTransactionTime !== null
+				storedDay === transaction.startDate && storedTransactionTime !== null
 					? storedTransactionTime
 					: midnight;
 			postings.push({
 				...storedPosting,
-				id: movement.id,
-				name: movement.name,
-				sourceAccountId: movement.fromId,
+				id: transaction.id,
+				name: transaction.name,
+				sourceAccountId: transaction.fromId,
 				destinations,
 				amount,
 				postedTime,
 				transactionTime,
-				// Wishlist items no longer ride on movements. A regular movement
+				// Wishlist items no longer ride on transactions. A regular transaction
 				// reusing a legacy purchase posting clears its marker.
 				...(storedPosting?.purchase ? { purchase: null } : {}),
-				...(movement.claimRuleId && movement.claimOccurrenceDate
+				...(transaction.claimRuleId && transaction.claimOccurrenceDate
 					? {
 							claim: {
-								ruleId: movement.claimRuleId,
-								occurrenceDate: movement.claimOccurrenceDate,
+								ruleId: transaction.claimRuleId,
+								occurrenceDate: transaction.claimOccurrenceDate,
 							},
 						}
 					: storedPosting?.claim === undefined
 						? {}
 						: { claim: null }),
-				enabled: movement.enabled,
+				enabled: transaction.enabled,
 				...(source === undefined ? {} : { source }),
 			});
 			return;
@@ -1478,36 +1484,39 @@ export function displayPlanToBackendDocument(
 		const previousDisplayFrequency =
 			storedExtras?.displayFrequency ??
 			(storedRule ? displayFrequency(storedRule.frequency) : undefined);
-		const sameFrequency = previousDisplayFrequency === movement.frequency;
+		const sameFrequency = previousDisplayFrequency === transaction.frequency;
 		const frequency = sameFrequency
 			? (storedExtras?.frequency ??
 				storedRule?.frequency ??
-				backendFrequency(movement.frequency))
-			: backendFrequency(movement.frequency);
+				backendFrequency(transaction.frequency))
+			: backendFrequency(transaction.frequency);
 		const storedGrowth = growthRateOfAmount(preservedAmount) ?? 0;
-		const sameGrowth = sameNumber(storedGrowth * 100, movement.annualIncrease);
+		const sameGrowth = sameNumber(
+			storedGrowth * 100,
+			transaction.annualIncrease,
+		);
 		const effectiveGrowth = sameGrowth
 			? storedGrowth
-			: movement.annualIncrease / 100;
+			: transaction.annualIncrease / 100;
 		const grownAmount =
 			effectiveGrowth !== 0 || growthRateOfAmount(amount) !== null
 				? withGrowthRate(amount, effectiveGrowth)
 				: amount;
 		recurrenceRules.push({
 			...storedRule,
-			id: movement.id,
-			name: movement.name,
-			sourceAccountId: movement.fromId,
+			id: transaction.id,
+			name: transaction.name,
+			sourceAccountId: transaction.fromId,
 			destinations,
 			amount: grownAmount,
 			frequency,
-			startDate: movement.startDate,
-			endDate: movement.endDate,
+			startDate: transaction.startDate,
+			endDate: transaction.endDate,
 			annualCap: storedExtras?.annualCap ?? storedRule?.annualCap ?? null,
 			priority: ruleOrderKept
 				? (storedExtras?.priority ?? storedRule?.priority ?? rulePosition)
 				: rulePosition,
-			enabled: movement.enabled,
+			enabled: transaction.enabled,
 		});
 	});
 
@@ -1518,7 +1527,8 @@ export function displayPlanToBackendDocument(
 	const plannedPresentations = options.presentation?.plannedPurchases ?? {};
 	plan.plannedPurchases.forEach((purchase, priority) => {
 		const storedExtras =
-			plannedPresentations[purchase.id] ?? movementPresentations[purchase.id];
+			plannedPresentations[purchase.id] ??
+			transactionPresentations[purchase.id];
 		const storedPosting = sourcePostings.get(purchase.id);
 		if (storedPosting && storedPosting.pending) {
 			lose(
@@ -1592,7 +1602,7 @@ export function displayPlanToBackendDocument(
 	const removedMovementIDs = (ids: string[]) =>
 		ids.filter(
 			(id) =>
-				!plan.movements.some((item) => item.id === id) &&
+				!plan.transactions.some((item) => item.id === id) &&
 				!plan.plannedPurchases.some((item) => item.id === id),
 		);
 
@@ -1603,16 +1613,16 @@ export function displayPlanToBackendDocument(
 		if (isSyncOwned(storedPosting?.source)) {
 			lose(
 				conversionReport,
-				`movements.${postingId}`,
+				`transactions.${postingId}`,
 				"Synced postings cannot be removed through the display plan.",
-				`movements.${postingId}`,
+				`transactions.${postingId}`,
 			);
 		} else {
 			warn(
 				conversionReport,
 				"posting-removed",
 				"The backend deposit will be removed from the canonical model.",
-				`movements.${postingId}`,
+				`transactions.${postingId}`,
 			);
 		}
 	}
@@ -1623,7 +1633,7 @@ export function displayPlanToBackendDocument(
 			conversionReport,
 			"rule-removed",
 			"The backend recurrence rule will be removed from the canonical model.",
-			`movements.${ruleId}`,
+			`transactions.${ruleId}`,
 		);
 	}
 

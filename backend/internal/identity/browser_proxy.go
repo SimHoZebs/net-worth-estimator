@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 )
 
 // browserProviderHandlers exposes the same Casdoor through configured browser
@@ -69,11 +71,26 @@ func (s *Service) browserProviderHandlers() map[string]http.Handler {
 			},
 		}
 		csrf := http.NewCrossOriginProtection()
-		_ = csrf.AddTrustedOrigin(endpoint.provider) // Validated during configuration.
+		// endpoint.provider is already canonical via canonicalBrowserOrigin,
+		// which delegates to api.CanonicalOrigin. Re-canonicalize here so the
+		// CSRF guard shares the single checker.
+		canonicalProvider, err := api.CanonicalOrigin(endpoint.provider)
+		if err != nil {
+			canonicalProvider = endpoint.provider
+		}
+		_ = csrf.AddTrustedOrigin(canonicalProvider)
 		handlers[strings.ToLower(provider.Host)] = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if origin := r.Header.Get("Origin"); origin != "" && origin != endpoint.provider && !isSafeMethod(r.Method) {
-				failure(w, http.StatusForbidden, "The request origin does not match this account address.")
-				return
+			if origin := r.Header.Get("Origin"); origin != "" && !isSafeMethod(r.Method) {
+				allowed := origin == endpoint.provider
+				if !allowed {
+					if canonical, err := api.CanonicalOrigin(origin); err == nil && canonical == endpoint.provider {
+						allowed = true
+					}
+				}
+				if !allowed {
+					failure(w, http.StatusForbidden, "The request origin does not match this account address.")
+					return
+				}
 			}
 			ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 			defer cancel()

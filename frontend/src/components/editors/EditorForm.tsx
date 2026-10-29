@@ -10,9 +10,7 @@ import { Modal } from "../Modal.tsx";
 
 export interface EditorProps {
 	plan: Plan;
-	/** Applied to the draft. May save immediately; async editors resolve
-	 *  true only after the save completes so rapid edits serialize. */
-	onApply: (plan: Plan) => boolean | Promise<boolean>;
+	onApply: (plan: Plan) => boolean;
 	onClose: () => void;
 	applyError?: string | null;
 }
@@ -34,7 +32,6 @@ export function EditorForm({
 	const [dirty, setDirty] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
 	const [applyFailed, setApplyFailed] = useState(false);
-	const [saving, setSaving] = useState(false);
 	useBeforeUnload(dirty);
 	const requestClose = () => {
 		if (!dirty) return true;
@@ -61,7 +58,7 @@ export function EditorForm({
 			<form
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (readOnlyReason || saving) return;
+					if (readOnlyReason) return;
 					setError(null);
 					setApplyFailed(false);
 					const validated = validatePlan(
@@ -71,27 +68,13 @@ export function EditorForm({
 						setError(validated.message);
 						return;
 					}
-					const result = onApply(validated);
-					if (result instanceof Promise) {
-						setSaving(true);
-						void result.then(
-							(ok) => {
-								setSaving(false);
-								if (ok) onClose();
-								else setApplyFailed(true);
-							},
-							() => {
-								setSaving(false);
-								setApplyFailed(true);
-							},
-						);
-					} else if (result) onClose();
+					if (onApply(validated)) onClose();
 					else setApplyFailed(true);
 				}}
 				onChange={() => setDirty(true)}
 			>
 				<fieldset
-					disabled={Boolean(readOnlyReason) || saving}
+					disabled={Boolean(readOnlyReason)}
 					className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
 				>
 					{children}
@@ -120,21 +103,15 @@ export function EditorForm({
 					</div>
 				) : (
 					<div className={dialogActionsStyles}>
-						<Button
-							type="button"
-							variant="secondary"
-							onClick={close}
-							disabled={saving}
-						>
+						<Button type="button" variant="secondary" onClick={close}>
 							Cancel
 						</Button>
 						<Button
 							type="submit"
 							variant="primary"
-							disabled={Boolean(readOnlyReason) || saving}
+							disabled={Boolean(readOnlyReason)}
 						>
-							{saving ? "Saving…" : "Apply unsaved changes"}{" "}
-							<ArrowRight size={16} aria-hidden="true" />
+							Save changes <ArrowRight size={16} aria-hidden="true" />
 						</Button>
 					</div>
 				)}
@@ -144,4 +121,4 @@ export function EditorForm({
 }
 
 export const sourceReadOnlyReason =
-	"Change it at the source and import a refreshed plan.";
+	"Change it at the source and import a refreshed copy.";
