@@ -92,10 +92,9 @@ it("exposes pending then success without any forecast request", async () => {
 		calls += 1;
 		return calls === 1 ? pending : { result };
 	});
-	const hook = renderHook(
-		() => useCurrentPosition({ document: model() }),
-		{ wrapper },
-	);
+	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+		wrapper,
+	});
 	expect(hook.result.current.status).toBe("pending");
 	await act(async () => {
 		finish({ result });
@@ -111,10 +110,10 @@ it("clears previous-input data while the new position is pending", async () => {
 		if (!gate) return { result };
 		return new Promise(() => {});
 	});
-	const hook = renderHook(
-		({ document }) => useCurrentPosition({ document }),
-		{ wrapper, initialProps: { document: model() } },
-	);
+	const hook = renderHook(({ document }) => useCurrentPosition({ document }), {
+		wrapper,
+		initialProps: { document: model() },
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	gate = true;
 	hook.rerender({ document: model(200) });
@@ -131,10 +130,9 @@ it("exposes errors and retries explicitly", async () => {
 			return { issues: [{ severity: "error", message: "Invalid history" }] };
 		return { result };
 	});
-	const hook = renderHook(
-		() => useCurrentPosition({ document: model() }),
-		{ wrapper },
-	);
+	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+		wrapper,
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("error"));
 	expect(hook.result.current.error).toBe("Invalid history");
 	act(() => hook.result.current.retry());
@@ -183,9 +181,7 @@ it("requests the saved model", async () => {
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
-	expect(
-		(bodies[0] as { document?: unknown }).document,
-	).toBeUndefined();
+	expect((bodies[0] as { document?: unknown }).document).toBeUndefined();
 });
 
 it("separates identical models by resource identity", async () => {
@@ -215,10 +211,9 @@ it("separates identical models by resource identity", async () => {
 			suspendAccountScope(),
 		);
 	selectScope("accounts/one");
-	const hook = renderHook(
-		() => useCurrentPosition({ document: model() }),
-		{ wrapper },
-	);
+	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+		wrapper,
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	selectScope("accounts/two");
 	hook.rerender();
@@ -277,8 +272,6 @@ it("ignores workspace drafts and requests the saved model", async () => {
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
-	expect(
-		(bodies[0] as { document?: unknown }).document,
-	).toBeUndefined();
+	expect((bodies[0] as { document?: unknown }).document).toBeUndefined();
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
 });

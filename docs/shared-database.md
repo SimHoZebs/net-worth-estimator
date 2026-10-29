@@ -3,26 +3,26 @@
 ## Boundary
 
 `NET_WORTH_ESTIMATOR_DB` names one application SQLite database. It contains all
-private plans, the approved guest sample, and application sessions and grants.
+private accounts, the approved guest sample, and application sessions and grants.
 Casdoor remains the external identity provider with its own state directory.
 
 An application account is a signed-in user. It differs from a financial account
-in the model's `accounts` table. `app_accounts` records immutable OIDC identities.
-`plans` records the owner of each private plan. The owner key derives from the
+in the model's `accounts` table. `app_accounts` records immutable OIDC identities;
+the store row ID is the account scope itself. The owner key derives from the
 exact verified issuer and subject, not a username or email.
 
-Each financial table carries a non-null `plan_id`. Composite keys allow the same
-entity IDs and preset names in different plans. Composite foreign keys prevent
-relational references across plans. JSON references validate against the scoped
-financial document. The sample uses `plans/sample` without a private owner.
+Each financial table carries a non-null `account_id`. Composite keys allow the same
+entity IDs and preset names in different accounts. Composite foreign keys prevent
+relational references across accounts. JSON references validate against the scoped
+financial document. The sample uses the synthetic `sample` account.
 
 Deployment owns database creation and schema setup. The running server only opens
 an existing, compatible database. A financial store holds
-one immutable plan ID. The authenticated router resolves access before it creates
-that scope. An empty or missing scope never selects a default private plan.
+one immutable account ID. The authenticated router resolves access before it creates
+that scope. An empty or missing scope never selects a default private account.
 
 Schema migration records are global. Model metadata, sync state, settings,
-ordering, presets, identity registries, and artifact retention are plan-scoped.
+ordering, presets, identity registries, and artifact retention are account-scoped.
 Application sessions, provider grants, and logout replay records remain global
 identity tables. Financial clear, CSV import, refresh, and sample publication
 never replace those identity tables.
@@ -63,7 +63,7 @@ harmless). Do not put setup in the server entrypoint or an automatic startup
 dependency. Outside Komodo, run this maintenance command explicitly.
 Dev setup and the isolated fixture harness also provision explicitly.
 
-New user signup still inserts account, plan, and default-preset rows. It does not
+New user signup still inserts account and default-preset rows. It does not
 create database files or change schema.
 
 ## Rollback
@@ -80,20 +80,19 @@ Treat the whole application database as a credential store. It contains provider
 tokens and financial data for every account. A full backup is private and must
 never serve as a guest sample or a frontend asset.
 
-A financial replacement selects one explicit plan. It preserves all other plans
+A financial replacement selects one explicit account. It preserves all other accounts
 and all identity state. Sample publication creates an approved snapshot, not a
 live alias. It removes private upstream identities, links, sync times, source
 paths, migration history, and projection history from the published content.
 
-Server-level SimpleFIN credentials remain bound to the configured owner's plan.
-Other private plans and the sample never inherit those credentials. The global
+Server-level SimpleFIN credentials remain bound to the configured owner's account.
+Other private accounts and the sample never inherit those credentials. The global
 read-only switch still blocks editor writes.
 
 ## Verification
 
 ```bash
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api
 backend/scripts/verify.sh
@@ -101,24 +100,24 @@ node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 ```
 
 Use identical entity IDs, preset names, sync identities, and projection inputs
-in two plans. Exercise imports, clears, deletes, reorders, sync, and artifact
-eviction. Every result must remain within the selected plan.
+in two accounts. Exercise imports, clears, deletes, reorders, sync, and artifact
+eviction. Every result must remain within the selected account.
 
 The current deployment keeps one API instance and one SQLite writer.
 
-## Offline plan replacement
+## Offline account replacement
 
-The destination private plan must already exist. Use a separate migrated source
+The destination private account must already exist. Use a separate migrated source
 snapshot and stop the application before this operation:
 
 ```bash
 CGO_ENABLED=0 go -C backend run ./cmd/refreshplan \
   --db /private/application.db \
   --source /private/approved-snapshot.db \
-  --source-plan "$SOURCE_PLAN" --plan "$TARGET_PLAN"
+  --source-account "$SOURCE_ACCOUNT" --account "$TARGET_ACCOUNT"
 ```
 
-Use `--sample` instead of `--plan` for approved guest publication. Replacement
+Use `--sample` instead of `--account` for approved guest publication. Replacement
 discards derived projection artifacts. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
@@ -126,4 +125,4 @@ Direct command users must take that backup themselves.
 The API container includes `setupdb`, `importcsv`, and `refreshplan` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
-server container for migration or plan replacement.
+server container for migration or account replacement.

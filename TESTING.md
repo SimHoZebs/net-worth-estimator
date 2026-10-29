@@ -131,13 +131,12 @@ The pre-commit hook verifies the backend packages containing staged Go files, pl
 ## Shared Database Isolation
 
 The application stores all plans and application identity state in one SQLite
-database. Isolation tests must use at least two plans in that same physical file,
+database. Isolation tests must use at least two accounts in that same physical file,
 with identical entity IDs, preset names, and upstream sync keys. Separate fixture
 files alone do not prove row-level isolation.
 
 ```bash
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api
 ```
@@ -153,7 +152,6 @@ Unit checks need no identity container:
 ```bash
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/authorization
-backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/api
 node --test auth/casdoor/*.test.mjs
 ```
@@ -166,7 +164,7 @@ Run the real-Nginx provider-header regression with
 The test requires an available local image and Docker. It runs without root
 inside the container and checks both the corrected buffer and default-buffer 502.
 Without `NGINX_TEST_IMAGE`, it skips the Docker-only test.
-Authenticated requests use the account's private plan and assert its resource ID.
+Authenticated requests use the account's private account and assert its resource ID.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
 passkey, restart, revocation, refresh, and administrator recovery checks. The
@@ -273,7 +271,7 @@ Direct API snippets below require a valid session cookie file, the discovered re
 
 ```bash
 export COOKIE_FILE=/path/to/private/disposable-cookie-jar
-export RESOURCE_ID=plans/your-discovered-resource-id
+export RESOURCE_ID=accounts/your-discovered-resource-id
 export PUBLIC_ORIGIN=http://localhost:8080
 curl() {
   command curl --cookie "$COOKIE_FILE" \
@@ -321,7 +319,7 @@ Expected baseline:
 The document is optional and defaults to the scoped stored model. It returns
 `result: { asOfDate, netWorth, accounts: [{ accountId, balance }] }` from the same
 historical preparation as projections, without a future simulation. It requires
-`plan:project`, allows read-only/sample access, and stores no additional history.
+`account:project`, allows read-only/sample access, and stores no additional history.
 Model/date errors return HTTP 200 with `issues` and `error`, without `result`.
 
 `frontend/tests/position.spec.ts` holds forecast requests open to verify that the

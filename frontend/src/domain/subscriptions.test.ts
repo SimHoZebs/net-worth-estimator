@@ -57,7 +57,9 @@ describe("mark as subscription", () => {
 	});
 
 	it("rejects invalid payment counts and clamps month ends", () => {
-		expect(markAsInstallment(testAccount, "renovation", 1)).toBeInstanceOf(Error);
+		expect(markAsInstallment(testAccount, "renovation", 1)).toBeInstanceOf(
+			Error,
+		);
 		expect(addMonthsClamped("2028-01-31", 1)).toBe("2028-02-29");
 		expect(addMonthsClamped("2028-01-31", 3)).toBe("2028-04-30");
 	});

@@ -51,7 +51,7 @@ ${plan.fields.formSideHtml}
 <p>The JSON file is authoritative. Each section below shows its exact field value, including embedded font and SVG data.</p>
 ${details}
 <h2>Limits</h2>
-<p>This changes application presentation only. It does not change permissions, plan ownership, OIDC, account policy, passwords, or passkeys.</p>
+<p>This changes application presentation only. It does not change permissions, account ownership, OIDC, account policy, passwords, or passkeys.</p>
 <p>Profile, password, and app-session management are native Waypoint screens backed by a thin Casdoor proxy. Passkey enrollment and removal remain Casdoor screens. Device passkey prompts remain browser and operating-system screens.</p>
 </main></html>\n`;
   await mkdir(directory, { mode: 0o700 });

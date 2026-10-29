@@ -3,7 +3,10 @@ import { AccountPage } from "../auth/AccountPage.tsx";
 import { Tabs, type TabItem } from "../components/Tabs.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { stageAndSave } from "../state/workspaceWrites.ts";
-import { useAccountPlan, useAccountReadOnly } from "../state/useAccountScope.ts";
+import {
+	useAccountPlan,
+	useAccountReadOnly,
+} from "../state/useAccountScope.ts";
 import { useTransactionCatalog } from "../state/workspaceResources.ts";
 import { AssumptionsPanel } from "./accounts/AssumptionsPanel.tsx";
 import { SyncSettings } from "./sources/SyncSettings.tsx";

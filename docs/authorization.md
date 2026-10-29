@@ -10,23 +10,22 @@ An account is the permission boundary. Its model accounts, postings, recurrence 
 checkpoints, evaluations, presets, pinned results, sync links, and projection
 artifacts stay inside that boundary.
 
-| Principal             | Resource                    | Default capabilities                      |
-| --------------------- | --------------------------- | ----------------------------------------- |
-| Guest                 | `plans/sample`              | `plan:read`, `plan:project`               |
-| Verified account      | Its own `accounts/<opaque-id>` | `plan:read`, `plan:project`, `plan:write` |
-| Any other combination | Another account            | Denied                                    |
+| Principal             | Resource                       | Default capabilities                            |
+| --------------------- | ------------------------------ | ----------------------------------------------- |
+| Guest                 | `accounts/sample`              | `account:read`, `account:project`               |
+| Verified account      | Its own `accounts/<opaque-id>` | `account:read`, `account:project`, `account:write` |
+| Any other combination | Another account                | Denied                                          |
 
 Signed-in accounts use their private account, not the sample. Signup does not ask
-for a role. The owner relationship automatically supplies the plan-owner role.
+for a role. The owner relationship automatically supplies the account-owner role.
 Casdoor policies define the actions that role permits. The global server
 read-only flag still overrides write permission.
 
-Action strings stay `plan:*` so the Casdoor model (`waypoint/plan-access`)
-needs no migration. Permission resources move from `plans/*` to
-`accounts/*`; the seed keeps legacy `plans/*` until the
-`feat/account-scope-store` DB rekey migrates old rows. The guest sample stays
-the global read-only `plans/sample` row until that rekey moves it to account
-storage.
+Actions are `account:*` under the Casdoor model (`waypoint/account-access`)
+with adapter `account-policy-store`. Permission resources are `accounts/*`
+and the global read-only `accounts/sample`. There are no `plans/*` resources
+and no legacy action strings: old databases and old Casdoor state have no
+migration path.
 
 The resource ID derives from the exact OIDC issuer and immutable subject, not
 the display name, username, email, or browser input. A new account starts with
@@ -43,26 +42,26 @@ fail closed. Positive permission decisions do not have an application cache.
 ## Data isolation
 
 `NET_WORTH_ESTIMATOR_DB` names one shared application database. `app_accounts`
-records verified issuer/subject identities. Each private `plans` row references
-its owning application account. Financial `accounts` are separate model entities.
+records verified issuer/subject identities. Financial `accounts` are separate
+model entities inside each account scope.
 
-Every financial table carries `plan_id`. Keys, uniqueness rules, foreign keys,
-ordering, bulk replacement, sync, and artifact retention stay inside that plan.
-The database owns the connection. A scoped store holds one immutable plan ID.
-No plan-facing operation has an unscoped fallback.
+Every financial table carries `account_id`. Keys, uniqueness rules, foreign keys,
+ordering, bulk replacement, sync, and artifact retention stay inside that account.
+The database owns the connection. A scoped store holds one immutable account ID.
+No account-facing operation has an unscoped fallback.
 
-The public sample is the explicitly published `plans/sample` row in that same
-database. Its ownership is absent and its API is read-only. An absent sample
+The public sample is the explicitly published `accounts/sample` scope in that same
+database. Its ownership is the synthetic `sample` identity and its API is read-only. An absent sample
 grants guests no financial access. Private data never becomes a fallback sample.
 
 All API operations receive the store for the authorized resource. A guessed row
-ID in another plan cannot select another plan. Projection artifact identities
+ID in another account cannot select another account. Projection artifact identities
 and seeded in-flight runs also include the resource ID. Server-level SimpleFIN
 credentials remain attached only to the explicitly assigned primary owner.
 Other accounts and the sample never inherit that integration.
 
-The sample is a published snapshot, not a live alias of the owner's plan.
-`./scripts/dev publish-sample` explicitly publishes the dev primary plan. It
+The sample is a published snapshot, not a live alias of the owner's account.
+`./scripts/dev publish-sample` explicitly publishes the dev primary account. It
 removes private projection history, Bridge links, sync timestamps, and the source
 filesystem path from the copy. Later private edits do not change the sample.
 Replacing the sample requires another explicit publication.
@@ -106,13 +105,12 @@ the server fails closed at startup.
 Before an existing authenticated deployment starts the new code:
 
 1. Stop API writes and sync. Back up the application database and Casdoor state.
-2. Retain the existing Casdoor issuer, subjects, model, roles, and permissions.
+2. Retain the existing Casdoor issuer and subjects. Replace the model, roles,
+   and permissions with the account seed: model `waypoint/account-access`,
+   actions `account:*`, resources `accounts/*` plus `accounts/sample`.
 3. Verify guest, owner, second-account, denial, and provider-outage cases.
-4. Update Casdoor permission resources from `plans/*` to `accounts/*`
-   (the seed applies both during the transition). Action strings are unchanged.
-5. Set `NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT` instead of the retired
-   `PLAN_OWNER_SUBJECT`. The server rejects the old variable with a pointer
-   to the new one.
+4. Set `NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT`. The old
+   `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` variable no longer exists.
 
 See [the shared database guide](shared-database.md) for backup and rollback.
 Runtime startup rejects legacy unscoped financial databases. It never merges files or guesses an owner.
@@ -122,7 +120,7 @@ permissions. The owner assignment is a one-time data migration, not signup role 
 
 ## Scope limits
 
-The first resource boundary is the whole plan. Per-row sharing, a plan picker,
+The first resource boundary is the whole account. Per-row sharing, an account picker,
 an IAM management screen, and cross-account collaboration are out of scope. New action/resource policies belong in Casdoor. New resource visibility
 must also pass the API's resource-resolution and storage-isolation boundary.
 

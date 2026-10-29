@@ -18,7 +18,7 @@ docker compose --env-file auth/casdoor/.env \
   -f auth/casdoor/compose.yml -p waypoint-casdoor down
 export CASDOOR_STATE_DIR="$PWD/auth/casdoor/data"
 export COMPOSE_FILE="docker-compose.yml:auth/compose.casdoor.yml"
-export NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT="$(
+export NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT="$(
   node --input-type=module -e \
     'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).subject)'
 )"
@@ -33,7 +33,7 @@ Never run two Casdoor processes against one SQLite directory. Keep the verified
 primary-data owner in private deployment configuration. Both dev and production require Casdoor;
 the server rejects token-only and unauthenticated configurations.
 
-`setupdb` is an explicit deployment step. Legacy per-plan data is unsupported.
+`setupdb` is an explicit deployment step. Legacy per-account data is unsupported.
 The API never creates or repairs its application database. Repeat setup preserves current data.
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
@@ -50,11 +50,11 @@ Override its name or use a separate bind mount for disposable tests.
 ## Session and access contract
 
 - Anonymous visitors read/project only a separately published sample plan.
-- Each verified account automatically owns its own private plan. Signup has no
+- Each verified account automatically owns its own private account. Signup has no
   role choice or subject-grant step. Existing primary data needs an explicit owner.
-- Casdoor's built-in Casbin API checks roles, actions, and plan resources.
+- Casdoor's built-in Casbin API checks roles, actions, and account resources.
 - One application SQLite database holds all plans and application sessions.
-- Account data, artifacts, sync state, and browser drafts remain plan-scoped.
+- Account data, artifacts, sync state, and browser drafts remain account-scoped.
 - Provider administrator status never grants access to another account's plan.
 - Application sessions persist across browser and API restarts, with a seven-day
   absolute limit by default. Managed refresh grants renew short-lived tokens.

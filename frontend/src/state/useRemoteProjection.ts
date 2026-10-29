@@ -265,9 +265,7 @@ export function projectionResultToLocal(
 				envelope: result.evaluations.postingFulfillment.find(
 					(item) => item.instanceId === evaluation.instanceId,
 				),
-				postingIds: Array.isArray(
-					valueRecord(evaluation.config)?.postingIds,
-				)
+				postingIds: Array.isArray(valueRecord(evaluation.config)?.postingIds)
 					? (valueRecord(evaluation.config)!.postingIds as string[])
 					: null,
 				enabled: evaluation.enabled,
@@ -371,7 +369,10 @@ export function mergeEvaluationResults(
 	base: ProjectionResult,
 	overlay: ProjectionResult,
 ): ProjectionResult {
-	const pick = <T extends { instanceId: string }>(left: T[], right: T[]): T[] => {
+	const pick = <T extends { instanceId: string }>(
+		left: T[],
+		right: T[],
+	): T[] => {
 		const ids = new Set(right.map((item) => item.instanceId));
 		return [...left.filter((item) => !ids.has(item.instanceId)), ...right];
 	};
@@ -446,9 +447,9 @@ export function useRemoteProjection({
 }: UseRemoteProjectionOptions = {}) {
 	const { activeDocument, baseDocument, baseKey, evalKey } =
 		useProjectionDocument({
-		document: documentOverride,
-		evaluations: evaluationsOverride,
-	});
+			document: documentOverride,
+			evaluations: evaluationsOverride,
+		});
 	const storeYears = useUiStore((state) => state.years);
 	const storeRanges = useUiStore((state) => state.ranges);
 	const years = yearsOverride ?? storeYears;
@@ -607,9 +608,9 @@ export function useRemoteProjection({
 				? MISSING_DOCUMENT_MESSAGE
 				: null
 			: (deterministic.error?.message ??
-					overlayErrorMessage ??
-					mappingErrorMessage ??
-					"The deterministic projection request failed. Retry the connection.");
+				overlayErrorMessage ??
+				mappingErrorMessage ??
+				"The deterministic projection request failed. Retry the connection.");
 	const loading = deterministic.isFetching || overlay.isFetching;
 	const runCount = randomRunCount();
 	const seed = 42;
@@ -641,9 +642,7 @@ export function useRemoteProjection({
 		base,
 		status: !enabled
 			? ("disabled" as const)
-			: missingDocument ||
-					deterministic.isError ||
-					mappingErrorMessage !== null
+			: missingDocument || deterministic.isError || mappingErrorMessage !== null
 				? ("error" as const)
 				: deterministic.isPending || (overlayNeeded && overlay.isPending)
 					? ("pending" as const)

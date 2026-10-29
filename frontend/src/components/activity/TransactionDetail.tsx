@@ -857,7 +857,9 @@ export function TransactionDetail({
 								Posted
 							</Badge>
 						) : null}
-						{showExcluded && <Badge tone="warning">Excluded from account</Badge>}
+						{showExcluded && (
+							<Badge tone="warning">Excluded from account</Badge>
+						)}
 						{showShortfall && (
 							<Badge tone="warning">
 								<TriangleAlert size={10} aria-hidden="true" />

@@ -158,8 +158,8 @@ export function ReceiptPanel({
 					)}
 					{!eligible && receipts.length === 0 && (
 						<p className="text-sm text-muted">
-							Receipts attach to saved owner transactions, not pending
-							or void bank rows.
+							Receipts attach to saved owner transactions, not pending or void
+							bank rows.
 						</p>
 					)}
 				</>

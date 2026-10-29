@@ -32,9 +32,7 @@ describe("eval outcome renderers", () => {
 			enabled: true,
 			config: { target: 500 },
 		};
-		expect(
-			thresholdEvaluation(evaluation, envelope(), 60, 160),
-		).toMatchObject({
+		expect(thresholdEvaluation(evaluation, envelope(), 60, 160)).toMatchObject({
 			evaluation: { id: "t", kind: "net-worth", target: 500, accountId: null },
 			firstDate: null,
 			current: 60,
@@ -64,7 +62,9 @@ describe("eval outcome renderers", () => {
 		expect(cycleOutcome({ withinBudget: true }).outcomeText).toBe(
 			"Within budget",
 		);
-		expect(cycleOutcome({ withinBudget: false }).outcomeText).toBe("Over budget");
+		expect(cycleOutcome({ withinBudget: false }).outcomeText).toBe(
+			"Over budget",
+		);
 	});
 
 	it("extracts numeric values and bands without changing status", () => {

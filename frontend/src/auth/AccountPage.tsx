@@ -128,8 +128,8 @@ export function AccountPage() {
 						Account
 					</h2>
 					<p className="mb-0 text-sm text-muted">
-						Signed in as{" "}
-						{profile?.name ?? session.user?.name ?? "your account"}.
+						Signed in as {profile?.name ?? session.user?.name ?? "your account"}
+						.
 					</p>
 				</div>
 				<Button

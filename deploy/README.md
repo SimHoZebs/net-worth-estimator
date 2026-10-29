@@ -18,7 +18,7 @@ identity-provider migrations are outside this contract.
 | Schema | Explicit `setupdb` operation with the API stopped |
 | Liveness | `GET /healthz` reports process availability |
 | Readiness | `GET /readyz` checks the database connection with a two-second deadline |
-| Probes | No session, proxy secret, or plan header required; no private data returned |
+| Probes | No session, proxy secret, or account header required; no private data returned |
 | Shutdown | Deliver `SIGTERM`; allow at least 15 seconds for HTTP shutdown |
 
 Startup validates schema compatibility and OIDC discovery before it listens.

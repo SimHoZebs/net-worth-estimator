@@ -7,7 +7,11 @@ it("does not report a missing account balance as zero", () => {
 	const html = renderToStaticMarkup(
 		<PositionEvidence
 			plan={{ ...testAccount, accounts: [testAccount.accounts[0]!] }}
-			position={{ asOfDate: testAccount.startDate, netWorth: 100, accounts: [] }}
+			position={{
+				asOfDate: testAccount.startDate,
+				netWorth: 100,
+				accounts: [],
+			}}
 			onClose={() => {}}
 		/>,
 	);

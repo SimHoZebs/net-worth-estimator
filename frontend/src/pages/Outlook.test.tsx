@@ -17,7 +17,12 @@ vi.mock("../state/useRemoteProjection.ts", () => ({
 	}),
 }));
 
-const blankPlan = { ...testAccount, accounts: [], movements: [], evaluations: [] };
+const blankPlan = {
+	...testAccount,
+	accounts: [],
+	movements: [],
+	evaluations: [],
+};
 const props = {
 	onAddAccount: vi.fn(),
 	onEvidence: vi.fn(),

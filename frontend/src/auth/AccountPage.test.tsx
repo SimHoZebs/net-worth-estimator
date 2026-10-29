@@ -176,16 +176,13 @@ describe("account page", () => {
 						displayName: "Sam Lee",
 						avatar: "",
 					});
-				if (url.endsWith("/v1/auth/sessions"))
-					return json({ sessions: [] });
+				if (url.endsWith("/v1/auth/sessions")) return json({ sessions: [] });
 				throw new Error(`unexpected ${url}`);
 			}),
 		);
 		acceptAccountScope(sessionScopeInput(session), suspendAccountScope());
 		render(
-			<SessionContext
-				value={{ session, logout, logoutPending: false }}
-			>
+			<SessionContext value={{ session, logout, logoutPending: false }}>
 				<AccountPage />
 				<NotificationCenter />
 			</SessionContext>,

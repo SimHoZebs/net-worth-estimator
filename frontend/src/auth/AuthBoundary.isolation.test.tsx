@@ -18,10 +18,7 @@ import {
 import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
-import {
-	getAccountScope,
-	suspendAccountScope,
-} from "@/auth/resourceScope.ts";
+import { getAccountScope, suspendAccountScope } from "@/auth/resourceScope.ts";
 import { ok } from "@/mocks/fetch.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import { clearPersistedMemory } from "@/state/persisted.ts";
@@ -526,7 +523,10 @@ describe("authentication resource isolation", () => {
 		["missing private subject", { ...session(), user: undefined }, A],
 		[
 			"invalid private resource ID",
-			{ ...session(), resource: { ...session().resource, id: "accounts/sample" } },
+			{
+				...session(),
+				resource: { ...session().resource, id: "accounts/sample" },
+			},
 			"accounts/sample",
 		],
 		[

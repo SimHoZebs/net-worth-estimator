@@ -18,7 +18,9 @@ import type {
 } from "./contracts.ts";
 import { financialIndependenceEvaluation } from "./financialIndependence.ts";
 
-export function valueRecord(value: JsonValue | undefined): Record<string, unknown> | null {
+export function valueRecord(
+	value: JsonValue | undefined,
+): Record<string, unknown> | null {
 	return isRecord(value) ? value : null;
 }
 
@@ -191,9 +193,7 @@ export function bandsOf(
 ): OtherEvaluationBands | null {
 	const probabilistic = valueRecord(envelope?.probabilistic);
 	if (!probabilistic) return null;
-	const nested = valueRecord(
-		probabilistic.bands as JsonValue | undefined,
-	);
+	const nested = valueRecord(probabilistic.bands as JsonValue | undefined);
 	const source = nested ?? probabilistic;
 	const p10 = finite(source.p10);
 	const p50 = finite(source.p50);

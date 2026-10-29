@@ -76,9 +76,7 @@ async function readSession(
 	// Only canonical account ids (`accounts/*`, `user:<hash>`). Sample is
 	// `accounts/sample`. Legacy plan ids are rejected: no legacy wire support.
 	const resourceId =
-		isRecord(resource) && typeof resource.id === "string"
-			? resource.id
-			: null;
+		isRecord(resource) && typeof resource.id === "string" ? resource.id : null;
 	const authenticatedId =
 		typeof resourceId === "string" &&
 		(/^accounts\/[a-f0-9]{64}$/.test(resourceId) ||

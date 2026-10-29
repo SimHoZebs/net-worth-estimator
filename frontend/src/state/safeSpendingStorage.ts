@@ -26,7 +26,10 @@ export async function readSafeSpendingSettings(
 	} catch (error) {
 		throw error instanceof Error ? error : new Error(String(error));
 	}
-	if (settings === null && scope.resource?.permissions.includes("account:write")) {
+	if (
+		settings === null &&
+		scope.resource?.permissions.includes("account:write")
+	) {
 		const storage = accountLocalStorage(scope);
 		const raw = await storage.getItem(name);
 		if (scope !== getAccountScope() || signal?.aborted) return null;
