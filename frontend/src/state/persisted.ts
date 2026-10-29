@@ -4,8 +4,10 @@ import {
 	type StateStorage,
 } from "zustand/middleware";
 import {
-	getResourceScope,
-	resourceStorageKey,
+	getAccountScope,
+	accountStorageKey,
+	legacyResourceStorageKey,
+	type AccountScope,
 	type ResourceScope,
 } from "../auth/resourceScope.ts";
 
@@ -76,21 +78,31 @@ export function appJsonStorage<T>() {
 	return createJSONStorage<T>(() => appLocalStorage);
 }
 
-/** Financial preferences bind to one verified owner, including memory fallbacks. */
-export function resourceLocalStorage(scope: ResourceScope): StateStorage {
+/** Financial preferences bind to one verified account, including memory fallbacks. */
+export function accountLocalStorage(scope: AccountScope): StateStorage {
 	const keyFor = (name: string) =>
-		scope === getResourceScope() ? resourceStorageKey(name, scope) : null;
+		scope === getAccountScope() ? accountStorageKey(name, scope) : null;
+	const legacyKeyFor = (name: string) =>
+		scope === getAccountScope()
+			? legacyResourceStorageKey(name, scope)
+			: null;
 	return {
 		getItem: (name) => {
 			const key = keyFor(name);
 			if (!key) return null;
 			try {
 				const raw = appLocalStorage.getItem(key);
-				if (raw instanceof Promise)
-					return raw
+				const resolved =
+					raw ??
+					(() => {
+						const legacy = legacyKeyFor(name);
+						return legacy ? appLocalStorage.getItem(legacy) : null;
+					})();
+				if (resolved instanceof Promise)
+					return resolved
 						.then((value) => (keyFor(name) ? value : null))
 						.catch(() => null);
-				return keyFor(name) ? raw : null;
+				return keyFor(name) ? resolved : null;
 			} catch {
 				return null;
 			}
@@ -101,9 +113,16 @@ export function resourceLocalStorage(scope: ResourceScope): StateStorage {
 		},
 		removeItem: (name) => {
 			const key = keyFor(name);
-			if (key) return appLocalStorage.removeItem(key);
+			const legacy = legacyKeyFor(name);
+			if (key) appLocalStorage.removeItem(key);
+			if (legacy) appLocalStorage.removeItem(legacy);
 		},
 	};
+}
+
+/** @deprecated Use accountLocalStorage. Keeps legacy `:resource:` reads. */
+export function resourceLocalStorage(scope: ResourceScope): StateStorage {
+	return accountLocalStorage(scope);
 }
 
 /**
