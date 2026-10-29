@@ -7,7 +7,7 @@ import {
 	selectDraftChangeCount,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
-import { useAccountPlan } from "../state/useAccountScope.ts";
+import { useUserPlan } from "../state/useUserScope.ts";
 import { stageAndSave } from "../state/workspaceWrites.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
@@ -28,7 +28,7 @@ export function WorkspaceEvidence({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	// Evidence subscribes to the base case only while its dialog is open.
 	if (!overlays.evidence) return null;
 	if (overlays.evidence.kind === "position")
@@ -45,7 +45,7 @@ function WorkspaceEvidenceLoaded({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	const hasDraft = useWorkspaceStore((state) => state.draft != null);
 	const projection = useRemoteProjection({ ranges: false });
 	const base =
@@ -79,7 +79,7 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	const applyError = useWorkspaceStore((state) => state.error);
 	const changeCount = useWorkspaceStore(selectDraftChangeCount);
 	if (!plan) return null;

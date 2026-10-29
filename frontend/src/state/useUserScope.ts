@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 import {
-	getAccountScope,
-	subscribeAccountScope,
-	type AccountScope,
+	getUserScope,
+	subscribeUserScope,
+	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { ApiHttpError } from "../api/index.ts";
 import {
@@ -16,48 +16,48 @@ import {
 } from "./workspaceStore.ts";
 import { useWorkspaceWriteError } from "./workspaceWrites.ts";
 
-/** Verified account scope for the mounted session. */
-export function useAccountScope(): AccountScope {
-	return useSyncExternalStore(subscribeAccountScope, getAccountScope);
+/** Verified user scope for the mounted session. */
+export function useUserScope(): UserScope {
+	return useSyncExternalStore(subscribeUserScope, getUserScope);
 }
 
-/** Verified account scope for the mounted session. */
-export function useVerifiedResource(): AccountScope {
-	return useAccountScope();
+/** Verified user scope for the mounted session. */
+export function useVerifiedResource(): UserScope {
+	return useUserScope();
 }
 
-/** Verified account id (`accounts/*`, `user:<hash>`) or null while pending. */
-export function useVerifiedAccountId(): string | null {
-	return useAccountScope().resource?.id ?? null;
+/** Verified user id (`users/*`) or null while pending. */
+export function useVerifiedUserId(): string | null {
+	return useUserScope().resource?.id ?? null;
 }
 
-/** True while the account scope is still verifying. */
-export function useAccountPending(): boolean {
-	return useAccountScope().status === "pending";
+/** True while the user scope is still verifying. */
+export function useUserPending(): boolean {
+	return useUserScope().status === "pending";
 }
 
 /**
- * Account-model presence for shell routing. New screens should prefer row
- * hooks directly; this only answers "is account data available yet?".
+ * User-model presence for shell routing. New screens should prefer row
+ * hooks directly; this only answers "is user data available yet?".
  */
-export function useAccountModelAvailable(): boolean {
+export function useUserModelAvailable(): boolean {
 	const model = useModel();
 	return model.data?.document != null;
 }
 
 /**
- * Verified account's draft/review aggregate. New screens should prefer row
+ * Verified user's draft/review aggregate. New screens should prefer row
  * hooks (`useAccountBalances`/`useTransactions`) plus projection slices;
  * the `Plan` aggregate stays only for the draft/review layer.
  */
-export function useAccountPlan() {
+export function useUserPlan() {
 	const draft = useWorkspaceStore((state) => state.draft);
 	const model = useModel();
 	return model.data?.conversion ? (draft ?? model.data.conversion.plan) : null;
 }
 
-/** Read-only policy for the verified account (sample accounts stay read-only). */
-export function useAccountReadOnly() {
+/** Read-only policy for the verified user (sample users stay read-only). */
+export function useUserReadOnly() {
 	const model = useModel();
 	const status = useServerStatus();
 	const error = useWorkspaceWriteError();

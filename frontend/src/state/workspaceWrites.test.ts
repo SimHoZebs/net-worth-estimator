@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
-	acceptAccountScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	suspendAccountScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
@@ -11,17 +11,17 @@ import { resetWorkspaceStore } from "./workspaceStore.ts";
 import { performSave } from "./workspaceWrites.ts";
 
 function owner() {
-	acceptAccountScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: "accounts/a",
+				id: "users/a",
 				kind: "private",
-				permissions: ["account:read", "account:write"],
+				permissions: ["user:read", "user:write"],
 			},
-			subject: "accounts/a",
+			subject: "users/a",
 		},
-		suspendAccountScope(),
+		suspendUserScope(),
 	);
 }
 
@@ -35,7 +35,7 @@ beforeEach(() => {
 afterEach(() => {
 	resetWorkspaceStore();
 	resetServerQueryCache();
-	suspendAccountScope();
+	suspendUserScope();
 	vi.unstubAllGlobals();
 });
 
@@ -84,7 +84,7 @@ it("reports a thrown failure without refreshing", async () => {
 
 it("refuses saves before the workspace is ready", async () => {
 	stubTestServer();
-	suspendAccountScope();
+	suspendUserScope();
 	const call = vi.fn(async () => ({ data: { persisted: true } }));
 	const refresh = vi.fn(async () => {});
 	expect(await performSave({ call, refresh, failureMessage: "Nope." })).toBe(

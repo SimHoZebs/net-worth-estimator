@@ -17,7 +17,7 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "../state/serverQuery.ts";
-import { acceptAccountScope, suspendAccountScope } from "./resourceScope.ts";
+import { acceptUserScope, suspendUserScope } from "./resourceScope.ts";
 import { sessionScopeInput } from "./sessionDiscovery.ts";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
@@ -28,9 +28,9 @@ const session: Session = {
 	allowed: true,
 	accountURL: "https://identity.example/account",
 	resource: {
-		id: `accounts/${"a".repeat(64)}`,
+		id: `users/${"a".repeat(64)}`,
 		kind: "private",
-		permissions: ["account:read", "account:write"],
+		permissions: ["user:read", "user:write"],
 	},
 	user: { subject: "subject-1", name: "Sam Lee" },
 };
@@ -40,7 +40,7 @@ function renderPage(
 	next: Session = session,
 ) {
 	vi.stubGlobal("fetch", vi.fn(fetcher));
-	acceptAccountScope(sessionScopeInput(next), suspendAccountScope());
+	acceptUserScope(sessionScopeInput(next), suspendUserScope());
 	return render(
 		<SessionContext
 			value={{
@@ -65,7 +65,7 @@ function json(body: unknown, status = 200) {
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
-	suspendAccountScope();
+	suspendUserScope();
 	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
@@ -84,14 +84,14 @@ describe("account page", () => {
 			target: { value: "Unsaved name" },
 		});
 		await act(async () => {
-			await serverQueryClient().refetchQueries({ queryKey: ["account"] });
+			await serverQueryClient().refetchQueries({ queryKey: ["user"] });
 		});
 		expect(screen.getByLabelText<HTMLInputElement>("Display name").value).toBe(
 			"Unsaved name",
 		);
 		displayName = "Fresh server name";
 		await act(async () => {
-			await serverQueryClient().refetchQueries({ queryKey: ["account"] });
+			await serverQueryClient().refetchQueries({ queryKey: ["user"] });
 		});
 		await waitFor(() =>
 			expect(
@@ -115,13 +115,13 @@ describe("account page", () => {
 		await screen.findByText("Signed in as editor.");
 		expect(fetcher).toHaveBeenCalledTimes(2);
 		act(() => {
-			suspendAccountScope();
+			suspendUserScope();
 		});
 		await waitFor(() =>
 			expect(screen.getByLabelText("Display name")).toBeTruthy(),
 		);
 		// The form stays rendered with its loaded values; only fetching stops.
-		expect(serverQueryClient().isFetching({ queryKey: ["account"] })).toBe(0);
+		expect(serverQueryClient().isFetching({ queryKey: ["user"] })).toBe(0);
 		expect(fetcher).toHaveBeenCalledTimes(2);
 	});
 
@@ -180,7 +180,7 @@ describe("account page", () => {
 				throw new Error(`unexpected ${url}`);
 			}),
 		);
-		acceptAccountScope(sessionScopeInput(session), suspendAccountScope());
+		acceptUserScope(sessionScopeInput(session), suspendUserScope());
 		render(
 			<SessionContext value={{ session, logout, logoutPending: false }}>
 				<AccountPage />

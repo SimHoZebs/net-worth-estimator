@@ -50,14 +50,14 @@ function SessionProbe() {
 }
 
 const sampleAccount = {
-	id: "accounts/sample",
+	id: "users/sample",
 	kind: "sample",
-	permissions: ["account:read", "account:project"],
+	permissions: ["user:read", "user:project"],
 };
 const privateAccount = {
-	id: `accounts/${"a".repeat(64)}`,
+	id: `users/${"a".repeat(64)}`,
 	kind: "private",
-	permissions: ["account:read", "account:project", "account:write"],
+	permissions: ["user:read", "user:project", "user:write"],
 };
 
 beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
@@ -234,7 +234,7 @@ describe("provider-independent authentication boundary", () => {
 			}),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
-			"This account does not have access.",
+			"This user does not have access.",
 		);
 		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 		expect(
@@ -358,7 +358,7 @@ describe("provider-independent authentication boundary", () => {
 		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("keeps a verified account mounted with a retry toast on a transient outage", async () => {
+	it("keeps a verified user mounted with a retry toast on a transient outage", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,

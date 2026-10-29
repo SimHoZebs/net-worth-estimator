@@ -10,14 +10,14 @@ import {
 } from "../state/notifications.ts";
 import { redirectToSignIn } from "./navigation.ts";
 import { useSession } from "./sessionContext.ts";
-import { useAccountResources } from "./accountApi.ts";
+import { useUserResources } from "./userApi.ts";
 
 export function AccountPage() {
 	const account = useSession();
 	const session = account?.session ?? null;
 	const logout = account?.logout ?? (async () => {});
 	const logoutPending = account?.logoutPending ?? false;
-	const resources = useAccountResources(session);
+	const resources = useUserResources(session);
 	const profile = resources.details.data?.profile ?? null;
 	const sessions = resources.details.data?.sessions ?? [];
 	const [nameDraft, setNameDraft] = useState<{

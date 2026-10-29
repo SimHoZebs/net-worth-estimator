@@ -5,9 +5,9 @@ import {
 	parseErrorResponse,
 } from "@/api/http.ts";
 import { getApiBaseUrl } from "@/api/runtime.ts";
-import { getAccountScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import {
-	AccountScopeError,
+	UserScopeError,
 	scopedRequest,
 	scopedResponseError,
 	responseScopeError,
@@ -17,7 +17,7 @@ export interface WaypointRequestOptions extends RequestInit {
 	baseUrl?: string;
 }
 
-/** Identity requests precede account verification and do not assert an account. */
+/** Identity requests precede user verification and do not assert a user. */
 export async function waypointAuthFetch<T>(
 	url: string,
 	options?: WaypointRequestOptions,
@@ -56,22 +56,22 @@ export async function waypointLogoutFetch<_T>(
 	return identityRequest(url, options);
 }
 
-/** Preserve the response stream, including its account-scoped lifetime. */
+/** Preserve the response stream, including its user-scoped lifetime. */
 export async function waypointStreamFetch<_T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<Response> {
-	return accountRequest(url, options);
+	return userRequest(url, options);
 }
 
-/** Binary responses use the same account assertion and guarded body lifetime. */
+/** Binary responses use the same user assertion and guarded body lifetime. */
 export async function waypointBlobFetch<T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<T> {
-	const response = await accountRequest(url, options);
+	const response = await userRequest(url, options);
 	const data = await response.blob().catch((cause: unknown) => {
-		if (cause instanceof AccountScopeError) throw cause;
+		if (cause instanceof UserScopeError) throw cause;
 		throw new ApiNetworkError(cause);
 	});
 	return { data, status: response.status, headers: response.headers } as T;
@@ -83,19 +83,19 @@ export async function waypointBlobFetch<T>(
  * shared error taxonomy stay in one place instead of forking a second
  * client. Application requests flow query/mutation -> generated endpoint ->
  * mutator; only the mutator uses the network transport
- * (clientBoundary.test.ts). Resolves the full response envelope; throws AccountScopeError or
+ * (clientBoundary.test.ts). Resolves the full response envelope; throws UserScopeError or
  * ApiError; never resolves to Error.
  */
 export async function waypointFetch<T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<T> {
-	const response = await accountRequest(url, options);
+	const response = await userRequest(url, options);
 	const headers = response.headers;
 	const status = response.status;
 	if (status === 204) return { data: undefined, status, headers } as T;
 	const text = await response.text().catch((cause: unknown) => {
-		if (cause instanceof AccountScopeError) throw cause;
+		if (cause instanceof UserScopeError) throw cause;
 		throw new ApiNetworkError(cause);
 	});
 	if (!text.trim()) return { data: undefined, status, headers } as T;
@@ -106,11 +106,11 @@ export async function waypointFetch<T>(
 	}
 }
 
-async function accountRequest(
+async function userRequest(
 	url: string,
 	options?: RequestInit,
 ): Promise<Response> {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	const baseUrl = getApiBaseUrl();
 	const outcome = await scopedRequest(
 		baseUrl,

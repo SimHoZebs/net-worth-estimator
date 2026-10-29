@@ -3,7 +3,7 @@ import {
 	getSafeSpendingSettings,
 	setSafeSpendingSettings,
 } from "@/api/generated/endpoints.ts";
-import { getAccountScope, type AccountScope } from "@/auth/resourceScope.ts";
+import { getUserScope, type UserScope } from "@/auth/resourceScope.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
 import {
 	accountLocalStorage,
@@ -12,7 +12,7 @@ import {
 
 /** Backend authority with a one-time, verified-owner browser import. */
 export async function readSafeSpendingSettings(
-	scope: AccountScope,
+	scope: UserScope,
 	sanitize: (value: unknown) => SafeSpendingSettings,
 	signal?: AbortSignal,
 ): Promise<SafeSpendingSettings | null> {
@@ -21,7 +21,7 @@ export async function readSafeSpendingSettings(
 	let settings: SafeSpendingSettings | null;
 	try {
 		const data = (await getSafeSpendingSettings({ signal })).data;
-		if (scope !== getAccountScope()) return null;
+		if (scope !== getUserScope()) return null;
 		settings = (data.settings ?? null) as SafeSpendingSettings | null;
 	} catch (error) {
 		throw error instanceof Error ? error : new Error(String(error));
@@ -29,14 +29,14 @@ export async function readSafeSpendingSettings(
 	if (settings === null) {
 		const storage = accountLocalStorage(scope);
 		const raw = await storage.getItem(name);
-		if (scope !== getAccountScope() || signal?.aborted) return null;
+		if (scope !== getUserScope() || signal?.aborted) return null;
 		if (raw) {
 			try {
 				const legacy = sanitize(JSON.parse(raw));
 				let saved: SafeSpendingSettings | null;
 				try {
 					const data = (await setSafeSpendingSettings(legacy as never)).data;
-					if (scope !== getAccountScope()) return null;
+					if (scope !== getUserScope()) return null;
 					saved = (data.settings ?? null) as SafeSpendingSettings | null;
 				} catch (error) {
 					// A read-only server can still display backend defaults.

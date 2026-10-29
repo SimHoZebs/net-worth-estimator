@@ -30,7 +30,7 @@ import {
 } from "../../state/workspaceResources.ts";
 import { transactionToPlan } from "../../domain/transactionRows.ts";
 import { deleteAccount } from "@/api/generated/endpoints.ts";
-import { useAccountPlan } from "../../state/useAccountScope.ts";
+import { useUserPlan } from "../../state/useUserScope.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
 
@@ -51,7 +51,7 @@ export function AccountSections({
 }) {
 	// Plan data and actions subscribe here; only the viewed tab and UI
 	// callbacks arrive as props.
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	if (!plan) return null;
 	if (view === "accounts") {
 		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;

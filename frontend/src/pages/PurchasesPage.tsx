@@ -1,10 +1,10 @@
 import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
 import { PURCHASE_EVALUATIONS } from "../state/purchaseEvaluation.ts";
-import { useAccountPlan } from "../state/useAccountScope.ts";
+import { useUserPlan } from "../state/useUserScope.ts";
 import { WishListPanel } from "./purchase-planner/WishListPanelReplacement.tsx";
 
 export function PurchasesPage() {
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	if (!plan) return null;
 	return (
 		<BaseProjectionView evaluations={PURCHASE_EVALUATIONS}>

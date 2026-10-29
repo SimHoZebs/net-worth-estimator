@@ -1,13 +1,13 @@
 import { QueryClient } from "@tanstack/react-query";
-import { getAccountScope } from "../auth/resourceScope.ts";
+import { getUserScope } from "../auth/resourceScope.ts";
 
 /**
  * Shared TanStack Query cache for server resources and derived projections. A projection is a
  * pure function of its inputs, so a cache key holding the full input set
  * can never go stale: identical concurrent requests attach to one in-flight
  * fetch instead of computing side by side, and completed results are reused
- * across remounts while fresh. Account identity belongs in each key:
- * identical inputs from different accounts never share
+ * across remounts while fresh. User identity belongs in each key:
+ * identical inputs from different users never share
  * data or in-flight requests. Mutable resources define their own freshness
  * and mutation policy. Session discovery belongs to its own hook.
  */
@@ -17,7 +17,7 @@ export function deterministicQueryKey(
 	years: number,
 	rangeKey = "",
 ): readonly unknown[] {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	return ["deterministic-projection", scope.key, documentKey, years, rangeKey];
 }
 
@@ -28,7 +28,7 @@ export function stochasticQueryKey(
 	seed: number,
 	attempt: number,
 ): readonly unknown[] {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	return [
 		"stochastic-projection",
 		scope.key,
@@ -51,7 +51,7 @@ export function evalOverlayQueryKey(
 	years: number,
 	rangeKey = "",
 ): readonly unknown[] {
-	const scope = getAccountScope();
+	const scope = getUserScope();
 	return [
 		"deterministic-eval-overlay",
 		scope.key,
@@ -66,7 +66,7 @@ export function currentPositionQueryKey(
 	documentKey: string,
 	asOfDate: string,
 ): readonly unknown[] {
-	return ["current-position", getAccountScope().key, documentKey, asOfDate];
+	return ["current-position", getUserScope().key, documentKey, asOfDate];
 }
 
 const FINANCIAL_QUERY_KINDS = [

@@ -20,7 +20,7 @@ import { upsertItem } from "../../domain/accountEdits.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
-import { useAccountPlan } from "../../state/useAccountScope.ts";
+import { useUserPlan } from "../../state/useUserScope.ts";
 import { useTransactionCatalog } from "../../state/workspaceResources.ts";
 import { parseDisplayNumber, textValue, numberValue } from "./formValues.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
@@ -165,7 +165,7 @@ export function TransactionEditor({
 	onSaved: () => void;
 	onClose: () => void;
 }) {
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	const catalog = useTransactionCatalog();
 	const accounts = useMemo(() => visibleAccounts(plan?.accounts ?? []), [plan]);
 	const claimRules = useMemo(

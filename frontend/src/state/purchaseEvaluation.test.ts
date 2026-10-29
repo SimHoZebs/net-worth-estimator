@@ -3,7 +3,7 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
-import { getAccountScope } from "../auth/resourceScope.ts";
+import { getUserScope } from "../auth/resourceScope.ts";
 import { displayPlanToBackendDocument } from "../api/adapter.ts";
 import type {
 	DeterministicProjectionRequest,
@@ -175,7 +175,7 @@ describe("isolated purchase evaluation", () => {
 		let purchasesCalls = 0;
 		const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 			const headers = new Headers({ "content-type": "application/json" });
-			const resource = getAccountScope().resource?.id;
+			const resource = getUserScope().resource?.id;
 			if (resource) headers.set("Waypoint-Resource", resource);
 			if (String(url).endsWith("/v1/projections/deterministic")) {
 				const request = JSON.parse(

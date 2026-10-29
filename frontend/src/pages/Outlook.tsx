@@ -8,9 +8,9 @@ import { TextButton } from "../components/Button.tsx";
 import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import {
-	useAccountPlan,
-	useAccountReadOnly,
-} from "../state/useAccountScope.ts";
+	useUserPlan,
+	useUserReadOnly,
+} from "../state/useUserScope.ts";
 import {
 	useCheckpoints,
 	useServerStatus,
@@ -65,7 +65,7 @@ function OutlookContent({
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
-	const plan = useAccountPlan();
+	const plan = useUserPlan();
 	const {
 		ids: pinnedIds,
 		toggle: togglePin,
@@ -84,7 +84,7 @@ function OutlookContent({
 			) ?? false,
 	});
 	const status = useServerStatus().data;
-	const writeBlocked = useAccountReadOnly();
+	const writeBlocked = useUserReadOnly();
 	// Previous-input placeholders are not forecasts for the active model.
 	const base =
 		projection.base instanceof Error || projection.isPlaceholderData

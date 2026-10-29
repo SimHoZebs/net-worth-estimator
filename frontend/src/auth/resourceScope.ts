@@ -1,23 +1,23 @@
-export interface SessionAccount {
+export interface SessionUser {
 	id: string;
 	kind: "sample" | "private";
 	permissions: string[];
 }
 
-export interface AccountScopeInput {
+export interface UserScopeInput {
 	apiBaseUrl: string;
-	resource: SessionAccount;
+	resource: SessionUser;
 	subject: string | null;
 }
 
-export interface AccountScope extends Omit<AccountScopeInput, "resource"> {
-	resource: SessionAccount | null;
+export interface UserScope extends Omit<UserScopeInput, "resource"> {
+	resource: SessionUser | null;
 	status: "pending" | "ready";
 	key: string;
 }
 
 const listeners = new Set<() => void>();
-let current: AccountScope = {
+let current: UserScope = {
 	status: "pending",
 	key: "pending",
 	apiBaseUrl: "",
@@ -29,17 +29,17 @@ export function canonicalApiBaseUrl(baseUrl: string): string {
 	return new URL(baseUrl || "/", location.href).href.replace(/\/+$/, "");
 }
 
-/** Browser data always belongs to a verified account. */
-export function accountStorageKey(
+/** Browser data always belongs to a verified user. */
+export function userStorageKey(
 	baseKey: string,
-	scope: AccountScope = getAccountScope(),
+	scope: UserScope = getUserScope(),
 ): string | null {
 	if (scope.status === "pending" || !scope.resource) return null;
 	const owner = `${scope.resource.kind}:${encodeURIComponent(scope.resource.id)}`;
-	return `${baseKey}:account:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
+	return `${baseKey}:user:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
 }
 
-export function accountScopeKey(input: AccountScopeInput): string {
+export function userScopeKey(input: UserScopeInput): string {
 	return JSON.stringify([
 		input.apiBaseUrl,
 		input.resource.id,
@@ -49,23 +49,23 @@ export function accountScopeKey(input: AccountScopeInput): string {
 	]);
 }
 
-export function getAccountScope(): AccountScope {
+export function getUserScope(): UserScope {
 	return current;
 }
 
-export function subscribeAccountScope(listener: () => void): () => void {
+export function subscribeUserScope(listener: () => void): () => void {
 	listeners.add(listener);
 	return () => listeners.delete(listener);
 }
 
-function publish(scope: AccountScope): AccountScope {
+function publish(scope: UserScope): UserScope {
 	current = scope;
 	for (const listener of listeners) listener();
 	return scope;
 }
 
-/** Invalidate captured requests immediately, before React removes the account view. */
-export function suspendAccountScope(): AccountScope {
+/** Invalidate captured requests immediately, before React removes the user view. */
+export function suspendUserScope(): UserScope {
 	return publish({
 		status: "pending",
 		key: "pending",
@@ -76,21 +76,21 @@ export function suspendAccountScope(): AccountScope {
 }
 
 /** Only the session boundary may accept a server-verified scope. */
-export function acceptAccountScope(
-	input: AccountScopeInput,
-	expected: AccountScope,
-): AccountScope | null {
+export function acceptUserScope(
+	input: UserScopeInput,
+	expected: UserScope,
+): UserScope | null {
 	if (current !== expected) return null;
 	return publish({
 		...input,
 		status: "ready",
-		key: accountScopeKey(input),
+		key: userScopeKey(input),
 	});
 }
 
 /** API clients call this for a current response with a missing/mismatched scope. */
-export function requireAccountRecheck(): void {
-	suspendAccountScope();
+export function requireUserRecheck(): void {
+	suspendUserScope();
 	if (typeof window !== "undefined")
 		window.dispatchEvent(new Event("waypoint:authentication-required"));
 }

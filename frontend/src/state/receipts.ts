@@ -14,23 +14,23 @@ import type {
 	ReceiptOutputBody,
 	ReceiptDetails,
 } from "@/api/generated/model/index.ts";
-import { AccountScopeError } from "@/api/scopedRequest.ts";
+import { UserScopeError } from "@/api/scopedRequest.ts";
 import {
-	getAccountScope,
-	subscribeAccountScope,
+	getUserScope,
+	subscribeUserScope,
 } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { useServerModel, accountResourceKey } from "./workspaceResources.ts";
+import { useServerModel, userResourceKey } from "./workspaceResources.ts";
 
 export function useReceiptScope() {
-	return useSyncExternalStore(subscribeAccountScope, getAccountScope);
+	return useSyncExternalStore(subscribeUserScope, getUserScope);
 }
 
 export const receiptCollectionKey = (
 	postingId: string,
-	scope = getAccountScope(),
+	scope = getUserScope(),
 ) => ["receipts", scope.key, postingId] as const;
-export const receiptDetailKey = (id: string, scope = getAccountScope()) =>
+export const receiptDetailKey = (id: string, scope = getUserScope()) =>
 	["receipt-detail", scope.key, id] as const;
 
 export function useReceipts(postingId: string, enabled: boolean) {
@@ -92,14 +92,14 @@ function useReceiptWrite<T>(
 			mutationKey: ["receipt-write", scope.key, postingId],
 			retry: false,
 			mutationFn: async (input: T) => {
-				if (scope !== getAccountScope() || scope.status !== "ready")
-					throw new AccountScopeError();
+				if (scope !== getUserScope() || scope.status !== "ready")
+					throw new UserScopeError();
 				const result = await perform(input);
-				if (scope !== getAccountScope()) throw new AccountScopeError();
+				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},
 			onSuccess: async (result) => {
-				if (scope !== getAccountScope()) return;
+				if (scope !== getUserScope()) return;
 				if (result)
 					cache.setQueryData(
 						receiptDetailKey(result.receipt.id, scope),
@@ -111,7 +111,7 @@ function useReceiptWrite<T>(
 				// Reverse lookup lives on the financial-model envelope, outside
 				// the document. Refresh it so posting badges follow mutations.
 				await cache.invalidateQueries({
-					queryKey: accountResourceKey("model", scope),
+					queryKey: userResourceKey("model", scope),
 				});
 			},
 		},

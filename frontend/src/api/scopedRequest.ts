@@ -1,53 +1,53 @@
 import {
 	canonicalApiBaseUrl,
-	getAccountScope,
-	requireAccountRecheck,
-	subscribeAccountScope,
-	type AccountScope,
+	getUserScope,
+	requireUserRecheck,
+	subscribeUserScope,
+	type UserScope,
 } from "../auth/resourceScope.ts";
 import type { ApiHttpError, FetchLike } from "./http.ts";
 
-export class AccountScopeError extends Error {
+export class UserScopeError extends Error {
 	readonly status = 409;
 	constructor(
 		message = "The active account changed. Verify your session before continuing.",
 	) {
 		super(message);
-		this.name = "AccountScopeError";
+		this.name = "UserScopeError";
 	}
 }
 
 export interface ScopedResponse {
 	response: Response;
-	scope: AccountScope;
+	scope: UserScope;
 }
 
 export function responseScopeError(
-	scope: AccountScope,
-): AccountScopeError | null {
-	return scope === getAccountScope() ? null : new AccountScopeError();
+	scope: UserScope,
+): UserScopeError | null {
+	return scope === getUserScope() ? null : new UserScopeError();
 }
 
 /** Only the server's resource-change error requests a new session check. */
 export function scopedResponseError(
-	scope: AccountScope,
+	scope: UserScope,
 	error: ApiHttpError,
-): ApiHttpError | AccountScopeError {
+): ApiHttpError | UserScopeError {
 	const stale = responseScopeError(scope);
 	if (stale) return stale;
 	if (error.status === 409 && error.problem?.code === "RESOURCE_CHANGED") {
-		requireAccountRecheck();
-		return new AccountScopeError();
+		requireUserRecheck();
+		return new UserScopeError();
 	}
 	return error;
 }
 
 /** One lifetime covers fetch, JSON body reads, and streaming response consumption. */
-function requestLifetime(scope: AccountScope, signal?: AbortSignal | null) {
+function requestLifetime(scope: UserScope, signal?: AbortSignal | null) {
 	const controller = new AbortController();
 	const forwardAbort = () => controller.abort(signal?.reason);
-	const stopScope = subscribeAccountScope(() => {
-		if (scope !== getAccountScope()) controller.abort(new AccountScopeError());
+	const stopScope = subscribeUserScope(() => {
+		if (scope !== getUserScope()) controller.abort(new UserScopeError());
 	});
 	if (signal?.aborted) forwardAbort();
 	else signal?.addEventListener("abort", forwardAbort, { once: true });
@@ -124,28 +124,28 @@ export async function scopedRequest(
 	url: string,
 	init: RequestInit,
 	fetcher: FetchLike,
-	scope: AccountScope,
-): Promise<ScopedResponse | AccountScopeError> {
+	scope: UserScope,
+): Promise<ScopedResponse | UserScopeError> {
 	if (scope.status === "pending" || !scope.resource)
-		return new AccountScopeError(
+		return new UserScopeError(
 			"Verify your session before requesting account data.",
 		);
 	if (canonicalApiBaseUrl(baseUrl) !== scope.apiBaseUrl)
-		return new AccountScopeError(
+		return new UserScopeError(
 			"The API address does not match the verified account.",
 		);
-	const current = getAccountScope();
+	const current = getUserScope();
 	if (scope !== current) {
-		// Retired same-account work stays retired. The server cannot tell it
-		// apart (same account ID, same cookie), so block it before network access.
-		// A signed-out browser has no verified account: fail fast.
+		// Retired same-user work stays retired. The server cannot tell it
+		// apart (same user ID, same cookie), so block it before network access.
+		// A signed-out browser has no verified user: fail fast.
 		if (
 			current.status === "pending" ||
 			!current.resource ||
 			current.resource.id === scope.resource.id
 		)
-			return new AccountScopeError();
-		// Different account: send the pinned original ID and let the backend
+			return new UserScopeError();
+		// Different user: send the pinned original ID and let the backend
 		// reject with 409 RESOURCE_CHANGED. Never retarget the header.
 	}
 	const lifetime = requestLifetime(scope, init.signal);
@@ -177,8 +177,8 @@ export async function scopedRequest(
 	) {
 		lifetime.dispose();
 		void response.body?.cancel().catch(() => {});
-		if (!stale) requireAccountRecheck();
-		return stale ?? new AccountScopeError();
+		if (!stale) requireUserRecheck();
+		return stale ?? new UserScopeError();
 	}
 	return { response: guardedBody(response, lifetime), scope };
 }
