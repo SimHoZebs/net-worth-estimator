@@ -122,7 +122,8 @@ discards derived projection artifacts. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
 
-The API container includes `setupdb`, `importcsv`, and `refreshplan` under `/app`.
+The API container includes `setupdb`, `importcsv`, `refreshplan`, and the
+temporary `migrate-plans-to-users` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
 server container for migration or user replacement.
