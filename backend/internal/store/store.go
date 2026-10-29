@@ -15,16 +15,16 @@ import (
 // suite in storetest to prove it.
 //
 // Contract notes for implementers:
-//   - Every operation belongs to one immutable plan scope. There is no default
-//     private scope and no database-wide financial operation.
+//   - Every operation belongs to one immutable account scope. There is no default
+//     scope and no database-wide financial operation.
 //   - Writes are single-threaded by the caller discipline (one server, one
 //     instance); the backend must still serialize concurrent writes safely.
 //   - Readers always see the latest committed state (no stale replicas).
 //   - A fresh backend reports DocumentExists() == false. InitializeDocument
 //     activates an empty model without replacing existing data.
-//   - Clear resets this plan's model, sync state (including the Bridge key
+//   - Clear resets this account's model, sync state (including the Bridge key
 //     and card selection), settings, and artifacts. It preserves amount
-//     presets, plan ownership, other plans, and identity state. Use
+//     presets, other accounts, and identity state. Use
 //     ClearSyncCredential to disconnect the key while keeping cards.
 //   - Missing rows report ErrNotFound (or IsNotFound). Backends must not
 //     leak sql.ErrNoRows, missing files, or other mechanism errors.
@@ -91,7 +91,7 @@ type Store interface {
 	Close() error
 }
 
-// ReceiptStore is the plan-scoped persistence boundary for evidence only.
+// ReceiptStore is the account-scoped persistence boundary for evidence only.
 type ReceiptStore interface {
 	CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (types.Receipt, error)
 	ListReceipts(postingID string) ([]types.Receipt, error)
@@ -103,14 +103,21 @@ type ReceiptStore interface {
 	DeleteReceipt(ctx context.Context, id string) error
 }
 
-// Database owns the application lifecycle: plan routing, group persistence,
+// Database owns the application lifecycle: account routing, group persistence,
 // blob cleanup, and health. Financial operations use a Store returned for an
-// explicit plan. Backends implement this plus Open/Setup constructors; the
+// explicit account. Backends implement this plus Open/Setup constructors; the
 // rest of the backend depends only on this interface, never on files, SQL,
 // or driver handles.
 type Database interface {
 	Close() error
 	PingContext(ctx context.Context) error
+	HasAccount(accountID string) (bool, error)
+	Account(accountID string) (Store, error)
+	EnsureAccount(accountID, issuer, subject string) (Store, error)
+	// Deprecated plan shims: account scope replaced plan scope. These map
+	// plans/<suffix> to user:<suffix> (sample/fixture to their synthetic
+	// accounts) so auth/frontend still build until the auth lane removes
+	// guest/sample. New code must use HasAccount/Account/EnsureAccount.
 	HasPlan(planID string) (bool, error)
 	Plan(planID string) (Store, error)
 	EnsurePrivatePlan(planID, accountID, issuer, subject string) (Store, error)

@@ -178,7 +178,7 @@ func TestGroupsSharePlanActorIdentity(t *testing.T) {
 }
 
 // Removal preserves identity and financial state: app_accounts rows and
-// private plans survive, and sole-owned groups are deleted like LeaveGroup
+// account scopes survive, and sole-owned groups are deleted like LeaveGroup
 // does instead of stranding an ownerless group.
 func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	d := openGroupTestDB(t)
@@ -214,7 +214,7 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	}
 	_ = bobInvite
 
-	if _, err := d.EnsurePrivatePlan("plans/bob", bob, "https://issuer.test", "bob"); err != nil {
+	if _, err := d.EnsureAccount(bob, "https://issuer.test", "bob"); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.RemoveGroupMembershipsForAccount(bob); err != nil {
@@ -225,8 +225,8 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM app_accounts WHERE id = ?`, bob).Scan(&accounts); err != nil || accounts != 1 {
 		t.Fatalf("app_accounts for bob = %d, %v", accounts, err)
 	}
-	if exists, err := d.HasPlan("plans/bob"); err != nil || !exists {
-		t.Fatalf("private plan lost: %v, %v", exists, err)
+	if exists, err := d.HasAccount(bob); err != nil || !exists {
+		t.Fatalf("account scope lost: %v, %v", exists, err)
 	}
 	if _, err := d.GetGroup(solo.ID, bob); err != ErrNotFound {
 		t.Fatalf("sole-owned group err = %v, want ErrNoRows", err)
@@ -323,12 +323,12 @@ func mustGroup(t *testing.T, d *Database, owner string) Group {
 	return group
 }
 
-// Group writes never touch plan-scoped financial tables.
+// Group writes never touch account-scoped financial tables.
 func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 	d := openGroupTestDB(t)
 	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
 	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
-	plan, err := d.EnsurePrivatePlan("plans/alice", alice, "https://issuer.test", "alice")
+	plan, err := d.EnsureAccount(alice, "https://issuer.test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 		t.Fatalf("document presence changed: %+v -> %+v", before, after)
 	}
 	var counts [2]int
-	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE plan_id = 'plans/alice'`).Scan(&counts[0]); err != nil {
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE account_id = ?`, alice).Scan(&counts[0]); err != nil {
 		t.Fatal(err)
 	}
 	if counts[0] != 0 {

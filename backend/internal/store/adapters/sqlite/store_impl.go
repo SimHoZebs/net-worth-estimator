@@ -16,12 +16,12 @@ var (
 // sqliteStore is the embedded-SQLite Store implementation. Pure-Go driver
 // (modernc), single file, WAL mode, one open connection.
 type sqliteStore struct {
-	db          *planDB
+	db          *accountDB
 	owned       *Database
 	application *Database
 }
 
-// Open creates or opens an explicit plans/fixture scope for isolated tests
+// Open creates or opens an explicit fixture account scope for isolated tests
 // and fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
 // databases are rejected and never converted here.
 func Open(path string) (store.Store, error) {
@@ -29,7 +29,7 @@ func Open(path string) (store.Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	st, err := db.ensurePlan("plans/fixture", "fixture", "", "", "")
+	st, err := db.ensureAccount(FixtureAccountID, FixtureAccountID, FixtureAccountID)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -38,7 +38,7 @@ func Open(path string) (store.Store, error) {
 	return st, nil
 }
 
-// Close releases an owned fixture database. Shared plan handles never close it.
+// Close releases an owned fixture database. Shared account handles never close it.
 func (s *sqliteStore) Close() error {
 	if s.owned != nil {
 		return s.owned.Close()
