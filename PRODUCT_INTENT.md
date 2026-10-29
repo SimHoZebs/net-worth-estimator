@@ -8,7 +8,7 @@ The Net Worth Estimator helps one household understand and deliberately improve 
 
 It answers:
 
-> If we continue with the current plan, where does the base case end up, what could prevent that outcome, how uncertain is it, and which change should we inspect next?
+> If we continue with the saved model, where does the base case end up, what could prevent that outcome, how uncertain is it, and which change should we inspect next?
 
 The product turns financial records and assumptions into a defensible decision. It should help the user move from description to understanding to action without requiring the user to operate the calculation machinery or manage a spreadsheet.
 
@@ -27,7 +27,7 @@ A useful answer can establish:
 
 ### Primary audience: the household planner
 
-The primary user is responsible for one household's long-term financial plan. They may be financially literate without being a professional planner. They understand balances, annual spending, dates, growth, and uncertainty but should not need specialist financial terminology to make a decision.
+The primary user is responsible for one household's long-term financial model. They may be financially literate without being a professional planner. They understand balances, annual spending, dates, growth, and uncertainty but should not need specialist financial terminology to make a decision.
 
 The planner needs to:
 
@@ -35,26 +35,26 @@ The planner needs to:
 - understand when a goal may be reached;
 - evaluate planned spending, debt payments, income, and withdrawals;
 - identify the first important constraint before it becomes a crisis;
-- separate near-term safe spending from longer-term plan constraints when the evidence supports it;
-- test assumptions without committing them;
+- separate near-term safe spending from longer-term model constraints when the evidence supports it;
+- test assumptions in a what-if without changing saved state;
 - understand the consequence of a change before deciding whether to keep it; and
 - retain confidence that displayed values reflect the intended source data.
 
-### Secondary audience: the plan maintainer
+### Secondary audience: the model maintainer
 
-A plan maintainer may prepare or repair the household plan and its source data. This person needs:
+A model maintainer may prepare or repair the household model and its source data. This person needs:
 
 - clear source and validation status;
-- access to the saved plan;
+- access to the saved model;
 - visibility into errors and incomplete information;
 - safe handling of access credentials and read-only sources; and
-- enough detail to repair a plan that is not producing useful outcomes.
+- enough detail to repair a model that is not producing useful outcomes.
 
 The product's purpose remains the household's financial decision. A technically capable maintainer should not need specialist knowledge of the underlying calculation to use it safely.
 
 ### Audience assumptions to validate
 
-The current working hypothesis is a single-household, U.S.-oriented planner and a technically capable plan maintainer. No user-research record establishes those personas yet.
+The current working hypothesis is a single-household, U.S.-oriented planner and a technically capable model maintainer. No user-research record establishes those personas yet.
 
 The product should preserve room for a less technical household user. It should not assume a broad consumer audience until onboarding, data portability, and source setup support that audience.
 
@@ -65,16 +65,16 @@ The product must help the user complete these jobs:
 | User question                    | Required response                                                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Where are we now?                | Current net worth, account balances, recorded-versus-modeled status, and data freshness.                                                  |
-| What happens if nothing changes? | A base-case projection from the current plan through the selected horizon.                                                                |
-| How uncertain is that outcome?   | A median and an interpretable range across modeled scenarios when ranges are enabled.                                                     |
+| What happens if nothing changes? | A base-case projection from the saved model through the selected horizon.                                                                |
+| How uncertain is that outcome?   | A median and an interpretable range across sampled scenarios when ranges are enabled.                                                     |
 | Can we reach our goals?          | Goal outcomes, dates, status, and uncertainty where available.                                                                            |
 | What fails first?                | The first underfulfilled movement or goal, with its date, amount, and limiting constraint.                                                |
-| Why does it fail?                | The relevant account, movement, limit, funding source, or other plan constraint.                                                          |
-| What is happening soon?          | Cash available, upcoming commitments, replenishment cadence, and a conservative near-term spending assessment when supported by the plan. |
-| What is the plan made of?        | Accounts, contributions, transfers, planned income, recurring rules, one-time movements, balance checks, and goal definitions.            |
-| What happens if I change this?   | A temporary version whose outcomes can be compared descriptively with the saved or previously captured state.                             |
+| Why does it fail?                | The relevant account, movement, limit, funding source, or other model constraint.                                                          |
+| What is happening soon?          | Cash available, upcoming commitments, replenishment cadence, and a conservative near-term spending assessment when supported by saved state. |
+| What is the model made of?       | Accounts, contributions, transfers, planned income, recurring rules, one-time movements, balance checks, and goal definitions.            |
+| What happens if I change this?   | A what-if simulator outcome that can be compared descriptively with the saved state.                                                          |
 | Can I trust this?                | Clear separation of recorded facts, assumptions, planned movements, projections, ranges, goal outcomes, and inferred evidence.            |
-| How do I fix or verify it?       | A precise path to the relevant record or assumption, followed by an explicit save or discard decision.                                    |
+| How do I fix or verify it?       | A precise path to the relevant record or assumption, followed by an immediate save for base rows or an explicit promote or discard for a what-if.                                    |
 
 ## 4. Core concepts
 
@@ -86,15 +86,15 @@ The product must make these concepts understandable without specialist documenta
 | **Balance check**           | A recorded end-of-day account balance used to correct modeled history and establish what was known to be true at that date.                                                                                                                                                                                                                    |
 | **Planned movement**        | An expected movement into, out of, or between accounts.                                                                                                                                                                                                                                                                                        |
 | **Account rule**            | A recurring or constrained movement associated with an account.                                                                                                                                                                                                                                                                                |
-| **Plan**                    | The saved collection of accounts, movements, balance checks, assumptions, source information, and goal definitions.                                                                                                                                                                                                                            |
-| **Temporary version**       | An edited plan used for evaluation without changing the saved plan.                                                                                                                                                                                                                                                                            |
-| **Projection**              | A calculated future path from the current plan and chosen horizon.                                                                                                                                                                                                                                                                             |
-| **Base case**               | The projection using central assumptions without scenario variation. It is a calculation, not a prediction of what must happen.                                                                                                                                                                                                                |
-| **Range**                   | A percentile band across modeled scenarios. Its meaning must remain clear without requiring specialist terminology.                                                                                                                                                                                                                            |
+| **Saved model**             | The saved collection of accounts, movements, balance checks, assumptions, source information, and goal definitions. The base projection runs only off this saved state.                                                                                                                                                                         |
+| **What-if**                 | A simulator evaluation that layers hypothetical additions, disables, and modified copies on top of the saved model without changing it. A modified row is a disable plus an addition. Promote replays the set as sequential row writes. Discard deletes the evaluation instance.                                                              |
+| **Projection**              | A calculated future path from the saved model and chosen horizon.                                                                                                                                                                                                                                                                              |
+| **Base case**               | The projection using central assumptions without sampled variation. It is a calculation, not a prediction of what must happen.                                                                                                                                                                                                                  |
+| **Range**                   | A percentile band across sampled scenarios. Its meaning must remain clear without requiring specialist terminology.                                                                                                                                                                                                                            |
 | **Goal check**              | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned movements are fulfilled.                                                                                                                                                                                                      |
 | **Financial independence**  | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing movements, a principal policy, and required confidence. Continuing movements are user-selected and never inferred from labels, categories, identity, or rates. |
 | **Evidence analysis**       | An independent inference from posting-derived external inflows, such as an estimate of posting-derived net pay. It does not independently verify bank provenance.                                                                                                                                                                              |
-| **Comparison**              | A descriptive snapshot of selected measures. It does not store or restore another plan.                                                                                                                                                                                                                                                        |
+| **Comparison**              | A descriptive snapshot of selected measures. It does not store or restore another saved model.                                                                                                                                                                                                                                                 |
 | **Household safe spending** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them.                                                                                                                                       |
 
 ## 5. Required product knowledge
@@ -137,7 +137,7 @@ When ranges are enabled, the product must establish:
 - which conclusions are stable across the range; and
 - which conclusions are materially uncertain.
 
-A range represents modeled scenarios, not a guarantee. The midpoint must never be presented as the expected outcome.
+A range represents sampled scenarios, not a guarantee. The midpoint must never be presented as the expected outcome.
 
 ### 5.4 Goal outcomes and milestones
 
@@ -162,7 +162,7 @@ The product must identify the earliest meaningful underfulfilled movement or goa
 - the relevant account or funding source;
 - the binding balance, ceiling, withdrawal limit, or other constraint;
 - the downstream consequence; and
-- a specific way to inspect or repair the relevant plan element.
+- a specific way to inspect or repair the relevant model element.
 
 Near-term safe spending failures and longer-term structural constraints must remain distinguishable unless the product defines an explicit rule for combining them.
 
@@ -180,7 +180,7 @@ For every material conclusion, the user must be able to determine:
 
 A conclusion that cannot be explained must be marked provisional or incomplete rather than presented with false confidence.
 
-### 5.7 Plan composition and maintenance
+### 5.7 Saved model composition and maintenance
 
 The product must support deliberate maintenance of:
 
@@ -194,13 +194,13 @@ The product must support deliberate maintenance of:
 - source ownership and read-only status; and
 - validation diagnostics.
 
-Every proposed change must be understandable before it is committed. A modified item must be reversible. A removed item must remain distinguishable from a newly added item or an exclusion.
+Every proposed change must be understandable before it is saved or promoted. Saved edits apply immediately and are reversed by a further edit. A removed item must remain distinguishable from a newly added item or an exclusion. Interrupted what-if work survives only as its saved evaluation instance. Interrupted immediate saves and interrupted promotes leave only completed row writes; recovery is re-promote of the remainder or re-edit.
 
 ### 5.8 Posting-derived pay evidence
 
 Posting-derived evidence must answer a narrow question:
 
-> What can be inferred about net pay from the one-time external inflows currently in the plan?
+> What can be inferred about net pay from the one-time external inflows currently saved?
 
 When evidence is available, the product must establish:
 
@@ -213,14 +213,14 @@ When evidence is available, the product must establish:
 - limitations; and
 - the supporting and excluded movements.
 
-Inferred net pay must never be presented as gross salary, used to silently change the plan, or shown without its evidence quality and limitations.
+Inferred net pay must never be presented as gross salary, used to silently change saved state, or shown without its evidence quality and limitations.
 
 ### 5.9 Provenance and data health
 
 The product must distinguish:
 
 - source- or balance-check-backed from modeled;
-- saved from temporary;
+- saved from what-if;
 - current from stale;
 - validated from invalid;
 - read-only from writable;
@@ -234,7 +234,7 @@ Useful provenance includes:
 - last successful load or synchronization;
 - balance-check and source-record coverage;
 - validation diagnostics;
-- plan and income-source revision;
+- model and income-source revision;
 - calculation status; and
 - evidence limitations.
 
@@ -242,13 +242,13 @@ Provenance must remain available whenever a user questions a material value.
 
 ## 6. Safe experimentation and comparison
 
-The central plan lifecycle is:
+The central lifecycle is:
 
 ```text
-saved plan → temporary version → evaluated consequence → compare → save or discard
+saved model → what-if simulator → evaluated consequence → compare → promote or discard
 ```
 
-A temporary version must remain visibly distinct from the saved plan. Saving must be deliberate. Discarding must be explicit. Unfinished work must not be lost because the user changed context, ended a session, or encountered an error.
+The base projection runs only off saved rows. Editing a row saves immediately and re-projects. Draft keystrokes never issue backend queries. A what-if must remain visibly distinct from saved state. Promote replays the what-if set as sequential saved row writes under last-write-wins with per-row validation. Discard deletes the what-if evaluation instance.
 
 A comparison is useful when it answers:
 
@@ -258,12 +258,12 @@ The product must establish:
 
 - which measures are being compared;
 - which state is current;
-- how many unsaved changes are associated with the evaluated state;
+- which what-if scenario is associated with the evaluated state;
 - the horizon, source, and relevant assumptions;
 - whether the compared contexts are sufficiently comparable; and
 - that the comparison is descriptive rather than causal proof.
 
-A comparison must not imply that it stores or restores an alternative plan.
+A comparison must not imply that it stores or restores another saved model.
 
 ## 7. Product principles
 
@@ -283,7 +283,7 @@ The product must visibly distinguish:
 - source-provided or user-provided assumptions;
 - planned movements;
 - base-case projections;
-- ranges derived from modeled scenarios;
+- ranges derived from sampled scenarios;
 - goal outcomes; and
 - posting-derived inferences.
 
@@ -305,7 +305,7 @@ The product should favor recognition over unnecessary reading, structure over re
 
 ### Make state visible
 
-The user should never need to guess whether an outcome belongs to the saved plan, a temporary version, a previous evaluation, or a calculation still in progress.
+The user should never need to guess whether an outcome belongs to saved state, a what-if scenario, a previous evaluation, or a calculation still in progress.
 
 ### Optimize repeated understanding
 
@@ -328,7 +328,7 @@ The product must handle these states coherently regardless of interaction struct
 - provisional outcome;
 - stale outcome;
 - read-only source;
-- temporary changes;
+- what-if scenario;
 - failed save; and
 - successful save.
 
@@ -369,11 +369,11 @@ The product is not intended to become:
 - a multi-household or institutional portfolio manager;
 - a multi-currency reporting platform;
 - a specialist calculation laboratory; or
-- a place where multiple alternative plans are silently stored and restored.
+- a place where multiple alternative models are silently stored and restored.
 
-The product should keep authoritative financial data separate from temporary versions and should not expose internal calculation machinery as the primary experience.
+The product should keep authoritative financial data separate from what-if scenarios and should not expose internal calculation machinery as the primary experience.
 
-A source integration may support the plan-maintainer workflow, but source availability alone does not justify a general financial-operations product.
+A source integration may support the model-maintainer workflow, but source availability alone does not justify a general financial-operations product.
 
 ## 11. Success criteria
 
@@ -382,7 +382,7 @@ The product is aligned with this intent when a user can:
 - state the current position, base-case future position, and most important uncertainty;
 - identify the first meaningful failure and its cause;
 - distinguish recorded, planned, modeled, and inferred information;
-- understand whether an outcome is saved, temporary, provisional, stale, or incomplete;
+- understand whether an outcome is saved, what-if, provisional, stale, or incomplete;
 - trace a material conclusion to supporting records;
 - test a change safely and compare the consequence under a known context;
 - distinguish near-term safe spending from longer-term structural constraints;
@@ -397,11 +397,11 @@ Feature count is not a product goal. Trustworthy understanding and deliberate ac
 The product does not settle the following questions:
 
 - Is this primarily a personal planning tool, or should it support a less technical self-service audience?
-- Should plan and source onboarding be part of the product experience?
+- Should model and source onboarding be part of the product experience?
 - Which goal check or diagnosis should receive primary emphasis when several are configured?
 - What rule, if any, should combine near-term safe spending constraints and longer-term structural constraints?
 - How much record-level evidence should be available for posting-derived inference?
-- Should temporary versions and comparisons remain temporary, or should any become durable planning records?
+- How many what-if scenarios should persist, and should comparisons ever become durable records?
 - Should household safe spending become a reusable household concept or remain a personal extension?
 - How should recorded and modeled balances be distinguished when both describe the same account?
 - Which approximation labels are acceptable for debt payoff and other derived dates?
