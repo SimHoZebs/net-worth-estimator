@@ -11,7 +11,7 @@ import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
  * Boot chrome while the server workspace hydrates. Static chrome renders
  * exactly as in the loaded state; only slots awaiting network data show
  * skeletons. Page content is network data, so it skeletonizes wholesale
- * until the plan arrives. Terminal load failures are not handled here.
+ * until the account arrives. Terminal load failures are not handled here.
  */
 export function ServerLoadingShell({
 	navigation,

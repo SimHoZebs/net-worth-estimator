@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../mocks/plan.ts";
+import { testAccount } from "../../mocks/account.ts";
 import { evaluationFixture } from "../../mocks/projection.ts";
 import { EvaluationCard } from "./EvaluationCard.tsx";
 
 afterEach(cleanup);
 
-const evaluation = testPlan.evaluations[0]!;
+const evaluation = testAccount.evaluations[0]!;
 
 describe("EvaluationCard", () => {
 	it("preserves icon actions and pin state without an evidence action", () => {
@@ -67,7 +67,7 @@ describe("EvaluationCard", () => {
 		expect(view.queryByRole("button", { name: /Evidence/ })).toBeNull();
 	});
 
-	it.each(testPlan.evaluations)(
+	it.each(testAccount.evaluations)(
 		"keeps the $kind target result and editor actions without evidence",
 		(evaluation) => {
 			const onEdit = vi.fn();

@@ -15,11 +15,11 @@ import {
 } from "../state/workspaceStore.ts";
 import type { FinancialModelResponse } from "../api/index.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { usePlan } from "../state/useWorkspacePlan.ts";
+import { useAccountPlan } from "../state/useAccountScope.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
 import { stubTestServer } from "../mocks/waypointServer.ts";
@@ -51,7 +51,7 @@ vi.mock("../WorkspaceShell.tsx", () => ({
 	),
 }));
 function Readout() {
-	return <p>{usePlan()?.name}</p>;
+	return <p>{useAccountPlan()?.name}</p>;
 }
 
 beforeEach(() => {
@@ -89,7 +89,7 @@ it("keeps notification and draft-storage state out of the root's server loading 
 	act(() => useWorkspaceStore.setState({ error: null }));
 	act(() =>
 		useWorkspaceStore.setState({
-			draft: { ...testPlan, name: "Edited browser draft" },
+			draft: { ...testAccount, name: "Edited browser draft" },
 		}),
 	);
 	expect(screen.getByText("Edited browser draft")).toBeTruthy();

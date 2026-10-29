@@ -3,11 +3,11 @@ import { ApiNetworkError } from "../api/http.ts";
 import { useNotifications } from "./notifications.ts";
 import type { SafeSpendingSettings } from "../api/contracts.ts";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	resourceStorageKey,
-	suspendResourceScope,
+	getAccountScope,
+	accountStorageKey,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 import {
 	THEME_STORAGE_KEY,
@@ -16,7 +16,7 @@ import {
 	SAFE_SPENDING_LEGACY_KEYS,
 	appLocalStorage,
 	clearPersistedMemory,
-	resourceLocalStorage,
+	accountLocalStorage,
 } from "./persisted.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import { useThemeStore } from "./useTheme.ts";
@@ -30,21 +30,21 @@ import {
 import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../mocks/safeSpendingSettings.ts";
 import { memoryStorage, stubStorage } from "../mocks/storage.ts";
 
-const A = `plans/${"a".repeat(64)}`;
-const B = `plans/${"b".repeat(64)}`;
+const A = `accounts/${"a".repeat(64)}`;
+const B = `accounts/${"b".repeat(64)}`;
 
 function acceptOwner(id: string = A, apiBaseUrl = canonicalApiBaseUrl("")) {
-	const scope = acceptResourceScope(
+	const scope = acceptAccountScope(
 		{
 			apiBaseUrl,
 			resource: {
 				id,
-				kind: id === "plans/sample" ? "sample" : "private",
-				permissions: ["plan:read", "plan:write"],
+				kind: id === "accounts/sample" ? "sample" : "private",
+				permissions: ["account:read", "account:write"],
 			},
-			subject: id !== "plans/sample" ? id : null,
+			subject: id !== "accounts/sample" ? id : null,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 	if (!scope) throw new Error("The fixture scope could not be verified.");
 	return scope;
@@ -59,8 +59,8 @@ async function verifyOwner(
 	return scope;
 }
 
-function financialKey(scope = getResourceScope()) {
-	const key = resourceStorageKey(SAFE_SPENDING_STORAGE_KEY, scope);
+function financialKey(scope = getAccountScope()) {
+	const key = accountStorageKey(SAFE_SPENDING_STORAGE_KEY, scope);
 	if (!key) throw new Error("A verified fixture resource is required.");
 	return key;
 }
@@ -90,11 +90,11 @@ const server = {
 };
 
 function backendKey() {
-	return `${getResourceScope().apiBaseUrl}:${getResourceScope().resource?.id}`;
+	return `${getAccountScope().apiBaseUrl}:${getAccountScope().resource?.id}`;
 }
 
 function stubSettingsFetch() {
-	const resource = () => getResourceScope().resource?.id ?? null;
+	const resource = () => getAccountScope().resource?.id ?? null;
 	return vi.fn(async (url: unknown, init?: RequestInit) => {
 		if (!String(url).endsWith("/v1/safe-spending-settings"))
 			return ok({}, resource());
@@ -117,7 +117,7 @@ function stubSettingsFetch() {
 
 beforeEach(async () => {
 	vi.unstubAllGlobals();
-	suspendResourceScope();
+	suspendAccountScope();
 	stubStorage(memoryStorage());
 	clearPersistedMemory();
 	useUiStore.persist.setOptions({
@@ -141,7 +141,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-	suspendResourceScope();
+	suspendAccountScope();
 	clearPersistedMemory();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
@@ -367,7 +367,7 @@ describe("financial preference owner isolation", () => {
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
 		await refreshSafeSpendingSettings();
-		await verifyOwner("plans/sample");
+		await verifyOwner("accounts/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
@@ -379,7 +379,7 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsB);
-		await verifyOwner("plans/sample");
+		await verifyOwner("accounts/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 42,
 			incomeRuleIds: ["sample-income"],
@@ -392,7 +392,7 @@ describe("financial preference owner isolation", () => {
 		await refreshSafeSpendingSettings();
 		const keyA = financialKey();
 		const rawA = window.localStorage.getItem(keyA);
-		suspendResourceScope();
+		suspendAccountScope();
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
@@ -425,7 +425,7 @@ describe("financial preference owner isolation", () => {
 		});
 		for (const key of keys) window.localStorage.setItem(key, raw);
 		const read = vi.spyOn(window.localStorage, "getItem");
-		for (const id of [A, B, "plans/sample"]) {
+		for (const id of [A, B, "accounts/sample"]) {
 			await verifyOwner(id);
 			expect(useSafeSpendingSettings.getState()).toMatchObject(
 				defaultSafeSpendingSettings(),
@@ -452,19 +452,19 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);
-		await verifyOwner("plans/sample");
+		await verifyOwner("accounts/sample");
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
-		await verifyOwner("plans/sample");
+		await verifyOwner("accounts/sample");
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 200,
 			incomeRuleIds: ["sample-income"],
 		});
-		suspendResourceScope();
+		suspendAccountScope();
 		expect(useThemeStore.getState().preference).toBe("dark");
 		expect(useUiStore.getState()).toMatchObject({ years: 30, ranges: false });
 		expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toContain("dark");
@@ -501,8 +501,8 @@ describe("financial preference owner isolation", () => {
 	});
 
 	it("rejects writes through a captured storage owner after verification changes", async () => {
-		const oldScope = getResourceScope();
-		const oldStorage = resourceLocalStorage(oldScope);
+		const oldScope = getAccountScope();
+		const oldStorage = accountLocalStorage(oldScope);
 		const oldKey = financialKey();
 		await verifyOwner(B);
 		oldStorage.setItem(SAFE_SPENDING_STORAGE_KEY, "private-a-stale-write");

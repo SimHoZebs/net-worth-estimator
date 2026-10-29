@@ -11,7 +11,7 @@ import { Reorder, useDragControls } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Transaction, Plan } from "../../domain/model.ts";
-import type { EditorTarget } from "../../domain/planEdits.ts";
+import type { EditorTarget } from "../../domain/accountEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { moveRule } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
@@ -304,7 +304,7 @@ export function RecurringRules({
 					{!transaction.enabled && (
 						<span className="m-0 flex flex-wrap gap-1">
 							<Badge tone="warning" className={transactionBadgeStyles()}>
-								Excluded from plan
+								Excluded from account
 							</Badge>
 						</span>
 					)}

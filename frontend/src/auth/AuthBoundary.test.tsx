@@ -49,15 +49,15 @@ function SessionProbe() {
 	);
 }
 
-const sampleResource = {
-	id: "plans/sample",
+const sampleAccount = {
+	id: "accounts/sample",
 	kind: "sample",
-	permissions: ["plan:read", "plan:project"],
+	permissions: ["account:read", "account:project"],
 };
-const privateResource = {
-	id: `plans/${"a".repeat(64)}`,
+const privateAccount = {
+	id: `accounts/${"a".repeat(64)}`,
 	kind: "private",
-	permissions: ["plan:read", "plan:project", "plan:write"],
+	permissions: ["account:read", "account:project", "account:write"],
 };
 
 beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
@@ -122,7 +122,7 @@ describe("provider-independent authentication boundary", () => {
 					enabled: true,
 					authenticated: false,
 					allowed: true,
-					resource: sampleResource,
+					resource: sampleAccount,
 					user: { subject: "", name: "" },
 				}),
 			),
@@ -146,7 +146,7 @@ describe("provider-independent authentication boundary", () => {
 					enabled: true,
 					authenticated: false,
 					allowed: false,
-					resource: { ...sampleResource, permissions: [] },
+					resource: { ...sampleAccount, permissions: [] },
 				}),
 			),
 		);
@@ -170,7 +170,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: false,
-				resource: { ...sampleResource, permissions: [] },
+				resource: { ...sampleAccount, permissions: [] },
 			}),
 		);
 		vi.stubGlobal("fetch", fetcher);
@@ -218,7 +218,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: false,
-				resource: { ...privateResource, permissions: [] },
+				resource: { ...privateAccount, permissions: [] },
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -247,7 +247,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -260,7 +260,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -278,7 +278,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: true,
-				resource: sampleResource,
+				resource: sampleAccount,
 			}),
 		);
 		window.dispatchEvent(new Event("waypoint:authentication-required"));
@@ -304,7 +304,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: true,
-				resource: sampleResource,
+				resource: sampleAccount,
 			}),
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
@@ -323,7 +323,7 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+			await screen.findByRole("heading", { name: "Cannot reach your account" }),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
 			"The Waypoint server is unavailable (HTTP 502). It may be restarting; retry shortly.",
@@ -351,7 +351,7 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+			await screen.findByRole("heading", { name: "Cannot reach your account" }),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
 			"Cannot reach the Waypoint server. It may be down or restarting.",
@@ -364,7 +364,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -391,7 +391,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);

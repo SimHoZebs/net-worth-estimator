@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { IconButton } from "../../../components/Button.tsx";
-import { money } from "../../../domain/format.ts";
-import type { PlannedPurchase } from "../../../domain/model.ts";
+import { IconButton } from "../../components/Button.tsx";
+import { money } from "../../domain/format.ts";
+import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
 import { PurchaseStatus } from "./PurchaseStatus.tsx";
 

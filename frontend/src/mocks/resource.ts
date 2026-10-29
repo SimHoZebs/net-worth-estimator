@@ -1,32 +1,32 @@
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	suspendResourceScope,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 
 export function acceptTestResource() {
-	return acceptResourceScope(
+	return acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: "plans/test",
+				id: "accounts/test",
 				kind: "private",
-				permissions: ["plan:read", "plan:write", "plan:project"],
+				permissions: ["account:read", "account:write", "account:project"],
 			},
 			subject: "test-owner",
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 }
 
-/** Parameterized private owner for tests that rotate the resource identity. */
+/** Parameterized private owner for tests that rotate the account identity. */
 export function acceptOwnerResource(id: string) {
-	return acceptResourceScope(
+	return acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
-			resource: { id, kind: "private", permissions: ["plan:read"] },
+			resource: { id, kind: "private", permissions: ["account:read"] },
 			subject: id,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 }

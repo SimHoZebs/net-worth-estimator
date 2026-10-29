@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	suspendResourceScope,
+	suspendAccountScope,
 } from "@/auth/resourceScope.ts";
 import { resetNotifications, useNotifications } from "@/state/notifications.ts";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/state/pinnedEvaluations.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 
-const scopeId = `plans/${"a".repeat(64)}`;
+const scopeId = `accounts/${"a".repeat(64)}`;
 
 function stubPins(initial: string[] = [], failWrite = false) {
 	const seen: { url: string; init?: RequestInit }[] = [];
@@ -56,17 +56,17 @@ beforeEach(() => {
 	resetNotifications();
 	resetPinnedEvaluationsClient();
 	vi.unstubAllGlobals();
-	acceptResourceScope(
+	acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: scopeId,
 				kind: "private",
-				permissions: ["plan:read", "plan:project", "plan:write"],
+				permissions: ["account:read", "account:project", "account:write"],
 			},
 			subject: scopeId,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 });
 
@@ -141,7 +141,7 @@ describe("query-owned pins", () => {
 			const action =
 				operation === "read" ? refreshPins() : togglePin("private-a");
 			await vi.waitFor(() => expect(calls).toBeGreaterThan(0));
-			suspendResourceScope();
+			suspendAccountScope();
 			finish(ok({ instanceIds: ["private-a"] }));
 			await action;
 			expect(pins()).toBeUndefined();

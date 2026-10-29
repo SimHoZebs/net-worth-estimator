@@ -16,23 +16,22 @@ import { getApiBaseUrl } from "../api/runtime.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
 import {
 	canonicalApiBaseUrl,
-	getResourceScope,
-	normalizeAccountId,
-	subscribeResourceScope,
+	getAccountScope,
+	subscribeAccountScope,
 } from "./resourceScope.ts";
 import type { Session } from "./sessionContext.ts";
 
 async function accountRequest<T>(
-	scope: ReturnType<typeof getResourceScope>,
+	scope: ReturnType<typeof getAccountScope>,
 	session: Session | null,
 	perform: () => Promise<T>,
 	fallback = "Account details are unavailable.",
 ): Promise<T> {
-	if (scope !== getResourceScope() || !isAccountScope(scope, session))
+	if (scope !== getAccountScope() || !isAccountScope(scope, session))
 		throw new Error("The active account changed.");
 	try {
 		const result = await perform();
-		if (scope !== getResourceScope() || !isAccountScope(scope, session))
+		if (scope !== getAccountScope() || !isAccountScope(scope, session))
 			throw new Error("The active account changed.");
 		return result;
 	} catch (cause) {
@@ -50,7 +49,7 @@ async function accountRequest<T>(
 }
 
 function isAccountScope(
-	scope: ReturnType<typeof getResourceScope>,
+	scope: ReturnType<typeof getAccountScope>,
 	session: Session | null,
 ): boolean {
 	return (
@@ -58,8 +57,7 @@ function isAccountScope(
 		session?.authenticated === true &&
 		scope.subject === session.user?.subject &&
 		scope.resource != null &&
-		normalizeAccountId(scope.resource.id) ===
-			normalizeAccountId(session.resource.id) &&
+		scope.resource.id === session.resource.id &&
 		scope.apiBaseUrl === canonicalApiBaseUrl(getApiBaseUrl())
 	);
 }
@@ -67,7 +65,7 @@ function isAccountScope(
 export function useAccountResources(session: Session | null) {
 	const client = serverQueryClient();
 	const baseUrl = getApiBaseUrl();
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeAccountScope, getAccountScope);
 	const key = ["account", scope.key] as const;
 	const options = queryOptions({
 		queryKey: key,
@@ -107,7 +105,7 @@ export function useAccountResources(session: Session | null) {
 					"The account update was rejected.",
 				),
 			onSuccess: (profile) => {
-				if (scope !== getResourceScope()) return;
+				if (scope !== getAccountScope()) return;
 				client.setQueryData(key, (previous: typeof details.data) =>
 					previous ? { ...previous, profile } : previous,
 				);

@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { testPlan } from "../../mocks/plan.ts";
+import { testAccount } from "../../mocks/account.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
@@ -70,16 +70,16 @@ it("keeps an existing selected rule current across plan updates and closes it on
 	acceptTestResource();
 	resetWorkspaceStore();
 	resetServerQueryCache();
-	const account = testPlan.accounts[0]!;
+	const account = testAccount.accounts[0]!;
 	const transaction = {
-		...testPlan.transactions[0]!,
+		...testAccount.transactions[0]!,
 		id: "selected",
 		name: "Original rule",
 		frequency: "monthly" as const,
 		fromId: account.id,
 		toId: null,
 	};
-	const plan = { ...testPlan, transactions: [transaction] };
+	const plan = { ...testAccount, transactions: [transaction] };
 	const view = render(
 		<RecurringRules account={account} plan={plan} onEdit={() => {}} />,
 	);
@@ -118,9 +118,9 @@ it("returns a rejected drag preview to the server order", async () => {
 	resetWorkspaceStore();
 	resetServerQueryCache();
 	const server = stubTestServer();
-	const account = testPlan.accounts[0]!;
+	const account = testAccount.accounts[0]!;
 	const transactions = ["first", "second"].map((id) => ({
-		...testPlan.transactions[0]!,
+		...testAccount.transactions[0]!,
 		id,
 		name: id,
 		frequency: "monthly" as const,
@@ -130,7 +130,7 @@ it("returns a rejected drag preview to the server order", async () => {
 	render(
 		<RecurringRules
 			account={account}
-			plan={{ ...testPlan, transactions }}
+			plan={{ ...testAccount, transactions }}
 			onEdit={() => {}}
 		/>,
 	);

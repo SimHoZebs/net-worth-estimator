@@ -38,8 +38,8 @@ import type {
 	RuleBody,
 } from "@/api/generated/model/index.ts";
 import { ApiRequestError } from "@/api/http.ts";
-import { getResourceScope } from "@/auth/resourceScope.ts";
-import { ResourceScopeError } from "@/api/scopedRequest.ts";
+import { getAccountScope } from "@/auth/resourceScope.ts";
+import { AccountScopeError } from "@/api/scopedRequest.ts";
 
 // Row operations run through generated endpoints. Wire payloads pass through
 // untouched; only the envelope is normalized onto the domain shape.
@@ -376,14 +376,14 @@ export async function applyRowOperations(
 	operations: RowOperation[],
 	options: ApiRequestOptions = {},
 ): Promise<RowApplyResult> {
-	const scope = getResourceScope();
+	const scope = getAccountScope();
 	const issues: ModelValidationIssue[] = [];
 	for (const operation of operations) {
 		if (options.signal?.aborted)
 			return issues.length ? { ok: false, issues } : { ok: true, issues };
 		// A scope change retires the remaining writes instead of sending a
 		// request computed for one plan against another plan's workspace.
-		if (scope !== getResourceScope()) return new ResourceScopeError();
+		if (scope !== getAccountScope()) return new AccountScopeError();
 		let outcome: Error | ModelValidationIssue[] | null;
 		switch (operation.kind) {
 			case "account":

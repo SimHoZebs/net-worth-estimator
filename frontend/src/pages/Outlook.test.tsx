@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resetWorkspaceStore } from "../state/workspaceStore.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import {
 	setServerModelFixture,
@@ -17,7 +17,7 @@ vi.mock("../state/useRemoteProjection.ts", () => ({
 	}),
 }));
 
-const blankPlan = { ...testPlan, accounts: [], movements: [], evaluations: [] };
+const blankPlan = { ...testAccount, accounts: [], movements: [], evaluations: [] };
 const props = {
 	onAddAccount: vi.fn(),
 	onEvidence: vi.fn(),

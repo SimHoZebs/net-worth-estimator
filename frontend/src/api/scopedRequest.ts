@@ -1,12 +1,9 @@
 import {
 	canonicalApiBaseUrl,
-	denormalizeAccountId,
 	getAccountScope,
-	normalizeAccountId,
 	requireAccountRecheck,
 	subscribeAccountScope,
 	type AccountScope,
-	type ResourceScope,
 } from "../auth/resourceScope.ts";
 import type { ApiHttpError, FetchLike } from "./http.ts";
 
@@ -19,9 +16,6 @@ export class AccountScopeError extends Error {
 		this.name = "AccountScopeError";
 	}
 }
-
-/** @deprecated Use AccountScopeError. */
-export const ResourceScopeError = AccountScopeError;
 
 export interface ScopedResponse {
 	response: Response;
@@ -146,13 +140,10 @@ export async function scopedRequest(
 		// Retired same-account work stays retired. The server cannot tell it
 		// apart (same account ID, same cookie), so block it before network access.
 		// A signed-out browser has no verified account: fail fast.
-		// Compare canonical ids so plans/* and accounts/* for the same
-		// account retire together.
 		if (
 			current.status === "pending" ||
 			!current.resource ||
-			normalizeAccountId(current.resource.id) ===
-				normalizeAccountId(scope.resource.id)
+			current.resource.id === scope.resource.id
 		)
 			return new AccountScopeError();
 		// Different account: send the pinned original ID and let the backend
@@ -161,12 +152,8 @@ export async function scopedRequest(
 	const lifetime = requestLifetime(scope, init.signal);
 	const headers = new Headers(init.headers);
 	// The assertion always comes from discovery, never caller-supplied options.
-	// Denormalize to the wire form the unchanged backend expects.
 	headers.delete("Waypoint-Resource");
-	headers.set(
-		"Waypoint-Resource",
-		denormalizeAccountId(scope.resource.id),
-	);
+	headers.set("Waypoint-Resource", scope.resource.id);
 	let response: Response;
 	try {
 		response = await fetcher(url, {
@@ -187,8 +174,7 @@ export async function scopedRequest(
 	if (
 		stale ||
 		(response.ok &&
-			response.headers.get("Waypoint-Resource") !==
-				denormalizeAccountId(scope.resource.id))
+			response.headers.get("Waypoint-Resource") !== scope.resource.id)
 	) {
 		lifetime.dispose();
 		void response.body?.cancel().catch(() => {});
@@ -197,5 +183,3 @@ export async function scopedRequest(
 	}
 	return { response: guardedBody(response, lifetime), scope };
 }
-
-export type { ResourceScope };
