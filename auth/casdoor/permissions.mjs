@@ -1,11 +1,11 @@
 // Casdoor v4.23.0 imports models, roles, adapters, then permissions. See:
 // https://github.com/casdoor/casdoor/blob/v4.23.0/object/init_data.go
 // https://github.com/casdoor/casdoor/blob/v4.23.0/object/permission_enforcer.go
-export const permissionModelId = "waypoint/plan-access";
-export const permissionAdapter = "plan-policy-store";
-export const planActions = Object.freeze(["plan:read", "plan:project", "plan:write"]);
+export const permissionModelId = "waypoint/account-access";
+export const permissionAdapter = "account-policy-store";
+export const accountActions = Object.freeze(["account:read", "account:project", "account:write"]);
 
-export const planModelText = `[request_definition]
+export const accountModelText = `[request_definition]
 r = sub, obj, act, owner
 
 [policy_definition]
@@ -18,13 +18,12 @@ g = _, _
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 
 [matchers]
-m = ((p.sub == "waypoint/plan-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "plans/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
+m = ((p.sub == "waypoint/account-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "accounts/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
 `;
 
-// Account scope: action strings stay plan:* so the Casdoor model needs no
-// migration. Permission resources move from plans/* to accounts/*; the seed
-// keeps legacy plans/* until the feat/account-scope-store DB rekey migrates
-// old rows. The guest sample stays plans/sample (global read-only).
+// Account scope: action strings are account:* under waypoint/account-access.
+// Permission resources are accounts/* only, including the guest sample
+// accounts/sample (global read-only).
 export function buildPermissionSeed() {
   const role = (name, displayName, description) => ({
     owner: "waypoint",
@@ -61,45 +60,45 @@ export function buildPermissionSeed() {
     models: [
       {
         owner: "waypoint",
-        name: "plan-access",
-        displayName: "Waypoint plan access",
-        modelText: planModelText,
+        name: "account-access",
+        displayName: "Waypoint account access",
+        modelText: accountModelText,
       },
     ],
     roles: [
       role(
-        "plan-owner",
-        "Private plan owner",
-        "Contextual role: the verified actor owns this private plan. No signup-time role writes.",
+        "account-owner",
+        "Private account owner",
+        "Contextual role: the verified actor owns this private account. No signup-time role writes.",
       ),
       role(
         "guest",
-        "Sample plan guest",
-        "Contextual role: an anonymous actor can read and project only the separate sample plan.",
+        "Sample account guest",
+        "Contextual role: an anonymous actor can read and project only the separate sample account.",
       ),
     ],
     adapters: [
       {
         owner: "waypoint",
         name: permissionAdapter,
-        table: "waypoint_plan_permission_rule",
+        table: "waypoint_account_permission_rule",
         useSameDb: true,
       },
     ],
     permissions: [
       permission(
-        "own-private-plan",
+        "own-private-account",
         "Own private account: read, project, write",
-        "plan-owner",
-        ["accounts/*", "plans/*"],
-        [...planActions],
+        "account-owner",
+        ["accounts/*"],
+        [...accountActions],
       ),
       permission(
-        "guest-sample-plan",
-        "Sample plan: guest read and project",
+        "guest-sample-account",
+        "Sample account: guest read and project",
         "guest",
-        ["plans/sample"],
-        ["plan:read", "plan:project"],
+        ["accounts/sample"],
+        ["account:read", "account:project"],
       ),
     ],
   };
