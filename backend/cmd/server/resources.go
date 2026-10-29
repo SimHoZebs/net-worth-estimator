@@ -8,6 +8,7 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/plans"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -60,7 +61,22 @@ func resourceHandler(ctx context.Context, database *store.Database, config resou
 		router.Close()
 		return nil, nil, err
 	}
-	return login.Wrap(router), func() error { return errors.Join(login.Close(), router.Close()) }, nil
+	// Group routes carry authentication only: membership is enforced by the
+	// groups handler, not by plan authorization, so they must never reach
+	// the plan router (which 403s requests without a verified plan scope).
+	groupHandler := groups.New(database, loginConfig.Issuer, groups.Config{
+		AllowedOrigins: apiConfig.AllowedOrigins,
+		ReadOnly:       apiConfig.ReadOnly,
+	})
+	groupRoutes := groupHandler.Routes()
+	combined := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if identity.IsGroupRoute(r.URL.Path) {
+			groupRoutes.ServeHTTP(w, r)
+			return
+		}
+		router.ServeHTTP(w, r)
+	})
+	return login.Wrap(combined), func() error { return errors.Join(login.Close(), router.Close()) }, nil
 }
 
 // The subject comes only from a verified identity grant. Casdoor must authorize
