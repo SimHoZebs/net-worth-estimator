@@ -19,7 +19,7 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 			seed(t, source)
 			seed(t, target)
 			if existing {
-				if err := refresh(target, source, "plans/owner", "", true); err != nil {
+				if err := refresh(target, source, "owner", "", true); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -31,8 +31,8 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 				t.Fatal(err)
 			}
 			_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
-				INSERT INTO checkpoints(plan_id, id, position, date, account_id, balance)
-				VALUES ('plans/other', 1, 0, '2026-01-01', 'missing-account', 100)`)
+				INSERT INTO checkpoints(account_id, id, position, date, model_account_id, balance)
+				VALUES ('other', 1, 0, '2026-01-01', 'missing-account', 100)`)
 			db.Close()
 			if err != nil {
 				t.Fatal(err)
@@ -41,7 +41,7 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := refresh(target, source, "plans/other", "", true); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
+			if err := refresh(target, source, "other", "", true); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
 				t.Fatalf("expected foreign-key copy failure, got %v", err)
 			}
 			sourceAfter, err := os.ReadFile(source)
@@ -55,13 +55,13 @@ func TestFailedSampleCopyIsAtomic(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			hasSample, err := db.HasPlan("plans/sample")
+			hasSample, err := db.HasPlan("sample")
 			db.Close()
 			if err != nil {
 				t.Fatal(err)
 			}
 			if hasSample != existing {
-				t.Fatalf("HasPlan(plans/sample)=%t, want %t", hasSample, existing)
+				t.Fatalf("HasPlan(sample)=%t, want %t", hasSample, existing)
 			}
 			if after := sampleRows(t, target); after != before {
 				t.Fatal("failed copy changed sample financial rows")
@@ -79,7 +79,7 @@ func sampleRows(t *testing.T, path string) string {
 	defer db.Close()
 	var result strings.Builder
 	for _, table := range financialTables {
-		rows, err := db.SQL().Query("SELECT * FROM " + quote(table) + " WHERE plan_id='plans/sample' ORDER BY rowid")
+		rows, err := db.SQL().Query("SELECT * FROM " + quote(table) + " WHERE account_id='sample' ORDER BY rowid")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,13 +117,13 @@ func seed(t *testing.T, path string) {
 	}
 	defer db.Close()
 	for _, id := range []string{"owner", "other"} {
-		if _, err := db.EnsurePrivatePlan("plans/"+id, id, "https://issuer.invalid", id); err != nil {
+		if _, err := db.EnsurePrivateAccount(id, "https://issuer.invalid", id); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.SQL().Exec("INSERT INTO accounts(plan_id,id,position,name,kind,enabled) VALUES (?, 'checking', 0, ?, 'cash', 1)", "plans/"+id, id); err != nil {
+		if _, err := db.SQL().Exec("INSERT INTO accounts(account_id,id,position,name,kind,enabled) VALUES (?, 'checking', 0, ?, 'cash', 1)", id, id); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.SQL().Exec("UPDATE model_metadata SET document_present=1, source_path='private-source' WHERE plan_id=?", "plans/"+id); err != nil {
+		if _, err := db.SQL().Exec("UPDATE model_metadata SET document_present=1, source_path='private-source' WHERE account_id=?", id); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -148,6 +148,90 @@ func query(t *testing.T, path, sql string, args ...any) string {
 	return value
 }
 
+func TestRefreshAcceptsLegacyPlanAliases(t *testing.T) {
+	dir := t.TempDir()
+	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
+	seed(t, source)
+	seed(t, target)
+	// Bare legacy plans/<name> IDs resolve to the same owner scopes.
+	if err := refresh(target, source, "plans/other", "plans/owner", false); err != nil {
+		t.Fatalf("legacy alias refresh: %v", err)
+	}
+	if got := query(t, target, "SELECT name FROM accounts WHERE account_id='owner'"); got != "other" {
+		t.Fatalf("legacy alias refresh copied: %q", got)
+	}
+	// Production plans/<hash> IDs normalize to user:<hash> scopes.
+	const issuer = "https://issuer.invalid"
+	hashOwner := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	for _, path := range []string{source, target} {
+		db, err := sqlite.OpenDatabase(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.EnsurePrivateAccount("user:"+hashOwner, issuer, hashOwner); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		if _, err := db.SQL().Exec("INSERT INTO accounts(account_id,id,position,name,kind,enabled) VALUES ('user:" + hashOwner + "','checking',0,'Hashed','cash',1)"); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		if _, err := db.SQL().Exec("UPDATE model_metadata SET document_present=1 WHERE account_id='user:" + hashOwner + "'"); err != nil {
+			db.Close()
+			t.Fatal(err)
+		}
+		db.Close()
+	}
+	if err := refresh(target, source, "plans/"+hashOwner, "plans/"+hashOwner, false); err != nil {
+		t.Fatalf("hash alias refresh: %v", err)
+	}
+	if got := query(t, target, "SELECT name FROM accounts WHERE account_id='user:"+hashOwner+"'"); got != "Hashed" {
+		t.Fatalf("hash alias refresh copied: %q", got)
+	}
+}
+
+func TestRefreshPreservesGroupMemberships(t *testing.T) {
+	dir := t.TempDir()
+	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
+	seed(t, source)
+	seed(t, target)
+	sourceDB, err := sqlite.OpenDatabase(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceGroup, err := sourceDB.CreateGroup("other", "Source team", "Other")
+	if err != nil {
+		sourceDB.Close()
+		t.Fatal(err)
+	}
+	sourceDB.Close()
+	targetDB, err := sqlite.OpenDatabase(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetGroup, err := targetDB.CreateGroup("owner", "Target team", "Owner")
+	if err != nil {
+		targetDB.Close()
+		t.Fatal(err)
+	}
+	targetDB.Close()
+	if err := refresh(target, source, "other", "owner", false); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sqlite.OpenDatabase(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	members, err := db.ListGroupMembers(targetGroup.ID, "owner")
+	if err != nil || len(members) != 1 {
+		t.Fatalf("target memberships = %+v, %v", members, err)
+	}
+	if _, err := db.GetGroup(sourceGroup.ID, "owner"); err == nil {
+		t.Fatal("source group copied into target scope")
+	}
+}
+
 func TestRefreshPreservesOtherPlansAndIdentity(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
@@ -157,29 +241,29 @@ func TestRefreshPreservesOtherPlansAndIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sourceDB.SQL().Exec(`UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE plan_id='plans/other'`); err != nil {
+	if _, err := sourceDB.SQL().Exec(`UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE account_id='other'`); err != nil {
 		t.Fatal(err)
 	}
 	sourceDB.Close()
-	if err := refresh(target, source, "plans/other", "plans/owner", false); err != nil {
+	if err := refresh(target, source, "other", "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE plan_id='plans/owner'"); got != "" {
+	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE account_id='owner'"); got != "" {
 		t.Fatalf("refresh copied the Bridge secret: %q", got)
 	}
-	if got := query(t, target, `SELECT cards_json FROM sync_credentials WHERE plan_id='plans/owner'`); got != `["prime_card"]` {
+	if got := query(t, target, `SELECT cards_json FROM sync_credentials WHERE account_id='owner'`); got != `["prime_card"]` {
 		t.Fatalf("refresh dropped card selection: %q", got)
 	}
-	if got := query(t, target, "SELECT name FROM accounts WHERE plan_id='plans/owner'"); got != "other" {
+	if got := query(t, target, "SELECT name FROM accounts WHERE account_id='owner'"); got != "other" {
 		t.Fatal(got)
 	}
-	if got := query(t, target, "SELECT name FROM accounts WHERE plan_id='plans/other'"); got != "other" {
+	if got := query(t, target, "SELECT name FROM accounts WHERE account_id='other'"); got != "other" {
 		t.Fatal(got)
 	}
-	if got := query(t, source, "SELECT name FROM accounts WHERE plan_id='plans/owner'"); got != "owner" {
+	if got := query(t, source, "SELECT name FROM accounts WHERE account_id='owner'"); got != "owner" {
 		t.Fatal("source changed", got)
 	}
-	if got := query(t, target, "SELECT owner_account_id FROM plans WHERE id='plans/owner'"); got != "owner" {
+	if got := query(t, target, "SELECT issuer FROM app_accounts WHERE id='owner'"); got != "https://issuer.invalid" {
 		t.Fatal("ownership changed", got)
 	}
 	for _, check := range []struct{ sql, want string }{
@@ -202,36 +286,36 @@ func TestSamplePublicationStripsPrivateHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.SQL().Exec(`INSERT INTO account_links(plan_id, bridge_account_id, model_account_id) VALUES ('plans/owner','secret-bridge-id','checking');
-		INSERT INTO projection_artifacts(plan_id, identity, kind, payload) VALUES ('plans/owner','secret-artifact','deterministic','private');
-		INSERT INTO posting_id_migrations(plan_id, old_id, new_id) VALUES ('plans/owner','legacy','uuid');
-		UPDATE sync_state SET last_sync_at='2026-01-01' WHERE plan_id='plans/owner';
-		UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE plan_id='plans/owner';`)
+	_, err = db.SQL().Exec(`INSERT INTO account_links(account_id, bridge_account_id, model_account_id) VALUES ('owner','secret-bridge-id','checking');
+		INSERT INTO projection_artifacts(account_id, identity, kind, payload) VALUES ('owner','secret-artifact','deterministic','private');
+		INSERT INTO posting_id_migrations(account_id, old_id, new_id) VALUES ('owner','legacy','uuid');
+		UPDATE sync_state SET last_sync_at='2026-01-01' WHERE account_id='owner';
+		UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE account_id='owner';`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := refresh(target, source, "plans/owner", "", true); err != nil {
+	if err := refresh(target, source, "owner", "", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT name FROM accounts WHERE plan_id='plans/sample'"); got != "owner" {
+	if got := query(t, target, "SELECT name FROM accounts WHERE account_id='sample'"); got != "owner" {
 		t.Fatal(got)
 	}
 	for _, table := range []string{"account_links", "projection_artifacts", "posting_sync_keys", "posting_id_migrations"} {
-		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE plan_id='plans/sample'"); got != "0" {
+		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE account_id='sample'"); got != "0" {
 			t.Fatal(table, got)
 		}
 	}
-	if got := query(t, target, "SELECT source_path FROM model_metadata WHERE plan_id='plans/sample'"); got != "sample" {
+	if got := query(t, target, "SELECT source_path FROM model_metadata WHERE account_id='sample'"); got != "sample" {
 		t.Fatal(got)
 	}
-	if got := query(t, target, "SELECT last_sync_at FROM sync_state WHERE plan_id='plans/sample'"); got != "" {
+	if got := query(t, target, "SELECT last_sync_at FROM sync_state WHERE account_id='sample'"); got != "" {
 		t.Fatal(got)
 	}
-	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE plan_id='plans/sample'"); got != "" {
+	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE account_id='sample'"); got != "" {
 		t.Fatalf("sample copied the Bridge secret: %q", got)
 	}
-	if got := query(t, target, "SELECT cards_json FROM sync_credentials WHERE plan_id='plans/sample'"); got != `["prime_card"]` {
+	if got := query(t, target, "SELECT cards_json FROM sync_credentials WHERE account_id='sample'"); got != `["prime_card"]` {
 		t.Fatalf("sample dropped card selection: %q", got)
 	}
 	if got := query(t, target, "SELECT data FROM identity_grants"); got != "sealed-credentials" {
@@ -248,11 +332,11 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 		source, sourcePlan, plan string
 		sample                   bool
 	}{
-		{target, "plans/owner", "plans/owner", false},
-		{source, "plans/missing", "plans/owner", false},
-		{source, "plans/owner", "plans/missing", false},
-		{source, "plans/owner", "plans/sample", false},
-		{source, "plans/owner", "plans/owner", true},
+		{target, "owner", "owner", false},
+		{source, "missing", "owner", false},
+		{source, "owner", "missing", false},
+		{source, "owner", "sample", false},
+		{source, "owner", "owner", true},
 	} {
 		if err := refresh(target, args.source, args.sourcePlan, args.plan, args.sample); err == nil {
 			t.Fatal("unsafe operation accepted", args)
@@ -263,27 +347,27 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A late insert failure must roll back the earlier deletes.
-	_, err = db.SQL().Exec(`CREATE TRIGGER reject_copy BEFORE INSERT ON accounts WHEN NEW.plan_id='plans/owner' BEGIN SELECT RAISE(ABORT,'copy blocked'); END`)
+	_, err = db.SQL().Exec(`CREATE TRIGGER reject_copy BEFORE INSERT ON accounts WHEN NEW.account_id='owner' BEGIN SELECT RAISE(ABORT,'copy blocked'); END`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := refresh(target, source, "plans/other", "plans/owner", false); err == nil {
+	if err := refresh(target, source, "other", "owner", false); err == nil {
 		t.Fatal("expected insert failure")
 	}
-	if got := query(t, target, "SELECT name FROM accounts WHERE plan_id='plans/owner'"); got != "owner" {
+	if got := query(t, target, "SELECT name FROM accounts WHERE account_id='owner'"); got != "owner" {
 		t.Fatal("transaction did not roll back", got)
 	}
 	db, err = sqlite.OpenDatabase(target)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.SQL().Exec(`CREATE TABLE future_financial_data(plan_id TEXT, value TEXT)`)
+	_, err = db.SQL().Exec(`CREATE TABLE future_financial_data(account_id TEXT, value TEXT)`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := refresh(target, source, "plans/other", "plans/owner", false); err == nil || !strings.Contains(err.Error(), "unknown plan-scoped table") {
+	if err := refresh(target, source, "other", "owner", false); err == nil || !strings.Contains(err.Error(), "unknown account-scoped table") {
 		t.Fatal(err)
 	}
 }

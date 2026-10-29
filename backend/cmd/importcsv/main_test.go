@@ -17,12 +17,12 @@ import (
 )
 
 func TestRequiresExplicitDatabaseAndPlan(t *testing.T) {
-	for _, args := range [][]string{nil, {"--db", filepath.Join(t.TempDir(), "absent.db")}, {"--plan", "plans/sample"}} {
+	for _, args := range [][]string{nil, {"--db", filepath.Join(t.TempDir(), "absent.db")}, {"--account", "sample"}} {
 		var out, errOut bytes.Buffer
 		if code := run(args, &out, &errOut); code != 2 {
 			t.Fatalf("code=%d stderr=%s", code, errOut.String())
 		}
-		if !strings.Contains(errOut.String(), "--plan") || out.Len() != 0 {
+		if !strings.Contains(errOut.String(), "--account") || out.Len() != 0 {
 			t.Fatalf("unexpected output: %q %q", out.String(), errOut.String())
 		}
 	}
@@ -48,7 +48,7 @@ func TestScopedImportPreservesOtherPlanAndIdentity(t *testing.T) {
 		if _, err := plan.CreateAccount(types.Account{ID: "same-id", Name: subject, Kind: types.AccountKind("cash"), Enabled: true}); err != nil {
 			t.Fatal(err)
 		}
-		plans = append(plans, resource.ID)
+		plans = append(plans, resource.Owner)
 	}
 	_, err = db.SQL().Exec(`INSERT INTO sessions VALUES('opaque-token',X'00FF',999);
 INSERT INTO identity_grants VALUES('grant-id','issuer','subject','sid',999,X'0100');
@@ -78,7 +78,7 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 		}
 	}
 	var out, errOut bytes.Buffer
-	if code := run([]string{"--db", path, "--plan", plans[0], "--model", model}, &out, &errOut); code != 0 {
+	if code := run([]string{"--db", path, "--account", plans[0], "--model", model}, &out, &errOut); code != 0 {
 		t.Fatalf("code=%d stderr=%s", code, errOut.String())
 	}
 	after := protectedRows(t, db.SQL(), plans[1])
@@ -86,7 +86,7 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 		t.Fatalf("import changed protected rows\nbefore: %v\nafter: %v", before, after)
 	}
 	var name string
-	if err := db.SQL().QueryRow(`SELECT name FROM accounts WHERE plan_id=? AND id='same-id'`, plans[0]).Scan(&name); err != nil || name != "Imported account" {
+	if err := db.SQL().QueryRow(`SELECT name FROM accounts WHERE account_id=? AND id='same-id'`, plans[0]).Scan(&name); err != nil || name != "Imported account" {
 		t.Fatalf("selected plan was not imported: %q %v", name, err)
 	}
 }
@@ -114,16 +114,16 @@ func protectedRows(t *testing.T, db *sql.DB, plan string) map[string][]string {
 	result := map[string][]string{}
 	for _, table := range tables {
 		var scoped int
-		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name='plan_id'`, table).Scan(&scoped); err != nil {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name='account_id'`, table).Scan(&scoped); err != nil {
 			t.Fatal(err)
 		}
-		if scoped == 0 && table != "sessions" && !strings.HasPrefix(table, "identity_") && table != "app_accounts" && table != "plans" {
+		if scoped == 0 && table != "sessions" && !strings.HasPrefix(table, "identity_") && table != "app_accounts" {
 			continue
 		}
 		query := `SELECT * FROM "` + strings.ReplaceAll(table, `"`, `""`) + `"`
 		var args []any
 		if scoped != 0 {
-			query += " WHERE plan_id=?"
+			query += " WHERE account_id=?"
 			args = append(args, plan)
 		}
 		r, err := db.Query(query, args...)

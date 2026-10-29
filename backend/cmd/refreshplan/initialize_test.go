@@ -20,19 +20,19 @@ func TestInitializeSeedsOnlySelectedFinancialScopeForDevIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	issuer, subject := "http://dev-issuer.invalid", "fresh-dev-subject"
-	if err := initialize(target, source, "plans/other", issuer, subject); err != nil {
+	if err := initialize(target, source, "other", issuer, subject); err != nil {
 		t.Fatal(err)
 	}
 	resource := authorization.ResourceFor(issuer, subject)
 	for _, check := range []struct{ sql, want string }{
-		{"SELECT COUNT(*) FROM plans", "1"},
+		{"SELECT COUNT(DISTINCT account_id) FROM accounts", "1"},
 		{"SELECT COUNT(*) FROM app_accounts", "1"},
 		{"SELECT issuer FROM app_accounts", issuer},
 		{"SELECT subject FROM app_accounts", subject},
-		{"SELECT owner_account_id FROM plans", authorization.ActorKey(issuer, subject)},
-		{"SELECT id FROM plans", resource.ID},
+		{"SELECT id FROM app_accounts", resource.Owner},
+		{"SELECT account_id FROM model_metadata", resource.Owner},
 		{"SELECT name FROM accounts", "other"},
-		{"SELECT plan_id FROM accounts", resource.ID},
+		{"SELECT account_id FROM accounts", resource.Owner},
 		{"SELECT document_present FROM model_metadata", "1"},
 		{"SELECT COUNT(*) FROM sessions", "0"},
 		{"SELECT COUNT(*) FROM identity_grants", "0"},
@@ -50,7 +50,7 @@ func TestInitializeSeedsOnlySelectedFinancialScopeForDevIdentity(t *testing.T) {
 	if !bytes.Equal(before, after) {
 		t.Fatal("production snapshot changed")
 	}
-	if err := initialize(target, source, "plans/owner", issuer, subject); err == nil {
+	if err := initialize(target, source, "owner", issuer, subject); err == nil {
 		t.Fatal("existing dev database replaced")
 	}
 	if got := query(t, target, "SELECT name FROM accounts"); got != "other" {
@@ -62,7 +62,7 @@ func TestInitializeInfersOnlyUnambiguousPrivateSource(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "dev.db")
 	seed(t, source)
-	if err := initialize(target, source, "", "http://dev.invalid", "dev-owner"); err == nil || !strings.Contains(err.Error(), "exactly one private plan") {
+	if err := initialize(target, source, "", "http://dev.invalid", "dev-owner"); err == nil || !strings.Contains(err.Error(), "exactly one private account scope") {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
@@ -72,7 +72,7 @@ func TestInitializeInfersOnlyUnambiguousPrivateSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.SQL().Exec("DELETE FROM plans WHERE id='plans/other'")
+	_, err = db.SQL().Exec("DELETE FROM app_accounts WHERE id='other'")
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -94,13 +94,13 @@ func TestInitializeFailedCopyPublishesNoDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
-		INSERT INTO checkpoints(plan_id,id,position,date,account_id,balance)
-		VALUES ('plans/owner',1,0,'2026-01-01','missing',1)`)
+		INSERT INTO checkpoints(account_id,id,position,date,model_account_id,balance)
+		VALUES ('owner',1,0,'2026-01-01','missing',1)`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := initialize(target, source, "plans/owner", "http://dev.invalid", "dev-owner"); err == nil {
+	if err := initialize(target, source, "owner", "http://dev.invalid", "dev-owner"); err == nil {
 		t.Fatal("invalid financial copy succeeded")
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
@@ -127,7 +127,7 @@ func TestInitializeRefusesExistingDestinationSidecars(t *testing.T) {
 			if err := os.WriteFile(target+suffix, []byte(original), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := initialize(target, source, "plans/owner", "http://dev.invalid", "dev-owner"); err == nil {
+			if err := initialize(target, source, "owner", "http://dev.invalid", "dev-owner"); err == nil {
 				t.Fatal("published a database next to an existing sidecar")
 			}
 			if _, err := os.Lstat(target); !os.IsNotExist(err) {
