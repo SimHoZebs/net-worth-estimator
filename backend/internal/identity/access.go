@@ -11,9 +11,14 @@ import (
 
 const ResourceHeader = "Waypoint-Resource"
 
-// WriteResourceChanged distinguishes a stale plan assertion from an operation conflict.
+// The header name stays Waypoint-Resource: browsers and the nwe CLI already
+// assert it, and the value is now an account resource (accounts/<opaque-id>,
+// guest plans/sample). Only the copy changes from plan to account; the 409
+// RESOURCE_CHANGED contract is unchanged.
+
+// WriteResourceChanged distinguishes a stale account assertion from an operation conflict.
 func WriteResourceChanged(w http.ResponseWriter) {
-	failureWithCode(w, http.StatusConflict, "The active plan changed. Reload the session before this request.", "RESOURCE_CHANGED")
+	failureWithCode(w, http.StatusConflict, "The active account changed. Reload the session before this request.", "RESOURCE_CHANGED")
 }
 
 type scopeKey struct{}
@@ -48,6 +53,8 @@ func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization
 }
 
 // Every unknown state-changing route requires write permission by default.
+// Action strings stay plan:* so the Casdoor model needs no migration; only
+// the resource IDs they pair with moved to the account namespace.
 func requestAction(r *http.Request) string {
 	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic") {
 		return "plan:project"
@@ -59,9 +66,9 @@ func requestAction(r *http.Request) string {
 }
 
 // IsGroupRoute reports social group routes, which need authentication
-// only. Membership is enforced by the groups handler, not plan
+// only. Membership is enforced by the groups handler, not account
 // permissions. It matches exactly the routes the groups handler serves so
-// no future plan route can hide inside the bypass.
+// no future account route can hide inside the bypass.
 func IsGroupRoute(path string) bool {
 	return path == "/v1/groups" || strings.HasPrefix(path, "/v1/groups/") ||
 		path == "/v1/invites/accept"
