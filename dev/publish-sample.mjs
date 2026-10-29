@@ -21,9 +21,9 @@ export function validatePublish(values, positionals = []) {
   ) {
     throw new Error("Ports are fixed at slot creation. Pick a new --slot name for new ports.");
   }
-  if (!values["source-plan"])
-    throw new Error("--source-plan is required. Select the reviewed financial scope explicitly.");
-  if (values.plan) throw new Error("publish-sample always targets plans/sample; omit --plan");
+  if (!values["source-account"])
+    throw new Error("--source-account is required. Select the reviewed financial scope explicitly.");
+  if (values.account) throw new Error("publish-sample always targets accounts/sample; omit --account");
 }
 
 export async function run(values, positionals) {
@@ -38,8 +38,8 @@ export async function run(values, positionals) {
       stateDir,
       slot,
       source,
-      sourcePlan: values["source-plan"],
-      plan: undefined,
+      sourceAccount: values["source-account"],
+      account: undefined,
       publishing: true,
     });
   });
@@ -50,7 +50,7 @@ export async function main(args) {
   const { values, positionals } = parsePublishArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev publish-sample --source-plan SOURCE_ID [--from approved-app.db] [--slot NAME]",
+      "Usage: scripts/dev publish-sample --source-account SOURCE_ID [--from approved-app.db] [--slot NAME]",
     );
     return;
   }

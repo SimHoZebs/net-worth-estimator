@@ -16,11 +16,11 @@ export function validateSnapshot(path) {
     const scoped = db
       .prepare("PRAGMA table_info(model_metadata)")
       .all()
-      .some((column) => column.name === "plan_id");
+      .some((column) => column.name === "account_id");
     if (scoped) {
-      // An empty application database is valid. Plan ownership is separate from
-      // financial document presence, and identity tables share this backup.
-      db.prepare("SELECT id FROM plans LIMIT 1").all();
+      // An empty application database is valid. Account ownership is separate
+      // from financial document presence, and identity tables share this backup.
+      db.prepare("SELECT id FROM app_accounts LIMIT 1").all();
       return "application";
     }
     if (

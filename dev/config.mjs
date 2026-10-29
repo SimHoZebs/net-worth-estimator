@@ -135,7 +135,7 @@ export function settings(config) {
       config.ownerSubject !== config.ownerSubject.trim() ||
       /[*,\r\n]/.test(config.ownerSubject))
   ) {
-    throw new Error("The primary plan owner must be one verified OIDC subject");
+    throw new Error("The primary account owner must be one verified OIDC subject");
   }
   if (
     !config.source ||
