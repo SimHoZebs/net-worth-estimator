@@ -74,11 +74,17 @@ export function EditorForm({
 					const result = onApply(validated);
 					if (result instanceof Promise) {
 						setSaving(true);
-						void result.then((ok) => {
-							setSaving(false);
-							if (ok) onClose();
-							else setApplyFailed(true);
-						});
+						void result.then(
+							(ok) => {
+								setSaving(false);
+								if (ok) onClose();
+								else setApplyFailed(true);
+							},
+							() => {
+								setSaving(false);
+								setApplyFailed(true);
+							},
+						);
 					} else if (result) onClose();
 					else setApplyFailed(true);
 				}}
@@ -114,7 +120,12 @@ export function EditorForm({
 					</div>
 				) : (
 					<div className={dialogActionsStyles}>
-						<Button type="button" variant="secondary" onClick={close}>
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={close}
+							disabled={saving}
+						>
 							Cancel
 						</Button>
 						<Button

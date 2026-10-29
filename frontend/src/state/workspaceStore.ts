@@ -219,15 +219,8 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 					: "The plan could not be converted.",
 			);
 		}
-		const orderChanged = (
-			["accounts", "movements", "plannedPurchases", "evaluations"] as const
-		).some((key) => {
-			const before = (saved[key] ?? []).map((item) => item.id).join(",");
-			const after = (validated[key] ?? []).map((item) => item.id).join(",");
-			return before !== after;
-		});
 		const changed =
-			orderChanged ||
+			orderChanged(saved, validated) ||
 			changesBetween({ saved, current: validated }).length > 0 ||
 			saved.updatedAt !== validated.updatedAt ||
 			saved.revision !== validated.revision ||
@@ -361,6 +354,17 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 	};
 });
 
+export function orderChanged(saved: Plan | null, current: Plan | null) {
+	if (!saved || !current) return false;
+	return (["accounts", "movements", "plannedPurchases", "evaluations"] as const).some(
+		(key) => {
+			const before = (saved[key] ?? []).map((item) => item.id).join(",");
+			const after = (current[key] ?? []).map((item) => item.id).join(",");
+			return before !== after;
+		},
+	);
+}
+
 export function selectDraftChangeCount(state: DraftState) {
 	if (!state.draft || !state.baseline) return 0;
 	const count = changesBetween({
@@ -370,14 +374,7 @@ export function selectDraftChangeCount(state: DraftState) {
 	if (count > 0) return count;
 	// Pure reorders carry no content changes but still need a DraftBar with
 	// a save and discard path when their immediate save fails.
-	const orderChanged = (
-		["accounts", "movements", "plannedPurchases", "evaluations"] as const
-	).some((key) => {
-		const before = (state.baseline?.[key] ?? []).map((item) => item.id).join(",");
-		const after = (state.draft?.[key] ?? []).map((item) => item.id).join(",");
-		return before !== after;
-	});
-	return orderChanged ? 1 : 0;
+	return orderChanged(state.baseline, state.draft) ? 1 : 0;
 }
 
 export function draftDocumentForSave(): FinancialModelDocument {

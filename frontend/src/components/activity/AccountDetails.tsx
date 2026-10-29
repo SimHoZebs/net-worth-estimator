@@ -18,6 +18,7 @@ import { Notice } from "../Notice.tsx";
 import { cssVariables } from "../cssVariables.ts";
 import { Badge } from "../Badge.tsx";
 import { dismissKey, notifyError } from "../../state/notifications.ts";
+import { saveWorkspace } from "../../state/workspaceWrites.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 
 function toAmountInput(value: number | null): string {
@@ -84,7 +85,7 @@ export function AccountDetails({
 
 	const dirty = edit.dirty;
 
-	const submit = (event: FormEvent) => {
+	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (readOnly) return;
 		if (edit.conflict) {
@@ -122,7 +123,9 @@ export function AccountDetails({
 			notifyError("account-details", validated.message);
 			return;
 		}
-		if (onApply(validated)) edit.reset();
+		if (onApply(validated)) {
+			if (await saveWorkspace()) edit.reset();
+		}
 	};
 
 	return (
