@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/blobstore"
 	blobsqlite "github.com/simhozebs/net-worth-estimator/backend/internal/blobstore/adapters/sqlite"
@@ -22,8 +21,7 @@ var ErrLegacyDatabase = errors.New("unsupported legacy database: start from a cu
 var ErrSetupRequired = errors.New("database setup required: run setupdb before starting the server")
 
 // Synthetic account IDs for the explicit sample/fixture exceptions. They use
-// placeholder issuer/subject identities so app_accounts FKs hold. Full guest
-// removal belongs to the auth lane; these shims only keep the build green.
+// placeholder issuer/subject identities so app_accounts FKs hold.
 const (
 	SampleAccountID  = "sample"
 	FixtureAccountID = "fixture"
@@ -190,13 +188,26 @@ func (d *Database) ensureAccount(accountID, issuer, subject string) (store.Store
 		return nil, fmt.Errorf("account identity conflict")
 	}
 	// Only the creator seeds: the app_accounts insert reports RowsAffected,
-	// so concurrent ensures for one new ID seed exactly once. Seeding runs in
-	// the same transaction, so a commit means both account and seed persist.
+	// so concurrent ensures for one new ID seed exactly once. A row first
+	// created by EnsureGroupAccount carries no financial tables yet; the
+	// first EnsureAccount seeds it while its metadata row is still absent.
+	// Seeding runs in the same transaction, so a commit means both account
+	// and seed persist. Within this handle the single open connection
+	// serializes concurrent ensures, so the check-and-seed cannot run twice
+	// for one account through one Database.
 	created, err := result.RowsAffected()
 	if err != nil {
 		return nil, err
 	}
-	if created != 0 {
+	seed := created != 0
+	if !seed {
+		var present int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM model_metadata WHERE account_id = ?`, accountID).Scan(&present); err != nil {
+			return nil, err
+		}
+		seed = present == 0
+	}
+	if seed {
 		if err := seedAccountTables(&accountTx{Tx: tx, accountID: accountID}); err != nil {
 			return nil, err
 		}
@@ -207,54 +218,9 @@ func (d *Database) ensureAccount(accountID, issuer, subject string) (store.Store
 	return &sqliteStore{db: &accountDB{DB: d.db, accountID: accountID}, application: d}, nil
 }
 
-// planToAccountID maps legacy plan IDs to account scope. Private plans
-// plans/<hash> map to user:<hash> (same hash suffix as ActorKey); sample and
-// fixture map to their synthetic accounts.
-func planToAccountID(planID string) (string, error) {
-	switch planID {
-	case "plans/sample":
-		return SampleAccountID, nil
-	case "plans/fixture":
-		return FixtureAccountID, nil
-	}
-	if strings.HasPrefix(planID, "plans/") && len(planID) > len("plans/") {
-		return "user:" + strings.TrimPrefix(planID, "plans/"), nil
-	}
-	return "", fmt.Errorf("unknown plan %q", planID)
-}
-
-// HasPlan is a deprecated shim over HasAccount for auth/frontend callers.
-func (d *Database) HasPlan(planID string) (bool, error) {
-	accountID, err := planToAccountID(planID)
-	if err != nil {
-		return false, nil
-	}
-	return d.HasAccount(accountID)
-}
-
-// Plan is a deprecated shim over Account for auth/frontend callers.
-func (d *Database) Plan(planID string) (store.Store, error) {
-	accountID, err := planToAccountID(planID)
-	if err != nil {
-		return nil, fmt.Errorf("plan %q: %w", planID, store.ErrNotFound)
-	}
-	return d.Account(accountID)
-}
-
-// EnsurePrivatePlan is a deprecated shim over EnsureAccount. The accountID
-// parameter selects the scope; planID is validated for shape only.
-func (d *Database) EnsurePrivatePlan(planID, accountID, issuer, subject string) (store.Store, error) {
-	if planID == "" || planID == "plans/sample" || planID == "plans/fixture" || accountID == "" || issuer == "" || subject == "" {
-		return nil, fmt.Errorf("private plan requires a plan, account, issuer, and subject")
-	}
-	if _, err := planToAccountID(planID); err != nil {
-		return nil, fmt.Errorf("private plan requires a plan, account, issuer, and subject")
-	}
-	return d.EnsureAccount(accountID, issuer, subject)
-}
-
-// EnsureSamplePlan is a deprecated shim that ensures the synthetic sample
-// account. Full guest removal belongs to the auth lane.
-func (d *Database) EnsureSamplePlan() (store.Store, error) {
+// EnsureSampleAccount provisions the synthetic sample account. The sample is
+// an explicit exception to verified-identity provisioning: it uses
+// placeholder identity values so app_accounts FKs hold.
+func (d *Database) EnsureSampleAccount() (store.Store, error) {
 	return d.ensureAccount(SampleAccountID, SampleAccountID, SampleAccountID)
 }

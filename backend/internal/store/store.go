@@ -114,14 +114,7 @@ type Database interface {
 	HasAccount(accountID string) (bool, error)
 	Account(accountID string) (Store, error)
 	EnsureAccount(accountID, issuer, subject string) (Store, error)
-	// Deprecated plan shims: account scope replaced plan scope. These map
-	// plans/<suffix> to user:<suffix> (sample/fixture to their synthetic
-	// accounts) so auth/frontend still build until the auth lane removes
-	// guest/sample. New code must use HasAccount/Account/EnsureAccount.
-	HasPlan(planID string) (bool, error)
-	Plan(planID string) (Store, error)
-	EnsurePrivatePlan(planID, accountID, issuer, subject string) (Store, error)
-	EnsureSamplePlan() (Store, error)
+	EnsureSampleAccount() (Store, error)
 	EnsureGroupAccount(issuer, subject string) (string, error)
 	CreateGroup(accountID, name, displayName string) (Group, error)
 	ListGroupsForAccount(accountID string) ([]Group, error)
