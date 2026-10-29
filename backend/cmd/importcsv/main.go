@@ -19,14 +19,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("importcsv", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	dbPath := flags.String("db", "", "required existing shared SQLite database path")
-	planID := flags.String("plan", "", "required existing plan resource ID")
+	planID := flags.String("plan", "", "required existing account resource ID")
 	modelPath := flags.String("model", "public/configs", "directory containing model CSV files")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
 
 	if *dbPath == "" || *planID == "" || flags.NArg() != 0 {
-		fmt.Fprintln(stderr, "usage: importcsv --db EXISTING.db --plan plans/RESOURCE [--model directory]")
+		fmt.Fprintln(stderr, "usage: importcsv --db EXISTING.db --plan accounts/RESOURCE [--model directory]")
 		return 2
 	}
 	if info, err := os.Stat(*dbPath); err != nil || !info.Mode().IsRegular() {
@@ -41,7 +41,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer database.Close()
 	plan, err := database.Plan(*planID)
 	if err != nil {
-		fmt.Fprintf(stderr, "select existing plan: %v\n", err)
+		fmt.Fprintf(stderr, "select existing account: %v\n", err)
 		return 1
 	}
 	doc, err := csvio.ImportModel(*modelPath)
@@ -53,6 +53,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "import: %v\n", err)
 		return 1
 	}
-	fmt.Fprintln(stdout, "imported CSV into the selected plan")
+	fmt.Fprintln(stdout, "imported CSV into the selected account")
 	return 0
 }
