@@ -13,5 +13,7 @@ export function AccountsPage({
 	onEdit: (target: EditorTarget) => void;
 	onAccount: (id: string) => void;
 }) {
-	return <AccountSections view="accounts" onEdit={onEdit} onAccount={onAccount} />;
+	return (
+		<AccountSections view="accounts" onEdit={onEdit} onAccount={onAccount} />
+	);
 }

@@ -99,7 +99,12 @@ export type RowOperation =
 			row: BackendPlannedPurchase;
 	  }
 	| { kind: "plannedPurchase"; action: "delete"; id: string }
-	| { kind: "plannedPurchase"; action: "move"; id: string; beforeId: string | null }
+	| {
+			kind: "plannedPurchase";
+			action: "move";
+			id: string;
+			beforeId: string | null;
+	  }
 	| {
 			kind: "evaluation";
 			action: "create";

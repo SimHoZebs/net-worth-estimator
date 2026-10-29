@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { testAccount } from "../mocks/account.ts";
 import { changesBetween, validatePlan } from "./model.ts";
-import { removeEvaluation, removePlanItem, upsertItem } from "./accountEdits.ts";
+import {
+	removeEvaluation,
+	removePlanItem,
+	upsertItem,
+} from "./accountEdits.ts";
 
 describe("immutable plan edits", () => {
 	it("preserves unchanged item order and reports exactly one toggle", () => {

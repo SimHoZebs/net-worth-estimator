@@ -30,13 +30,13 @@ var financialTables = []string{
 }
 
 func main() {
-	var target, source, sourcePlan, targetPlan string
+	var target, source, sourceAccount, targetAccount string
 	var initIssuer, initSubject string
 	var sample bool
 	flag.StringVar(&target, "db", "", "existing application database (application must be stopped)")
 	flag.StringVar(&source, "source", "", "application database snapshot")
-	flag.StringVar(&sourcePlan, "source-plan", "", "explicit source account ID")
-	flag.StringVar(&targetPlan, "account", "", "existing destination private account ID")
+	flag.StringVar(&sourceAccount, "source-account", "", "explicit source account ID")
+	flag.StringVar(&targetAccount, "account", "", "existing destination private account ID")
 	flag.BoolVar(&sample, "sample", false, "publish canonical financial data to accounts/sample")
 	flag.StringVar(&initIssuer, "init-issuer", "", "initialize a NEW database for this verified dev issuer")
 	flag.StringVar(&initSubject, "init-subject", "", "initialize a NEW database for this verified dev subject")
@@ -46,32 +46,32 @@ func main() {
 	}
 	var err error
 	if initIssuer != "" || initSubject != "" {
-		if sample || targetPlan != "" {
+		if sample || targetAccount != "" {
 			log.Fatal("initialization cannot combine with --sample or --account")
 		}
-		err = initialize(target, source, sourcePlan, initIssuer, initSubject)
+		err = initialize(target, source, sourceAccount, initIssuer, initSubject)
 	} else {
-		err = refresh(target, source, sourcePlan, targetPlan, sample)
+		err = refresh(target, source, sourceAccount, targetAccount, sample)
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
-	if target == "" || source == "" || sourcePlan == "" {
-		return errors.New("--db, --source, and --source-plan are required")
+func refresh(target, source, sourceAccount, targetAccount string, sample bool) error {
+	if target == "" || source == "" || sourceAccount == "" {
+		return errors.New("--db, --source, and --source-account are required")
 	}
 	if sample {
-		if targetPlan != "" && targetPlan != sampleResourceID {
+		if targetAccount != "" && targetAccount != sampleResourceID {
 			return errors.New("--sample can only replace accounts/sample")
 		}
-		targetPlan = sampleResourceID
-	} else if targetPlan == "" || normalizeAccountRow(targetPlan) == sqlite.SampleAccountID {
+		targetAccount = sampleResourceID
+	} else if targetAccount == "" || normalizeAccountRow(targetAccount) == sqlite.SampleAccountID {
 		return errors.New("--account must name an existing private account; use --sample to publish public data")
 	}
-	sourceRow := normalizeAccountRow(sourcePlan)
-	targetRow := normalizeAccountRow(targetPlan)
+	sourceRow := normalizeAccountRow(sourceAccount)
+	targetRow := normalizeAccountRow(targetAccount)
 	for _, path := range []string{target, source} {
 		info, err := os.Stat(path)
 		if err != nil {

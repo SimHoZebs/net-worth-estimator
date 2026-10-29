@@ -14,6 +14,10 @@ export function TransactionsPage({
 	onAccount: (id: string) => void;
 }) {
 	return (
-		<AccountSections view="transactions" onEdit={onEdit} onAccount={onAccount} />
+		<AccountSections
+			view="transactions"
+			onEdit={onEdit}
+			onAccount={onAccount}
+		/>
 	);
 }

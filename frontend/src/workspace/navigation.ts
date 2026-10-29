@@ -68,9 +68,3 @@ export const pages: PageDefinition[] = [
 		title: "How your data is configured",
 	},
 ];
-
-export const LEGACY_PAGES: Record<string, Page> = {
-	plan: "accounts",
-	goals: "evaluations",
-	account: "sources",
-};

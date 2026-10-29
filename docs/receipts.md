@@ -13,7 +13,7 @@ run explicit setup against its database:
 CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
 ```
 
-Setup adds the plan-scoped `receipts` table and `receipt-evidence-v1` migration
+Setup adds the account-scoped `receipts` table and `receipt-evidence-v1` migration
 record. It preserves existing financial and identity data. Runtime never repairs
 missing schema. A schema downgrade requires a compatible backup.
 
@@ -26,7 +26,7 @@ inline images into the default SQLite adapter and records `receipt-blobs-v1`.
 Manual attachments and review need no extraction service. The ordinary deployment
 default is `NET_WORTH_ESTIMATOR_RECEIPT_SOURCE=disabled`. The dev Compose stack and
 isolated browser harness explicitly select `mock`. Keep normal Casdoor settings
-and plan permissions. No live OCR, LLM, cloud credentials, or external extraction
+and account permissions. No live OCR, LLM, cloud credentials, or external extraction
 requests are part of this release.
 
 1. Open a saved expense through its account's transaction list.
@@ -66,7 +66,7 @@ cannot receive attachments: pending rows are transient sync snapshots, and
 void rows record authorizations that never settled. Recurrence rules and
 generated occurrences cannot receive attachments; attach to a saved
 transaction instead. Receipt review remains separate from unsaved
-financial-plan edits. Converted settled rows are owner transactions, so they
+financial-account edits. Converted settled rows are owner transactions, so they
 accept receipts and keep the original posting UUID. Posted charges with no
 pending predecessor insert as new disabled owner rows; they accept receipts
 once saved and never duplicate across repeat syncs.
@@ -123,7 +123,7 @@ The mock proves workflow contracts, not OCR accuracy or provider reliability.
 | `DELETE /v1/receipts/{id}` | Delete image and receipt data. |
 
 Existing identity, CSRF/origin, and `Waypoint-Resource` policies apply. Mutations
-require `plan:write` and a writable server. Cross-plan IDs return 404. Receipt
+require `account:write` and a writable server. Cross-account IDs return 404. Receipt
 content uses `Cache-Control: private, no-store`. Images set a verified media type
 and `X-Content-Type-Options: nosniff`.
 
@@ -135,7 +135,7 @@ scope change. Receipt content never enters browser persistent storage.
 - Bound decoded images to 20 megapixels and 10,000 pixels per side.
 - Apply JPEG orientation and remove metadata through pixel re-encoding.
 - Reject normalized images over 3 MiB instead of silently degrading text.
-- Limit each plan to 100 MiB of pixels and 500 receipts.
+- Limit each account to 100 MiB of pixels and 500 receipts.
 - Deduplicate identical normalized images within one posting.
 - Reject replacement images already attached as another receipt on that posting.
 - Permit two active extraction calls per source, one per receipt.
@@ -164,13 +164,13 @@ as stale.
 ## Lifecycle and privacy
 
 Posting edits and reorders preserve receipts. Explicit posting deletion, CSV
-replacement of postings, and plan clearing remove dependent receipts. The
+replacement of postings, and account clearing remove dependent receipts. The
 transaction-removal confirmation explains this consequence before save.
 
 With the default SQLite blob adapter, database backups include receipt pixels
 and details. Other adapters need backups of their object storage too. Private
-plan refreshes copy evidence through the blob port. Public sample publication
-excludes receipts entirely. Other plans and application identity state remain
+account refreshes copy evidence through the blob port. Public sample publication
+excludes receipts entirely. Other accounts and application identity state remain
 unchanged. Protect production backups and dev snapshots as financial records.
 
 Deletion removes access immediately and queues durable physical cleanup. A

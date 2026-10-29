@@ -211,7 +211,10 @@ describe("applyRowOperations", () => {
 	it("diffs planned purchases with moves and translates writes to legacy postings", async () => {
 		const base: FinancialModelDocument = {
 			...emptyDocument(),
-			plannedPurchases: [plannedPurchase("keep", 0), plannedPurchase("drop", 1)],
+			plannedPurchases: [
+				plannedPurchase("keep", 0),
+				plannedPurchase("drop", 1),
+			],
 		};
 		const next: FinancialModelDocument = {
 			...emptyDocument(),

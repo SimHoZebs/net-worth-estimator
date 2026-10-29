@@ -257,13 +257,13 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 
 export function orderChanged(saved: Plan | null, current: Plan | null) {
 	if (!saved || !current) return false;
-	return (["accounts", "transactions", "plannedPurchases", "evaluations"] as const).some(
-		(key) => {
-			const before = (saved[key] ?? []).map((item) => item.id).join(",");
-			const after = (current[key] ?? []).map((item) => item.id).join(",");
-			return before !== after;
-		},
-	);
+	return (
+		["accounts", "transactions", "plannedPurchases", "evaluations"] as const
+	).some((key) => {
+		const before = (saved[key] ?? []).map((item) => item.id).join(",");
+		const after = (current[key] ?? []).map((item) => item.id).join(",");
+		return before !== after;
+	});
 }
 
 export function selectDraftChangeCount(state: DraftState) {

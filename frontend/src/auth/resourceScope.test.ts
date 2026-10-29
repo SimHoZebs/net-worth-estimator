@@ -47,7 +47,10 @@ describe("verified account scope", () => {
 			{ ...input, apiBaseUrl: "https://other.example" },
 			{ ...input, subject: "account-b" },
 			{ ...input, resource: { ...input.resource, id: "accounts/private-b" } },
-			{ ...input, resource: { ...input.resource, permissions: ["account:read"] } },
+			{
+				...input,
+				resource: { ...input.resource, permissions: ["account:read"] },
+			},
 		])
 			expect(accountScopeKey(changed)).not.toBe(key);
 	});

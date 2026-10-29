@@ -15,7 +15,7 @@ import (
 // initialize publishes a new, private dev database only after its selected
 // financial scope copies successfully. Production ownership and identity rows
 // never enter this file. An existing destination always remains untouched.
-func initialize(target, source, sourcePlan, issuer, subject string) error {
+func initialize(target, source, sourceAccount, issuer, subject string) error {
 	if target == "" || source == "" || issuer == "" || subject == "" {
 		return errors.New("initialization requires --db, --source, --init-issuer, and --init-subject")
 	}
@@ -30,7 +30,7 @@ func initialize(target, source, sourcePlan, issuer, subject string) error {
 			return errors.New("initialization destination has an existing SQLite sidecar")
 		}
 	}
-	selected, err := selectSourceAccount(source, sourcePlan)
+	selected, err := selectSourceAccount(source, sourceAccount)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func selectSourceAccount(path, selected string) (string, error) {
 		return "", err
 	}
 	if len(ids) != 1 {
-		return "", errors.New("source must contain exactly one private account unless --source-plan selects its reviewed financial scope")
+		return "", errors.New("source must contain exactly one private account unless --source-account selects its reviewed financial scope")
 	}
 	return ids[0], nil
 }

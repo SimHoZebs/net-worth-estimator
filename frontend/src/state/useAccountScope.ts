@@ -5,7 +5,10 @@ import {
 	type AccountScope,
 } from "@/auth/resourceScope.ts";
 import { ApiHttpError } from "../api/index.ts";
-import { useServerModel as useModel, useServerStatus } from "./workspaceResources.ts";
+import {
+	useServerModel as useModel,
+	useServerStatus,
+} from "./workspaceResources.ts";
 import {
 	draftConflict,
 	selectDraftChangeCount,

@@ -82,7 +82,7 @@ const env = {
   PORT: origin.port || "80",
   NET_WORTH_ESTIMATOR_DB: primaryDB,
   NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, "frontend/dist"),
-  NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: subject,
+  NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT: subject,
   NET_WORTH_ESTIMATOR_READ_ONLY: "",
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
 };
@@ -214,7 +214,7 @@ try {
   await snapshotFile(primaryDB, approvedSnapshot);
   const publish = spawn(
     publisher,
-    ["--db", primaryDB, "--source", approvedSnapshot, "--source-plan", own.resource.id, "--sample"],
+    ["--db", primaryDB, "--source", approvedSnapshot, "--source-account", own.resource.id, "--sample"],
     { stdio: "inherit" },
   );
   assert.equal((await once(publish, "exit"))[0], 0, "Sample publication failed");
@@ -354,14 +354,14 @@ try {
   );
   const shared = new DatabaseSync(primaryDB, { readOnly: true });
   try {
-    const accounts = shared.prepare("SELECT plan_id, id FROM accounts ORDER BY plan_id, id").all();
+    const accounts = shared.prepare("SELECT account_id, id FROM accounts ORDER BY account_id, id").all();
     assert.equal(
-      new Set(accounts.map((row) => row.plan_id)).size,
+      new Set(accounts.map((row) => row.account_id)).size,
       3,
       "Owner, sample, and second account must share one database",
     );
     assert.deepEqual(
-      accounts.filter((row) => row.plan_id === sample.resource.id).map((row) => row.id),
+      accounts.filter((row) => row.account_id === sample.resource.id).map((row) => row.id),
       ["owner-checking"],
     );
     assert.ok(

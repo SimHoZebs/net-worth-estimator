@@ -47,8 +47,7 @@ function requestLifetime(scope: AccountScope, signal?: AbortSignal | null) {
 	const controller = new AbortController();
 	const forwardAbort = () => controller.abort(signal?.reason);
 	const stopScope = subscribeAccountScope(() => {
-		if (scope !== getAccountScope())
-			controller.abort(new AccountScopeError());
+		if (scope !== getAccountScope()) controller.abort(new AccountScopeError());
 	});
 	if (signal?.aborted) forwardAbort();
 	else signal?.addEventListener("abort", forwardAbort, { once: true });
