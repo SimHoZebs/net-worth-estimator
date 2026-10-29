@@ -24,7 +24,7 @@ func openSharedTestDatabase(t *testing.T) *Database {
 
 func privateTestPlan(t *testing.T, d *Database, name string) *sqliteStore {
 	t.Helper()
-	s, err := d.EnsurePrivatePlan("plans/"+name, name, "https://issuer.test", name)
+	s, err := d.EnsureAccount(name, "https://issuer.test", name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	for _, table := range expectedSchemaTables() {
-		if table == "plans" || table == "app_accounts" || table == "schema_migrations" || table == "blob_objects" || table == "blob_data" {
+		if table == "app_accounts" || table == "schema_migrations" || table == "blob_objects" || table == "blob_data" {
 			continue
 		}
 		if table == "user_groups" || table == "group_members" || table == "group_invites" {
@@ -46,7 +46,7 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 		if table == "sessions" || table == "identity_grants" || table == "identity_logout_marks" || table == "identity_logout_tokens" {
 			continue
 		}
-		rows, err := s.db.Query(`SELECT * FROM ` + table + ` WHERE plan_id = :plan_id ORDER BY rowid`)
+		rows, err := s.db.Query(`SELECT * FROM ` + table + ` WHERE account_id = :account_id ORDER BY rowid`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +131,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if err := s.SetLastSyncTime("before"); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.PutArtifact("same-artifact", "deterministic", s.db.planID); err != nil {
+		if err := s.PutArtifact("same-artifact", "deterministic", s.db.accountID); err != nil {
 			t.Fatal(err)
 		}
 		// Migrated sources may contain the exact same local sync UUID.
@@ -225,7 +225,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		}
 		checkOther()
 	}
-	if payload, ok, err := b.GetArtifact("same-artifact"); err != nil || !ok || payload != "plans/b" {
+	if payload, ok, err := b.GetArtifact("same-artifact"); err != nil || !ok || payload != "b" {
 		t.Fatalf("artifact = %q, %v, %v", payload, ok, err)
 	}
 	if exists, err := a.DocumentExists(); err != nil || exists {
@@ -238,24 +238,33 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 
 func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 	d := openSharedTestDatabase(t)
-	if _, err := d.Plan("plans/missing"); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("missing plan = %v", err)
+	if _, err := d.Account("missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing account = %v", err)
 	}
 	a := privateTestPlan(t, d, "a")
-	if _, err := d.EnsurePrivatePlan("plans/a", "other", "https://issuer.test", "other"); err == nil {
-		t.Fatal("changed plan owner")
-	}
-	if _, err := d.EnsurePrivatePlan("plans/new", "a", "https://issuer.test", "a"); err == nil {
-		t.Fatal("created second private plan for owner")
-	}
-	if _, err := d.EnsurePrivatePlan("plans/a", "a", "https://issuer.test", "different"); err == nil {
+	if _, err := d.EnsureAccount("a", "https://issuer.test", "other"); err == nil {
 		t.Fatal("changed account identity")
 	}
-	if _, err := d.EnsurePrivatePlan("plans/duplicate-identity", "different", "https://issuer.test", "a"); err == nil {
+	if _, err := d.EnsureAccount("different", "https://issuer.test", "a"); err == nil {
 		t.Fatal("duplicated issuer/subject")
 	}
-	if exists, err := d.HasPlan("plans/new"); err != nil || exists {
-		t.Fatalf("failed creation persisted plan: %v, %v", exists, err)
+	if exists, err := d.HasAccount("new"); err != nil || exists {
+		t.Fatalf("failed creation persisted account: %v, %v", exists, err)
+	}
+	// Deprecated plan shims still resolve to the same account scope.
+	// Use a real user:<hash> mapping: plans/<suffix> -> user:<suffix>.
+	shimAccount := "user:shimtest"
+	if _, err := d.EnsureAccount(shimAccount, "https://issuer.test", "shimuser"); err != nil {
+		t.Fatalf("shim account ensure = %v", err)
+	}
+	if _, err := d.EnsurePrivatePlan("plans/shimtest", shimAccount, "https://issuer.test", "shimuser"); err != nil {
+		t.Fatalf("plan shim ensure = %v", err)
+	}
+	if exists, err := d.HasPlan("plans/shimtest"); err != nil || !exists {
+		t.Fatalf("plan shim has = %v, %v", exists, err)
+	}
+	if _, err := d.Plan("plans/shimtest"); err != nil {
+		t.Fatalf("plan shim open = %v", err)
 	}
 	presets, err := a.ListAmountPresets()
 	if err != nil {
@@ -287,7 +296,7 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 	if err := a.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if exists, err := d.HasPlan("plans/a"); err != nil || !exists {
+	if exists, err := d.HasAccount("a"); err != nil || !exists {
 		t.Fatalf("scoped close closed database: %v, %v", exists, err)
 	}
 }
