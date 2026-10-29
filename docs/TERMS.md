@@ -8,7 +8,7 @@ The names are display names. The engine keeps its own vocabulary: the Go API, th
 
 A planned or recorded movement of money into, out of, or between accounts.
 
-Use **transaction**, qualified as **planned** or **recorded**. The plan's "Transactions" tab holds the rules and dated entries you edit. An account's activity view holds the rows the engine computed from those rules.
+Use **transaction**, qualified as **planned** or **recorded**. The saved model's "Transactions" tab holds the rules and dated entries you edit. An account's activity view holds the rows the engine computed from those rules.
 
 - Retired from copy: posting, movement, money movement.
 - Retired from prose: one-time movement, planned movement, projected transaction.
@@ -26,21 +26,22 @@ Use **balance check**. Its date column is **balance**; its tab is "Balance check
 
 ## C. Projection, base case and range
 
-Two computations over the same plan. The **base case** is the single calculated path. The **range** is a percentile band across modeled scenarios.
+Two computations over the same saved model. The **base case** is the single calculated path. The **range** is a percentile band across sampled scenarios.
 
 - Retired from copy: deterministic, Monte Carlo, stochastic, simulation, baseline projection.
 - Engine sections name the engine's own computation modes, so no prose term is retired there.
 - **Scenario** names one sampled assumption set, as in "80% of 400 scenarios". It is never the name of the result.
+- **What-if** names a simulator evaluation that layers hypothetical additions, disables, and modified copies on saved state without changing it. It is distinct from a sampled scenario. Promote replays it as sequential saves. Discard deletes the evaluation.
 
 ## D. Changes
 
-The edits in the current session that are not yet saved to the server.
+Base edits save immediately and re-project. There are no unsaved base edits.
 
-Use **changes**, with **unsaved** as the state adjective. **Save** sends them to the server; **discard** throws them away.
+Use **changes** only for a what-if evaluation that is not yet promoted. **Promote** replays it as sequential saves. **Discard** deletes the evaluation.
 
-- Retired from copy: draft, temporary, temporary version, temporary plan, current changes.
+- Retired from copy: draft, temporary, temporary version, temporary plan, current changes, unsaved changes for base edits.
 - Retired from prose: temporary change, staged draft, editing baseline.
-- The saved result in a comparison is the **saved plan**.
+- The saved result in a comparison is the **saved model**.
 
 ## E. Evaluation
 
@@ -69,7 +70,7 @@ Use **income evidence**. Its parts stay distinct: **deposit** (the record), **ca
 
 ## Evaluation and income evidence are different things
 
-**Evaluation** asks a question of a projection. It is configured on the plan and rendered on the outlook.
+**Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.
 
 **Income evidence** computes from recorded deposits. It is not configured and is rendered under Data and sources.
 
@@ -81,8 +82,8 @@ Both produce a result. Neither reads or writes the other's inputs.
 | ------------------------ | -------------------------------------- | ----------------------------- |
 | compute the single path  | project (code, docs), calculate (copy) | simulate, run, execute        |
 | compute the sampled band | calculate (copy)                       | sample, Monte Carlo           |
-| send edits to the server | save                                   | persist, commit, apply, write |
-| throw away unsaved edits | discard                                | revert, clear, reset          |
+| send edits to the server | save (base rows), promote (what-if)      | persist, commit, apply, write |
+| throw away a what-if       | discard                                | revert, clear, reset          |
 | fetch the model          | load (copy), read (code)               | fetch, pull, retrieve         |
 | import CSV into SQLite   | import                                 | ingest, ingestion             |
 | sync a bank              | sync                                   | —                             |

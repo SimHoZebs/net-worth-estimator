@@ -33,6 +33,18 @@ describe("immutable plan edits", () => {
 		};
 		expect(changesBetween({ saved: testPlan, current })).toEqual([]);
 	});
+	it("reports a pure reorder as a change so queue moves stage a draft", () => {
+		const first = testPlan.transactions[0];
+		const second = testPlan.transactions[1];
+		if (!first || !second) throw new Error("Missing test transactions");
+		const current = {
+			...testPlan,
+			transactions: [second, first, ...testPlan.transactions.slice(2)],
+		};
+		const changes = changesBetween({ saved: testPlan, current });
+		expect(changes).toHaveLength(1);
+		expect(changes[0]?.kind).toBe("Modified");
+	});
 	it("reports exactly one removal and preserves all other records", () => {
 		const current = removePlanItem({
 			plan: testPlan,

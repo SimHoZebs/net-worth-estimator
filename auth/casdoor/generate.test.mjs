@@ -17,8 +17,15 @@ const env = {
 
 test("requires explicit distinct secrets and well-formed origins", () => {
   for (const key of Object.keys(env)) assert.throws(() => settingsFromEnv({ ...env, [key]: "" }));
+  assert.throws(() =>
+    settingsFromEnv({ ...env, CASDOOR_PUBLIC_URL: "http://192.168.1.50:8000" }),
+  );
   assert.equal(
-    settingsFromEnv({ ...env, CASDOOR_PUBLIC_URL: "http://192.168.1.50:8000" }).publicUrl,
+    settingsFromEnv({
+      ...env,
+      CASDOOR_PUBLIC_URL: "http://192.168.1.50:8000",
+      NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP: "1",
+    }).publicUrl,
     "http://192.168.1.50:8000",
   );
   assert.throws(() =>
@@ -119,6 +126,7 @@ test("additional browser addresses add exact callbacks without changing identiti
     ...env,
     CASDOOR_PUBLIC_URL: "http://192.168.1.50:8000",
     APP_PUBLIC_URL: "http://192.168.1.50:8080",
+    NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP: "1",
     NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS: JSON.stringify({
       "http://192.168.1.50:18081": "http://192.168.1.50:18083",
     }),

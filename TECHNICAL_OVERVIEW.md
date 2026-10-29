@@ -121,9 +121,10 @@ The frontend displays these provider-neutral sync signals. Provider setup, accou
 
 Resolution rules:
 
-- If `document` is omitted, the stored model supplies it.
-- A supplied document affects only that request.
+- Production omits `document` and `overrides`; the stored model supplies the base.
+- A supplied document affects only that request and exists for tests, fixtures, and offline tooling.
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
+- What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
 - `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and movement events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
 
 A successful response has `result` and `Projection-Source: stored|computed`. `stored` means the backend retrieved the identified simulation result. `computed` means this request took the simulation execution path. The header does not guarantee successful completion or storage; preparation and execution errors also report `computed`.
@@ -468,7 +469,7 @@ The kernel:
 
 ## 9. Evaluation Runtime
 
-`EvaluationRegistry` contains five process-wide definitions:
+`EvaluationRegistry` contains six process-wide definitions:
 
 | Go definition                     | Type                    |
 | --------------------------------- | ----------------------- |
@@ -477,6 +478,7 @@ The kernel:
 | `accountBalanceDefinition`        | `accountBalance`        |
 | `postingFulfillmentDefinition`    | `postingFulfillment`    |
 | `cycleFulfillmentDefinition`      | `cycleFulfillment`      |
+| `whatIfDefinition`                | `whatIf`                |
 
 `types.EvaluationTypeOrder` fixes table order. Each table preserves stored order. Instance IDs are globally unique across all tables.
 

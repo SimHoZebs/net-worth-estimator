@@ -90,8 +90,8 @@ export function TransactionRow({
 						{receiptBadge}{" "}
 						{transaction.void ? (
 							<Badge tone="neutral" className={transactionBadgeStyles()}>
-								Void
-								<span className="sr-only">voided bank authorization</span>
+								Did not post
+								<span className="sr-only">bank hold that did not post</span>
 							</Badge>
 						) : transaction.pending ? (
 							<Badge tone="neutral" className={transactionBadgeStyles()}>
@@ -131,7 +131,7 @@ export function TransactionRow({
 					)}
 				</>
 			}
-			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.pending ? "; pending" : transaction.excluded ? "; excluded from plan" : ""}`}
+			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from plan" : ""}`}
 			onSelect={() => {
 				if (planTransaction) onEdit(planTransaction);
 			}}

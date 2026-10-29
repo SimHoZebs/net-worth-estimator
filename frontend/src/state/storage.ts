@@ -3,7 +3,7 @@ import { type Plan, planSchema } from "../domain/model.ts";
 
 export class StorageError extends errore.createTaggedError({
 	name: "StorageError",
-	message: "$detail Your saved plan has not been replaced. Retry.",
+	message: "$detail Your changes were not saved. Retry.",
 }) {}
 export class ImportError extends errore.createTaggedError({
 	name: "ImportError",

@@ -14,6 +14,57 @@ type scheduledPurchase struct {
 	cost     float64
 }
 
+// purchasesCandidateRequest rebuilds the purchases candidate simulation
+// request from the prepared base path. The candidate owns all state: the
+// model carries the full effective document (including PaymentTerms, so
+// terms-minimum semantics match the base simulation), and the initial state
+// deep-copies the projection-start posting ledger through the shared
+// CloneSimulationState. Start balances are the latest historical row over
+// zero-filled accounts; with no history they are the prepared zero state.
+// A start-day checkpoint is an end-of-day observation whose events already
+// replayed as history, so candidates exclude start-day events exactly when
+// the base path does (mirroring prepare.go's !hasStartDateCheckpoint).
+// Both the purchases candidate and the FI branch rebuild owned state from
+// the same prepared posting ledger through this shared cloner path, so cap,
+// terms-minimum, and latest-realized semantics cannot drift between branches.
+func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCarloSample) types.SimulationRequest {
+	document := path.EffectiveDocument
+	var latestHistorical *types.ProjectionRow
+	for index := range path.Rows {
+		row := &path.Rows[index]
+		if !row.IsHistorical {
+			break
+		}
+		latestHistorical = row
+	}
+	includeStartDateEvents := true
+	for _, checkpoint := range document.Checkpoints {
+		if checkpoint.Date == path.ProjectionStartDate {
+			includeStartDateEvents = false
+			break
+		}
+	}
+	return types.SimulationRequest{
+		Model: types.FinancialModel{
+			Accounts:         document.Accounts,
+			Postings:         document.Postings,
+			RecurrenceRules:  document.RecurrenceRules,
+			PaymentTerms:     document.PaymentTerms,
+			PlannedPurchases: document.PlannedPurchases,
+		},
+		InitialState: CloneSimulationState(SimulationState{
+			Balances:                     balancesAt(latestHistorical, document.Accounts),
+			LatestRealizedPostingAmounts: path.ProjectionStartPostingState.LatestRealizedPostingAmounts,
+			LatestRealizedPostingDates:   path.ProjectionStartPostingState.LatestRealizedPostingDates,
+			RealizedPostingAmountsByYear: path.ProjectionStartPostingState.RealizedPostingAmountsByYear,
+		}),
+		StartDate:              path.ProjectionStartDate,
+		EndDate:                path.ProjectionEndDate,
+		IncludeStartDateEvents: includeStartDateEvents,
+		MonteCarloSample:       sample,
+	}
+}
+
 func plannedToPosting(p *types.PlannedPurchase) *types.Posting {
 	costExpr := strconv.FormatFloat(p.Cost, 'f', -1, 64)
 	return &types.Posting{
@@ -161,6 +212,7 @@ func simulationPath(run *types.SimulationRun) *types.ProjectionPath {
 		EffectiveDocument: types.FinancialModelDocument{
 			Accounts: run.Request.Model.Accounts, Postings: run.Request.Model.Postings,
 			RecurrenceRules:  run.Request.Model.RecurrenceRules,
+			PaymentTerms:     run.Request.Model.PaymentTerms,
 			PlannedPurchases: run.Request.Model.PlannedPurchases,
 		},
 	}, run)

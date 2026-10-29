@@ -99,40 +99,21 @@ test("saved target pins control Outlook without an evidence dialog", async ({
 	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(0);
 });
 
-test("edits apply to a temporary plan that a reload discards", async ({
-	page,
-}) => {
+test("edits save immediately and survive a reload", async ({ page }) => {
 	await page.goto("/");
 	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.reload();
-	// The draft lives in memory only: reloading clears it, and the saved
-	// plan is untouched.
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toHaveCount(0);
-	const saved = await readSavedServerPlan();
-	expect(
-		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
-			.expression,
-	).toBe("600");
-	// Restage the edit and save deliberately.
-	await openInvestingTransactionEditor(page);
-	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await page.getByRole("button", { name: "Save changes" }).click();
-	// Synchronize on save completion, not on the banner flipping to its
-	// loading text: the "unsaved change" copy disappears the moment the
-	// save starts, while the draft is only cleared after the server
-	// roundtrips finish. Reloading on the loading text races the save and
-	// restores a stale draft.
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+	// The save lands async after the editor closes; poll the server for it.
+	await expect
+		.poll(async () => {
+			const saved = await readSavedServerPlan();
+			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+				.config.expression;
+		})
+		.toBe("900");
 	await page.reload();
-	// The save reached the server, and the unsaved changes are gone.
+	// The save reached the server, so the reload keeps it.
 	const after = await readSavedServerPlan();
 	expect(
 		after.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
@@ -140,26 +121,27 @@ test("edits apply to a temporary plan that a reload discards", async ({
 	).toBe("900");
 });
 
-test("discard is explicit and restores the saved plan", async ({ page }) => {
+test("discard is explicit and restores the editor value", async ({ page }) => {
 	await page.goto("/");
 	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("999");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await page.getByRole("button", { name: "Discard", exact: true }).click();
+	// Closing a dirty edit asks first instead of dropping it silently.
+	await page.getByRole("button", { name: "Close dialog" }).click();
 	await expect(page.getByRole("dialog")).toContainText(
-		"Return to your saved plan?",
+		"Discard the changes in this form?",
 	);
-	await page.getByRole("button", { name: "Keep exploring" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.getByRole("button", { name: "Discard", exact: true }).click();
-	await page
-		.getByRole("button", { name: "Discard changes", exact: true })
-		.click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).not.toBeVisible();
+	await page.getByRole("button", { name: "Continue", exact: true }).click();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("999");
+	// The header Discard restores the saved value without closing.
+	await page.getByRole("button", { name: "Discard changes" }).first().click();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
+	// A clean close asks nothing and leaves the server untouched.
+	await page.getByRole("button", { name: "Close dialog" }).click();
+	const saved = await readSavedServerPlan();
+	expect(
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("600");
 });
 
 test("a transaction converts across once and recurring in one save each way", async ({
@@ -239,8 +221,9 @@ test("failed saves retain the intended plan", async ({ page }) => {
 	await page.goto("/#sources");
 	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	// The server rejects the write, so the unsaved changes must survive.
+	// The editor saves immediately, so the failure injection must be armed
+	// before pressing Save. The server rejects the write, and the unsaved
+	// changes must survive for a banner retry.
 	await page.route("**/v1/recurrence-rules/*", async (route) => {
 		if (route.request().method() === "PATCH")
 			return route.fulfill({
@@ -255,7 +238,7 @@ test("failed saves retain the intended plan", async ({ page }) => {
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
 	const saved = await readSavedServerPlan();
 	expect(
@@ -475,17 +458,23 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	).toBeDisabled();
 	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	// Unsaved changes are allowed; saving them back to the source is not.
+	await page.getByRole("button", { name: "Save changes" }).click();
+	// The edit stages locally, but the read-only server rejects the save,
+	// so the banner Save stays disabled and the server is untouched.
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
 	await expect(
 		page.getByRole("button", { name: "Save changes" }),
 	).toBeDisabled();
+	const saved = await readSavedServerPlan();
+	expect(
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("600");
 });
 
-test("tabs stage drafts independently without cross-tab loss", async ({
+test("tabs save independently with last write winning", async ({
 	page,
 	context,
 }) => {
@@ -494,28 +483,29 @@ test("tabs stage drafts independently without cross-tab loss", async ({
 	await other.goto("/");
 	await openInvestingTransactionEditor(other);
 	await other.getByLabel("Amount (USD)").fill("1200");
-	await other.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await other.getByRole("button", { name: "Save changes" }).click();
+	// The other tab's save lands first; last write wins below.
+	await expect
+		.poll(async () => {
+			const saved = await readSavedServerPlan();
+			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+				.config.expression;
+		})
+		.toBe("1200");
 	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("1300");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	// Drafts live in memory per tab: neither tab warns about the other, and
-	// each keeps its own staged value.
+	await page.getByRole("button", { name: "Save changes" }).click();
+	await expect
+		.poll(async () => {
+			const saved = await readSavedServerPlan();
+			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+				.config.expression;
+		})
+		.toBe("1300");
+	// Independent saves warn about nothing across tabs.
 	await expect(
 		page.getByRole("alert").filter({ hasText: "another tab" }),
 	).toHaveCount(0);
-	await expect(
-		other.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	// Saving from the other tab wins first; this tab then overwrites with its
-	// own staged value. Drafts are per-tab memory with no cross-tab warning:
-	// last write wins.
-	await other.getByRole("button", { name: "Save changes" }).click();
-	await expect(other.getByText("Plan saved on the server.")).toBeVisible();
-	await page.getByRole("button", { name: "Save changes" }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 	const final = await readSavedServerPlan();
 	expect(
 		final.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config

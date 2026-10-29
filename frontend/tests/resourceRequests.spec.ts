@@ -9,10 +9,6 @@ async function editInvestingAmount(page: Page) {
 	await page.getByRole("button", { name: "Monthly investing" }).click();
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
 }
 
 test("an ordinary save conflict preserves edits without another session check", async ({
@@ -37,12 +33,14 @@ test("an ordinary save conflict preserves edits without another session check", 
 			json: { status: 409, detail: "That change conflicts with server data." },
 		});
 	});
+	// The detail editor saves immediately; the rejected save surfaces an
+	// alert while the staged draft stays bannered.
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(
 		page.getByRole("alert").filter({ hasText: "That change conflicts" }),
 	).toBeVisible();
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
 	expect(sessionChecks).toBe(0);
 	expect(writes).toBe(1);
@@ -50,7 +48,7 @@ test("an ordinary save conflict preserves edits without another session check", 
 	// server plan is untouched. The detail reads saved rows, so the banner
 	// is the edits-preserved evidence here.
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
 	expect(await readSavedServerPlan()).toEqual(saved);
 });
@@ -83,7 +81,7 @@ test("a resource-change error restores the workspace without replaying the save"
 	expect(writes).toBe(1);
 	expect(await readSavedServerPlan()).toEqual(saved);
 	await page.getByRole("button", { name: "Save changes" }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+	await expect(page.getByText("Changes saved.")).toBeVisible();
 	expect(writes).toBe(2);
 	expect(
 		(await readSavedServerPlan()).recurrenceRules.find(

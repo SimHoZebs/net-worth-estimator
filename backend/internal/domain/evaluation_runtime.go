@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -190,12 +191,20 @@ var readerSimGuard int32
 var readerSimEvalMu sync.Mutex
 var readerSimEval string
 
+// simulatorSimDepth counts in-flight simulator EvaluatePath calls.
+// Simulators run simulations by design, so their resimulation never counts
+// as a reader violation even when a concurrent request holds the reader
+// guard above: the guard is process-global while requests evaluate
+// concurrently (base and eval-overlay requests from one page overlap).
+var simulatorSimDepth int32
+
 // orchestratorSimDepth counts in-flight orchestrator simulations: the base
 // path builder and the stochastic sample projector. Simulation is concurrent
 // by design (sample workers run while the coordinator evaluates), so the
-// resimulation refusal below exempts orchestrator-initiated runs and only
-// fires for simulation entered from inside a guarded reader evaluation
-// with no orchestrator simulation in flight.
+// resimulation refusal below exempts orchestrator-initiated runs and
+// simulator evaluations, and only fires for simulation entered from inside
+// a guarded reader evaluation with no orchestrator simulation or simulator
+// evaluation in flight.
 var orchestratorSimDepth int32
 
 func readerSimulationBlocked() (string, bool) {
@@ -203,6 +212,9 @@ func readerSimulationBlocked() (string, bool) {
 		return "", false
 	}
 	if atomic.LoadInt32(&orchestratorSimDepth) > 0 {
+		return "", false
+	}
+	if atomic.LoadInt32(&simulatorSimDepth) > 0 {
 		return "", false
 	}
 	readerSimEvalMu.Lock()
@@ -237,17 +249,49 @@ func orchestratedSimulate(request types.SimulationRequest) (run types.Simulation
 
 // requireResimulationAllowed reports a violation when a reader
 // evaluation attempts to rerun the base simulation.
+//
+// The guard counters are process-wide, so concurrent requests interleave:
+// a simulator branch in one request may start while another request holds
+// a short reader window. Reader windows are brief by contract (readers
+// answer from the cached path), so a blocked simulation waits briefly and
+// retries instead of failing at once. A genuine violation nests in the
+// same call stack, so the guard never clears and the call still fails
+// after the bound, preserving the diagnostic.
+//
+// resimGuardTries and resimGuardPause bound that wait. Tests shrink them;
+// production keeps the default 50x20ms (~1s ceiling).
+var resimGuardTries = 50
+var resimGuardPause = 20 * time.Millisecond
+
 func requireResimulationAllowed(caller string) error {
-	if evalType, blocked := readerSimulationBlocked(); blocked {
-		return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; mark Kind=simulator with explicit opt-in to run simulations", evalType, caller)
+	tries := resimGuardTries
+	if tries < 1 {
+		tries = 1
+	}
+	firstEval := ""
+	for attempt := 0; attempt < tries; attempt++ {
+		if evalType, blocked := readerSimulationBlocked(); blocked {
+			if firstEval == "" {
+				firstEval = evalType
+			}
+			if attempt+1 == tries {
+				return fmt.Errorf("reader evaluation %q must not rerun the base simulation via %s; mark Kind=simulator with explicit opt-in to run simulations", firstEval, caller)
+			}
+			time.Sleep(resimGuardPause)
+			continue
+		}
+		return nil
 	}
 	return nil
 }
 
 // withReaderGuard runs fn with resimulation refused when the definition
-// is a reader (the default). Simulator evaluations run unguarded.
+// is a reader (the default). Simulator evaluations run unguarded and mark
+// their own depth so concurrent readers in other requests never block them.
 func withReaderGuard(definition *EvaluationDefinition, evalType string, fn func() (PathResult, error)) (PathResult, error) {
 	if definition.IsSimulator() {
+		atomic.AddInt32(&simulatorSimDepth, 1)
+		defer atomic.AddInt32(&simulatorSimDepth, -1)
 		return fn()
 	}
 	readerSimEvalMu.Lock()

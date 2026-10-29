@@ -33,9 +33,7 @@ describe("WishListEditor", () => {
 			target: { value: "400" },
 		});
 		fireEvent.submit(
-			view
-				.getByRole("button", { name: "Apply unsaved changes" })
-				.closest("form")!,
+			view.getByRole("button", { name: "Save changes" }).closest("form")!,
 		);
 		expect(view.getByRole("alert").textContent).toContain(
 			"The authoritative plan changed. Reload before editing.",
@@ -61,9 +59,7 @@ describe("WishListEditor", () => {
 			target: { value: "400" },
 		});
 		fireEvent.submit(
-			view
-				.getByRole("button", { name: "Apply unsaved changes" })
-				.closest("form")!,
+			view.getByRole("button", { name: "Save changes" }).closest("form")!,
 		);
 		expect(view.getByRole("alert").textContent).toContain(
 			"could not be applied",
@@ -106,9 +102,7 @@ describe("WishListEditor", () => {
 		expect(include.checked).toBe(true);
 		fireEvent.click(include);
 		fireEvent.submit(
-			view
-				.getByRole("button", { name: "Apply unsaved changes" })
-				.closest("form")!,
+			view.getByRole("button", { name: "Save changes" }).closest("form")!,
 		);
 		expect(onApply).toHaveBeenCalledOnce();
 		expect(onApply.mock.calls[0]![0].plannedPurchases.at(-1)).toMatchObject({
@@ -139,7 +133,7 @@ describe("WishListEditor", () => {
 		expect(
 			(
 				view.getByRole("button", {
-					name: "Apply unsaved changes",
+					name: "Save changes",
 				}) as HTMLButtonElement
 			).disabled,
 		).toBe(true);

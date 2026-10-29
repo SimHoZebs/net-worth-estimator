@@ -2,7 +2,7 @@ import { create } from "zustand";
 // State owner derives from the data's authority and lifetime, not its
 // reader count. Saved model, pins, budget settings, projections, and
 // mutation status live in TanStack Query (resource-scoped keys; scope
-// changes cancel queries and clear private data). The shared unsaved plan,
+// changes cancel queries and clear private data). The shared unsaved changes,
 // comparison baseline, theme, and projection controls live in Zustand here.
 // Unsubmitted fields, selections, and pagination stay local. New server
 // state gets a resource-scoped query and mutation, never a second cache.
@@ -105,7 +105,6 @@ interface DraftActions {
 	restore: (scope: ResourceScope) => void;
 	reconcile: (model: ServerModel) => void;
 	updatePlan: (next: Plan) => boolean;
-	replace: (next: Plan) => boolean;
 	discard: (allowStale?: boolean) => boolean;
 	acknowledgeSave: (draft: Plan) => boolean;
 }
@@ -132,7 +131,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 	const edit = (next: Plan, replacing: boolean) => {
 		if (workspaceIsBusy())
 			return fail(
-				"Wait for the current server operation to finish before editing the plan.",
+				"Wait for the current server operation to finish before editing.",
 			);
 		const model = getServerModel();
 		const saved = model?.conversion?.plan;
@@ -140,28 +139,12 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			return fail("Load the server workspace before editing it.");
 		const conflict = draftConflict(get(), model);
 		if (conflict) return fail(conflict);
-		if (replacing && get().draft)
-			return fail(
-				"Save or discard the current temporary plan before importing another plan.",
-			);
 		const validated = validatePlan(next);
 		if (validated instanceof Error) return fail(validated.message);
-		const presentation = replacing
-			? {
-					...model.conversion!.presentation,
-					name: validated.name,
-					origin: validated.origin,
-					updatedAt: validated.updatedAt,
-					revision: validated.revision,
-					assumptions: validated.assumptions,
-				}
-			: (get().draftPresentation ?? model.conversion!.presentation);
+		const presentation =
+			get().draftPresentation ?? model.conversion!.presentation;
 		try {
-			conversion(
-				validated,
-				model,
-				replacing ? model.conversion!.presentation : presentation,
-			);
+			conversion(validated, model, presentation);
 		} catch (error) {
 			return fail(
 				error instanceof Error
@@ -170,6 +153,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			);
 		}
 		const changed =
+			orderChanged(saved, validated) ||
 			changesBetween({ saved, current: validated }).length > 0 ||
 			saved.updatedAt !== validated.updatedAt ||
 			saved.revision !== validated.revision ||
@@ -232,7 +216,6 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 				});
 		},
 		updatePlan: (next) => edit(next, false),
-		replace: (next) => edit(next, true),
 		discard: (allowStale = false) => {
 			if (!get().draft) return false;
 			if (workspaceIsBusy())
@@ -252,7 +235,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			});
 			notifySuccess(
 				"workspace-notice",
-				"Unsaved changes discarded. Saved server plan restored.",
+				"Unsaved changes discarded. Your last save is restored.",
 			);
 			return true;
 		},
@@ -272,10 +255,27 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 	};
 });
 
+export function orderChanged(saved: Plan | null, current: Plan | null) {
+	if (!saved || !current) return false;
+	return (["accounts", "transactions", "plannedPurchases", "evaluations"] as const).some(
+		(key) => {
+			const before = (saved[key] ?? []).map((item) => item.id).join(",");
+			const after = (current[key] ?? []).map((item) => item.id).join(",");
+			return before !== after;
+		},
+	);
+}
+
 export function selectDraftChangeCount(state: DraftState) {
-	return state.draft && state.baseline
-		? changesBetween({ saved: state.baseline, current: state.draft }).length
-		: 0;
+	if (!state.draft || !state.baseline) return 0;
+	const count = changesBetween({
+		saved: state.baseline,
+		current: state.draft,
+	}).length;
+	if (count > 0) return count;
+	// Pure reorders carry no content changes but still need a DraftBar with
+	// a save and discard path when their immediate save fails.
+	return orderChanged(state.baseline, state.draft) ? 1 : 0;
 }
 
 export function draftDocumentForSave(): FinancialModelDocument {
@@ -288,7 +288,7 @@ export function draftDocumentForSave(): FinancialModelDocument {
 	if (getServerStatus()?.readOnly || state.draft.readOnly)
 		throw new ApiHttpError({
 			status: 403,
-			message: "The server is read-only. The temporary plan remains unsaved.",
+			message: "The server is read-only. Your changes remain unsaved.",
 		});
 	return conversion(
 		state.draft,
