@@ -32,6 +32,9 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 		if !resource.valid() || resource.Owner != actor || strings.Count(resource.ID, "/") != 1 || resource.ID == "plans/sample" {
 			t.Fatalf("unsafe resource: %+v", resource)
 		}
+		if !strings.HasPrefix(resource.ID, "accounts/") {
+			t.Fatalf("private resource must use the account namespace: %+v", resource)
+		}
 		data, err := json.Marshal(resource)
 		if err != nil || strings.Contains(string(data), "owner") || strings.Contains(string(data), "user:") {
 			t.Fatalf("internal owner leaked: %s, %v", data, err)
@@ -39,5 +42,18 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 	}
 	if ActorKey("https://id.example", "") != "guest" || !ResourceFor("https://id.example", "").valid() {
 		t.Fatal("guest canonicalization failed")
+	}
+}
+
+func TestLegacyPlanResourceStaysValidForMigration(t *testing.T) {
+	const issuer = "https://id.example"
+	current := ResourceFor(issuer, "alice")
+	hash := strings.TrimPrefix(current.Owner, "user:")
+	legacy := Resource{ID: "plans/" + hash, Kind: "private", Owner: current.Owner}
+	if !legacy.valid() {
+		t.Fatalf("legacy plan resource rejected before store rekey: %+v", legacy)
+	}
+	if ResourceFor(issuer, "alice").ID == legacy.ID {
+		t.Fatal("ResourceFor must return the account namespace, not the legacy plan form")
 	}
 }
