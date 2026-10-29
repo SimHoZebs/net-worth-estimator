@@ -5,8 +5,6 @@ import {
 	ArrowRightLeft,
 	ArrowUpRight,
 	Banknote,
-	CalendarCheck2,
-	CalendarDays,
 	Check,
 	ChevronDown,
 	Clock3,
@@ -22,7 +20,6 @@ import { createPortal } from "react-dom";
 import {
 	useId,
 	useState,
-	type ComponentType,
 	type FormEvent,
 	type ReactNode,
 } from "react";
@@ -101,29 +98,6 @@ function accountFor(
 ): AccountRef | null {
 	if (!id) return null;
 	return accounts.find((account) => account.id === id) ?? null;
-}
-
-/** Aligned metadata row: quiet icon label on the left, value on the right.
- * A wrapping label associates the text with the control inside, so no
- * aria-labels are needed on row controls. */
-function MetaRow({
-	icon: Icon,
-	label,
-	children,
-}: {
-	icon: ComponentType<{ size?: number; className?: string }>;
-	label: string;
-	children: ReactNode;
-}) {
-	return (
-		<label className="flex items-center justify-between gap-3 rounded-control py-2 max-sm:flex-col max-sm:items-stretch max-sm:gap-0.5">
-			<span className="inline-flex flex-none items-center gap-2 text-sm text-muted">
-				<Icon size={15} aria-hidden="true" />
-				{label}
-			</span>
-			{children}
-		</label>
-	);
 }
 
 function categoryLabel(kind: "in" | "out" | "transfer"): string {
@@ -626,17 +600,13 @@ function MarkAsSubscriptionAction({
 		else setError("That change could not be applied.");
 	};
 	return (
-		<Notice className="my-4">
-			<Repeat size={18} className="mt-px" aria-hidden="true" />
-			<span>
-				Pay this every month? Marking it as a subscription creates a monthly
-				rule and links this transaction to its first occurrence.
-			</span>
-			<Button type="button" variant="ghost" size="sm" onClick={mark}>
+		<div className="mt-4">
+			<Button type="button" variant="secondary" size="sm" onClick={mark}>
+				<Repeat size={16} aria-hidden="true" />
 				Mark as subscription
 			</Button>
 			{error && <ErrorNotice message={error} />}
-		</Notice>
+		</div>
 	);
 }
 
@@ -740,27 +710,46 @@ export function TransactionDetail({
 		else setDeleteError("The transaction could not be removed.");
 	};
 	const editHeading = (
-		<>
+		<span className="flex items-center gap-3">
 			<span className="sr-only">{edit.draft.name}</span>
-			<span className="flex items-center gap-3">
-				<span
-					className={transactionIconStyles({
-						tone:
-							kind === "transfer"
-								? "transfer"
-								: kind === "in"
-									? "inflow"
-									: "outflow",
-						size: "hero",
-					})}
-				>
-					<DirectionIcon kind={kind} size={22} />
-				</span>
-				<span className="text-xs font-semibold tracking-widest text-muted uppercase">
-					Transaction details
-				</span>
+			<span
+				className={transactionIconStyles({
+					tone:
+						kind === "transfer"
+							? "transfer"
+							: kind === "in"
+								? "inflow"
+								: "outflow",
+					size: "hero",
+				})}
+			>
+				<DirectionIcon kind={kind} size={22} />
 			</span>
-		</>
+			<input
+				id={`${edit.formId}-name`}
+				aria-label="Transaction name"
+				name="name"
+				required
+				maxLength={100}
+				value={edit.draft.name}
+				onChange={(event) =>
+					edit.updateDraft({ name: event.target.value }, "name")
+				}
+				readOnly={!canEdit}
+				form={edit.formId}
+				className={transactionControlStyles({ shape: "name" })}
+			/>
+			{planTransaction.frequency !== "once" && (
+				<span
+					title="Recurring transaction"
+					aria-label="Recurring transaction"
+					role="img"
+					className="inline-flex size-9 flex-none items-center justify-center rounded-surface bg-surface-2 text-muted"
+				>
+					<Repeat size={16} aria-hidden="true" />
+				</span>
+			)}
+		</span>
 	);
 	return (
 		<DetailPortal>
@@ -768,40 +757,15 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
+				className="max-sm:m-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none"
 				actions={edit.actions}
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={edit.submit}>
-					<div className="flex items-center gap-3">
-						<input
-							id={`${edit.formId}-name`}
-							aria-label="Transaction name"
-							name="name"
-							required
-							maxLength={100}
-							value={edit.draft.name}
-							onChange={(event) =>
-								edit.updateDraft({ name: event.target.value }, "name")
-							}
-							readOnly={!canEdit}
-							form={edit.formId}
-							className={transactionControlStyles({ shape: "name" })}
-						/>
-						{planTransaction.frequency !== "once" && (
-							<span
-								title="Recurring transaction"
-								aria-label="Recurring transaction"
-								role="img"
-								className="inline-flex size-9 flex-none items-center justify-center rounded-surface bg-surface-2 text-muted"
-							>
-								<Repeat size={16} aria-hidden="true" />
-							</span>
-						)}
-					</div>
-					{showAmount && (
-						<div className="flex items-center gap-4 pt-1 pb-2">
-							<div className="flex min-w-0 flex-1 flex-col gap-1">
+					<div className="flex items-center gap-4 pt-1 pb-2">
+						<div className="flex min-w-0 flex-1 flex-col gap-2">
+							{showAmount && (
 								<span
 									className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
 								>
@@ -837,92 +801,94 @@ export function TransactionDetail({
 										})}
 									/>
 								</span>
+							)}
+							<div className="flex flex-wrap items-center gap-2">
+							{transaction.void ? (
+								<Badge tone="neutral">
+									Did not post
+									<span className="sr-only">bank hold that did not post</span>
+								</Badge>
+							) : transaction.pending ? (
+								<Badge tone="warning">
+									<Clock3 size={10} aria-hidden="true" />
+									Pending
+								</Badge>
+							) : transaction.source === "historical" ? (
+								<Badge tone="success">
+									<Check size={10} aria-hidden="true" />
+									Posted
+								</Badge>
+							) : null}
+							{showExcluded && <Badge tone="warning">Excluded from plan</Badge>}
+							{showShortfall && (
+								<Badge tone="warning">
+									<TriangleAlert size={10} aria-hidden="true" />
+									{shortfallLabel ?? "Shortfall"}
+								</Badge>
+							)}
+							{!planTransaction.enabled &&
+								!transaction.pending &&
+								!showExcluded && <Badge tone="warning">Excluded</Badge>}
+							{planTransaction.amountKnown === false && (
+								<Badge tone="neutral">Calculated</Badge>
+							)}
+							{hasStatusPill && (
+								<span className="text-muted" aria-hidden="true">
+									·
+								</span>
+							)}
+							<span className="text-sm text-muted">{categoryLabel(kind)}</span>
 							</div>
 						</div>
-					)}
-					<div className="mt-3 flex flex-wrap items-center gap-2">
-						{transaction.void ? (
-							<Badge tone="neutral">
-								Did not post
-								<span className="sr-only">bank hold that did not post</span>
-							</Badge>
-						) : transaction.pending ? (
-							<Badge tone="warning">
-								<Clock3 size={10} aria-hidden="true" />
-								Pending
-							</Badge>
-						) : transaction.source === "historical" ? (
-							<Badge tone="success">
-								<Check size={10} aria-hidden="true" />
-								Posted
-							</Badge>
-						) : null}
-						{showExcluded && <Badge tone="warning">Excluded from plan</Badge>}
-						{showShortfall && (
-							<Badge tone="warning">
-								<TriangleAlert size={10} aria-hidden="true" />
-								{shortfallLabel ?? "Shortfall"}
-							</Badge>
-						)}
-						{!planTransaction.enabled &&
-							!transaction.pending &&
-							!showExcluded && <Badge tone="warning">Excluded</Badge>}
-						{planTransaction.amountKnown === false && (
-							<Badge tone="neutral">Calculated</Badge>
-						)}
-						{hasStatusPill && (
-							<span className="text-muted" aria-hidden="true">
-								·
-							</span>
-						)}
-						<span className="text-sm text-muted">{categoryLabel(kind)}</span>
-					</div>
-					{(once || transaction.pending || postedDiffers) && (
-						<div className="mt-5 border-t border-line pt-2">
-							{once && (
-								<MetaRow icon={CalendarDays} label="Transaction date">
-									<input
-										className={transactionControlStyles({ shape: "date" })}
-										id={`${edit.formId}-date`}
-										type="date"
-										name="startDate"
-										required
-										value={edit.draft.startDate}
-										onChange={(event) =>
-											edit.updateDraft(
-												{ startDate: event.target.value },
-												"schedule",
-											)
-										}
-										readOnly={!canEdit}
-									/>
-								</MetaRow>
-							)}
-							{(transaction.pending || postedDiffers) && (
-								<MetaRow icon={CalendarCheck2} label="Date posted">
-									{transaction.pending ? (
-										<span className="text-sm text-muted">Not yet posted</span>
-									) : (
+						{(once || transaction.pending || postedDiffers) && (
+							<div className="flex flex-none flex-col items-end gap-2">
+								{once && (
+									<label className="inline-flex items-center gap-2 text-sm text-muted">
+										Occurred
 										<input
 											className={transactionControlStyles({ shape: "date" })}
-											id={`${edit.formId}-posted`}
+											id={`${edit.formId}-date`}
 											type="date"
-											name="postedDate"
+											name="startDate"
 											required
-											value={edit.draft.postedDate}
+											value={edit.draft.startDate}
 											onChange={(event) =>
 												edit.updateDraft(
-													{ postedDate: event.target.value },
-													"posted",
+													{ startDate: event.target.value },
+													"schedule",
 												)
 											}
 											readOnly={!canEdit}
 										/>
-									)}
-								</MetaRow>
-							)}
-						</div>
-					)}
+									</label>
+								)}
+								{(transaction.pending || postedDiffers) && (
+									<label className="inline-flex items-center gap-2 text-sm text-muted">
+										Posted
+										{transaction.pending ? (
+											<span>Not yet posted</span>
+										) : (
+											<input
+												className={transactionControlStyles({ shape: "date" })}
+												id={`${edit.formId}-posted`}
+												type="date"
+												name="postedDate"
+												required
+												value={edit.draft.postedDate}
+												onChange={(event) =>
+													edit.updateDraft(
+														{ postedDate: event.target.value },
+														"posted",
+													)
+												}
+												readOnly={!canEdit}
+											/>
+										)}
+									</label>
+								)}
+							</div>
+						)}
+					</div>
 					{kind === "transfer" && (
 						<div className="mt-5">
 							<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>
