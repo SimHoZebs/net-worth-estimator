@@ -21,9 +21,6 @@ type resourceConfig struct {
 }
 
 func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
-	if legacy := getenv("NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT"); legacy != "" {
-		return resourceConfig{}, errors.New("PLAN_OWNER_SUBJECT is retired; set NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT to the same verified OIDC subject")
-	}
 	c := resourceConfig{
 		OwnerSubject: getenv("NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT"),
 		ModelID:      getenv("NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL"),
@@ -86,12 +83,10 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 // The subject comes only from a verified identity grant. Casdoor must authorize
 // the derived resource before this boundary provisions any private state.
 //
-// Depends on feat/account-scope-store (DB rekey): the store still keys
-// financial rows by plan ID, so this boundary provisions through
-// EnsurePrivatePlan keyed by the account resource ID plus the canonical
+// Depends on account scope: the store keys financial rows by account ID, so
+// this boundary provisions through EnsureAccount keyed by the canonical
 // account record via EnsureGroupAccount (both derive from ActorKey, so one
-// verified identity never splits). Once the store lane lands EnsureAccount,
-// this resolver calls it directly and the EnsurePrivatePlan bridge goes away.
+// verified identity never splits).
 func accountAccessResolver(database *sqlite.Database, issuer string, resolve func(context.Context, string) (authorization.Scope, error)) func(context.Context, string) (authorization.Scope, error) {
 	return func(ctx context.Context, subject string) (authorization.Scope, error) {
 		scope, err := resolve(ctx, subject)
@@ -103,7 +98,7 @@ func accountAccessResolver(database *sqlite.Database, issuer string, resolve fun
 			return authorization.Scope{}, errors.New("authorization returned an unexpected account")
 		}
 		if subject == "" {
-			exists, err := database.HasPlan(expected.ID)
+			exists, err := database.HasAccount(sqlite.SampleAccountID)
 			if err != nil {
 				return authorization.Scope{}, err
 			}
@@ -114,7 +109,7 @@ func accountAccessResolver(database *sqlite.Database, issuer string, resolve fun
 			if _, err := database.EnsureGroupAccount(issuer, subject); err != nil {
 				return authorization.Scope{}, err
 			}
-			scoped, err := database.EnsurePrivatePlan(expected.ID, authorization.ActorKey(issuer, subject), issuer, subject)
+			scoped, err := database.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject)
 			if err != nil {
 				return authorization.Scope{}, err
 			}
@@ -128,8 +123,7 @@ func accountAccessResolver(database *sqlite.Database, issuer string, resolve fun
 
 var (
 	accountResource  = regexp.MustCompile(`^accounts/[a-f0-9]{64}$`)
-	legacyResource   = regexp.MustCompile(`^plans/[a-f0-9]{64}$`)
-	sampleResourceID = "plans/sample"
+	sampleResourceID = "accounts/sample"
 )
 
 type accountRouterConfig struct {
@@ -156,7 +150,7 @@ func newAccountRouter(database store.Database, config accountRouterConfig) (*acc
 	if database == nil {
 		return nil, errors.New("account routing requires the application database")
 	}
-	if config.PrimaryResourceID != "" && !accountResource.MatchString(config.PrimaryResourceID) && !legacyResource.MatchString(config.PrimaryResourceID) {
+	if config.PrimaryResourceID != "" && !accountResource.MatchString(config.PrimaryResourceID) {
 		return nil, errors.New("primary account requires an explicit private account resource ID")
 	}
 	// Health and static files do not access financial state.
@@ -189,20 +183,30 @@ func (p *accountRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(w, r)
 }
 
+// storeAccountID maps an authorized account resource to the store's account
+// row ID. Private resources (accounts/<hash>) are owned by user:<hash>;
+// the guest sample (accounts/sample) is the synthetic sample account.
+func storeAccountID(resourceID string) string {
+	if resourceID == sampleResourceID {
+		return sqlite.SampleAccountID
+	}
+	return "user:" + strings.TrimPrefix(resourceID, "accounts/")
+}
+
 func (p *accountRouter) handlerFor(resource authorization.Resource) (http.Handler, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.closed {
 		return nil, errors.New("account router is closed")
 	}
-	if !((resource.Kind == "sample" && resource.ID == sampleResourceID) || (resource.Kind == "private" && (accountResource.MatchString(resource.ID) || legacyResource.MatchString(resource.ID)))) {
+	if !((resource.Kind == "sample" && resource.ID == sampleResourceID) || (resource.Kind == "private" && accountResource.MatchString(resource.ID))) {
 		return nil, errors.New("invalid account resource")
 	}
 	if existing, ok := p.opened[resource.ID]; ok {
 		return existing, nil
 	}
 	// Provisioning belongs to the verified authorization boundary, not routing.
-	scoped, err := p.database.Plan(resource.ID)
+	scoped, err := p.database.Account(storeAccountID(resource.ID))
 	if err != nil {
 		return nil, err
 	}

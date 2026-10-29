@@ -47,7 +47,6 @@ func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
 		t.Fatalf("unexpected defaults: %+v %v", c, err)
 	}
 	for key, value := range map[string]string{
-		"NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT":    "alice",
 		"NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT": "*",
 		"NET_WORTH_ESTIMATOR_PLANS_DIR":             "/data/plans",
 		"NET_WORTH_ESTIMATOR_SAMPLE_DB":             "/data/sample.db",
@@ -74,14 +73,16 @@ func TestAccountOwnerSubjectEnvMigration(t *testing.T) {
 	if err != nil || c.OwnerSubject != "alice" {
 		t.Fatalf("new owner var rejected: %+v %v", c, err)
 	}
-	_, err = resourceConfigFromEnv(func(name string) string {
+	// The retired plan owner var is gone entirely: it must not error and
+	// must not provision an owner.
+	c, err = resourceConfigFromEnv(func(name string) string {
 		if name == "NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT" {
 			return "alice"
 		}
 		return ""
 	})
-	if err == nil || !strings.Contains(err.Error(), "NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT") {
-		t.Fatalf("legacy owner var lacks deprecation pointer: %v", err)
+	if err != nil || c.OwnerSubject != "" {
+		t.Fatalf("retired owner var leaked: %+v %v", c, err)
 	}
 }
 
@@ -96,13 +97,13 @@ func TestAccountProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 		name, subject       string
 		permissions         []string
 		fail, wrongResource bool
-		wantPlan            bool
+		wantAccount         bool
 	}{
 		{name: "denied", subject: "denied"},
 		{name: "unknown permission", subject: "unknown-permission", permissions: []string{"other:read"}},
 		{name: "provider unavailable", subject: "unavailable", fail: true},
 		{name: "wrong scope", subject: "wrong", permissions: []string{authorization.Read}, wrongResource: true},
-		{name: "authorized", subject: "new-user", permissions: []string{authorization.Read, authorization.Project, authorization.Write}, wantPlan: true},
+		{name: "authorized", subject: "new-user", permissions: []string{authorization.Read, authorization.Project, authorization.Write}, wantAccount: true},
 		{name: "guest", permissions: []string{authorization.Read, authorization.Project}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -120,15 +121,15 @@ func TestAccountProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 			if (err != nil) != (test.fail || test.wrongResource) {
 				t.Fatalf("resolve error=%v", err)
 			}
-			exists, err := database.HasPlan(authorization.ResourceFor(issuer, test.subject).ID)
-			if err != nil || exists != test.wantPlan {
-				t.Fatalf("plan exists=%v want=%v err=%v", exists, test.wantPlan, err)
+			exists, err := database.HasAccount(authorization.ActorKey(issuer, test.subject))
+			if err != nil || exists != test.wantAccount {
+				t.Fatalf("account exists=%v want=%v err=%v", exists, test.wantAccount, err)
 			}
 			if test.subject == "" && len(scope.Permissions) != 0 {
 				t.Fatalf("unpublished sample received permissions: %+v", scope)
 			}
-			if test.wantPlan {
-				scoped, err := database.Plan(scope.Resource.ID)
+			if test.wantAccount {
+				scoped, err := database.Account(authorization.ActorKey(issuer, test.subject))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -142,10 +143,10 @@ func TestAccountProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 			}
 		})
 	}
-	if exists, err := database.HasPlan(authorization.ResourceFor(issuer, "other-user").ID); err != nil || exists {
-		t.Fatalf("unexpected authorized resource created a plan: exists=%v err=%v", exists, err)
+	if exists, err := database.HasAccount(authorization.ActorKey(issuer, "other-user")); err != nil || exists {
+		t.Fatalf("unexpected authorized resource created an account: exists=%v err=%v", exists, err)
 	}
-	if _, err := database.EnsureSamplePlan(); err != nil {
+	if _, err := database.EnsureSampleAccount(); err != nil {
 		t.Fatal(err)
 	}
 	resolve := accountAccessResolver(database, issuer, func(_ context.Context, subject string) (authorization.Scope, error) {
@@ -170,18 +171,17 @@ func TestOwnerSyncStoreSkipsMissingAccount(t *testing.T) {
 	if scoped, err := ownerSyncStore(database, issuer, subject); err != nil || scoped != nil {
 		t.Fatalf("missing account = %v, %v; want nil, nil", scoped, err)
 	}
-	resource := authorization.ResourceFor(issuer, subject)
-	if exists, err := database.HasPlan(resource.ID); err != nil || exists {
+	if exists, err := database.HasAccount(authorization.ActorKey(issuer, subject)); err != nil || exists {
 		t.Fatalf("startup provisioned an owner: %v", err)
 	}
-	if _, err := database.EnsurePrivatePlan(resource.ID, resource.Owner, issuer, subject); err != nil {
+	if _, err := database.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ownerSyncStore(database, issuer, subject); err != nil {
 		t.Fatalf("existing owner rejected: %v", err)
 	}
 	if scoped, err := ownerSyncStore(database, issuer, "someone-else"); err != nil || scoped != nil {
-		t.Fatalf("unrelated subject without a plan = %v, %v; want nil, nil", scoped, err)
+		t.Fatalf("unrelated subject without an account = %v, %v; want nil, nil", scoped, err)
 	}
 }
 
@@ -193,7 +193,7 @@ func TestAccountRouterIsolatesAccountsFromSampleAndEachOther(t *testing.T) {
 	defer database.Close()
 	const issuer = "https://identity.test"
 	ownerID := authorization.ResourceFor(issuer, "a").ID
-	owner, err := database.EnsurePrivatePlan(ownerID, authorization.ActorKey(issuer, "a"), issuer, "a")
+	owner, err := database.EnsureAccount(authorization.ActorKey(issuer, "a"), issuer, "a")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestAccountRouterIsolatesAccountsFromSampleAndEachOther(t *testing.T) {
 	if _, err := owner.CreateAccount(types.Account{ID: "primary", Name: "Private owner checking", Kind: "cash", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.EnsureSamplePlan(); err != nil {
+	if _, err := database.EnsureSampleAccount(); err != nil {
 		t.Fatal(err)
 	}
 	router, err := newAccountRouter(database, accountRouterConfig{PrimaryResourceID: ownerID})
@@ -211,8 +211,7 @@ func TestAccountRouterIsolatesAccountsFromSampleAndEachOther(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer router.Close()
-	otherID := authorization.ResourceFor(issuer, "b").ID
-	otherStore, err := database.EnsurePrivatePlan(otherID, authorization.ActorKey(issuer, "b"), issuer, "b")
+	otherStore, err := database.EnsureAccount(authorization.ActorKey(issuer, "b"), issuer, "b")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +255,7 @@ func TestAccountRouterIsolatesAccountsFromSampleAndEachOther(t *testing.T) {
 	if w := post(t, router, "GET", "/v1/financial-model", ""); w.Code != 403 {
 		t.Fatalf("unverified account routing=%d", w.Code)
 	}
-	bad, err := newAccountRouter(database, accountRouterConfig{PrimaryResourceID: "plans/sample"})
+	bad, err := newAccountRouter(database, accountRouterConfig{PrimaryResourceID: "accounts/sample"})
 	if err == nil {
 		bad.Close()
 		t.Fatal("sample can own server Bridge credentials")
@@ -271,14 +270,14 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerAccount(t *testing.T) {
 	defer database.Close()
 	const issuer = "https://identity.test"
 	ownerID := authorization.ResourceFor(issuer, "a").ID
-	ownerStore, err := database.EnsurePrivatePlan(ownerID, authorization.ActorKey(issuer, "a"), issuer, "a")
+	ownerStore, err := database.EnsureAccount(authorization.ActorKey(issuer, "a"), issuer, "a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.EnsurePrivatePlan(authorization.ResourceFor(issuer, "b").ID, authorization.ActorKey(issuer, "b"), issuer, "b"); err != nil {
+	if _, err := database.EnsureAccount(authorization.ActorKey(issuer, "b"), issuer, "b"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.EnsureSamplePlan(); err != nil {
+	if _, err := database.EnsureSampleAccount(); err != nil {
 		t.Fatal(err)
 	}
 	router, err := newAccountRouter(database, accountRouterConfig{

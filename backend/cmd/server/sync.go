@@ -23,12 +23,12 @@ func ownerSyncStore(database *sqlite.Database, issuer, subject string) (store.St
 	if subject == "" {
 		return nil, nil
 	}
-	accountID := authorization.ResourceFor(issuer, subject).ID
-	exists, err := database.HasPlan(accountID)
+	accountID := authorization.ActorKey(issuer, subject)
+	exists, err := database.HasAccount(accountID)
 	if err != nil || !exists {
 		return nil, err
 	}
-	return database.Plan(accountID)
+	return database.Account(accountID)
 }
 
 // configureSync builds the SimpleFIN runner on the owner account's scoped
@@ -62,7 +62,7 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 		log.Fatalf("invalid simplefin rate-limit cooldown: %v", err)
 	}
 	if database == nil {
-		log.Print("simplefin sync is not configured: no owner plan provisioned yet")
+		log.Print("simplefin sync is not configured: no owner account provisioned yet")
 		return nil, func() {}
 	}
 	config := simplefin.Config{

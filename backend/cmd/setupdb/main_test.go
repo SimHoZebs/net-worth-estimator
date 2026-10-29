@@ -38,12 +38,12 @@ func TestSetupCreatesParentAndSupportsRepeatProvisioning(t *testing.T) {
 			t.Fatal(err)
 		}
 		if attempt == 0 {
-			_, err = db.EnsurePrivatePlan("plans/owner", "owner", "https://issuer.invalid", "owner")
+			_, err = db.EnsureAccount("owner", "https://issuer.invalid", "owner")
 		} else {
 			var present bool
-			present, err = db.HasPlan("plans/owner")
+			present, err = db.HasAccount("owner")
 			if err == nil && !present {
-				t.Error("repeat setup lost existing plan")
+				t.Error("repeat setup lost existing account")
 			}
 		}
 		if closeErr := db.Close(); closeErr != nil {
