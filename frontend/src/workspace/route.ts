@@ -5,7 +5,7 @@ import {
 	SAFE_SPENDING_DETAIL_TABS,
 	type SafeSpendingDetailTab,
 } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { LEGACY_PAGES, pages, type Page } from "./navigation.ts";
+import { pages, type Page } from "./navigation.ts";
 
 // URL-driven overlays. The hash carries the page plus at most one overlay:
 // `#accounts` stays the accounts page, `#accounts/everyday-checking` opens
@@ -258,9 +258,7 @@ export function parseHash(hash: string): WorkspaceRoute {
 	const [head, ...rest] = segments as [string, ...string[]];
 	const page: Page | null = pages.some((item) => item.id === head)
 		? (head as Page)
-		: Object.hasOwn(LEGACY_PAGES, head)
-			? (LEGACY_PAGES[head] ?? null)
-			: null;
+		: null;
 	if (!page) return { page: "outlook", overlay: { type: "invalid" } };
 	return { page, overlay: parseOverlaySegments(rest, page) };
 }

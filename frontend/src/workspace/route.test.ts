@@ -78,7 +78,7 @@ const plan = {
 };
 
 describe("parseHash", () => {
-	test("page-only hashes keep their legacy meaning", () => {
+	test("page-only hashes resolve to their page", () => {
 		expect(parseHash("")).toEqual({ page: "outlook", overlay: null });
 		expect(parseHash("#")).toEqual({ page: "outlook", overlay: null });
 		expect(parseHash("#accounts")).toEqual({
@@ -89,12 +89,18 @@ describe("parseHash", () => {
 			page: "accounts",
 			overlay: null,
 		});
-		expect(parseHash("#plan")).toEqual({ page: "accounts", overlay: null });
-		expect(parseHash("#goals")).toEqual({
-			page: "evaluations",
-			overlay: null,
+		expect(parseHash("#plan")).toEqual({
+			page: "outlook",
+			overlay: { type: "invalid" },
 		});
-		expect(parseHash("#account")).toEqual({ page: "sources", overlay: null });
+		expect(parseHash("#goals")).toEqual({
+			page: "outlook",
+			overlay: { type: "invalid" },
+		});
+		expect(parseHash("#account")).toEqual({
+			page: "outlook",
+			overlay: { type: "invalid" },
+		});
 	});
 
 	test("planned purchases has a direct page route", () => {

@@ -218,7 +218,7 @@ export async function saveWorkspace(): Promise<boolean> {
 			const saved = useWorkspaceStore.getState().acknowledgeSave(draft);
 			if (saved) {
 				dismissKey("workspace");
-				notifySuccess("workspace-notice", "Plan saved.");
+				notifySuccess("workspace-notice", "Changes saved.");
 			}
 			return saved;
 		})) === true

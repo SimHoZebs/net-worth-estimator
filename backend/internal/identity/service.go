@@ -198,9 +198,9 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			if !slices.Contains(scope.Permissions, requestAction(r)) {
 				if p.Subject == "" {
 					w.Header().Set("WWW-Authenticate", "Session")
-					failure(w, 401, "Sign in to edit your own plan.")
+					failure(w, 401, "Sign in to edit your own account.")
 				} else {
-					failure(w, 403, "This action is not permitted on this plan.")
+					failure(w, 403, "This action is not permitted on this account.")
 				}
 				return
 			}

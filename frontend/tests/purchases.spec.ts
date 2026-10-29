@@ -13,7 +13,7 @@ test.beforeEach(async () => {
 async function openPurchases(page: Page) {
 	await page.goto("/#purchases");
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Plan your purchases" }),
+		page.getByRole("heading", { level: 1, name: "Planned purchases" }),
 	).toBeVisible();
 }
 
@@ -40,7 +40,7 @@ test("planned purchases has a navigation entry, direct route, and browser histor
 		page.getByRole("link", { name: "Planned purchases", exact: true }),
 	).toHaveAttribute("aria-current", "page");
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Plan your purchases" }),
+		page.getByRole("heading", { level: 1, name: "Planned purchases" }),
 	).toBeFocused();
 	await expect(page).toHaveTitle("Planned purchases · Waypoint");
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
@@ -255,7 +255,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
 	).toHaveCount(2);
 	await page.getByRole("button", { name: "Save changes", exact: true }).click();
-	await expect(page.getByText("Plan saved.")).toBeVisible();
+	await expect(page.getByText("Changes saved.")).toBeVisible();
 	await page.reload();
 	await expect(queue.locator("li").first()).toContainText("Chair");
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
