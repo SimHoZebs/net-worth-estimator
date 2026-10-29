@@ -130,10 +130,13 @@ The pre-commit hook verifies the backend packages containing staged Go files, pl
 
 ## Shared Database Isolation
 
-The application stores all plans and application identity state in one SQLite
-database. Isolation tests must use at least two plans in that same physical file,
+The application stores all account scopes and application identity state in one SQLite
+database. Isolation tests must use at least two accounts in that same physical file,
 with identical entity IDs, preset names, and upstream sync keys. Separate fixture
-files alone do not prove row-level isolation.
+files alone do not prove row-level isolation. `TestAccountScopeIsolationMatrix`
+adds the matrix: identical IDs/names/sync keys coexist without leaking, `Clear`
+on one account preserves the other account and the sample, and owner writes never
+leak into the sample scope.
 
 ```bash
 backend/scripts/verify.sh ./internal/store
@@ -145,6 +148,10 @@ backend/scripts/verify.sh ./internal/api
 Test fixtures provision through `store.SetupDatabase` before runtime opens. Startup
 regressions verify that missing, empty, and incompatible databases create no files
 or schema. Identity initialization must also reject incomplete tables without repair.
+Account-scope migration is covered by `TestSetupMigratesPlanScopeToAccountScope`:
+a legacy plan-scoped fixture migrates through setup and the backfill
+(`plans/<hash>` rows to their owner's `user:<hash>` storage scope, sample to `sample`) is verified
+before any row test runs.
 
 ## Casdoor Authentication
 
@@ -159,14 +166,14 @@ node --test auth/casdoor/*.test.mjs
 ```
 
 `scripts/smoke-compose.sh` checks the guest sample on the authenticated stack.
-Guests see only a separate sample.
+Guests see only the separate `sample` scope.
 Run its request-contract regressions with `node --test scripts/smoke-compose.test.mjs`.
 Run the real-Nginx provider-header regression with
 `NGINX_TEST_IMAGE=nginx:alpine node --test scripts/nginx-provider.test.mjs`.
 The test requires an available local image and Docker. It runs without root
 inside the container and checks both the corrected buffer and default-buffer 502.
 Without `NGINX_TEST_IMAGE`, it skips the Docker-only test.
-Authenticated requests use the account's private plan and assert its resource ID.
+Authenticated requests use the account's private scope and assert its `plans/<hash>` resource ID. Storage lookups normalize legacy and account forms to the same scope.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
 passkey, restart, revocation, refresh, and administrator recovery checks. The
@@ -384,10 +391,10 @@ A small seeded run should terminate with one `result` event. It may include `pro
 
 Exercise each row through the real identity boundary against disposable state.
 
-| Access                                        | Plan reads/projections                      | Canonical writes and manual sync                  |
+| Access                                        | Scope reads/projections                     | Canonical writes and manual sync                  |
 | --------------------------------------------- | ------------------------------------------- | ------------------------------------------------- |
 | Guest, sample resource                        | allowed                                     | 401                                               |
-| Signed-in owner, own resource                 | allowed                                     | allowed, subject to validation/sync configuration |
+| Signed-in owner, own resource (`plans/<hash>`) | allowed                                     | allowed, subject to validation/sync configuration |
 | Signed-in owner, another resource             | 409 for stale resource assertion            | rejected                                          |
 | Owner without write permission                | allowed when read/project permissions exist | 403                                               |
 | Owner with global read-only enabled           | allowed                                     | 403                                               |

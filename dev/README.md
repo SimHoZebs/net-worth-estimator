@@ -109,10 +109,13 @@ financial data before publication. The copy omits private projection history,
 Bridge links, upstream sync keys, sync times, migration history, and the source
 path. Later private edits do not change the sample.
 
-Use verified account IDs (`user:<hash>`) for `TARGET_ACCOUNT` and `SOURCE_ACCOUNT`. The source must
+Pass the storage scope (`user:<hash>`) or the legacy plan form (`plans/<hash>`)
+for `TARGET_ACCOUNT` and `SOURCE_ACCOUNT`; both resolve to the same stored
+scope. The source must
 use the shared application schema; plan-scoped snapshots migrate on setup. Legacy backups are unsupported. The commands
 require explicit selection because one source snapshot can contain several owners.
-Legacy `--plan`/`--source-plan` flags and `plans/*` values remain accepted aliases.
+Legacy `--plan`/`--source-plan` flags remain accepted aliases. Session and
+`Waypoint-Resource` wire IDs stay in the `plans/*` form.
 
 ## Access and state
 

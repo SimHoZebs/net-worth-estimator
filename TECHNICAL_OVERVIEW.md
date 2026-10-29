@@ -35,19 +35,26 @@ with SQLite and filesystem adapters, private references, and durable cleanup
 in `backend/internal/store/blob_storage.go`).
 
 `store.Database` owns the shared connection. Each financial store holds one
-immutable plan ID. The plan router creates that scope only after Casdoor verifies
+immutable account ID. The plan router creates that scope only after Casdoor verifies
 access. `app_accounts` identifies users by immutable issuer and subject. Private
-`plans` rows reference their owner. Financial `accounts` remain model entities.
+scopes are keyed by their owner's application account ID. Financial `accounts`
+remain model entities.
 
-Every financial table includes `plan_id`. Entity IDs and unique names can repeat
-between plans. Relational references use composite plan/entity keys. JSON model
+Every financial table includes `account_id`. Entity IDs and unique names can repeat
+between accounts. Relational references use composite account/entity keys. JSON model
 references validate against the scoped document. Imports, deletes, ordering,
-sync state, default presets, and artifact eviction operate within one plan.
+sync state, default presets, and artifact eviction operate within one account scope.
+Model-account references use distinct columns (`model_account_id`,
+`source_account_id`, `bridge_account_id`) so the scope column never collides
+with a financial reference. Storage lookups normalize `plans/<hash>` to the
+same owner's `user:<hash>` scope (`plans/sample` to `sample`); wire session
+and resource IDs keep the `plans/*` form.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
 Casdoor retains its own external provider database. Legacy per-plan files are
-unsupported.
+unsupported. Plan-scoped databases migrate to account scope on setup; see
+the shared-database guide.
 
 ## 2. HTTP Contracts
 
@@ -211,7 +218,7 @@ The kill switch rejects those writes with 403. Guests can read and project only 
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`Database.Plan` returns the scoped interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior. `store.Open` remains an isolated fixture helper, not the runtime constructor.
+`Database.Account` returns the scoped interface, not the SQLite implementation. `Plan`, `HasPlan`, and the `Ensure*Plan` variants remain as compatibility wrappers that normalize legacy `plans/*` IDs. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior. `store.Open` remains an isolated fixture helper, not the runtime constructor.
 
 ### SQLite setup
 
@@ -233,8 +240,10 @@ Identity initialization also validates its tables without DDL. SQLite can create
 normal WAL/SHM sidecars during operation.
 
 Schema changes are transactional and forward-only. Completed upgrades are recorded
-in `schema_migrations`. Legacy unscoped databases are rejected. Restore a
-compatible database backup instead of downgrading.
+in `schema_migrations`. Migration drops the retired `shared-plans-v1` marker, so a
+migrated database claims exactly `shared-accounts-v1`. Legacy unscoped
+databases are rejected. Restore a compatible database backup instead of
+downgrading.
 
 The current schema stores:
 
@@ -245,7 +254,7 @@ The current schema stores:
 | `identity_logout_marks`  | global revocation markers that block delayed callbacks and stale grants                                       |
 | `identity_logout_tokens` | global signed logout token replay records                                                                     |
 | `app_accounts`           | verified application account identities, unique by issuer and subject                                         |
-| `plans`                  | private owner relationship or explicitly published guest sample                                               |
+| _(retired `plans` table)_ | removed by the account-scope migration; scopes are keyed by `app_accounts` IDs |
 | `model_metadata`         | source path and document-present flag                                                                         |
 | `accounts`               | ordered account definitions                                                                                   |
 | `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |

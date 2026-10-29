@@ -81,8 +81,8 @@ destinations. Native loopback development can use the API's bounded introspectio
 fallback. Keep the public OIDC issuer unchanged when private routing is used.
 
 `bootstrap.json` records the provider's generated subject. Application permissions
-and per-account plans follow [the authentication contract](../../docs/authentication.md).
-Branding does not change permissions, account policy, or plan ownership.
+and per-account scopes follow [the authentication contract](../../docs/authentication.md).
+Branding does not change permissions, account policy, or account-scope ownership.
 
 Application sign-in sends the browser to Casdoor. `sign up now` opens Casdoor's
 username, display-name, and password form. Signup returns through the existing
@@ -112,7 +112,7 @@ go run ./backend/cmd/nwe api POST /v1/sync/simplefin --data @trigger.json
 
 `login` prints a verification URL plus a user code. Approve it in the
 browser. The CLI caches tokens owner-only (`0600`) and refreshes them
-without further approval. Every request carries the cached plan resource,
+without further approval. Every request carries the cached account resource,
 so `Waypoint-Resource` checks and `plan:write` enforcement behave exactly
 like browser traffic. `logout` wipes the local cache; issued tokens expire
 on their own.
@@ -130,8 +130,8 @@ revoked from the account page; otherwise they expire on their own.
 
 Fresh initialization includes the `waypoint/plan-access` Casbin model, the
 plan-owner and guest roles, and one dedicated same-database policy adapter.
-Casdoor evaluates `plan:read`, `plan:project`, and `plan:write` on plan resources.
-Owners receive actions on their private plan automatically. Guests receive only
+Casdoor evaluates `plan:read`, `plan:project`, and `plan:write` on account resources.
+Owners receive actions on their private plan automatically (storage scope `user:<hash>`). Guests receive only
 read/project actions on a separate sample. Signup needs no role choice or
 permission-object write.
 
@@ -149,7 +149,7 @@ objects only. It refuses drift, extra model permissions, unknown versions,
 and mismatched application identity. It never overwrites operator policies.
 The API fails closed until the permission model resolves.
 
-The application still owns plan storage isolation. See the
+The application still owns account storage isolation. See the
 [authorization contract](../../docs/authorization.md) for existing-data ownership,
 sample publication, per-account stores, and resource-header checks.
 
