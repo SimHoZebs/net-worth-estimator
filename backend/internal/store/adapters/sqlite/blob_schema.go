@@ -63,7 +63,7 @@ func migrateInlineReceiptImages(tx *sql.Tx, defaultSQLite bool) error {
 	if _, err := tx.Exec(receiptSchema); err != nil {
 		return err
 	}
-	rows, err = tx.Query(`SELECT account_id,id FROM receipts_inline`)
+	rows, err = tx.Query(`SELECT user_id,id FROM receipts_inline`)
 	if err != nil {
 		return err
 	}
@@ -90,11 +90,11 @@ func migrateInlineReceiptImages(tx *sql.Tx, defaultSQLite bool) error {
 		if _, err := tx.Exec(`INSERT INTO blob_objects(key,state,expires_at) VALUES (?,'live',0)`, key); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO blob_data(key,data) SELECT ?,image FROM receipts_inline WHERE account_id=? AND id=?`, key, id.user, id.id); err != nil {
+		if _, err := tx.Exec(`INSERT INTO blob_data(key,data) SELECT ?,image FROM receipts_inline WHERE user_id=? AND id=?`, key, id.user, id.id); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload)
-			SELECT account_id,id,posting_id,digest,size,?,revision,payload FROM receipts_inline WHERE account_id=? AND id=?`, key, id.user, id.id); err != nil {
+			SELECT user_id,id,posting_id,digest,size,?,revision,payload FROM receipts_inline WHERE user_id=? AND id=?`, key, id.user, id.id); err != nil {
 			return err
 		}
 	}
