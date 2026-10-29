@@ -1,5 +1,13 @@
-// Package authorization obtains plan permissions from Casdoor's built-in Casbin API.
+// Package authorization obtains account permissions from Casdoor's built-in Casbin API.
 // It never evaluates or caches authorization policies in the application process.
+//
+// Account scope: a verified identity owns one account resource. The resource ID
+// derives from the exact OIDC issuer and immutable subject, not the display
+// name, username, or browser input. Action strings stay plan:* so the Casdoor
+// model (waypoint/plan-access) needs no migration; only permission resource
+// values change from plans/* to accounts/*. The guest sample stays the global
+// read-only plans/sample row until the feat/account-scope-store DB rekey moves
+// it to account storage.
 package authorization
 
 import (
@@ -45,13 +53,19 @@ func ActorKey(issuer, subject string) string {
 }
 
 // ResourceFor derives routing metadata exclusively from a verified identity.
-// Callers must never decode Resource.Owner from browser input.
+// Private accounts use accounts/<opaque-id>; the guest uses the global
+// read-only sample. Callers must never decode Resource.Owner from browser
+// input.
+//
+// Casdoor migration: permission resources must cover accounts/* (seed includes
+// legacy plans/* until the feat/account-scope-store DB rekey lands and old
+// rows migrate). Action strings are unchanged.
 func ResourceFor(issuer, subject string) Resource {
 	if subject == "" {
 		return Resource{ID: "plans/sample", Kind: "sample"}
 	}
 	actor := ActorKey(issuer, subject)
-	return Resource{ID: "plans/" + strings.TrimPrefix(actor, "user:"), Kind: "private", Owner: actor}
+	return Resource{ID: "accounts/" + strings.TrimPrefix(actor, "user:"), Kind: "private", Owner: actor}
 }
 
 func (r Resource) valid() bool {
@@ -63,5 +77,10 @@ func (r Resource) valid() bool {
 	}
 	hash := strings.TrimPrefix(r.Owner, "user:")
 	decoded, err := hex.DecodeString(hash)
-	return err == nil && hex.EncodeToString(decoded) == hash && r.ID == "plans/"+hash
+	if err != nil || hex.EncodeToString(decoded) != hash {
+		return false
+	}
+	// Legacy plans/<hash> stays valid until the store rekey migrates old
+	// rows to accounts/<hash>. ResourceFor never returns the legacy form.
+	return r.ID == "accounts/"+hash || r.ID == "plans/"+hash
 }

@@ -1,4 +1,4 @@
-// Command refreshplan replaces one plan's financial rows in an application
+// Command refreshplan replaces one account's financial rows in an application
 // database. It never replaces the database file or copies identity records.
 // Stop the application and take a SQLite backup before this offline operation.
 package main
@@ -35,8 +35,8 @@ func main() {
 	var sample bool
 	flag.StringVar(&target, "db", "", "existing application database (application must be stopped)")
 	flag.StringVar(&source, "source", "", "application database snapshot")
-	flag.StringVar(&sourcePlan, "source-plan", "", "explicit source plan ID")
-	flag.StringVar(&targetPlan, "plan", "", "existing destination private plan ID")
+	flag.StringVar(&sourcePlan, "source-plan", "", "explicit source account ID")
+	flag.StringVar(&targetPlan, "plan", "", "existing destination private account ID")
 	flag.BoolVar(&sample, "sample", false, "publish canonical financial data to plans/sample")
 	flag.StringVar(&initIssuer, "init-issuer", "", "initialize a NEW database for this verified dev issuer")
 	flag.StringVar(&initSubject, "init-subject", "", "initialize a NEW database for this verified dev subject")
@@ -68,7 +68,7 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 		}
 		targetPlan = "plans/sample"
 	} else if targetPlan == "" || targetPlan == "plans/sample" {
-		return errors.New("--plan must name an existing private plan; use --sample to publish public data")
+		return errors.New("--plan must name an existing private account; use --sample to publish public data")
 	}
 	for _, path := range []string{target, source} {
 		info, err := os.Stat(path)
@@ -104,10 +104,10 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	}
 	var present int
 	if err := db.SQL().QueryRow("SELECT document_present FROM incoming.model_metadata WHERE plan_id=? AND id=1", sourcePlan).Scan(&present); err != nil {
-		return fmt.Errorf("source plan must contain a current financial model: %w", err)
+		return fmt.Errorf("source account must contain a current financial model: %w", err)
 	}
 	if present != 1 {
-		return errors.New("source plan has no financial model")
+		return errors.New("source account has no financial model")
 	}
 	var receipts *sqlite.ReceiptCopy
 	if !sample {
@@ -143,14 +143,14 @@ func refresh(target, source, sourcePlan, targetPlan string, sample bool) error {
 	var kind string
 	var owner sql.NullString
 	if err := tx.QueryRow("SELECT kind, owner_account_id FROM plans WHERE id=?", targetPlan).Scan(&kind, &owner); err != nil {
-		return fmt.Errorf("destination plan must already exist: %w", err)
+		return fmt.Errorf("destination account must already exist: %w", err)
 	}
 	if sample {
 		if kind != "sample" || owner.Valid {
-			return errors.New("sample plan ownership conflict")
+			return errors.New("sample account ownership conflict")
 		}
 	} else if kind != "private" {
-		return errors.New("destination must be a private plan")
+		return errors.New("destination must be a private account")
 	}
 	// Child tables precede parents during deletion. Deferred checks also permit
 	// future references between canonical tables within the same transaction.
