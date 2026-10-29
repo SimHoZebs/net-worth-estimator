@@ -1,4 +1,4 @@
-// Real-provider contract: owner, guest sample, and second account in one DB.
+// Real-provider contract: owner, guest sample, and second user in one DB.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -82,7 +82,7 @@ const env = {
   PORT: origin.port || "80",
   NET_WORTH_ESTIMATOR_DB: primaryDB,
   NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, "frontend/dist"),
-  NET_WORTH_ESTIMATOR_ACCOUNT_OWNER_SUBJECT: subject,
+  NET_WORTH_ESTIMATOR_OWNER_SUBJECT: subject,
   NET_WORTH_ESTIMATOR_READ_ONLY: "",
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
 };
@@ -168,7 +168,7 @@ try {
   const ownerPage = await login(owner);
   const own = await session(owner);
   assert.equal(own.user.subject, subject);
-  assert.ok(own.resource.permissions.includes("account:write"));
+  assert.ok(own.resource.permissions.includes("user:write"));
   assert.equal(own.resource.kind, "private");
   const created = await request(owner, own, "POST", "/v1/accounts", {
     id: "owner-checking",
@@ -214,7 +214,7 @@ try {
   await snapshotFile(primaryDB, approvedSnapshot);
   const publish = spawn(
     publisher,
-    ["--db", primaryDB, "--source", approvedSnapshot, "--source-account", own.resource.id, "--sample"],
+    ["--db", primaryDB, "--source", approvedSnapshot, "--source-user", own.resource.id, "--sample"],
     { stdio: "inherit" },
   );
   assert.equal((await once(publish, "exit"))[0], 0, "Sample publication failed");
@@ -292,7 +292,7 @@ try {
   const secondPage = await login(second, true);
   const other = await session(second);
   assert.equal(other.allowed, true);
-  assert.ok(other.resource.permissions.includes("account:write"));
+  assert.ok(other.resource.permissions.includes("user:write"));
   assert.notEqual(other.resource.id, own.resource.id);
   const blank = (await (await request(second, other, "GET", "/v1/financial-model")).json())
     .document;
@@ -340,7 +340,7 @@ try {
   assert.equal(
     (
       await request(second, other, "PATCH", "/v1/accounts/owner-checking", {
-        name: "Cross-account attempt",
+        name: "Cross-user attempt",
         kind: "cash",
         enabled: true,
       })
@@ -354,14 +354,14 @@ try {
   );
   const shared = new DatabaseSync(primaryDB, { readOnly: true });
   try {
-    const accounts = shared.prepare("SELECT account_id, id FROM accounts ORDER BY account_id, id").all();
+    const users = shared.prepare("SELECT user_id, id FROM accounts ORDER BY user_id, id").all();
     assert.equal(
-      new Set(accounts.map((row) => row.account_id)).size,
+      new Set(users.map((row) => row.user_id)).size,
       3,
-      "Owner, sample, and second account must share one database",
+      "Owner, sample, and second user must share one database",
     );
     assert.deepEqual(
-      accounts.filter((row) => row.account_id === sample.resource.id).map((row) => row.id),
+      users.filter((row) => row.user_id === sample.resource.id).map((row) => row.id),
       ["owner-checking"],
     );
     assert.ok(

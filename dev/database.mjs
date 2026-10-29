@@ -18,7 +18,7 @@ export function validateSnapshot(path) {
       .all()
       .some((column) => column.name === "account_id");
     if (scoped) {
-      // An empty application database is valid. Account ownership is separate
+      // An empty application database is valid. User ownership is separate
       // from financial document presence, and identity tables share this backup.
       db.prepare("SELECT id FROM app_accounts LIMIT 1").all();
       return "application";

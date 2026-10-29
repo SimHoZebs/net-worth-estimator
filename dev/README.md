@@ -8,7 +8,7 @@ Receipt extraction uses a local mock adapter with no cloud credentials or
 external calls. Upload the [synthetic sample](../backend/internal/receipts/adapters/mock/testdata/market.png)
 to a saved expense to exercise extraction. Other images support manual review.
 See [receipt setup and source contracts](../docs/receipts.md). Production snapshots
-and private account refreshes now include receipt images and review data.
+and private user refreshes now include receipt images and review data.
 
 ## One-time setup
 
@@ -22,20 +22,20 @@ Requires Docker Compose 5.0+ and Node 24+. The data commands use
 Setup generates private credentials, initializes Casdoor, and snapshots the
 stopped production database. Stop the production container first so the file
 copies cleanly. Use `setup --from /absolute/path/backup.db` instead
-to start from an existing shared-schema backup. Fresh setup copies one selected
-financial account into the bootstrap dev account. It excludes production identity
-records and other users' accounts. It starts Casdoor only if identity initialization
+to start from an existing shared-schema backup. Fresh setup copies the selected
+financial data into the bootstrap dev user. It excludes production identity
+records and other users. It starts Casdoor only if identity initialization
 is required. It does not start the API or frontend.
 
 Database provisioning occurs in this explicit setup workflow. Daily API startup
 requires the existing complete schema and never creates or repairs a database.
 
-If the source contains several private accounts, supply `--source-account "$SOURCE_ACCOUNT"`.
-If the source contains exactly one private account, setup selects it automatically.
+If the source contains several private users, supply `--source-user "$SOURCE_USER"`.
+If the source contains exactly one private user, setup selects it automatically.
 Legacy files are unsupported.
 
 For an existing dev stack, run the same setup command once. It preserves saved
-credentials, issuer URLs, account ownership, financial data, and sessions. Legacy dev
+credentials, issuer URLs, user ownership, financial data, and sessions. Legacy dev
 databases are unsupported; delete the dev database and run setup again. Setup
 exports runtime settings to the ignored `.env.dev` file without restarting services.
 
@@ -91,44 +91,44 @@ It does not build images or change production data. Without --from, the source
 is the production container: stop it first so the file copies cleanly.
 
 ```bash
-./scripts/dev refresh-db --account "$TARGET_ACCOUNT" --source-account "$SOURCE_ACCOUNT"
-./scripts/dev refresh-db --account "$TARGET_ACCOUNT" --source-account "$SOURCE_ACCOUNT" --from /absolute/path/backup.db
-./scripts/dev publish-sample --source-account "$SOURCE_ACCOUNT" --from /absolute/path/approved-snapshot.db
+./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
+./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
+./scripts/dev publish-sample --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
 ```
 
 `refresh-db` backs up the shared application database under `tmp/dev/backups/`.
-It replaces only the explicitly selected private account. It preserves identities,
-passkeys, application sessions, grants, logout records, and other accounts.
+It replaces only the explicitly selected private user. It preserves identities,
+passkeys, application sessions, grants, logout records, and other users.
 `--from` selects a source for that operation. Plain Compose startup never refreshes data.
 
-`publish-sample` publishes a snapshot as `accounts/sample` in the shared application
-database. Without `--from`, it reads the selected account from the current dev database. Approve the exact
+`publish-sample` publishes a snapshot as `users/sample` in the shared application
+database. Without `--from`, it reads the selected user from the current dev database. Approve the exact
 financial data before publication. The copy omits private projection history,
 Bridge links, upstream sync keys, sync times, migration history, and the source
 path. Later private edits do not change the sample.
 
-Use verified resource IDs for `TARGET_ACCOUNT` and `SOURCE_ACCOUNT`. The source must
+Use verified resource IDs for `TARGET_USER` and `SOURCE_USER`. The source must
 use the shared application schema. Legacy backups are unsupported. The commands
 require explicit selection because one source snapshot can contain several owners.
 
 ## Access and state
 
-Casdoor grants access to each account's private account. Signup needs no role choice
+Casdoor grants access to each user's private data. Signup needs no role choice
 or manual grant. Guests can read and project only the separate sample. Account
 controls appear above sidebar navigation.
 
-One shared application database holds every private account, the published sample,
+One shared application database holds every private user, the published sample,
 and application sessions. The verified `ownerSubject` in `tmp/dev/config.json`
-selects the account for server-level Bridge credentials. Dev keeps sync disabled.
+selects the user for server-level Bridge credentials. Dev keeps sync disabled.
 Fresh setup assigns the bootstrap
-account. Other accounts receive their own blank plan in the same database.
+user. Other users receive their own blank plan in the same database.
 
 Back up `.env.dev` and `tmp/dev/` to retain the full dev state. Files use `0600`,
 and private directories use `0700`. Compose `down` retains the bind-mounted data.
 Existing Casdoor instances require the reviewed permission objects described in
 [the authorization contract](../docs/authorization.md).
 
-Legacy per-account databases are unsupported. Runtime startup does not merge
+Legacy per-user databases are unsupported. Runtime startup does not merge
 files or infer ownership. Casdoor's external state remains separate from the
 shared application database.
 

@@ -22,14 +22,14 @@ export async function main(args) {
   const { values, positionals } = parseMainArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-account SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N] | refresh-db --account ACCOUNT_ID --source-account SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --source-account SOURCE_ID [--from approved-app.db] [--slot NAME] | ps-all",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | ps-all",
     );
     return;
   }
   const [command, ...rest] = positionals;
   if (command === "grant")
     throw new Error(
-      "Access is automatic for each account's own data. Casdoor manages resource permissions; no global editor grant is needed.",
+      "Access is automatic for each user's own data. Casdoor manages resource permissions; no global editor grant is needed.",
     );
   const run = commands[command];
   if (!run)
