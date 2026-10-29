@@ -19,9 +19,9 @@ async function smoke(t, finalEvent = "result", readiness = 200) {
       return send(200, {
         enabled: true,
         allowed: true,
-        resource: { id: "accounts/sample", kind: "sample" },
+        resource: { id: "users/sample", kind: "sample" },
       });
-    if (request.headers["waypoint-resource"] !== "accounts/sample")
+    if (request.headers["waypoint-resource"] !== "users/sample")
       return send(409, "resource required");
     if (request.headers.origin === "http://unlisted.example") return send(403, "origin rejected");
     if (request.url === "/v1/status") return send(200, { readOnly: true });

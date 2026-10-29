@@ -6,11 +6,11 @@ Status: decided against for now. Revisit only with a concrete trigger
 ## Context
 
 Financial row endpoints are scope-relative (`/v1/accounts/checking`).
-The intended account travels in the `Waypoint-Resource` header, asserted
+The intended user travels in the `Waypoint-Resource` header, asserted
 per request against the session-derived scope. Mismatch returns 409
 `RESOURCE_CHANGED` before any store opens. This was challenged: why not
-put the account in the URL path and let the per-call Casdoor permission
-check reject cross-account writes?
+put the user in the URL path and let the per-call Casdoor permission
+check reject cross-user writes?
 
 ## Assessment
 
