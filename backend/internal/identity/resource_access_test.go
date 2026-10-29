@@ -111,7 +111,7 @@ func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
 	resolver := s.config.ResolveAccess
 	s.config.ResolveAccess = func(ctx context.Context, subject string) (authorization.Scope, error) {
 		scope, err := resolver(ctx, subject)
-		scope.Permissions = []string{"plan:read"}
+		scope.Permissions = []string{"account:read"}
 		return scope, err
 	}
 	r, _ = client.Post(server.URL+"/v1/accounts", "application/json", nil)

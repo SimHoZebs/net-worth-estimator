@@ -52,7 +52,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = database.Close() })
 			resource := authorization.ResourceFor(p.server.URL, p.subject)
-			owner, err := database.EnsurePrivatePlan(resource.ID, resource.Owner, p.server.URL, p.subject)
+			owner, err := database.EnsureAccount(authorization.ActorKey(p.server.URL, p.subject), p.server.URL, p.subject)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -89,7 +89,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 				login := newService(t, p, "", func(c *Config) {
 					c.Store, c.PublicURL, c.RequireResourceHeader = database, publicURL, true
 				})
-				scoped, err := database.Plan(resource.ID)
+				scoped, err := database.Account(authorization.ActorKey(p.server.URL, p.subject))
 				if err != nil {
 					t.Fatal(err)
 				}

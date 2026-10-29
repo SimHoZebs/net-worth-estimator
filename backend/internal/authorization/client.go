@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	DefaultModelID = "waypoint/plan-access"
-	DefaultAdapter = "plan-policy-store"
+	DefaultModelID = "waypoint/account-access"
+	DefaultAdapter = "account-policy-store"
 	maxResponse    = 32 << 10
 )
 

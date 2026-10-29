@@ -13,7 +13,7 @@ const ResourceHeader = "Waypoint-Resource"
 
 // The header name stays Waypoint-Resource: browsers and the nwe CLI already
 // assert it, and the value is now an account resource (accounts/<opaque-id>,
-// guest plans/sample). Only the copy changes from plan to account; the 409
+// guest accounts/sample). Only the copy changes from plan to account; the 409
 // RESOURCE_CHANGED contract is unchanged.
 
 // WriteResourceChanged distinguishes a stale account assertion from an operation conflict.
@@ -53,16 +53,15 @@ func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization
 }
 
 // Every unknown state-changing route requires write permission by default.
-// Action strings stay plan:* so the Casdoor model needs no migration; only
-// the resource IDs they pair with moved to the account namespace.
+// Action strings are account:* under the Casdoor model waypoint/account-access.
 func requestAction(r *http.Request) string {
 	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic") {
-		return "plan:project"
+		return "account:project"
 	}
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
-		return "plan:read"
+		return "account:read"
 	}
-	return "plan:write"
+	return "account:write"
 }
 
 // IsGroupRoute reports social group routes, which need authentication
