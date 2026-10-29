@@ -1,9 +1,9 @@
 import type { EditorTarget } from "../domain/accountEdits.ts";
-import { PlanPage } from "./PlanPage.tsx";
+import { AccountSections } from "./accounts/AccountSections.tsx";
 
 /**
  * Transactions section of the account workspace. Thin wrapper over
- * `PlanPage view="transactions"`; row-hook migration pending — still
+ * `AccountSections view="transactions"`; row-hook migration pending — still
  * requires the `Plan` draft layer.
  */
 export function TransactionsPage({
@@ -14,6 +14,6 @@ export function TransactionsPage({
 	onAccount: (id: string) => void;
 }) {
 	return (
-		<PlanPage view="transactions" onEdit={onEdit} onAccount={onAccount} />
+		<AccountSections view="transactions" onEdit={onEdit} onAccount={onAccount} />
 	);
 }

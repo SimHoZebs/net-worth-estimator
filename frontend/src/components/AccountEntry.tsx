@@ -4,7 +4,7 @@ import { AccountIcon } from "./AccountIcon.tsx";
 
 export type AccountEntryAccount = Pick<Account, "id" | "kind" | "color">;
 
-// One row of a money flow: the same account glyph used in the plan and
+// One row of a money flow: the same account glyph used in the account and
 // account views grouped with its value, so the user recognizes the account
 // instead of reading a text row. A null account is an external endpoint and
 // keeps the directional icon language from the transaction views. The value

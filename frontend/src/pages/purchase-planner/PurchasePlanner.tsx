@@ -1,9 +1,9 @@
 import { Plus, ShoppingBag } from "lucide-react";
 import { useState } from "react";
-import { Button } from "../../../components/Button.tsx";
-import { EmptyState } from "../../../components/EmptyState.tsx";
-import { Tabs } from "../../../components/Tabs.tsx";
-import { money } from "../../../domain/format.ts";
+import { Button } from "../../components/Button.tsx";
+import { EmptyState } from "../../components/EmptyState.tsx";
+import { Tabs } from "../../components/Tabs.tsx";
+import { money } from "../../domain/format.ts";
 import type {
 	PurchasePlannerActions,
 	PurchaseViewItem,
