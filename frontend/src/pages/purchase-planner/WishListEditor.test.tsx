@@ -23,7 +23,7 @@ describe("WishListEditor", () => {
 				onApply={() => false}
 				onClose={() => {}}
 				readOnly={false}
-				applyError="The authoritative account changed. Reload before editing."
+				applyError="The authoritative plan changed. Reload before editing."
 			/>,
 		);
 		fireEvent.change(view.getByLabelText("Purchase name"), {
@@ -36,7 +36,7 @@ describe("WishListEditor", () => {
 			view.getByRole("button", { name: "Save changes" }).closest("form")!,
 		);
 		expect(view.getByRole("alert").textContent).toContain(
-			"The authoritative account changed. Reload before editing.",
+			"The authoritative plan changed. Reload before editing.",
 		);
 	});
 

@@ -156,10 +156,10 @@ for (const width of [320, 390, 768, 1440]) {
 		// banner; the bar unmounts once the save lands.
 		await page.unroute("**/v1/recurrence-rules/*");
 		await page.getByRole("button", { name: "Save changes" }).click();
-		await expect(page.getByText("Changes saved.")).toBeVisible();
+		await expect(page.getByText("Plan saved.")).toBeVisible();
 		await expect(bar).toHaveCount(0);
 		await expectWithinViewport(
-			page.getByRole("status").filter({ hasText: "Changes saved." }),
+			page.getByRole("status").filter({ hasText: "Plan saved." }),
 			page,
 		);
 	});

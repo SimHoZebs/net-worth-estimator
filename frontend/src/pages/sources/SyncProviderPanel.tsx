@@ -174,8 +174,8 @@ export function SyncProviderPanel({
 								{syncUnavailable && (
 									<p className="mb-4 text-sm leading-relaxed text-warning-text">
 										Your connection is saved, but the server has not enabled
-										sync for this account. Ask your server administrator to
-										check the sync configuration.
+										sync for this plan. Ask your server administrator to check
+										the sync configuration.
 									</p>
 								)}
 								<div className="flex flex-wrap gap-3">

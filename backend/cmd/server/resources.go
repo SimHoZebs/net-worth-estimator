@@ -166,17 +166,17 @@ func (p *accountRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	scope, ok := identity.Scope(r.Context())
 	if !ok || scope.Resource.ID == "" {
-		http.Error(w, "Account access has not been verified.", http.StatusForbidden)
+		http.Error(w, "Plan access has not been verified.", http.StatusForbidden)
 		return
 	}
 	guest := identity.Subject(r.Context()) == ""
 	if guest != (scope.Resource.Kind == "sample") {
-		http.Error(w, "This account is not available to this identity.", http.StatusForbidden)
+		http.Error(w, "This plan is not available to this identity.", http.StatusForbidden)
 		return
 	}
 	handler, err := p.handlerFor(scope.Resource)
 	if err != nil {
-		http.Error(w, "The selected account is temporarily unavailable.", http.StatusServiceUnavailable)
+		http.Error(w, "The selected plan is temporarily unavailable.", http.StatusServiceUnavailable)
 		return
 	}
 	w.Header().Set(identity.ResourceHeader, scope.Resource.ID)

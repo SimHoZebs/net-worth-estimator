@@ -7,7 +7,7 @@ export class StorageError extends errore.createTaggedError({
 }) {}
 export class ImportError extends errore.createTaggedError({
 	name: "ImportError",
-	message: "$detail Choose a valid Waypoint account JSON file.",
+	message: "$detail Choose a valid Waypoint plan JSON file.",
 }) {}
 
 // Drafts live in memory only. File import validates through planSchema below.
