@@ -34,10 +34,12 @@ export function parseSetupArgs(args) {
 export function validateSetup(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   const slot = slotFromOptions(values);
-  if (values.plan)
+  if (values.plan || values.account)
     throw new Error(
-      "--plan applies only to refresh-db; setup binds a new plan to its verified dev identity",
+      "--account applies only to refresh-db; setup binds a new scope to its verified dev identity",
     );
+  if (values["source-account"] && values["source-plan"])
+    throw new Error("--source-plan and --source-account conflict; use --source-account");
   if (
     (values["app-port"] !== undefined ||
       values["casdoor-port"] !== undefined ||
@@ -149,7 +151,7 @@ async function setupFlow(config, sourcePlan, { stateDir, envFile, slot }) {
   }
   if (!config.ownerSubject)
     throw new Error(
-      `Set the verified Bridge ownerSubject in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. Plan ownership comes from the application database.`,
+      `Set the verified Bridge ownerSubject in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. Account ownership comes from the application database.`,
     );
   if (fresh) {
     const incoming = await snapshot(config, stateDir);
@@ -168,7 +170,7 @@ async function setupFlow(config, sourcePlan, { stateDir, envFile, slot }) {
       bootstrap.issuer,
       "--init-subject",
       bootstrap.subject,
-      ...(sourcePlan ? ["--source-plan", sourcePlan] : []),
+      ...(sourcePlan ? ["--source-account", sourcePlan] : []),
     ]);
   }
   await writeComposeEnv(config, envFile, stateDir);
@@ -198,18 +200,18 @@ export async function run(values, positionals) {
     const config = await loadConfig(stateDir, true, source, hostname, slotOptions);
     if (source && (await exists(resolve(stateDir, "data", databaseName)))) {
       throw new Error(
-        "Dev data already exists. Use refresh-db --plan PLAN_ID --source-plan SOURCE_ID --from to replace only the selected financial scope.",
+        "Dev data already exists. Use refresh-db --account ACCOUNT_ID --source-account SOURCE_ID --from to replace only the selected financial scope.",
       );
     }
-    if (values["source-plan"] && (await exists(resolve(stateDir, "data", databaseName))))
+    if ((values["source-plan"] || values["source-account"]) && (await exists(resolve(stateDir, "data", databaseName))))
       throw new Error(
-        "Dev data already exists. Select a plan through refresh-db instead of setup.",
+        "Dev data already exists. Select an account scope through refresh-db instead of setup.",
       );
     if (source) {
       config.source = source;
       await saveConfig(stateDir, config);
     }
-    await setupFlow(config, values["source-plan"], { stateDir, envFile, slot });
+    await setupFlow(config, values["source-account"] ?? values["source-plan"], { stateDir, envFile, slot });
   });
 }
 
@@ -218,7 +220,7 @@ export async function main(args) {
   const { values, positionals } = parseSetupArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-plan SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N]",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-account SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N]",
     );
     return;
   }

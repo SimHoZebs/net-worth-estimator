@@ -38,17 +38,17 @@ export async function refreshData({ config, stateDir, slot, source, sourcePlan, 
       destination,
       "--source",
       incoming,
-      "--source-plan",
+      "--source-account",
       sourcePlan,
-      ...(publishing ? ["--sample"] : ["--plan", plan]),
+      ...(publishing ? ["--sample"] : ["--account", plan]),
     ]);
   } finally {
     compose(config, ["start", "--wait", "backend"]);
   }
   console.log(
     publishing
-      ? "Sample published in the application database. Private plans and all identity state remain unchanged."
-      : "Selected dev plan refreshed. Other plans and all identity state remain unchanged.",
+      ? "Sample published in the application database. Private scopes and all identity state remain unchanged."
+      : "Selected dev scope refreshed. Other scopes and all identity state remain unchanged.",
   );
   console.log(
     `The prior application database is in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/backups/.`,

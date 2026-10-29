@@ -67,19 +67,20 @@ test("invalid sources do not leave an accepted snapshot or overwrite an existing
   }
 });
 
-test("application snapshot includes multiple plans and identity state in one file", async () => {
+test("application snapshot includes multiple accounts and identity state in one file", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "waypoint-application-snapshot-"));
   const source = resolve(dir, "app.db");
   const writer = new DatabaseSync(source);
   writer.exec(
-    "PRAGMA journal_mode=WAL; CREATE TABLE plans(id TEXT); INSERT INTO plans VALUES('owner'),('second'),('plans/sample'); CREATE TABLE model_metadata(plan_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('plans/sample',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');",
+    "PRAGMA journal_mode=WAL; CREATE TABLE app_accounts(id TEXT); INSERT INTO app_accounts VALUES('owner'),('second'); CREATE TABLE model_metadata(account_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('sample',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');",
   );
   try {
     const target = resolve(dir, "snapshot.db");
     await snapshotFile(source, target);
     const sample = new DatabaseSync(target, { readOnly: true });
     try {
-      assert.equal(sample.prepare("SELECT COUNT(*) AS n FROM plans").get().n, 3);
+      assert.equal(sample.prepare("SELECT COUNT(*) AS n FROM app_accounts").get().n, 2);
+      assert.equal(sample.prepare("SELECT COUNT(*) AS n FROM model_metadata").get().n, 3);
       assert.equal(sample.prepare("SELECT data FROM identity_grants").get().data, "sealed grant");
     } finally {
       sample.close();
@@ -100,7 +101,7 @@ test("explicit setup provisions an empty application snapshot and repeat setup p
     assert.equal(validateSnapshot(source), "application");
     const first = new DatabaseSync(source);
     try {
-      assert.equal(first.prepare("SELECT COUNT(*) AS n FROM plans").get().n, 0);
+      assert.equal(first.prepare("SELECT COUNT(*) AS n FROM app_accounts").get().n, 0);
       for (const table of [
         "sessions",
         "identity_grants",

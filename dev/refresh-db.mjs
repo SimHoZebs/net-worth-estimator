@@ -21,10 +21,16 @@ export function validateRefresh(values, positionals = []) {
   ) {
     throw new Error("Ports are fixed at slot creation. Pick a new --slot name for new ports.");
   }
-  if (!values["source-plan"])
-    throw new Error("--source-plan is required. Select the reviewed financial scope explicitly.");
-  if (!values.plan || values.plan === "plans/sample")
-    throw new Error("refresh-db requires --plan for an existing private plan");
+  if (values["source-account"] && values["source-plan"])
+    throw new Error("--source-plan and --source-account conflict; use --source-account");
+  if (values.account && values.plan)
+    throw new Error("--plan and --account conflict; use --account");
+  const source = values["source-account"] ?? values["source-plan"];
+  const target = values.account ?? values.plan;
+  if (!source)
+    throw new Error("--source-account is required. Select the reviewed financial scope explicitly.");
+  if (!target || target === "plans/sample" || target === "sample")
+    throw new Error("refresh-db requires --account for an existing private account scope");
 }
 
 export async function run(values, positionals) {
@@ -39,8 +45,8 @@ export async function run(values, positionals) {
       stateDir,
       slot,
       source,
-      sourcePlan: values["source-plan"],
-      plan: values.plan,
+      sourcePlan: values["source-account"] ?? values["source-plan"],
+      plan: values.account ?? values.plan,
       publishing: false,
     });
   });
@@ -51,7 +57,7 @@ export async function main(args) {
   const { values, positionals } = parseRefreshArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev refresh-db --plan PLAN_ID --source-plan SOURCE_ID [--from migrated-app.db] [--slot NAME]",
+      "Usage: scripts/dev refresh-db --account ACCOUNT_ID --source-account SOURCE_ID [--from migrated-app.db] [--slot NAME]",
     );
     return;
   }

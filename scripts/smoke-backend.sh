@@ -13,7 +13,7 @@ fi
 
 base="${BASE_URL:-http://localhost:8787}"
 : "${COOKIE_FILE:?Set COOKIE_FILE to a private disposable owner-session cookie jar}"
-: "${RESOURCE_ID:?Set RESOURCE_ID from session discovery}"
+: "${RESOURCE_ID:?Set RESOURCE_ID from session discovery (owner scopes look like user:<hash>; the guest sample is "sample")}"
 : "${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the configured frontend origin}"
 for cmd in curl jq; do
 	if ! command -v "$cmd" >/dev/null 2>&1; then

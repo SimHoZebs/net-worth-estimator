@@ -5,7 +5,9 @@
 export const devOptions = {
   from: { type: "string" },
   plan: { type: "string" },
+  account: { type: "string" },
   "source-plan": { type: "string" },
+  "source-account": { type: "string" },
   slot: { type: "string" },
   "app-port": { type: "string" },
   "casdoor-port": { type: "string" },
