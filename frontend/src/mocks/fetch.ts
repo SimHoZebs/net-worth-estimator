@@ -1,4 +1,4 @@
-import { getResourceScope } from "../auth/resourceScope.ts";
+import { getAccountScope } from "../auth/resourceScope.ts";
 
 // Shared fetch-test response helper. Route-specific stubs stay in the test
 // files; only JSON-body construction with the current scope assertion is
@@ -6,7 +6,7 @@ import { getResourceScope } from "../auth/resourceScope.ts";
 
 export function ok(body: unknown, status = 200) {
 	const headers = new Headers({ "content-type": "application/json" });
-	const resource = getResourceScope().resource?.id;
+	const resource = getAccountScope().resource?.id;
 	if (resource) headers.set("Waypoint-Resource", resource);
 	return new Response(JSON.stringify(body), { status, headers });
 }

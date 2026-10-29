@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	suspendResourceScope,
+	getAccountScope,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 import {
 	resetWorkspaceForResource,
@@ -13,7 +13,7 @@ import {
 import {
 	getServerModel,
 	modelOptions,
-	workspaceResourceKey,
+	accountResourceKey,
 } from "./workspaceResources.ts";
 import {
 	cancelResourceQueries,
@@ -21,24 +21,24 @@ import {
 	serverQueryClient,
 } from "./serverQuery.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 
 function owner(id: string) {
-	acceptResourceScope(
+	acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id,
 				kind: "private",
-				permissions: ["plan:read", "plan:write"],
+				permissions: ["account:read", "account:write"],
 			},
 			subject: id,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 }
 beforeEach(() => {
-	owner("plans/a");
+	owner("accounts/a");
 	resetWorkspaceStore();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
@@ -46,21 +46,21 @@ beforeEach(() => {
 afterEach(() => {
 	resetWorkspaceStore();
 	resetServerQueryCache();
-	suspendResourceScope();
+	suspendAccountScope();
 	vi.unstubAllGlobals();
 });
 
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
 	const model = setServerModelFixture();
-	const scope = getResourceScope();
-	useWorkspaceStore.setState({ draft: testPlan });
-	suspendResourceScope();
+	const scope = getAccountScope();
+	useWorkspaceStore.setState({ draft: testAccount });
+	suspendAccountScope();
 	await cancelResourceQueries();
 	expect(getServerModel()).toBeUndefined();
 	expect(
-		serverQueryClient().getQueryData(workspaceResourceKey("model", scope)),
+		serverQueryClient().getQueryData(accountResourceKey("model", scope)),
 	).toEqual(model);
-	expect(useWorkspaceStore.getState().draft).toBe(testPlan);
+	expect(useWorkspaceStore.getState().draft).toBe(testAccount);
 });
 
 it("does not publish a retired account's late model result", async () => {
@@ -70,7 +70,7 @@ it("does not publish a retired account's late model result", async () => {
 	});
 	const headers = () => {
 		const responseHeaders = new Headers({ "content-type": "application/json" });
-		const resource = getResourceScope().resource?.id;
+		const resource = getAccountScope().resource?.id;
 		if (resource) responseHeaders.set("Waypoint-Resource", resource);
 		return responseHeaders;
 	};
@@ -91,7 +91,7 @@ it("does not publish a retired account's late model result", async () => {
 	const old = serverQueryClient()
 		.fetchQuery(modelOptions())
 		.catch(() => {});
-	owner("plans/b");
+	owner("accounts/b");
 	resetWorkspaceForResource();
 	const current = setServerModelFixture(undefined, { revision: "b" });
 	finish(
@@ -106,11 +106,11 @@ it("does not publish a retired account's late model result", async () => {
 
 it("retains only unsaved in-memory data for an explicit same-owner recovery", () => {
 	useWorkspaceStore.setState({
-		draft: testPlan,
+		draft: testAccount,
 		baseRevision: "a",
 	});
 	resetWorkspaceForResource({ preserveDraft: true });
-	expect(useWorkspaceStore.getState().draft).toBe(testPlan);
+	expect(useWorkspaceStore.getState().draft).toBe(testAccount);
 	expect(useWorkspaceStore.getState().scope).toBeNull();
 	resetWorkspaceForResource();
 	expect(useWorkspaceStore.getState().draft).toBeNull();

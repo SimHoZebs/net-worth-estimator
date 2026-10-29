@@ -34,7 +34,7 @@ function stubApi(state: {
 }) {
 	const jsonHeaders = () => {
 		const headers = new Headers({ "content-type": "application/json" });
-		headers.set("Waypoint-Resource", "plans/test");
+		headers.set("Waypoint-Resource", "accounts/test");
 		return headers;
 	};
 	const requests: { method: string; path: string; body?: unknown }[] = [];
@@ -480,13 +480,13 @@ it("disables Sync now when read-only", async () => {
 it("hides bridge quota when the backend omits it", async () => {
 	stubApi({ configured: true, links: [] });
 	const { serverQueryClient } = await import("../../state/serverQuery.ts");
-	const { getResourceScope } = await import("../../auth/resourceScope.ts");
-	const { workspaceResourceKey } =
+	const { getAccountScope } = await import("../../auth/resourceScope.ts");
+	const { accountResourceKey } =
 		await import("../../state/workspaceResources.ts");
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	await screen.findByText(/Connected since/);
 	serverQueryClient().setQueryData(
-		workspaceResourceKey("status", getResourceScope()),
+		accountResourceKey("status", getAccountScope()),
 		{ readOnly: false, syncConfigured: true },
 	);
 	await waitFor(() => {

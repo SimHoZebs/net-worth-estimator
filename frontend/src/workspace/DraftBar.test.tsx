@@ -16,7 +16,7 @@ import {
 	resetWorkspaceStore,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import {
 	setServerModelFixture,
@@ -53,8 +53,8 @@ describe("draft bar presence", () => {
 		expect(view.container.querySelector("[data-draft-bar]")).toBeNull();
 		act(() =>
 			useWorkspaceStore.setState({
-				draft: { ...testPlan, name: "Edited household" },
-				baseline: testPlan,
+				draft: { ...testAccount, name: "Edited household" },
+				baseline: testAccount,
 			}),
 		);
 		expect(view.getByText("1 unsaved change · not saved yet")).toBeTruthy();
@@ -63,8 +63,8 @@ describe("draft bar presence", () => {
 	});
 	it("uses Query's save command and a local discard callback", async () => {
 		useWorkspaceStore.setState({
-			draft: { ...testPlan, name: "Edited household" },
-			baseline: testPlan,
+			draft: { ...testAccount, name: "Edited household" },
+			baseline: testAccount,
 		});
 		const onDiscard = vi.fn();
 		const view = render(<DraftBar onDiscard={onDiscard} />);

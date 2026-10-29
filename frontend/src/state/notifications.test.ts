@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { suspendResourceScope } from "../auth/resourceScope.ts";
+import { suspendAccountScope } from "../auth/resourceScope.ts";
 import {
 	dismissKey,
 	resetNotifications,
@@ -8,7 +8,7 @@ import {
 
 afterEach(() => {
 	resetNotifications();
-	suspendResourceScope();
+	suspendAccountScope();
 });
 
 describe("notification stack", () => {
@@ -49,7 +49,7 @@ describe("notification stack", () => {
 		useNotifications
 			.getState()
 			.notify({ key: "workspace", kind: "error", message: "Load failed." });
-		suspendResourceScope();
+		suspendAccountScope();
 		expect(useNotifications.getState().items).toHaveLength(0);
 	});
 

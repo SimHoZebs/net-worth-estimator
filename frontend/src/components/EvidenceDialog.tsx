@@ -1,5 +1,5 @@
 import type { Plan } from "../domain/model.ts";
-import type { EditorTarget } from "../domain/planEdits.ts";
+import type { EditorTarget } from "../domain/accountEdits.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";

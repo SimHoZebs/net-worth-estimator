@@ -218,9 +218,9 @@ describe("sidebar account placement", () => {
 			allowed: true,
 			accountURL: "https://identity.example/account",
 			resource: {
-				id: `plans/${"a".repeat(64)}`,
+				id: `accounts/${"a".repeat(64)}`,
 				kind: "private",
-				permissions: ["plan:read", "plan:write"],
+				permissions: ["account:read", "account:write"],
 			},
 			user: { subject: "editor", name: "Sam Lee" },
 		});

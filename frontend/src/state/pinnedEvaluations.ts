@@ -5,30 +5,30 @@ import {
 	setPinnedEvaluations,
 } from "@/api/generated/endpoints.ts";
 import {
-	getResourceScope,
-	subscribeResourceScope,
+	getAccountScope,
+	subscribeAccountScope,
 } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 
 export function pinnedEvaluationsKey() {
-	return ["pinned-evaluations", getResourceScope().key] as const;
+	return ["pinned-evaluations", getAccountScope().key] as const;
 }
 
 function pinsOptions() {
-	const scope = getResourceScope();
+	const scope = getAccountScope();
 	return {
 		queryKey: pinnedEvaluationsKey(),
 		staleTime: 30_000,
 		queryFn: async ({ signal }: { signal: AbortSignal }) => {
 			try {
 				const data = (await getPinnedEvaluations({ signal })).data;
-				if (scope !== getResourceScope())
+				if (scope !== getAccountScope())
 					throw new Error("The active resource changed.");
 				dismissKey("evaluation-pins");
 				return data.instanceIds ?? [];
 			} catch (error) {
-				if (scope === getResourceScope() && !signal.aborted)
+				if (scope === getAccountScope() && !signal.aborted)
 					notifyError(
 						"evaluation-pins",
 						error instanceof Error
@@ -46,7 +46,7 @@ function pinsOptions() {
 }
 
 export async function refreshPins(force = false): Promise<void> {
-	if (getResourceScope().status === "pending") return;
+	if (getAccountScope().status === "pending") return;
 	const options = pinsOptions();
 	try {
 		if (force)
@@ -61,7 +61,7 @@ export async function refreshPins(force = false): Promise<void> {
 }
 
 export async function togglePin(id: string): Promise<boolean> {
-	const scope = getResourceScope();
+	const scope = getAccountScope();
 	if (scope.status === "pending") return false;
 	const cache = serverQueryClient();
 	const key = pinnedEvaluationsKey();
@@ -69,14 +69,14 @@ export async function togglePin(id: string): Promise<boolean> {
 		mutationKey: key,
 		scope: { id: JSON.stringify(key) },
 		mutationFn: async () => {
-			if (scope !== getResourceScope())
+			if (scope !== getAccountScope())
 				throw new Error("The active resource changed.");
 			if (cache.getQueryData(key) === undefined)
 				await cache.fetchQuery(pinsOptions());
-			if (scope !== getResourceScope())
+			if (scope !== getAccountScope())
 				throw new Error("The active resource changed.");
 			await cache.cancelQueries({ queryKey: key });
-			if (scope !== getResourceScope())
+			if (scope !== getAccountScope())
 				throw new Error("The active resource changed.");
 			const previous = cache.getQueryData<string[]>(key) ?? [];
 			const next = previous.includes(id)
@@ -85,21 +85,21 @@ export async function togglePin(id: string): Promise<boolean> {
 			cache.setQueryData(key, next);
 			try {
 				const data = (await setPinnedEvaluations({ instanceIds: next })).data;
-				if (scope === getResourceScope())
+				if (scope === getAccountScope())
 					cache.setQueryData(key, data.instanceIds ?? []);
 			} catch (error) {
-				if (scope === getResourceScope()) cache.setQueryData(key, previous);
+				if (scope === getAccountScope()) cache.setQueryData(key, previous);
 				throw error;
 			}
 		},
 	});
 	try {
 		await mutation.execute(undefined);
-		if (scope !== getResourceScope()) return false;
+		if (scope !== getAccountScope()) return false;
 		dismissKey("evaluation-pins");
 		return true;
 	} catch (error) {
-		if (scope === getResourceScope()) {
+		if (scope === getAccountScope()) {
 			await cache.invalidateQueries({ queryKey: key, refetchType: "none" });
 			notifyError(
 				"evaluation-pins",
@@ -118,10 +118,10 @@ export function resetPinnedEvaluationsClient() {
 	serverQueryClient().removeQueries({ queryKey: ["pinned-evaluations"] });
 }
 
-subscribeResourceScope(resetPinnedEvaluationsClient);
+subscribeAccountScope(resetPinnedEvaluationsClient);
 
 export function usePinnedEvaluations() {
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	const scope = useSyncExternalStore(subscribeAccountScope, getAccountScope);
 	const query = useQuery(
 		{ ...pinsOptions(), enabled: scope.status === "ready" },
 		serverQueryClient(),

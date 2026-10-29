@@ -46,9 +46,9 @@ it("keeps navigation usable without account controls when the private plan is em
 					authenticated: true,
 					allowed: true,
 					resource: {
-						id: `plans/${"a".repeat(64)}`,
+						id: `accounts/${"a".repeat(64)}`,
 						kind: "private",
-						permissions: ["plan:read", "plan:write"],
+						permissions: ["account:read", "account:write"],
 					},
 					user: {
 						subject: "new-owner",

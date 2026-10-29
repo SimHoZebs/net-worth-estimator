@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { accountTransactions } from "../domain/accountActivity.ts";
 import { dateLabel, money } from "../domain/format.ts";
 import type { Account, Plan } from "../domain/model.ts";
-import type { EditorTarget } from "../domain/planEdits.ts";
+import type { EditorTarget } from "../domain/accountEdits.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";

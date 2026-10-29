@@ -54,27 +54,6 @@ export function accountResourceKey(
 	return ["account-resources", scope.key, kind] as const;
 }
 
-/**
- * @deprecated Use accountResourceKey. New scopes use `account-resources`
- * which invalidates cached `plans/*` entries. The old `workspace-resources`
- * prefix is only invalidated for pre-upgrade cache.
- */
-export function workspaceResourceKey(
-	kind:
-		| "model"
-		| "status"
-		| "presets"
-		| "resolvers"
-		| "balances"
-		| "transactions"
-		| "catalog"
-		| "eval-summary"
-		| "checkpoints",
-	scope = getAccountScope(),
-) {
-	return accountResourceKey(kind, scope);
-}
-
 function current(scope: AccountScope, signal?: AbortSignal) {
 	if (
 		scope !== getAccountScope() ||
@@ -281,11 +260,6 @@ export async function reloadWorkspace() {
 	if (scope !== getAccountScope() || scope.status !== "ready") return;
 	await cache.invalidateQueries({
 		queryKey: ["account-resources", scope.key],
-		refetchType: "none",
-	});
-	// Drop legacy workspace keys from before the account rename.
-	await cache.invalidateQueries({
-		queryKey: ["workspace-resources", scope.key],
 		refetchType: "none",
 	});
 	const results = await Promise.allSettled([

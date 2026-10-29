@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import { movementFixture } from "../mocks/projection.ts";
 import {
 	cashCushion,
@@ -37,7 +37,7 @@ describe("month helpers", () => {
 
 describe("checking", () => {
 	it("prefers the checking account id", () => {
-		expect(checkingAccountId(testPlan)).toBe("checking");
+		expect(checkingAccountId(testAccount)).toBe("checking");
 	});
 });
 
@@ -457,9 +457,9 @@ describe("groupMandatorySpending", () => {
 
 describe("spendingBalance", () => {
 	it("sums the selected accounts and ignores unknown ids", () => {
-		expect(spendingBalance(testPlan, ["checking", "savings"])).toBe(60250);
-		expect(spendingBalance(testPlan, ["checking", "missing"])).toBe(18250);
-		expect(spendingBalance(testPlan, [])).toBe(0);
+		expect(spendingBalance(testAccount, ["checking", "savings"])).toBe(60250);
+		expect(spendingBalance(testAccount, ["checking", "missing"])).toBe(18250);
+		expect(spendingBalance(testAccount, [])).toBe(0);
 	});
 });
 

@@ -1,35 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	suspendResourceScope,
+	getAccountScope,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 import { ApiHttpError } from "./http.ts";
 import { applyRowOperations } from "./rowSync.ts";
 import { requestStochasticProjection } from "./sse.ts";
 import {
-	ResourceScopeError,
+	AccountScopeError,
 	scopedRequest,
 	scopedResponseError,
 } from "./scopedRequest.ts";
 import { waypointFetch } from "./waypoint-fetch.ts";
 
-const A = `plans/${"a".repeat(64)}`;
-const B = `plans/${"b".repeat(64)}`;
+const A = `accounts/${"a".repeat(64)}`;
+const B = `accounts/${"b".repeat(64)}`;
 
 function owner(id = A, baseUrl = "") {
-	return acceptResourceScope(
+	return acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 			resource: {
 				id,
 				kind: "private",
-				permissions: ["plan:read", "plan:project", "plan:write"],
+				permissions: ["account:read", "account:project", "account:write"],
 			},
 			subject: id,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	)!;
 }
 
@@ -61,7 +61,7 @@ function request(kind: "json" | "sse") {
 
 beforeEach(() => owner());
 afterEach(() => {
-	suspendResourceScope();
+	suspendAccountScope();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
@@ -102,7 +102,7 @@ describe("resource assertion at the API boundary", () => {
 				},
 			},
 		]);
-		expect(result).toBeInstanceOf(ResourceScopeError);
+		expect(result).toBeInstanceOf(AccountScopeError);
 		// The first write sends while scope A is current. The scope switch
 		// retires the second write before it sends, so nothing computed for
 		// plan A can land in plan B's workspace.
@@ -120,8 +120,8 @@ describe("resource assertion at the API boundary", () => {
 			const awaiting = request(kind);
 			owner(B);
 			finish(response("{}", B));
-			await expect(awaiting).rejects.toBeInstanceOf(ResourceScopeError);
-			expect(getResourceScope().resource?.id).toBe(B);
+			await expect(awaiting).rejects.toBeInstanceOf(AccountScopeError);
+			expect(getAccountScope().resource?.id).toBe(B);
 			const init = (
 				fetcher as unknown as { mock: { calls: [string, RequestInit][] } }
 			).mock.calls[0]?.[1];
@@ -132,9 +132,9 @@ describe("resource assertion at the API boundary", () => {
 	it.each(["json", "sse"] as const)(
 		"blocks %s before network access while discovery is pending",
 		async (kind) => {
-			suspendResourceScope();
+			suspendAccountScope();
 			const fetcher = stubFetch(async () => response("{}"));
-			await expect(request(kind)).rejects.toBeInstanceOf(ResourceScopeError);
+			await expect(request(kind)).rejects.toBeInstanceOf(AccountScopeError);
 			expect(fetcher).not.toHaveBeenCalled();
 		},
 	);
@@ -164,11 +164,11 @@ describe("resource assertion at the API boundary", () => {
 				`${baseUrl}/v1/financial-model`,
 				{ method: "GET" },
 				fetcher,
-				getResourceScope(),
+				getAccountScope(),
 			);
-			expect(outcome).toBeInstanceOf(ResourceScopeError);
+			expect(outcome).toBeInstanceOf(AccountScopeError);
 			expect(fetcher).not.toHaveBeenCalled();
-			expect(getResourceScope().status).toBe("ready");
+			expect(getAccountScope().status).toBe("ready");
 		},
 	);
 
@@ -181,8 +181,8 @@ describe("resource assertion at the API boundary", () => {
 			try {
 				await expect(
 					waypointFetch("/v1/financial-model", { method: "GET" }),
-				).rejects.toBeInstanceOf(ResourceScopeError);
-				expect(getResourceScope().status).toBe("pending");
+				).rejects.toBeInstanceOf(AccountScopeError);
+				expect(getAccountScope().status).toBe("pending");
 				expect(check).toHaveBeenCalledOnce();
 				expect(fetcher).toHaveBeenCalledOnce();
 			} finally {
@@ -211,9 +211,9 @@ describe("resource assertion at the API boundary", () => {
 					headers: { "Waypoint-Resource": A },
 				}),
 			);
-			await expect(pending).rejects.toBeInstanceOf(ResourceScopeError);
+			await expect(pending).rejects.toBeInstanceOf(AccountScopeError);
 			expect(cancel).toHaveBeenCalledOnce();
-			expect(getResourceScope().resource?.id).toBe(B);
+			expect(getAccountScope().resource?.id).toBe(B);
 		},
 	);
 
@@ -243,7 +243,7 @@ describe("resource assertion at the API boundary", () => {
 		// Let the fetch continuation attach the guarded body before changing identity.
 		await Promise.resolve();
 		owner(B);
-		await expect(pending).rejects.toBeInstanceOf(ResourceScopeError);
+		await expect(pending).rejects.toBeInstanceOf(AccountScopeError);
 		expect(cancel).toHaveBeenCalledOnce();
 	});
 
@@ -264,7 +264,7 @@ describe("resource assertion at the API boundary", () => {
 		const reader = result.body!.getReader();
 		const pending = reader.read();
 		owner(B);
-		await expect(pending).rejects.toBeInstanceOf(ResourceScopeError);
+		await expect(pending).rejects.toBeInstanceOf(AccountScopeError);
 		expect(cancel).toHaveBeenCalledOnce();
 	});
 
@@ -287,19 +287,19 @@ describe("resource assertion at the API boundary", () => {
 		await expect(pending).rejects.toMatchObject({ name: "AbortError" });
 		expect(signal?.aborted).toBe(true);
 		expect(cancel).toHaveBeenCalledOnce();
-		expect(getResourceScope().status).toBe("ready");
+		expect(getAccountScope().status).toBe("ready");
 	});
 
 	it.each(["json", "sse"] as const)(
 		"preserves ordinary %s HTTP failures without a session recheck",
 		async (kind) => {
 			for (const status of [401, 403, 409, 503]) {
-				const scope = getResourceScope();
+				const scope = getAccountScope();
 				stubFetch(async () => response("{}", A, status));
 				const failure = await request(kind).catch((cause: unknown) => cause);
 				expect(failure).toBeInstanceOf(ApiHttpError);
 				expect(failure).toMatchObject({ status });
-				expect(getResourceScope()).toBe(scope);
+				expect(getAccountScope()).toBe(scope);
 			}
 		},
 	);
@@ -315,8 +315,8 @@ describe("resource assertion at the API boundary", () => {
 					409,
 				);
 			});
-			await expect(request(kind)).rejects.toBeInstanceOf(ResourceScopeError);
-			expect(getResourceScope().status).toBe("pending");
+			await expect(request(kind)).rejects.toBeInstanceOf(AccountScopeError);
+			expect(getAccountScope().status).toBe("pending");
 			expect(fetcher).toHaveBeenCalledOnce();
 		},
 	);
@@ -324,7 +324,7 @@ describe("resource assertion at the API boundary", () => {
 	it.each([null, A, B])(
 		"preserves a duplicate-row conflict with resource header %s",
 		async (resource) => {
-			const scope = getResourceScope();
+			const scope = getAccountScope();
 			const problem = { status: 409, detail: "That account already exists." };
 			stubFetch(async () => response(JSON.stringify(problem), resource, 409));
 			const failure = await waypointFetch("/v1/accounts", {
@@ -336,12 +336,12 @@ describe("resource assertion at the API boundary", () => {
 			expect((failure as ApiHttpError).message).toBe(
 				"The request conflicts with the current server data. That account already exists.",
 			);
-			expect(getResourceScope()).toBe(scope);
+			expect(getAccountScope()).toBe(scope);
 		},
 	);
 
 	it("preserves a non-409 failure even with a resource-change code", async () => {
-		const scope = getResourceScope();
+		const scope = getAccountScope();
 		stubFetch(async () =>
 			response(
 				JSON.stringify({ status: 503, code: "RESOURCE_CHANGED" }),
@@ -354,11 +354,11 @@ describe("resource assertion at the API boundary", () => {
 		}).catch((cause: unknown) => cause);
 		expect(failure).toBeInstanceOf(ApiHttpError);
 		expect(failure).toMatchObject({ status: 503 });
-		expect(getResourceScope()).toBe(scope);
+		expect(getAccountScope()).toBe(scope);
 	});
 
 	it("preserves an operation conflict with another problem code", async () => {
-		const scope = getResourceScope();
+		const scope = getAccountScope();
 		const problem = { status: 409, code: "ID_CONFLICT" };
 		stubFetch(async () => response(JSON.stringify(problem), A, 409));
 		const failure = await waypointFetch("/v1/accounts", {
@@ -367,11 +367,11 @@ describe("resource assertion at the API boundary", () => {
 		}).catch((cause: unknown) => cause);
 		expect(failure).toBeInstanceOf(ApiHttpError);
 		expect(failure).toMatchObject({ status: 409, problem });
-		expect(getResourceScope()).toBe(scope);
+		expect(getAccountScope()).toBe(scope);
 	});
 
 	it("does not invalidate a new account scope for an old resource-change error", () => {
-		const oldScope = getResourceScope();
+		const oldScope = getAccountScope();
 		const current = owner(B);
 		const result = scopedResponseError(
 			oldScope,
@@ -381,7 +381,7 @@ describe("resource assertion at the API boundary", () => {
 				problem: { status: 409, code: "RESOURCE_CHANGED" },
 			}),
 		);
-		expect(result).toBeInstanceOf(ResourceScopeError);
-		expect(getResourceScope()).toBe(current);
+		expect(result).toBeInstanceOf(AccountScopeError);
+		expect(getAccountScope()).toBe(current);
 	});
 });
