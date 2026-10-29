@@ -18,7 +18,7 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 		{"https://id.example", "guest"},
 		{"https://id.example", "sample"},
 		{"https://id.example", "../sample"},
-		{"https://id.example", "waypoint/plan-owner"},
+		{"https://id.example", "waypoint/account-owner"},
 		{"https://id.example/a", "bc"},
 		{"https://id.example/ab", "c"},
 	} {
@@ -29,7 +29,7 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 		}
 		seen[actor] = true
 		resource := ResourceFor(pair[0], pair[1])
-		if !resource.valid() || resource.Owner != actor || strings.Count(resource.ID, "/") != 1 || resource.ID == "plans/sample" {
+		if !resource.valid() || resource.Owner != actor || strings.Count(resource.ID, "/") != 1 || resource.ID == "accounts/sample" {
 			t.Fatalf("unsafe resource: %+v", resource)
 		}
 		if !strings.HasPrefix(resource.ID, "accounts/") {
@@ -45,13 +45,13 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 	}
 }
 
-func TestLegacyPlanResourceStaysValidForMigration(t *testing.T) {
+func TestLegacyPlanResourceIsRejected(t *testing.T) {
 	const issuer = "https://id.example"
 	current := ResourceFor(issuer, "alice")
 	hash := strings.TrimPrefix(current.Owner, "user:")
 	legacy := Resource{ID: "plans/" + hash, Kind: "private", Owner: current.Owner}
-	if !legacy.valid() {
-		t.Fatalf("legacy plan resource rejected before store rekey: %+v", legacy)
+	if legacy.valid() {
+		t.Fatalf("legacy plan resource accepted after cutover: %+v", legacy)
 	}
 	if ResourceFor(issuer, "alice").ID == legacy.ID {
 		t.Fatal("ResourceFor must return the account namespace, not the legacy plan form")

@@ -41,7 +41,7 @@ func TestResourceCapabilitiesDriveAPIReadOnlyStatus(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&session); err != nil {
 			t.Fatal(err)
 		}
-		if r.StatusCode != 200 || session.Authenticated != authenticated || !session.Allowed || slices.Contains(session.Resource.Permissions, "plan:write") != writable {
+		if r.StatusCode != 200 || session.Authenticated != authenticated || !session.Allowed || slices.Contains(session.Resource.Permissions, "account:write") != writable {
 			t.Fatalf("session status=%d body=%+v", r.StatusCode, session)
 		}
 		if _, exists := session.User["role"]; exists {

@@ -206,9 +206,9 @@ func newService(t *testing.T, p *testIDP, path string, options ...func(*Config))
 	t.Helper()
 	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour,
 		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
-			permissions := []string{"plan:read", "plan:project"}
+			permissions := []string{"account:read", "account:project"}
 			if subject != "" {
-				permissions = append(permissions, "plan:write")
+				permissions = append(permissions, "account:write")
 			}
 			return authorization.Scope{Resource: authorization.ResourceFor(p.server.URL, subject), Permissions: permissions}, nil
 		},

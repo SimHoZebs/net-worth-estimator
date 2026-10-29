@@ -3,11 +3,9 @@
 //
 // Account scope: a verified identity owns one account resource. The resource ID
 // derives from the exact OIDC issuer and immutable subject, not the display
-// name, username, or browser input. Action strings stay plan:* so the Casdoor
-// model (waypoint/plan-access) needs no migration; only permission resource
-// values change from plans/* to accounts/*. The guest sample stays the global
-// read-only plans/sample row until the feat/account-scope-store DB rekey moves
-// it to account storage.
+// name, username, or browser input. Action strings are account:* under the
+// Casdoor model waypoint/account-access; permission resource values are
+// accounts/*, including the global read-only accounts/sample row.
 package authorization
 
 import (
@@ -17,9 +15,9 @@ import (
 )
 
 const (
-	Read    = "plan:read"
-	Project = "plan:project"
-	Write   = "plan:write"
+	Read    = "account:read"
+	Project = "account:project"
+	Write   = "account:write"
 )
 
 type Resource struct {
@@ -56,13 +54,9 @@ func ActorKey(issuer, subject string) string {
 // Private accounts use accounts/<opaque-id>; the guest uses the global
 // read-only sample. Callers must never decode Resource.Owner from browser
 // input.
-//
-// Casdoor migration: permission resources must cover accounts/* (seed includes
-// legacy plans/* until the feat/account-scope-store DB rekey lands and old
-// rows migrate). Action strings are unchanged.
 func ResourceFor(issuer, subject string) Resource {
 	if subject == "" {
-		return Resource{ID: "plans/sample", Kind: "sample"}
+		return Resource{ID: "accounts/sample", Kind: "sample"}
 	}
 	actor := ActorKey(issuer, subject)
 	return Resource{ID: "accounts/" + strings.TrimPrefix(actor, "user:"), Kind: "private", Owner: actor}
@@ -70,7 +64,7 @@ func ResourceFor(issuer, subject string) Resource {
 
 func (r Resource) valid() bool {
 	if r.Kind == "sample" {
-		return r.ID == "plans/sample" && r.Owner == ""
+		return r.ID == "accounts/sample" && r.Owner == ""
 	}
 	if r.Kind != "private" || len(r.Owner) != len("user:")+64 || !strings.HasPrefix(r.Owner, "user:") {
 		return false
@@ -80,7 +74,5 @@ func (r Resource) valid() bool {
 	if err != nil || hex.EncodeToString(decoded) != hash {
 		return false
 	}
-	// Legacy plans/<hash> stays valid until the store rekey migrates old
-	// rows to accounts/<hash>. ResourceFor never returns the legacy form.
-	return r.ID == "accounts/"+hash || r.ID == "plans/"+hash
+	return r.ID == "accounts/"+hash
 }
