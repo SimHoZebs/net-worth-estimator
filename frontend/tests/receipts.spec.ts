@@ -58,7 +58,7 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 			assertedImage = Boolean(request.headers()["waypoint-resource"]);
 	});
 	const detail = await openExpense(page);
-	await detail.getByLabel("Attach receipt (JPEG or PNG)").setInputFiles(sample);
+	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
 	const receipt = page.getByRole("dialog", {
 		name: "Receipt details",
 		exact: true,
@@ -137,7 +137,7 @@ test("reopened extraction polls only reads and exposes interrupted recovery", as
 }) => {
 	const postingId = await seedExpense(page);
 	const detail = await openExpense(page);
-	await detail.getByLabel("Attach receipt (JPEG or PNG)").setInputFiles(sample);
+	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
 	const receipt = page.getByRole("dialog", {
 		name: "Receipt details",
 		exact: true,
@@ -203,7 +203,7 @@ test("extraction gives immediate busy feedback until the OCR response completes"
 }) => {
 	await seedExpense(page);
 	const detail = await openExpense(page);
-	await detail.getByLabel("Attach receipt (JPEG or PNG)").setInputFiles(sample);
+	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
 	const receipt = page.getByRole("dialog", {
 		name: "Receipt details",
 		exact: true,
@@ -268,7 +268,7 @@ test("unknown images recover through manual review and drafts survive reload", a
 	const id = await seedExpense(page);
 	const detail = await openExpense(page);
 	const unknownImage = await page.screenshot();
-	await detail.getByLabel("Attach receipt (JPEG or PNG)").setInputFiles({
+	await detail.getByLabel("Upload receipt image").setInputFiles({
 		name: "other.png",
 		mimeType: "image/png",
 		buffer: unknownImage,
@@ -329,7 +329,7 @@ test("receipt review supports narrow screens, keyboard dismissal, and accessible
 	await seedExpense(page);
 	await page.setViewportSize({ width: 390, height: 844 });
 	const detail = await openExpense(page);
-	await detail.getByLabel("Attach receipt (JPEG or PNG)").setInputFiles(sample);
+	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
 	const receipt = page.getByRole("dialog", {
 		name: "Receipt details",
 		exact: true,
@@ -382,7 +382,7 @@ test("read-only plans keep receipt mutations unavailable", async ({ page }) => {
 	await expect(
 		page.getByRole("region", { name: "Receipt evidence" }),
 	).toBeVisible();
-	await expect(page.getByLabel("Attach receipt (JPEG or PNG)")).toHaveCount(0);
+	await expect(page.getByLabel("Upload receipt image")).toHaveCount(0);
 	const rejected = await page.request.post("/v1/receipts/missing/extract");
 	expect(rejected.status()).toBe(403);
 });
@@ -393,7 +393,7 @@ test("image controls replace all receipt content and delete it without changing 
 	const postingId = await seedExpense(page);
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	const detail = await openExpense(page);
-	await detail.getByLabel("Attach receipt (JPEG or PNG)").setInputFiles(sample);
+	await detail.getByLabel("Upload receipt image").setInputFiles(sample);
 	const receipt = page.getByRole("dialog", {
 		name: "Receipt details",
 		exact: true,

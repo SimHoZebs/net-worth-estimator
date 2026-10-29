@@ -1,4 +1,4 @@
-import { Camera, Paperclip, ReceiptText } from "lucide-react";
+import { Camera, ImageUp, Paperclip, ReceiptText } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { receiptReviewLabel } from "@/domain/receipt.ts";
 import { useServerModel, useServerStatus } from "@/state/workspaceResources.ts";
@@ -10,7 +10,6 @@ import {
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
-import { InputField } from "../Field.tsx";
 import { ReceiptReviewDialog } from "./ReceiptReviewDialog.tsx";
 
 export function ReceiptPanel({
@@ -29,6 +28,7 @@ export function ReceiptPanel({
 	const collection = useReceipts(postingId, Boolean(saved));
 	const actions = useReceiptActions(postingId);
 	const camera = useRef<HTMLInputElement>(null);
+	const upload = useRef<HTMLInputElement>(null);
 	const [selection, setSelection] = useState<{
 		scope: string;
 		id: string;
@@ -65,10 +65,6 @@ export function ReceiptPanel({
 				<h3 className="text-sm font-semibold">Receipts</h3>
 				{receipts.length > 0 && <Badge tone="neutral">{receipts.length}</Badge>}
 			</div>
-			<p className="text-xs text-muted">
-				Private evidence for the saved transaction. Receipt edits never change
-				its amount.
-			</p>
 			{!saved ? (
 				<p className="text-sm text-muted">
 					Save this transaction before you attach a receipt.
@@ -116,17 +112,27 @@ export function ReceiptPanel({
 					{!locked && eligible && (
 						<fieldset
 							disabled={actions.attach.isPending}
-							className="flex flex-col gap-3"
+							className="flex flex-col gap-2"
 						>
-							<InputField
-								label="Attach receipt (JPEG or PNG)"
-								name="receipt"
-								type="file"
-								accept="image/jpeg,image/png"
-								onChange={attach}
-								hint="Up to 10 MiB. Large images must fit within 3 MiB after normalization."
-							/>
-							<div>
+							<div className="flex flex-wrap items-center gap-2">
+								<Button
+									variant="secondary"
+									size="sm"
+									onClick={() => upload.current?.click()}
+								>
+									<ImageUp size={14} aria-hidden="true" />
+									Upload receipt
+								</Button>
+								<input
+									ref={upload}
+									type="file"
+									accept="image/jpeg,image/png"
+									className="sr-only"
+									tabIndex={-1}
+									aria-label="Upload receipt image"
+									aria-describedby="receipt-size-hint"
+									onChange={attach}
+								/>
 								<Button
 									variant="secondary"
 									size="sm"
@@ -143,9 +149,14 @@ export function ReceiptPanel({
 									className="sr-only"
 									tabIndex={-1}
 									aria-label="Take receipt photo"
+									aria-describedby="receipt-size-hint"
 									onChange={attach}
 								/>
 							</div>
+							<p id="receipt-size-hint" className="text-xs text-muted">
+								JPEG or PNG, up to 10 MiB. Large images must fit within 3
+								MiB after normalization.
+							</p>
 						</fieldset>
 					)}
 					{actions.attach.isPending && (
