@@ -251,20 +251,16 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 	if exists, err := d.HasAccount("new"); err != nil || exists {
 		t.Fatalf("failed creation persisted account: %v, %v", exists, err)
 	}
-	// Deprecated plan shims still resolve to the same account scope.
-	// Use a real user:<hash> mapping: plans/<suffix> -> user:<suffix>.
+	// Reopening an ensured account resolves to the same account scope.
 	shimAccount := "user:shimtest"
 	if _, err := d.EnsureAccount(shimAccount, "https://issuer.test", "shimuser"); err != nil {
-		t.Fatalf("shim account ensure = %v", err)
+		t.Fatalf("account ensure = %v", err)
 	}
-	if _, err := d.EnsurePrivatePlan("plans/shimtest", shimAccount, "https://issuer.test", "shimuser"); err != nil {
-		t.Fatalf("plan shim ensure = %v", err)
+	if _, err := d.Account(shimAccount); err != nil {
+		t.Fatalf("account reopen = %v", err)
 	}
-	if exists, err := d.HasPlan("plans/shimtest"); err != nil || !exists {
-		t.Fatalf("plan shim has = %v, %v", exists, err)
-	}
-	if _, err := d.Plan("plans/shimtest"); err != nil {
-		t.Fatalf("plan shim open = %v", err)
+	if exists, err := d.HasAccount(shimAccount); err != nil || !exists {
+		t.Fatalf("account has = %v, %v", exists, err)
 	}
 	presets, err := a.ListAmountPresets()
 	if err != nil {
@@ -279,13 +275,13 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 		privateTestPlan(t, d, "a")
 		b := privateTestPlan(t, d, "b")
 		if got, err := b.ListAmountPresets(); err != nil || len(got) != 8 {
-			t.Fatalf("new plan presets = %d, %v", len(got), err)
+			t.Fatalf("new account presets = %d, %v", len(got), err)
 		}
 		if got, err := a.ListAmountPresets(); err != nil || len(got) != 0 {
 			t.Fatalf("deleted presets reseeded = %d, %v", len(got), err)
 		}
 	}
-	sample, err := d.EnsureSamplePlan()
+	sample, err := d.EnsureSampleAccount()
 	if err != nil {
 		t.Fatal(err)
 	}
