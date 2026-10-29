@@ -1,20 +1,18 @@
 package store
 
 import (
-	"fmt"
+	"context"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
-
-	_ "modernc.org/sqlite"
 )
 
 // Store is the persistence seam behind the canonical model, projection
 // artifacts, and SimpleFIN sync state. The server, API handlers,
-// and sync runner depend only on this interface; the SQLite file backend
-// below is one implementation. Table definitions live in schema.go; this file owns the contract, the handle, and its
-// lifecycle. A replacement backend (Turso, Postgres, …)
-// implements these methods plus a constructor, then runs the conformance
-// suite (RunConformance) to prove it.
+// and sync runner depend only on this interface. Backends (SQLite files,
+// CSV directories, S3 blobs, a human with paper and mic, Turso, Postgres,
+// …) implement these methods plus a constructor, then run the conformance
+// suite in storetest to prove it.
 //
 // Contract notes for implementers:
 //   - Every operation belongs to one immutable plan scope. There is no default
@@ -22,20 +20,20 @@ import (
 //   - Writes are single-threaded by the caller discipline (one server, one
 //     instance); the backend must still serialize concurrent writes safely.
 //   - Readers always see the latest committed state (no stale replicas).
-//   - SQL must stay portable: plain DDL/DML plus ON CONFLICT only. No
-//     SQLite pragmas, extensions, or file assumptions outside database setup.
 //   - A fresh backend reports DocumentExists() == false. InitializeDocument
 //     activates an empty model without replacing existing data.
 //   - Clear resets this plan's model, sync state (including the Bridge key
 //     and card selection), settings, and artifacts. It preserves amount
 //     presets, plan ownership, other plans, and identity state. Use
 //     ClearSyncCredential to disconnect the key while keeping cards.
+//   - Missing rows report ErrNotFound (or IsNotFound). Backends must not
+//     leak sql.ErrNoRows, missing files, or other mechanism errors.
 type Store interface {
 	ReceiptStore
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
 	InitializeDocument() error
-	ImportCSV(modelPath string) (*types.FinancialModelDocument, error)
+	ImportDocument(doc *types.FinancialModelDocument) (*types.FinancialModelDocument, error)
 	CreateAccount(account types.Account) (types.Account, error)
 	UpdateAccount(account types.Account) (types.Account, error)
 	DeleteAccount(id string) error
@@ -78,23 +76,12 @@ type Store interface {
 	SaveAccountLink(link AccountLink) (AccountLink, error)
 	DeleteAccountLink(bridgeAccountID string) error
 	ProvisionSyncAccounts(items []SyncProvision) (map[string]string, int, []string, error)
-	// GetSyncCredential reports the stored per-plan SimpleFIN credential, or
-	// a zero credential when no key is connected. The AccessURL is a secret
-	// and must never leave the server in API payloads or logs.
 	GetSyncCredential() (SyncCredential, error)
-	// SetSyncCredential stores the Bridge Access URL with display metadata.
 	SetSyncCredential(accessURL, bridgeHost string) (SyncCredential, error)
-	// ClearSyncCredential disconnects the Bridge key, keeping card selection.
 	ClearSyncCredential() error
-	// GetSyncCards reports the per-plan card account selection.
 	GetSyncCards() ([]string, error)
-	// SetSyncCards replaces the per-plan card account selection.
 	SetSyncCards(cards []string) ([]string, error)
-	// GetLastSyncTime reports the completion time of the last successful
-	// SimpleFIN sync as RFC3339 UTC, or "" when no sync has completed yet.
 	GetLastSyncTime() (string, error)
-	// SetLastSyncTime records a successful sync completion time. Callers
-	// pass RFC3339 UTC; failed runs must not record.
 	SetLastSyncTime(completedAt string) error
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
@@ -104,51 +91,45 @@ type Store interface {
 	Close() error
 }
 
-// sqliteStore is the embedded-SQLite Store implementation. Pure-Go driver
-// (modernc), single file, WAL mode, one open connection.
-type sqliteStore struct {
-	db          *planDB
-	owned       *Database
-	application *Database
+// ReceiptStore is the plan-scoped persistence boundary for evidence only.
+type ReceiptStore interface {
+	CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (types.Receipt, error)
+	ListReceipts(postingID string) ([]types.Receipt, error)
+	ListPostingReceiptIDs() (map[string][]string, error)
+	GetReceipt(id string) (types.Receipt, error)
+	GetReceiptImage(ctx context.Context, id string) (types.ReceiptImage, error)
+	ReplaceReceiptImage(ctx context.Context, id string, expectedRevision int64, filename string, image types.ReceiptImage) (types.Receipt, error)
+	SaveReceipt(receipt types.Receipt, expectedRevision int64) (types.Receipt, error)
+	DeleteReceipt(ctx context.Context, id string) error
 }
 
-// Open creates or opens an explicit plans/fixture scope for isolated tests
-// and fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
-// databases are rejected and never converted here.
-func Open(path string) (Store, error) {
-	db, err := SetupDatabase(path)
-	if err != nil {
-		return nil, fmt.Errorf("open sqlite: %w", err)
-	}
-	store, err := db.ensurePlan("plans/fixture", "fixture", "", "", "")
-	if err != nil {
-		db.Close()
-		return nil, err
-	}
-	store.(*sqliteStore).owned = db
-	return store, nil
-}
-
-// Close releases an owned fixture database. Shared plan handles never close it.
-func (s *sqliteStore) Close() error {
-	if s.owned != nil {
-		return s.owned.Close()
-	}
-	return nil
-}
-
-// Clear removes all canonical model rows (used by tests/import).
-func (s *sqliteStore) Clear() error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("clear begin: %w", err)
-	}
-	defer tx.Rollback()
-	if err := clearDocument(tx); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("clear commit: %w", err)
-	}
-	return nil
+// Database owns the application lifecycle: plan routing, group persistence,
+// blob cleanup, and health. Financial operations use a Store returned for an
+// explicit plan. Backends implement this plus Open/Setup constructors; the
+// rest of the backend depends only on this interface, never on files, SQL,
+// or driver handles.
+type Database interface {
+	Close() error
+	PingContext(ctx context.Context) error
+	HasPlan(planID string) (bool, error)
+	Plan(planID string) (Store, error)
+	EnsurePrivatePlan(planID, accountID, issuer, subject string) (Store, error)
+	EnsureSamplePlan() (Store, error)
+	EnsureGroupAccount(issuer, subject string) (string, error)
+	CreateGroup(accountID, name, displayName string) (Group, error)
+	ListGroupsForAccount(accountID string) ([]Group, error)
+	GetGroup(groupID, accountID string) (Group, error)
+	RenameGroup(groupID, accountID, name string) error
+	DeleteGroup(groupID, accountID string) error
+	ListGroupMembers(groupID, accountID string) ([]GroupMember, error)
+	UpdateMemberRole(groupID, callerID, targetID, role string) error
+	RemoveMember(groupID, callerID, targetID string) error
+	LeaveGroup(groupID, accountID string) error
+	CreateInvite(groupID, accountID string, maxUses int, ttl time.Duration) (GroupInvite, string, error)
+	ListInvites(groupID, accountID string) ([]GroupInvite, error)
+	RevokeInvite(groupID, inviteID, accountID string) error
+	AcceptInvite(code, accountID, displayName string) (Group, error)
+	TouchMemberDisplay(accountID, displayName string)
+	RemoveGroupMembershipsForAccount(accountID string) error
+	CollectBlobGarbage(ctx context.Context, limit int) error
 }

@@ -3,7 +3,9 @@ package domain
 import (
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -56,7 +58,7 @@ func TestEvaluationRegistryValidatesKnownDefinitions(t *testing.T) {
 	for _, entry := range evaluationRegistryInstance.List() {
 		definition, _ := evaluationRegistryInstance.Get(entry.Type)
 		switch entry.Type {
-		case types.EvaluationTypePlannedPurchases, types.EvaluationTypeFinancialIndependence:
+		case types.EvaluationTypePlannedPurchases, types.EvaluationTypeFinancialIndependence, types.EvaluationTypeWhatIf:
 			if !definition.IsSimulator() {
 				t.Fatalf("%s must be an explicit simulator", entry.Type)
 			}
@@ -89,6 +91,9 @@ func kindTestPath(t *testing.T) *types.ProjectionPath {
 
 func TestReaderEvaluationCannotResimulate(t *testing.T) {
 	path := kindTestPath(t)
+	oldTries, oldPause := resimGuardTries, resimGuardPause
+	resimGuardTries, resimGuardPause = 3, time.Millisecond
+	defer func() { resimGuardTries, resimGuardPause = oldTries, oldPause }()
 	resimulating := &EvaluationDefinition{
 		Type: "test-resimulate",
 		Name: "test resimulate",
@@ -134,6 +139,32 @@ func TestReaderEvaluationCannotResimulate(t *testing.T) {
 	if !found {
 		t.Fatalf("reader resimulation must report a reader violation, got %+v", runtime.diagnostics)
 	}
+}
+
+func TestResimulationGuardToleratesBriefCrossRequestOverlap(t *testing.T) {
+	oldTries, oldPause := resimGuardTries, resimGuardPause
+	resimGuardTries, resimGuardPause = 50, time.Millisecond
+	defer func() { resimGuardTries, resimGuardPause = oldTries, oldPause }()
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		withReaderGuard(
+			&EvaluationDefinition{Type: "test-reader", Name: "test reader"},
+			"test-reader",
+			func() (PathResult, error) {
+				close(release)
+				time.Sleep(10 * time.Millisecond)
+				return &cannedResult{}, nil
+			},
+		)
+	}()
+	<-release
+	if err := requireResimulationAllowed("Simulate"); err != nil {
+		t.Fatalf("brief cross-request overlap must be retried, got %v", err)
+	}
+	wg.Wait()
 }
 
 func kindTestDocument() (*types.FinancialModelDocument, *types.ProjectionRuntimeSettings) {
@@ -210,5 +241,81 @@ func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
 	}
 	if len(third.Evaluations.NetWorthThreshold) != 0 {
 		t.Fatal("cached base result must not leak evaluations across calls")
+	}
+}
+
+// A simulator evaluation must resimulate even while another request holds a
+// reader guard: the guard is process-global and base plus eval-overlay
+// requests evaluate concurrently, so a foreign reader must never block a
+// simulator's own entitled simulation.
+func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
+	path := kindTestPath(t)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	blockingReader := &EvaluationDefinition{
+		Type:           "test-blocking-reader",
+		Name:           "test blocking reader",
+		ValidateConfig: func(any) error { return nil },
+		ParseConfig:    func(config any) (any, error) { return config, nil },
+		EvaluatePath: func(ctx *EvaluationContext, _ any) (PathResult, error) {
+			close(entered)
+			<-release
+			return &cannedResult{}, nil
+		},
+		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus {
+			return types.StatusSatisfied
+		},
+	}
+	readerSet := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
+		evaluationType: blockingReader.Type,
+		configuredRaw:  map[string]any{},
+		instanceID:     "reader",
+		name:           "reader",
+		definition:     blockingReader,
+	}}}
+	readerDone := make(chan struct{})
+	go func() {
+		defer close(readerDone)
+		readerSet.EvaluateDeterministic(&EvaluationContext{Path: path, Document: &path.EffectiveDocument})
+	}()
+	<-entered
+	simulator := &EvaluationDefinition{
+		Type:            "test-concurrent-simulator",
+		Name:            "test concurrent simulator",
+		Kind:            EvaluationKindSimulator,
+		AllowSimulation: true,
+		ValidateConfig:  func(any) error { return nil },
+		ParseConfig:     func(config any) (any, error) { return config, nil },
+		EvaluatePath: func(ctx *EvaluationContext, _ any) (PathResult, error) {
+			if err := requireResimulationAllowed("simulatePurchases"); err != nil {
+				return nil, err
+			}
+			return &cannedResult{}, nil
+		},
+		Status: func(PathResult, types.JsonValue) types.EvaluationResultStatus {
+			return types.StatusSatisfied
+		},
+	}
+	simulatorSet := &EvaluationRuntimeSet{runtimes: []*instanceRuntime{{
+		evaluationType: simulator.Type,
+		configuredRaw:  map[string]any{},
+		instanceID:     "simulator",
+		name:           "simulator",
+		definition:     simulator,
+	}}}
+	simulatorSet.EvaluateDeterministic(&EvaluationContext{Path: path, Document: &path.EffectiveDocument})
+	unblock()
+	<-readerDone
+	runtime := simulatorSet.runtimes[0]
+	if runtime.deterministic == nil {
+		t.Fatalf("simulator must resimulate during a concurrent reader, got %+v", runtime.diagnostics)
+	}
+	for _, diagnostic := range runtime.diagnostics {
+		if diagnostic.Code == "evaluation-runtime-error" {
+			t.Fatalf("simulator must not report a reader violation, got %+v", runtime.diagnostics)
+		}
 	}
 }

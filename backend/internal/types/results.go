@@ -36,6 +36,7 @@ type EvaluationResultTables struct {
 	PostingFulfillment    []EvaluationResultEnvelope `json:"postingFulfillment"`
 	CycleFulfillment      []EvaluationResultEnvelope `json:"cycleFulfillment"`
 	PlannedPurchases      []EvaluationResultEnvelope `json:"plannedPurchases,omitempty"`
+	WhatIf                []EvaluationResultEnvelope `json:"whatIf,omitempty"`
 }
 
 type EvaluationResultCollection struct {

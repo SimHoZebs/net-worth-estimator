@@ -22,12 +22,11 @@ export function useCurrentPosition({
 		enabled: enabled && activeDocument !== null,
 		queryFn: async ({ signal }) => {
 			if (!activeDocument) throw new Error("No financial model is available.");
-			// The generated client takes the request body first and request
-			// options second; keep that order so the document is sent.
+			// Stored-only: the server resolves the saved model. The local
+			// document supplies only the as-of date.
 			const response = (
 				await resolveCurrentPosition(
 					{
-						document: activeDocument,
 						asOfDate,
 					} as unknown as PositionRequestBody,
 					{ signal },

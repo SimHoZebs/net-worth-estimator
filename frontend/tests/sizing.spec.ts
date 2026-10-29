@@ -107,15 +107,23 @@ for (const width of [320, 390, 768, 1440]) {
 		await expect(
 			page.getByRole("row", { name: /Sizing regression/ }),
 		).toBeVisible();
-		// Stage a transaction edit: the draft-bar layout checks below need an
-		// unsaved change, which account writes no longer produce. Navigate
-		// directly: the sidebar links hide behind the nav drawer on phones.
+		// Stage a transaction edit and hold its save: the retained draft
+		// keeps the banner mounted for the layout checks below. Edits save
+		// immediately now, so only a failed save leaves a banner behind.
+		await page.route("**/v1/recurrence-rules/*", async (route) => {
+			if (route.request().method() !== "PATCH") return route.continue();
+			return route.fulfill({
+				status: 409,
+				contentType: "application/problem+json",
+				json: { status: 409, detail: "Sizing check holds the save." },
+			});
+		});
 		await page.goto("/#transactions");
 		await page.getByRole("tab", { name: /Recurring/ }).click();
 		await page.getByRole("button", { name: "Monthly investing" }).click();
 		await page.getByLabel("Amount (USD)").click();
 		await page.getByLabel("Amount (USD)").fill("900");
-		await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+		await page.getByRole("button", { name: "Save changes" }).click();
 		await expect(
 			page.getByRole("dialog", { name: "Monthly investing" }),
 		).not.toBeVisible();
@@ -144,11 +152,14 @@ for (const width of [320, 390, 768, 1440]) {
 		expect(fieldBox!.y + fieldBox!.height).toBeLessThanOrEqual(barBox!.y + 1);
 		await lastField.click();
 		await expect(lastField).toBeFocused();
+		// Release the held save and persist the retained draft from the
+		// banner; the bar unmounts once the save lands.
+		await page.unroute("**/v1/recurrence-rules/*");
 		await page.getByRole("button", { name: "Save changes" }).click();
-		await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+		await expect(page.getByText("Changes saved.")).toBeVisible();
 		await expect(bar).toHaveCount(0);
 		await expectWithinViewport(
-			page.getByRole("status").filter({ hasText: "Plan saved on the server." }),
+			page.getByRole("status").filter({ hasText: "Changes saved." }),
 			page,
 		);
 	});

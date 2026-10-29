@@ -37,7 +37,7 @@ import {
 	type Plan,
 } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { stageAndSave } from "../../state/workspaceWrites.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { Badge } from "../Badge.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
@@ -480,7 +480,6 @@ function useTransactionEdit({
 	plan: Plan;
 	onClose: () => void;
 }) {
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	// Only the clicked value is editable; null renders the pure read view.
 	const [activeField, setActiveField] = useState<EditField | null>(null);
 	const [touched, setTouched] = useState(false);
@@ -559,9 +558,9 @@ function useTransactionEdit({
 			setError(validated.message);
 			return;
 		}
-		// Like the overlay editor, a successful apply returns to the
-		// underlying view so Save/Discard stay one click away.
-		if (updatePlan(validated)) onClose();
+		// Like the overlay editor, a successful save returns to the
+		// underlying view.
+		if (stageAndSave(validated)) onClose();
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
@@ -575,7 +574,7 @@ function useTransactionEdit({
 				/>
 				<IconButton
 					icon={Save}
-					label="Apply unsaved changes"
+					label="Save changes"
 					type="submit"
 					form={formId}
 					disabled={Boolean(readOnlyReason)}
@@ -610,7 +609,6 @@ function MarkAsSubscriptionAction({
 	locked: boolean;
 	onDone: () => void;
 }) {
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const [error, setError] = useState<string | null>(null);
 	if (
 		planTransaction.frequency !== "once" ||
@@ -624,8 +622,8 @@ function MarkAsSubscriptionAction({
 			setError(next.message);
 			return;
 		}
-		if (updatePlan(next)) onDone();
-		else setError("That change could not be applied to the plan.");
+		if (stageAndSave(next)) onDone();
+		else setError("That change could not be applied.");
 	};
 	return (
 		<Notice className="my-4">
@@ -843,7 +841,12 @@ export function TransactionDetail({
 						</div>
 					)}
 					<div className="mt-3 flex flex-wrap items-center gap-2">
-						{transaction.pending ? (
+						{transaction.void ? (
+							<Badge tone="neutral">
+								Did not post
+								<span className="sr-only">bank hold that did not post</span>
+							</Badge>
+						) : transaction.pending ? (
 							<Badge tone="warning">
 								<Clock3 size={10} aria-hidden="true" />
 								Pending

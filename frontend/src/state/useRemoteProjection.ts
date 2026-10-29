@@ -48,7 +48,6 @@ export interface ProjectionDateRange {
 
 export interface UseRemoteProjectionOptions {
 	document?: FinancialModelDocument | null;
-	draftDocument?: FinancialModelDocument | null;
 	years?: number;
 	ranges?: boolean;
 	// Request-local evaluation scope. It participates in document/cache identity.
@@ -56,9 +55,7 @@ export interface UseRemoteProjectionOptions {
 	// Requested timeline slice. Undefined keeps the full span the hook has
 	// always fetched: everything through the horizon end.
 	dateRange?: ProjectionDateRange;
-	// When false the hook issues no requests. The saved-plan projection is
-	// identical to the active one whenever there is no draft, so running it
-	// separately would compute the same projection twice.
+	// When false the hook issues no requests.
 	enabled?: boolean;
 }
 
@@ -89,12 +86,11 @@ async function fetchDeterministicResult(
 export function projectionRequest(
 	document: FinancialModelDocument,
 	years: number,
-): DeterministicProjectionRequest {
+): Omit<DeterministicProjectionRequest, "document"> {
 	const horizonYears = Number.isFinite(years)
 		? Math.max(1, Math.trunc(years))
 		: 1;
 	return {
-		document,
 		settings: {
 			fallbackProjectionStartDate: projectionStartDate(document),
 			horizonYears,
@@ -442,7 +438,6 @@ function isAbortError(cause: unknown): boolean {
 
 export function useRemoteProjection({
 	document: documentOverride,
-	draftDocument: draftOverride,
 	years: yearsOverride,
 	ranges: rangesOverride,
 	evaluations: evaluationsOverride,
@@ -452,7 +447,6 @@ export function useRemoteProjection({
 	const { activeDocument, baseDocument, baseKey, evalKey } =
 		useProjectionDocument({
 		document: documentOverride,
-		draftDocument: draftOverride,
 		evaluations: evaluationsOverride,
 	});
 	const storeYears = useUiStore((state) => state.years);

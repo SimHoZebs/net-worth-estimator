@@ -62,6 +62,7 @@ import {
 	saveWorkspace,
 	importServerDocument,
 	reloadDraft,
+	stageAndSave,
 	useWorkspaceWriteError,
 	useWorkspaceSaving,
 } from "./workspaceWrites.ts";
@@ -1586,6 +1587,42 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
+	it("saves immediately when an edit is staged through stageAndSave", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		const model = modelFixture();
+		const server = stubTestServer(undefined, model);
+		const rendered = renderHook(() => useRemoteWorkspace());
+		await rendered.settle();
+		const plan = rendered.result().plan!;
+		const purchase = {
+			id: "01900000-0000-7000-8000-000000000002",
+			name: "New laptop",
+			amount: 1200,
+			fromId: "cash",
+			startDate: "2026-02-15",
+			enabled: true,
+			readOnly: false,
+		};
+		expect(
+			stageAndSave({
+				...plan,
+				plannedPurchases: [...plan.plannedPurchases, purchase],
+			}),
+		).toBe(true);
+		await waitFor(() =>
+			expect(
+				server.calls.filter(
+					(call) => call.method === "POST" && call.url === "/v1/postings",
+				),
+			).toHaveLength(1),
+		);
+		await rendered.settle();
+		expect(rendered.result().workspace?.draft).toBeNull();
+		expect(rendered.result().error).toBeNull();
+		expect(rendered.result().plan?.plannedPurchases).toContainEqual(purchase);
+		rendered.unmount();
+	});
+
 	it.each([
 		{ fromReadOnly: true, toReadOnly: false },
 		{ fromReadOnly: false, toReadOnly: true },
@@ -1833,7 +1870,7 @@ describe("remote workspace state", () => {
 		third.unmount();
 	});
 
-	it("rejects a lossy display import until explicit conversion review exists", async () => {
+	it("rejects a lossy edit the server cannot represent", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		stubTestServer(() => ({
@@ -1846,7 +1883,7 @@ describe("remote workspace state", () => {
 			...rendered.result().plan!,
 			assumptions: { inflation: 2, volatility: 0 },
 		};
-		expect(rendered.result().replace(lossyPlan)).toBe(false);
+		expect(rendered.result().updatePlan(lossyPlan)).toBe(false);
 		await rendered.settle();
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
