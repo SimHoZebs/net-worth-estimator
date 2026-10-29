@@ -4,8 +4,8 @@
 // accept and reject identically; each purpose module owns its semantic checks.
 export const devOptions = {
   from: { type: "string" },
-  account: { type: "string" },
-  "source-account": { type: "string" },
+  user: { type: "string" },
+  "source-user": { type: "string" },
   slot: { type: "string" },
   "app-port": { type: "string" },
   "casdoor-port": { type: "string" },

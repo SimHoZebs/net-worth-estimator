@@ -67,7 +67,7 @@ test("invalid sources do not leave an accepted snapshot or overwrite an existing
   }
 });
 
-test("application snapshot includes multiple accounts and identity state in one file", async () => {
+test("application snapshot includes multiple users and identity state in one file", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "waypoint-application-snapshot-"));
   const source = resolve(dir, "app.db");
   const writer = new DatabaseSync(source);

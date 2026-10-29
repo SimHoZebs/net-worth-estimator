@@ -3,26 +3,26 @@
 ## Boundary
 
 `NET_WORTH_ESTIMATOR_DB` names one application SQLite database. It contains all
-private accounts, the approved guest sample, and application sessions and grants.
+private users, the approved guest sample, and application sessions and grants.
 Casdoor remains the external identity provider with its own state directory.
 
-An application account is a signed-in user. It differs from a financial account
-in the model's `accounts` table. `app_accounts` records immutable OIDC identities;
-the store row ID is the account scope itself. The owner key derives from the
+An application user is a signed-in user. It differs from a financial account
+in the model's `accounts` table. `users` records immutable OIDC identities;
+the store row ID is the user scope itself. The owner key derives from the
 exact verified issuer and subject, not a username or email.
 
-Each financial table carries a non-null `account_id`. Composite keys allow the same
-entity IDs and preset names in different accounts. Composite foreign keys prevent
-relational references across accounts. JSON references validate against the scoped
-financial document. The sample uses the synthetic `sample` account.
+Each financial table carries a non-null `user_id`. Composite keys allow the same
+entity IDs and preset names in different users. Composite foreign keys prevent
+relational references across users. JSON references validate against the scoped
+financial document. The sample uses the synthetic `sample` user.
 
 Deployment owns database creation and schema setup. The running server only opens
 an existing, compatible database. A financial store holds
-one immutable account ID. The authenticated router resolves access before it creates
-that scope. An empty or missing scope never selects a default private account.
+one immutable user ID. The authenticated router resolves access before it creates
+that scope. An empty or missing scope never selects a default private user.
 
 Schema migration records are global. Model metadata, sync state, settings,
-ordering, presets, identity registries, and artifact retention are account-scoped.
+ordering, presets, identity registries, and artifact retention are user-scoped.
 Application sessions, provider grants, and logout replay records remain global
 identity tables. Financial clear, CSV import, refresh, and sample publication
 never replace those identity tables.
@@ -63,30 +63,30 @@ harmless). Do not put setup in the server entrypoint or an automatic startup
 dependency. Outside Komodo, run this maintenance command explicitly.
 Dev setup and the isolated fixture harness also provision explicitly.
 
-New user signup still inserts account and default-preset rows. It does not
+New user signup still inserts user and default-preset rows. It does not
 create database files or change schema.
 
 ## Rollback
 
 Before new writes, stop the API and restore the previous images and database
-configuration. Do not silently restore an older backup over current account data.
+configuration. Do not silently restore an older backup over current user data.
 
 After new writes, a rollback requires reconciliation or an accepted loss of those
-writes. Do not silently restore an older backup over current account data.
+writes. Do not silently restore an older backup over current user data.
 
 ## Backups and financial replacement
 
 Treat the whole application database as a credential store. It contains provider
-tokens and financial data for every account. A full backup is private and must
+tokens and financial data for every user. A full backup is private and must
 never serve as a guest sample or a frontend asset.
 
-A financial replacement selects one explicit account. It preserves all other accounts
+A financial replacement selects one explicit user. It preserves all other users
 and all identity state. Sample publication creates an approved snapshot, not a
 live alias. It removes private upstream identities, links, sync times, source
 paths, migration history, and projection history from the published content.
 
-Server-level SimpleFIN credentials remain bound to the configured owner's account.
-Other private accounts and the sample never inherit those credentials. The global
+Server-level SimpleFIN credentials remain bound to the configured owner.
+Other private users and the sample never inherit those credentials. The global
 read-only switch still blocks editor writes.
 
 ## Verification
@@ -100,24 +100,24 @@ node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 ```
 
 Use identical entity IDs, preset names, sync identities, and projection inputs
-in two accounts. Exercise imports, clears, deletes, reorders, sync, and artifact
-eviction. Every result must remain within the selected account.
+in two users. Exercise imports, clears, deletes, reorders, sync, and artifact
+eviction. Every result must remain within the selected user.
 
 The current deployment keeps one API instance and one SQLite writer.
 
-## Offline account replacement
+## Offline user replacement
 
-The destination private account must already exist. Use a separate migrated source
+The destination private user must already exist. Use a separate migrated source
 snapshot and stop the application before this operation:
 
 ```bash
 CGO_ENABLED=0 go -C backend run ./cmd/refreshplan \
   --db /private/application.db \
   --source /private/approved-snapshot.db \
-  --source-account "$SOURCE_ACCOUNT" --account "$TARGET_ACCOUNT"
+  --source-user "$SOURCE_USER" --user "$TARGET_USER"
 ```
 
-Use `--sample` instead of `--account` for approved guest publication. Replacement
+Use `--sample` instead of `--user` for approved guest publication. Replacement
 discards derived projection artifacts. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
@@ -125,4 +125,4 @@ Direct command users must take that backup themselves.
 The API container includes `setupdb`, `importcsv`, and `refreshplan` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
-server container for migration or account replacement.
+server container for migration or user replacement.
