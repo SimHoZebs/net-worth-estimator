@@ -15,6 +15,7 @@ func (t *EvaluationTables) Tables() []EvaluationTable[EvaluationInstance[JsonVal
 		{EvaluationTypePostingFulfillment, &t.PostingFulfillment},
 		{EvaluationTypeCycleFulfillment, &t.CycleFulfillment},
 		{EvaluationTypePlannedPurchases, &t.PlannedPurchases},
+		{EvaluationTypeWhatIf, &t.WhatIf},
 	}
 }
 
@@ -35,5 +36,6 @@ func (t *EvaluationResultTables) Tables() []EvaluationTable[EvaluationResultEnve
 		{EvaluationTypePostingFulfillment, &t.PostingFulfillment},
 		{EvaluationTypeCycleFulfillment, &t.CycleFulfillment},
 		{EvaluationTypePlannedPurchases, &t.PlannedPurchases},
+		{EvaluationTypeWhatIf, &t.WhatIf},
 	}
 }
