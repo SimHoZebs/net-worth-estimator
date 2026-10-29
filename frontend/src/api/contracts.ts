@@ -247,6 +247,7 @@ export interface EvaluationTables extends HumaMetadata {
 	postingFulfillment: PostingFulfillmentEvaluation[];
 	cycleFulfillment?: CycleFulfillmentEvaluation[];
 	plannedPurchases?: EvaluationInstance[];
+	whatIf?: EvaluationInstance[];
 }
 
 export interface FinancialModelDocument extends HumaMetadata {
@@ -399,6 +400,7 @@ export interface EvaluationResultTables extends HumaMetadata {
 	postingFulfillment: EvaluationResultEnvelope[];
 	cycleFulfillment?: EvaluationResultEnvelope[];
 	plannedPurchases?: EvaluationResultEnvelope[];
+	whatIf?: EvaluationResultEnvelope[];
 }
 
 export interface ProjectionResult extends HumaMetadata {

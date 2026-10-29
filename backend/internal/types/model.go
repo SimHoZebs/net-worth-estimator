@@ -17,6 +17,7 @@ const (
 	EvaluationTypePostingFulfillment    = "postingFulfillment"
 	EvaluationTypeCycleFulfillment      = "cycleFulfillment"
 	EvaluationTypePlannedPurchases      = "plannedPurchases"
+	EvaluationTypeWhatIf                = "whatIf"
 )
 
 // EvaluationTypeOrder controls evaluation type ordering; table arrays
@@ -28,6 +29,7 @@ var EvaluationTypeOrder = []string{
 	EvaluationTypePostingFulfillment,
 	EvaluationTypeCycleFulfillment,
 	EvaluationTypePlannedPurchases,
+	EvaluationTypeWhatIf,
 }
 
 // JsonValue represents arbitrary JSON values in wire payloads.

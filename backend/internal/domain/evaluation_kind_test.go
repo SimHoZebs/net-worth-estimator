@@ -56,7 +56,7 @@ func TestEvaluationRegistryValidatesKnownDefinitions(t *testing.T) {
 	for _, entry := range evaluationRegistryInstance.List() {
 		definition, _ := evaluationRegistryInstance.Get(entry.Type)
 		switch entry.Type {
-		case types.EvaluationTypePlannedPurchases, types.EvaluationTypeFinancialIndependence:
+		case types.EvaluationTypePlannedPurchases, types.EvaluationTypeFinancialIndependence, types.EvaluationTypeWhatIf:
 			if !definition.IsSimulator() {
 				t.Fatalf("%s must be an explicit simulator", entry.Type)
 			}

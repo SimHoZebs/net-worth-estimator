@@ -64,6 +64,19 @@ type CycleFulfillmentConfig struct {
 	Budget       float64  `json:"budget"`
 }
 
+// WhatIfConfig carries hypothetical additions, disables, and modified copies
+// on top of saved state. A modified row is represented as a disable plus an
+// addition with the same identity. The simulator overlays this set in a branch
+// without mutating saved rows. Promote replays it as sequential row writes.
+type WhatIfConfig struct {
+	AddedAccounts      []Account        `json:"addedAccounts,omitempty"`
+	AddedPostings      []Posting        `json:"addedPostings,omitempty"`
+	AddedRules         []RecurrenceRule `json:"addedRules,omitempty"`
+	DisabledAccountIDs []string         `json:"disabledAccountIds,omitempty"`
+	DisabledPostingIDs []string         `json:"disabledPostingIds,omitempty"`
+	DisabledRuleIDs    []string         `json:"disabledRuleIds,omitempty"`
+}
+
 // EvaluationInstance is the generic configured evaluation row.
 type EvaluationInstance[T any] struct {
 	InstanceID string `json:"instanceId"`
@@ -80,6 +93,7 @@ type (
 	BalanceEvaluation     = EvaluationInstance[JsonValue]
 	FulfillmentEvaluation = EvaluationInstance[JsonValue]
 	CycleEvaluation       = EvaluationInstance[JsonValue]
+	WhatIfEvaluation      = EvaluationInstance[JsonValue]
 )
 
 type EvaluationTables struct {
@@ -89,6 +103,7 @@ type EvaluationTables struct {
 	PostingFulfillment    []FulfillmentEvaluation         `json:"postingFulfillment"`
 	CycleFulfillment      []CycleEvaluation               `json:"cycleFulfillment"`
 	PlannedPurchases      []EvaluationInstance[JsonValue] `json:"plannedPurchases,omitempty"`
+	WhatIf                []WhatIfEvaluation              `json:"whatIf,omitempty"`
 }
 
 func EmptyEvaluationTables() EvaluationTables {

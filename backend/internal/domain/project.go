@@ -16,6 +16,7 @@ func init() {
 	evaluationRegistryInstance.Register(postingFulfillmentDefinition)
 	evaluationRegistryInstance.Register(cycleFulfillmentDefinition)
 	evaluationRegistryInstance.Register(plannedPurchasesDefinition)
+	evaluationRegistryInstance.Register(whatIfDefinition)
 }
 
 // EvaluateProjectionPath runs configured deterministic evaluations over a path.
