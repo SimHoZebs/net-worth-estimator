@@ -37,6 +37,7 @@ import {
 } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { saveWorkspace } from "../../state/workspaceWrites.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { Badge } from "../Badge.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
@@ -551,9 +552,13 @@ function useMovementEdit({
 			setError(validated.message);
 			return;
 		}
-		// Like the overlay editor, a successful apply returns to the
-		// underlying view so Save/Discard stay one click away.
-		if (updatePlan(validated)) onClose();
+		// Stored-only: apply updates the draft then saves immediately. A
+		// failed save leaves the draft for the DraftBar retry path; a
+		// successful save returns to the underlying view.
+		if (updatePlan(validated)) {
+			onClose();
+			void saveWorkspace();
+		}
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
@@ -612,8 +617,10 @@ function MarkAsSubscriptionAction({
 			setError(next.message);
 			return;
 		}
-		if (updatePlan(next)) onDone();
-		else setError("That change could not be applied to the plan.");
+		if (updatePlan(next)) {
+			onDone();
+			void saveWorkspace();
+		} else setError("That change could not be applied to the plan.");
 	};
 	return (
 		<Notice className="my-4">

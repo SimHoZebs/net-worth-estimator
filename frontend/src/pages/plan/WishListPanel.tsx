@@ -20,6 +20,7 @@ import { movePurchase, purchaseQueue } from "../../domain/purchases.ts";
 import { horizonDate, type PurchaseSchedule } from "../../domain/result.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { saveWorkspace } from "../../state/workspaceWrites.ts";
 import {
 	useDraftConflict,
 	useWorkspaceReadOnly,
@@ -58,10 +59,11 @@ export function WishListPanel({
 		.reduce((sum, item) => sum + item.amount, 0);
 	const move = (item: PlannedPurchase, direction: -1 | 1) => {
 		const next = movePurchase(plan, item.id, direction);
-		if (onUpdate(next))
-			setAnnouncement(
-				`${item.name} is now priority ${purchaseQueue(next.plannedPurchases).findIndex((entry) => entry.id === item.id) + 1}.`,
-			);
+		if (!onUpdate(next)) return;
+		setAnnouncement(
+			`${item.name} is now priority ${purchaseQueue(next.plannedPurchases).findIndex((entry) => entry.id === item.id) + 1}.`,
+		);
+		void saveWorkspace();
 	};
 	return (
 		<section aria-label="Planned purchases" className="@container/wish-list">
@@ -189,7 +191,10 @@ export function WishListPanel({
 					plan={plan}
 					item={editor.item}
 					readOnly={locked || Boolean(editor.item?.readOnly)}
-					onApply={onUpdate}
+					onApply={async (next) => {
+						if (!onUpdate(next)) return false;
+						return saveWorkspace();
+					}}
 					applyError={applyError}
 					onClose={() => setEditor(null)}
 				/>
@@ -199,7 +204,7 @@ export function WishListPanel({
 					title={`Remove ${remove.name}?`}
 					eyebrow="Planned purchases"
 					cancelLabel="Keep item"
-					confirmLabel="Remove from unsaved changes"
+					confirmLabel="Remove purchase"
 					onCancel={() => setRemove(null)}
 					onConfirm={() => {
 						if (
@@ -209,11 +214,13 @@ export function WishListPanel({
 									(item) => item.id !== remove.id,
 								),
 							})
-						)
+						) {
 							setRemove(null);
+							void saveWorkspace();
+						}
 					}}
 				>
-					<p>Your saved plan stays intact until you save these changes.</p>
+					<p>This removes the purchase immediately.</p>
 				</ConfirmDialog>
 			)}
 		</section>
