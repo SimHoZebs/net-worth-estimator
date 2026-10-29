@@ -7,12 +7,20 @@ import {
 import { useWorkspaceWriteError } from "./workspaceWrites.ts";
 import { ApiHttpError } from "../api/index.ts";
 
+/**
+ * @deprecated Use row hooks (`useAccountBalances`/`useTransactions`) plus
+ * projection slices, or `useAccountScope` for the verified account. The
+ * `Plan` aggregate stays only for the draft/review layer until the
+ * store lane removes it.
+ */
 export function usePlan() {
 	const draft = useWorkspaceStore((state) => state.draft);
 	const model = useServerModel();
 	return model.data?.conversion ? (draft ?? model.data.conversion.plan) : null;
 }
-export function useWorkspaceReadOnly() {
+
+/** Read-only policy for the verified account (sample accounts stay read-only). */
+export function useAccountReadOnly() {
 	const model = useServerModel();
 	const status = useServerStatus();
 	const error = useWorkspaceWriteError();
@@ -21,6 +29,11 @@ export function useWorkspaceReadOnly() {
 		model.data?.conversion?.plan.readOnly ||
 		(error instanceof ApiHttpError && error.status === 403),
 	);
+}
+
+/** @deprecated Use useAccountReadOnly. */
+export function useWorkspaceReadOnly() {
+	return useAccountReadOnly();
 }
 export function useDraftChangeCount() {
 	return useWorkspaceStore(selectDraftChangeCount);

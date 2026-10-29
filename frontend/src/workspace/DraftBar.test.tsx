@@ -74,9 +74,9 @@ describe("draft bar presence", () => {
 		await waitFor(() => expect(saveWorkspace).toHaveBeenCalledOnce());
 	});
 	it("lets the notification store own confirmation dismissal", () => {
-		notifySuccess("workspace-notice", "Plan saved.");
+		notifySuccess("workspace-notice", "Changes saved.");
 		const view = render(<NotificationCenter />);
-		expect(view.getByRole("status").textContent).toContain("Plan saved.");
+		expect(view.getByRole("status").textContent).toContain("Changes saved.");
 		fireEvent.click(view.getByRole("button", { name: "Dismiss notification" }));
 		expect(useNotifications.getState().items).toHaveLength(0);
 		expect(useWorkspaceStore.getState()).not.toHaveProperty("notice");
