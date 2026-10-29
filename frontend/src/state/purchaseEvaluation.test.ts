@@ -172,6 +172,7 @@ describe("isolated purchase evaluation", () => {
 		}).document;
 		const before = JSON.stringify(document);
 		const deterministicCalls: unknown[] = [];
+		let purchasesCalls = 0;
 		const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 			const headers = new Headers({ "content-type": "application/json" });
 			const resource = getResourceScope().resource?.id;
@@ -187,7 +188,8 @@ describe("isolated purchase evaluation", () => {
 					accountBalance: [],
 					postingFulfillment: [],
 				};
-				if (request.settings.evaluations.plannedPurchases?.length)
+				if (request.settings.evaluations.plannedPurchases?.length) {
+					purchasesCalls += 1;
 					evaluations.plannedPurchases = [
 						{
 							instanceId: PURCHASE_EVALUATION_ID,
@@ -200,17 +202,14 @@ describe("isolated purchase evaluation", () => {
 									{
 										postingId: "laptop",
 										date:
-											request.document?.postings.find(
-												(item) => item.id === "laptop",
-											)?.purchase?.priority === 0
-												? "2026-02-01"
-												: "2026-03-01",
+											purchasesCalls === 1 ? "2026-02-01" : "2026-03-01",
 										amount: 500,
 									},
 								],
 							},
 						},
 					];
+				}
 				return new Response(
 					JSON.stringify({ result: resultFixture(evaluations), issues: [] }),
 					{ headers },

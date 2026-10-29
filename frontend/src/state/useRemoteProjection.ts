@@ -86,12 +86,11 @@ async function fetchDeterministicResult(
 export function projectionRequest(
 	document: FinancialModelDocument,
 	years: number,
-): DeterministicProjectionRequest {
+): Omit<DeterministicProjectionRequest, "document"> {
 	const horizonYears = Number.isFinite(years)
 		? Math.max(1, Math.trunc(years))
 		: 1;
 	return {
-		document,
 		settings: {
 			fallbackProjectionStartDate: projectionStartDate(document),
 			horizonYears,
