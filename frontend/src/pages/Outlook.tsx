@@ -7,10 +7,7 @@ import { Notice } from "../components/Notice.tsx";
 import { TextButton } from "../components/Button.tsx";
 import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import {
-	useUserPlan,
-	useUserReadOnly,
-} from "../state/useUserScope.ts";
+import { useUserPlan, useUserReadOnly } from "../state/useUserScope.ts";
 import {
 	useCheckpoints,
 	useServerStatus,

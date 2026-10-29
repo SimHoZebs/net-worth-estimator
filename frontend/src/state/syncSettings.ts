@@ -33,11 +33,7 @@ function syncTriggerKey(scope = getUserScope()) {
 }
 
 function current(scope: UserScope, signal?: AbortSignal) {
-	if (
-		scope !== getUserScope() ||
-		scope.status !== "ready" ||
-		signal?.aborted
-	)
+	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
 		throw new Error("The active resource changed or the request was canceled.");
 }
 

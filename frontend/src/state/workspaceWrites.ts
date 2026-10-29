@@ -17,10 +17,7 @@ import {
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
 import type { Plan } from "@/domain/model.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
 	getServerModel,
@@ -173,9 +170,7 @@ export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
 
 export async function saveWorkspace(): Promise<boolean> {
 	const scope = getUserScope();
-	if (
-		serverQueryClient().isFetching({ queryKey: userResourceKey("model") })
-	) {
+	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
 		notifyError(
 			"workspace",
 			"Wait for the current server load to finish before saving.",
@@ -241,9 +236,7 @@ export async function importServerDocument(
 	document: FinancialModelDocument,
 ): Promise<boolean> {
 	const scope = getUserScope();
-	if (
-		serverQueryClient().isFetching({ queryKey: userResourceKey("model") })
-	) {
+	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
 		notifyError(
 			"workspace",
 			"Wait for the current server load to finish before importing.",

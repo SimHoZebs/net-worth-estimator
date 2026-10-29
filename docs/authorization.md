@@ -22,7 +22,7 @@ Casdoor policies define the actions that role permits. The global server
 read-only flag still overrides write permission.
 
 Actions are `user:*` under the Casdoor model (`waypoint/user-access`)
-with adapter `account-policy-store`. Permission resources are `users/*`
+with adapter `user-policy-store`. Permission resources are `users/*`
 and the global read-only `users/sample`. There are no `plans/*` resources
 and no legacy action strings: old databases and old Casdoor state have no
 migration path.

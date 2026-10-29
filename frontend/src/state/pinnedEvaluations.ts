@@ -4,10 +4,7 @@ import {
 	getPinnedEvaluations,
 	setPinnedEvaluations,
 } from "@/api/generated/endpoints.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 

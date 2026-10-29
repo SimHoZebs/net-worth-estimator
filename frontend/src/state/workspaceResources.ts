@@ -55,12 +55,8 @@ export function userResourceKey(
 }
 
 function current(scope: UserScope, signal?: AbortSignal) {
-	if (
-		scope !== getUserScope() ||
-		scope.status !== "ready" ||
-		signal?.aborted
-	)
-		throw new Error("The active account changed or the request was canceled.");
+	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
+		throw new Error("The active user changed or the request was canceled.");
 }
 
 const defaults = {

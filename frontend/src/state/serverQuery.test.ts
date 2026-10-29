@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	acceptUserScope,
-	suspendUserScope,
-} from "../auth/resourceScope.ts";
+import { acceptUserScope, suspendUserScope } from "../auth/resourceScope.ts";
 import {
 	clearResourceQueryCache,
 	cancelResourceQueries,

@@ -44,8 +44,8 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
 				{session?.authenticated
 					? "Session access is unavailable"
 					: failed
-						? "Cannot reach your account"
-						: "Your account. Your access."}
+						? "Cannot reach your data."
+						: "Your data. Your access."}
 			</h1>
 			<p className="mb-6 text-muted">
 				{session?.authenticated

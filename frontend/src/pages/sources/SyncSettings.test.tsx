@@ -481,14 +481,13 @@ it("hides bridge quota when the backend omits it", async () => {
 	stubApi({ configured: true, links: [] });
 	const { serverQueryClient } = await import("../../state/serverQuery.ts");
 	const { getUserScope } = await import("../../auth/resourceScope.ts");
-	const { userResourceKey } =
-		await import("../../state/workspaceResources.ts");
+	const { userResourceKey } = await import("../../state/workspaceResources.ts");
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	await screen.findByText(/Connected since/);
-	serverQueryClient().setQueryData(
-		userResourceKey("status", getUserScope()),
-		{ readOnly: false, syncConfigured: true },
-	);
+	serverQueryClient().setQueryData(userResourceKey("status", getUserScope()), {
+		readOnly: false,
+		syncConfigured: true,
+	});
 	await waitFor(() => {
 		expect(screen.queryByText(/syncs available/)).toBeNull();
 	});
