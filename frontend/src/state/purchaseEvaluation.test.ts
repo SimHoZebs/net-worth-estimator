@@ -223,13 +223,11 @@ describe("isolated purchase evaluation", () => {
 			({ active }) => ({
 				baseline: useRemoteProjection({
 					document: active,
-					draftDocument: null,
 					years: 1,
 					ranges: false,
 				}),
 				purchases: useRemoteProjection({
 					document: active,
-					draftDocument: null,
 					years: 1,
 					ranges: false,
 					evaluations: PURCHASE_EVALUATIONS,

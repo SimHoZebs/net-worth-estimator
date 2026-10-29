@@ -93,7 +93,7 @@ it("exposes pending then success without any forecast request", async () => {
 		return calls === 1 ? pending : { result };
 	});
 	const hook = renderHook(
-		() => useCurrentPosition({ document: model(), draftDocument: null }),
+		() => useCurrentPosition({ document: model() }),
 		{ wrapper },
 	);
 	expect(hook.result.current.status).toBe("pending");
@@ -112,7 +112,7 @@ it("clears previous-input data while the new position is pending", async () => {
 		return new Promise(() => {});
 	});
 	const hook = renderHook(
-		({ document }) => useCurrentPosition({ document, draftDocument: null }),
+		({ document }) => useCurrentPosition({ document }),
 		{ wrapper, initialProps: { document: model() } },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
@@ -132,7 +132,7 @@ it("exposes errors and retries explicitly", async () => {
 		return { result };
 	});
 	const hook = renderHook(
-		() => useCurrentPosition({ document: model(), draftDocument: null }),
+		() => useCurrentPosition({ document: model() }),
 		{ wrapper },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("error"));
@@ -155,7 +155,6 @@ it("does not request a disabled position", () => {
 		() =>
 			useCurrentPosition({
 				document: model(),
-				draftDocument: null,
 				enabled: false,
 			}),
 		{ wrapper },
@@ -164,7 +163,7 @@ it("does not request a disabled position", () => {
 	expect(calls).toHaveLength(0);
 });
 
-it("requests the draft model in preference to the saved model", async () => {
+it("requests the saved model", async () => {
 	setup();
 	const bodies: unknown[] = [];
 	vi.stubGlobal(
@@ -178,17 +177,15 @@ it("requests the draft model in preference to the saved model", async () => {
 		}),
 	);
 	const saved = model(100);
-	const draft = model(200);
-	const hook = renderHook(
-		() => useCurrentPosition({ document: saved, draftDocument: draft }),
-		{ wrapper },
-	);
+	const hook = renderHook(() => useCurrentPosition({ document: saved }), {
+		wrapper,
+	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
 	expect(
 		(bodies[0] as { document?: { checkpoints?: unknown[] } }).document,
-	).toEqual(draft);
+	).toEqual(saved);
 });
 
 it("separates identical models by resource identity", async () => {
@@ -219,7 +216,7 @@ it("separates identical models by resource identity", async () => {
 		);
 	selectScope("plans/one");
 	const hook = renderHook(
-		() => useCurrentPosition({ document: model(), draftDocument: null }),
+		() => useCurrentPosition({ document: model() }),
 		{ wrapper },
 	);
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
@@ -228,4 +225,59 @@ it("separates identical models by resource identity", async () => {
 	expect(hook.result.current.data).toBeNull();
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(seen).toEqual(["plans/one", "plans/two"]);
+});
+
+it("ignores workspace drafts and requests the saved model", async () => {
+	setup();
+	const bodies: unknown[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body ?? "{}")));
+			const headers = new Headers({ "content-type": "application/json" });
+			const resource = getResourceScope().resource?.id;
+			if (resource) headers.set("Waypoint-Resource", resource);
+			return new Response(JSON.stringify({ result }), { headers });
+		}),
+	);
+	const { useWorkspaceStore } = await import("./workspaceStore.ts");
+	useWorkspaceStore.setState({
+		draft: {
+			schemaVersion: 1,
+			name: "Draft marker",
+			origin: "personal",
+			startDate: "2026-01-01",
+			updatedAt: new Date().toISOString(),
+			revision: 1,
+			readOnly: false,
+			accounts: [
+				{
+					id: "draft-acc",
+					name: "Draft",
+					kind: "cash",
+					balance: 200,
+					minBalance: 0,
+					maxBalance: null,
+					color: null,
+					observedOn: "2026-01-01",
+					balanceCheck: false,
+					source: "Manual entry",
+					readOnly: false,
+				},
+			],
+			transactions: [],
+			plannedPurchases: [],
+			evaluations: [],
+			assumptions: { inflation: 2, volatility: 0 },
+		} as never,
+	});
+	const saved = model(100);
+	const hook = renderHook(() => useCurrentPosition({ document: saved }), {
+		wrapper,
+	});
+	await waitFor(() => expect(hook.result.current.status).toBe("success"));
+	expect(bodies).toHaveLength(1);
+	expect(
+		(bodies[0] as { document?: { checkpoints?: unknown[] } }).document,
+	).toEqual(saved);
 });
