@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Flag, Pin, TriangleAlert } from "lucide-react";
+import { Check, Flag, Pin, TriangleAlert } from "lucide-react";
 import { useId } from "react";
 import { Badge } from "@/components/Badge.tsx";
 import { IconButton } from "@/components/Button.tsx";
@@ -16,7 +16,6 @@ import {
 import { dateLabel, money, percent } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
 import { FinancialIndependenceModal } from "./FinancialIndependenceModal.tsx";
-import { IndependenceRange } from "./IndependenceRange.tsx";
 import { IndependenceVerdict } from "./IndependenceVerdict.tsx";
 
 function CoveragePreview({ candidate }: { candidate: IndependenceCandidate }) {
@@ -84,8 +83,18 @@ export function FinancialIndependenceCard({
 			<Card
 				tone={item.enabled ? "default" : "subtle"}
 				aria-labelledby={headingId}
+				className="relative"
 			>
-				<div className="flex items-start justify-between gap-3">
+				{item.enabled && analysis && (
+					<button
+						type="button"
+						aria-haspopup="dialog"
+						aria-label={`Inspect independence for ${item.name}`}
+						onClick={() => setInspector(true)}
+						className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+					/>
+				)}
+				<div className="relative flex items-start justify-between gap-3">
 					<h2
 						id={headingId}
 						className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold [overflow-wrap:anywhere]"
@@ -106,7 +115,7 @@ export function FinancialIndependenceCard({
 							onClick={pin.onPinChange}
 							disabled={pin.disabled}
 							aria-pressed={pin.pinned}
-							className="aria-pressed:bg-success-bg aria-pressed:text-success-text"
+							className="relative z-10 aria-pressed:bg-success-bg aria-pressed:text-success-text"
 						/>
 					)}
 				</div>
@@ -137,28 +146,13 @@ export function FinancialIndependenceCard({
 										type="button"
 										aria-haspopup="dialog"
 										onClick={() => setInspector(true)}
-										className="flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
+										className="relative z-10 flex min-h-6 items-center gap-1 border-0 bg-transparent p-0 text-left text-xs text-warning-text pointer-coarse:min-h-12"
 									>
 										<TriangleAlert size={14} aria-hidden="true" />
 										{analysis.diagnostics.length} source or configuration{" "}
 										{analysis.diagnostics.length === 1 ? "issue" : "issues"}
 									</button>
 								)}
-								<IndependenceRange
-									compact
-									range={range}
-									required={analysis.requiredConfidence}
-								/>
-								<button
-									type="button"
-									aria-haspopup="dialog"
-									aria-label={`Inspect independence for ${item.name}`}
-									onClick={() => setInspector(true)}
-									className="mt-auto flex items-center justify-between rounded-control border border-line-strong bg-surface px-3 py-3 text-xs font-semibold text-success-text hover:bg-hover"
-								>
-									Inspect independence{" "}
-									<ArrowUpRight size={15} aria-hidden="true" />
-								</button>
 							</>
 						) : (
 							<>

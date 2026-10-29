@@ -78,7 +78,6 @@ export function PinnedEvaluations({
 								<EvaluationCard
 									evaluation={item.result.evaluation}
 									result={item.result}
-									probability={range?.evaluationSuccess[id] ?? null}
 									pin={pin}
 								/>
 							) : (

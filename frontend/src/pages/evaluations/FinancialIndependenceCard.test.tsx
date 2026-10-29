@@ -300,8 +300,8 @@ describe("FinancialIndependenceCard", () => {
 			/>,
 		);
 		expect(view.getByText("Base case")).toBeTruthy();
-		expect(view.getByText("65%")).toBeTruthy();
-		expect(view.getByText(/90% required/)).toBeTruthy();
+		expect(view.queryByText("65%")).toBeNull();
+		expect(view.queryByText(/90% required/)).toBeNull();
 		const dialog = openInspector(view);
 		expect(dialog.getByText("Self-sustaining · Feb 2036")).toBeTruthy();
 		expect(dialog.getByText("90% required · 400 scenarios")).toBeTruthy();

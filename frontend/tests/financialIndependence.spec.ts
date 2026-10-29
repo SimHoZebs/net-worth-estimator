@@ -62,7 +62,7 @@ test("compact financial independence cards open an inspector without more calcul
 	).toHaveCount(0);
 	await expect(card.getByRole("slider")).toHaveCount(0);
 	await expect(card.getByRole("table")).toHaveCount(0);
-	await expect(card.getByText(/reached independence/)).toBeVisible();
+	await expect(card.getByText(/reached independence/)).toHaveCount(0);
 	const initialHeight = (await card.boundingBox())!.height;
 	expect(initialHeight).toBeLessThan(500);
 	const count = projections;
