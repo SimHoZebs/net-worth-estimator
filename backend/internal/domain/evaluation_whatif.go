@@ -107,44 +107,12 @@ func evaluateWhatIf(ctx *EvaluationContext, config any) (PathResult, error) {
 	base := ctx.Path.EffectiveDocument
 	overrides := whatIfOverridesFromParsed(config)
 	effective := types.ApplyModelOverrides(base, overrides)
-	startBalances := map[string]float64{}
-	for _, account := range effective.Accounts {
-		startBalances[account.ID] = 0
-	}
-	for _, row := range ctx.Path.Rows {
-		if !row.IsHistorical {
-			break
-		}
-		for _, snapshot := range row.AccountSnapshots {
-			startBalances[snapshot.AccountID] = snapshot.Balance
-		}
-	}
-	includeStartDateEvents := true
-	for _, row := range ctx.Path.Rows {
-		if row.IsHistorical && row.Date == ctx.Path.ProjectionStartDate {
-			includeStartDateEvents = false
-			break
-		}
-	}
-	request := types.SimulationRequest{
-		Model: types.FinancialModel{
-			Accounts:         effective.Accounts,
-			Postings:         effective.Postings,
-			RecurrenceRules:  effective.RecurrenceRules,
-			PaymentTerms:     effective.PaymentTerms,
-			PlannedPurchases: effective.PlannedPurchases,
-		},
-		InitialState: types.SimulationState{
-			Balances:                     startBalances,
-			LatestRealizedPostingAmounts: cloneStringFloatMap(ctx.Path.ProjectionStartPostingState.LatestRealizedPostingAmounts),
-			LatestRealizedPostingDates:   cloneStringMap(ctx.Path.ProjectionStartPostingState.LatestRealizedPostingDates),
-			RealizedPostingAmountsByYear: cloneNestedMap(ctx.Path.ProjectionStartPostingState.RealizedPostingAmountsByYear),
-		},
-		StartDate:              ctx.Path.ProjectionStartDate,
-		EndDate:                ctx.Path.ProjectionEndDate,
-		IncludeStartDateEvents: includeStartDateEvents,
-		MonteCarloSample:       ctx.MonteCarloSample,
-	}
+	// Reuse the shared candidate builder against the overlaid document.
+	// History rows and the projection window come from the base path; only
+	// the effective document is swapped.
+	branched := *ctx.Path
+	branched.EffectiveDocument = effective
+	request := purchasesCandidateRequest(&branched, ctx.MonteCarloSample)
 	run, err := Simulate(request)
 	if err != nil {
 		return nil, err

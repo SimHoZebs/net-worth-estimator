@@ -4,15 +4,15 @@ import {
 	fireEvent,
 	render,
 	screen,
+	waitFor,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { testPlan } from "../../mocks/plan.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
-import {
-	resetWorkspaceStore,
-	useWorkspaceStore,
-} from "../../state/workspaceStore.ts";
+import { stubTestServer } from "../../mocks/waypointServer.ts";
+import { resetServerQueryCache } from "../../state/serverQuery.ts";
+import { resetWorkspaceStore } from "../../state/workspaceStore.ts";
 import { RecurringRules } from "./RecurringRules.tsx";
 
 vi.mock("./TransactionDetail.tsx", () => ({
@@ -62,21 +62,24 @@ vi.mock("motion/react", async (importOriginal) => ({
 afterEach(() => {
 	cleanup();
 	resetWorkspaceStore();
+	resetServerQueryCache();
+	vi.unstubAllGlobals();
 });
 
 it("keeps an existing selected rule current across plan updates and closes it on removal", () => {
 	acceptTestResource();
 	resetWorkspaceStore();
+	resetServerQueryCache();
 	const account = testPlan.accounts[0]!;
-	const movement = {
-		...testPlan.movements[0]!,
+	const transaction = {
+		...testPlan.transactions[0]!,
 		id: "selected",
 		name: "Original rule",
 		frequency: "monthly" as const,
 		fromId: account.id,
 		toId: null,
 	};
-	const plan = { ...testPlan, movements: [movement] };
+	const plan = { ...testPlan, transactions: [transaction] };
 	const view = render(
 		<RecurringRules account={account} plan={plan} onEdit={() => {}} />,
 	);
@@ -92,7 +95,10 @@ it("keeps an existing selected rule current across plan updates and closes it on
 	view.rerender(
 		<RecurringRules
 			account={account}
-			plan={{ ...plan, movements: [{ ...movement, name: "Current rule" }] }}
+			plan={{
+				...plan,
+				transactions: [{ ...transaction, name: "Current rule" }],
+			}}
 			onEdit={() => {}}
 		/>,
 	);
@@ -100,31 +106,31 @@ it("keeps an existing selected rule current across plan updates and closes it on
 	view.rerender(
 		<RecurringRules
 			account={account}
-			plan={{ ...plan, movements: [] }}
+			plan={{ ...plan, transactions: [] }}
 			onEdit={() => {}}
 		/>,
 	);
 	expect(screen.queryByTestId("selected-rule")).toBeNull();
 });
 
-it("returns a rejected drag preview to the workspace order", () => {
+it("returns a rejected drag preview to the server order", async () => {
 	acceptTestResource();
 	resetWorkspaceStore();
+	resetServerQueryCache();
+	const server = stubTestServer();
 	const account = testPlan.accounts[0]!;
-	const movements = ["first", "second"].map((id) => ({
-		...testPlan.movements[0]!,
+	const transactions = ["first", "second"].map((id) => ({
+		...testPlan.transactions[0]!,
 		id,
 		name: id,
 		frequency: "monthly" as const,
 		fromId: account.id,
 		toId: null,
 	}));
-	const update = vi.fn(() => false);
-	useWorkspaceStore.setState({ updatePlan: update });
 	render(
 		<RecurringRules
 			account={account}
-			plan={{ ...testPlan, movements }}
+			plan={{ ...testPlan, transactions }}
 			onEdit={() => {}}
 		/>,
 	);
@@ -133,10 +139,20 @@ it("returns a rejected drag preview to the workspace order", () => {
 	);
 	const ids = () =>
 		screen.getAllByTestId("drag-row").map((row) => row.dataset.id);
+	server.writeOnce(
+		(method, path) =>
+			method === "POST" && path === "/v1/recurrence-rules/reorder",
+		new Error("The order could not be saved."),
+	);
 	fireEvent.pointerDown(screen.getAllByTestId("drag-row")[0]!);
 	act(() => motion.reorder(["second", "first"]));
 	expect(ids()).toEqual(["second", "first"]);
 	fireEvent.pointerUp(screen.getAllByTestId("drag-row")[0]!);
-	expect(update).toHaveBeenCalledOnce();
-	expect(ids()).toEqual(["first", "second"]);
+	await waitFor(() => expect(ids()).toEqual(["first", "second"]));
+	expect(
+		server.calls.some(
+			(call) =>
+				call.method === "POST" && call.url === "/v1/recurrence-rules/reorder",
+		),
+	).toBe(true);
 });

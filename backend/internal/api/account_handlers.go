@@ -3,6 +3,9 @@ package api
 import (
 	"context"
 
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/google/uuid"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -14,6 +17,13 @@ type accountBody struct {
 	MaxBalance *float64          `json:"maxBalance,omitempty"`
 	Color      *string           `json:"color,omitempty"`
 	Enabled    bool              `json:"enabled"`
+	// Balance with ObservedOn records the opening (create) or moved (update)
+	// balance observation atomically with the account write, so callers
+	// never sequence a second checkpoint request. Omitted balance leaves
+	// balance history untouched.
+	Balance *float64 `json:"balance,omitempty"`
+	// ObservedOn is the YYYY-MM-DD date of Balance. Required with Balance.
+	ObservedOn *string `json:"observedOn,omitempty"`
 	// Source is accepted and ignored: accounts carry no authorship flag.
 	// Row authorship lives in checkpoints/postings ("user" | "simplefin")
 	// plus account_links, mirroring the retired whole-document PUT contract.
@@ -45,12 +55,36 @@ type accountOutput struct {
 
 func accountID(account types.Account) string { return account.ID }
 
+func accountObservation(body accountBody) (*float64, types.IsoDate, error) {
+	if body.Balance == nil && body.ObservedOn == nil {
+		return nil, "", nil
+	}
+	if body.Balance == nil || body.ObservedOn == nil || *body.ObservedOn == "" {
+		return nil, "", huma.Error422UnprocessableEntity("balance and observedOn must be sent together")
+	}
+	return body.Balance, types.IsoDate(*body.ObservedOn), nil
+}
+
 func (s *Server) createAccount(_ context.Context, input *accountInput) (*accountOutput, error) {
 	account := input.Body.toAccount("")
+	if account.ID == "" {
+		id, err := uuid.NewV7()
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+		account.ID = id.String()
+	}
+	balance, observedOn, err := accountObservation(input.Body)
+	if err != nil {
+		return nil, err
+	}
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
+		if balance != nil {
+			document.Checkpoints = replaceByID(document.Checkpoints, account.ID+"\x00"+string(observedOn), checkpointKey, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: store.SourceUser})
+		}
 	}, func() (types.Account, error) {
-		return s.store.CreateAccount(account)
+		return s.store.CreateAccountWithBalance(account, balance, observedOn)
 	})
 	if err != nil {
 		return nil, err
@@ -63,10 +97,17 @@ func (s *Server) updateAccount(_ context.Context, input *struct {
 	Body accountBody `json:"body"`
 }) (*accountOutput, error) {
 	account := input.Body.toAccount(input.ID)
+	balance, observedOn, err := accountObservation(input.Body)
+	if err != nil {
+		return nil, err
+	}
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
+		if balance != nil {
+			document.Checkpoints = replaceByID(document.Checkpoints, account.ID+"\x00"+string(observedOn), checkpointKey, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: store.SourceUser})
+		}
 	}, func() (types.Account, error) {
-		return s.store.UpdateAccount(account)
+		return s.store.UpdateAccountWithBalance(account, balance, observedOn)
 	})
 	if err != nil {
 		return nil, err

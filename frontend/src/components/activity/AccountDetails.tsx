@@ -303,7 +303,7 @@ export function AccountDetails({
 			{!readOnly && (
 				<div className={mergeStyles(dialogActionsStyles, "mt-0")}>
 					<Button type="submit" variant="primary" disabled={!dirty}>
-						Apply unsaved changes
+						Save changes
 					</Button>
 				</div>
 			)}

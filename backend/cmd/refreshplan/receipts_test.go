@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -14,7 +14,7 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
 	seed(t, target)
-	db, err := store.OpenDatabase(source)
+	db, err := sqlite.OpenDatabase(source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForSample(t *tes
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
 	seed(t, target)
-	db, err := store.OpenDatabase(source)
+	db, err := sqlite.OpenDatabase(source)
 	if err != nil {
 		t.Fatal(err)
 	}

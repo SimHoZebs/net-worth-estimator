@@ -53,6 +53,18 @@ type postingOutput struct {
 
 func postingID(posting types.Posting) string { return posting.ID }
 
+// keepEchoedDestinations preserves a stored multi-destination set when a row
+// write echoes its display destination unchanged. The row endpoints carry a
+// single display destination, so an unchanged echo cannot express intent to
+// trim; an explicit change (different, cleared, or multi-valued) still
+// replaces the set verbatim.
+func keepEchoedDestinations(stored, incoming []string) []string {
+	if len(incoming) == 1 && len(stored) > 1 && stored[0] == incoming[0] {
+		return stored
+	}
+	return incoming
+}
+
 func (s *Server) createPosting(_ context.Context, input *postingInput) (*postingOutput, error) {
 	posting := input.Body.toPosting("")
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
@@ -73,6 +85,18 @@ func (s *Server) updatePosting(_ context.Context, input *struct {
 	ID   string      `path:"id"`
 	Body postingBody `json:"body"`
 }) (*postingOutput, error) {
+	if len(input.Body.Destinations) == 1 {
+		// An unchanged display echo keeps the stored set (see
+		// keepEchoedDestinations); the editor never models extra legs.
+		if stored, err := s.store.LoadDocument(); err == nil && stored != nil {
+			for _, existing := range stored.Postings {
+				if existing.ID == input.ID {
+					input.Body.Destinations = keepEchoedDestinations(existing.Destinations, input.Body.Destinations)
+					break
+				}
+			}
+		}
+	}
 	posting := input.Body.toPosting(input.ID)
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Postings = replaceByID(document.Postings, posting.ID, postingID, posting)

@@ -2,7 +2,7 @@ import type { EditorTarget } from "../domain/planEdits.ts";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
 import type { EditorProps } from "./editors/EditorForm.tsx";
 import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
-import { MovementEditor } from "./editors/MovementEditor.tsx";
+import { TransactionEditor } from "./editors/TransactionEditor.tsx";
 
 export type { EditorTarget } from "../domain/planEdits.ts";
 
@@ -16,15 +16,17 @@ export function PlanEditor({
 				<AccountEditor
 					key={target.item?.id ?? "new-account"}
 					item={target.item}
-					{...props}
+					onSaved={props.onClose}
+					onClose={props.onClose}
 				/>
 			);
-		case "movement":
+		case "transaction":
 			return (
-				<MovementEditor
-					key={target.item?.id ?? "new-movement"}
+				<TransactionEditor
+					key={target.item?.id ?? "new-transaction"}
 					item={target.item}
-					{...props}
+					onSaved={props.onClose}
+					onClose={props.onClose}
 				/>
 			);
 		case "evaluation":
@@ -32,7 +34,8 @@ export function PlanEditor({
 				<EvaluationEditor
 					key={target.item?.id ?? "new-evaluation"}
 					item={target.item}
-					{...props}
+					onSaved={props.onClose}
+					onClose={props.onClose}
 				/>
 			);
 	}

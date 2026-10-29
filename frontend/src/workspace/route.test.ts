@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Account, Evaluation, Movement } from "../domain/model.ts";
+import type { Account, Evaluation, Transaction } from "../domain/model.ts";
 import {
 	discardHash,
 	editorHash,
@@ -31,7 +31,7 @@ function account(id: string, name: string, archived = false): Account {
 	};
 }
 
-function movement(id: string): Movement {
+function transaction(id: string): Transaction {
 	return {
 		id,
 		name: id,
@@ -63,7 +63,7 @@ function evaluation(id: string): Evaluation {
 	};
 }
 
-const investMovement = movement("invest");
+const investTransaction = transaction("invest");
 const goalEvaluation = evaluation("goal-1");
 
 const plan = {
@@ -73,7 +73,7 @@ const plan = {
 		account("old", "Old account", true),
 		account("new", "New", true),
 	],
-	movements: [investMovement],
+	transactions: [investTransaction],
 	evaluations: [goalEvaluation],
 };
 
@@ -152,15 +152,19 @@ describe("parseHash", () => {
 		});
 		expect(parseHash("#transactions/invest/edit")).toEqual({
 			page: "transactions",
-			overlay: { type: "movementEdit", key: "invest" },
+			overlay: { type: "transactionEdit", key: "invest" },
+		});
+		expect(parseHash("#outlook/edit-transaction/invest")).toEqual({
+			page: "outlook",
+			overlay: { type: "transactionEdit", key: "invest" },
+		});
+		expect(parseHash("#accounts/edit-transaction/new")).toEqual({
+			page: "accounts",
+			overlay: { type: "transactionEdit", key: "new" },
 		});
 		expect(parseHash("#outlook/edit-movement/invest")).toEqual({
 			page: "outlook",
-			overlay: { type: "movementEdit", key: "invest" },
-		});
-		expect(parseHash("#accounts/edit-movement/new")).toEqual({
-			page: "accounts",
-			overlay: { type: "movementEdit", key: "new" },
+			overlay: { type: "transactionEdit", key: "invest" },
 		});
 		expect(parseHash("#outlook/edit-account/new")).toEqual({
 			page: "outlook",
@@ -214,23 +218,33 @@ describe("parseHash", () => {
 			overlay: { type: "safeSpendingDetail", tab: "last-cycle" },
 		});
 		expect(
+			parseHash("#outlook/safe-spending-detail/cycle/edit-transaction/invest"),
+		).toEqual({
+			page: "outlook",
+			overlay: {
+				type: "safeSpendingDetail",
+				tab: "cycle",
+				editTransaction: "invest",
+			},
+		});
+		expect(
+			parseHash("#outlook/safe-spending-detail/edit-transaction/invest"),
+		).toEqual({
+			page: "outlook",
+			overlay: {
+				type: "safeSpendingDetail",
+				tab: "cycle",
+				editTransaction: "invest",
+			},
+		});
+		expect(
 			parseHash("#outlook/safe-spending-detail/cycle/edit-movement/invest"),
 		).toEqual({
 			page: "outlook",
 			overlay: {
 				type: "safeSpendingDetail",
 				tab: "cycle",
-				editMovement: "invest",
-			},
-		});
-		expect(
-			parseHash("#outlook/safe-spending-detail/edit-movement/invest"),
-		).toEqual({
-			page: "outlook",
-			overlay: {
-				type: "safeSpendingDetail",
-				tab: "cycle",
-				editMovement: "invest",
+				editTransaction: "invest",
 			},
 		});
 		expect(parseHash("#outlook/safe-spending-detail/bogus")).toEqual({
@@ -356,7 +370,7 @@ describe("resolveOverlayRoute", () => {
 			resolveOverlayRoute(
 				{
 					page: "transactions",
-					overlay: { type: "movementEdit", key: "invest" },
+					overlay: { type: "transactionEdit", key: "invest" },
 				},
 				plan,
 			),
@@ -364,14 +378,14 @@ describe("resolveOverlayRoute", () => {
 			state: "ready",
 			overlay: {
 				kind: "editor",
-				target: { kind: "movement", item: investMovement },
+				target: { kind: "transaction", item: investTransaction },
 			},
 		});
 		expect(
 			resolveOverlayRoute(
 				{
 					page: "transactions",
-					overlay: { type: "movementEdit", key: "missing" },
+					overlay: { type: "transactionEdit", key: "missing" },
 				},
 				plan,
 			),
@@ -427,7 +441,7 @@ describe("resolveOverlayRoute", () => {
 				overlay: {
 					type: "safeSpendingDetail",
 					tab: "cycle",
-					editMovement: "invest",
+					editTransaction: "invest",
 				},
 			},
 			plan,
@@ -437,7 +451,7 @@ describe("resolveOverlayRoute", () => {
 			overlay: {
 				kind: "safeSpendingDetail",
 				tab: "cycle",
-				edit: { kind: "movement", item: investMovement },
+				edit: { kind: "transaction", item: investTransaction },
 			},
 		});
 		expect(
@@ -447,7 +461,7 @@ describe("resolveOverlayRoute", () => {
 					overlay: {
 						type: "safeSpendingDetail",
 						tab: "cycle",
-						editMovement: "missing",
+						editTransaction: "missing",
 					},
 				},
 				plan,
@@ -490,16 +504,16 @@ describe("hash builders round-trip through the parser", () => {
 	test("editors serialize scoped on their home page and global elsewhere", () => {
 		expect(
 			editorHash("transactions", {
-				kind: "movement",
-				item: investMovement,
+				kind: "transaction",
+				item: investTransaction,
 			}),
 		).toBe("#transactions/invest/edit");
 		expect(
-			editorHash("outlook", { kind: "movement", item: investMovement }),
-		).toBe("#outlook/edit-movement/invest");
-		expect(editorHash("transactions", { kind: "movement", item: null })).toBe(
-			"#transactions/new",
-		);
+			editorHash("outlook", { kind: "transaction", item: investTransaction }),
+		).toBe("#outlook/edit-transaction/invest");
+		expect(
+			editorHash("transactions", { kind: "transaction", item: null }),
+		).toBe("#transactions/new");
 		expect(editorHash("accounts", { kind: "account", item: null })).toBe(
 			"#accounts/new",
 		);
@@ -511,11 +525,29 @@ describe("hash builders round-trip through the parser", () => {
 		).toBe("#evaluations/goal-1/edit");
 		expect(
 			parseHash(
-				editorHash("outlook", { kind: "movement", item: investMovement }),
+				editorHash("outlook", { kind: "transaction", item: investTransaction }),
 			),
 		).toEqual({
 			page: "outlook",
-			overlay: { type: "movementEdit", key: "invest" },
+			overlay: { type: "transactionEdit", key: "invest" },
+		});
+		// "Edit Movement" slugifies to the retired segment, so the editor
+		// link uses the explicit id form and still resolves to the account.
+		const legacy = account("move-1", "Edit Movement");
+		expect(editorHash("accounts", { kind: "account", item: legacy })).toBe(
+			"#accounts/edit-account/move-1",
+		);
+		expect(
+			resolveOverlayRoute(
+				parseHash(editorHash("accounts", { kind: "account", item: legacy })),
+				{ ...plan, accounts: [legacy] },
+			),
+		).toEqual({
+			state: "ready",
+			overlay: {
+				kind: "editor",
+				target: { kind: "account", item: legacy },
+			},
 		});
 	});
 
@@ -527,14 +559,14 @@ describe("hash builders round-trip through the parser", () => {
 			overlay: {
 				type: "safeSpendingDetail",
 				tab: "last-cycle",
-				editMovement: "invest",
+				editTransaction: "invest",
 			},
 		});
 		expect(safeSpendingDetailHash("outlook", "cycle")).toBe(
 			"#outlook/safe-spending-detail/cycle",
 		);
 		expect(safeSpendingDetailHash("outlook", "cycle", "invest")).toBe(
-			"#outlook/safe-spending-detail/cycle/edit-movement/invest",
+			"#outlook/safe-spending-detail/cycle/edit-transaction/invest",
 		);
 		expect(discardHash("sources")).toBe("#sources/discard");
 		expect(
@@ -544,7 +576,7 @@ describe("hash builders round-trip through the parser", () => {
 			overlay: {
 				type: "safeSpendingDetail",
 				tab: "cycle",
-				editMovement: "invest",
+				editTransaction: "invest",
 			},
 		});
 	});

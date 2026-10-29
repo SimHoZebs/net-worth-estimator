@@ -37,12 +37,13 @@ export function AccountDialog({
 	);
 	const recurring = useMemo(
 		() =>
-			plan.movements.filter(
-				(movement) =>
-					movement.frequency !== "once" &&
-					(movement.fromId === account.id || movement.toId === account.id),
+			plan.transactions.filter(
+				(transaction) =>
+					transaction.frequency !== "once" &&
+					(transaction.fromId === account.id ||
+						transaction.toId === account.id),
 			),
-		[plan.movements, account.id],
+		[plan.transactions, account.id],
 	);
 	const starting =
 		projection.points.find((point) => point.date === plan.startDate) ??
@@ -56,7 +57,7 @@ export function AccountDialog({
 			label={account.name}
 			appearance={{
 				title: account.name,
-				eyebrow: `Account activity · ${temporary ? "Changes" : "Saved plan"}`,
+				eyebrow: `Account activity · ${temporary ? "Changes" : "Saved"}`,
 				coverage: "full",
 			}}
 		>

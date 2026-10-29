@@ -3,7 +3,7 @@ import {
 	type AccountTransaction,
 } from "./accountActivity.ts";
 import { isoDate, utcDate } from "./format.ts";
-import { isPendingMovement, type Plan } from "./model.ts";
+import { isPendingTransaction, type Plan } from "./model.ts";
 import type { MovementResult } from "./result.ts";
 
 // Server ownership: every amount summed here originates server-side.
@@ -343,7 +343,9 @@ export function mandatoryTransactions({
 	);
 	const rows: AccountTransaction[] = [];
 	const pendingIds = new Set(
-		plan.movements.filter(isPendingMovement).map((movement) => movement.id),
+		plan.transactions
+			.filter(isPendingTransaction)
+			.map((transaction) => transaction.id),
 	);
 	let index = 0;
 	for (const movement of movements) {

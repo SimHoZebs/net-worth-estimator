@@ -1,9 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import {
-	readSavedServerPlan,
-	readTemporaryVersion,
-	resetFixture,
-} from "./fixture.ts";
+import { readSavedServerPlan, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
 
@@ -37,21 +33,23 @@ test("an ordinary save conflict preserves edits without another session check", 
 			json: { status: 409, detail: "That change conflicts with server data." },
 		});
 	});
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	// The detail editor saves immediately; the rejected save surfaces an
+	// alert while the staged draft stays bannered.
+	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(
 		page.getByRole("alert").filter({ hasText: "That change conflicts" }),
 	).toBeVisible();
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
 	expect(sessionChecks).toBe(0);
 	expect(writes).toBe(1);
-	const draft = await readTemporaryVersion(page);
-	expect(
-		draft?.movements.find(
-			(movement: { id: string }) => movement.id === "invest",
-		)?.amount,
-	).toBe(900);
+	// The failed save keeps the staged edit as an unsaved change while the
+	// server plan is untouched. The detail reads saved rows, so the banner
+	// is the edits-preserved evidence here.
+	await expect(
+		page.getByText("1 unsaved change · not saved yet"),
+	).toBeVisible();
 	expect(await readSavedServerPlan()).toEqual(saved);
 });
 
@@ -75,7 +73,7 @@ test("a resource-change error restores the workspace without replaying the save"
 			json: { status: 409, code: "RESOURCE_CHANGED" },
 		});
 	});
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect.poll(() => sessionChecks).toBe(1);
 	await expect(
 		page.getByRole("button", { name: "Save changes" }),
@@ -83,7 +81,7 @@ test("a resource-change error restores the workspace without replaying the save"
 	expect(writes).toBe(1);
 	expect(await readSavedServerPlan()).toEqual(saved);
 	await page.getByRole("button", { name: "Save changes" }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+	await expect(page.getByText("Changes saved.")).toBeVisible();
 	expect(writes).toBe(2);
 	expect(
 		(await readSavedServerPlan()).recurrenceRules.find(

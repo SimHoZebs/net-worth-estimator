@@ -19,32 +19,6 @@ func init() {
 	evaluationRegistryInstance.Register(whatIfDefinition)
 }
 
-// EvaluateProjectionPath runs configured deterministic evaluations over a path.
-// Reader and simulator runtimes evaluate separately so each system keeps its
-// own caching policy; the merged collection preserves canonical table order.
-func EvaluateProjectionPath(path *types.ProjectionPath, evaluations *types.EvaluationTables, monteCarloSample *types.MonteCarloSample, detailLevel string) *types.EvaluationResultCollection {
-	if detailLevel == "" {
-		detailLevel = "detailed"
-	}
-	set := NewEvaluationRuntimeSet(evaluations, evaluationRegistryInstance)
-	readers, simulators := set.PartitionByKind()
-	readers.EvaluateDeterministic(&EvaluationContext{
-		Path:             path,
-		Document:         &path.EffectiveDocument,
-		MonteCarloSample: monteCarloSample,
-		DetailLevel:      detailLevel,
-	})
-	simulators.EvaluateDeterministic(&EvaluationContext{
-		Path:             path,
-		Document:         &path.EffectiveDocument,
-		MonteCarloSample: monteCarloSample,
-		DetailLevel:      detailLevel,
-	})
-	readerCollection := readers.Result()
-	simulatorCollection := simulators.Result()
-	return MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
-}
-
 // ProjectFinancialModelDocument produces the full public projection result.
 // The base path comes from the base-path cache (keyed without evaluations);
 // evaluations run separately against the cached path, so eval-only changes

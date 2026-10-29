@@ -105,7 +105,7 @@ export function useResourceSession() {
 				if (!previous) {
 					if (changed) {
 						resetWorkspaceForResource({
-							preserveVolatile: !!previous && sameOwner(previous, next),
+							preserveDraft: !!previous && sameOwner(previous, next),
 						});
 						await clearResourceQueryCache();
 					}
@@ -144,7 +144,7 @@ export function useResourceSession() {
 							activeLogout.checkedSession = next;
 							return;
 						}
-						resetWorkspaceForResource({ preserveVolatile: true });
+						resetWorkspaceForResource({ preserveDraft: true });
 						await clearResourceQueryCache();
 						if (signal.aborted) return;
 						owner.current = next;
@@ -171,7 +171,7 @@ export function useResourceSession() {
 					return;
 				}
 				resetWorkspaceForResource({
-					preserveVolatile: sameOwner(previous, next),
+					preserveDraft: sameOwner(previous, next),
 				});
 				await clearResourceQueryCache();
 				if (signal.aborted) return;
@@ -229,9 +229,9 @@ export function useResourceSession() {
 
 	const logout = useCallback(async () => {
 		if (signingOut.current || !owner.current) return;
-		if (useWorkspaceStore.getState().volatile) {
+		if (useWorkspaceStore.getState().draft) {
 			const blocked =
-				"Your draft has recovery data. Discard the draft before signing out.";
+				"You have unsaved changes. Discard the draft before signing out.";
 			setStatus((previous) => ({ ...previous, error: blocked }));
 			notifyError("session-logout", blocked);
 			return;

@@ -20,7 +20,7 @@ import { movePurchase, purchaseQueue } from "../../domain/purchases.ts";
 import { horizonDate, type PurchaseSchedule } from "../../domain/result.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { saveWorkspace, useWorkspaceSaving } from "../../state/workspaceWrites.ts";
+import { stageAndSave } from "../../state/workspaceWrites.ts";
 import {
 	useDraftConflict,
 	useWorkspaceReadOnly,
@@ -35,7 +35,7 @@ export function WishListPanel({
 	plan: Plan;
 	schedule: PurchaseSchedule | null;
 }) {
-	const onUpdate = useWorkspaceStore((state) => state.updatePlan);
+	const onUpdate = stageAndSave;
 	const applyError = useWorkspaceStore((state) => state.error);
 	const blocked = useWorkspaceReadOnly();
 	const conflict = useDraftConflict();
@@ -53,19 +53,16 @@ export function WishListPanel({
 		}),
 	);
 	const locked = readOnly || plan.readOnly;
-	const saving = useWorkspaceSaving();
 	const end = horizonDate({ start: plan.startDate, years });
 	const total = queue
 		.filter((item) => item.enabled)
 		.reduce((sum, item) => sum + item.amount, 0);
 	const move = (item: PlannedPurchase, direction: -1 | 1) => {
-		if (saving) return;
 		const next = movePurchase(plan, item.id, direction);
-		if (!onUpdate(next)) return;
-		setAnnouncement(
-			`${item.name} is now priority ${purchaseQueue(next.plannedPurchases).findIndex((entry) => entry.id === item.id) + 1}.`,
-		);
-		void saveWorkspace();
+		if (onUpdate(next))
+			setAnnouncement(
+				`${item.name} is now priority ${purchaseQueue(next.plannedPurchases).findIndex((entry) => entry.id === item.id) + 1}.`,
+			);
 	};
 	return (
 		<section aria-label="Planned purchases" className="@container/wish-list">
@@ -144,7 +141,7 @@ export function WishListPanel({
 										iconSize={16}
 										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Move ${item.name} up`}
-										disabled={locked || saving || item.readOnly || index === 0}
+										disabled={locked || item.readOnly || index === 0}
 										onClick={() => move(item, -1)}
 									/>
 									<IconButton
@@ -153,7 +150,7 @@ export function WishListPanel({
 										className="min-h-8 min-w-8 max-sm:min-h-9 max-sm:min-w-9 [@media(pointer:coarse)]:min-h-12 [@media(pointer:coarse)]:min-w-12"
 										label={`Move ${item.name} down`}
 										disabled={
-											locked || saving || item.readOnly || index === queue.length - 1
+											locked || item.readOnly || index === queue.length - 1
 										}
 										onClick={() => move(item, 1)}
 									/>
@@ -193,10 +190,7 @@ export function WishListPanel({
 					plan={plan}
 					item={editor.item}
 					readOnly={locked || Boolean(editor.item?.readOnly)}
-					onApply={async (next) => {
-						if (!onUpdate(next)) return false;
-						return saveWorkspace();
-					}}
+					onApply={onUpdate}
 					applyError={applyError}
 					onClose={() => setEditor(null)}
 				/>
@@ -206,7 +200,7 @@ export function WishListPanel({
 					title={`Remove ${remove.name}?`}
 					eyebrow="Planned purchases"
 					cancelLabel="Keep item"
-					confirmLabel="Remove purchase"
+					confirmLabel="Remove and save"
 					onCancel={() => setRemove(null)}
 					onConfirm={() => {
 						if (
@@ -216,13 +210,11 @@ export function WishListPanel({
 									(item) => item.id !== remove.id,
 								),
 							})
-						) {
+						)
 							setRemove(null);
-							void saveWorkspace();
-						}
 					}}
 				>
-					<p>This removes the purchase immediately.</p>
+					<p>This removes the item and saves immediately.</p>
 				</ConfirmDialog>
 			)}
 		</section>

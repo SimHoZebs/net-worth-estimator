@@ -2,6 +2,7 @@ package identity
 
 import (
 	"encoding/json"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -112,7 +113,7 @@ func TestBrowserLoginRejectsUnconfiguredHostsAndCrossOriginCallbacks(t *testing.
 		t.Fatalf("cross-origin callback=%d", w.Code)
 	}
 	var count int
-	if err := s.store.db.QueryRow("SELECT COUNT(*) FROM identity_grants").Scan(&count); err != nil || count != 0 {
+	if err := s.store.(*sqlite.Database).SQL().QueryRow("SELECT COUNT(*) FROM identity_grants").Scan(&count); err != nil || count != 0 {
 		t.Fatal("cross-origin callback created a grant")
 	}
 }
@@ -155,5 +156,28 @@ func TestProxyOriginsUseCanonicalAppsAndProviderAliases(t *testing.T) {
 	c.PublicURL = "https://app.test/invalid"
 	if _, err := c.ProxyOrigins(); err == nil {
 		t.Fatal("accepted an invalid application origin")
+	}
+}
+
+func TestCanonicalBrowserOriginSingleCheckerParity(t *testing.T) {
+	bare, err := canonicalBrowserOrigin("https://app.example.com", false)
+	if err != nil {
+		t.Fatalf("bare: %v", err)
+	}
+	slashed, err := canonicalBrowserOrigin("https://app.example.com/", false)
+	if err != nil {
+		t.Fatalf("slashed: %v", err)
+	}
+	if bare != "https://app.example.com" || slashed != bare {
+		t.Fatalf("trailing slash did not normalize identically: %q vs %q", bare, slashed)
+	}
+	for _, raw := range []string{"https://app.test/v1", "https://user:pass@app.test", "https://app.test.", "https://app.test./"} {
+		if _, err := canonicalBrowserOrigin(raw, false); err == nil {
+			t.Fatalf("canonicalBrowserOrigin(%q) accepted", raw)
+		}
+		c := Config{PublicURL: raw, Issuer: "https://identity.test"}
+		if _, err := c.ProxyOrigins(); err == nil {
+			t.Fatalf("ProxyOrigins accepted %q", raw)
+		}
 	}
 }

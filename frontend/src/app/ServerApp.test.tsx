@@ -84,8 +84,9 @@ it("keeps notification and draft-storage state out of the root's server loading 
 		"Plan saved on the server.",
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
-	act(() => useWorkspaceStore.setState({ volatile: true }));
+	act(() => useWorkspaceStore.setState({ error: "transient" }));
 	expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
+	act(() => useWorkspaceStore.setState({ error: null }));
 	act(() =>
 		useWorkspaceStore.setState({
 			draft: { ...testPlan, name: "Edited browser draft" },

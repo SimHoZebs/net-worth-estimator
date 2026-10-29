@@ -19,16 +19,16 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
 const resetPath = "/__fixture/reset"
@@ -66,12 +66,15 @@ func main() {
 	}
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", filepath.Join(os.TempDir(), "waypoint-fixture.db"))
 	modelPath := envOr("NET_WORTH_ESTIMATOR_MODEL_PATH", "public/configs")
-	allowedOrigins := splitOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
+	allowedOrigins, err := api.ParseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
+	if err != nil {
+		log.Fatalf("configure allowed origins: %v", err)
+	}
 
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o700); err != nil {
 		log.Fatalf("create fixture directory: %v", err)
 	}
-	application, err := store.SetupDatabase(dbPath)
+	application, err := sqlite.SetupDatabase(dbPath)
 	if err != nil {
 		log.Fatalf("open application database: %v", err)
 	}
@@ -98,7 +101,11 @@ func main() {
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
-		if _, err := database.ImportCSV(modelPath); err != nil {
+		doc, err := csvio.ImportModel(modelPath)
+		if err != nil {
+			return fmt.Errorf("import fixture: %w", err)
+		}
+		if _, err := database.ImportDocument(doc); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
 		readOnly = nextReadOnly
@@ -211,17 +218,4 @@ func parseBool(value string) bool {
 	default:
 		return false
 	}
-}
-
-func splitOrigins(value string) []string {
-	if value == "" {
-		return nil
-	}
-	origins := []string{}
-	for _, part := range strings.Split(value, ",") {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			origins = append(origins, trimmed)
-		}
-	}
-	return origins
 }

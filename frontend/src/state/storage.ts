@@ -3,14 +3,14 @@ import { type Plan, planSchema } from "../domain/model.ts";
 
 export class StorageError extends errore.createTaggedError({
 	name: "StorageError",
-	message: "$detail Your saved plan has not been replaced. Retry.",
+	message: "$detail Your changes were not saved. Retry.",
 }) {}
 export class ImportError extends errore.createTaggedError({
 	name: "ImportError",
 	message: "$detail Choose a valid Waypoint plan JSON file.",
 }) {}
 
-// Workspace persistence lives in remoteStorage.ts (REMOTE_STORAGE_KEY).
+// Drafts live in memory only. File import validates through planSchema below.
 // Do not add another workspace schema here.
 export function parsePlan(text: string): Plan | ImportError {
 	const value = errore.try({
