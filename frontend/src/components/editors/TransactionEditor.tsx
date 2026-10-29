@@ -16,11 +16,11 @@ import {
 } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { upsertItem } from "../../domain/planEdits.ts";
+import { upsertItem } from "../../domain/accountEdits.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
-import { usePlan } from "../../state/useWorkspacePlan.ts";
+import { useAccountPlan } from "../../state/useAccountScope.ts";
 import { useTransactionCatalog } from "../../state/workspaceResources.ts";
 import { parseDisplayNumber, textValue, numberValue } from "./formValues.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
@@ -165,7 +165,7 @@ export function TransactionEditor({
 	onSaved: () => void;
 	onClose: () => void;
 }) {
-	const plan = usePlan();
+	const plan = useAccountPlan();
 	const catalog = useTransactionCatalog();
 	const accounts = useMemo(() => visibleAccounts(plan?.accounts ?? []), [plan]);
 	const claimRules = useMemo(

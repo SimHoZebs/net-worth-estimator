@@ -1,13 +1,13 @@
 import { Suspense, lazy } from "react";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
-import { PlanEditor } from "../components/PlanEditor.tsx";
+import { WorkspaceEditor } from "../components/WorkspaceEditor.tsx";
 import { Skeleton } from "../components/Skeleton.tsx";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import {
 	selectDraftChangeCount,
 	useWorkspaceStore,
 } from "../state/workspaceStore.ts";
-import { usePlan } from "../state/useWorkspacePlan.ts";
+import { useAccountPlan } from "../state/useAccountScope.ts";
 import { stageAndSave } from "../state/workspaceWrites.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
@@ -28,7 +28,7 @@ export function WorkspaceEvidence({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = usePlan();
+	const plan = useAccountPlan();
 	// Evidence subscribes to the base case only while its dialog is open.
 	if (!overlays.evidence) return null;
 	if (overlays.evidence.kind === "position")
@@ -45,7 +45,7 @@ function WorkspaceEvidenceLoaded({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = usePlan();
+	const plan = useAccountPlan();
 	const hasDraft = useWorkspaceStore((state) => state.draft != null);
 	const projection = useRemoteProjection({ ranges: false });
 	const base =
@@ -79,14 +79,14 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = usePlan();
+	const plan = useAccountPlan();
 	const applyError = useWorkspaceStore((state) => state.error);
 	const changeCount = useWorkspaceStore(selectDraftChangeCount);
 	if (!plan) return null;
 	return (
 		<>
 			{overlays.editor && (
-				<PlanEditor
+				<WorkspaceEditor
 					target={overlays.editor}
 					plan={plan}
 					onApply={stageAndSave}

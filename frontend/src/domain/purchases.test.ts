@@ -10,7 +10,7 @@ import {
 	type PlannedPurchase,
 } from "./model.ts";
 import { movePurchase, purchaseQueue } from "./purchases.ts";
-import { testPlan } from "../mocks/plan.ts";
+import { testAccount } from "../mocks/account.ts";
 import { projectionFixture } from "../mocks/projection.ts";
 
 function wish(id: string): PlannedPurchase {
@@ -19,7 +19,7 @@ function wish(id: string): PlannedPurchase {
 		name: id,
 		amount: 500,
 		fromId: "checking",
-		startDate: testPlan.startDate,
+		startDate: testAccount.startDate,
 		enabled: true,
 		readOnly: false,
 	};
@@ -28,7 +28,7 @@ function wish(id: string): PlannedPurchase {
 describe("purchase queue", () => {
 	it("changes priorities without changing established payments or the input", () => {
 		const plan = {
-			...testPlan,
+			...testAccount,
 			plannedPurchases: [wish("laptop"), wish("chair")],
 		};
 		const next = movePurchase(plan, "chair", -1);
@@ -43,9 +43,9 @@ describe("purchase queue", () => {
 		expect(movePurchase(next, "missing", 1)).toBe(next);
 	});
 
-	it("round-trips wishlist rows through saved and exported plans", () => {
+	it("round-trips wishlist rows through saved and exported accounts", () => {
 		const plan = {
-			...testPlan,
+			...testAccount,
 			plannedPurchases: [{ ...wish("laptop"), amount: 1500 }],
 		};
 		const converted = displayPlanToBackendDocument(plan, {
@@ -98,7 +98,7 @@ describe("purchase queue", () => {
 
 	it("never manufactures historical purchase activity", () => {
 		const plan = {
-			...testPlan,
+			...testAccount,
 			transactions: [],
 			plannedPurchases: [wish("laptop")],
 		};
@@ -113,7 +113,7 @@ describe("purchase queue", () => {
 	it("rejects wishes without funding accounts", () => {
 		expect(
 			validatePlan({
-				...testPlan,
+				...testAccount,
 				plannedPurchases: [{ ...wish("laptop"), fromId: null }],
 			}),
 		).toBeInstanceOf(Error);
@@ -123,11 +123,11 @@ describe("purchase queue", () => {
 		// Intentionally the pre-rename shape: old drafts stored wishlist
 		// items in `movements` with a purchasePriority field.
 		const legacy = {
-			...testPlan,
+			...testAccount,
 			movements: [
-				...testPlan.transactions,
+				...testAccount.transactions,
 				{
-					...testPlan.transactions[0]!,
+					...testAccount.transactions[0]!,
 					id: "laptop",
 					name: "laptop",
 					amount: 500,

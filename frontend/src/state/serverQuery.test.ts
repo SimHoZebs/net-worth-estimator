@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
-	suspendResourceScope,
+	acceptAccountScope,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 import {
 	clearResourceQueryCache,
@@ -15,28 +15,28 @@ import {
 } from "./serverQuery.ts";
 
 function owner(id: string) {
-	acceptResourceScope(
+	acceptAccountScope(
 		{
 			apiBaseUrl: "https://plan.example",
 			resource: {
 				id,
 				kind: "private",
-				permissions: ["plan:read", "plan:project"],
+				permissions: ["account:read", "account:project"],
 			},
 			subject: id,
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 }
 
 afterEach(() => {
 	resetServerQueryCache();
-	suspendResourceScope();
+	suspendAccountScope();
 });
 
 describe("resource-scoped projection cache", () => {
 	it("filters calculations by resource without matching session data", () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const keys = [
 			deterministicQueryKey("doc", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
@@ -46,7 +46,7 @@ describe("resource-scoped projection cache", () => {
 		for (const queryKey of keys)
 			expect(filter.predicate({ queryKey })).toBe(true);
 		expect(filter.predicate({ queryKey: ["session"] })).toBe(false);
-		owner("plans/b");
+		owner("accounts/b");
 		for (const queryKey of [
 			deterministicQueryKey("doc", 10),
 			stochasticQueryKey("doc", 10, 100, 42, 0),
@@ -55,7 +55,7 @@ describe("resource-scoped projection cache", () => {
 			expect(filter.predicate({ queryKey })).toBe(false);
 	});
 	it("keeps calculations fresh beyond a minute but supports explicit invalidation", async () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const client = serverQueryClient();
 		for (const queryKey of [
 			deterministicQueryKey("doc", 10),
@@ -78,12 +78,12 @@ describe("resource-scoped projection cache", () => {
 		}
 	});
 	it("never reuses identical deterministic or stochastic inputs across accounts", () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const deterministicA = deterministicQueryKey("same-document", 10);
 		const stochasticA = stochasticQueryKey("same-document", 10, 100, 42, 0);
 		serverQueryClient().setQueryData(deterministicA, "private-a-result");
 		serverQueryClient().setQueryData(stochasticA, "private-a-bands");
-		owner("plans/b");
+		owner("accounts/b");
 		const deterministicB = deterministicQueryKey("same-document", 10);
 		const stochasticB = stochasticQueryKey("same-document", 10, 100, 42, 0);
 		expect(deterministicB).not.toEqual(deterministicA);
@@ -93,15 +93,15 @@ describe("resource-scoped projection cache", () => {
 	});
 
 	it("reuses results after a same-account verification", () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const before = deterministicQueryKey("same-document", 10);
 		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
-		owner("plans/a");
+		owner("accounts/a");
 		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
 	});
 
 	it("isolates deterministic cache entries by range", () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const full = deterministicQueryKey("same-document", 10, "..2028-01-31");
 		const narrowed = deterministicQueryKey(
 			"same-document",
@@ -116,7 +116,7 @@ describe("resource-scoped projection cache", () => {
 	});
 
 	it("aborts old fetches, removes data, and ignores late non-cooperative results", async () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const client = serverQueryClient();
 		const key = deterministicQueryKey("same-document", 10);
 		let signal: AbortSignal | undefined;
@@ -142,7 +142,7 @@ describe("resource-scoped projection cache", () => {
 	});
 
 	it("cancels verification-era work without losing completed same-account results", async () => {
-		owner("plans/a");
+		owner("accounts/a");
 		const client = serverQueryClient();
 		const key = deterministicQueryKey("same-document", 10);
 		client.setQueryData(key, "completed-result");
@@ -161,7 +161,7 @@ describe("resource-scoped projection cache", () => {
 			})
 			.catch(() => null);
 		await cancelResourceQueries();
-		owner("plans/a");
+		owner("accounts/a");
 		finish("late-result");
 		await pending;
 		expect(signal?.aborted).toBe(true);

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
+	acceptAccountScope,
 	canonicalApiBaseUrl,
-	suspendResourceScope,
+	suspendAccountScope,
 } from "../auth/resourceScope.ts";
 import { ok } from "../mocks/fetch.ts";
 import { ApiHttpError, ApiNetworkError } from "./http.ts";
-import { ResourceScopeError } from "./scopedRequest.ts";
+import { AccountScopeError } from "./scopedRequest.ts";
 import type { BackendAccount, FinancialModelDocument } from "./contracts.ts";
 import {
 	importServerModel,
@@ -51,17 +51,17 @@ function rowResponse(row: unknown) {
 function setup(
 	preconditions: Partial<ServerModelImportOptions["preconditions"]> = {},
 ) {
-	acceptResourceScope(
+	acceptAccountScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: `plans/${"a".repeat(64)}`,
+				id: `accounts/${"a".repeat(64)}`,
 				kind: "private",
-				permissions: ["plan:read", "plan:write", "plan:project"],
+				permissions: ["account:read", "account:write", "account:project"],
 			},
 			subject: "account-a",
 		},
-		suspendResourceScope(),
+		suspendAccountScope(),
 	);
 	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 		const path = String(url);
@@ -95,7 +95,7 @@ function setup(
 }
 
 afterEach(() => {
-	suspendResourceScope();
+	suspendAccountScope();
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
 });
@@ -104,10 +104,10 @@ describe("server model replacement", () => {
 	it("does not start writes if the resource changes after the initial read", async () => {
 		const { run, fetcher, reload } = setup();
 		fetcher.mockImplementationOnce(async () => {
-			suspendResourceScope();
+			suspendAccountScope();
 			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
-		expect(await run()).toBeInstanceOf(ResourceScopeError);
+		expect(await run()).toBeInstanceOf(AccountScopeError);
 		expect(
 			fetcher.mock.calls.filter(([, init]) => init?.method === "POST"),
 		).toHaveLength(0);
@@ -121,12 +121,12 @@ describe("server model replacement", () => {
 				String(url).endsWith("/v1/accounts") &&
 				(init?.method ?? "GET") === "POST"
 			) {
-				suspendResourceScope();
+				suspendAccountScope();
 				return ok(rowResponse(account));
 			}
 			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
 		});
-		expect(await run()).toBeInstanceOf(ResourceScopeError);
+		expect(await run()).toBeInstanceOf(AccountScopeError);
 		expect(reload).not.toHaveBeenCalled();
 	});
 

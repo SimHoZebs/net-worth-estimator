@@ -1,6 +1,6 @@
 import * as errore from "errore";
 import type { FinancialModelDocument } from "@/api/contracts.ts";
-import { getResourceScope } from "@/auth/resourceScope.ts";
+import { getAccountScope } from "@/auth/resourceScope.ts";
 import { responseScopeError } from "@/api/scopedRequest.ts";
 import { getFinancialModel } from "@/api/generated/endpoints.ts";
 import {
@@ -38,7 +38,7 @@ export async function importServerModel({
 }: ServerModelImportOptions & {
 	document: FinancialModelDocument;
 }): Promise<boolean | Error> {
-	const scope = getResourceScope();
+	const scope = getAccountScope();
 	if (!preconditions.hasWorkspace) return recover(document);
 	if (preconditions.readOnly)
 		return new ServerModelImportError({

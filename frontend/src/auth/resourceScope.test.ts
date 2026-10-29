@@ -1,41 +1,41 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
-	getResourceScope,
-	requireSessionRecheck,
-	resourceScopeKey,
-	subscribeResourceScope,
-	suspendResourceScope,
+	acceptAccountScope,
+	getAccountScope,
+	requireAccountRecheck,
+	accountScopeKey,
+	subscribeAccountScope,
+	suspendAccountScope,
 } from "./resourceScope.ts";
 
-afterEach(() => suspendResourceScope());
+afterEach(() => suspendAccountScope());
 
 const input = {
 	apiBaseUrl: "https://plan.example",
 	resource: {
-		id: "plans/private-a",
+		id: "accounts/private-a",
 		kind: "private" as const,
-		permissions: ["plan:read", "plan:write"],
+		permissions: ["account:read", "account:write"],
 	},
 	subject: "account-a",
 };
 
-describe("verified resource scope", () => {
+describe("verified account scope", () => {
 	it("starts and remains blocked until the current verification accepts a scope", () => {
-		const pending = suspendResourceScope();
+		const pending = suspendAccountScope();
 		expect(pending.status).toBe("pending");
-		const newer = suspendResourceScope();
-		expect(acceptResourceScope(input, pending)).toBeNull();
-		expect(getResourceScope()).toBe(newer);
-		expect(acceptResourceScope(input, newer)?.resource?.id).toBe(
+		const newer = suspendAccountScope();
+		expect(acceptAccountScope(input, pending)).toBeNull();
+		expect(getAccountScope()).toBe(newer);
+		expect(acceptAccountScope(input, newer)?.resource?.id).toBe(
 			input.resource.id,
 		);
 	});
 
 	it("includes resource, subject, API, and permissions in a stable identity", () => {
-		const key = resourceScopeKey(input);
+		const key = accountScopeKey(input);
 		expect(
-			resourceScopeKey({
+			accountScopeKey({
 				...input,
 				resource: {
 					...input.resource,
@@ -46,42 +46,42 @@ describe("verified resource scope", () => {
 		for (const changed of [
 			{ ...input, apiBaseUrl: "https://other.example" },
 			{ ...input, subject: "account-b" },
-			{ ...input, resource: { ...input.resource, id: "plans/private-b" } },
-			{ ...input, resource: { ...input.resource, permissions: ["plan:read"] } },
+			{ ...input, resource: { ...input.resource, id: "accounts/private-b" } },
+			{ ...input, resource: { ...input.resource, permissions: ["account:read"] } },
 		])
-			expect(resourceScopeKey(changed)).not.toBe(key);
+			expect(accountScopeKey(changed)).not.toBe(key);
 	});
 
 	it("replaces request guards even when the verified identity stays the same", () => {
-		const first = acceptResourceScope(input, suspendResourceScope())!;
-		const pending = suspendResourceScope();
-		const newer = suspendResourceScope();
+		const first = acceptAccountScope(input, suspendAccountScope())!;
+		const pending = suspendAccountScope();
+		const newer = suspendAccountScope();
 		expect(newer).not.toBe(pending);
-		expect(acceptResourceScope(input, pending)).toBeNull();
-		const second = acceptResourceScope(input, newer)!;
+		expect(acceptAccountScope(input, pending)).toBeNull();
+		const second = acceptAccountScope(input, newer)!;
 		expect(second).not.toBe(first);
 		expect(second.key).toBe(first.key);
 	});
 
 	it("invalidates captured requests before it requests a session recheck", () => {
-		const captured = acceptResourceScope(input, suspendResourceScope());
+		const captured = acceptAccountScope(input, suspendAccountScope());
 		const listener = vi.fn(() =>
-			expect(getResourceScope().status).toBe("pending"),
+			expect(getAccountScope().status).toBe("pending"),
 		);
 		window.addEventListener("waypoint:authentication-required", listener);
-		requireSessionRecheck();
-		expect(getResourceScope()).not.toBe(captured);
+		requireAccountRecheck();
+		expect(getAccountScope()).not.toBe(captured);
 		expect(listener).toHaveBeenCalledOnce();
 		window.removeEventListener("waypoint:authentication-required", listener);
 	});
 
 	it("notifies subscribers and removes detached listeners", () => {
 		const changed = vi.fn();
-		const stop = subscribeResourceScope(changed);
-		suspendResourceScope();
+		const stop = subscribeAccountScope(changed);
+		suspendAccountScope();
 		expect(changed).toHaveBeenCalledOnce();
 		stop();
-		suspendResourceScope();
+		suspendAccountScope();
 		expect(changed).toHaveBeenCalledOnce();
 	});
 });

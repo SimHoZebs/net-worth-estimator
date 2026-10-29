@@ -5,7 +5,7 @@ import {
 	parseErrorResponse,
 } from "@/api/http.ts";
 import { getApiBaseUrl } from "@/api/runtime.ts";
-import { getResourceScope } from "@/auth/resourceScope.ts";
+import { getAccountScope } from "@/auth/resourceScope.ts";
 import {
 	AccountScopeError,
 	scopedRequest,
@@ -56,20 +56,20 @@ export async function waypointLogoutFetch<_T>(
 	return identityRequest(url, options);
 }
 
-/** Preserve the response stream, including its resource-scoped lifetime. */
+/** Preserve the response stream, including its account-scoped lifetime. */
 export async function waypointStreamFetch<_T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<Response> {
-	return resourceRequest(url, options);
+	return accountRequest(url, options);
 }
 
-/** Binary responses use the same resource assertion and guarded body lifetime. */
+/** Binary responses use the same account assertion and guarded body lifetime. */
 export async function waypointBlobFetch<T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<T> {
-	const response = await resourceRequest(url, options);
+	const response = await accountRequest(url, options);
 	const data = await response.blob().catch((cause: unknown) => {
 		if (cause instanceof AccountScopeError) throw cause;
 		throw new ApiNetworkError(cause);
@@ -90,7 +90,7 @@ export async function waypointFetch<T>(
 	url: string,
 	options?: RequestInit,
 ): Promise<T> {
-	const response = await resourceRequest(url, options);
+	const response = await accountRequest(url, options);
 	const headers = response.headers;
 	const status = response.status;
 	if (status === 204) return { data: undefined, status, headers } as T;
@@ -106,11 +106,11 @@ export async function waypointFetch<T>(
 	}
 }
 
-async function resourceRequest(
+async function accountRequest(
 	url: string,
 	options?: RequestInit,
 ): Promise<Response> {
-	const scope = getResourceScope();
+	const scope = getAccountScope();
 	const baseUrl = getApiBaseUrl();
 	const outcome = await scopedRequest(
 		baseUrl,

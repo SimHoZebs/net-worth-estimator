@@ -6,9 +6,7 @@ import {
 import {
 	getAccountScope,
 	accountStorageKey,
-	legacyResourceStorageKey,
 	type AccountScope,
-	type ResourceScope,
 } from "../auth/resourceScope.ts";
 
 export const THEME_STORAGE_KEY = "waypoint-theme";
@@ -82,27 +80,17 @@ export function appJsonStorage<T>() {
 export function accountLocalStorage(scope: AccountScope): StateStorage {
 	const keyFor = (name: string) =>
 		scope === getAccountScope() ? accountStorageKey(name, scope) : null;
-	const legacyKeyFor = (name: string) =>
-		scope === getAccountScope()
-			? legacyResourceStorageKey(name, scope)
-			: null;
 	return {
 		getItem: (name) => {
 			const key = keyFor(name);
 			if (!key) return null;
 			try {
 				const raw = appLocalStorage.getItem(key);
-				const resolved =
-					raw ??
-					(() => {
-						const legacy = legacyKeyFor(name);
-						return legacy ? appLocalStorage.getItem(legacy) : null;
-					})();
-				if (resolved instanceof Promise)
-					return resolved
+				if (raw instanceof Promise)
+					return raw
 						.then((value) => (keyFor(name) ? value : null))
 						.catch(() => null);
-				return keyFor(name) ? resolved : null;
+				return keyFor(name) ? raw : null;
 			} catch {
 				return null;
 			}
@@ -113,16 +101,9 @@ export function accountLocalStorage(scope: AccountScope): StateStorage {
 		},
 		removeItem: (name) => {
 			const key = keyFor(name);
-			const legacy = legacyKeyFor(name);
 			if (key) appLocalStorage.removeItem(key);
-			if (legacy) appLocalStorage.removeItem(legacy);
 		},
 	};
-}
-
-/** @deprecated Use accountLocalStorage. Keeps legacy `:resource:` reads. */
-export function resourceLocalStorage(scope: ResourceScope): StateStorage {
-	return accountLocalStorage(scope);
 }
 
 /**

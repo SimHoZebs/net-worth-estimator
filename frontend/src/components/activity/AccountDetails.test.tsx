@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Plan } from "../../domain/model.ts";
-import { testPlan } from "../../mocks/plan.ts";
+import { testAccount } from "../../mocks/account.ts";
 import { AccountDetails } from "./AccountDetails.tsx";
 
 afterEach(cleanup);
 
-const home = testPlan.accounts.find((account) => account.id === "home")!;
+const home = testAccount.accounts.find((account) => account.id === "home")!;
 
 function input(name: string): HTMLInputElement {
 	const element = screen.getByLabelText(name);
@@ -20,7 +20,7 @@ describe("AccountDetails", () => {
 		const onApply = vi.fn(() => true);
 		const props = {
 			account: home,
-			plan: testPlan,
+			plan: testAccount,
 			endingBalance: 480000,
 			onApply,
 		};
@@ -42,7 +42,7 @@ describe("AccountDetails", () => {
 		const onApply = vi.fn(() => true);
 		const props = {
 			account: home,
-			plan: testPlan,
+			plan: testAccount,
 			endingBalance: 480000,
 			onApply,
 		};
@@ -73,7 +73,7 @@ describe("AccountDetails", () => {
 		render(
 			<AccountDetails
 				account={home}
-				plan={testPlan}
+				plan={testAccount}
 				endingBalance={480000}
 				onApply={(plan) => {
 					applied.plan = plan;
@@ -118,7 +118,7 @@ describe("AccountDetails", () => {
 		render(
 			<AccountDetails
 				account={home}
-				plan={testPlan}
+				plan={testAccount}
 				endingBalance={480000}
 				onApply={(plan) => {
 					applied.plan = plan;
@@ -142,7 +142,7 @@ describe("AccountDetails", () => {
 		const { container } = render(
 			<AccountDetails
 				account={{ ...home, readOnly: true }}
-				plan={testPlan}
+				plan={testAccount}
 				endingBalance={480000}
 				onApply={() => true}
 			/>,
