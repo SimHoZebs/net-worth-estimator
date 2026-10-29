@@ -88,7 +88,6 @@ async function readSession(
 		(next.authenticated ? !authenticatedId : !sampleId) ||
 		resource.kind !== (next.authenticated ? "private" : "sample") ||
 		!Array.isArray(resource.permissions) ||
-		(next.allowed && !resource.permissions.includes("account:read")) ||
 		!resource.permissions.every(
 			(permission) => typeof permission === "string" && permission.length > 0,
 		) ||

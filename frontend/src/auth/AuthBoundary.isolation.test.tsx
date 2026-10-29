@@ -515,6 +515,22 @@ describe("authentication resource isolation", () => {
 		expect(getAccountScope().status).toBe("pending");
 	});
 
+	it("mounts when the grant list is unusual and leaves enforcement to the server", async () => {
+		const body = {
+			...session(),
+			resource: { ...session().resource, permissions: ["account:write"] },
+		};
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => response(body, A)),
+		);
+		renderWorkspace();
+		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
+			`${A}:empty`,
+		);
+		expect(getAccountScope().status).toBe("ready");
+	});
+
 	it.each([
 		["missing resource", { ...session(), resource: undefined }, A],
 		["missing header", session(), null],
@@ -528,14 +544,6 @@ describe("authentication resource isolation", () => {
 				resource: { ...session().resource, id: "accounts/sample" },
 			},
 			"accounts/sample",
-		],
-		[
-			"missing read permission",
-			{
-				...session(),
-				resource: { ...session().resource, permissions: ["account:write"] },
-			},
-			A,
 		],
 	])("fails closed on %s", async (_name, body, header) => {
 		vi.stubGlobal(
