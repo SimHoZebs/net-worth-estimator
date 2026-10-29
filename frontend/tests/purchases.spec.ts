@@ -13,7 +13,7 @@ test.beforeEach(async () => {
 async function openPurchases(page: Page) {
 	await page.goto("/#purchases");
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Plan your purchases" }),
+		page.getByRole("heading", { level: 1, name: "Planned purchases" }),
 	).toBeVisible();
 }
 
@@ -40,7 +40,7 @@ test("planned purchases has a navigation entry, direct route, and browser histor
 		page.getByRole("link", { name: "Planned purchases", exact: true }),
 	).toHaveAttribute("aria-current", "page");
 	await expect(
-		page.getByRole("heading", { level: 1, name: "Plan your purchases" }),
+		page.getByRole("heading", { level: 1, name: "Planned purchases" }),
 	).toBeFocused();
 	await expect(page).toHaveTitle("Planned purchases · Waypoint");
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();

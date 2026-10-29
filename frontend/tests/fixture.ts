@@ -25,7 +25,7 @@ export async function seedResourceStorage(
 ): Promise<void> {
 	await page.addInitScript(
 		({ baseKey, raw, resource }) => {
-			const key = `${baseKey}:resource:${encodeURIComponent(window.location.origin)}:${resource.kind}:${encodeURIComponent(resource.id)}`;
+			const key = `${baseKey}:account:${encodeURIComponent(window.location.origin)}:${resource.kind}:${encodeURIComponent(resource.id)}`;
 			if (localStorage.getItem(key) === null) localStorage.setItem(key, raw);
 		},
 		{ baseKey, raw, resource: await fixtureResource(page) },
