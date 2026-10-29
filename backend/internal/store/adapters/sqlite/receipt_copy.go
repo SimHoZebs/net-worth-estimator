@@ -24,14 +24,14 @@ type copiedReceipt struct {
 	key     string
 }
 
-// PrepareReceiptCopy reads only the selected source plan. The source connection
+// PrepareReceiptCopy reads only the selected source account. The source connection
 // and source blob adapter belong to the offline command's composition boundary.
-func (d *Database) PrepareReceiptCopy(ctx context.Context, source *sql.DB, blobs blobstore.Store, planID string) (*ReceiptCopy, error) {
+func (d *Database) PrepareReceiptCopy(ctx context.Context, source *sql.DB, blobs blobstore.Store, accountID string) (*ReceiptCopy, error) {
 	// Finish preparation before an early upload lease can expire. Apply still
 	// checks every lease inside the target transaction and fails atomically.
 	ctx, cancel := context.WithTimeout(ctx, blobStageLease/2)
 	defer cancel()
-	rows, err := source.QueryContext(ctx, `SELECT blob_key,payload FROM receipts WHERE plan_id=? ORDER BY id`, planID)
+	rows, err := source.QueryContext(ctx, `SELECT blob_key,payload FROM receipts WHERE account_id=? ORDER BY id`, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,13 +89,13 @@ func (d *Database) PrepareReceiptCopy(ctx context.Context, source *sql.DB, blobs
 
 // Apply publishes the copied objects and metadata in the caller's financial
 // replacement transaction. Parent postings must already exist in that transaction.
-func (c *ReceiptCopy) Apply(tx *sql.Tx, planID string) error {
+func (c *ReceiptCopy) Apply(tx *sql.Tx, accountID string) error {
 	for _, row := range c.rows {
 		if err := publishBlob(tx, row.key); err != nil {
 			return err
 		}
 		r := row.receipt
-		if _, err := tx.Exec(`INSERT INTO receipts(plan_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, planID, r.ID, r.PostingID, r.Digest, r.Size, row.key, r.Revision, row.payload); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts(account_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, accountID, r.ID, r.PostingID, r.Digest, r.Size, row.key, r.Revision, row.payload); err != nil {
 			return err
 		}
 	}
