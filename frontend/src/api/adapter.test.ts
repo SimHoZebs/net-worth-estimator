@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
 	changesBetween,
-	isHistoricalMovement,
+	isHistoricalTransaction,
 	netWorth,
 	validatePlan,
 	visibleAccounts,
-	visibleMovements,
+	visibleTransactions,
 } from "../domain/model.ts";
 import {
 	backendToDisplayPlan,
@@ -193,7 +193,7 @@ describe("backend and display plan adapter", () => {
 		expect(conversion.plan.accounts[0]?.minBalance).toBe(0);
 		expect(conversion.plan.accounts[0]?.maxBalance).toBeNull();
 		expect(conversion.plan.accounts[1]?.kind).toBe("debt");
-		expect(conversion.plan.movements[0]).toMatchObject({
+		expect(conversion.plan.transactions[0]).toMatchObject({
 			amount: 250,
 			fromId: null,
 			toId: "cash",
@@ -321,10 +321,10 @@ describe("backend and display plan adapter", () => {
 		},
 	);
 
-	// A one-time movement dated at or before the projection start is historical
+	// A one-time transaction dated at or before the projection start is historical
 	// whoever authored it; a recurring rule is a projection, not a past event.
 	// Nothing is stored: the display plan is judged by frequency and date.
-	it("classifies a one-time movement before the projection start as historical", () => {
+	it("classifies a one-time transaction before the projection start as historical", () => {
 		const startDate = "2026-02-01";
 		const past = documentFixture();
 		past.postings = [
@@ -351,11 +351,11 @@ describe("backend and display plan adapter", () => {
 			startDate,
 		});
 		// Nothing is stored: the plan holds frequency and date only.
-		const pastMovement = pastConversion.plan.movements.find(
-			(movement) => movement.id === "bonus",
+		const pastTransaction = pastConversion.plan.transactions.find(
+			(transaction) => transaction.id === "bonus",
 		)!;
-		expect(Object.keys(pastMovement ?? {})).not.toContain("provenance");
-		expect(isHistoricalMovement(pastMovement, startDate)).toBe(true);
+		expect(Object.keys(pastTransaction ?? {})).not.toContain("provenance");
+		expect(isHistoricalTransaction(pastTransaction, startDate)).toBe(true);
 
 		const future = documentFixture();
 		future.postings = [
@@ -372,10 +372,10 @@ describe("backend and display plan adapter", () => {
 			projection: projectionFixture(),
 			startDate,
 		});
-		const futureMovement = futureConversion.plan.movements.find(
-			(movement) => movement.id === "future-bonus",
+		const futureTransaction = futureConversion.plan.transactions.find(
+			(transaction) => transaction.id === "future-bonus",
 		)!;
-		expect(isHistoricalMovement(futureMovement, startDate)).toBe(false);
+		expect(isHistoricalTransaction(futureTransaction, startDate)).toBe(false);
 
 		const recurring = documentFixture();
 		recurring.recurrenceRules[0] = {
@@ -389,7 +389,10 @@ describe("backend and display plan adapter", () => {
 			startDate,
 		});
 		expect(
-			isHistoricalMovement(recurringConversion.plan.movements[0]!, startDate),
+			isHistoricalTransaction(
+				recurringConversion.plan.transactions[0]!,
+				startDate,
+			),
 		).toBe(false);
 
 		// Backend sync-owned rows carry a non-"user" author; the exact sync
@@ -402,13 +405,13 @@ describe("backend and display plan adapter", () => {
 			projection: projectionFixture(),
 			startDate,
 		});
-		const syncedMovement = syncedConversion.plan.movements.find(
-			(movement) => movement.id === "bonus",
+		const syncedTransaction = syncedConversion.plan.transactions.find(
+			(transaction) => transaction.id === "bonus",
 		)!;
-		expect(syncedMovement).toMatchObject({
+		expect(syncedTransaction).toMatchObject({
 			readOnly: true,
 		});
-		expect(isHistoricalMovement(syncedMovement, startDate)).toBe(true);
+		expect(isHistoricalTransaction(syncedTransaction, startDate)).toBe(true);
 	});
 
 	it("preserves unchanged backend rows and allows expression-backed amount edits", () => {
@@ -426,8 +429,10 @@ describe("backend and display plan adapter", () => {
 		const amountEdit = displayPlanToBackendDocument(
 			{
 				...conversion.plan,
-				movements: conversion.plan.movements.map((movement) =>
-					movement.id === "salary" ? { ...movement, amount: 300 } : movement,
+				transactions: conversion.plan.transactions.map((transaction) =>
+					transaction.id === "salary"
+						? { ...transaction, amount: 300 }
+						: transaction,
 				),
 			},
 			{ sourceDocument: document, presentation: conversion.presentation },
@@ -453,7 +458,7 @@ describe("backend and display plan adapter", () => {
 			presentation: conversion.presentation,
 			projection: projectionWithSalaryEvent(300),
 		});
-		expect(reloaded.presentation.movements.salary?.amountValue).toBe(300);
+		expect(reloaded.presentation.transactions.salary?.amountValue).toBe(300);
 	});
 
 	it.each([
@@ -470,7 +475,7 @@ describe("backend and display plan adapter", () => {
 				startDate: "2026-02-01",
 			});
 			expect(
-				conversion.plan.movements.find((row) => row.id === id),
+				conversion.plan.transactions.find((row) => row.id === id),
 			).toMatchObject({
 				readOnly: true,
 				enabled: false,
@@ -509,7 +514,7 @@ describe("backend and display plan adapter", () => {
 
 			expect(reverse.report.losses).toContainEqual(
 				expect.objectContaining({
-					field: `movements.${id}.pending`,
+					field: `transactions.${id}.pending`,
 					message: "Pending status is server-owned bank metadata.",
 				}),
 			);
@@ -528,7 +533,7 @@ describe("backend and display plan adapter", () => {
 		const reverse = displayPlanToBackendDocument(
 			{
 				...conversion.plan,
-				movements: conversion.plan.movements.map((row) =>
+				transactions: conversion.plan.transactions.map((row) =>
 					row.id === posting.id ? { ...row, frequency: "monthly" } : row,
 				),
 			},
@@ -536,11 +541,11 @@ describe("backend and display plan adapter", () => {
 		);
 
 		expect(reverse.report.losses).toContainEqual(
-			expect.objectContaining({ field: `movements.${posting.id}.readOnly` }),
+			expect.objectContaining({ field: `transactions.${posting.id}.readOnly` }),
 		);
 	});
 
-	it("round-trips a claim from a posting through the display movement", () => {
+	it("round-trips a claim from a posting through the display transaction", () => {
 		const document = documentFixture();
 		document.postings = [
 			{
@@ -566,8 +571,8 @@ describe("backend and display plan adapter", () => {
 			startDate: "2026-02-01",
 		});
 		expect(
-			conversion.plan.movements.find(
-				(movement) => movement.id === "rent-actual",
+			conversion.plan.transactions.find(
+				(transaction) => transaction.id === "rent-actual",
 			),
 		).toMatchObject({
 			frequency: "once",
@@ -586,10 +591,10 @@ describe("backend and display plan adapter", () => {
 		).toEqual({ ruleId: "salary", occurrenceDate: "2026-02-05" });
 		const cleared = {
 			...conversion.plan,
-			movements: conversion.plan.movements.map((movement) =>
-				movement.id === "rent-actual"
-					? { ...movement, claimRuleId: null, claimOccurrenceDate: null }
-					: movement,
+			transactions: conversion.plan.transactions.map((transaction) =>
+				transaction.id === "rent-actual"
+					? { ...transaction, claimRuleId: null, claimOccurrenceDate: null }
+					: transaction,
 			),
 		};
 		const reverse = displayPlanToBackendDocument(cleared, {
@@ -622,7 +627,7 @@ describe("backend and display plan adapter", () => {
 			status: { readOnly: false },
 			projection: projectionFixture(),
 		});
-		expect(conversion.plan.movements[0]).toMatchObject({
+		expect(conversion.plan.transactions[0]).toMatchObject({
 			amount: 0,
 			amountKnown: false,
 			readOnly: true,
@@ -671,8 +676,10 @@ describe("backend and display plan adapter", () => {
 		});
 		const edited = {
 			...conversion.plan,
-			movements: conversion.plan.movements.map((movement) =>
-				movement.id === "salary" ? { ...movement, amount: 300 } : movement,
+			transactions: conversion.plan.transactions.map((transaction) =>
+				transaction.id === "salary"
+					? { ...transaction, amount: 300 }
+					: transaction,
 			),
 		};
 		const reverse = displayPlanToBackendDocument(edited, {
@@ -706,7 +713,7 @@ describe("backend and display plan adapter", () => {
 					balance: 123,
 					observedOn: "2026-02-02",
 				})),
-			movements: conversion.plan.movements.slice(0, 0),
+			transactions: conversion.plan.transactions.slice(0, 0),
 		};
 		const reverse = displayPlanToBackendDocument(edited, {
 			sourceDocument: document,
@@ -892,7 +899,7 @@ describe("backend and display plan adapter", () => {
 		]);
 	});
 
-	it("hides archived accounts and their movements from display helpers", () => {
+	it("hides archived accounts and their transactions from display helpers", () => {
 		const document = documentFixture();
 		document.checkpoints.push({
 			Date: "2026-01-15",
@@ -909,11 +916,11 @@ describe("backend and display plan adapter", () => {
 			"cash",
 		]);
 		expect(
-			visibleMovements({
-				movements: conversion.plan.movements,
+			visibleTransactions({
+				transactions: conversion.plan.transactions,
 				accounts: conversion.plan.accounts,
 			}),
-		).toEqual(conversion.plan.movements);
+		).toEqual(conversion.plan.transactions);
 		expect(netWorth(conversion.plan)).toBe(
 			conversion.plan.accounts
 				.filter((a) => a.enabled && !a.archived)

@@ -86,8 +86,8 @@ func TestPurchasePolicyPersistsWithPosting(t *testing.T) {
 		t.Fatal(err)
 	}
 	loaded, err = database.LoadDocument()
-	if err != nil || loaded.Postings[0].Purchase != nil {
-		t.Fatalf("cleared policy = %+v, %v", loaded, err)
+	if err != nil || loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 1 {
+		t.Fatalf("omitted policy must keep the stored policy: %+v, %v", loaded, err)
 	}
 	posting.Purchase = &types.PurchasePolicy{Priority: 0}
 	if _, err := database.UpdatePosting(posting); err != nil {

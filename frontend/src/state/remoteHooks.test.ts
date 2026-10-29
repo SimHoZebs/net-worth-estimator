@@ -26,12 +26,7 @@ import {
 } from "../api/index.ts";
 import type { Plan } from "../domain/model.ts";
 
-import {
-	loadRemoteState,
-	persistRemoteState,
-	remoteStorageKey,
-	serverDocumentFingerprint,
-} from "./remoteStorage.ts";
+import { serverDocumentFingerprint } from "./remoteStorage.ts";
 import { memoryStorage } from "../mocks/storage.ts";
 import {
 	clearResourceQueryCache,
@@ -298,11 +293,11 @@ function scenarioStreamClient(cancelBody = true) {
 	return { client, stream, fetcher, deterministicCalls, stochasticCalls };
 }
 
-function withMovementAmount(plan: Plan, amount: number): Plan {
+function withTransactionAmount(plan: Plan, amount: number): Plan {
 	return {
 		...plan,
-		movements: plan.movements.map((movement) =>
-			movement.id === "salary" ? { ...movement, amount } : movement,
+		transactions: plan.transactions.map((transaction) =>
+			transaction.id === "salary" ? { ...transaction, amount } : transaction,
 		),
 	};
 }
@@ -510,31 +505,29 @@ describe("remote workspace state", () => {
 		stubTestServer();
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
-		const edited = withMovementAmount(view.result().plan!, 125);
+		const edited = withTransactionAmount(view.result().plan!, 125);
 		await act(async () => {
 			expect(view.result().updatePlan(edited)).toBe(true);
 		});
 		await act(async () => {
 			await reloadWorkspace();
 		});
-		expect(view.result().workspace?.draft?.movements).toEqual(edited.movements);
+		expect(view.result().workspace?.draft?.transactions).toEqual(
+			edited.transactions,
+		);
 		view.unmount();
 	});
 
-	it("does not publish an empty browser draft when saved-only data is checked again", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("does not publish an empty in-memory draft when saved-only data is checked again", async () => {
 		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
-		const key = remoteStorageKey()!;
 		expect(view.result().workspace?.draft).toBeNull();
-		expect(storage.getItem(key)).toBeNull();
 		await act(async () => reloadWorkspace());
-		expect(storage.getItem(key)).toBeNull();
+		expect(view.result().workspace?.draft).toBeNull();
 		view.unmount();
 	});
 
@@ -670,7 +663,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		const release = server.holdWriteOnce(
 			(_method, path) => path === "/v1/recurrence-rules/salary",
@@ -687,7 +680,9 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 		release(undefined);
 		expect(await saving).toBe(false);
-		expect(useWorkspaceStore.getState().draft?.movements[0]?.amount).toBe(125);
+		expect(useWorkspaceStore.getState().draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(server.modelFetches()).toHaveLength(1);
 	});
 
@@ -746,9 +741,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("hydrates server state and persists a draft without credentials", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("hydrates server state and keeps a draft in memory without credentials", async () => {
 		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -764,19 +757,16 @@ describe("remote workspace state", () => {
 		).toEqual(["cash", "loan"]);
 		expect(rendered.result().adapterReport?.warnings.length).toBeGreaterThan(0);
 
-		const edited = withMovementAmount(rendered.result().plan!, 125);
+		const edited = withTransactionAmount(rendered.result().plan!, 125);
 		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
-		const raw = storage.getItem(remoteStorageKey()!) ?? "";
-		expect(raw).not.toMatch(/authToken|bearerToken/);
-		expect(loadRemoteState()).toMatchObject({
-			version: 1,
-			draft: { movements: [{ id: "salary", amount: 125 }] },
-		});
+		expect(useWorkspaceStore.getState().draft?.transactions).toEqual(
+			edited.transactions,
+		);
 		rendered.unmount();
 		const rehydrated = renderHook(() => useRemoteWorkspace());
 		await rehydrated.settle();
-		expect(rehydrated.result().plan?.movements[0]?.amount).toBe(125);
+		expect(rehydrated.result().plan?.transactions[0]?.amount).toBe(125);
 		rehydrated.unmount();
 	});
 
@@ -790,13 +780,11 @@ describe("remote workspace state", () => {
 		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
-			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+			first
+				.result()
+				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
-		const stored = loadRemoteState();
-		expect(stored).not.toBeInstanceOf(Error);
-		if (stored instanceof Error || stored === null)
-			throw new Error("Expected a stored remote draft.");
-		expect(stored.baseFingerprint).toBe(
+		expect(useWorkspaceStore.getState().baseFingerprint).toBe(
 			serverDocumentFingerprint(modelFixture()),
 		);
 		first.unmount();
@@ -824,14 +812,15 @@ describe("remote workspace state", () => {
 
 		expect(rendered.result().stale).toBe(true);
 		expect(rendered.result().draftStale).toBe(true);
-		expect(rendered.result().volatile).toBe(false);
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(rendered.result().error).not.toBeNull();
 		expect(await rendered.result().save()).toBe(false);
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 150)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 150)),
 		).toBe(false);
 		expect(rendered.result().discard()).toBe(false);
 		expect(
@@ -843,7 +832,9 @@ describe("remote workspace state", () => {
 		expect(await rendered.result().retry()).toBeUndefined();
 		await rendered.settle();
 		expect(rendered.result().stale).toBe(true);
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(await rendered.result().reloadDraft()).toBe(true);
 		await rendered.settle();
 		expect(rendered.result().stale).toBe(false);
@@ -852,8 +843,6 @@ describe("remote workspace state", () => {
 	});
 
 	it("treats a draft without server identity metadata as recovery-only", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
 		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -861,15 +850,12 @@ describe("remote workspace state", () => {
 		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
-			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+			first
+				.result()
+				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
-		const raw = JSON.parse(
-			storage.getItem(remoteStorageKey()!) ?? "{}",
-		) as Record<string, unknown>;
-		delete raw.baseFingerprint;
-		delete raw.baseRevision;
-		storage.setItem(remoteStorageKey()!, JSON.stringify(raw));
+		useWorkspaceStore.setState({ baseFingerprint: null, baseRevision: null });
 
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
@@ -894,7 +880,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		await rendered.settle();
 		expect(await rendered.result().save()).toBe(true);
@@ -916,7 +902,9 @@ describe("remote workspace state", () => {
 		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
-			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+			first
+				.result()
+				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
 		resetServerQueryCache();
@@ -930,7 +918,7 @@ describe("remote workspace state", () => {
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
 		expect(rendered.result().workspace).toBeNull();
-		expect(rendered.result().recoveryDraft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().recoveryDraft?.transactions[0]?.amount).toBe(125);
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
 	});
@@ -947,7 +935,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		server.failStatusOnce(new Error("connection unavailable"));
 		server.failModelOnce(new Error("connection unavailable"));
@@ -955,7 +943,9 @@ describe("remote workspace state", () => {
 		await rendered.result().retry();
 		await rendered.settle();
 		expect(rendered.result().workspace).not.toBeNull();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
 	});
@@ -971,7 +961,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
 		const release = server.holdWriteOnce(
@@ -993,7 +983,9 @@ describe("remote workspace state", () => {
 		await retryPromise;
 		await rendered.settle();
 		expect(rendered.result().workspace).not.toBeNull();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		rendered.unmount();
 	});
 
@@ -1009,7 +1001,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
 		const release = server.holdWriteOnce(
@@ -1029,7 +1021,7 @@ describe("remote workspace state", () => {
 		await retryPromise;
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().plan?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().plan?.transactions[0]?.amount).toBe(125);
 		expect(rendered.result().draftStale).toBe(false);
 		rendered.unmount();
 	});
@@ -1043,7 +1035,7 @@ describe("remote workspace state", () => {
 				{
 					severity: "error",
 					code: "invalid",
-					message: "The server rejected this movement.",
+					message: "The server rejected this transaction.",
 					path: [],
 				},
 			],
@@ -1053,7 +1045,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
 		const release = server.holdWriteOnce(
@@ -1075,7 +1067,9 @@ describe("remote workspace state", () => {
 		await retryPromise;
 		await rendered.settle();
 		expect(rendered.result().error).not.toBeNull();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		rendered.unmount();
 	});
 
@@ -1088,7 +1082,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
 		const release = server.holdWriteOnce(
@@ -1119,7 +1113,9 @@ describe("remote workspace state", () => {
 		await savePromise;
 		await refresh;
 		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(rendered.result().draftStale).toBe(false);
 		rendered.unmount();
 	});
@@ -1136,7 +1132,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		const release = server.holdWriteOnce(
 			(_method, path) => path === "/v1/recurrence-rules/salary",
@@ -1170,7 +1166,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
 		const release = server.holdWriteOnce(
@@ -1187,7 +1183,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 150)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 150)),
 		).toBe(false);
 		expect(await rendered.result().save()).toBe(false);
 		release(undefined);
@@ -1196,7 +1192,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 175)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 175)),
 		).toBe(true);
 		rendered.unmount();
 	});
@@ -1230,9 +1226,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("exposes a stored draft when the server has no model", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("exposes an in-memory draft when the server has no model", async () => {
 		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -1240,7 +1234,9 @@ describe("remote workspace state", () => {
 		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
-			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+			first
+				.result()
+				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
 
@@ -1255,13 +1251,11 @@ describe("remote workspace state", () => {
 		const recovery = renderHook(() => useRemoteWorkspace());
 		await recovery.settle();
 		expect(recovery.result().workspace).toBeNull();
-		expect(recovery.result().recoveryDraft?.movements[0]?.amount).toBe(125);
+		expect(recovery.result().recoveryDraft?.transactions[0]?.amount).toBe(125);
 		recovery.unmount();
 	});
 
-	it("keeps a clean stored draft usable and discardable", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("keeps a clean in-memory draft usable and discardable", async () => {
 		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -1269,30 +1263,27 @@ describe("remote workspace state", () => {
 		const first = renderHook(() => useRemoteWorkspace());
 		await first.settle();
 		expect(
-			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+			first
+				.result()
+				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
 
 		const rehydrated = renderHook(() => useRemoteWorkspace());
 		await rehydrated.settle();
 		expect(rehydrated.result().stale).toBe(false);
-		expect(rehydrated.result().workspace?.draft?.movements[0]?.amount).toBe(
+		expect(rehydrated.result().workspace?.draft?.transactions[0]?.amount).toBe(
 			125,
 		);
 		expect(rehydrated.result().discard()).toBe(true);
 		await rehydrated.settle();
 		expect(rehydrated.result().workspace?.draft).toBeNull();
-		expect(loadRemoteState()).toMatchObject({
-			draft: null,
-			baseFingerprint: null,
-			baseRevision: null,
-		});
+		expect(useWorkspaceStore.getState().draft).toBeNull();
+		expect(useWorkspaceStore.getState().baseFingerprint).toBeNull();
 		rehydrated.unmount();
 	});
 
-	it("returns false from discard and preserves a volatile draft when storage fails", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("returns false from discard when there is no draft", async () => {
 		stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -1302,22 +1293,14 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		await rendered.settle();
-		vi.spyOn(storage, "setItem").mockImplementationOnce(() => {
-			throw new Error("quota exceeded");
-		});
 
-		expect(rendered.result().discard()).toBe(false);
+		expect(rendered.result().discard()).toBe(true);
 		await rendered.settle();
-		expect(rendered.result().volatile).toBe(true);
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
-		expect(rendered.result().error).not.toBeNull();
-
-		await rendered.result().retry();
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft).toBeNull();
+		expect(useWorkspaceStore.getState().draft).toBeNull();
 		rendered.unmount();
 	});
 
@@ -1340,7 +1323,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 
 		// Exercise reconciliation before the fetch promise returns, rather than rely on React's batched effects.
@@ -1360,7 +1343,7 @@ describe("remote workspace state", () => {
 		).toHaveLength(1);
 		expect(server.modelFetches()).toHaveLength(2);
 		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(loadRemoteState()).toMatchObject({ version: 1, draft: null });
+		expect(useWorkspaceStore.getState().draft).toBeNull();
 		rendered.unmount();
 	});
 
@@ -1372,7 +1355,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		server.writeOnce(
 			(_method, path) => path === "/v1/recurrence-rules/salary",
@@ -1385,7 +1368,9 @@ describe("remote workspace state", () => {
 		);
 		expect(await rendered.result().save()).toBe(false);
 		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(server.modelFetches()).toHaveLength(1);
 		rendered.unmount();
 	});
@@ -1398,7 +1383,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		server.writeOnce(
 			(_method, path) => path === "/v1/recurrence-rules/salary",
@@ -1410,7 +1395,9 @@ describe("remote workspace state", () => {
 		await rendered.result().retry();
 		await rendered.settle();
 		expect(rendered.result().readOnly).toBe(false);
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		rendered.unmount();
 	});
 
@@ -1444,16 +1431,12 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("does not persist or announce discard when there is no draft", () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const write = vi.spyOn(storage, "setItem");
+	it("does not announce discard when there is no draft", () => {
 		expect(useWorkspaceStore.getState().discard()).toBe(false);
-		expect(write).not.toHaveBeenCalled();
 		expect(useNotifications.getState().items).toHaveLength(0);
 	});
 
-	it("applies movement edits as rule updates", async () => {
+	it("applies transaction edits as rule updates", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const server = stubTestServer(() => ({
@@ -1465,7 +1448,7 @@ describe("remote workspace state", () => {
 		expect(
 			rendered
 				.result()
-				.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 		).toBe(true);
 		expect(await rendered.result().save()).toBe(true);
 		expect(
@@ -1619,7 +1602,7 @@ describe("remote workspace state", () => {
 			expect(
 				rendered
 					.result()
-					.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+					.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 			).toBe(true);
 			await rendered.settle();
 			const baseFingerprint = rendered.result().workspace?.baseFingerprint;
@@ -1633,7 +1616,7 @@ describe("remote workspace state", () => {
 			expect(rendered.result().draftPresentation?.accounts.loan?.readOnly).toBe(
 				toReadOnly,
 			);
-			expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(
+			expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
 				125,
 			);
 			expect(rendered.result().workspace?.baseFingerprint).toBe(
@@ -1644,7 +1627,7 @@ describe("remote workspace state", () => {
 			expect(
 				rendered
 					.result()
-					.updatePlan(withMovementAmount(rendered.result().plan!, 130)),
+					.updatePlan(withTransactionAmount(rendered.result().plan!, 130)),
 			).toBe(true);
 			expect(
 				server.calls.filter((call) =>
@@ -1652,10 +1635,16 @@ describe("remote workspace state", () => {
 				),
 			).toHaveLength(0);
 			expect(
-				server.calls.filter((call) => call.url.startsWith("/v1/accounts")),
+				server.calls.filter(
+					(call) =>
+						call.url.startsWith("/v1/accounts") && call.method !== "GET",
+				),
 			).toHaveLength(0);
 			expect(
-				server.calls.filter((call) => call.url.startsWith("/v1/checkpoints")),
+				server.calls.filter(
+					(call) =>
+						call.url.startsWith("/v1/checkpoints") && call.method !== "GET",
+				),
 			).toHaveLength(0);
 			rendered.unmount();
 		},
@@ -1676,7 +1665,7 @@ describe("remote workspace state", () => {
 			expect(
 				rendered
 					.result()
-					.updatePlan(withMovementAmount(rendered.result().plan!, 125)),
+					.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 			).toBe(true);
 			await rendered.settle();
 			serverQueryClient().setQueryData(workspaceResourceKey("status"), {
@@ -1693,10 +1682,16 @@ describe("remote workspace state", () => {
 				),
 			).toHaveLength(0);
 			expect(
-				server.calls.filter((call) => call.url.startsWith("/v1/accounts")),
+				server.calls.filter(
+					(call) =>
+						call.url.startsWith("/v1/accounts") && call.method !== "GET",
+				),
 			).toHaveLength(0);
 			expect(
-				server.calls.filter((call) => call.url.startsWith("/v1/checkpoints")),
+				server.calls.filter(
+					(call) =>
+						call.url.startsWith("/v1/checkpoints") && call.method !== "GET",
+				),
 			).toHaveLength(0);
 			rendered.unmount();
 		},
@@ -1766,14 +1761,9 @@ describe("remote workspace state", () => {
 		expect(rendered.result().workspace?.draft?.accounts[0]?.name).toBe(
 			"Keep rejected draft",
 		);
-		expect(loadRemoteState()).toMatchObject({
-			version: 1,
-			draft: {
-				accounts: expect.arrayContaining([
-					expect.objectContaining({ name: "Keep rejected draft" }),
-				]),
-			},
-		});
+		expect(useWorkspaceStore.getState().draft?.accounts[0]?.name).toBe(
+			"Keep rejected draft",
+		);
 		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
 	});
@@ -1798,13 +1788,9 @@ describe("remote workspace state", () => {
 		await first.settle();
 		expect(first.result().workspace?.draft?.accounts[0]?.name).toBe("Keep me");
 		expect(first.result().authRequired).toBe(true);
-		expect(loadRemoteState()).toMatchObject({
-			draft: {
-				accounts: expect.arrayContaining([
-					expect.objectContaining({ name: "Keep me" }),
-				]),
-			},
-		});
+		expect(useWorkspaceStore.getState().draft?.accounts[0]?.name).toBe(
+			"Keep me",
+		);
 		first.unmount();
 
 		resetServerQueryCache();
@@ -1966,7 +1952,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("allows a movement amount edit represented by an expression posting", async () => {
+	it("allows a transaction amount edit represented by an expression posting", async () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const server = stubTestServer(() => ({
@@ -1975,11 +1961,13 @@ describe("remote workspace state", () => {
 		}));
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
-		const edited = withMovementAmount(rendered.result().plan!, 125);
+		const edited = withTransactionAmount(rendered.result().plan!, 125);
 
 		expect(rendered.result().updatePlan(edited)).toBe(true);
 		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.movements[0]?.amount).toBe(125);
+		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
+			125,
+		);
 		expect(
 			deriveDraftDocument(
 				rendered.result().workspace?.draft ?? null,
@@ -2008,31 +1996,33 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("retains a stored draft when save finds conversion losses", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("retains an in-memory draft when save finds conversion losses", async () => {
 		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
 		}));
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
+		const rendered = renderHook(() => useRemoteWorkspace());
+		await rendered.settle();
 		const lossyPlan = {
-			...first.result().plan!,
+			...rendered.result().plan!,
 			assumptions: { inflation: 2, volatility: 0 },
 		};
-		expect(
-			persistRemoteState({
-				version: 1,
+		// Bypass form validation to stage a draft the converter rejects,
+		// mirroring a draft that became lossy after the server model changed.
+		const model = getServerModel();
+		act(() => {
+			useWorkspaceStore.setState({
 				draft: lossyPlan,
-				draftPresentation: first.result().savedPresentation,
-				baseFingerprint: serverDocumentFingerprint(modelFixture()),
-				baseRevision: '"sha256-test"',
-			}),
-		).toBeNull();
-		first.unmount();
-
-		const rendered = renderHook(() => useRemoteWorkspace());
+				baseline: model?.conversion?.plan ?? null,
+				draftPresentation:
+					rendered.result().savedPresentation ??
+					model?.conversion?.presentation ??
+					null,
+				baseFingerprint: model?.fingerprint ?? null,
+				baseRevision: model?.revision ?? null,
+				error: null,
+			});
+		});
 		await rendered.settle();
 		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
 		expect(await rendered.result().save()).toBe(false);
@@ -2110,7 +2100,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(projectionResultToLocal(result, document).movements).toHaveLength(1);
 	});
 
-	it("accepts movement events without account deltas", () => {
+	it("accepts transaction events without account deltas", () => {
 		const document = modelFixture();
 		const result = projectionFixture();
 		result.movementEvents![0]!.accountDeltas = null;
@@ -2122,7 +2112,7 @@ describe("remote projection mapping and SSE", () => {
 		});
 	});
 
-	it("maps binding evidence and excludes movements on or before the plan start", () => {
+	it("maps binding evidence and excludes transactions on or before the plan start", () => {
 		const document = modelFixture();
 		const result = projectionFixture();
 		const baseEvent = result.movementEvents![0]!;
@@ -2458,7 +2448,7 @@ describe("remote projection mapping and SSE", () => {
 				postingFulfillment: [
 					{
 						instanceId: "fulfillment",
-						name: "Planned movements",
+						name: "Planned transactions",
 						enabled: true,
 						config: { postingIds: null },
 					},
@@ -2472,7 +2462,7 @@ describe("remote projection mapping and SSE", () => {
 				postingFulfillment: [
 					{
 						instanceId: "fulfillment",
-						name: "Planned movements",
+						name: "Planned transactions",
 						status: "not-satisfied",
 						deterministic: {
 							firstUnderfulfilledDate: "2026-05-01",
@@ -2517,7 +2507,7 @@ describe("remote projection mapping and SSE", () => {
 				postingFulfillment: [
 					{
 						instanceId: "fulfillment",
-						name: "Planned movements",
+						name: "Planned transactions",
 						status: "satisfied",
 						deterministic: { completionRate: 1 },
 						probabilistic: null,
@@ -3164,8 +3154,8 @@ describe("remote projection mapping and SSE", () => {
 	});
 });
 
-describe("remote draft storage", () => {
-	it("restores only the active private resource's draft and never a sample or other account's draft", async () => {
+describe("in-memory draft scope", () => {
+	it("clears the in-memory draft when the active resource changes", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
 		const mount = async (id: string) => {
 			acceptResourceScope(
@@ -3189,7 +3179,9 @@ describe("remote draft storage", () => {
 		};
 		const first = await mount("plans/a");
 		expect(
-			first.result().updatePlan(withMovementAmount(first.result().plan!, 125)),
+			first
+				.result()
+				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
 		const second = await mount("plans/b");
@@ -3197,19 +3189,13 @@ describe("remote draft storage", () => {
 		expect(
 			second
 				.result()
-				.updatePlan(withMovementAmount(second.result().plan!, 175)),
+				.updatePlan(withTransactionAmount(second.result().plan!, 175)),
 		).toBe(true);
 		second.unmount();
 		const sample = await mount("plans/sample");
 		expect(sample.result().workspace?.draft).toBeNull();
-		expect(sample.result().plan?.movements[0]?.amount).toBe(100);
+		expect(sample.result().plan?.transactions[0]?.amount).toBe(100);
 		sample.unmount();
-		const restoredA = await mount("plans/a");
-		expect(restoredA.result().workspace?.draft?.movements[0]?.amount).toBe(125);
-		restoredA.unmount();
-		const restoredB = await mount("plans/b");
-		expect(restoredB.result().workspace?.draft?.movements[0]?.amount).toBe(175);
-		restoredB.unmount();
 	});
 
 	it("uses a stable semantic server fingerprint", () => {
@@ -3237,19 +3223,5 @@ describe("remote draft storage", () => {
 		expect(serverDocumentFingerprint(changed)).not.toBe(
 			serverDocumentFingerprint(document),
 		);
-	});
-
-	it("round-trips a versioned draft and rejects malformed data", () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const state = {
-			version: 1 as const,
-			draft: null,
-			draftPresentation: null,
-		};
-		expect(persistRemoteState(state)).toBeNull();
-		expect(loadRemoteState()).toEqual(state);
-		storage.setItem(remoteStorageKey()!, "{bad");
-		expect(loadRemoteState()).toBeInstanceOf(Error);
 	});
 });

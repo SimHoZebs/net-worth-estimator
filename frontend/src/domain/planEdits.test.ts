@@ -8,7 +8,7 @@ describe("immutable plan edits", () => {
 		const before = JSON.stringify(testPlan);
 		const toggleEnabled = (enabled: boolean) => ({
 			...testPlan,
-			movements: testPlan.movements.map((item) =>
+			transactions: testPlan.transactions.map((item) =>
 				item.id === "invest" ? { ...item, enabled } : item,
 			),
 		});
@@ -36,7 +36,7 @@ describe("immutable plan edits", () => {
 	it("reports exactly one removal and preserves all other records", () => {
 		const current = removePlanItem({
 			plan: testPlan,
-			target: { kind: "movements", id: "invest", name: "Monthly investing" },
+			target: { kind: "transactions", id: "invest", name: "Monthly investing" },
 		});
 		if (current instanceof Error) throw current;
 		const changes = changesBetween({ saved: testPlan, current });
@@ -54,20 +54,25 @@ describe("immutable plan edits", () => {
 		const plan = {
 			...testPlan,
 			accounts: testPlan.accounts.slice(0, 1),
-			movements: [],
+			transactions: [],
 			evaluations: [],
 		};
 		expect(removePlanItem({ plan, target })).toBeInstanceOf(Error);
 		expect(plan.accounts).toHaveLength(1);
 	});
 	it("accepts blank workspaces and the first account without weakening references", () => {
-		const blank = { ...testPlan, accounts: [], movements: [], evaluations: [] };
+		const blank = {
+			...testPlan,
+			accounts: [],
+			transactions: [],
+			evaluations: [],
+		};
 		expect(validatePlan(blank)).toEqual(blank);
 		expect(
 			validatePlan({ ...blank, accounts: testPlan.accounts.slice(0, 1) }),
 		).not.toBeInstanceOf(Error);
 		expect(
-			validatePlan({ ...blank, movements: testPlan.movements }),
+			validatePlan({ ...blank, transactions: testPlan.transactions }),
 		).toBeInstanceOf(Error);
 	});
 	it("isolates evaluation removal", () => {

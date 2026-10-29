@@ -1,21 +1,22 @@
 import { useState } from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import type { Movement } from "../../domain/model.ts";
+import type { Transaction } from "../../domain/model.ts";
 
 /** Selection is local identity, never a second copy of financial records. */
 export function useTransactionSelection(
 	transactions: AccountTransaction[],
-	movements: Map<string, Movement>,
+	planTransactions: Map<string, Transaction>,
 ) {
 	const [id, setId] = useState<string | null>(null);
 	const transaction = transactions.find((item) => item.id === id);
-	const movement = transaction
-		? movements.get(transaction.movementId)
+	const planTransaction = transaction
+		? planTransactions.get(transaction.movementId)
 		: undefined;
-	const exists = Boolean(transaction && movement);
+	const exists = Boolean(transaction && planTransaction);
 	if (id !== null && !exists) setId(null);
 	return {
-		selected: transaction && movement ? { transaction, movement } : null,
+		selected:
+			transaction && planTransaction ? { transaction, planTransaction } : null,
 		inspect: (transaction: AccountTransaction) => setId(transaction.id),
 		close: () => setId(null),
 	};

@@ -79,13 +79,13 @@ function event(
 	realized: number,
 	constraint: string | null,
 ): MovementResult {
-	const movement = plan.movements.find((item) => item.id === movementId);
-	const fromId = movement?.fromId ?? null;
-	const toId = movement?.toId ?? null;
+	const transaction = plan.transactions.find((item) => item.id === movementId);
+	const fromId = transaction?.fromId ?? null;
+	const toId = transaction?.toId ?? null;
 	return {
 		date,
 		movementId,
-		name: movement?.name ?? movementId,
+		name: transaction?.name ?? movementId,
 		requested,
 		realized,
 		fromId,
@@ -118,23 +118,23 @@ export function activityProjection(
 	plan: typeof testPlan = testPlan,
 ): Projection {
 	const movements: MovementResult[] = [];
-	for (const movement of plan.movements) {
-		if (!movement.enabled) continue;
-		if (movement.frequency === "once") {
-			const shortfall = movement.id === "renovation";
+	for (const transaction of plan.transactions) {
+		if (!transaction.enabled) continue;
+		if (transaction.frequency === "once") {
+			const shortfall = transaction.id === "renovation";
 			movements.push(
 				event(
 					plan,
-					movement.id,
-					movement.startDate,
-					shortfall ? 48000 : movement.amount,
-					shortfall ? 12000 : movement.amount,
+					transaction.id,
+					transaction.startDate,
+					shortfall ? 48000 : transaction.amount,
+					shortfall ? 12000 : transaction.amount,
 					shortfall ? "Protected account balance" : null,
 				),
 			);
 			continue;
 		}
-		const day = Number(movement.startDate.slice(8, 10));
+		const day = Number(transaction.startDate.slice(8, 10));
 		for (let month = 0; month < 120; month++) {
 			const year = 2026 + Math.floor(month / 12);
 			const monthIndex = ((month + 9) % 12) + 1;
@@ -143,14 +143,14 @@ export function activityProjection(
 			if (date <= plan.startDate) continue;
 			// The mortgage is paid off after five years; the scheduled payment then
 			// continues at zero and must not appear as a transaction.
-			const paidOff = movement.id === "mortgage-payment" && month >= 60;
+			const paidOff = transaction.id === "mortgage-payment" && month >= 60;
 			movements.push(
 				event(
 					plan,
-					movement.id,
+					transaction.id,
 					date,
-					paidOff ? 0 : movement.amount,
-					paidOff ? 0 : movement.amount,
+					paidOff ? 0 : transaction.amount,
+					paidOff ? 0 : transaction.amount,
 					null,
 				),
 			);

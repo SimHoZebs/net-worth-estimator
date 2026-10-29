@@ -10,9 +10,12 @@ import {
 import { Reorder, useDragControls } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
-import type { Account, Movement, Plan } from "../../domain/model.ts";
+import type { Account, Transaction, Plan } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/planEdits.ts";
 import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { moveRule } from "@/api/generated/endpoints.ts";
+import { performSave } from "../../state/workspaceWrites.ts";
+import { refreshTransactions } from "../../state/workspaceResources.ts";
 import {
 	useServerModel,
 	useServerStatus,
@@ -21,17 +24,17 @@ import { Badge } from "../Badge.tsx";
 import { EmptyState } from "../EmptyState.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
 import {
-	movementIconStyles,
+	transactionIconStyles,
 	transactionBadgeStyles,
 } from "./activityStyles.ts";
 import { TransactionDetail } from "./TransactionDetail.tsx";
-import { movementRuleTransaction } from "../../domain/accountActivity.ts";
+import { ruleTransaction } from "../../domain/accountActivity.ts";
 
 type Direction = "in" | "out" | "transfer";
 
-function directionFor(movement: Movement, accountId: string): Direction {
-	if (movement.fromId && movement.toId) return "transfer";
-	if (movement.fromId === accountId) return "out";
+function directionFor(transaction: Transaction, accountId: string): Direction {
+	if (transaction.fromId && transaction.toId) return "transfer";
+	if (transaction.fromId === accountId) return "out";
 	return "in";
 }
 
@@ -116,7 +119,6 @@ export function RecurringRules({
 	plan: Plan;
 	onEdit: (target: EditorTarget) => void;
 }) {
-	const updatePlan = useWorkspaceStore((state) => state.updatePlan);
 	const status = useServerStatus().data;
 	const model = useServerModel().data;
 	const serverDocument = model?.document;
@@ -136,45 +138,45 @@ export function RecurringRules({
 		[serverDocument],
 	);
 	const globalRecurring = useMemo(
-		() => plan.movements.filter((movement) => movement.frequency !== "once"),
-		[plan.movements],
+		() =>
+			plan.transactions.filter(
+				(transaction) => transaction.frequency !== "once",
+			),
+		[plan.transactions],
 	);
 	const rules = useMemo(
 		() =>
 			globalRecurring.filter(
-				(movement) =>
-					movement.fromId === account.id || movement.toId === account.id,
+				(transaction) =>
+					transaction.fromId === account.id || transaction.toId === account.id,
 			),
 		[globalRecurring, account.id],
 	);
 	if (selectedId !== null && !rules.some((rule) => rule.id === selectedId))
 		setSelectedId(null);
 
-	const detailFor = (movement: Movement) => {
-		const stored = presentation?.movements[movement.id];
-		const server = serverRules.get(movement.id);
+	const detailFor = (transaction: Transaction) => {
+		const stored = presentation?.transactions[transaction.id];
+		const server = serverRules.get(transaction.id);
 		const backendFrequency =
-			stored?.frequency ?? server?.frequency ?? movement.frequency;
+			stored?.frequency ?? server?.frequency ?? transaction.frequency;
 		return { backendFrequency };
 	};
 
-	const persistOrder = (orderedIds: string[]) => {
-		const byId = new Map(
-			plan.movements.map((movement) => [movement.id, movement]),
-		);
-		const queue = orderedIds
-			.map((id) => byId.get(id))
-			.filter((item): item is Movement => item !== undefined);
-		let cursor = 0;
-		const movements = plan.movements.map((movement) => {
-			if (movement.frequency === "once") return movement;
-			if (movement.fromId !== account.id && movement.toId !== account.id)
-				return movement;
-			const next = queue[cursor];
-			cursor += 1;
-			return next ?? movement;
-		});
-		return updatePlan({ ...plan, movements });
+	const persistOrder = async (orderedIds: string[]): Promise<boolean> => {
+		// Rebuild the account order with row moves, anchoring from the end
+		// so each move lands before an already-placed successor.
+		for (let index = orderedIds.length - 1; index >= 0; index -= 1) {
+			const id = orderedIds[index];
+			if (id === undefined) continue;
+			const ok = await performSave({
+				call: () => moveRule({ id, beforeId: orderedIds[index + 1] ?? "" }),
+				refresh: refreshTransactions,
+				failureMessage: "The order could not be saved.",
+			});
+			if (!ok) return false;
+		}
+		return true;
 	};
 
 	// Local drag order. Reorder fires onReorder continuously mid-drag, so
@@ -184,7 +186,7 @@ export function RecurringRules({
 	const [localIds, setLocalIds] = useState<string[]>([]);
 	const localIdsRef = useRef<string[]>([]);
 	const draggingRef = useRef(false);
-	const ids = rules.map((movement) => movement.id);
+	const ids = rules.map((transaction) => transaction.id);
 	useEffect(() => {
 		if (!draggingRef.current) {
 			setLocalIds(ids);
@@ -197,33 +199,37 @@ export function RecurringRules({
 		setLocalIds(orderedIds);
 	};
 	const orderedRules = useMemo(() => {
-		const byId = new Map(rules.map((movement) => [movement.id, movement]));
+		const byId = new Map(
+			rules.map((transaction) => [transaction.id, transaction]),
+		);
 		const ordered = localIds
 			.map((id) => byId.get(id))
-			.filter((item): item is Movement => item !== undefined);
-		for (const movement of rules) {
-			if (!ordered.includes(movement)) ordered.push(movement);
+			.filter((item): item is Transaction => item !== undefined);
+		for (const transaction of rules) {
+			if (!ordered.includes(transaction)) ordered.push(transaction);
 		}
 		return ordered;
 	}, [rules, localIds]);
 
 	const handleDrop = () => {
 		draggingRef.current = false;
-		const current = rules.map((movement) => movement.id);
+		const current = rules.map((transaction) => transaction.id);
 		const next = localIdsRef.current;
 		if (
 			current.length !== next.length ||
 			current.some((id, index) => id !== next[index])
 		) {
-			if (!persistOrder(next)) {
-				localIdsRef.current = current;
-				setLocalIds(current);
-			}
+			void persistOrder(next).then((ok) => {
+				if (!ok) {
+					localIdsRef.current = current;
+					setLocalIds(current);
+				}
+			});
 		}
 	};
 
 	const moveBy = (id: string, delta: -1 | 1) => {
-		const ids = rules.map((movement) => movement.id);
+		const ids = rules.map((transaction) => transaction.id);
 		const index = ids.indexOf(id);
 		const target = index + delta;
 		if (index < 0 || target < 0 || target >= ids.length) return;
@@ -231,7 +237,15 @@ export function RecurringRules({
 		const [removed] = next.splice(index, 1);
 		if (removed === undefined) return;
 		next.splice(target, 0, removed);
-		persistOrder(next);
+		localIdsRef.current = next;
+		setLocalIds(next);
+		void persistOrder(next).then((ok) => {
+			if (!ok) {
+				const current = rules.map((transaction) => transaction.id);
+				localIdsRef.current = current;
+				setLocalIds(current);
+			}
+		});
 	};
 
 	const canEdit = !plan.readOnly && !status?.readOnly;
@@ -242,13 +256,17 @@ export function RecurringRules({
 				icon={Repeat}
 				title="No recurring transactions for this account yet"
 				action="Add a planned transaction"
-				onAction={() => onEdit({ kind: "movement", item: null })}
+				onAction={() => onEdit({ kind: "transaction", item: null })}
 			/>
 		);
 
-	const rowContent = (movement: Movement, order: number, compact: boolean) => {
-		const direction = directionFor(movement, account.id);
-		const { backendFrequency } = detailFor(movement);
+	const rowContent = (
+		transaction: Transaction,
+		order: number,
+		compact: boolean,
+	) => {
+		const direction = directionFor(transaction, account.id);
+		const { backendFrequency } = detailFor(transaction);
 		const DirectionIcon =
 			direction === "transfer"
 				? ArrowRightLeft
@@ -264,7 +282,7 @@ export function RecurringRules({
 					{order}
 				</span>
 				<span
-					className={movementIconStyles({
+					className={transactionIconStyles({
 						tone:
 							direction === "transfer"
 								? "transfer"
@@ -277,13 +295,13 @@ export function RecurringRules({
 				</span>
 				<span className="flex min-w-0 flex-col gap-1">
 					<strong className="m-0 text-xs font-semibold [overflow-wrap:anywhere]">
-						{movement.name}
+						{transaction.name}
 					</strong>
 					<span className="m-0 text-xs text-muted">
 						{directionLabel(direction)} · {frequencyLabel(backendFrequency)} ·{" "}
-						{movement.amountKnown ? money(movement.amount) : "Varies"}
+						{transaction.amountKnown ? money(transaction.amount) : "Varies"}
 					</span>
-					{!movement.enabled && (
+					{!transaction.enabled && (
 						<span className="m-0 flex flex-wrap gap-1">
 							<Badge tone="warning" className={transactionBadgeStyles()}>
 								Excluded from plan
@@ -299,7 +317,7 @@ export function RecurringRules({
 		<>
 			<div className="flex items-center justify-between gap-4">
 				<p className="p-0 text-xs leading-[1.8] text-muted">
-					Execution order for this account. Same-day movements apply in this
+					Execution order for this account. Same-day transactions apply in this
 					order.
 				</p>
 				{canEdit && (
@@ -327,11 +345,11 @@ export function RecurringRules({
 					className="m-0 flex list-none flex-col border-t border-line p-0"
 					aria-label={`Reorder recurring transactions for ${account.name}`}
 				>
-					{orderedRules.map((movement, index) => (
+					{orderedRules.map((transaction, index) => (
 						<SortableRow
-							key={movement.id}
-							id={movement.id}
-							label={`${index + 1} of ${orderedRules.length}: ${movement.name}`}
+							key={transaction.id}
+							id={transaction.id}
+							label={`${index + 1} of ${orderedRules.length}: ${transaction.name}`}
 							onDragStart={() => {
 								draggingRef.current = true;
 							}}
@@ -340,22 +358,22 @@ export function RecurringRules({
 								<span className="ml-auto flex items-center gap-1 max-sm:gap-0.5">
 									<IconButton
 										icon={ChevronUp}
-										label={`Move ${movement.name} up`}
+										label={`Move ${transaction.name} up`}
 										disabled={index === 0}
-										onClick={() => moveBy(movement.id, -1)}
+										onClick={() => moveBy(transaction.id, -1)}
 									/>
 									<IconButton
 										icon={ChevronDown}
-										label={`Move ${movement.name} down`}
+										label={`Move ${transaction.name} down`}
 										disabled={index === orderedRules.length - 1}
-										onClick={() => moveBy(movement.id, 1)}
+										onClick={() => moveBy(transaction.id, 1)}
 									/>
 									<TextButton
 										type="button"
-										aria-label={`Edit ${movement.name}`}
+										aria-label={`Edit ${transaction.name}`}
 										onClick={() => {
 											setEditing(false);
-											setSelectedId(movement.id);
+											setSelectedId(transaction.id);
 										}}
 									>
 										Edit
@@ -363,7 +381,7 @@ export function RecurringRules({
 								</span>
 							}
 						>
-							{rowContent(movement, index + 1, true)}
+							{rowContent(transaction, index + 1, true)}
 						</SortableRow>
 					))}
 				</Reorder.Group>
@@ -372,18 +390,18 @@ export function RecurringRules({
 					className="m-0 flex list-none flex-col border-t border-line p-0"
 					aria-label={`Recurring transactions for ${account.name}`}
 				>
-					{rules.map((movement, index) => (
+					{rules.map((transaction, index) => (
 						<li
-							key={movement.id}
+							key={transaction.id}
 							className="flex items-center gap-3 border-b border-line bg-transparent p-3 max-sm:gap-2 max-sm:px-2 max-sm:py-3"
 						>
 							<button
 								type="button"
 								className="flex min-w-0 flex-1 items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left"
-								aria-label={`View ${movement.name}, ${directionLabel(directionFor(movement, account.id)).toLowerCase()} ${frequencyLabel(detailFor(movement).backendFrequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
-								onClick={() => setSelectedId(movement.id)}
+								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${frequencyLabel(detailFor(transaction).backendFrequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
+								onClick={() => setSelectedId(transaction.id)}
 							>
-								{rowContent(movement, index + 1, false)}
+								{rowContent(transaction, index + 1, false)}
 							</button>
 						</li>
 					))}
@@ -391,12 +409,12 @@ export function RecurringRules({
 			)}
 			{selectedId &&
 				(() => {
-					const movement = rules.find((item) => item.id === selectedId);
-					if (!movement) return null;
+					const transaction = rules.find((item) => item.id === selectedId);
+					if (!transaction) return null;
 					return (
 						<TransactionDetail
-							transaction={movementRuleTransaction({ movement, plan })}
-							movement={movement}
+							transaction={ruleTransaction({ transaction, plan })}
+							planTransaction={transaction}
 							accounts={plan.accounts}
 							plan={plan}
 							onClose={() => setSelectedId(null)}

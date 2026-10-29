@@ -95,14 +95,30 @@ for (const width of [320, 390, 768, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
 		await page.goto("/#accounts");
 		await page.getByRole("button", { name: "Add account" }).click();
-		const dialog = page.getByRole("dialog");
+		const dialog = page.getByRole("dialog", { name: "Add account" });
 		await expect(dialog).toBeVisible();
 		await expectWithinViewport(dialog, page);
 		await page.getByLabel("Account name").fill("Sizing regression");
 		await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
 		// Submit through the native form interaction, not an internal event handler.
+		// Accounts save straight to the server, so the dialog closes with no draft.
 		await page.getByLabel("Account name").press("Enter");
 		await expect(dialog).not.toBeVisible();
+		await expect(
+			page.getByRole("row", { name: /Sizing regression/ }),
+		).toBeVisible();
+		// Stage a transaction edit: the draft-bar layout checks below need an
+		// unsaved change, which account writes no longer produce. Navigate
+		// directly: the sidebar links hide behind the nav drawer on phones.
+		await page.goto("/#transactions");
+		await page.getByRole("tab", { name: /Recurring/ }).click();
+		await page.getByRole("button", { name: "Monthly investing" }).click();
+		await page.getByLabel("Amount (USD)").click();
+		await page.getByLabel("Amount (USD)").fill("900");
+		await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+		await expect(
+			page.getByRole("dialog", { name: "Monthly investing" }),
+		).not.toBeVisible();
 		const bar = page.locator("[data-draft-bar]");
 		await expect(bar).toBeVisible();
 		await expectWithinViewport(bar, page);

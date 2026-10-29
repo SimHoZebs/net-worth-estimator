@@ -221,7 +221,7 @@ export function SafeSpendingPreview({
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
-		return plan.movements
+		return plan.transactions
 			.filter(
 				(movement) =>
 					movement.fromId !== null &&
@@ -234,7 +234,7 @@ export function SafeSpendingPreview({
 				amount: movement.amount,
 				frequency: movement.frequency,
 			}));
-	}, [plan.movements, spendingIds]);
+	}, [plan.transactions, spendingIds]);
 
 	const trackedBillIds = useMemo(() => {
 		const knownIds = billCandidates.map((bill) => bill.id);
@@ -286,7 +286,7 @@ export function SafeSpendingPreview({
 		if (!spendingIds.length) return [];
 		const bills = new Set(trackedBillIds);
 		const rules = new Set(
-			plan.movements
+			plan.transactions
 				.filter((movement) => movement.frequency !== "once")
 				.map((movement) => movement.id),
 		);
@@ -298,7 +298,7 @@ export function SafeSpendingPreview({
 				!bills.has(movement.movementId) &&
 				!rules.has(movement.movementId),
 		);
-	}, [movements, spendingIds, trackedBillIds, plan.movements]);
+	}, [movements, spendingIds, trackedBillIds, plan.transactions]);
 
 	const directSpentSinceStart = useMemo(
 		() =>

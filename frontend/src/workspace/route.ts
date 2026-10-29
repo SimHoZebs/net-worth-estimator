@@ -1,5 +1,5 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
-import type { Account, Evaluation, Movement } from "../domain/model.ts";
+import type { Account, Evaluation, Transaction } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/planEdits.ts";
 import {
 	SAFE_SPENDING_DETAIL_TABS,
@@ -9,7 +9,7 @@ import { LEGACY_PAGES, pages, type Page } from "./navigation.ts";
 
 // URL-driven overlays. The hash carries the page plus at most one overlay:
 // `#accounts` stays the accounts page, `#accounts/everyday-checking` opens
-// that account's activity, `#transactions/new` opens a blank movement editor.
+// that account's activity, `#transactions/new` opens a blank transaction editor.
 // The hash (not component state) is the source of truth, so the back button,
 // bookmarks, and direct loads all resolve through the same parser. Page-only
 // hashes are unchanged: every overlay form appends segments to them.
@@ -21,7 +21,7 @@ export const SAFE_SPENDING_TABS = SAFE_SPENDING_DETAIL_TABS.map(
 export type OverlayRoute =
 	| { type: "account"; key: string }
 	| { type: "accountEdit"; key: string }
-	| { type: "movementEdit"; key: string }
+	| { type: "transactionEdit"; key: string }
 	| { type: "evaluationEdit"; key: string }
 	| { type: "group"; key: string }
 	| { type: "position" }
@@ -30,7 +30,7 @@ export type OverlayRoute =
 	| {
 			type: "safeSpendingDetail";
 			tab: SafeSpendingDetailTab;
-			editMovement?: string;
+			editTransaction?: string;
 	  }
 	| { type: "discard" }
 	// Well-formed page, unparseable overlay segments. Resolves to unknown so
@@ -46,7 +46,7 @@ export interface WorkspaceRoute {
 // depend on this narrow view rather than the full document shape.
 export type PlanLike = {
 	accounts: Account[];
-	movements: Movement[];
+	transactions: Transaction[];
 	evaluations: Evaluation[];
 };
 
@@ -81,6 +81,7 @@ const RESERVED_SLUGS = new Set([
 	"evaluation",
 	"evaluations",
 	"edit-account",
+	"edit-transaction",
 	"edit-movement",
 	"edit-evaluation",
 ]);
@@ -122,7 +123,7 @@ function homeEditor(page: Page): OverlayRoute | { type: "invalid" } {
 		case "accounts":
 			return { type: "accountEdit", key: "new" };
 		case "transactions":
-			return { type: "movementEdit", key: "new" };
+			return { type: "transactionEdit", key: "new" };
 		case "evaluations":
 			return { type: "evaluationEdit", key: "new" };
 		default:
@@ -135,7 +136,7 @@ function scopedEditor(page: Page, key: string): OverlayRoute | null {
 		case "accounts":
 			return { type: "accountEdit", key };
 		case "transactions":
-			return { type: "movementEdit", key };
+			return { type: "transactionEdit", key };
 		case "evaluations":
 			return { type: "evaluationEdit", key };
 		default:
@@ -147,22 +148,23 @@ function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 	const [requestedTab, maybeEdit, key, ...extra] = parts;
 	const tabOrEdit = requestedTab === "mandatory" ? "cycle" : requestedTab;
 	if (extra.length > 0) return { type: "invalid" };
-	if (tabOrEdit === "edit-movement") {
-		// `#outlook/safe-spending-detail/edit-movement/<id>`
+	if (tabOrEdit === "edit-transaction" || tabOrEdit === "edit-movement") {
+		// `#outlook/safe-spending-detail/edit-transaction/<id>`
 		return maybeEdit
 			? {
 					type: "safeSpendingDetail",
 					tab: "cycle",
-					editMovement: maybeEdit,
+					editTransaction: maybeEdit,
 				}
 			: { type: "invalid" };
 	}
 	if (!isSafeSpendingTab(tabOrEdit)) return { type: "invalid" };
 	if (maybeEdit === undefined)
 		return { type: "safeSpendingDetail", tab: tabOrEdit };
-	// `#outlook/safe-spending-detail/<tab>/edit-movement/<id>`
-	return maybeEdit === "edit-movement" && key
-		? { type: "safeSpendingDetail", tab: tabOrEdit, editMovement: key }
+	// `#outlook/safe-spending-detail/<tab>/edit-transaction/<id>`
+	return (maybeEdit === "edit-transaction" || maybeEdit === "edit-movement") &&
+		key
+		? { type: "safeSpendingDetail", tab: tabOrEdit, editTransaction: key }
 		: { type: "invalid" };
 }
 
@@ -217,8 +219,11 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 	switch (first) {
 		case "edit-account":
 			return { type: "accountEdit", key: second ?? "" };
+		case "edit-transaction":
+		// Legacy `edit-movement` hashes resolve the same way: only the
+		// segment name changed, and editor URLs are ephemeral.
 		case "edit-movement":
-			return { type: "movementEdit", key: second ?? "" };
+			return { type: "transactionEdit", key: second ?? "" };
 		case "edit-evaluation":
 			return { type: "evaluationEdit", key: second ?? "" };
 		case "account":
@@ -307,17 +312,19 @@ export function resolveOverlayRoute(
 				? ready({ kind: "editor", target: { kind: "account", item: account } })
 				: unknown();
 		}
-		case "movementEdit": {
+		case "transactionEdit": {
 			if (overlay.key === "new")
 				return ready({
 					kind: "editor",
-					target: { kind: "movement", item: null },
+					target: { kind: "transaction", item: null },
 				});
-			const movement = plan.movements.find((item) => item.id === overlay.key);
-			return movement
+			const transaction = plan.transactions.find(
+				(item) => item.id === overlay.key,
+			);
+			return transaction
 				? ready({
 						kind: "editor",
-						target: { kind: "movement", item: movement },
+						target: { kind: "transaction", item: transaction },
 					})
 				: unknown();
 		}
@@ -338,26 +345,26 @@ export function resolveOverlayRoute(
 				: unknown();
 		}
 		case "safeSpendingDetail": {
-			if (overlay.editMovement === undefined)
+			if (overlay.editTransaction === undefined)
 				return ready({
 					kind: "safeSpendingDetail",
 					tab: overlay.tab,
 					edit: null,
 				});
-			if (overlay.editMovement === "new")
+			if (overlay.editTransaction === "new")
 				return ready({
 					kind: "safeSpendingDetail",
 					tab: overlay.tab,
-					edit: { kind: "movement", item: null },
+					edit: { kind: "transaction", item: null },
 				});
-			const movement = plan.movements.find(
-				(item) => item.id === overlay.editMovement,
+			const transaction = plan.transactions.find(
+				(item) => item.id === overlay.editTransaction,
 			);
-			return movement
+			return transaction
 				? ready({
 						kind: "safeSpendingDetail",
 						tab: overlay.tab,
-						edit: { kind: "movement", item: movement },
+						edit: { kind: "transaction", item: transaction },
 					})
 				: unknown();
 		}
@@ -413,14 +420,14 @@ export function editorHash(page: Page, target: EditorTarget): string {
 				? `#${page}/${encode(slug)}/edit`
 				: `#${page}/edit-account/${encode(slug ?? target.item.id)}`;
 		}
-		case "movement":
+		case "transaction":
 			if (!target.item)
 				return page === "transactions"
 					? `#${page}/new`
-					: `#${page}/edit-movement/new`;
+					: `#${page}/edit-transaction/new`;
 			return page === "transactions"
 				? `#${page}/${encode(target.item.id)}/edit`
-				: `#${page}/edit-movement/${encode(target.item.id)}`;
+				: `#${page}/edit-transaction/${encode(target.item.id)}`;
 		case "evaluation":
 			if (!target.item)
 				return page === "evaluations"
@@ -438,7 +445,7 @@ export function safeSpendingDetailHash(
 	editKey?: string,
 ): string {
 	const base = `#${page}/safe-spending-detail/${tab}`;
-	return editKey ? `${base}/edit-movement/${encode(editKey)}` : base;
+	return editKey ? `${base}/edit-transaction/${encode(editKey)}` : base;
 }
 
 export function discardHash(page: Page): string {

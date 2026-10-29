@@ -39,6 +39,96 @@
 				],
 				"type": "object"
 			},
+			"AccountBalanceRow": {
+				"additionalProperties": false,
+				"properties": {
+					"archived": {
+						"type": "boolean"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"color": {
+						"type": "string"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"hasCheckpoint": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"maxBalance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"minBalance": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"name": {
+						"type": "string"
+					},
+					"observedOn": {
+						"type": "string"
+					},
+					"readOnly": {
+						"type": "boolean"
+					},
+					"syncOwned": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"kind",
+					"enabled",
+					"archived",
+					"minBalance",
+					"maxBalance",
+					"balance",
+					"observedOn",
+					"hasCheckpoint",
+					"syncOwned",
+					"readOnly"
+				],
+				"type": "object"
+			},
+			"AccountBalancesOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AccountBalancesOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accounts": {
+						"items": {
+							"$ref": "#/components/schemas/AccountBalanceRow"
+						},
+						"type": ["array", "null"]
+					},
+					"asOf": {
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["accounts", "asOf", "revision"],
+				"type": "object"
+			},
 			"AccountBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -48,6 +138,10 @@
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
+					},
+					"balance": {
+						"format": "double",
+						"type": "number"
 					},
 					"color": {
 						"type": "string"
@@ -70,6 +164,9 @@
 						"type": "number"
 					},
 					"name": {
+						"type": "string"
+					},
+					"observedOn": {
 						"type": "string"
 					},
 					"source": {
@@ -486,6 +583,90 @@
 				],
 				"type": "object"
 			},
+			"CheckpointListOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/CheckpointListOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"checkpoints": {
+						"items": {
+							"$ref": "#/components/schemas/Checkpoint"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["checkpoints", "revision"],
+				"type": "object"
+			},
+			"ConvertTransactionBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ConvertTransactionBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"posting": {
+						"$ref": "#/components/schemas/PostingBody"
+					},
+					"rule": {
+						"$ref": "#/components/schemas/RuleBody"
+					}
+				},
+				"required": ["kind"],
+				"type": "object"
+			},
+			"ConvertTransactionOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ConvertTransactionOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"kind": {
+						"type": "string"
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "kind", "issues", "persisted", "revision"],
+				"type": "object"
+			},
 			"CurrentPosition": {
 				"additionalProperties": false,
 				"properties": {
@@ -796,6 +977,28 @@
 				],
 				"type": "object"
 			},
+			"EvaluationSummaryOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/EvaluationSummaryOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"evaluations": {
+						"$ref": "#/components/schemas/EvaluationTables"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["evaluations", "revision"],
+				"type": "object"
+			},
 			"EvaluationTables": {
 				"additionalProperties": false,
 				"properties": {
@@ -899,6 +1102,12 @@
 						},
 						"type": ["array", "null"]
 					},
+					"plannedPurchases": {
+						"items": {
+							"$ref": "#/components/schemas/PlannedPurchase"
+						},
+						"type": ["array", "null"]
+					},
 					"postings": {
 						"items": {
 							"$ref": "#/components/schemas/Posting"
@@ -927,6 +1136,22 @@
 				"type": "object"
 			},
 			"Item": {
+				"additionalProperties": false,
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "kind", "name"],
+				"type": "object"
+			},
+			"Item1": {
 				"additionalProperties": false,
 				"properties": {
 					"accountId": {
@@ -1180,7 +1405,7 @@
 				"properties": {
 					"accountDeltas": {
 						"items": {
-							"$ref": "#/components/schemas/Item"
+							"$ref": "#/components/schemas/Item1"
 						},
 						"type": ["array", "null"]
 					},
@@ -1357,6 +1582,43 @@
 				"required": ["instanceIds"],
 				"type": "object"
 			},
+			"PlannedPurchase": {
+				"additionalProperties": false,
+				"properties": {
+					"cost": {
+						"format": "double",
+						"type": "number"
+					},
+					"earliestDate": {
+						"type": "string"
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"fundingAccountId": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"cost",
+					"earliestDate",
+					"enabled",
+					"priority"
+				],
+				"type": "object"
+			},
 			"PositionAccount": {
 				"additionalProperties": false,
 				"properties": {
@@ -1465,6 +1727,9 @@
 					"transactionTime": {
 						"format": "int64",
 						"type": "integer"
+					},
+					"void": {
+						"type": "boolean"
 					}
 				},
 				"required": [
@@ -2503,14 +2768,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"name",
-					"amount",
-					"frequency",
-					"startDate",
-					"priority",
-					"enabled"
-				],
+				"required": ["name", "amount", "frequency", "startDate", "enabled"],
 				"type": "object"
 			},
 			"SafeSpendingOutputBody": {
@@ -2930,6 +3188,136 @@
 				},
 				"required": ["accountId", "minimumFixed", "dueDay"],
 				"type": "object"
+			},
+			"TransactionCatalogOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionCatalogOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/Item"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["items", "revision"],
+				"type": "object"
+			},
+			"TransactionListOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionListOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"transactions": {
+						"items": {
+							"$ref": "#/components/schemas/TransactionRow"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["transactions", "revision"],
+				"type": "object"
+			},
+			"TransactionRow": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"claim": {
+						"$ref": "#/components/schemas/PostingClaim"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"endDate": {
+						"type": ["string", "null"]
+					},
+					"frequency": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"pending": {
+						"type": "boolean"
+					},
+					"postedTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"readOnly": {
+						"type": "boolean"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"startDate": {
+						"type": "string"
+					},
+					"syncOwned": {
+						"type": "boolean"
+					},
+					"transactionTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"void": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"id",
+					"kind",
+					"name",
+					"sourceAccountId",
+					"destinations",
+					"amount",
+					"frequency",
+					"startDate",
+					"endDate",
+					"enabled",
+					"syncOwned",
+					"readOnly"
+				],
+				"type": "object"
 			}
 		}
 	},
@@ -2975,6 +3363,46 @@
 					}
 				},
 				"summary": "Create one account"
+			}
+		},
+		"/v1/accounts/balances": {
+			"get": {
+				"operationId": "list-account-balances",
+				"parameters": [
+					{
+						"description": "Balance date YYYY-MM-DD; defaults to the latest checkpoint date or today",
+						"explode": false,
+						"in": "query",
+						"name": "asOf",
+						"schema": {
+							"description": "Balance date YYYY-MM-DD; defaults to the latest checkpoint date or today",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountBalancesOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List accounts with balances as of a date"
 			}
 		},
 		"/v1/accounts/reorder": {
@@ -3503,6 +3931,64 @@
 				},
 				"summary": "Delete one balance checkpoint"
 			},
+			"get": {
+				"operationId": "list-checkpoints",
+				"parameters": [
+					{
+						"description": "Only checkpoints for this account",
+						"explode": false,
+						"in": "query",
+						"name": "accountId",
+						"schema": {
+							"description": "Only checkpoints for this account",
+							"type": "string"
+						}
+					},
+					{
+						"description": "First date YYYY-MM-DD inclusive",
+						"explode": false,
+						"in": "query",
+						"name": "since",
+						"schema": {
+							"description": "First date YYYY-MM-DD inclusive",
+							"type": "string"
+						}
+					},
+					{
+						"description": "Last date YYYY-MM-DD inclusive",
+						"explode": false,
+						"in": "query",
+						"name": "until",
+						"schema": {
+							"description": "Last date YYYY-MM-DD inclusive",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CheckpointListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List balance checkpoints for an account and window"
+			},
 			"post": {
 				"operationId": "save-checkpoint",
 				"requestBody": {
@@ -3614,6 +4100,34 @@
 					}
 				},
 				"summary": "Move one evaluation"
+			}
+		},
+		"/v1/evaluations/summary": {
+			"get": {
+				"operationId": "list-evaluation-summary",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/EvaluationSummaryOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List evaluation identity and configs"
 			}
 		},
 		"/v1/evaluations/{instanceId}": {
@@ -5093,6 +5607,133 @@
 					}
 				},
 				"summary": "Connect a SimpleFIN key from a setup token or access URL"
+			}
+		},
+		"/v1/transactions": {
+			"get": {
+				"operationId": "list-transactions",
+				"parameters": [
+					{
+						"description": "Only transactions touching this account",
+						"explode": false,
+						"in": "query",
+						"name": "accountId",
+						"schema": {
+							"description": "Only transactions touching this account",
+							"type": "string"
+						}
+					},
+					{
+						"description": "once, recurring, or all",
+						"explode": false,
+						"in": "query",
+						"name": "recurring",
+						"schema": {
+							"default": "all",
+							"description": "once, recurring, or all",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TransactionListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List transactions touching an account"
+			}
+		},
+		"/v1/transactions/catalog": {
+			"get": {
+				"operationId": "list-transaction-catalog",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TransactionCatalogOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List transaction reference triples"
+			}
+		},
+		"/v1/transactions/{id}/convert": {
+			"post": {
+				"operationId": "convert-transaction",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ConvertTransactionBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ConvertTransactionOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one transaction across the posting/rule tables"
 			}
 		}
 	}

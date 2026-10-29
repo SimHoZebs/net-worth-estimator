@@ -20,7 +20,6 @@ import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar.tsx";
 // data display subscribes to the stores; this component takes no props.
 export function WorkspaceShell() {
 	const navigation = useWorkspaceNavigation();
-	const volatile = useWorkspaceStore((state) => state.volatile);
 	const hasDraft = useWorkspaceStore((state) => state.draft != null);
 	const discard = useWorkspaceStore((state) => state.discard);
 	const overlays = useWorkspaceOverlays({
@@ -29,10 +28,8 @@ export function WorkspaceShell() {
 		pushHash: navigation.pushHash,
 		replaceHash: navigation.replaceHash,
 	});
-	// Volatile alone also covers storage read failures with nothing to lose
-	// (pending scope during verification, empty stores). Only warn when a
-	// draft actually exists.
-	useBeforeUnload(volatile && hasDraft);
+	// Only warn when a draft actually exists.
+	useBeforeUnload(hasDraft);
 	const safeSpendingDetail = (tab: SafeSpendingDetailTab | null) => {
 		if (tab) overlays.openSafeSpendingDetail(tab);
 		else overlays.closeSafeSpendingDetail();

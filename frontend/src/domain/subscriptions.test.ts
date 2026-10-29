@@ -12,9 +12,9 @@ describe("mark as subscription", () => {
 			ruleId: "renovation-sub",
 		});
 		if (next instanceof Error) throw next;
-		expect(next.movements).toHaveLength(testPlan.movements.length + 1);
-		const original = next.movements.find((item) => item.id === "renovation");
-		const rule = next.movements.find((item) => item.id === "renovation-sub");
+		expect(next.transactions).toHaveLength(testPlan.transactions.length + 1);
+		const original = next.transactions.find((item) => item.id === "renovation");
+		const rule = next.transactions.find((item) => item.id === "renovation-sub");
 		expect(original?.claimRuleId).toBe("renovation-sub");
 		expect(original?.claimOccurrenceDate).toBe(original?.startDate);
 		expect(rule).toMatchObject({
@@ -29,7 +29,8 @@ describe("mark as subscription", () => {
 		});
 		// Source plan is untouched.
 		expect(
-			testPlan.movements.find((item) => item.id === "renovation")?.claimRuleId,
+			testPlan.transactions.find((item) => item.id === "renovation")
+				?.claimRuleId,
 		).toBeNull();
 	});
 
@@ -47,11 +48,11 @@ describe("mark as subscription", () => {
 			ruleId: "reno-split",
 		});
 		if (next instanceof Error) throw next;
-		const rule = next.movements.find((item) => item.id === "reno-split");
+		const rule = next.transactions.find((item) => item.id === "reno-split");
 		expect(rule?.frequency).toBe("monthly");
 		expect(rule?.endDate).toBe("2028-09-15");
 		expect(
-			next.movements.find((item) => item.id === "renovation")?.claimRuleId,
+			next.transactions.find((item) => item.id === "renovation")?.claimRuleId,
 		).toBe("reno-split");
 	});
 

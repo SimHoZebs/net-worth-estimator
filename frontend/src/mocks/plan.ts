@@ -102,7 +102,7 @@ export const testPlan: Plan = {
 			readOnly: false,
 		},
 	],
-	movements: [
+	transactions: [
 		{
 			id: "pay",
 			name: "Household take-home pay",

@@ -27,6 +27,7 @@ import {
 	modelOptions,
 	presetsOptions,
 	reloadWorkspace,
+	workspaceIsBusy,
 	workspaceResourceKey,
 } from "@/state/workspaceResources.ts";
 import {
@@ -41,6 +42,67 @@ import {
 
 export function workspaceWriteKey(kind: "model" | "presets") {
 	return ["workspace-write", getResourceScope().key, kind] as const;
+}
+
+/** Backend save envelope: persisted with issues, or rejected with reasons. */
+export interface SaveResult {
+	issues?: { severity: string; message?: string | null }[] | null;
+	persisted?: boolean;
+}
+
+function saveRejection(envelope: SaveResult): string | null {
+	if (envelope.persisted === false) {
+		const messages = (envelope.issues ?? [])
+			.map((issue) => issue.message)
+			.filter(Boolean);
+		return messages.length
+			? messages.join(" ")
+			: "The server rejected the change.";
+	}
+	const errors = (envelope.issues ?? []).filter(
+		(issue) => issue.severity === "error",
+	);
+	if (errors.length) return errors.map((issue) => issue.message).join(" ");
+	return null;
+}
+
+/**
+ * One immediate save behind a form action: guard the workspace, run the
+ * call, surface a rejection notice, then refresh the given queries.
+ * Returns true only when the server persisted the change.
+ */
+export async function performSave(options: {
+	call: () => Promise<{ data: unknown }>;
+	refresh: () => Promise<void>;
+	failureMessage: string;
+}): Promise<boolean> {
+	if (workspaceIsBusy()) {
+		notifyError(
+			"workspace",
+			"Wait for the current server operation to finish before editing the plan.",
+		);
+		return false;
+	}
+	if (getResourceScope().status !== "ready") {
+		notifyError("workspace", "Load the server workspace before editing it.");
+		return false;
+	}
+	try {
+		const envelope = (await options.call()).data as unknown as SaveResult;
+		const rejection = saveRejection(envelope);
+		if (rejection) {
+			notifyError("workspace", rejection);
+			return false;
+		}
+		await options.refresh();
+		return true;
+	} catch (cause) {
+		notifyError(
+			"workspace",
+			cause instanceof Error ? cause.message : options.failureMessage,
+		);
+		return false;
+	}
 }
 
 async function write<T>(

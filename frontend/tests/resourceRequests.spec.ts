@@ -1,9 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import {
-	readSavedServerPlan,
-	readTemporaryVersion,
-	resetFixture,
-} from "./fixture.ts";
+import { readSavedServerPlan, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
 
@@ -50,12 +46,12 @@ test("an ordinary save conflict preserves edits without another session check", 
 	).toBeVisible();
 	expect(sessionChecks).toBe(0);
 	expect(writes).toBe(1);
-	const draft = await readTemporaryVersion(page);
-	expect(
-		draft?.movements.find(
-			(movement: { id: string }) => movement.id === "invest",
-		)?.amount,
-	).toBe(900);
+	// The failed save keeps the staged edit as an unsaved change while the
+	// server plan is untouched. The detail reads saved rows, so the banner
+	// is the edits-preserved evidence here.
+	await expect(
+		page.getByText("1 unsaved change · saved plan unchanged"),
+	).toBeVisible();
 	expect(await readSavedServerPlan()).toEqual(saved);
 });
 

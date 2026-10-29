@@ -16,12 +16,6 @@ import {
 import { getResourceScope, type ResourceScope } from "../auth/resourceScope.ts";
 import { changesBetween, type Plan, validatePlan } from "../domain/model.ts";
 import {
-	loadRemoteState,
-	persistRemoteState,
-	readRemoteStateRaw,
-	type RemoteLocalState,
-} from "./remoteStorage.ts";
-import {
 	getServerModel,
 	getServerStatus,
 	workspaceIsBusy,
@@ -37,10 +31,7 @@ export interface DraftState {
 	baseFingerprint: string | null;
 	baseRevision: string | null;
 	scope: ResourceScope | null;
-	expectedRaw: string | null | undefined;
-	volatile: boolean;
 	error: string | null;
-	errorCode: "storage-conflict" | null;
 }
 
 const initialData = (): DraftState => ({
@@ -50,10 +41,7 @@ const initialData = (): DraftState => ({
 	baseFingerprint: null,
 	baseRevision: null,
 	scope: null,
-	expectedRaw: undefined,
-	volatile: false,
 	error: null,
-	errorCode: null,
 });
 
 export const staleDraftMessage =
@@ -95,16 +83,6 @@ export function deriveDraftDocument(
 	}
 }
 
-function localState(state: DraftState): RemoteLocalState {
-	return {
-		version: 1,
-		draft: state.draft,
-		draftPresentation: state.draft ? state.draftPresentation : null,
-		baseFingerprint: state.draft ? state.baseFingerprint : null,
-		baseRevision: state.draft ? state.baseRevision : null,
-	};
-}
-
 function conversion(
 	plan: Plan,
 	model: ServerModel,
@@ -137,8 +115,8 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 	set,
 	get,
 ) => {
-	const fail = (message: string, errorCode: DraftState["errorCode"] = null) => {
-		set({ error: message, errorCode });
+	const fail = (message: string) => {
+		set({ error: message });
 		notifyError(
 			"workspace",
 			message,
@@ -147,37 +125,9 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 						label: "Discard draft and load latest",
 						onAction: () => void reloadDraft(),
 					}
-				: errorCode === "storage-conflict"
-					? {
-							label: "Reload latest saved plan",
-							onAction: () => window.location.reload(),
-						}
-					: undefined,
+				: undefined,
 		);
 		return false;
-	};
-	const persist = (next: DraftState): boolean => {
-		const result = persistRemoteState(
-			localState(next),
-			get().expectedRaw,
-			getResourceScope(),
-		);
-		if (result) {
-			set({ volatile: true });
-			return fail(
-				result.message,
-				result.message.includes("changed in another tab")
-					? "storage-conflict"
-					: null,
-			);
-		}
-		set({
-			expectedRaw: JSON.stringify(localState(next)),
-			volatile: false,
-			error: null,
-			errorCode: null,
-		});
-		return true;
 	};
 	const edit = (next: Plan, replacing: boolean) => {
 		if (workspaceIsBusy())
@@ -224,7 +174,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			saved.updatedAt !== validated.updatedAt ||
 			saved.revision !== validated.revision ||
 			saved.readOnly !== validated.readOnly;
-		const state: DraftState = {
+		set({
 			...get(),
 			draft: changed ? validated : null,
 			baseline: changed ? saved : null,
@@ -235,9 +185,8 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			baseRevision: changed
 				? (get().baseRevision ?? model.revision ?? null)
 				: null,
-		};
-		set(state);
-		persist(state);
+			error: null,
+		});
 		notifySuccess(
 			"workspace-notice",
 			replacing
@@ -250,26 +199,10 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 		...initialData(),
 		restore: (scope) => {
 			if (scope !== getResourceScope() || scope.status !== "ready") return;
-			const raw = readRemoteStateRaw(scope);
-			const stored = loadRemoteState(scope);
-			const retained = get().volatile
-				? localState(get())
-				: stored instanceof Error
-					? localState(get())
-					: (stored ?? (get().draft ? localState(get()) : null));
 			set({
 				scope,
-				expectedRaw: raw instanceof Error ? undefined : raw,
 				baseline: null,
-				draft: retained?.draft ?? null,
-				draftPresentation: retained?.draftPresentation ?? null,
-				baseFingerprint: retained?.baseFingerprint ?? null,
-				baseRevision: retained?.baseRevision ?? null,
 			});
-			if (raw instanceof Error || stored instanceof Error) {
-				set({ volatile: true });
-				fail((raw instanceof Error ? raw : (stored as Error)).message);
-			}
 		},
 		reconcile: (model) => {
 			// A save acknowledges the exact draft it submitted. Access reconciliation must not replace it mid-write.
@@ -308,21 +241,14 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 				);
 			const conflict = draftConflict(get());
 			if (conflict && !allowStale) return fail(conflict);
-			const next = {
+			set({
 				...get(),
 				draft: null,
 				baseline: null,
 				draftPresentation: null,
 				baseFingerprint: null,
 				baseRevision: null,
-			};
-			if (!persist(next)) return false;
-			set(next);
-			set({
 				error: null,
-				errorCode: null,
-				volatile: false,
-				expectedRaw: JSON.stringify(localState(next)),
 			});
 			notifySuccess(
 				"workspace-notice",
@@ -332,21 +258,14 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 		},
 		acknowledgeSave: (draft) => {
 			if (get().draft !== draft) return false;
-			const next = {
+			set({
 				...get(),
 				draft: null,
 				baseline: null,
 				draftPresentation: null,
 				baseFingerprint: null,
 				baseRevision: null,
-			};
-			if (!persist(next)) return false;
-			set(next);
-			set({
 				error: null,
-				errorCode: null,
-				volatile: false,
-				expectedRaw: JSON.stringify(localState(next)),
 			});
 			return true;
 		},
@@ -378,17 +297,17 @@ export function draftDocumentForSave(): FinancialModelDocument {
 	);
 }
 
-export function resetWorkspaceForResource({ preserveVolatile = false } = {}) {
+export function resetWorkspaceForResource({ preserveDraft = false } = {}) {
 	const previous = useWorkspaceStore.getState();
 	useWorkspaceStore.setState({
 		...initialData(),
-		...(preserveVolatile && previous.volatile
+		...(preserveDraft && previous.draft
 			? {
 					draft: previous.draft,
+					baseline: previous.baseline,
 					draftPresentation: previous.draftPresentation,
 					baseFingerprint: previous.baseFingerprint,
 					baseRevision: previous.baseRevision,
-					volatile: true,
 				}
 			: {}),
 	});

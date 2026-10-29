@@ -10,7 +10,7 @@ export class ImportError extends errore.createTaggedError({
 	message: "$detail Choose a valid Waypoint plan JSON file.",
 }) {}
 
-// Workspace persistence lives in remoteStorage.ts (REMOTE_STORAGE_KEY).
+// Drafts live in memory only. File import validates through planSchema below.
 // Do not add another workspace schema here.
 export function parsePlan(text: string): Plan | ImportError {
 	const value = errore.try({

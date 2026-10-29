@@ -74,7 +74,7 @@ export function useWorkspaceOverlays({
 		// An editor opened from the safe spending detail stacks onto it, preserving
 		// the detail underneath; anywhere else it replaces the overlay.
 		if (
-			target.kind === "movement" &&
+			target.kind === "transaction" &&
 			route.overlay?.type === "safeSpendingDetail"
 		) {
 			pushHash(
@@ -100,7 +100,7 @@ export function useWorkspaceOverlays({
 		if (!plan) return;
 		if (
 			route.overlay?.type === "safeSpendingDetail" &&
-			route.overlay.editMovement !== undefined
+			route.overlay.editTransaction !== undefined
 		) {
 			pushHash(safeSpendingDetailHash(page, route.overlay.tab));
 			return;
@@ -120,7 +120,9 @@ export function useWorkspaceOverlays({
 	};
 	const switchSafeSpendingTab = (tab: SafeSpendingDetailTab) => {
 		if (route.overlay?.type !== "safeSpendingDetail") return;
-		replaceHash(safeSpendingDetailHash(page, tab, route.overlay.editMovement));
+		replaceHash(
+			safeSpendingDetailHash(page, tab, route.overlay.editTransaction),
+		);
 	};
 	const closeSafeSpendingDetail = () => {
 		pushHash(pageHash(page));
