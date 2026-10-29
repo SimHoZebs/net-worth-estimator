@@ -5,7 +5,7 @@ import { Card } from "@/components/Card.tsx";
 import type { EvaluationPin } from "@/components/evaluationCard.ts";
 import { Progress } from "@/components/Progress.tsx";
 import { Skeleton } from "@/components/Skeleton.tsx";
-import { dateLabel, money, percent } from "@/domain/format.ts";
+import { dateLabel, money } from "@/domain/format.ts";
 import type { Evaluation } from "@/domain/model.ts";
 import type { EvaluationResult } from "@/domain/result.ts";
 
@@ -14,7 +14,6 @@ export type { EvaluationPin } from "@/components/evaluationCard.ts";
 export function EvaluationCard({
 	evaluation,
 	result,
-	probability,
 	onEdit,
 	onRemove,
 	pending = false,
@@ -22,7 +21,6 @@ export function EvaluationCard({
 }: {
 	evaluation: Evaluation;
 	result: Pick<EvaluationResult, "current" | "firstDate"> | undefined;
-	probability: number | null;
 	onEdit?: () => void;
 	onRemove?: () => void;
 	pending?: boolean;
@@ -138,12 +136,6 @@ export function EvaluationCard({
 							</div>
 						)
 					))}
-				{probability !== null && evaluation.enabled && !outcomePending && (
-					<p className="m-0 text-xs">
-						Reached in <strong>{percent(probability)}</strong> of modeled
-						scenarios.
-					</p>
-				)}
 			</div>
 		</Card>
 	);

@@ -17,7 +17,6 @@ describe("EvaluationCard", () => {
 			<EvaluationCard
 				evaluation={evaluation}
 				result={{ current: 500000, firstDate: "2028-06-01" }}
-				probability={0.75}
 				onEdit={onEdit}
 				onRemove={onRemove}
 				pin={{ pinned: true, onPinChange }}
@@ -40,14 +39,13 @@ describe("EvaluationCard", () => {
 		expect(
 			view.getByRole("progressbar", { name: evaluation.name }),
 		).toBeTruthy();
-		expect(view.getByText("75%", { exact: false })).toBeTruthy();
+		expect(view.queryByText(/of modeled scenarios/)).toBeNull();
 	});
 
 	it("keeps pending outcomes and paused evaluations explicit", () => {
 		const props = {
 			evaluation,
 			result: undefined,
-			probability: null,
 			pending: true,
 		};
 		const view = render(<EvaluationCard {...props} />);
@@ -78,7 +76,6 @@ describe("EvaluationCard", () => {
 				<EvaluationCard
 					evaluation={evaluation}
 					result={evaluationFixture({ evaluation })}
-					probability={0.75}
 					onEdit={onEdit}
 					onRemove={onRemove}
 				/>,
@@ -87,7 +84,7 @@ describe("EvaluationCard", () => {
 			expect(
 				view.getByRole("progressbar", { name: evaluation.name }),
 			).toBeTruthy();
-			expect(view.getByText("75%")).toBeTruthy();
+			expect(view.queryByText(/of modeled scenarios/)).toBeNull();
 			expect(view.queryByRole("button", { name: /Evidence/ })).toBeNull();
 			fireEvent.click(
 				view.getByRole("button", { name: `Edit ${evaluation.name}` }),

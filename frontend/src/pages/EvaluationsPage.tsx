@@ -149,11 +149,6 @@ function EvaluationsContent({
 						result={projection?.evaluations.find(
 							(goal) => goal.evaluation.id === evaluation.id,
 						)}
-						probability={
-							projection && range
-								? (range.evaluationSuccess[evaluation.id] ?? 0)
-								: null
-						}
 						pending={pending}
 						pin={{
 							pinned: pinnedSet.has(evaluation.id),

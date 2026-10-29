@@ -90,7 +90,7 @@ describe("pinned evaluation cards", () => {
 				),
 			);
 			expect(card.queryByRole("button", { name: /Evidence/ })).toBeNull();
-			expect(card.getByText("75%")).toBeTruthy();
+			expect(card.queryByText(/of modeled scenarios/)).toBeNull();
 			fireEvent.click(
 				card.getByRole("button", {
 					name: `Unpin ${evaluation.name} from Outlook`,
