@@ -243,7 +243,7 @@ describe("authentication resource isolation", () => {
 		);
 	});
 
-	it("clears live model and projection state before it first mounts a verified workspace", async () => {
+	it("clears live model and projection state before it first mounts a verified account", async () => {
 		setServerRevisionFixture("previous-account-private-revision");
 		serverQueryClient().setQueryData(workspaceResourceKey("presets"), [
 			{ id: "previous-private-recipe" },
@@ -373,7 +373,7 @@ describe("authentication resource isolation", () => {
 		expect(getResourceScope().resource?.id).toBe(B);
 	});
 
-	it("preserves workspace data, recovery, and completed results across a same-account check", async () => {
+	it("preserves account data, recovery, and completed results across a same-account check", async () => {
 		const fetcher = vi.fn(async () => response(session()));
 		vi.stubGlobal("fetch", fetcher);
 		renderWorkspace();

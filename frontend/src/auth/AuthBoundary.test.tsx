@@ -234,7 +234,7 @@ describe("provider-independent authentication boundary", () => {
 			}),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
-			"This account does not have access to this plan.",
+			"This account does not have access.",
 		);
 		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 		expect(
@@ -358,7 +358,7 @@ describe("provider-independent authentication boundary", () => {
 		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("keeps a verified workspace mounted with a retry toast on a transient outage", async () => {
+	it("keeps a verified account mounted with a retry toast on a transient outage", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
