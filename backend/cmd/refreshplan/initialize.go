@@ -15,7 +15,7 @@ import (
 // initialize publishes a new, private dev database only after its selected
 // financial scope copies successfully. Production ownership and identity rows
 // never enter this file. An existing destination always remains untouched.
-func initialize(target, source, sourceAccount, issuer, subject string) error {
+func initialize(target, source, sourceUser, issuer, subject string) error {
 	if target == "" || source == "" || issuer == "" || subject == "" {
 		return errors.New("initialization requires --db, --source, --init-issuer, and --init-subject")
 	}
@@ -30,7 +30,7 @@ func initialize(target, source, sourceAccount, issuer, subject string) error {
 			return errors.New("initialization destination has an existing SQLite sidecar")
 		}
 	}
-	selected, err := selectSourceAccount(source, sourceAccount)
+	selected, err := selectSourceUser(source, sourceUser)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func initialize(target, source, sourceAccount, issuer, subject string) error {
 		return err
 	}
 	resource := authorization.ResourceFor(issuer, subject)
-	_, err = db.EnsureAccount(authorization.ActorKey(issuer, subject), issuer, subject)
+	_, err = db.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject)
 	closeErr := db.Close()
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func initialize(target, source, sourceAccount, issuer, subject string) error {
 	return os.Link(temporary, target)
 }
 
-func selectSourceAccount(path, selected string) (string, error) {
+func selectSourceUser(path, selected string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
@@ -85,15 +85,15 @@ func selectSourceAccount(path, selected string) (string, error) {
 	defer db.Close()
 	if selected != "" {
 		var present int
-		if err := db.QueryRow("SELECT COUNT(*) FROM app_accounts WHERE id=? AND id NOT IN ('sample','fixture')", selected).Scan(&present); err != nil {
-			return "", fmt.Errorf("selected source account: %w", err)
+		if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id=? AND id NOT IN ('sample','fixture')", selected).Scan(&present); err != nil {
+			return "", fmt.Errorf("selected source user: %w", err)
 		}
 		if present != 1 {
-			return "", errors.New("setup source must be a private account")
+			return "", errors.New("setup source must be a private user")
 		}
 		return selected, nil
 	}
-	rows, err := db.Query("SELECT id FROM app_accounts WHERE id NOT IN ('sample','fixture') ORDER BY id LIMIT 2")
+	rows, err := db.Query("SELECT id FROM users WHERE id NOT IN ('sample','fixture') ORDER BY id LIMIT 2")
 	if err != nil {
 		return "", fmt.Errorf("source must be a current application database: %w", err)
 	}
@@ -110,7 +110,7 @@ func selectSourceAccount(path, selected string) (string, error) {
 		return "", err
 	}
 	if len(ids) != 1 {
-		return "", errors.New("source must contain exactly one private account unless --source-account selects its reviewed financial scope")
+		return "", errors.New("source must contain exactly one private user unless --source-user selects its reviewed financial scope")
 	}
 	return ids[0], nil
 }

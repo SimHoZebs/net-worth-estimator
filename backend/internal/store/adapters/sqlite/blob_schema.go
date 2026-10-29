@@ -67,11 +67,11 @@ func migrateInlineReceiptImages(tx *sql.Tx, defaultSQLite bool) error {
 	if err != nil {
 		return err
 	}
-	type identity struct{ account, id string }
+	type identity struct{ user, id string }
 	var identities []identity
 	for rows.Next() {
 		var id identity
-		if err := rows.Scan(&id.account, &id.id); err != nil {
+		if err := rows.Scan(&id.user, &id.id); err != nil {
 			rows.Close()
 			return err
 		}
@@ -90,11 +90,11 @@ func migrateInlineReceiptImages(tx *sql.Tx, defaultSQLite bool) error {
 		if _, err := tx.Exec(`INSERT INTO blob_objects(key,state,expires_at) VALUES (?,'live',0)`, key); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO blob_data(key,data) SELECT ?,image FROM receipts_inline WHERE account_id=? AND id=?`, key, id.account, id.id); err != nil {
+		if _, err := tx.Exec(`INSERT INTO blob_data(key,data) SELECT ?,image FROM receipts_inline WHERE account_id=? AND id=?`, key, id.user, id.id); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO receipts(account_id,id,posting_id,digest,size,blob_key,revision,payload)
-			SELECT account_id,id,posting_id,digest,size,?,revision,payload FROM receipts_inline WHERE account_id=? AND id=?`, key, id.account, id.id); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload)
+			SELECT account_id,id,posting_id,digest,size,?,revision,payload FROM receipts_inline WHERE account_id=? AND id=?`, key, id.user, id.id); err != nil {
 			return err
 		}
 	}

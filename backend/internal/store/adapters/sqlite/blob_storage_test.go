@@ -72,7 +72,7 @@ func externalBlobFixture(t *testing.T) (*Database, *sqliteStore, *faultBlobs, st
 func receiptBlobKey(t *testing.T, s *sqliteStore, id string) string {
 	t.Helper()
 	var key string
-	if err := s.db.QueryRow(`SELECT blob_key FROM receipts WHERE id=? AND account_id=:account_id`, id).Scan(&key); err != nil {
+	if err := s.db.QueryRow(`SELECT blob_key FROM receipts WHERE id=? AND user_id=:user_id`, id).Scan(&key); err != nil {
 		t.Fatal(err)
 	}
 	return key

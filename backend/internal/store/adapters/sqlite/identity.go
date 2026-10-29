@@ -209,7 +209,7 @@ func (d *Database) RevokeGrants(issuer, subject, sid, jti string, lifetime time.
 
 // RemoveGroupMemberships drops social group memberships after the provider
 // confirms the account is gone. It delegates to the shared removal path so
-// revocation and offline cleanup cannot diverge. It preserves app_accounts
+// revocation and offline cleanup cannot diverge. It preserves users
 // and private plans. Logout and password changes must not call this.
 func (d *Database) RemoveGroupMemberships(issuer, subject string) error {
 	if issuer == "" || subject == "" {

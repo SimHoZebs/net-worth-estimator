@@ -15,20 +15,20 @@ import (
 // but never define them. SetupDatabase alone creates the shared schema.
 // A replacement backend implements Store without importing anything here.
 
-// seedAccountTables runs only in the transaction that first creates an account.
+// seedUserTables runs only in the transaction that first creates a user.
 // A later ensure never restores factory presets that the owner deleted.
-func seedAccountTables(tx *accountTx) error {
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO model_metadata (account_id, id, source_path, document_present) VALUES (:account_id, 1, '', 0)`); err != nil {
+func seedUserTables(tx *userTx) error {
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO model_metadata (user_id, id, source_path, document_present) VALUES (:user_id, 1, '', 0)`); err != nil {
 		return fmt.Errorf("ensure model metadata: %w", err)
 	}
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO sync_state (account_id, id, last_sync_at) VALUES (:account_id, 1, '')`); err != nil {
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO sync_state (user_id, id, last_sync_at) VALUES (:user_id, 1, '')`); err != nil {
 		return fmt.Errorf("ensure sync state: %w", err)
 	}
-	if _, err := tx.Exec(`INSERT OR IGNORE INTO sync_credentials (account_id, id, access_url, bridge_host, updated_at, cards_json) VALUES (:account_id, 1, '', '', '', '[]')`); err != nil {
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO sync_credentials (user_id, id, access_url, bridge_host, updated_at, cards_json) VALUES (:user_id, 1, '', '', '', '[]')`); err != nil {
 		return fmt.Errorf("ensure sync credentials: %w", err)
 	}
 	var presetCount int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM amount_presets WHERE account_id = :account_id`).Scan(&presetCount); err != nil {
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM amount_presets WHERE user_id = :user_id`).Scan(&presetCount); err != nil {
 		return fmt.Errorf("count amount presets: %w", err)
 	}
 	if presetCount == 0 {
@@ -42,7 +42,7 @@ func seedAccountTables(tx *accountTx) error {
 				return err
 			}
 			if _, err := tx.Exec(
-				`INSERT INTO amount_presets (id, position, name, label, summary, when_use, amount_json, enabled, account_id) VALUES (?,?,?,?,?,?,?,?, :account_id)`,
+				`INSERT INTO amount_presets (id, position, name, label, summary, when_use, amount_json, enabled, user_id) VALUES (?,?,?,?,?,?,?,?, :user_id)`,
 				id, position, seed.Name, seed.Label, seed.Summary, seed.WhenUse, string(amountJSON), boolToInt(seed.Enabled),
 			); err != nil {
 				return fmt.Errorf("seed preset %s: %w", seed.Name, err)
@@ -82,20 +82,20 @@ func schemaStatements() []string {
 			expiry INTEGER NOT NULL,
 			PRIMARY KEY(issuer, jti)
 		)`,
-		`CREATE TABLE IF NOT EXISTS app_accounts (
+		`CREATE TABLE IF NOT EXISTS users (
 			id TEXT PRIMARY KEY,
 			issuer TEXT NOT NULL,
 			subject TEXT NOT NULL,
 			UNIQUE(issuer, subject)
 		)`,
 		`CREATE TABLE IF NOT EXISTS safe_spending_settings (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id INTEGER NOT NULL CHECK (id = 1),
 			settings_json TEXT NOT NULL,
-			PRIMARY KEY (account_id, id)
+			PRIMARY KEY (user_id, id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS accounts (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			name TEXT NOT NULL,
@@ -104,22 +104,22 @@ func schemaStatements() []string {
 			max_balance REAL,
 			color TEXT,
 			enabled INTEGER NOT NULL,
-			PRIMARY KEY (account_id, id)
+			PRIMARY KEY (user_id, id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS checkpoints (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id INTEGER NOT NULL,
 			position INTEGER NOT NULL,
 			date TEXT NOT NULL,
 			model_account_id TEXT NOT NULL,
 			balance REAL NOT NULL,
 			source TEXT NOT NULL DEFAULT 'user',
-			PRIMARY KEY(account_id, id),
-			UNIQUE(account_id, model_account_id, date),
-			FOREIGN KEY(account_id, model_account_id) REFERENCES accounts(account_id, id) DEFERRABLE INITIALLY DEFERRED
+			PRIMARY KEY(user_id, id),
+			UNIQUE(user_id, model_account_id, date),
+			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		`CREATE TABLE IF NOT EXISTS postings (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			name TEXT NOT NULL,
@@ -136,39 +136,39 @@ func schemaStatements() []string {
 			void INTEGER NOT NULL DEFAULT 0 CHECK (void IN (0, 1)),
 			execution_order INTEGER NOT NULL DEFAULT 0 CHECK (execution_order >= 0),
 			receipt_ids TEXT NOT NULL DEFAULT '[]',
-			PRIMARY KEY (account_id, id),
-			FOREIGN KEY(account_id, source_account_id) REFERENCES accounts(account_id, id) DEFERRABLE INITIALLY DEFERRED,
-			FOREIGN KEY(account_id, fulfills_rule_id) REFERENCES recurrence_rules(account_id, id) DEFERRABLE INITIALLY DEFERRED
+			PRIMARY KEY (user_id, id),
+			FOREIGN KEY(user_id, source_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED,
+			FOREIGN KEY(user_id, fulfills_rule_id) REFERENCES recurrence_rules(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		`CREATE TABLE IF NOT EXISTS posting_sync_keys (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			provider TEXT NOT NULL,
 			bridge_account_id TEXT NOT NULL,
 			transaction_id TEXT NOT NULL,
 			posting_id TEXT NOT NULL,
-			UNIQUE(account_id, posting_id),
-			FOREIGN KEY(account_id, posting_id) REFERENCES postings(account_id, id) ON DELETE CASCADE,
-			PRIMARY KEY (account_id, provider, bridge_account_id, transaction_id)
+			UNIQUE(user_id, posting_id),
+			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
+			PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS posting_id_migrations (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			old_id TEXT NOT NULL,
 			new_id TEXT NOT NULL,
-			PRIMARY KEY(account_id, old_id),
-			UNIQUE(account_id, new_id)
+			PRIMARY KEY(user_id, old_id),
+			UNIQUE(user_id, new_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,
 		`CREATE TABLE IF NOT EXISTS purchase_policies (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			posting_id TEXT NOT NULL,
 			priority INTEGER NOT NULL CHECK (priority >= 0),
-			PRIMARY KEY(account_id, posting_id),
-			FOREIGN KEY(account_id, posting_id) REFERENCES postings(account_id, id) ON DELETE CASCADE
+			PRIMARY KEY(user_id, posting_id),
+			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
 		)`,
 		`CREATE TABLE IF NOT EXISTS recurrence_rules (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			name TEXT NOT NULL,
@@ -181,87 +181,87 @@ func schemaStatements() []string {
 			annual_cap REAL,
 			priority INTEGER NOT NULL,
 			enabled INTEGER NOT NULL,
-			PRIMARY KEY (account_id, id),
-			FOREIGN KEY(account_id, source_account_id) REFERENCES accounts(account_id, id) DEFERRABLE INITIALLY DEFERRED
+			PRIMARY KEY (user_id, id),
+			FOREIGN KEY(user_id, source_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		`CREATE TABLE IF NOT EXISTS evaluations (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			type TEXT NOT NULL,
 			instance_id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			name TEXT NOT NULL,
 			enabled INTEGER NOT NULL,
 			config_json TEXT NOT NULL,
-			PRIMARY KEY (account_id, type, instance_id),
-			UNIQUE(account_id, instance_id)
+			PRIMARY KEY (user_id, type, instance_id),
+			UNIQUE(user_id, instance_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS projection_artifacts (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			identity TEXT NOT NULL,
 			kind TEXT NOT NULL,
 			created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
 			payload TEXT NOT NULL,
-			PRIMARY KEY(account_id, identity)
+			PRIMARY KEY(user_id, identity)
 		)`,
 		`CREATE TABLE IF NOT EXISTS model_metadata (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id INTEGER NOT NULL CHECK (id = 1),
 			source_path TEXT NOT NULL,
 			document_present INTEGER NOT NULL CHECK (document_present IN (0, 1)),
-			PRIMARY KEY(account_id, id)
+			PRIMARY KEY(user_id, id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS payment_terms (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			model_account_id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			minimum_fixed REAL NOT NULL,
 			minimum_percent REAL,
 			due_day INTEGER NOT NULL,
 			statement_day INTEGER,
-			PRIMARY KEY(account_id, model_account_id),
-			FOREIGN KEY(account_id, model_account_id) REFERENCES accounts(account_id, id) DEFERRABLE INITIALLY DEFERRED
+			PRIMARY KEY(user_id, model_account_id),
+			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		`CREATE TABLE IF NOT EXISTS entity_ids (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
 			kind TEXT NOT NULL,
-			PRIMARY KEY(account_id, id)
+			PRIMARY KEY(user_id, id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS account_links (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			bridge_account_id TEXT NOT NULL,
 			model_account_id TEXT NOT NULL,
 			bridge_name TEXT NOT NULL DEFAULT '',
 			currency TEXT NOT NULL DEFAULT '',
 			origin TEXT NOT NULL DEFAULT 'manual',
 			last_seen_at TEXT NOT NULL DEFAULT '',
-			PRIMARY KEY(account_id, bridge_account_id),
-			UNIQUE(account_id, model_account_id)
+			PRIMARY KEY(user_id, bridge_account_id),
+			UNIQUE(user_id, model_account_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS pinned_evaluations (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			instance_id TEXT NOT NULL,
 			position INTEGER NOT NULL,
-			PRIMARY KEY(account_id, instance_id),
-			FOREIGN KEY(account_id, instance_id) REFERENCES evaluations(account_id, instance_id) ON DELETE CASCADE
+			PRIMARY KEY(user_id, instance_id),
+			FOREIGN KEY(user_id, instance_id) REFERENCES evaluations(user_id, instance_id) ON DELETE CASCADE
 		)`,
 		`CREATE TABLE IF NOT EXISTS sync_state (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id INTEGER NOT NULL CHECK (id = 1),
 			last_sync_at TEXT NOT NULL DEFAULT '',
-			PRIMARY KEY(account_id, id)
+			PRIMARY KEY(user_id, id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS sync_credentials (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id INTEGER NOT NULL CHECK (id = 1),
 			access_url TEXT NOT NULL DEFAULT '',
 			bridge_host TEXT NOT NULL DEFAULT '',
 			updated_at TEXT NOT NULL DEFAULT '',
 			cards_json TEXT NOT NULL DEFAULT '[]',
-			PRIMARY KEY(account_id, id)
+			PRIMARY KEY(user_id, id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS amount_presets (
-			account_id TEXT NOT NULL REFERENCES app_accounts(id) ON DELETE CASCADE,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
 			position INTEGER NOT NULL,
 			name TEXT NOT NULL,
@@ -270,8 +270,8 @@ func schemaStatements() []string {
 			when_use TEXT NOT NULL DEFAULT '',
 			amount_json TEXT NOT NULL,
 			enabled INTEGER NOT NULL,
-			PRIMARY KEY(account_id, id),
-			UNIQUE(account_id, name)
+			PRIMARY KEY(user_id, id),
+			UNIQUE(user_id, name)
 		)`,
 		blobObjectSchema,
 		blobsqlite.Schema,
@@ -280,23 +280,23 @@ func schemaStatements() []string {
 		`CREATE TABLE IF NOT EXISTS user_groups (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
-			created_by_account_id TEXT NOT NULL REFERENCES app_accounts(id),
+			created_by_user_id TEXT NOT NULL REFERENCES users(id),
 			created_at INTEGER NOT NULL
 		)`,
 		`CREATE TABLE IF NOT EXISTS group_members (
 			group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
-			account_id TEXT NOT NULL REFERENCES app_accounts(id),
+			user_id TEXT NOT NULL REFERENCES users(id),
 			role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
 			joined_at INTEGER NOT NULL,
 			display_name TEXT NOT NULL DEFAULT '',
-			PRIMARY KEY(group_id, account_id)
+			PRIMARY KEY(group_id, user_id)
 		)`,
-		`CREATE INDEX IF NOT EXISTS group_members_account ON group_members(account_id, group_id)`,
+		`CREATE INDEX IF NOT EXISTS group_members_account ON group_members(user_id, group_id)`,
 		`CREATE TABLE IF NOT EXISTS group_invites (
 			id TEXT PRIMARY KEY,
 			group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
 			code_hash TEXT NOT NULL UNIQUE,
-			created_by_account_id TEXT NOT NULL REFERENCES app_accounts(id),
+			created_by_user_id TEXT NOT NULL REFERENCES users(id),
 			expires_at INTEGER NOT NULL,
 			max_uses INTEGER NOT NULL DEFAULT 1 CHECK (max_uses >= 1),
 			used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
@@ -430,29 +430,29 @@ var requiredSchemaColumns = map[string]string{
 	"identity_grants":        "id, issuer, subject, sid, expiry, data",
 	"identity_logout_marks":  "issuer, kind, identifier, seen_at, expiry",
 	"identity_logout_tokens": "issuer, jti, expiry",
-	"app_accounts":           "id, issuer, subject",
-	"user_groups":            "id, name, created_by_account_id, created_at",
-	"group_members":          "group_id, account_id, role, joined_at, display_name",
-	"group_invites":          "id, group_id, code_hash, created_by_account_id, expires_at, max_uses, used_count, revoked_at, created_at",
-	"accounts":               "account_id, id, position, name, kind, min_balance, max_balance, color, enabled",
-	"checkpoints":            "account_id, id, position, date, model_account_id, balance, source",
-	"postings":               "account_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids",
-	"posting_sync_keys":      "account_id, provider, bridge_account_id, transaction_id, posting_id",
-	"posting_id_migrations":  "account_id, old_id, new_id",
+	"users":                  "id, issuer, subject",
+	"user_groups":            "id, name, created_by_user_id, created_at",
+	"group_members":          "group_id, user_id, role, joined_at, display_name",
+	"group_invites":          "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
+	"accounts":               "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
+	"checkpoints":            "user_id, id, position, date, model_account_id, balance, source",
+	"postings":               "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids",
+	"posting_sync_keys":      "user_id, provider, bridge_account_id, transaction_id, posting_id",
+	"posting_id_migrations":  "user_id, old_id, new_id",
 	"schema_migrations":      "name",
-	"purchase_policies":      "account_id, posting_id, priority",
-	"recurrence_rules":       "account_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
-	"evaluations":            "account_id, type, instance_id, position, name, enabled, config_json",
-	"projection_artifacts":   "account_id, identity, kind, created_at, payload",
-	"model_metadata":         "account_id, id, source_path, document_present",
-	"payment_terms":          "account_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
-	"entity_ids":             "account_id, id, kind",
-	"account_links":          "account_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
-	"pinned_evaluations":     "account_id, instance_id, position",
-	"safe_spending_settings": "account_id, id, settings_json",
-	"sync_state":             "account_id, id, last_sync_at",
-	"sync_credentials":       "account_id, id, access_url, bridge_host, updated_at, cards_json",
-	"amount_presets":         "account_id, id, position, name, label, summary, when_use, amount_json, enabled",
+	"purchase_policies":      "user_id, posting_id, priority",
+	"recurrence_rules":       "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
+	"evaluations":            "user_id, type, instance_id, position, name, enabled, config_json",
+	"projection_artifacts":   "user_id, identity, kind, created_at, payload",
+	"model_metadata":         "user_id, id, source_path, document_present",
+	"payment_terms":          "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
+	"entity_ids":             "user_id, id, kind",
+	"account_links":          "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
+	"pinned_evaluations":     "user_id, instance_id, position",
+	"safe_spending_settings": "user_id, id, settings_json",
+	"sync_state":             "user_id, id, last_sync_at",
+	"sync_credentials":       "user_id, id, access_url, bridge_host, updated_at, cards_json",
+	"amount_presets":         "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
 }
 
 func validateSchemaObjects(db queryer) error {
@@ -489,7 +489,7 @@ func expectedSchemaTables() []string {
 		"identity_grants",
 		"identity_logout_marks",
 		"identity_logout_tokens",
-		"app_accounts",
+		"users",
 		"user_groups",
 		"group_members",
 		"group_invites",

@@ -31,7 +31,7 @@ func (d *Database) PrepareReceiptCopy(ctx context.Context, source *sql.DB, blobs
 	// checks every lease inside the target transaction and fails atomically.
 	ctx, cancel := context.WithTimeout(ctx, blobStageLease/2)
 	defer cancel()
-	rows, err := source.QueryContext(ctx, `SELECT blob_key,payload FROM receipts WHERE account_id=? ORDER BY id`, accountID)
+	rows, err := source.QueryContext(ctx, `SELECT blob_key,payload FROM receipts WHERE user_id=? ORDER BY id`, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (c *ReceiptCopy) Apply(tx *sql.Tx, accountID string) error {
 			return err
 		}
 		r := row.receipt
-		if _, err := tx.Exec(`INSERT INTO receipts(account_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, accountID, r.ID, r.PostingID, r.Digest, r.Size, row.key, r.Revision, row.payload); err != nil {
+		if _, err := tx.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES (?,?,?,?,?,?,?,?)`, accountID, r.ID, r.PostingID, r.Digest, r.Size, row.key, r.Revision, row.payload); err != nil {
 			return err
 		}
 	}

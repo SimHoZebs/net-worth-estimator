@@ -20,9 +20,9 @@ func openGroupTestDB(t *testing.T) *Database {
 	return d
 }
 
-func ensureTestAccount(t *testing.T, d *Database, issuer, subject string) string {
+func ensureTestUser(t *testing.T, d *Database, issuer, subject string) string {
 	t.Helper()
-	id, err := d.EnsureGroupAccount(issuer, subject)
+	id, err := d.EnsureGroupUser(issuer, subject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,8 +31,8 @@ func ensureTestAccount(t *testing.T, d *Database, issuer, subject string) string
 
 func TestGroupsMultipleMembership(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
 
 	first, err := d.CreateGroup(alice, "Hiking", "Alice")
 	if err != nil {
@@ -47,7 +47,7 @@ func TestGroupsMultipleMembership(t *testing.T) {
 	}
 
 	// Alice belongs to two groups.
-	groups, err := d.ListGroupsForAccount(alice)
+	groups, err := d.ListGroupsForUser(alice)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,8 +102,8 @@ func TestGroupsMultipleMembership(t *testing.T) {
 
 func TestGroupsLastOwnerGuard(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
 
 	group, err := d.CreateGroup(alice, "Household", "Alice")
 	if err != nil {
@@ -134,10 +134,10 @@ func TestGroupsLastOwnerGuard(t *testing.T) {
 	}
 }
 
-func TestGroupsAutoLeaveOnAccountDelete(t *testing.T) {
+func TestGroupsAutoLeaveOnUserDelete(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
 
 	group, err := d.CreateGroup(alice, "Climbing", "Alice")
 	if err != nil {
@@ -150,7 +150,7 @@ func TestGroupsAutoLeaveOnAccountDelete(t *testing.T) {
 	if _, err := d.AcceptInvite(code, bob, "Bob"); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RemoveGroupMembershipsForAccount(bob); err != nil {
+	if err := d.RemoveGroupMembershipsForUser(bob); err != nil {
 		t.Fatal(err)
 	}
 	members, err := d.ListGroupMembers(group.ID, alice)
@@ -159,31 +159,31 @@ func TestGroupsAutoLeaveOnAccountDelete(t *testing.T) {
 	}
 	for _, m := range members {
 		if m.AccountID == bob {
-			t.Fatal("deleted account still a member")
+			t.Fatal("deleted user still a member")
 		}
 	}
 }
 
 // The group identity shares the private-plan actor derivation so one
-// verified identity never splits into two app accounts.
+// verified identity never splits into two app users.
 func TestGroupsSharePlanActorIdentity(t *testing.T) {
 	d := openGroupTestDB(t)
-	id, err := d.EnsureGroupAccount("https://issuer.test", "alice")
+	id, err := d.EnsureGroupUser("https://issuer.test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if id != authorization.ActorKey("https://issuer.test", "alice") {
-		t.Fatalf("group account %q != ActorKey", id)
+		t.Fatalf("group user %q != ActorKey", id)
 	}
 }
 
-// Removal preserves identity and financial state: app_accounts rows and
-// account scopes survive, and sole-owned groups are deleted like LeaveGroup
+// Removal preserves identity and financial state: users rows and
+// user scopes survive, and sole-owned groups are deleted like LeaveGroup
 // does instead of stranding an ownerless group.
 func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
 
 	solo, err := d.CreateGroup(bob, "Solo", "Bob")
 	if err != nil {
@@ -214,19 +214,19 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	}
 	_ = bobInvite
 
-	if _, err := d.EnsureAccount(bob, "https://issuer.test", "bob"); err != nil {
+	if _, err := d.EnsureUser(bob, "https://issuer.test", "bob"); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RemoveGroupMembershipsForAccount(bob); err != nil {
+	if err := d.RemoveGroupMembershipsForUser(bob); err != nil {
 		t.Fatal(err)
 	}
 
-	var accounts int
-	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM app_accounts WHERE id = ?`, bob).Scan(&accounts); err != nil || accounts != 1 {
-		t.Fatalf("app_accounts for bob = %d, %v", accounts, err)
+	var users int
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, bob).Scan(&users); err != nil || users != 1 {
+		t.Fatalf("users for bob = %d, %v", users, err)
 	}
-	if exists, err := d.HasAccount(bob); err != nil || !exists {
-		t.Fatalf("account scope lost: %v, %v", exists, err)
+	if exists, err := d.HasUser(bob); err != nil || !exists {
+		t.Fatalf("user scope lost: %v, %v", exists, err)
 	}
 	if _, err := d.GetGroup(solo.ID, bob); err != ErrNotFound {
 		t.Fatalf("sole-owned group err = %v, want ErrNoRows", err)
@@ -245,18 +245,18 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 	revoked := 0
 	for _, in := range invites {
 		var creator string
-		if err := d.SQL().QueryRow(`SELECT created_by_account_id FROM group_invites WHERE id = ?`, in.ID).Scan(&creator); err != nil {
+		if err := d.SQL().QueryRow(`SELECT created_by_user_id FROM group_invites WHERE id = ?`, in.ID).Scan(&creator); err != nil {
 			t.Fatal(err)
 		}
 		if creator == bob {
 			if in.RevokedAt == nil {
-				t.Fatalf("invite %s by removed account still redeemable", in.ID)
+				t.Fatalf("invite %s by removed user still redeemable", in.ID)
 			}
 			revoked++
 		}
 	}
 	if revoked == 0 {
-		t.Fatal("expected the removed account's invite to be revoked")
+		t.Fatal("expected the removed user's invite to be revoked")
 	}
 	if _, err := d.AcceptInvite(bobCode, alice, "Alice"); err == nil {
 		t.Fatal("revoked invite should not redeem")
@@ -266,7 +266,7 @@ func TestGroupsRemovalPreservesIdentityAndPlans(t *testing.T) {
 // Invite codes are stored hashed only; no plaintext code column exists.
 func TestGroupsInviteCodesAreHashed(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
 	rows, err := d.SQL().Query(`PRAGMA table_info(group_invites)`)
 	if err != nil {
 		t.Fatal(err)
@@ -323,12 +323,12 @@ func mustGroup(t *testing.T, d *Database, owner string) Group {
 	return group
 }
 
-// Group writes never touch account-scoped financial tables.
+// Group writes never touch user-scoped financial tables.
 func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
-	plan, err := d.EnsureAccount(alice, "https://issuer.test", "alice")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
+	plan, err := d.EnsureUser(alice, "https://issuer.test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 		t.Fatalf("document presence changed: %+v -> %+v", before, after)
 	}
 	var counts [2]int
-	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE account_id = ?`, alice).Scan(&counts[0]); err != nil {
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE user_id = ?`, alice).Scan(&counts[0]); err != nil {
 		t.Fatal(err)
 	}
 	if counts[0] != 0 {
@@ -369,9 +369,9 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 // Invite lifecycle: single-use, revocation, expiry, duplicate join, bounds.
 func TestGroupsInviteLifecycle(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
-	carol := ensureTestAccount(t, d, "https://issuer.test", "carol")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
+	carol := ensureTestUser(t, d, "https://issuer.test", "carol")
 	group := mustGroup(t, d, alice)
 
 	single, singleCode, err := d.CreateInvite(group.ID, alice, 1, 24*time.Hour)
@@ -433,7 +433,7 @@ func TestGroupsInviteLifecycle(t *testing.T) {
 // Missing groups report 404 on every path, never a role denial.
 func TestGroupsMissingGroupIsNotFound(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
 	missing := "00000000-0000-7000-8000-000000000000"
 	if _, err := d.GetGroup(missing, alice); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("get err = %v, want ErrNoRows", err)
@@ -468,9 +468,9 @@ func TestGroupsMissingGroupIsNotFound(t *testing.T) {
 // and groups; members read.
 func TestGroupsRoleMatrix(t *testing.T) {
 	d := openGroupTestDB(t)
-	alice := ensureTestAccount(t, d, "https://issuer.test", "alice")
-	bob := ensureTestAccount(t, d, "https://issuer.test", "bob")
-	carol := ensureTestAccount(t, d, "https://issuer.test", "carol")
+	alice := ensureTestUser(t, d, "https://issuer.test", "alice")
+	bob := ensureTestUser(t, d, "https://issuer.test", "bob")
+	carol := ensureTestUser(t, d, "https://issuer.test", "carol")
 	group := mustGroup(t, d, alice)
 
 	_, code, err := d.CreateInvite(group.ID, alice, 5, 24*time.Hour)
@@ -505,7 +505,7 @@ func TestGroupsRoleMatrix(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Non-members get 404.
-	dave := ensureTestAccount(t, d, "https://issuer.test", "dave")
+	dave := ensureTestUser(t, d, "https://issuer.test", "dave")
 	if _, err := d.GetGroup(group.ID, dave); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("non-member get err = %v, want ErrNoRows", err)
 	}

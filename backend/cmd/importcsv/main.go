@@ -20,14 +20,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("importcsv", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	dbPath := flags.String("db", "", "required existing shared SQLite database path")
-	accountID := flags.String("account", "", "required existing account resource ID")
+	userID := flags.String("user", "", "required existing user resource ID")
 	modelPath := flags.String("model", "public/configs", "directory containing model CSV files")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
 
-	if *dbPath == "" || *accountID == "" || flags.NArg() != 0 {
-		fmt.Fprintln(stderr, "usage: importcsv --db EXISTING.db --account accounts/RESOURCE [--model directory]")
+	if *dbPath == "" || *userID == "" || flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "usage: importcsv --db EXISTING.db --user users/RESOURCE [--model directory]")
 		return 2
 	}
 	if info, err := os.Stat(*dbPath); err != nil || !info.Mode().IsRegular() {
@@ -40,9 +40,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer database.Close()
-	account, err := database.Account(normalizeAccountID(*accountID))
+	user, err := database.User(normalizeUserID(*userID))
 	if err != nil {
-		fmt.Fprintf(stderr, "select existing account: %v\n", err)
+		fmt.Fprintf(stderr, "select existing user: %v\n", err)
 		return 1
 	}
 	doc, err := csvio.ImportModel(*modelPath)
@@ -50,21 +50,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "import: %v\n", err)
 		return 1
 	}
-	if _, err := account.ImportDocument(doc); err != nil {
+	if _, err := user.ImportDocument(doc); err != nil {
 		fmt.Fprintf(stderr, "import: %v\n", err)
 		return 1
 	}
-	fmt.Fprintln(stdout, "imported CSV into the selected account")
+	fmt.Fprintln(stdout, "imported CSV into the selected user")
 	return 0
 }
 
-// normalizeAccountID maps an account resource to its store row: accounts/<hash>
+// normalizeUserID maps a user resource to its store row: users/<hash>
 // is owned by user:<hash>; raw row IDs pass through for offline operators.
-func normalizeAccountID(id string) string {
-	if id == "accounts/sample" {
-		return sqlite.SampleAccountID
+func normalizeUserID(id string) string {
+	if id == "users/sample" {
+		return sqlite.SampleUserID
 	}
-	if rest, ok := strings.CutPrefix(id, "accounts/"); ok {
+	if rest, ok := strings.CutPrefix(id, "users/"); ok {
 		return "user:" + rest
 	}
 	return id

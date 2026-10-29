@@ -966,6 +966,12 @@
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
 						"type": ["array", "null"]
+					},
+					"whatIf": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationResultEnvelope"
+						},
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -1033,6 +1039,12 @@
 						"type": ["array", "null"]
 					},
 					"postingFulfillment": {
+						"items": {
+							"$ref": "#/components/schemas/EvaluationInstanceInterface"
+						},
+						"type": ["array", "null"]
+					},
+					"whatIf": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},

@@ -12,8 +12,8 @@ func TestArtifactIdentityPreservesStoredResultKeys(t *testing.T) {
 
 func TestProjectionArtifactsAreScopedToPlanResources(t *testing.T) {
 	request := map[string]any{"document": "same input", "seed": 42}
-	a := &Server{ResourceID: "accounts/a"}
-	b := &Server{ResourceID: "accounts/b"}
+	a := &Server{ResourceID: "users/a"}
+	b := &Server{ResourceID: "users/b"}
 	for _, kind := range []string{"deterministic", "stochastic"} {
 		if a.resourceArtifactKey(kind, request) == b.resourceArtifactKey(kind, request) {
 			t.Fatalf("%s projections share a cross-account result or in-flight key", kind)

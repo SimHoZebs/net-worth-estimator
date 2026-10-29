@@ -15,16 +15,16 @@ import (
 // suite in storetest to prove it.
 //
 // Contract notes for implementers:
-//   - Every operation belongs to one immutable account scope. There is no default
+//   - Every operation belongs to one immutable user scope. There is no default
 //     scope and no database-wide financial operation.
 //   - Writes are single-threaded by the caller discipline (one server, one
 //     instance); the backend must still serialize concurrent writes safely.
 //   - Readers always see the latest committed state (no stale replicas).
 //   - A fresh backend reports DocumentExists() == false. InitializeDocument
 //     activates an empty model without replacing existing data.
-//   - Clear resets this account's model, sync state (including the Bridge key
+//   - Clear resets this user's model, sync state (including the Bridge key
 //     and card selection), settings, and artifacts. It preserves amount
-//     presets, other accounts, and identity state. Use
+//     presets, other users, and identity state. Use
 //     ClearSyncCredential to disconnect the key while keeping cards.
 //   - Missing rows report ErrNotFound (or IsNotFound). Backends must not
 //     leak sql.ErrNoRows, missing files, or other mechanism errors.
@@ -91,7 +91,7 @@ type Store interface {
 	Close() error
 }
 
-// ReceiptStore is the account-scoped persistence boundary for evidence only.
+// ReceiptStore is the user-scoped persistence boundary for evidence only.
 type ReceiptStore interface {
 	CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (types.Receipt, error)
 	ListReceipts(postingID string) ([]types.Receipt, error)
@@ -103,33 +103,33 @@ type ReceiptStore interface {
 	DeleteReceipt(ctx context.Context, id string) error
 }
 
-// Database owns the application lifecycle: account routing, group persistence,
+// Database owns the application lifecycle: user routing, group persistence,
 // blob cleanup, and health. Financial operations use a Store returned for an
-// explicit account. Backends implement this plus Open/Setup constructors; the
+// explicit user. Backends implement this plus Open/Setup constructors; the
 // rest of the backend depends only on this interface, never on files, SQL,
 // or driver handles.
 type Database interface {
 	Close() error
 	PingContext(ctx context.Context) error
-	HasAccount(accountID string) (bool, error)
-	Account(accountID string) (Store, error)
-	EnsureAccount(accountID, issuer, subject string) (Store, error)
-	EnsureSampleAccount() (Store, error)
-	EnsureGroupAccount(issuer, subject string) (string, error)
-	CreateGroup(accountID, name, displayName string) (Group, error)
-	ListGroupsForAccount(accountID string) ([]Group, error)
-	GetGroup(groupID, accountID string) (Group, error)
-	RenameGroup(groupID, accountID, name string) error
-	DeleteGroup(groupID, accountID string) error
-	ListGroupMembers(groupID, accountID string) ([]GroupMember, error)
+	HasUser(userID string) (bool, error)
+	User(userID string) (Store, error)
+	EnsureUser(userID, issuer, subject string) (Store, error)
+	EnsureSampleUser() (Store, error)
+	EnsureGroupUser(issuer, subject string) (string, error)
+	CreateGroup(userID, name, displayName string) (Group, error)
+	ListGroupsForUser(userID string) ([]Group, error)
+	GetGroup(groupID, userID string) (Group, error)
+	RenameGroup(groupID, userID, name string) error
+	DeleteGroup(groupID, userID string) error
+	ListGroupMembers(groupID, userID string) ([]GroupMember, error)
 	UpdateMemberRole(groupID, callerID, targetID, role string) error
 	RemoveMember(groupID, callerID, targetID string) error
-	LeaveGroup(groupID, accountID string) error
-	CreateInvite(groupID, accountID string, maxUses int, ttl time.Duration) (GroupInvite, string, error)
-	ListInvites(groupID, accountID string) ([]GroupInvite, error)
-	RevokeInvite(groupID, inviteID, accountID string) error
-	AcceptInvite(code, accountID, displayName string) (Group, error)
-	TouchMemberDisplay(accountID, displayName string)
-	RemoveGroupMembershipsForAccount(accountID string) error
+	LeaveGroup(groupID, userID string) error
+	CreateInvite(groupID, userID string, maxUses int, ttl time.Duration) (GroupInvite, string, error)
+	ListInvites(groupID, userID string) ([]GroupInvite, error)
+	RevokeInvite(groupID, inviteID, userID string) error
+	AcceptInvite(code, userID, displayName string) (Group, error)
+	TouchMemberDisplay(userID, displayName string)
+	RemoveGroupMembershipsForUser(userID string) error
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

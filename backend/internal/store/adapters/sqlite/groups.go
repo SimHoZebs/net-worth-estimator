@@ -44,41 +44,41 @@ func hashInviteCode(code string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// EnsureGroupAccount records the verified issuer/subject pair and returns
-// the stable app account ID. It never creates plans. The ID derivation is
+// EnsureGroupUser records the verified issuer/subject pair and returns
+// the stable user ID. It never creates plans. The ID derivation is
 // shared with private plans through authorization.ActorKey so one verified
 // identity never splits into a plan identity and a group identity.
-func (d *Database) EnsureGroupAccount(issuer, subject string) (string, error) {
+func (d *Database) EnsureGroupUser(issuer, subject string) (string, error) {
 	if issuer == "" || subject == "" {
-		return "", fmt.Errorf("%w: group account requires issuer and subject", ErrGroupInvalid)
+		return "", fmt.Errorf("%w: group user requires issuer and subject", ErrGroupInvalid)
 	}
-	accountID := authorization.ActorKey(issuer, subject)
+	userID := authorization.ActorKey(issuer, subject)
 	tx, err := d.db.Begin()
 	if err != nil {
 		return "", err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`INSERT INTO app_accounts(id, issuer, subject) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING`, accountID, issuer, subject); err != nil {
-		return "", fmt.Errorf("ensure group account: %w", err)
+	if _, err := tx.Exec(`INSERT INTO users(id, issuer, subject) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING`, userID, issuer, subject); err != nil {
+		return "", fmt.Errorf("ensure group user: %w", err)
 	}
 	var storedIssuer, storedSubject string
-	if err := tx.QueryRow(`SELECT issuer, subject FROM app_accounts WHERE id = ?`, accountID).Scan(&storedIssuer, &storedSubject); err != nil {
+	if err := tx.QueryRow(`SELECT issuer, subject FROM users WHERE id = ?`, userID).Scan(&storedIssuer, &storedSubject); err != nil {
 		return "", err
 	}
 	if storedIssuer != issuer || storedSubject != subject {
-		return "", errors.New("account identity conflict")
+		return "", errors.New("user identity conflict")
 	}
 	if err := tx.Commit(); err != nil {
 		return "", err
 	}
-	return accountID, nil
+	return userID, nil
 }
 
 // roleInTx reads one membership role inside a guard transaction. It returns
 // "" for non-members without an error so callers map absence to 404.
-func roleInTx(tx *sql.Tx, groupID, accountID string) (string, error) {
+func roleInTx(tx *sql.Tx, groupID, userID string) (string, error) {
 	var role string
-	err := tx.QueryRow(`SELECT role FROM group_members WHERE group_id = ? AND account_id = ?`, groupID, accountID).Scan(&role)
+	err := tx.QueryRow(`SELECT role FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, userID).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -96,12 +96,12 @@ func groupExistsTx(tx *sql.Tx, groupID string) (bool, error) {
 }
 
 // CreateGroup creates a group and assigns the caller as owner.
-func (d *Database) CreateGroup(accountID, name, displayName string) (Group, error) {
+func (d *Database) CreateGroup(userID, name, displayName string) (Group, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 100 {
 		return Group{}, fmt.Errorf("%w: group name must be 1-100 characters", ErrGroupInvalid)
 	}
-	if accountID == "" {
+	if userID == "" {
 		return Group{}, fmt.Errorf("%w: group creator is required", ErrGroupInvalid)
 	}
 	id, err := newGroupID()
@@ -115,16 +115,16 @@ func (d *Database) CreateGroup(accountID, name, displayName string) (Group, erro
 	}
 	defer tx.Rollback()
 	var exists int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM app_accounts WHERE id = ?`, accountID).Scan(&exists); err != nil {
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, userID).Scan(&exists); err != nil {
 		return Group{}, err
 	}
 	if exists == 0 {
-		return Group{}, fmt.Errorf("%w: unknown account", ErrGroupInvalid)
+		return Group{}, fmt.Errorf("%w: unknown user", ErrGroupInvalid)
 	}
-	if _, err := tx.Exec(`INSERT INTO user_groups(id, name, created_by_account_id, created_at) VALUES (?, ?, ?, ?)`, id, name, accountID, now); err != nil {
+	if _, err := tx.Exec(`INSERT INTO user_groups(id, name, created_by_user_id, created_at) VALUES (?, ?, ?, ?)`, id, name, userID, now); err != nil {
 		return Group{}, fmt.Errorf("create group: %w", err)
 	}
-	if _, err := tx.Exec(`INSERT INTO group_members(group_id, account_id, role, joined_at, display_name) VALUES (?, ?, 'owner', ?, ?)`, id, accountID, now, strings.TrimSpace(displayName)); err != nil {
+	if _, err := tx.Exec(`INSERT INTO group_members(group_id, user_id, role, joined_at, display_name) VALUES (?, ?, 'owner', ?, ?)`, id, userID, now, strings.TrimSpace(displayName)); err != nil {
 		return Group{}, fmt.Errorf("assign group owner: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -133,14 +133,14 @@ func (d *Database) CreateGroup(accountID, name, displayName string) (Group, erro
 	return Group{ID: id, Name: name, Role: GroupRoleOwner, MemberCount: 1, CreatedAt: now}, nil
 }
 
-// ListGroupsForAccount returns every group the account belongs to.
-func (d *Database) ListGroupsForAccount(accountID string) ([]Group, error) {
+// ListGroupsForUser returns every group the user belongs to.
+func (d *Database) ListGroupsForUser(userID string) ([]Group, error) {
 	rows, err := d.db.Query(`
 		SELECT g.id, g.name, g.created_at, m.role,
 			(SELECT COUNT(*) FROM group_members WHERE group_id = g.id)
 		FROM user_groups g
-		JOIN group_members m ON m.group_id = g.id AND m.account_id = ?
-		ORDER BY g.created_at DESC, g.id DESC`, accountID)
+		JOIN group_members m ON m.group_id = g.id AND m.user_id = ?
+		ORDER BY g.created_at DESC, g.id DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,9 +156,9 @@ func (d *Database) ListGroupsForAccount(accountID string) ([]Group, error) {
 	return groups, rows.Err()
 }
 
-func (d *Database) groupRole(groupID, accountID string) (string, error) {
+func (d *Database) groupRole(groupID, userID string) (string, error) {
 	var role string
-	err := d.db.QueryRow(`SELECT role FROM group_members WHERE group_id = ? AND account_id = ?`, groupID, accountID).Scan(&role)
+	err := d.db.QueryRow(`SELECT role FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, userID).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -166,15 +166,15 @@ func (d *Database) groupRole(groupID, accountID string) (string, error) {
 }
 
 // GetGroup returns group details when the caller is a member.
-func (d *Database) GetGroup(groupID, accountID string) (Group, error) {
+func (d *Database) GetGroup(groupID, userID string) (Group, error) {
 	var g Group
 	var role string
 	err := d.db.QueryRow(`
 		SELECT g.id, g.name, g.created_at, m.role,
 			(SELECT COUNT(*) FROM group_members WHERE group_id = g.id)
 		FROM user_groups g
-		JOIN group_members m ON m.group_id = g.id AND m.account_id = ?
-		WHERE g.id = ?`, accountID, groupID).Scan(&g.ID, &g.Name, &g.CreatedAt, &role, &g.MemberCount)
+		JOIN group_members m ON m.group_id = g.id AND m.user_id = ?
+		WHERE g.id = ?`, userID, groupID).Scan(&g.ID, &g.Name, &g.CreatedAt, &role, &g.MemberCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Group{}, ErrNotFound
 	}
@@ -186,7 +186,7 @@ func (d *Database) GetGroup(groupID, accountID string) (Group, error) {
 }
 
 // RenameGroup renames a group. Owner and admin may rename.
-func (d *Database) RenameGroup(groupID, accountID, name string) error {
+func (d *Database) RenameGroup(groupID, userID, name string) error {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 100 {
 		return fmt.Errorf("%w: group name must be 1-100 characters", ErrGroupInvalid)
@@ -203,7 +203,7 @@ func (d *Database) RenameGroup(groupID, accountID, name string) error {
 	if !exists {
 		return ErrNotFound
 	}
-	role, err := roleInTx(tx, groupID, accountID)
+	role, err := roleInTx(tx, groupID, userID)
 	if err != nil {
 		return err
 	}
@@ -222,7 +222,7 @@ func (d *Database) RenameGroup(groupID, accountID, name string) error {
 }
 
 // DeleteGroup deletes a group and its members and invites. Owner only.
-func (d *Database) DeleteGroup(groupID, accountID string) error {
+func (d *Database) DeleteGroup(groupID, userID string) error {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return err
@@ -235,7 +235,7 @@ func (d *Database) DeleteGroup(groupID, accountID string) error {
 	if !exists {
 		return ErrNotFound
 	}
-	role, err := roleInTx(tx, groupID, accountID)
+	role, err := roleInTx(tx, groupID, userID)
 	if err != nil {
 		return err
 	}
@@ -254,15 +254,15 @@ func (d *Database) DeleteGroup(groupID, accountID string) error {
 }
 
 // ListGroupMembers lists members when the caller belongs to the group.
-func (d *Database) ListGroupMembers(groupID, accountID string) ([]GroupMember, error) {
-	caller, err := d.groupRole(groupID, accountID)
+func (d *Database) ListGroupMembers(groupID, userID string) ([]GroupMember, error) {
+	caller, err := d.groupRole(groupID, userID)
 	if err != nil {
 		return nil, err
 	}
 	if caller == "" {
 		return nil, ErrNotFound
 	}
-	rows, err := d.db.Query(`SELECT account_id, role, display_name, joined_at FROM group_members WHERE group_id = ? ORDER BY joined_at ASC, account_id ASC`, groupID)
+	rows, err := d.db.Query(`SELECT user_id, role, display_name, joined_at FROM group_members WHERE group_id = ? ORDER BY joined_at ASC, user_id ASC`, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (d *Database) UpdateMemberRole(groupID, callerID, targetID, role string) er
 			return fmt.Errorf("%w: the last owner cannot change role", ErrGroupInvalid)
 		}
 	}
-	if _, err := tx.Exec(`UPDATE group_members SET role = ? WHERE group_id = ? AND account_id = ?`, role, groupID, targetID); err != nil {
+	if _, err := tx.Exec(`UPDATE group_members SET role = ? WHERE group_id = ? AND user_id = ?`, role, groupID, targetID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -370,7 +370,7 @@ func (d *Database) RemoveMember(groupID, callerID, targetID string) error {
 	default:
 		return ErrGroupForbidden
 	}
-	if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND account_id = ?`, groupID, targetID); err != nil {
+	if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, targetID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -378,13 +378,13 @@ func (d *Database) RemoveMember(groupID, callerID, targetID string) error {
 
 // LeaveGroup removes the caller. The last owner must transfer or delete.
 // The guard and write run in one transaction.
-func (d *Database) LeaveGroup(groupID, accountID string) error {
+func (d *Database) LeaveGroup(groupID, userID string) error {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	role, err := roleInTx(tx, groupID, accountID)
+	role, err := roleInTx(tx, groupID, userID)
 	if err != nil {
 		return err
 	}
@@ -411,7 +411,7 @@ func (d *Database) LeaveGroup(groupID, accountID string) error {
 			return tx.Commit()
 		}
 	}
-	if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND account_id = ?`, groupID, accountID); err != nil {
+	if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, userID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -420,7 +420,7 @@ func (d *Database) LeaveGroup(groupID, accountID string) error {
 // CreateInvite creates a redeemable invite. Owner and admin may invite.
 // Returns the invite plus the one-time code. The role check and insert run
 // in one transaction.
-func (d *Database) CreateInvite(groupID, accountID string, maxUses int, ttl time.Duration) (GroupInvite, string, error) {
+func (d *Database) CreateInvite(groupID, userID string, maxUses int, ttl time.Duration) (GroupInvite, string, error) {
 	if maxUses < 1 || maxUses > 100 {
 		return GroupInvite{}, "", fmt.Errorf("%w: max uses must be 1-100", ErrGroupInvalid)
 	}
@@ -449,15 +449,15 @@ func (d *Database) CreateInvite(groupID, accountID string, maxUses int, ttl time
 	if !exists {
 		return GroupInvite{}, "", ErrNotFound
 	}
-	role, err := roleInTx(tx, groupID, accountID)
+	role, err := roleInTx(tx, groupID, userID)
 	if err != nil {
 		return GroupInvite{}, "", err
 	}
 	if role != GroupRoleOwner && role != GroupRoleAdmin {
 		return GroupInvite{}, "", ErrGroupForbidden
 	}
-	if _, err := tx.Exec(`INSERT INTO group_invites(id, group_id, code_hash, created_by_account_id, expires_at, max_uses, used_count, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-		id, groupID, codeHash, accountID, invite.ExpiresAt, maxUses, now); err != nil {
+	if _, err := tx.Exec(`INSERT INTO group_invites(id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+		id, groupID, codeHash, userID, invite.ExpiresAt, maxUses, now); err != nil {
 		return GroupInvite{}, "", fmt.Errorf("create invite: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -467,7 +467,7 @@ func (d *Database) CreateInvite(groupID, accountID string, maxUses int, ttl time
 }
 
 // ListInvites lists active and history invites for owners and admins.
-func (d *Database) ListInvites(groupID, accountID string) ([]GroupInvite, error) {
+func (d *Database) ListInvites(groupID, userID string) ([]GroupInvite, error) {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return nil, err
@@ -480,7 +480,7 @@ func (d *Database) ListInvites(groupID, accountID string) ([]GroupInvite, error)
 	if !exists {
 		return nil, ErrNotFound
 	}
-	role, err := roleInTx(tx, groupID, accountID)
+	role, err := roleInTx(tx, groupID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -515,7 +515,7 @@ func (d *Database) ListInvites(groupID, accountID string) ([]GroupInvite, error)
 
 // RevokeInvite cancels an invite. Owner and admin may revoke. The role
 // check and update run in one transaction.
-func (d *Database) RevokeInvite(groupID, inviteID, accountID string) error {
+func (d *Database) RevokeInvite(groupID, inviteID, userID string) error {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return err
@@ -528,7 +528,7 @@ func (d *Database) RevokeInvite(groupID, inviteID, accountID string) error {
 	if !exists {
 		return ErrNotFound
 	}
-	role, err := roleInTx(tx, groupID, accountID)
+	role, err := roleInTx(tx, groupID, userID)
 	if err != nil {
 		return err
 	}
@@ -546,11 +546,11 @@ func (d *Database) RevokeInvite(groupID, inviteID, accountID string) error {
 	return tx.Commit()
 }
 
-// AcceptInvite redeems a code. Any authenticated account may accept.
-func (d *Database) AcceptInvite(code, accountID, displayName string) (Group, error) {
+// AcceptInvite redeems a code. Any authenticated user may accept.
+func (d *Database) AcceptInvite(code, userID, displayName string) (Group, error) {
 	code = strings.TrimSpace(code)
-	if code == "" || accountID == "" {
-		return Group{}, fmt.Errorf("%w: invite code and account are required", ErrGroupInvalid)
+	if code == "" || userID == "" {
+		return Group{}, fmt.Errorf("%w: invite code and user are required", ErrGroupInvalid)
 	}
 	codeHash := hashInviteCode(code)
 	now := time.Now().Unix()
@@ -573,14 +573,14 @@ func (d *Database) AcceptInvite(code, accountID, displayName string) (Group, err
 		return Group{}, fmt.Errorf("%w: invite is no longer valid", ErrGroupInvalid)
 	}
 	var existing string
-	err = tx.QueryRow(`SELECT role FROM group_members WHERE group_id = ? AND account_id = ?`, invite.GroupID, accountID).Scan(&existing)
+	err = tx.QueryRow(`SELECT role FROM group_members WHERE group_id = ? AND user_id = ?`, invite.GroupID, userID).Scan(&existing)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Group{}, err
 	}
 	if existing != "" {
 		return Group{}, fmt.Errorf("%w: already a member", ErrGroupInvalid)
 	}
-	if _, err := tx.Exec(`INSERT INTO group_members(group_id, account_id, role, joined_at, display_name) VALUES (?, ?, 'member', ?, ?)`, invite.GroupID, accountID, now, strings.TrimSpace(displayName)); err != nil {
+	if _, err := tx.Exec(`INSERT INTO group_members(group_id, user_id, role, joined_at, display_name) VALUES (?, ?, 'member', ?, ?)`, invite.GroupID, userID, now, strings.TrimSpace(displayName)); err != nil {
 		return Group{}, fmt.Errorf("join group: %w", err)
 	}
 	if _, err := tx.Exec(`UPDATE group_invites SET used_count = used_count + 1 WHERE id = ?`, invite.ID); err != nil {
@@ -600,44 +600,44 @@ func (d *Database) AcceptInvite(code, accountID, displayName string) (Group, err
 }
 
 // TouchMemberDisplay refreshes the cached display name on activity. It is
-// best-effort across every group the account belongs to, so errors stay
+// best-effort across every group the user belongs to, so errors stay
 // silent and never fail the surrounding request.
-func (d *Database) TouchMemberDisplay(accountID, displayName string) {
+func (d *Database) TouchMemberDisplay(userID, displayName string) {
 	displayName = strings.TrimSpace(displayName)
-	if displayName == "" || accountID == "" {
+	if displayName == "" || userID == "" {
 		return
 	}
-	_, _ = d.db.Exec(`UPDATE group_members SET display_name = ? WHERE account_id = ? AND (display_name IS NULL OR display_name = '' OR display_name != ?)`, displayName, accountID, displayName)
+	_, _ = d.db.Exec(`UPDATE group_members SET display_name = ? WHERE user_id = ? AND (display_name IS NULL OR display_name = '' OR display_name != ?)`, displayName, userID, displayName)
 }
 
-// RemoveGroupMembershipsForAccount removes every group membership after
-// confirmed provider account deletion. Groups left with no members are
-// deleted, and surviving invites created by the account are revoked so no
-// outstanding code stays redeemable. It preserves app_accounts and private
+// RemoveGroupMembershipsForUser removes every group membership after
+// confirmed provider user deletion. Groups left with no members are
+// deleted, and surviving invites created by the user are revoked so no
+// outstanding code stays redeemable. It preserves users and private
 // plans.
-func (d *Database) RemoveGroupMembershipsForAccount(accountID string) error {
-	if accountID == "" {
-		return fmt.Errorf("%w: account is required", ErrGroupInvalid)
+func (d *Database) RemoveGroupMembershipsForUser(userID string) error {
+	if userID == "" {
+		return fmt.Errorf("%w: user is required", ErrGroupInvalid)
 	}
-	return DeleteGroupMemberships(d.db, accountID)
+	return DeleteGroupMemberships(d.db, userID)
 }
 
-// DeleteGroupMemberships is the shared account-removal path for Database and
+// DeleteGroupMemberships is the shared user-removal path for Database and
 // the identity revocation path, which holds only a *sql.DB handle. Databases
 // without group tables are tolerated so old schemas fail nowhere on logout
 // or revocation.
-func DeleteGroupMemberships(db *sql.DB, accountID string) error {
-	if accountID == "" {
-		return fmt.Errorf("%w: account is required", ErrGroupInvalid)
+func DeleteGroupMemberships(db *sql.DB, userID string) error {
+	if userID == "" {
+		return fmt.Errorf("%w: user is required", ErrGroupInvalid)
 	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	// Capture the account's groups first so cleanup below touches only
-	// groups this account belonged to, never unrelated rows.
-	rows, err := tx.Query(`SELECT DISTINCT group_id FROM group_members WHERE account_id = ?`, accountID)
+	// Capture the user's groups first so cleanup below touches only
+	// groups this user belonged to, never unrelated rows.
+	rows, err := tx.Query(`SELECT DISTINCT group_id FROM group_members WHERE user_id = ?`, userID)
 	if err != nil {
 		if isMissingGroupTable(err) {
 			return nil
@@ -658,7 +658,7 @@ func DeleteGroupMemberships(db *sql.DB, accountID string) error {
 		return err
 	}
 	rows.Close()
-	if _, err := tx.Exec(`DELETE FROM group_members WHERE account_id = ?`, accountID); err != nil {
+	if _, err := tx.Exec(`DELETE FROM group_members WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
 	if len(owned) > 0 {
@@ -668,15 +668,15 @@ func DeleteGroupMemberships(db *sql.DB, accountID string) error {
 			args = append(args, id)
 		}
 		// Groups left with no members are deleted, like LeaveGroup does for
-		// a sole owner; their invites cascade. Scoped to this account's
+		// a sole owner; their invites cascade. Scoped to this user's
 		// former groups only.
 		if _, err := tx.Exec(`DELETE FROM user_groups WHERE id IN (`+placeholders+`) AND id NOT IN (SELECT group_id FROM group_members)`, args...); err != nil {
 			return err
 		}
 	}
-	// Revoke, rather than delete, surviving invites the account created so
+	// Revoke, rather than delete, surviving invites the user created so
 	// remaining members keep invite history and no code stays redeemable.
-	if _, err := tx.Exec(`UPDATE group_invites SET revoked_at = ? WHERE created_by_account_id = ? AND revoked_at IS NULL`, time.Now().Unix(), accountID); err != nil {
+	if _, err := tx.Exec(`UPDATE group_invites SET revoked_at = ? WHERE created_by_user_id = ? AND revoked_at IS NULL`, time.Now().Unix(), userID); err != nil {
 		return err
 	}
 	return tx.Commit()
