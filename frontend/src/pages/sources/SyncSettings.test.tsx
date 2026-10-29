@@ -283,7 +283,7 @@ it("refreshes status and links after connecting", async () => {
 	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
 	await screen.findByText(/Connected since/);
 	// The panel reads quota from /v1/status once the connection is stored.
-	await screen.findByText(/Bridge quota: 5 of 24 used in the last 24 hours\./);
+	await screen.findByText(/19 out of 24 syncs available/);
 	await waitFor(() => {
 		expect(accountFetches()).toBeGreaterThan(before);
 	});
@@ -434,7 +434,7 @@ it("shows bridge quota usage when connected", async () => {
 	stubApi({ configured: true, links: [] });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	expect(
-		await screen.findByText("Bridge quota: 5 of 24 used in the last 24 hours."),
+		await screen.findByText("19 out of 24 syncs available", { exact: false }),
 	).toBeTruthy();
 });
 
@@ -490,6 +490,6 @@ it("hides bridge quota when the backend omits it", async () => {
 		{ readOnly: false, syncConfigured: true },
 	);
 	await waitFor(() => {
-		expect(screen.queryByText(/Bridge quota:/)).toBeNull();
+		expect(screen.queryByText(/syncs available/)).toBeNull();
 	});
 });

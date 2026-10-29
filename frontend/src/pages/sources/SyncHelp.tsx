@@ -1,6 +1,3 @@
-import { ExternalLink, ShieldCheck } from "lucide-react";
-import { simplefinLinks } from "./simplefinLinks.ts";
-
 const questions = [
 	{
 		question: "My setup token did not work",
@@ -26,40 +23,19 @@ const questions = [
 
 export function SyncHelp() {
 	return (
-		<div className="grid content-start gap-5">
-			<div className="rounded-surface border border-success-border bg-success-bg p-5 sm:p-6">
-				<h3 className="mt-0 mb-2 flex items-center gap-2 text-base text-success-text">
-					<ShieldCheck size={18} aria-hidden="true" />
-					Read-only bank access
-				</h3>
-				<p className="m-0 text-sm leading-relaxed text-success-text">
-					SimpleFIN lets Waypoint read bank data. Waypoint cannot move money or
-					see your bank sign-in details.
-				</p>
-				<a
-					href={simplefinLinks.security}
-					target="_blank"
-					rel="noopener noreferrer"
-					className="mt-4 inline-flex min-h-6 items-center gap-2 text-sm font-semibold text-success-text underline underline-offset-4"
-				>
-					SimpleFIN security <ExternalLink size={14} aria-hidden="true" />
-					<span className="sr-only"> (opens in a new tab)</span>
-				</a>
-			</div>
-			<div className="rounded-surface border border-line bg-surface p-5 sm:p-6">
-				<h3 className="mt-0 mb-3 text-base">SimpleFIN help</h3>
-				<div className="divide-y divide-line">
-					{questions.map(({ question, answer }) => (
-						<details key={question} className="py-3">
-							<summary className="cursor-pointer text-sm font-semibold leading-relaxed">
-								{question}
-							</summary>
-							<p className="mt-3 mb-0 text-sm leading-relaxed text-muted">
-								{answer}
-							</p>
-						</details>
-					))}
-				</div>
+		<div className="rounded-surface border border-line bg-surface p-5 sm:p-6">
+			<h3 className="mt-0 mb-3 text-base">SimpleFIN help</h3>
+			<div className="divide-y divide-line">
+				{questions.map(({ question, answer }) => (
+					<details key={question} className="py-3">
+						<summary className="cursor-pointer text-sm font-semibold leading-relaxed">
+							{question}
+						</summary>
+						<p className="mt-3 mb-0 text-sm leading-relaxed text-muted">
+							{answer}
+						</p>
+					</details>
+				))}
 			</div>
 		</div>
 	);
