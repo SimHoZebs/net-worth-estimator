@@ -10,7 +10,9 @@ import { Modal } from "../Modal.tsx";
 
 export interface EditorProps {
 	plan: Plan;
-	onApply: (plan: Plan) => boolean;
+	/** Applied to the draft. May save immediately; async editors resolve
+	 *  true only after the save completes so rapid edits serialize. */
+	onApply: (plan: Plan) => boolean | Promise<boolean>;
 	onClose: () => void;
 	applyError?: string | null;
 }
@@ -32,6 +34,7 @@ export function EditorForm({
 	const [dirty, setDirty] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
 	const [applyFailed, setApplyFailed] = useState(false);
+	const [saving, setSaving] = useState(false);
 	useBeforeUnload(dirty);
 	const requestClose = () => {
 		if (!dirty) return true;
@@ -58,7 +61,7 @@ export function EditorForm({
 			<form
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (readOnlyReason) return;
+					if (readOnlyReason || saving) return;
 					setError(null);
 					setApplyFailed(false);
 					const validated = validatePlan(
@@ -68,13 +71,21 @@ export function EditorForm({
 						setError(validated.message);
 						return;
 					}
-					if (onApply(validated)) onClose();
+					const result = onApply(validated);
+					if (result instanceof Promise) {
+						setSaving(true);
+						void result.then((ok) => {
+							setSaving(false);
+							if (ok) onClose();
+							else setApplyFailed(true);
+						});
+					} else if (result) onClose();
 					else setApplyFailed(true);
 				}}
 				onChange={() => setDirty(true)}
 			>
 				<fieldset
-					disabled={Boolean(readOnlyReason)}
+					disabled={Boolean(readOnlyReason) || saving}
 					className="grid grid-cols-2 gap-5 max-sm:gap-x-3 max-sm:gap-y-4 max-sm:grid-cols-1"
 				>
 					{children}
@@ -109,9 +120,10 @@ export function EditorForm({
 						<Button
 							type="submit"
 							variant="primary"
-							disabled={Boolean(readOnlyReason)}
+							disabled={Boolean(readOnlyReason) || saving}
 						>
-							Apply unsaved changes <ArrowRight size={16} aria-hidden="true" />
+							{saving ? "Saving…" : "Apply unsaved changes"}{" "}
+							<ArrowRight size={16} aria-hidden="true" />
 						</Button>
 					</div>
 				)}

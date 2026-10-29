@@ -17,7 +17,7 @@ export function WishListEditor({
 }: {
 	plan: Plan;
 	item: PlannedPurchase | null;
-	onApply: (plan: Plan) => boolean;
+	onApply: (plan: Plan) => boolean | Promise<boolean>;
 	onClose: () => void;
 	applyError?: string | null;
 	readOnly: boolean;
