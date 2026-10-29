@@ -23,6 +23,7 @@ export function ProjectionChart({
 	pending?: boolean;
 }) {
 	const [inspected, setInspected] = useState<number | null>(null);
+	const [pinned, setPinned] = useState<number | null>(null);
 	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
 	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const id = useId().replaceAll(":", "");
@@ -51,7 +52,7 @@ export function ProjectionChart({
 		[model, today],
 	);
 	const selectedIndex = model
-		? Math.min(inspected ?? defaultIndex, model.points.length - 1)
+		? Math.min(inspected ?? pinned ?? defaultIndex, model.points.length - 1)
 		: 0;
 	const point = model?.points[selectedIndex] ?? model?.last;
 	// The evidence action lives here so the position breakdown stays
@@ -72,6 +73,7 @@ export function ProjectionChart({
 						onClick={() => {
 							setDays(option);
 							setInspected(null);
+							setPinned(null);
 						}}
 					>
 						{option} days
@@ -113,9 +115,12 @@ export function ProjectionChart({
 				<ProjectionPlot
 					model={model}
 					id={id}
-					inspected={inspected}
+					inspected={inspected ?? pinned}
 					selectedIndex={selectedIndex}
 					onInspect={setInspected}
+					onPin={(index) =>
+						setPinned((previous) => (previous === index ? null : index))
+					}
 				/>
 				<input
 					className="relative col-start-2 row-start-1 h-3 w-full min-w-0 self-end cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
