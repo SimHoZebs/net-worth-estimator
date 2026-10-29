@@ -1,4 +1,4 @@
-import type { PlannedPurchase } from "../../../domain/model.ts";
+import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
 import { PurchaseRow } from "./PurchaseRow.tsx";
 

@@ -1,6 +1,6 @@
 import { AlertTriangle, CalendarDays, Clock3 } from "lucide-react";
-import { dateLabel } from "../../../domain/format.ts";
-import type { PlannedPurchase } from "../../../domain/model.ts";
+import { dateLabel } from "../../domain/format.ts";
+import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
 import { PurchaseRow } from "./PurchaseRow.tsx";
 
@@ -128,7 +128,7 @@ export function PurchaseScheduleView({
 			{excluded.length > 0 && (
 				<div className="ml-8">
 					<h3 className="text-sm font-semibold text-muted">
-						Excluded from plan
+						Excluded from account
 					</h3>
 					<ol
 						className="m-0 mt-2 list-none rounded-surface border border-line bg-surface px-2"

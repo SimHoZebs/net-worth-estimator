@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { ConfirmDialog } from "../../../components/ConfirmDialog.tsx";
-import type { Plan, PlannedPurchase } from "../../../domain/model.ts";
-import { movePurchase } from "../../../domain/purchases.ts";
-import { horizonDate } from "../../../domain/result.ts";
-import type { PurchaseSchedule } from "../../../domain/result.ts";
-import { useUiStore } from "../../../state/uiStore.ts";
-import { useWorkspaceStore } from "../../../state/workspaceStore.ts";
-import { stageAndSave } from "../../../state/workspaceWrites.ts";
+import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
+import type { Plan, PlannedPurchase } from "../../domain/model.ts";
+import { movePurchase } from "../../domain/purchases.ts";
+import { horizonDate } from "../../domain/result.ts";
+import type { PurchaseSchedule } from "../../domain/result.ts";
+import { useUiStore } from "../../state/uiStore.ts";
+import { useWorkspaceStore } from "../../state/workspaceStore.ts";
+import { stageAndSave } from "../../state/workspaceWrites.ts";
 import {
 	useDraftConflict,
-	useWorkspaceReadOnly,
-} from "../../../state/useWorkspacePlan.ts";
-import { WishListEditor } from "../WishListEditor.tsx";
+	useAccountReadOnly,
+} from "../../state/useAccountScope.ts";
+import { WishListEditor } from "./WishListEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";
 import type { PurchaseEnhancements } from "./purchase.types.ts";
@@ -32,7 +32,7 @@ export function WishListPanel({
 }) {
 	const onUpdate = stageAndSave;
 	const applyError = useWorkspaceStore((state) => state.error);
-	const blocked = useWorkspaceReadOnly();
+	const blocked = useAccountReadOnly();
 	const draftConflict = useDraftConflict();
 	const years = useUiStore((state) => state.years);
 	const locked = blocked || Boolean(draftConflict) || plan.readOnly;

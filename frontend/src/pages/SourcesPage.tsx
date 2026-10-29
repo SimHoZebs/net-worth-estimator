@@ -3,9 +3,9 @@ import { AccountPage } from "../auth/AccountPage.tsx";
 import { Tabs, type TabItem } from "../components/Tabs.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
 import { stageAndSave } from "../state/workspaceWrites.ts";
-import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import { useAccountPlan, useAccountReadOnly } from "../state/useAccountScope.ts";
 import { useTransactionCatalog } from "../state/workspaceResources.ts";
-import { AssumptionsPanel } from "./plan/AssumptionsPanel.tsx";
+import { AssumptionsPanel } from "./accounts/AssumptionsPanel.tsx";
 import { SyncSettings } from "./sources/SyncSettings.tsx";
 
 type ConfigTab = "sync" | "amounts" | "assumptions" | "account";
@@ -20,9 +20,9 @@ const configTabs: TabItem<ConfigTab>[] = [
 export function SourcesPage() {
 	// Everything subscribes here, including the access control.
 	const [tab, setTab] = useState<ConfigTab>("sync");
-	const plan = usePlan();
+	const plan = useAccountPlan();
 	const catalog = useTransactionCatalog().data;
-	const readOnly = useWorkspaceReadOnly();
+	const readOnly = useAccountReadOnly();
 	const onUpdatePlan = stageAndSave;
 	if (!plan) return null;
 	const accounts = plan.accounts.map((account) => ({
