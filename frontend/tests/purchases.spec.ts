@@ -4,8 +4,7 @@ import type {
 	FinancialModelDocument,
 	FinancialModelResponse,
 } from "../src/api/contracts.ts";
-import type { Plan } from "../src/domain/model.ts";
-import { FIXTURE_API, readTemporaryVersion, resetFixture } from "./fixture.ts";
+import { FIXTURE_API, readSavedServerPlan, readTemporaryVersion, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
 	await resetFixture();
@@ -170,27 +169,11 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 
 	await openPurchases(page);
 	await addPurchase(page, "Synced-account laptop", "500");
-	const draft = (await readTemporaryVersion(page, resource)) as Plan;
-	expect(draft.readOnly).toBe(false);
-	expect(
-		draft.accounts.find((account) => account.id === "checking"),
-	).toMatchObject({
-		readOnly: true,
-		source: "Synced checkpoint",
-	});
-	expect(
-		draft.movements.find((movement) => movement.id === pending.id),
-	).toMatchObject({
-		readOnly: true,
-		pending: true,
-		enabled: false,
-	});
+	await expect(page.getByText("Plan saved on the server.").first()).toBeVisible();
+	expect(await readTemporaryVersion(page, resource)).toBeNull();
 	await expect(
 		page.getByText(/This change cannot be saved to the server/),
 	).toHaveCount(0);
-	await page.getByRole("button", { name: "Save changes", exact: true }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
-	expect(await readTemporaryVersion(page, resource)).toBeNull();
 	const savedResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	expect(savedResponse.ok()).toBe(true);
 	const { document: saved } =
@@ -237,19 +220,23 @@ test("purchase priorities persist and purchases protect all established payments
 	await expect(
 		page.getByRole("status").filter({ hasText: "Chair is now priority 1" }),
 	).toHaveText("Chair is now priority 1.");
+	// The reorder saves asynchronously. Gate on the server state, not on
+	// toasts: an earlier save toast can still be visible.
+	await expect
+		.poll(
+			async () =>
+				(await readSavedServerPlan()).postings.find(
+					(item) => item.name === "Chair",
+				)?.purchase,
+			{ timeout: 15000 },
+		)
+		.toEqual({ priority: 0 });
+	await expect.poll(() => readTemporaryVersion(page)).toBeNull();
 	await expect(
 		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
 	).toHaveCount(2);
-	const temporary = (await readTemporaryVersion(page)) as Plan;
-	expect(
-		temporary.plannedPurchases.findIndex(
-			(item: { name: string }) => item.name === "Chair",
-		),
-	).toBe(0);
 	await page.reload();
 	await expect(queue.locator("li").first()).toContainText("Chair");
-	await page.getByRole("button", { name: "Save changes", exact: true }).click();
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	const { document } = (await response.json()) as {
 		document: FinancialModelDocument;
@@ -328,9 +315,7 @@ test("purchase priorities persist and purchases protect all established payments
 	await editor.getByRole("button", { name: "Apply unsaved changes" }).click();
 	await expect(queue.locator("li").first()).toContainText("$200");
 	await page.getByRole("button", { name: "Remove Chair" }).click();
-	await page
-		.getByRole("button", { name: "Remove from unsaved changes" })
-		.click();
+	await page.getByRole("button", { name: "Remove purchase" }).click();
 	await expect(queue.locator("li")).toHaveCount(1);
 	expect(errors).toEqual([]);
 });
@@ -364,6 +349,17 @@ test("unfunded purchases hold lower priorities and the page remains accessible o
 			.getByRole("listitem")
 			.first(),
 	).toContainText("Small item");
+	// The reorder saves asynchronously. Gate on the server state, not on
+	// toasts: an earlier save toast can still be visible.
+	await expect
+		.poll(
+			async () =>
+				(await readSavedServerPlan()).postings.find(
+					(item) => item.name === "Small item",
+				)?.purchase,
+			{ timeout: 15000 },
+		)
+		.toEqual({ priority: 0 });
 	await expect(
 		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
 	).toHaveCount(1);

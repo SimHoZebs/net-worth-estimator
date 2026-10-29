@@ -213,7 +213,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
 	dialog = page.getByRole("dialog", { name: "Everyday checking" });
 	await expect(dialog).toBeVisible();
-	await expect(dialog).toContainText("Account activity · Changes");
+	await expect(dialog).toContainText("Account activity · Saved plan");
 	// Returning from the editor remounts the list with default filters.
 	await dialog.getByLabel("Transaction source").selectOption("all");
 	await dialog
@@ -221,20 +221,17 @@ test("a shortfall can be inspected and edited while preserving account context a
 		.fill("renovation");
 	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
-	// The saved plan is untouched: only the unsaved changes changed.
+	// Stored-only: Apply saves immediately, so the saved plan carries the
+	// edit and no temporary version remains.
 	// Posting CSV ids are replaced with server UUIDs on import, so the
-	// renovation is located by name on both sides.
+	// renovation is located by name.
 	const draft = await readTemporaryVersion(page);
-	const renovation = (plan: {
-		movements: { name: string; amount: number; postedDate: string | null }[];
-	}) => plan.movements.find((movement) => movement.name === "Home renovation");
-	expect(renovation(draft)?.amount).toBe(3000);
-	expect(renovation(draft)?.postedDate).toBe("2026-03-10");
+	expect(draft).toBeNull();
 	const saved = await readSavedServerPlan();
 	const savedExpression = saved.postings.find(
 		(posting) => posting.name === "Home renovation",
 	)?.amount.config.expression;
-	expect(savedExpression).toBe("9000");
+	expect(savedExpression).toBe("3000");
 });
 
 test("filters reset pagination and keep projected transfers distinct from recorded income", async ({
@@ -322,22 +319,23 @@ test("growth-only accounts have an honest empty state and retain account details
 	await expect(
 		dialog.getByRole("button", { name: "Edit account", exact: true }),
 	).toHaveCount(0);
-	// Editing applies to the draft without opening another dialog.
+	// Editing saves immediately without opening another dialog.
 	await dialog.getByLabel("Protected balance in USD").fill("5000");
 	await expect(
 		dialog.getByRole("button", { name: "Apply unsaved changes" }),
 	).toBeEnabled();
 	await dialog.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(dialog).toContainText("Account activity · Changes");
+	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+	await expect(dialog).toContainText("Account activity · Saved plan");
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
 		"5000",
 	);
-	// The inline edit changed the draft only; the saved plan is untouched.
-	const draft = await readTemporaryVersion(page);
-	const home = (
-		draft as { accounts: { id: string; minBalance: number }[] }
-	).accounts.find((account) => account.id === "home");
-	expect(home?.minBalance).toBe(5000);
+	// The inline edit saved immediately; no temporary version remains.
+	expect(await readTemporaryVersion(page)).toBeNull();
+	const saved = await readSavedServerPlan();
+	expect(
+		saved.accounts.find((account) => account.id === "home")?.minBalance,
+	).toBe(5000);
 });
 
 test("account transactions and editor evidence are accessible on desktop and mobile", async ({

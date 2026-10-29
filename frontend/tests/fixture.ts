@@ -88,8 +88,11 @@ export async function readSavedServerPlan() {
 			id: string;
 			name: string;
 			amount: { config: { expression?: string } };
+			purchase?: { priority: number };
 		};
+		type account = { id: string; minBalance: number };
 		return {
+			accounts: body.document.accounts as account[],
 			postings: body.document.postings as movement[],
 			recurrenceRules: (body.document.recurrenceRules ?? []) as movement[],
 		};
