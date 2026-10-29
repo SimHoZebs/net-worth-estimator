@@ -17,8 +17,8 @@ type postingSyncKey struct {
 	provider, accountID, transactionID, postingID string
 }
 
-func loadPostingSyncKeys(tx *planTx) ([]postingSyncKey, error) {
-	rows, err := tx.Query(`SELECT provider, account_id, transaction_id, posting_id FROM posting_sync_keys WHERE plan_id = :plan_id`)
+func loadPostingSyncKeys(tx *userTx) ([]postingSyncKey, error) {
+	rows, err := tx.Query(`SELECT provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys WHERE user_id = :user_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -34,8 +34,8 @@ func loadPostingSyncKeys(tx *planTx) ([]postingSyncKey, error) {
 	return keys, rows.Err()
 }
 
-func insertPostingSyncKey(tx *planTx, key postingSyncKey) error {
-	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, account_id, transaction_id, posting_id, plan_id) VALUES (?, ?, ?, ?, :plan_id)`,
+func insertPostingSyncKey(tx *userTx, key postingSyncKey) error {
+	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES (?, ?, ?, ?, :user_id)`,
 		key.provider, key.accountID, key.transactionID, key.postingID)
 	return err
 }
@@ -43,7 +43,7 @@ func insertPostingSyncKey(tx *planTx, key postingSyncKey) error {
 // LoadBankPostings returns every bank-reported posting with the upstream
 // identities pointing at it. Adapters reconcile snapshots against this.
 func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
-	rows, err := s.db.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE source != ? AND plan_id = :plan_id ORDER BY position`, SourceUser)
+	rows, err := s.db.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	keys, err := s.db.Query(`SELECT provider, account_id, transaction_id, posting_id FROM posting_sync_keys WHERE plan_id = :plan_id`)
+	keys, err := s.db.Query(`SELECT provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys WHERE user_id = :user_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -87,14 +87,14 @@ func validBankKey(key BankKey) bool {
 	return key.Provider != "" && key.AccountID != "" && key.TransactionID != ""
 }
 
-func resolveBankKeys(tx *planTx, keys []BankKey) (string, error) {
+func resolveBankKeys(tx *userTx, keys []BankKey) (string, error) {
 	resolved := ""
 	for _, key := range keys {
 		if !validBankKey(key) {
 			return "", fmt.Errorf("bank key requires provider, account, and transaction identities")
 		}
 		var postingID string
-		err := tx.QueryRow(`SELECT posting_id FROM posting_sync_keys WHERE provider = ? AND account_id = ? AND transaction_id = ? AND plan_id = :plan_id`,
+		err := tx.QueryRow(`SELECT posting_id FROM posting_sync_keys WHERE provider = ? AND bridge_account_id = ? AND transaction_id = ? AND user_id = :user_id`,
 			key.Provider, key.AccountID, key.TransactionID).Scan(&postingID)
 		if err == sql.ErrNoRows {
 			continue
@@ -110,7 +110,7 @@ func resolveBankKeys(tx *planTx, keys []BankKey) (string, error) {
 	return resolved, nil
 }
 
-func recordBankKeys(tx *planTx, postingID string, keys []BankKey) error {
+func recordBankKeys(tx *userTx, postingID string, keys []BankKey) error {
 	for _, key := range keys {
 		if !validBankKey(key) {
 			return fmt.Errorf("bank key requires provider, account, and transaction identities")
@@ -122,7 +122,7 @@ func recordBankKeys(tx *planTx, postingID string, keys []BankKey) error {
 	return nil
 }
 
-func writeBankValues(tx *planTx, id string, posting types.Posting) error {
+func writeBankValues(tx *userTx, id string, posting types.Posting) error {
 	amount, err := json.Marshal(posting.Amount)
 	if err != nil {
 		return err
@@ -131,7 +131,7 @@ func writeBankValues(tx *planTx, id string, posting types.Posting) error {
 	if err != nil {
 		return err
 	}
-	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND plan_id = :plan_id`,
+	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
 		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(posting.Pending), boolToInt(posting.Void), id, SourceUser)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func mirrorAccount(posting types.Posting) (string, bool) {
 // transaction. Counters classify by before/after state, never by provider
 // behavior: inserts split on the carried lifecycle flag, updates count as
 // refreshes, conversions and void flips count on actual change.
-func applyBankDirectives(tx *planTx, directives []BankDirective, summary *SyncApplySummary) error {
+func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncApplySummary) error {
 	position, err := nextTablePosition(tx, "postings")
 	if err != nil {
 		return err
@@ -181,7 +181,7 @@ func applyBankDirectives(tx *planTx, directives []BankDirective, summary *SyncAp
 	for _, directive := range directives {
 		switch {
 		case directive.Void != "":
-			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND plan_id = :plan_id`, directive.Void, SourceUser)
+			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
 			if err != nil {
 				return err
 			}
@@ -203,7 +203,7 @@ func applyBankDirectives(tx *planTx, directives []BankDirective, summary *SyncAp
 			if err := writeBankValues(tx, conversion.ID, conversion.Posting); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(`DELETE FROM posting_sync_keys WHERE posting_id = ? AND plan_id = :plan_id`, conversion.ID); err != nil {
+			if _, err := tx.Exec(`DELETE FROM posting_sync_keys WHERE posting_id = ? AND user_id = :user_id`, conversion.ID); err != nil {
 				return err
 			}
 			if err := recordBankKeys(tx, conversion.ID, conversion.AddKeys); err != nil {

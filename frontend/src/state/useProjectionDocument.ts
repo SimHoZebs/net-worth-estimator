@@ -4,7 +4,7 @@ import type {
 	FinancialModelDocument,
 } from "../api/contracts.ts";
 import { useServerModel } from "./workspaceResources.ts";
-import { getResourceScope } from "../auth/resourceScope.ts";
+import { getUserScope } from "../auth/resourceScope.ts";
 
 export interface ProjectionDocumentOptions {
 	document?: FinancialModelDocument | null;
@@ -20,8 +20,7 @@ export function useProjectionDocument({
 	const model = useServerModel().data;
 	const storeDocument = model?.document ?? null;
 	const saved = document !== undefined ? document : storeDocument;
-	const source =
-		getResourceScope().status === "ready" ? (saved ?? null) : null;
+	const source = getUserScope().status === "ready" ? (saved ?? null) : null;
 	// The eval/view scope never rewrites plan data: the base document holds
 	// the plan, the active document layers the request-local evaluations on
 	// top. Keys hash the two halves separately so the base path cache stays

@@ -17,10 +17,7 @@ import {
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
 import type { Plan } from "@/domain/model.ts";
-import {
-	getResourceScope,
-	subscribeResourceScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
 	getServerModel,
@@ -29,7 +26,7 @@ import {
 	presetsOptions,
 	reloadWorkspace,
 	workspaceIsBusy,
-	workspaceResourceKey,
+	userResourceKey,
 } from "@/state/workspaceResources.ts";
 import {
 	draftDocumentForSave,
@@ -42,7 +39,7 @@ import {
 } from "@/state/notifications.ts";
 
 export function workspaceWriteKey(kind: "model" | "presets") {
-	return ["workspace-write", getResourceScope().key, kind] as const;
+	return ["workspace-write", getUserScope().key, kind] as const;
 }
 
 /** Backend save envelope: persisted with issues, or rejected with reasons. */
@@ -80,11 +77,11 @@ export async function performSave(options: {
 	if (workspaceIsBusy()) {
 		notifyError(
 			"workspace",
-			"Wait for the current server operation to finish before editing the plan.",
+			"Wait for the current server operation to finish before editing.",
 		);
 		return false;
 	}
-	if (getResourceScope().status !== "ready") {
+	if (getUserScope().status !== "ready") {
 		notifyError("workspace", "Load the server workspace before editing it.");
 		return false;
 	}
@@ -110,7 +107,7 @@ async function write<T>(
 	kind: "model" | "presets",
 	perform: () => Promise<T>,
 ): Promise<T | false> {
-	const scope = getResourceScope();
+	const scope = getUserScope();
 	const cache = serverQueryClient();
 	const key = workspaceWriteKey(kind);
 	if (
@@ -122,15 +119,15 @@ async function write<T>(
 		mutationKey: key,
 		scope: { id: JSON.stringify(key) },
 		mutationFn: async () => {
-			if (scope !== getResourceScope())
+			if (scope !== getUserScope())
 				throw new Error("The active resource changed.");
 			const result = await perform();
-			if (scope !== getResourceScope())
+			if (scope !== getUserScope())
 				throw new Error("The active resource changed.");
 			return result;
 		},
 		onError: (error) => {
-			if (scope === getResourceScope())
+			if (scope === getUserScope())
 				notifyError(
 					kind === "presets" ? "amount-presets" : "workspace",
 					error instanceof Error ? error.message : "The server write failed.",
@@ -149,7 +146,7 @@ async function write<T>(
 }
 
 export function useWorkspaceSaving() {
-	useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	useSyncExternalStore(subscribeUserScope, getUserScope);
 	return (
 		useIsMutating(
 			{ mutationKey: workspaceWriteKey("model") },
@@ -159,7 +156,7 @@ export function useWorkspaceSaving() {
 }
 
 export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
-	useSyncExternalStore(subscribeResourceScope, getResourceScope);
+	useSyncExternalStore(subscribeUserScope, getUserScope);
 	const errors = useMutationState(
 		{
 			filters: { mutationKey: workspaceWriteKey(kind) },
@@ -172,10 +169,8 @@ export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
 }
 
 export async function saveWorkspace(): Promise<boolean> {
-	const scope = getResourceScope();
-	if (
-		serverQueryClient().isFetching({ queryKey: workspaceResourceKey("model") })
-	) {
+	const scope = getUserScope();
+	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
 		notifyError(
 			"workspace",
 			"Wait for the current server load to finish before saving.",
@@ -192,7 +187,7 @@ export async function saveWorkspace(): Promise<boolean> {
 					document,
 				),
 			);
-			if (scope !== getResourceScope()) return false;
+			if (scope !== getUserScope()) return false;
 			if (response instanceof Error) throw response;
 			if (!response.ok)
 				throw new Error(
@@ -206,11 +201,11 @@ export async function saveWorkspace(): Promise<boolean> {
 				throw new Error(errors.map((issue) => issue.message).join(" "));
 			const cache = serverQueryClient();
 			await cache.invalidateQueries({
-				queryKey: workspaceResourceKey("model", scope),
+				queryKey: userResourceKey("model", scope),
 				refetchType: "none",
 			});
 			const authoritative = await cache.fetchQuery(modelOptions(scope));
-			if (scope !== getResourceScope()) return false;
+			if (scope !== getUserScope()) return false;
 			if (!authoritative.document)
 				throw new Error(
 					"The save completed, but the server returned no saved data. Your unsaved changes remain available locally.",
@@ -240,10 +235,8 @@ export function stageAndSave(next: Plan): boolean {
 export async function importServerDocument(
 	document: FinancialModelDocument,
 ): Promise<boolean> {
-	const scope = getResourceScope();
-	if (
-		serverQueryClient().isFetching({ queryKey: workspaceResourceKey("model") })
-	) {
+	const scope = getUserScope();
+	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
 		notifyError(
 			"workspace",
 			"Wait for the current server load to finish before importing.",
@@ -264,17 +257,17 @@ export async function importServerDocument(
 			const result = await applyRowOperations(
 				diffFinancialModelDocuments(null, document),
 			);
-			if (scope !== getResourceScope()) return false;
+			if (scope !== getUserScope()) return false;
 			if (result instanceof Error) throw result;
 			if (!result.ok)
 				throw new Error(result.issues.map((issue) => issue.message).join(" "));
 			const cache = serverQueryClient();
 			await cache.invalidateQueries({
-				queryKey: workspaceResourceKey("model", scope),
+				queryKey: userResourceKey("model", scope),
 				refetchType: "none",
 			});
 			const model = await cache.fetchQuery(modelOptions(scope));
-			return scope === getResourceScope() && Boolean(model.document);
+			return scope === getUserScope() && Boolean(model.document);
 		})) === true
 	);
 }
@@ -286,18 +279,18 @@ export async function reloadDraft() {
 }
 
 async function changePreset(action: () => Promise<{ persisted: boolean }>) {
-	const scope = getResourceScope();
+	const scope = getUserScope();
 	return (
 		(await write("presets", async () => {
 			await serverQueryClient().cancelQueries({
-				queryKey: workspaceResourceKey("presets", scope),
+				queryKey: userResourceKey("presets", scope),
 			});
 			const response = await action();
 			if (!response.persisted)
 				throw new Error("The recipe was rejected by the server.");
-			if (scope !== getResourceScope()) return false;
+			if (scope !== getUserScope()) return false;
 			await serverQueryClient().invalidateQueries({
-				queryKey: workspaceResourceKey("presets", scope),
+				queryKey: userResourceKey("presets", scope),
 				refetchType: "none",
 			});
 			await serverQueryClient().fetchQuery(presetsOptions(scope));

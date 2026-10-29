@@ -13,7 +13,7 @@ import {
 	type FinancialModelDocument,
 	type PlanPresentation,
 } from "../api/index.ts";
-import { getResourceScope, type ResourceScope } from "../auth/resourceScope.ts";
+import { getUserScope, type UserScope } from "../auth/resourceScope.ts";
 import { changesBetween, type Plan, validatePlan } from "../domain/model.ts";
 import {
 	getServerModel,
@@ -30,7 +30,7 @@ export interface DraftState {
 	draftPresentation: PlanPresentation | null;
 	baseFingerprint: string | null;
 	baseRevision: string | null;
-	scope: ResourceScope | null;
+	scope: UserScope | null;
 	error: string | null;
 }
 
@@ -102,7 +102,7 @@ function conversion(
 }
 
 interface DraftActions {
-	restore: (scope: ResourceScope) => void;
+	restore: (scope: UserScope) => void;
 	reconcile: (model: ServerModel) => void;
 	updatePlan: (next: Plan) => boolean;
 	discard: (allowStale?: boolean) => boolean;
@@ -149,7 +149,7 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 			return fail(
 				error instanceof Error
 					? error.message
-					: "The plan could not be converted.",
+					: "The model could not be converted.",
 			);
 		}
 		const changed =
@@ -174,15 +174,15 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 		notifySuccess(
 			"workspace-notice",
 			replacing
-				? "Imported plan is ready for review and save."
-				: "Unsaved changes updated. Saved plan unchanged.",
+				? "Imported model data is ready for review and save."
+				: "Unsaved changes updated. Saved model unchanged.",
 		);
 		return true;
 	};
 	return {
 		...initialData(),
 		restore: (scope) => {
-			if (scope !== getResourceScope() || scope.status !== "ready") return;
+			if (scope !== getUserScope() || scope.status !== "ready") return;
 			set({
 				scope,
 				baseline: null,
@@ -257,13 +257,13 @@ export const useWorkspaceStore = create<DraftState & DraftActions>()((
 
 export function orderChanged(saved: Plan | null, current: Plan | null) {
 	if (!saved || !current) return false;
-	return (["accounts", "transactions", "plannedPurchases", "evaluations"] as const).some(
-		(key) => {
-			const before = (saved[key] ?? []).map((item) => item.id).join(",");
-			const after = (current[key] ?? []).map((item) => item.id).join(",");
-			return before !== after;
-		},
-	);
+	return (
+		["accounts", "transactions", "plannedPurchases", "evaluations"] as const
+	).some((key) => {
+		const before = (saved[key] ?? []).map((item) => item.id).join(",");
+		const after = (current[key] ?? []).map((item) => item.id).join(",");
+		return before !== after;
+	});
 }
 
 export function selectDraftChangeCount(state: DraftState) {

@@ -4,8 +4,8 @@ import {
   buildPermissionSeed,
   permissionAdapter,
   permissionModelId,
-  planActions,
-  planModelText,
+  userActions,
+  userModelText,
 } from "./permissions.mjs";
 
 test("permission seed is deterministic, independently mutable, and uses one dedicated same-DB adapter", () => {
@@ -16,11 +16,11 @@ test("permission seed is deterministic, independently mutable, and uses one dedi
     {
       owner: "waypoint",
       name: permissionAdapter,
-      table: "waypoint_plan_permission_rule",
+      table: "waypoint_account_permission_rule",
       useSameDb: true,
     },
   ]);
-  assert.equal(seed.models[0].modelText, planModelText);
+  assert.equal(seed.models[0].modelText, userModelText);
   assert.equal(`${seed.models[0].owner}/${seed.models[0].name}`, permissionModelId);
   for (const permission of seed.permissions) {
     assert.equal(permission.model, permissionModelId);
@@ -34,14 +34,14 @@ test("permission seed is deterministic, independently mutable, and uses one dedi
     assert.deepEqual(permission.domains, []);
   }
   seed.permissions[0].actions.push("unexpected");
-  assert.deepEqual(buildPermissionSeed().permissions[0].actions, planActions);
+  assert.deepEqual(buildPermissionSeed().permissions[0].actions, userActions);
 });
 
-test("contextual role grants need no per-account signup writes", () => {
+test("contextual role grants need no per-user signup writes", () => {
   const { roles, permissions } = buildPermissionSeed();
   assert.deepEqual(
     roles.map(({ name }) => name),
-    ["plan-owner", "guest"],
+    ["user-owner", "guest"],
   );
   for (const role of roles) {
     assert.equal(role.owner, "waypoint");
@@ -53,14 +53,14 @@ test("contextual role grants need no per-account signup writes", () => {
     permissions.map(({ roles, resources, actions }) => ({ roles, resources, actions })),
     [
       {
-        roles: ["waypoint/plan-owner"],
-        resources: ["plans/*"],
-        actions: ["plan:read", "plan:project", "plan:write"],
+        roles: ["waypoint/user-owner"],
+        resources: ["users/*"],
+        actions: ["user:read", "user:project", "user:write"],
       },
       {
         roles: ["waypoint/guest"],
-        resources: ["plans/sample"],
-        actions: ["plan:read", "plan:project"],
+        resources: ["users/sample"],
+        actions: ["user:read", "user:project"],
       },
     ],
   );
@@ -68,23 +68,23 @@ test("contextual role grants need no per-account signup writes", () => {
 
 test("model declares the pinned Casdoor six-column policy contract and native role support", () => {
   // These assert the exported artifact, not a handwritten policy evaluator.
-  assert.match(planModelText, /^r = sub, obj, act, owner$/m);
-  assert.match(planModelText, /^p = sub, obj, act, eft, unused, permissionId$/m);
-  assert.match(planModelText, /^g = _, _$/m);
+  assert.match(userModelText, /^r = sub, obj, act, owner$/m);
+  assert.match(userModelText, /^p = sub, obj, act, eft, unused, permissionId$/m);
+  assert.match(userModelText, /^g = _, _$/m);
   assert.match(
-    planModelText,
+    userModelText,
     /^e = some\(where \(p.eft == allow\)\) && !some\(where \(p.eft == deny\)\)$/m,
   );
   assert.ok(
-    planModelText.includes(
-      'p.sub == "waypoint/plan-owner" && r.sub == r.owner && r.sub != "guest"',
+    userModelText.includes(
+      'p.sub == "waypoint/user-owner" && r.sub == r.owner && r.sub != "guest"',
     ),
   );
   assert.ok(
-    planModelText.includes(
-      'p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "plans/sample"',
+    userModelText.includes(
+      'p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "users/sample"',
     ),
   );
-  assert.ok(planModelText.includes("|| g(r.sub, p.sub)"));
-  assert.ok(planModelText.includes("keyMatch(r.obj, p.obj) && r.act == p.act"));
+  assert.ok(userModelText.includes("|| g(r.sub, p.sub)"));
+  assert.ok(userModelText.includes("keyMatch(r.obj, p.obj) && r.act == p.act"));
 });

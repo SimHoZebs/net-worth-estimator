@@ -29,7 +29,7 @@ func (s *sqliteStore) GetReceiptImage(ctx context.Context, id string) (types.Rec
 	defer cancel()
 	for attempt := 0; attempt < 5; attempt++ {
 		var payload, key string
-		err := s.db.QueryRow(`SELECT blob_key,payload FROM receipts WHERE id=? AND plan_id=:plan_id`, id).Scan(&key, &payload)
+		err := s.db.QueryRow(`SELECT blob_key,payload FROM receipts WHERE id=? AND user_id=:user_id`, id).Scan(&key, &payload)
 		if err == sql.ErrNoRows {
 			return types.ReceiptImage{}, ErrReceiptNotFound
 		}
@@ -45,7 +45,7 @@ func (s *sqliteStore) GetReceiptImage(ctx context.Context, id string) (types.Rec
 			// Replacement can retire the captured object before Open. Retry only
 			// if this receipt moved to a different immutable object.
 			var current string
-			if scanErr := s.db.QueryRow(`SELECT blob_key FROM receipts WHERE id=? AND plan_id=:plan_id`, id).Scan(&current); scanErr == sql.ErrNoRows {
+			if scanErr := s.db.QueryRow(`SELECT blob_key FROM receipts WHERE id=? AND user_id=:user_id`, id).Scan(&current); scanErr == sql.ErrNoRows {
 				return types.ReceiptImage{}, ErrReceiptNotFound
 			} else if scanErr != nil {
 				return types.ReceiptImage{}, scanErr
@@ -80,10 +80,10 @@ func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expect
 		return out, err
 	}
 	var previous types.Receipt
-	check := func(tx *planTx) error {
+	check := func(tx *userTx) error {
 		var payload string
 		var oldSize int64
-		if err := tx.QueryRow(`SELECT payload, size FROM receipts WHERE id = ? AND plan_id = :plan_id`, id).Scan(&payload, &oldSize); err == sql.ErrNoRows {
+		if err := tx.QueryRow(`SELECT payload, size FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&payload, &oldSize); err == sql.ErrNoRows {
 			return ErrReceiptNotFound
 		} else if err != nil {
 			return err
@@ -95,14 +95,14 @@ func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expect
 			return ErrReceiptConflict
 		}
 		var duplicates int
-		if err := tx.QueryRow(`SELECT COUNT(*) FROM receipts WHERE posting_id = ? AND digest = ? AND id != ? AND plan_id = :plan_id`, previous.PostingID, image.Digest, id).Scan(&duplicates); err != nil {
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM receipts WHERE posting_id = ? AND digest = ? AND id != ? AND user_id = :user_id`, previous.PostingID, image.Digest, id).Scan(&duplicates); err != nil {
 			return err
 		}
 		if duplicates > 0 {
 			return ErrReceiptDuplicate
 		}
 		var used int64
-		if err := tx.QueryRow(`SELECT COALESCE(SUM(size),0) FROM receipts WHERE plan_id = :plan_id`).Scan(&used); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(SUM(size),0) FROM receipts WHERE user_id = :user_id`).Scan(&used); err != nil {
 			return err
 		}
 		if used-oldSize+int64(len(image.Bytes)) > ReceiptStorageLimit {
@@ -118,7 +118,7 @@ func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expect
 		return out, err
 	}
 	defer s.application.finishBlobWrite(key)
-	err = withRowTx(s.db, func(tx *planTx) error {
+	err = withRowTx(s.db, func(tx *userTx) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -139,7 +139,7 @@ func (s *sqliteStore) ReplaceReceiptImage(ctx context.Context, id string, expect
 		if err := publishBlob(tx.Tx, key); err != nil {
 			return err
 		}
-		result, err := tx.Exec(`UPDATE receipts SET digest = ?, size = ?, blob_key = ?, revision = ?, payload = ? WHERE id = ? AND revision = ? AND plan_id = :plan_id`, image.Digest, out.Size, key, out.Revision, string(data), id, expectedRevision)
+		result, err := tx.Exec(`UPDATE receipts SET digest = ?, size = ?, blob_key = ?, revision = ?, payload = ? WHERE id = ? AND revision = ? AND user_id = :user_id`, image.Digest, out.Size, key, out.Revision, string(data), id, expectedRevision)
 		if err != nil {
 			return err
 		}

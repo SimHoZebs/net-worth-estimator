@@ -1,5 +1,5 @@
 import type { Account, Plan } from "../../domain/model.ts";
-import { upsertItem } from "../../domain/planEdits.ts";
+import { upsertItem } from "../../domain/accountEdits.ts";
 
 /** System-owned account fields never come from the form. Both the overlay
  * editor and the detail editor preserve them from the stored account. */

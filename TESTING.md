@@ -78,7 +78,7 @@ Font roles live in `frontend/src/styles/typography.css`. `npm --prefix frontend 
 
 ## Frontend Browser Tests
 
-The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic account and plan through the production session contract. It does not enable a legacy authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
+The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic user and plan through the production session contract. It does not enable a legacy authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
 
 ```bash
 npm --prefix frontend exec playwright install chromium
@@ -131,13 +131,12 @@ The pre-commit hook verifies the backend packages containing staged Go files, pl
 ## Shared Database Isolation
 
 The application stores all plans and application identity state in one SQLite
-database. Isolation tests must use at least two plans in that same physical file,
+database. Isolation tests must use at least two users in that same physical file,
 with identical entity IDs, preset names, and upstream sync keys. Separate fixture
 files alone do not prove row-level isolation.
 
 ```bash
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api
 ```
@@ -153,7 +152,6 @@ Unit checks need no identity container:
 ```bash
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/authorization
-backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/api
 node --test auth/casdoor/*.test.mjs
 ```
@@ -166,7 +164,7 @@ Run the real-Nginx provider-header regression with
 The test requires an available local image and Docker. It runs without root
 inside the container and checks both the corrected buffer and default-buffer 502.
 Without `NGINX_TEST_IMAGE`, it skips the Docker-only test.
-Authenticated requests use the account's private plan and assert its resource ID.
+Authenticated requests use the user's private data and assert its resource ID.
 
 Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
 passkey, restart, revocation, refresh, and administrator recovery checks. The
@@ -180,15 +178,15 @@ Physical passkeys and phone recovery require the separate
 `go -C backend test ./internal/identity -run 'TestBrowser|TestProviderAlias|TestProviderProxy|TestSiblingApp'`
 checks browser-origin redirects, callback binding, provider cookie isolation,
 proxy transport, and sibling-origin denial. Additional browser aliases keep the
-same issuer and account-owned resource IDs. See
+same issuer and user-owned resource IDs. See
 [browser address configuration](docs/authentication.md#lan-and-tailnet-browser-addresses).
 
-`auth/test-integration.mjs` checks owner, guest sample, and second-account isolation
+`auth/test-integration.mjs` checks owner, guest sample, and second-user isolation
 against a marked disposable Casdoor fixture. `CASDOOR_TEST_MUTATIONS=1` is required.
 Its `fixture.json` must identify isolated state under repository `tmp/` or
 `/tmp/opencode/`, never live `tmp/dev/`. The script verifies the real permission
 API, OIDC, CSRF, restart persistence, private writes, sample projection/SSE,
-cross-account rejection, stale resource headers, and logout.
+cross-user rejection, stale resource headers, and logout.
 Signup checks include immediate blank-workspace access without administrator
 approval or import, first-account editing, draft reload, and saved restart persistence.
 
@@ -273,7 +271,7 @@ Direct API snippets below require a valid session cookie file, the discovered re
 
 ```bash
 export COOKIE_FILE=/path/to/private/disposable-cookie-jar
-export RESOURCE_ID=plans/your-discovered-resource-id
+export RESOURCE_ID=users/your-discovered-resource-id
 export PUBLIC_ORIGIN=http://localhost:8080
 curl() {
   command curl --cookie "$COOKIE_FILE" \
@@ -321,7 +319,7 @@ Expected baseline:
 The document is optional and defaults to the scoped stored model. It returns
 `result: { asOfDate, netWorth, accounts: [{ accountId, balance }] }` from the same
 historical preparation as projections, without a future simulation. It requires
-`plan:project`, allows read-only/sample access, and stores no additional history.
+`user:project`, allows read-only/sample access, and stores no additional history.
 Model/date errors return HTTP 200 with `issues` and `error`, without `result`.
 
 `frontend/tests/position.spec.ts` holds forecast requests open to verify that the
@@ -399,7 +397,7 @@ After each rejected write, confirm financial data stays unchanged. Row validatio
 can return 200 with error-severity issues and `persisted: false`.
 
 `auth/test-integration.mjs` owns the disposable real-provider session, CSRF,
-owner/sample/second-account, and logout checks. Go identity tests also check that
+owner/sample/second-user, and logout checks. Go identity tests also check that
 retired bearer headers cannot grant guest access.
 
 ## CORS Checks

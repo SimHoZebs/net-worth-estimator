@@ -5,47 +5,49 @@ import (
 	"database/sql"
 )
 
-// planDB and planTx bind the scope explicitly named in every financial SQL
-// statement. They never rewrite SQL or infer a tenant from request state.
-type planDB struct {
+// userDB and userTx bind the scope explicitly named in every financial
+// SQL statement. They never rewrite SQL or infer a tenant from request state.
+// Scope column is user_id referencing users(id); model-account
+// references use model_account_id/bridge_account_id to avoid collision.
+type userDB struct {
 	*sql.DB
-	planID string
+	userID string
 }
 
-type planTx struct {
+type userTx struct {
 	*sql.Tx
-	planID string
+	userID string
 }
 
-func planArgs(planID string, args []any) []any {
-	return append(args, sql.Named("plan_id", planID))
+func userArgs(userID string, args []any) []any {
+	return append(args, sql.Named("user_id", userID))
 }
 
-func (d *planDB) Exec(q string, args ...any) (sql.Result, error) {
-	return d.DB.Exec(q, planArgs(d.planID, args)...)
+func (d *userDB) Exec(q string, args ...any) (sql.Result, error) {
+	return d.DB.Exec(q, userArgs(d.userID, args)...)
 }
-func (d *planDB) Query(q string, args ...any) (*sql.Rows, error) {
-	return d.DB.Query(q, planArgs(d.planID, args)...)
+func (d *userDB) Query(q string, args ...any) (*sql.Rows, error) {
+	return d.DB.Query(q, userArgs(d.userID, args)...)
 }
-func (d *planDB) QueryRow(q string, args ...any) *sql.Row {
-	return d.DB.QueryRow(q, planArgs(d.planID, args)...)
+func (d *userDB) QueryRow(q string, args ...any) *sql.Row {
+	return d.DB.QueryRow(q, userArgs(d.userID, args)...)
 }
-func (d *planDB) Begin() (*planTx, error) {
+func (d *userDB) Begin() (*userTx, error) {
 	return d.BeginTx(context.Background(), nil)
 }
-func (d *planDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*planTx, error) {
+func (d *userDB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*userTx, error) {
 	tx, err := d.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return &planTx{Tx: tx, planID: d.planID}, nil
+	return &userTx{Tx: tx, userID: d.userID}, nil
 }
-func (t *planTx) Exec(q string, args ...any) (sql.Result, error) {
-	return t.Tx.Exec(q, planArgs(t.planID, args)...)
+func (t *userTx) Exec(q string, args ...any) (sql.Result, error) {
+	return t.Tx.Exec(q, userArgs(t.userID, args)...)
 }
-func (t *planTx) Query(q string, args ...any) (*sql.Rows, error) {
-	return t.Tx.Query(q, planArgs(t.planID, args)...)
+func (t *userTx) Query(q string, args ...any) (*sql.Rows, error) {
+	return t.Tx.Query(q, userArgs(t.userID, args)...)
 }
-func (t *planTx) QueryRow(q string, args ...any) *sql.Row {
-	return t.Tx.QueryRow(q, planArgs(t.planID, args)...)
+func (t *userTx) QueryRow(q string, args ...any) *sql.Row {
+	return t.Tx.QueryRow(q, userArgs(t.userID, args)...)
 }

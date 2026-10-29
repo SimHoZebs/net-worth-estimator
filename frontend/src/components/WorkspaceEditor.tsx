@@ -1,12 +1,16 @@
-import type { EditorTarget } from "../domain/planEdits.ts";
+import type { EditorTarget } from "../domain/accountEdits.ts";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
 import type { EditorProps } from "./editors/EditorForm.tsx";
 import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
 import { TransactionEditor } from "./editors/TransactionEditor.tsx";
 
-export type { EditorTarget } from "../domain/planEdits.ts";
+export type { EditorTarget } from "../domain/accountEdits.ts";
 
-export function PlanEditor({
+/**
+ * Account-scoped workspace editor. Renders row editors directly; the
+ * `Plan` aggregate is only the draft/review layer underneath.
+ */
+export function WorkspaceEditor({
 	target,
 	...props
 }: EditorProps & { target: EditorTarget }) {

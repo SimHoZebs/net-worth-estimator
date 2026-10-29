@@ -16,27 +16,27 @@ import { getApiBaseUrl } from "../api/runtime.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
 import {
 	canonicalApiBaseUrl,
-	getResourceScope,
-	subscribeResourceScope,
+	getUserScope,
+	subscribeUserScope,
 } from "./resourceScope.ts";
 import type { Session } from "./sessionContext.ts";
 
-async function accountRequest<T>(
-	scope: ReturnType<typeof getResourceScope>,
+async function userRequest<T>(
+	scope: ReturnType<typeof getUserScope>,
 	session: Session | null,
 	perform: () => Promise<T>,
 	fallback = "Account details are unavailable.",
 ): Promise<T> {
-	if (scope !== getResourceScope() || !isAccountScope(scope, session))
-		throw new Error("The active account changed.");
+	if (scope !== getUserScope() || !isUserScope(scope, session))
+		throw new Error("The active user changed.");
 	try {
 		const result = await perform();
-		if (scope !== getResourceScope() || !isAccountScope(scope, session))
-			throw new Error("The active account changed.");
+		if (scope !== getUserScope() || !isUserScope(scope, session))
+			throw new Error("The active user changed.");
 		return result;
 	} catch (cause) {
 		if (cause instanceof ApiHttpError && cause.status === 401)
-			throw new Error("Sign in to manage your account.");
+			throw new Error("Sign in to manage your data.");
 		// A missing endpoint means the account service is not serving the
 		// request. The raw transport body ("404 page not found") names a
 		// route, not the account, so it never reaches the UI.
@@ -48,32 +48,33 @@ async function accountRequest<T>(
 	}
 }
 
-function isAccountScope(
-	scope: ReturnType<typeof getResourceScope>,
+function isUserScope(
+	scope: ReturnType<typeof getUserScope>,
 	session: Session | null,
 ): boolean {
 	return (
 		scope.status === "ready" &&
 		session?.authenticated === true &&
 		scope.subject === session.user?.subject &&
-		scope.resource?.id === session.resource.id &&
+		scope.resource != null &&
+		scope.resource.id === session.resource.id &&
 		scope.apiBaseUrl === canonicalApiBaseUrl(getApiBaseUrl())
 	);
 }
 
-export function useAccountResources(session: Session | null) {
+export function useUserResources(session: Session | null) {
 	const client = serverQueryClient();
 	const baseUrl = getApiBaseUrl();
-	const scope = useSyncExternalStore(subscribeResourceScope, getResourceScope);
-	const key = ["account", scope.key] as const;
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const key = ["user", scope.key] as const;
 	const options = queryOptions({
 		queryKey: key,
-		enabled: isAccountScope(scope, session),
+		enabled: isUserScope(scope, session),
 		queryFn: ({ signal }) =>
-			accountRequest(scope, session, async () => {
+			userRequest(scope, session, async () => {
 				const [profile, sessions] = await Promise.all([
 					getAccountProfile({ signal, baseUrl }),
-					accountRequest(
+					userRequest(
 						scope,
 						session,
 						() => listAccountSessions({ signal, baseUrl }),
@@ -97,14 +98,14 @@ export function useAccountResources(session: Session | null) {
 			retry: false,
 			mutationKey: [...key, "profile"],
 			mutationFn: (input: AccountProfileUpdate) =>
-				accountRequest(
+				userRequest(
 					scope,
 					session,
 					async () => (await updateAccountProfile(input, { baseUrl })).data,
 					"The account update was rejected.",
 				),
 			onSuccess: (profile) => {
-				if (scope !== getResourceScope()) return;
+				if (scope !== getUserScope()) return;
 				client.setQueryData(key, (previous: typeof details.data) =>
 					previous ? { ...previous, profile } : previous,
 				);
@@ -118,7 +119,7 @@ export function useAccountResources(session: Session | null) {
 			retry: false,
 			mutationKey: [...key, "password"],
 			mutationFn: (input: AccountPasswordChange) =>
-				accountRequest(
+				userRequest(
 					scope,
 					session,
 					() => changeAccountPassword(input, { baseUrl }),
@@ -133,7 +134,7 @@ export function useAccountResources(session: Session | null) {
 			retry: false,
 			mutationKey: [...key, "revoke"],
 			mutationFn: (id: string) =>
-				accountRequest(
+				userRequest(
 					scope,
 					session,
 					() => revokeAccountSession({ id }, { baseUrl }),

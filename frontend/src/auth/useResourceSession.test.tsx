@@ -2,9 +2,9 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createAccount } from "@/api/generated/endpoints.ts";
 import { getServerStatus } from "@/api/generated/endpoints.ts";
-import { ResourceScopeError } from "@/api/scopedRequest.ts";
+import { UserScopeError } from "@/api/scopedRequest.ts";
 import { resetServerQueryCache } from "@/state/serverQuery.ts";
-import { getResourceScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import { useResourceSession } from "@/auth/useResourceSession.ts";
 
 const session = {
@@ -12,9 +12,9 @@ const session = {
 	authenticated: true,
 	allowed: true,
 	resource: {
-		id: `plans/${"a".repeat(64)}`,
+		id: `users/${"a".repeat(64)}`,
 		kind: "private",
-		permissions: ["plan:read", "plan:project", "plan:write"],
+		permissions: ["user:read", "user:project", "user:write"],
 	},
 	user: { subject: "account-a", name: "Account A" },
 };
@@ -65,7 +65,7 @@ it("keeps failed logout after a discovery outage closed without an implicit retr
 	);
 });
 
-it("restores requests when resource-change discovery returns to the same plan", async () => {
+it("restores requests when resource-change discovery returns to the same user", async () => {
 	const fetcher = vi.fn(async (input: RequestInfo | URL) => {
 		if (String(input).endsWith("/v1/auth/session")) return response(session);
 		if (String(input).endsWith("/v1/accounts"))
@@ -75,16 +75,16 @@ it("restores requests when resource-change discovery returns to the same plan", 
 	vi.stubGlobal("fetch", fetcher);
 	const { result } = renderHook(useResourceSession);
 	await waitFor(() => expect(result.current.phase).toBe("ready"));
-	const oldScope = getResourceScope();
+	const oldScope = getUserScope();
 	await act(async () => {
 		await expect(createAccount({} as never)).rejects.toBeInstanceOf(
-			ResourceScopeError,
+			UserScopeError,
 		);
 	});
-	await waitFor(() => expect(getResourceScope().status).toBe("ready"));
+	await waitFor(() => expect(getUserScope().status).toBe("ready"));
 	expect(result.current.phase).toBe("ready");
-	expect(getResourceScope()).not.toBe(oldScope);
-	expect(getResourceScope().resource?.id).toBe(session.resource.id);
+	expect(getUserScope()).not.toBe(oldScope);
+	expect(getUserScope().resource?.id).toBe(session.resource.id);
 	expect((await getServerStatus()).data).toEqual({
 		readOnly: false,
 	});
@@ -126,24 +126,24 @@ it("blocks an unverified logout redirect and recovers to the guest through an ex
 		"The Waypoint server is unavailable (HTTP 503). It may be restarting; retry shortly.",
 	);
 	expect(result.current.logoutPending).toBe(false);
-	expect(getResourceScope().status).toBe("pending");
+	expect(getUserScope().status).toBe("pending");
 	discovery = new Response(
 		JSON.stringify({
 			...session,
 			authenticated: false,
 			resource: {
-				id: "plans/sample",
+				id: "users/sample",
 				kind: "sample",
-				permissions: ["plan:read", "plan:project"],
+				permissions: ["user:read", "user:project"],
 			},
 			user: undefined,
 		}),
-		{ headers: { "Waypoint-Resource": "plans/sample" } },
+		{ headers: { "Waypoint-Resource": "users/sample" } },
 	);
 	await act(async () => result.current.refresh());
 	expect(result.current.phase).toBe("ready");
 	expect(result.current.session?.authenticated).toBe(false);
-	expect(getResourceScope().resource?.id).toBe("plans/sample");
+	expect(getUserScope().resource?.id).toBe("users/sample");
 });
 
 it("names an unreachable server instead of reporting a generic status failure", async () => {
@@ -207,10 +207,10 @@ it("aborts discovery and rejects a late response after unmount", async () => {
 	const signal = fetcher.mock.calls[0]![1]?.signal;
 	view.unmount();
 	expect(signal?.aborted).toBe(true);
-	const pending = getResourceScope();
+	const pending = getUserScope();
 	await act(async () => finish(response(session)));
-	expect(getResourceScope()).toBe(pending);
-	expect(getResourceScope().status).toBe("pending");
+	expect(getUserScope()).toBe(pending);
+	expect(getUserScope().status).toBe("pending");
 });
 
 it("rejects an old logout redirect after the boundary unmounts and mounts again", async () => {
@@ -238,12 +238,12 @@ it("rejects an old logout redirect after the boundary unmounts and mounts again"
 	old.unmount();
 	const current = renderHook(useResourceSession);
 	await waitFor(() => expect(current.result.current.phase).toBe("ready"));
-	const verified = getResourceScope();
+	const verified = getUserScope();
 	await act(async () => {
 		finish({ logoutURL: "#stale-logout" });
 		await logout;
 	});
 	expect(window.location.hash).toBe("");
 	expect(current.result.current.phase).toBe("ready");
-	expect(getResourceScope()).toBe(verified);
+	expect(getUserScope()).toBe(verified);
 });

@@ -49,15 +49,15 @@ function SessionProbe() {
 	);
 }
 
-const sampleResource = {
-	id: "plans/sample",
+const sampleAccount = {
+	id: "users/sample",
 	kind: "sample",
-	permissions: ["plan:read", "plan:project"],
+	permissions: ["user:read", "user:project"],
 };
-const privateResource = {
-	id: `plans/${"a".repeat(64)}`,
+const privateAccount = {
+	id: `users/${"a".repeat(64)}`,
 	kind: "private",
-	permissions: ["plan:read", "plan:project", "plan:write"],
+	permissions: ["user:read", "user:project", "user:write"],
 };
 
 beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
@@ -122,7 +122,7 @@ describe("provider-independent authentication boundary", () => {
 					enabled: true,
 					authenticated: false,
 					allowed: true,
-					resource: sampleResource,
+					resource: sampleAccount,
 					user: { subject: "", name: "" },
 				}),
 			),
@@ -146,7 +146,7 @@ describe("provider-independent authentication boundary", () => {
 					enabled: true,
 					authenticated: false,
 					allowed: false,
-					resource: { ...sampleResource, permissions: [] },
+					resource: { ...sampleAccount, permissions: [] },
 				}),
 			),
 		);
@@ -170,7 +170,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: false,
-				resource: { ...sampleResource, permissions: [] },
+				resource: { ...sampleAccount, permissions: [] },
 			}),
 		);
 		vi.stubGlobal("fetch", fetcher);
@@ -218,7 +218,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: false,
-				resource: { ...privateResource, permissions: [] },
+				resource: { ...privateAccount, permissions: [] },
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -234,7 +234,7 @@ describe("provider-independent authentication boundary", () => {
 			}),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
-			"This account does not have access to this plan.",
+			"This user does not have access.",
 		);
 		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 		expect(
@@ -247,7 +247,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -260,7 +260,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -278,7 +278,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: true,
-				resource: sampleResource,
+				resource: sampleAccount,
 			}),
 		);
 		window.dispatchEvent(new Event("waypoint:authentication-required"));
@@ -304,7 +304,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: true,
-				resource: sampleResource,
+				resource: sampleAccount,
 			}),
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
@@ -323,7 +323,7 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+			await screen.findByRole("heading", { name: "Cannot reach your data." }),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
 			"The Waypoint server is unavailable (HTTP 502). It may be restarting; retry shortly.",
@@ -351,20 +351,20 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your plan" }),
+			await screen.findByRole("heading", { name: "Cannot reach your data." }),
 		).toBeTruthy();
 		expect(screen.getByRole("alert").textContent).toBe(
 			"Cannot reach the Waypoint server. It may be down or restarting.",
 		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("keeps a verified workspace mounted with a retry toast on a transient outage", async () => {
+	it("keeps a verified user mounted with a retry toast on a transient outage", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
@@ -391,7 +391,7 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: true,
 				allowed: true,
-				resource: privateResource,
+				resource: privateAccount,
 				user: { subject: "known-account", name: "User" },
 			}),
 		);

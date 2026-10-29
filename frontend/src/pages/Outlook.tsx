@@ -7,7 +7,7 @@ import { Notice } from "../components/Notice.tsx";
 import { TextButton } from "../components/Button.tsx";
 import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import { useUserPlan, useUserReadOnly } from "../state/useUserScope.ts";
 import {
 	useCheckpoints,
 	useServerStatus,
@@ -62,7 +62,7 @@ function OutlookContent({
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
-	const plan = usePlan();
+	const plan = useUserPlan();
 	const {
 		ids: pinnedIds,
 		toggle: togglePin,
@@ -81,7 +81,7 @@ function OutlookContent({
 			) ?? false,
 	});
 	const status = useServerStatus().data;
-	const writeBlocked = useWorkspaceReadOnly();
+	const writeBlocked = useUserReadOnly();
 	// Previous-input placeholders are not forecasts for the active model.
 	const base =
 		projection.base instanceof Error || projection.isPlaceholderData
@@ -97,7 +97,7 @@ function OutlookContent({
 			<EmptyState
 				icon={Wallet}
 				title="Your workspace is ready"
-				description="Start with an account and its current balance. Add income, expenses, and plans at your own pace."
+				description="Start with an account and its current balance. Add income, expenses, and goals at your own pace."
 				action={readOnly ? undefined : "Add your first account"}
 				onAction={onAddAccount}
 			/>

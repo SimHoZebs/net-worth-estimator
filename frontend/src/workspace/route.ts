@@ -1,11 +1,11 @@
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { Account, Evaluation, Transaction } from "../domain/model.ts";
-import type { EditorTarget } from "../domain/planEdits.ts";
+import type { EditorTarget } from "../domain/accountEdits.ts";
 import {
 	SAFE_SPENDING_DETAIL_TABS,
 	type SafeSpendingDetailTab,
 } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { LEGACY_PAGES, pages, type Page } from "./navigation.ts";
+import { pages, type Page } from "./navigation.ts";
 
 // URL-driven overlays. The hash carries the page plus at most one overlay:
 // `#accounts` stays the accounts page, `#accounts/everyday-checking` opens
@@ -44,7 +44,7 @@ export interface WorkspaceRoute {
 
 // Only the id and name lookups below touch the plan, so tests and resolvers
 // depend on this narrow view rather than the full document shape.
-export type PlanLike = {
+export type AccountLike = {
 	accounts: Account[];
 	transactions: Transaction[];
 	evaluations: Evaluation[];
@@ -99,7 +99,10 @@ export function slugifyAccount(name: string): string {
 
 /** Exact id first, then a human-readable slug of the name. Archived accounts
  *  stay hidden: linking one resolves to unknown and the URL normalizes. */
-export function findAccount(plan: PlanLike, key: string): Account | undefined {
+export function findAccount(
+	plan: AccountLike,
+	key: string,
+): Account | undefined {
 	const exact = plan.accounts.find(
 		(account) => !account.archived && account.id === key,
 	);
@@ -255,9 +258,7 @@ export function parseHash(hash: string): WorkspaceRoute {
 	const [head, ...rest] = segments as [string, ...string[]];
 	const page: Page | null = pages.some((item) => item.id === head)
 		? (head as Page)
-		: Object.hasOwn(LEGACY_PAGES, head)
-			? (LEGACY_PAGES[head] ?? null)
-			: null;
+		: null;
 	if (!page) return { page: "outlook", overlay: { type: "invalid" } };
 	return { page, overlay: parseOverlaySegments(rest, page) };
 }
@@ -272,7 +273,7 @@ function ready(overlay: ResolvedOverlay): OverlayResolution {
 
 export function resolveOverlayRoute(
 	route: WorkspaceRoute,
-	plan: PlanLike | null,
+	plan: AccountLike | null,
 ): OverlayResolution {
 	const overlay = route.overlay;
 	if (!overlay) return { state: "none" };
@@ -389,7 +390,7 @@ function accountSlug(account: Account): string | null {
 export function evidenceHash(
 	page: Page,
 	target: EvidenceTarget,
-	plan: PlanLike | null,
+	plan: AccountLike | null,
 ): string {
 	switch (target.kind) {
 		case "position":

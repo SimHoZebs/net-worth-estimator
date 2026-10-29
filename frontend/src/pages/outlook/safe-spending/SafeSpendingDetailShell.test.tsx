@@ -6,7 +6,7 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { testPlan } from "../../../mocks/plan.ts";
+import { testAccount } from "../../../mocks/account.ts";
 import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
@@ -148,7 +148,7 @@ describe("SafeSpendingDetailShell", () => {
 					cashNow={cashNow}
 					paycheck={paycheck}
 					section={section}
-					plan={testPlan}
+					plan={testAccount}
 					transactionOrder="newest"
 					onTransactionOrderChange={noop}
 				/>
@@ -180,7 +180,7 @@ describe("SafeSpendingBillsPanel incoming foot", () => {
 				cashNow={cashNow}
 				paycheck={paycheck}
 				section={section}
-				plan={testPlan}
+				plan={testAccount}
 				transactionOrder="newest"
 				onTransactionOrderChange={noop}
 			/>,
@@ -368,7 +368,7 @@ describe("SafeSpendingConfigurePanel", () => {
 				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
-				accounts={testPlan.accounts}
+				accounts={testAccount.accounts}
 				onToggleBill={noop}
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}
@@ -393,7 +393,7 @@ describe("SafeSpendingConfigurePanel", () => {
 				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
-				accounts={testPlan.accounts}
+				accounts={testAccount.accounts}
 				onToggleBill={noop}
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}
@@ -434,7 +434,7 @@ describe("SafeSpendingConfigurePanel", () => {
 				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
-				accounts={testPlan.accounts}
+				accounts={testAccount.accounts}
 				onToggleBill={noop}
 				onToggleAccount={noop}
 				onToggleSpendingAccount={noop}

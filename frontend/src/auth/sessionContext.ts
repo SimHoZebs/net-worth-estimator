@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { SessionResource } from "./resourceScope.ts";
+import type { SessionUser } from "./resourceScope.ts";
 
 export interface Session {
 	enabled: true;
@@ -7,7 +7,7 @@ export interface Session {
 	authenticated: boolean;
 	allowed: boolean;
 	accountURL?: string;
-	resource: SessionResource;
+	resource: SessionUser;
 	user?: { subject: string; name: string };
 }
 

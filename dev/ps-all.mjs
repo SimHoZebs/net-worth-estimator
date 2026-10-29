@@ -14,7 +14,7 @@ export function parseStatusArgs(args) {
 
 export function validateStatus(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
-  if (values.slot || values.from || values.plan || values["source-plan"]) {
+  if (values.slot || values.from || values.user || values["source-user"]) {
     throw new Error("ps-all takes no scope options. Run it bare to list every dev stack.");
   }
 }

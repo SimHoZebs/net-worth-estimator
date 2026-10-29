@@ -6,17 +6,11 @@ import type { PlannedPurchase, Plan } from "./model.ts";
  * holds the rest of the queue. The backend derives the same priority from
  * row position.
  */
-export function purchaseQueue(
-	planned: PlannedPurchase[],
-): PlannedPurchase[] {
+export function purchaseQueue(planned: PlannedPurchase[]): PlannedPurchase[] {
 	return [...planned];
 }
 
-export function movePurchase(
-	plan: Plan,
-	id: string,
-	direction: -1 | 1,
-): Plan {
+export function movePurchase(plan: Plan, id: string, direction: -1 | 1): Plan {
 	const queue = [...plan.plannedPurchases];
 	const index = queue.findIndex((purchase) => purchase.id === id);
 	const nextIndex = index + direction;

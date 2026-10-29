@@ -1,54 +1,51 @@
 import {
 	canonicalApiBaseUrl,
-	getResourceScope,
-	requireSessionRecheck,
-	subscribeResourceScope,
-	type ResourceScope,
+	getUserScope,
+	requireUserRecheck,
+	subscribeUserScope,
+	type UserScope,
 } from "../auth/resourceScope.ts";
 import type { ApiHttpError, FetchLike } from "./http.ts";
 
-export class ResourceScopeError extends Error {
+export class UserScopeError extends Error {
 	readonly status = 409;
 	constructor(
-		message = "The active plan changed. Verify your session before continuing.",
+		message = "The active user changed. Verify your session before continuing.",
 	) {
 		super(message);
-		this.name = "ResourceScopeError";
+		this.name = "UserScopeError";
 	}
 }
 
 export interface ScopedResponse {
 	response: Response;
-	scope: ResourceScope;
+	scope: UserScope;
 }
 
-export function responseScopeError(
-	scope: ResourceScope,
-): ResourceScopeError | null {
-	return scope === getResourceScope() ? null : new ResourceScopeError();
+export function responseScopeError(scope: UserScope): UserScopeError | null {
+	return scope === getUserScope() ? null : new UserScopeError();
 }
 
 /** Only the server's resource-change error requests a new session check. */
 export function scopedResponseError(
-	scope: ResourceScope,
+	scope: UserScope,
 	error: ApiHttpError,
-): ApiHttpError | ResourceScopeError {
+): ApiHttpError | UserScopeError {
 	const stale = responseScopeError(scope);
 	if (stale) return stale;
 	if (error.status === 409 && error.problem?.code === "RESOURCE_CHANGED") {
-		requireSessionRecheck();
-		return new ResourceScopeError();
+		requireUserRecheck();
+		return new UserScopeError();
 	}
 	return error;
 }
 
 /** One lifetime covers fetch, JSON body reads, and streaming response consumption. */
-function requestLifetime(scope: ResourceScope, signal?: AbortSignal | null) {
+function requestLifetime(scope: UserScope, signal?: AbortSignal | null) {
 	const controller = new AbortController();
 	const forwardAbort = () => controller.abort(signal?.reason);
-	const stopScope = subscribeResourceScope(() => {
-		if (scope !== getResourceScope())
-			controller.abort(new ResourceScopeError());
+	const stopScope = subscribeUserScope(() => {
+		if (scope !== getUserScope()) controller.abort(new UserScopeError());
 	});
 	if (signal?.aborted) forwardAbort();
 	else signal?.addEventListener("abort", forwardAbort, { once: true });
@@ -125,28 +122,28 @@ export async function scopedRequest(
 	url: string,
 	init: RequestInit,
 	fetcher: FetchLike,
-	scope: ResourceScope,
-): Promise<ScopedResponse | ResourceScopeError> {
+	scope: UserScope,
+): Promise<ScopedResponse | UserScopeError> {
 	if (scope.status === "pending" || !scope.resource)
-		return new ResourceScopeError(
-			"Verify your session before requesting workspace data.",
+		return new UserScopeError(
+			"Verify your session before requesting account data.",
 		);
 	if (canonicalApiBaseUrl(baseUrl) !== scope.apiBaseUrl)
-		return new ResourceScopeError(
-			"The API address does not match the verified workspace.",
+		return new UserScopeError(
+			"The API address does not match the verified account.",
 		);
-	const current = getResourceScope();
+	const current = getUserScope();
 	if (scope !== current) {
-		// Retired same-plan work stays retired. The server cannot tell it
-		// apart (same plan ID, same cookie), so block it before network access.
-		// A signed-out browser has no verified workspace: fail fast.
+		// Retired same-user work stays retired. The server cannot tell it
+		// apart (same user ID, same cookie), so block it before network access.
+		// A signed-out browser has no verified user: fail fast.
 		if (
 			current.status === "pending" ||
 			!current.resource ||
 			current.resource.id === scope.resource.id
 		)
-			return new ResourceScopeError();
-		// Different plan: send the pinned original ID and let the backend
+			return new UserScopeError();
+		// Different user: send the pinned original ID and let the backend
 		// reject with 409 RESOURCE_CHANGED. Never retarget the header.
 	}
 	const lifetime = requestLifetime(scope, init.signal);
@@ -178,8 +175,8 @@ export async function scopedRequest(
 	) {
 		lifetime.dispose();
 		void response.body?.cancel().catch(() => {});
-		if (!stale) requireSessionRecheck();
-		return stale ?? new ResourceScopeError();
+		if (!stale) requireUserRecheck();
+		return stale ?? new UserScopeError();
 	}
 	return { response: guardedBody(response, lifetime), scope };
 }

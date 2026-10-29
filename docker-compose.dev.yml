@@ -51,9 +51,9 @@ services:
       NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${DEV_CASDOOR_PUBLIC_URL:?Run scripts/dev setup}/account
       NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME: 168h
       NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL: 30s
-      NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL: waypoint/plan-access
-      # Bridge credential selection only. Migration records plan ownership.
-      NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT: ${DEV_OWNER_SUBJECT:-}
+      NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL: waypoint/user-access
+      # Bridge credential selection only. Migration records user ownership.
+      NET_WORTH_ESTIMATOR_OWNER_SUBJECT: ${DEV_OWNER_SUBJECT:-}
       NET_WORTH_ESTIMATOR_READ_ONLY: ""
     depends_on:
       casdoor:

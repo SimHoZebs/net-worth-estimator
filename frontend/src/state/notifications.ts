@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { subscribeResourceScope } from "../auth/resourceScope.ts";
+import { subscribeUserScope } from "../auth/resourceScope.ts";
 
 export interface ToastAction {
 	label: string;
@@ -46,8 +46,8 @@ export const useNotifications = create<NotificationsState>()((set) => ({
 	clear: () => set({ items: [] }),
 }));
 
-/** Toasts describe a verified plan's operations; a new resource starts clean. */
-subscribeResourceScope(() => useNotifications.getState().clear());
+/** Toasts describe a verified user's operations; a new resource starts clean. */
+subscribeUserScope(() => useNotifications.getState().clear());
 
 /** Test hook: restores an empty stack and deterministic ids between cases. */
 export function resetNotifications(): void {

@@ -8,7 +8,7 @@ import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx
 import { dismissKey, notifyError } from "../state/notifications.ts";
 import { useFileReview } from "../state/useFileReview.ts";
 import { useServerModelImport } from "../state/useServerModelImport.ts";
-import { useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
+import { useUserReadOnly } from "../state/useUserScope.ts";
 import {
 	reloadWorkspace,
 	useServerModel,
@@ -25,7 +25,7 @@ export function ServerWorkspaceRecovery() {
 	// model import flow and access control.
 	const status = useServerStatus().data;
 	const serverDocument = useServerModel().data?.document;
-	const readOnly = useWorkspaceReadOnly();
+	const readOnly = useUserReadOnly();
 	const retry = reloadWorkspace;
 	const { importDocument } = useServerModelImport({
 		preconditions: {
@@ -69,7 +69,7 @@ export function ServerWorkspaceRecovery() {
 				title={
 					missingModel
 						? "No financial model is stored on this server"
-						: "Your server workspace needs attention"
+						: "Your workspace needs attention"
 				}
 				onRetry={() => {
 					void retry();

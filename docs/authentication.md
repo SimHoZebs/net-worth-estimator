@@ -13,7 +13,7 @@ Private-LAN HTTP keeps host-only non-Secure cookies. That traffic exposes
 passwords, codes, cookies, and financial data to the local network.
 
 The shared application database stores hashed application-session IDs, provider
-grants, and logout replay records alongside plan-scoped financial data.
+grants, and logout replay records alongside user-scoped financial data.
 Provider grants contain access, refresh, and ID tokens. SCS sessions hold only
 opaque grant references. Protect the whole application database as a credential store.
 
@@ -21,14 +21,14 @@ Deployment `setupdb` creates all application identity tables before the API star
 Identity initialization never creates tables or opens a new session database.
 Missing schema stops startup. See [database setup](shared-database.md#initial-deployment-and-schema-setup).
 
-Casdoor's built-in Casbin system grants actions on plan resources. Guests can
-read and project only a separate published sample. Each signed-in account can
-read and edit only its own private plan. Signup has no role-selection or manual
-grant step. Plans, artifacts, sync state, and browser drafts remain isolated.
-See [plan-scoped authorization](authorization.md) for the resource and migration
+Casdoor's built-in Casbin system grants actions on user resources. Guests can
+read and project only a separate published sample. Each signed-in user can
+read and edit only their own private data. Signup has no role-selection or manual
+grant step. User data, artifacts, sync state, and browser drafts remain isolated.
+See [user-scoped authorization](authorization.md) for the resource and migration
 contract. The global read-only switch still rejects editor writes.
 
-The sidebar offers sign-in and account creation for guests. Casdoor owns signup,
+The sidebar offers sign-in and user creation for guests. Casdoor owns signup,
 password checks, and passkeys. Built-in administrator signup stays disabled.
 The default signup form does not collect email or require a mail service.
 
@@ -43,9 +43,10 @@ The default signup form does not collect email or require a mail service.
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET`    | Private client credential                                                       |
 | `NET_WORTH_ESTIMATOR_PUBLIC_URL`            | Frontend origin, without a path                                                 |
 | `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL`      | Optional account/passkey page on the issuer origin                              |
-| `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/plan-access`                                |
-| `NET_WORTH_ESTIMATOR_DB`                    | Shared application database for financial plans and application identity state  |
-| `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT`    | Verified account whose plan may use server-level SimpleFIN credentials          |
+| `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/user-access`                                     |
+| `NET_WORTH_ESTIMATOR_DB`                    | Shared application database for private users and application identity state    |
+| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | Verified user whose scope may use server-level SimpleFIN credentials       |
+| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` (retired)  | Rejected with a deprecation error pointing at `OWNER_SUBJECT` |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h`                                   |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m`                       |
 | `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP`    | `1` opts into plain-HTTP origins on a trusted LAN; default requires HTTPS outside loopback |
@@ -69,7 +70,7 @@ identity settings stop startup rather than expose an unauthenticated API.
 Cross-origin session login is outside this integration.
 
 `GET /v1/auth/session` supplies identity and resource-capability discovery.
-The API checks Casdoor's resource permissions before any plan read or write.
+The API checks Casdoor's resource permissions before any user-data read or write.
 Guests read only sample status, which reports `readOnly: true`. Authentication
 discovery belongs to `/v1/auth/session`.
 The frontend has no shared-token prompt or token state. Its API client uses
@@ -79,14 +80,14 @@ The isolated `cmd/fixtureapi` browser-test harness intentionally omits identity.
 That executable is not a supported deployment or manual-development entry point.
 
 Legacy private databases are unsupported. New
-accounts receive their own empty private plan. Casdoor owns action/resource
+users receive their own empty private scope. Casdoor owns action/resource
 policies.
 
 ## Session lifecycle
 
 ### LAN and tailnet browser addresses
 
-The issuer identifies accounts. It does not need to be the browser's login
+The issuer identifies users. It does not need to be the browser's login
 address. `NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS` maps additional app origins
 to browser-facing Casdoor origins. For example:
 
@@ -125,7 +126,7 @@ presentation caches. They exceed normal cookie limits and inflate response
 headers. The native login UI still reads its logos from application metadata.
 Session and other provider cookies remain intact.
 
-Password login works through either address with the same account and plan.
+Password login works through either address with the same user and data.
 Existing passkeys remain bound to the canonical Casdoor hostname. The alias does
 not migrate passkeys or bypass WebAuthn hostname checks. Verify physical passkeys
 on the canonical hostname; use password fallback on the alias.
@@ -135,7 +136,7 @@ on the canonical hostname; use password fallback on the alias.
 Application sessions have an absolute deadline. Refresh never extends it. The
 next request refreshes tokens near their expiry. Concurrent requests share one
 refresh per grant. Rotated credentials persist before the next provider check.
-Expired application sessions lose private-plan access. A guest session uses
+Expired application sessions lose private access. A guest session uses
 only the sample resource. Casdoor can reuse its browser session for a new
 sign-in without another credential prompt.
 
@@ -155,7 +156,7 @@ conservatively deletes all grants for the subject.
 Introspection covers disabled/deleted users, revoked tokens, administrator session
 deletion, and password resets. The next request after the configured interval
 checks the provider. An inactive token deletes the app grant and removes private
-plan access. Old private-resource assertions return 409. Guest writes return 401.
+access. Old private-resource assertions return 409. Guest writes return 401.
 A provider outage returns 503 when verification is due, retaining the grant for
 retry. Cached verification remains valid until the interval ends. Requests and
 SSE streams already admitted can finish. Revocation does not cancel them.
@@ -182,7 +183,7 @@ out to the provider page from the Account page.
 ## Account recovery
 
 Keep the Casdoor administrator credential in a password manager with an offline
-recovery copy. Use a separate normal account for financial access. Enroll a
+recovery copy. Use a separate normal user for financial access. Enroll a
 second passkey on a separate device before you rely on passkey-only access.
 The default setup retains password fallback. Email self-service recovery stays
 disabled until an operator configures and verifies a Casdoor email provider.
@@ -200,10 +201,10 @@ If all user credentials are lost, use the separate Casdoor administrator account
 to reset the user's password and remove compromised passkeys. Delete the user's
 provider sessions too. Password reset expires OAuth tokens but does not replace
 the explicit session-deletion step. Never change the user's immutable subject
-to recover access. Do not grant the administrator access to the financial plan.
+to recover access. Do not grant the administrator access to user data.
 
 For immediate resource exclusion, add a Casdoor deny policy for the exact actor,
-plan resource, and actions in the same plan model/adapter. Permission checks have
+user resource, and actions in the same user model/adapter. Permission checks have
 no positive application cache. Also revoke provider credentials to prevent later
 reuse. Rotate the OIDC client
 secret if that secret leaks. Restore service only after both sides use it.
@@ -214,12 +215,12 @@ Back up the shared application database, Casdoor's whole state directory, and pr
 deployment configuration. Casdoor state includes signing keys and persistent
 file sessions. Use a stopped service or SQLite-safe backup method. Copying only
 an active database file can omit WAL data. The application backup contains
-provider credentials and private data for all accounts. Never publish it as a sample.
-Financial imports and dev refresh replace one plan only. They preserve application
-sessions, grants, logout records, and every other plan.
+provider credentials and private data for all users. Never publish it as a sample.
+Financial imports and dev refresh replace one user only. They preserve application
+sessions, grants, logout records, and every other user.
 
 Restore to the same issuer hostname and preserve generated subjects. Passkeys
-bind to that hostname. A new identity database or issuer needs an explicit plan
+bind to that hostname. A new identity database or issuer needs an explicit user
 ownership/resource migration and passkey enrollment. Automatic identity migration
 is outside scope.
 
@@ -233,7 +234,6 @@ application users through sign-in again. Keep financial data intact.
 ```bash
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/authorization
-backend/scripts/verify.sh ./internal/plans
 backend/scripts/verify.sh ./internal/api
 go -C backend test -race ./internal/identity
 node --test auth/casdoor/*.test.mjs

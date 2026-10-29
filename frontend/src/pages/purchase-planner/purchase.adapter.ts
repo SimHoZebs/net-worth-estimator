@@ -1,6 +1,6 @@
-import type { PlannedPurchase, Plan } from "../../../domain/model.ts";
-import { visiblePlannedPurchases } from "../../../domain/model.ts";
-import type { PurchaseSchedule } from "../../../domain/result.ts";
+import type { PlannedPurchase, Plan } from "../../domain/model.ts";
+import { visiblePlannedPurchases } from "../../domain/model.ts";
+import type { PurchaseSchedule } from "../../domain/result.ts";
 import type {
 	PurchaseEnhancements,
 	PurchaseOutcome,

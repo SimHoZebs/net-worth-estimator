@@ -22,6 +22,17 @@ export function upsertItem<T extends { id: string }>({
 		: [...items, item];
 }
 
+/** Alias for removePlanItem; row-record removal pending — still operates on the Plan draft layer. */
+export function removeAccountItem({
+	plan,
+	target,
+}: {
+	plan: Plan;
+	target: RemovalTarget;
+}): Plan | Error {
+	return removePlanItem({ plan, target });
+}
+
 export function removePlanItem({
 	plan,
 	target,

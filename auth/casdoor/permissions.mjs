@@ -1,11 +1,11 @@
 // Casdoor v4.23.0 imports models, roles, adapters, then permissions. See:
 // https://github.com/casdoor/casdoor/blob/v4.23.0/object/init_data.go
 // https://github.com/casdoor/casdoor/blob/v4.23.0/object/permission_enforcer.go
-export const permissionModelId = "waypoint/plan-access";
-export const permissionAdapter = "plan-policy-store";
-export const planActions = Object.freeze(["plan:read", "plan:project", "plan:write"]);
+export const permissionModelId = "waypoint/user-access";
+export const permissionAdapter = "user-policy-store";
+export const userActions = Object.freeze(["user:read", "user:project", "user:write"]);
 
-export const planModelText = `[request_definition]
+export const userModelText = `[request_definition]
 r = sub, obj, act, owner
 
 [policy_definition]
@@ -18,9 +18,12 @@ g = _, _
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 
 [matchers]
-m = ((p.sub == "waypoint/plan-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "plans/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
+m = ((p.sub == "waypoint/user-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "users/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
 `;
 
+// User scope: action strings are user:* under waypoint/user-access.
+// Permission resources are users/* only, including the guest sample
+// users/sample (global read-only).
 export function buildPermissionSeed() {
   const role = (name, displayName, description) => ({
     owner: "waypoint",
@@ -57,45 +60,45 @@ export function buildPermissionSeed() {
     models: [
       {
         owner: "waypoint",
-        name: "plan-access",
-        displayName: "Waypoint plan access",
-        modelText: planModelText,
+        name: "user-access",
+        displayName: "Waypoint user access",
+        modelText: userModelText,
       },
     ],
     roles: [
       role(
-        "plan-owner",
-        "Private plan owner",
-        "Contextual role: the verified actor owns this private plan. No signup-time role writes.",
+        "user-owner",
+        "Private user owner",
+        "Contextual role: the verified actor owns this private user. No signup-time role writes.",
       ),
       role(
         "guest",
-        "Sample plan guest",
-        "Contextual role: an anonymous actor can read and project only the separate sample plan.",
+        "Sample user guest",
+        "Contextual role: an anonymous actor can read and project only the separate sample user.",
       ),
     ],
     adapters: [
       {
         owner: "waypoint",
         name: permissionAdapter,
-        table: "waypoint_plan_permission_rule",
+        table: "waypoint_account_permission_rule",
         useSameDb: true,
       },
     ],
     permissions: [
       permission(
-        "own-private-plan",
-        "Own private plan: read, project, write",
-        "plan-owner",
-        ["plans/*"],
-        [...planActions],
+        "own-private-user",
+        "Own private user: read, project, write",
+        "user-owner",
+        ["users/*"],
+        [...userActions],
       ),
       permission(
-        "guest-sample-plan",
-        "Sample plan: guest read and project",
+        "guest-sample-user",
+        "Sample user: guest read and project",
         "guest",
-        ["plans/sample"],
-        ["plan:read", "plan:project"],
+        ["users/sample"],
+        ["user:read", "user:project"],
       ),
     ],
   };

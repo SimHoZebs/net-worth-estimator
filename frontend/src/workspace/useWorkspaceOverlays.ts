@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
-import type { EditorTarget } from "../components/PlanEditor.tsx";
+import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { usePlan } from "../state/useWorkspacePlan.ts";
+import { useUserPlan } from "../state/useUserScope.ts";
 import {
 	discardHash,
 	editorHash,
@@ -10,7 +10,7 @@ import {
 	pageHash,
 	resolveOverlayRoute,
 	safeSpendingDetailHash,
-	type PlanLike,
+	type AccountLike,
 	type WorkspaceRoute,
 } from "./route.ts";
 
@@ -31,7 +31,7 @@ export function useWorkspaceOverlays({
 	pushHash: (hash: string) => void;
 	replaceHash: (hash: string) => void;
 }) {
-	const plan: PlanLike | null = usePlan();
+	const plan: AccountLike | null = useUserPlan();
 	const resolution = resolveOverlayRoute(route, plan);
 	const [returnTo, setReturnTo] = useState<EvidenceTarget | null>(null);
 	const [discarding, setDiscarding] = useState(false);

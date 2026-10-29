@@ -7,17 +7,17 @@ import type { Plan } from "../domain/model.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
 import {
 	getServerModel,
-	workspaceResourceKey,
+	userResourceKey,
 	type ServerModel,
 } from "../state/workspaceResources.ts";
 import { serverDocumentFingerprint } from "../state/remoteStorage.ts";
-import { testPlan } from "./plan.ts";
+import { testAccount } from "./account.ts";
 
 export function setServerStatusFixture(status: ServerStatus) {
-	serverQueryClient().setQueryData(workspaceResourceKey("status"), status);
+	serverQueryClient().setQueryData(userResourceKey("status"), status);
 }
 export function setServerModelFixture(
-	plan: Plan = testPlan,
+	plan: Plan = testAccount,
 	overrides: Partial<ServerModel> = {},
 ) {
 	const document = displayPlanToBackendDocument(plan).document;
@@ -33,15 +33,15 @@ export function setServerModelFixture(
 		conversion: { ...conversion, plan },
 		...overrides,
 	};
-	serverQueryClient().setQueryData(workspaceResourceKey("model"), model);
+	serverQueryClient().setQueryData(userResourceKey("model"), model);
 	return model;
 }
 export function setServerRevisionFixture(revision: string) {
 	const model = getServerModel();
 	if (model)
-		serverQueryClient().setQueryData(workspaceResourceKey("model"), {
+		serverQueryClient().setQueryData(userResourceKey("model"), {
 			...model,
 			revision,
 		});
-	else setServerModelFixture(testPlan, { revision });
+	else setServerModelFixture(testAccount, { revision });
 }

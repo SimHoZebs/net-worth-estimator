@@ -1,8 +1,10 @@
 import type { Plan } from "../domain/model.ts";
 
+/** Account fixture for unit tests (account-scoped naming for Plan). */
+
 // A small household used only by unit tests. Production code has no
-// sample plan: every projection comes from the Go engine.
-export const testPlan: Plan = {
+// sample account: every projection comes from the Go engine.
+export const testAccount: Plan = {
 	schemaVersion: 1,
 	name: "Our household",
 	origin: "example",

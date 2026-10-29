@@ -1,5 +1,11 @@
-// Package authorization obtains plan permissions from Casdoor's built-in Casbin API.
+// Package authorization obtains user permissions from Casdoor's built-in Casbin API.
 // It never evaluates or caches authorization policies in the application process.
+//
+// User scope: a verified identity owns one user resource. The resource ID
+// derives from the exact OIDC issuer and immutable subject, not the display
+// name, username, or browser input. Action strings are user:* under the
+// Casdoor model waypoint/user-access; permission resource values are
+// users/*, including the global read-only users/sample row.
 package authorization
 
 import (
@@ -9,9 +15,9 @@ import (
 )
 
 const (
-	Read    = "plan:read"
-	Project = "plan:project"
-	Write   = "plan:write"
+	Read    = "user:read"
+	Project = "user:project"
+	Write   = "user:write"
 )
 
 type Resource struct {
@@ -45,23 +51,28 @@ func ActorKey(issuer, subject string) string {
 }
 
 // ResourceFor derives routing metadata exclusively from a verified identity.
-// Callers must never decode Resource.Owner from browser input.
+// Private users use users/<opaque-id>; the guest uses the global
+// read-only sample. Callers must never decode Resource.Owner from browser
+// input.
 func ResourceFor(issuer, subject string) Resource {
 	if subject == "" {
-		return Resource{ID: "plans/sample", Kind: "sample"}
+		return Resource{ID: "users/sample", Kind: "sample"}
 	}
 	actor := ActorKey(issuer, subject)
-	return Resource{ID: "plans/" + strings.TrimPrefix(actor, "user:"), Kind: "private", Owner: actor}
+	return Resource{ID: "users/" + strings.TrimPrefix(actor, "user:"), Kind: "private", Owner: actor}
 }
 
 func (r Resource) valid() bool {
 	if r.Kind == "sample" {
-		return r.ID == "plans/sample" && r.Owner == ""
+		return r.ID == "users/sample" && r.Owner == ""
 	}
 	if r.Kind != "private" || len(r.Owner) != len("user:")+64 || !strings.HasPrefix(r.Owner, "user:") {
 		return false
 	}
 	hash := strings.TrimPrefix(r.Owner, "user:")
 	decoded, err := hex.DecodeString(hash)
-	return err == nil && hex.EncodeToString(decoded) == hash && r.ID == "plans/"+hash
+	if err != nil || hex.EncodeToString(decoded) != hash {
+		return false
+	}
+	return r.ID == "users/"+hash
 }

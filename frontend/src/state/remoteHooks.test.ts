@@ -9,10 +9,10 @@ import {
 import { createElement, Fragment, type ReactNode, StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	acceptResourceScope,
+	acceptUserScope,
 	canonicalApiBaseUrl,
-	getResourceScope,
-	suspendResourceScope,
+	getUserScope,
+	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
 	ApiHttpError,
@@ -56,7 +56,7 @@ import {
 	presetsOptions,
 	statusOptions,
 	reloadWorkspace,
-	workspaceResourceKey,
+	userResourceKey,
 } from "./workspaceResources.ts";
 import {
 	saveWorkspace,
@@ -124,7 +124,7 @@ function useRemoteWorkspace() {
 			importServerDocument(document),
 		refreshPresets: async () => {
 			await serverQueryClient().invalidateQueries({
-				queryKey: workspaceResourceKey("presets"),
+				queryKey: userResourceKey("presets"),
 				refetchType: "none",
 			});
 			await serverQueryClient()
@@ -183,7 +183,7 @@ function renderHookWith<T>(
 			await waitFor(() =>
 				expect(
 					serverQueryClient().isFetching({
-						queryKey: workspaceResourceKey("model"),
+						queryKey: userResourceKey("model"),
 					}),
 				).toBe(0),
 			);
@@ -250,7 +250,7 @@ function scenarioStreamClient(cancelBody = true) {
 				const headers = new Headers({
 					"content-type": "text/event-stream",
 				});
-				const resource = getResourceScope().resource?.id;
+				const resource = getUserScope().resource?.id;
 				if (resource) headers.set("Waypoint-Resource", resource);
 				return new Response(body, { headers });
 			},
@@ -260,7 +260,7 @@ function scenarioStreamClient(cancelBody = true) {
 		const path = String(url);
 		const signal = init?.signal;
 		const headers = new Headers();
-		const resource = getResourceScope().resource?.id;
+		const resource = getUserScope().resource?.id;
 		if (resource) headers.set("Waypoint-Resource", resource);
 		if (path.endsWith("/v1/projections/deterministic")) {
 			const body = init?.body ? JSON.parse(String(init.body)) : {};
@@ -461,17 +461,17 @@ function stochasticFixture(): StochasticProjectionResult {
 }
 
 beforeEach(() => {
-	acceptResourceScope(
+	acceptUserScope(
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: "plans/sample",
+				id: "users/sample",
 				kind: "sample",
-				permissions: ["plan:read", "plan:project"],
+				permissions: ["user:read", "user:project"],
 			},
 			subject: null,
 		},
-		suspendResourceScope(),
+		suspendUserScope(),
 	);
 });
 
@@ -618,7 +618,7 @@ describe("remote workspace state", () => {
 		await waitFor(() =>
 			expect(
 				serverQueryClient().isFetching({
-					queryKey: workspaceResourceKey("model"),
+					queryKey: userResourceKey("model"),
 				}),
 			).toBe(0),
 		);
@@ -677,7 +677,7 @@ describe("remote workspace state", () => {
 				),
 			).not.toHaveLength(0),
 		);
-		suspendResourceScope();
+		suspendUserScope();
 		rendered.unmount();
 		release(undefined);
 		expect(await saving).toBe(false);
@@ -706,8 +706,7 @@ describe("remote workspace state", () => {
 		)?.signal as AbortSignal | undefined;
 		rendered.rerender();
 		expect(
-			serverQueryClient().getQueryState(workspaceResourceKey("model"))
-				?.fetchStatus,
+			serverQueryClient().getQueryState(userResourceKey("model"))?.fetchStatus,
 		).toBe("fetching");
 		expect(signal?.aborted).toBe(false);
 		await act(async () => {
@@ -1705,7 +1704,7 @@ describe("remote workspace state", () => {
 					.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
 			).toBe(true);
 			await rendered.settle();
-			serverQueryClient().setQueryData(workspaceResourceKey("status"), {
+			serverQueryClient().setQueryData(userResourceKey("status"), {
 				readOnly: readOnly || writeBlocked,
 			});
 
@@ -2654,7 +2653,7 @@ describe("remote projection mapping and SSE", () => {
 			vi.fn(async (url: unknown, init?: RequestInit) => {
 				seen.push({ url: String(url), init });
 				const headers = new Headers();
-				const resource = getResourceScope().resource?.id;
+				const resource = getUserScope().resource?.id;
 				if (resource) headers.set("Waypoint-Resource", resource);
 				if (String(url).endsWith("/v1/projections/deterministic")) {
 					headers.set("content-type", "application/json");
@@ -2720,7 +2719,7 @@ describe("remote projection mapping and SSE", () => {
 			vi.fn(async (url: unknown, init?: RequestInit) => {
 				seen.push({ url: String(url), init });
 				const headers = new Headers();
-				const resource = getResourceScope().resource?.id;
+				const resource = getUserScope().resource?.id;
 				if (resource) headers.set("Waypoint-Resource", resource);
 				if (String(url).endsWith("/v1/projections/deterministic")) {
 					headers.set("content-type", "application/json");
@@ -2772,7 +2771,7 @@ describe("remote projection mapping and SSE", () => {
 			vi.fn(async (url: unknown, init?: RequestInit) => {
 				seen.push({ url: String(url), init });
 				const headers = new Headers({ "content-type": "application/json" });
-				const resource = getResourceScope().resource?.id;
+				const resource = getUserScope().resource?.id;
 				if (resource) headers.set("Waypoint-Resource", resource);
 				return new Response(
 					JSON.stringify({ result: projectionFixture(), issues: [] }),
@@ -2813,7 +2812,7 @@ describe("remote projection mapping and SSE", () => {
 			vi.fn(async (url: unknown, init?: RequestInit) => {
 				seen.push({ url: String(url), init });
 				const headers = new Headers({ "content-type": "application/json" });
-				const resource = getResourceScope().resource?.id;
+				const resource = getUserScope().resource?.id;
 				if (resource) headers.set("Waypoint-Resource", resource);
 				return new Response(
 					JSON.stringify({ result: projectionFixture(), issues: [] }),
@@ -3058,7 +3057,7 @@ describe("remote projection mapping and SSE", () => {
 		});
 		await waitFor(() => expect(second.result().progress).toBe(0.5));
 		await act(async () => {
-			suspendResourceScope();
+			suspendUserScope();
 			await clearResourceQueryCache();
 			expect(stream().signal.aborted).toBe(true);
 			first.unmount();
@@ -3071,17 +3070,17 @@ describe("remote projection mapping and SSE", () => {
 		});
 		expect(serverQueryClient().getQueryCache().getAll()).toHaveLength(0);
 		expect(useNotifications.getState().items).toHaveLength(0);
-		acceptResourceScope(
+		acceptUserScope(
 			{
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				resource: {
-					id: "plans/other",
+					id: "users/other",
 					kind: "private",
-					permissions: ["plan:read", "plan:project"],
+					permissions: ["user:read", "user:project"],
 				},
 				subject: "other",
 			},
-			suspendResourceScope(),
+			suspendUserScope(),
 		);
 		const nextOwner = renderHook(consume);
 		await nextOwner.settle();
@@ -3096,7 +3095,7 @@ describe("remote projection mapping and SSE", () => {
 			"fetch",
 			vi.fn(async (url: unknown) => {
 				const headers = new Headers();
-				const resource = getResourceScope().resource?.id;
+				const resource = getUserScope().resource?.id;
 				if (resource) headers.set("Waypoint-Resource", resource);
 				if (String(url).endsWith("/v1/projections/deterministic")) {
 					headers.set("content-type", "application/json");
@@ -3195,17 +3194,17 @@ describe("in-memory draft scope", () => {
 	it("clears the in-memory draft when the active resource changes", async () => {
 		vi.stubGlobal("localStorage", memoryStorage());
 		const mount = async (id: string) => {
-			acceptResourceScope(
+			acceptUserScope(
 				{
 					apiBaseUrl: canonicalApiBaseUrl(""),
 					resource: {
 						id,
-						kind: id === "plans/sample" ? "sample" : "private",
-						permissions: ["plan:read", "plan:project", "plan:write"],
+						kind: id === "users/sample" ? "sample" : "private",
+						permissions: ["user:read", "user:project", "user:write"],
 					},
-					subject: id === "plans/sample" ? null : id,
+					subject: id === "users/sample" ? null : id,
 				},
-				suspendResourceScope(),
+				suspendUserScope(),
 			);
 			resetWorkspaceStore();
 			resetServerQueryCache();
@@ -3214,14 +3213,14 @@ describe("in-memory draft scope", () => {
 			await rendered.settle();
 			return rendered;
 		};
-		const first = await mount("plans/a");
+		const first = await mount("users/a");
 		expect(
 			first
 				.result()
 				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
 		).toBe(true);
 		first.unmount();
-		const second = await mount("plans/b");
+		const second = await mount("users/b");
 		expect(second.result().workspace?.draft).toBeNull();
 		expect(
 			second
@@ -3229,7 +3228,7 @@ describe("in-memory draft scope", () => {
 				.updatePlan(withTransactionAmount(second.result().plan!, 175)),
 		).toBe(true);
 		second.unmount();
-		const sample = await mount("plans/sample");
+		const sample = await mount("users/sample");
 		expect(sample.result().workspace?.draft).toBeNull();
 		expect(sample.result().plan?.transactions[0]?.amount).toBe(100);
 		sample.unmount();

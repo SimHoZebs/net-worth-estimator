@@ -1,23 +1,23 @@
-export interface SessionResource {
+export interface SessionUser {
 	id: string;
 	kind: "sample" | "private";
 	permissions: string[];
 }
 
-export interface ResourceScopeInput {
+export interface UserScopeInput {
 	apiBaseUrl: string;
-	resource: SessionResource;
+	resource: SessionUser;
 	subject: string | null;
 }
 
-export interface ResourceScope extends Omit<ResourceScopeInput, "resource"> {
-	resource: SessionResource | null;
+export interface UserScope extends Omit<UserScopeInput, "resource"> {
+	resource: SessionUser | null;
 	status: "pending" | "ready";
 	key: string;
 }
 
 const listeners = new Set<() => void>();
-let current: ResourceScope = {
+let current: UserScope = {
 	status: "pending",
 	key: "pending",
 	apiBaseUrl: "",
@@ -29,17 +29,17 @@ export function canonicalApiBaseUrl(baseUrl: string): string {
 	return new URL(baseUrl || "/", location.href).href.replace(/\/+$/, "");
 }
 
-/** Browser data always belongs to a verified plan. */
-export function resourceStorageKey(
+/** Browser data always belongs to a verified user. */
+export function userStorageKey(
 	baseKey: string,
-	scope: ResourceScope = getResourceScope(),
+	scope: UserScope = getUserScope(),
 ): string | null {
 	if (scope.status === "pending" || !scope.resource) return null;
 	const owner = `${scope.resource.kind}:${encodeURIComponent(scope.resource.id)}`;
-	return `${baseKey}:resource:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
+	return `${baseKey}:user:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
 }
 
-export function resourceScopeKey(input: ResourceScopeInput): string {
+export function userScopeKey(input: UserScopeInput): string {
 	return JSON.stringify([
 		input.apiBaseUrl,
 		input.resource.id,
@@ -49,23 +49,23 @@ export function resourceScopeKey(input: ResourceScopeInput): string {
 	]);
 }
 
-export function getResourceScope(): ResourceScope {
+export function getUserScope(): UserScope {
 	return current;
 }
 
-export function subscribeResourceScope(listener: () => void): () => void {
+export function subscribeUserScope(listener: () => void): () => void {
 	listeners.add(listener);
 	return () => listeners.delete(listener);
 }
 
-function publish(scope: ResourceScope): ResourceScope {
+function publish(scope: UserScope): UserScope {
 	current = scope;
 	for (const listener of listeners) listener();
 	return scope;
 }
 
-/** Invalidate captured requests immediately, before React removes the workspace. */
-export function suspendResourceScope(): ResourceScope {
+/** Invalidate captured requests immediately, before React removes the user view. */
+export function suspendUserScope(): UserScope {
 	return publish({
 		status: "pending",
 		key: "pending",
@@ -76,21 +76,21 @@ export function suspendResourceScope(): ResourceScope {
 }
 
 /** Only the session boundary may accept a server-verified scope. */
-export function acceptResourceScope(
-	input: ResourceScopeInput,
-	expected: ResourceScope,
-): ResourceScope | null {
+export function acceptUserScope(
+	input: UserScopeInput,
+	expected: UserScope,
+): UserScope | null {
 	if (current !== expected) return null;
 	return publish({
 		...input,
 		status: "ready",
-		key: resourceScopeKey(input),
+		key: userScopeKey(input),
 	});
 }
 
 /** API clients call this for a current response with a missing/mismatched scope. */
-export function requireSessionRecheck(): void {
-	suspendResourceScope();
+export function requireUserRecheck(): void {
+	suspendUserScope();
 	if (typeof window !== "undefined")
 		window.dispatchEvent(new Event("waypoint:authentication-required"));
 }

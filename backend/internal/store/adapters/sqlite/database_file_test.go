@@ -26,7 +26,7 @@ func TestSetupDatabaseFilesArePrivate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	if _, err := d.EnsureSamplePlan(); err != nil {
+	if _, err := d.EnsureSampleUser(); err != nil {
 		t.Fatal(err)
 	}
 	for _, suffix := range []string{"", "-wal", "-shm"} {
