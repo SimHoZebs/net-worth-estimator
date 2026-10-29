@@ -9,7 +9,7 @@ import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { usePlan, useWorkspaceReadOnly } from "../state/useWorkspacePlan.ts";
 import {
-	useServerModel,
+	useCheckpoints,
 	useServerStatus,
 } from "../state/workspaceResources.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
@@ -61,8 +61,7 @@ function OutlookContent({
 }: OutlookProps) {
 	// Every data input subscribes where the query is declared; only UI
 	// callbacks arrive as props.
-	const checkpoints =
-		useServerModel().data?.document?.checkpoints ?? EMPTY_CHECKPOINTS;
+	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const plan = usePlan();
 	const {
 		ids: pinnedIds,

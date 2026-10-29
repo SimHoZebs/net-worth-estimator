@@ -8,7 +8,7 @@ import {
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
-import type { Movement } from "../../domain/model.ts";
+import type { Transaction } from "../../domain/model.ts";
 import { useReceiptLinks } from "../../state/receipts.ts";
 import { Badge } from "../Badge.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
@@ -19,13 +19,13 @@ import {
 
 export function TransactionRow({
 	transaction,
-	movement,
+	planTransaction,
 	onEdit,
 	shortfallLabel,
 }: {
 	transaction: AccountTransaction;
-	movement: Movement | null;
-	onEdit: (movement: Movement) => void;
+	planTransaction: Transaction | null;
+	onEdit: (planTransaction: Transaction) => void;
 	shortfallLabel?: string;
 }) {
 	const DirectionIcon =
@@ -49,9 +49,9 @@ export function TransactionRow({
 		transaction.counterparty === externalCounterpartyName("out")
 			? null
 			: transaction.counterparty;
-	const receipts = useReceiptLinks(movement?.id ?? "");
+	const receipts = useReceiptLinks(planTransaction?.id ?? "");
 	const receiptBadge =
-		movement && receipts.length > 0 ? (
+		planTransaction && receipts.length > 0 ? (
 			<Badge tone="neutral" className={transactionBadgeStyles()}>
 				<ReceiptText size={10} aria-hidden="true" />
 				{receipts.length}
@@ -133,9 +133,9 @@ export function TransactionRow({
 			}
 			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from plan" : ""}`}
 			onSelect={() => {
-				if (movement) onEdit(movement);
+				if (planTransaction) onEdit(planTransaction);
 			}}
-			selectDisabled={!movement}
+			selectDisabled={!planTransaction}
 		/>
 	);
 }

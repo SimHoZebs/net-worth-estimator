@@ -58,9 +58,7 @@ describe("AccountDetails", () => {
 		view.rerender(
 			<AccountDetails {...props} account={{ ...home, name: "Another name" }} />,
 		);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Save changes" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onApply).not.toHaveBeenCalled();
 		fireEvent.click(
 			screen.getByRole("button", {
@@ -133,9 +131,7 @@ describe("AccountDetails", () => {
 		expect(ceiling.disabled).toBe(false);
 		expect(ceiling.value).toBe("0");
 		fireEvent.change(ceiling, { target: { value: "100000" } });
-		fireEvent.click(
-			screen.getByRole("button", { name: "Save changes" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(
 			applied.plan?.accounts.find((account) => account.id === "home")
 				?.maxBalance,
@@ -155,9 +151,7 @@ describe("AccountDetails", () => {
 		// assert the attribute on the group itself: real browsers lock all
 		// descendants behind it.
 		expect(container.querySelector("fieldset[disabled]")).toBeTruthy();
-		expect(
-			screen.queryByRole("button", { name: "Save changes" }),
-		).toBeNull();
+		expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 		expect(screen.getByText(/refreshed copy/)).toBeTruthy();
 	});
 });

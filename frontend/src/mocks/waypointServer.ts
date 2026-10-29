@@ -146,6 +146,25 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	const fail = (error: Error): never => {
 		throw error;
 	};
+	const upsertStubCheckpoint = (
+		model: FinancialModelDocument & { [key: string]: unknown },
+		balance: number | undefined,
+		observedOn: string | undefined,
+		accountId: string | undefined,
+	) => {
+		if (typeof balance !== "number" || !observedOn || !accountId) return;
+		const rows = model.checkpoints as unknown as Record<string, unknown>[];
+		const at = rows.findIndex(
+			(row) => row.AccountId === accountId && row.Date === observedOn,
+		);
+		const checkpoint = {
+			Date: observedOn,
+			AccountId: accountId,
+			Balance: balance,
+		};
+		if (at >= 0) rows[at] = checkpoint;
+		else rows.push(checkpoint);
+	};
 	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 		const method = init?.method ?? "GET";
 		const path = String(url);
@@ -185,6 +204,130 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			}
 			return ok({ presets: [] });
 		}
+		const [route, queryString] = String(path).split("?");
+		const query = new URLSearchParams(queryString ?? "");
+		const narrowRevision = revisionValue;
+		if (route === "/v1/accounts/balances" && method === "GET") {
+			const checkpoints = current.checkpoints as unknown as Record<
+				string,
+				unknown
+			>[];
+			let asOf = query.get("asOf") ?? "";
+			if (!asOf) {
+				for (const row of checkpoints) {
+					if ((row.Date as string) > asOf) asOf = row.Date as string;
+				}
+				if (!asOf) asOf = new Date().toISOString().slice(0, 10);
+			}
+			const accounts = (
+				current.accounts as unknown as Record<string, unknown>[]
+			).map((account) => {
+				let latest: Record<string, unknown> | null = null;
+				for (const row of checkpoints) {
+					if (row.AccountId !== account.id || (row.Date as string) > asOf)
+						continue;
+					if (!latest || (row.Date as string) > (latest.Date as string))
+						latest = row;
+				}
+				const balance = latest ? (latest.Balance as number) : 0;
+				const syncOwned = checkpoints.some(
+					(row) =>
+						row.AccountId === account.id &&
+						typeof row.source === "string" &&
+						row.source !== "" &&
+						row.source !== "user" &&
+						row.source !== "model",
+				);
+				return {
+					...account,
+					balance,
+					observedOn: latest ? latest.Date : asOf,
+					hasCheckpoint: latest !== null,
+					archived:
+						account.kind === "debt" &&
+						latest !== null &&
+						Math.abs(balance) < 0.005,
+					syncOwned,
+					readOnly: syncOwned,
+				};
+			});
+			return ok({ accounts, asOf, revision: narrowRevision });
+		}
+		if (route === "/v1/transactions" && method === "GET") {
+			const accountId = query.get("accountId") ?? "";
+			const recurring = query.get("recurring") ?? "all";
+			const touches = (source: unknown, destinations: unknown) => {
+				if (!accountId) return true;
+				if (source === accountId) return true;
+				return Array.isArray(destinations) && destinations.includes(accountId);
+			};
+			const transactions: unknown[] = [];
+			if (recurring !== "once") {
+				for (const rule of current.recurrenceRules as unknown as Record<
+					string,
+					unknown
+				>[]) {
+					if (!touches(rule.sourceAccountId, rule.destinations)) continue;
+					transactions.push({ ...rule, kind: "rule" });
+				}
+			}
+			if (recurring !== "recurring") {
+				for (const posting of current.postings as unknown as Record<
+					string,
+					unknown
+				>[]) {
+					if (!touches(posting.sourceAccountId, posting.destinations)) continue;
+					const syncOwned =
+						typeof posting.source === "string" &&
+						posting.source !== "" &&
+						posting.source !== "user" &&
+						posting.source !== "model";
+					transactions.push({
+						...posting,
+						kind: "posting",
+						frequency: "once",
+						syncOwned,
+						readOnly: syncOwned,
+					});
+				}
+			}
+			return ok({ transactions, revision: narrowRevision });
+		}
+		if (route === "/v1/transactions/catalog" && method === "GET") {
+			const items = [
+				...(
+					current.recurrenceRules as unknown as Record<string, unknown>[]
+				).map((rule) => ({ id: rule.id, kind: "rule", name: rule.name })),
+				...(current.postings as unknown as Record<string, unknown>[]).map(
+					(posting) => ({
+						id: posting.id,
+						kind: "posting",
+						name: posting.name,
+					}),
+				),
+			];
+			return ok({ items, revision: narrowRevision });
+		}
+		if (route === "/v1/evaluations/summary" && method === "GET") {
+			return ok({
+				evaluations: structuredClone(current.evaluations),
+				revision: narrowRevision,
+			});
+		}
+		if (route === "/v1/checkpoints" && method === "GET") {
+			const accountId = query.get("accountId") ?? "";
+			const since = query.get("since") ?? "";
+			const until = query.get("until") ?? "";
+			const checkpoints = (
+				current.checkpoints as unknown as Record<string, unknown>[]
+			).filter(
+				(row) =>
+					(!accountId || row.AccountId === accountId) &&
+					(!since || (row.Date as string) >= since) &&
+					(!until || (row.Date as string) <= until),
+			);
+			return ok({ checkpoints, revision: narrowRevision });
+		}
 		if (path === "/v1/amount-presets" && method === "POST")
 			return ok({
 				row: {
@@ -223,18 +366,39 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			}
 			return ok({ ...outcome });
 		};
-		if (path === "/v1/accounts" && method === "POST")
+		if (path === "/v1/accounts" && method === "POST") {
+			const row = {
+				...structuredClone(body),
+				id:
+					(body as { id?: string }).id ||
+					`generated-${Math.random().toString(36).slice(2, 10)}`,
+			};
 			return write(() => {
-				(current.accounts as unknown[]).push(structuredClone(body));
-			}, body);
+				(current.accounts as unknown[]).push(structuredClone(row));
+				upsertStubCheckpoint(
+					current,
+					(body as { balance?: number; observedOn?: string }).balance,
+					(body as { balance?: number; observedOn?: string }).observedOn,
+					(row as { id: string }).id,
+				);
+			}, row);
+		}
 		let match = path.match(/^\/v1\/accounts\/([^/]+)$/);
 		if (match) {
 			const [, id] = match;
 			if (method === "PATCH")
 				return write(() => {
 					current.accounts = (current.accounts as unknown[]).map((item) =>
-						(item as { id: string }).id === id ? structuredClone(body) : item,
+						(item as { id: string }).id === id
+							? { ...structuredClone(body), id }
+							: item,
 					) as typeof current.accounts;
+					upsertStubCheckpoint(
+						current,
+						(body as { balance?: number; observedOn?: string }).balance,
+						(body as { balance?: number; observedOn?: string }).observedOn,
+						id,
+					);
 				}, body);
 			current.accounts = (current.accounts as unknown[]).filter(
 				(item) => (item as { id: string }).id !== id,
@@ -257,14 +421,51 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			const [, id] = match;
 			if (method === "PATCH")
 				return write(() => {
-					current.postings = (current.postings as unknown[]).map((item) =>
-						(item as { id: string }).id === id ? structuredClone(body) : item,
+					const postings = current.postings as unknown[];
+					const stored = postings.find(
+						(item) => (item as { id: string }).id === id,
+					) as Record<string, unknown> | undefined;
+					const next = structuredClone(body) as Record<string, unknown>;
+					// An omitted purchase policy keeps the stored wishlist link.
+					if (next.purchase === undefined) next.purchase = stored?.purchase;
+					current.postings = postings.map((item) =>
+						(item as { id: string }).id === id ? { ...next, id } : item,
 					) as typeof current.postings;
 				}, body);
 			current.postings = (current.postings as unknown[]).filter(
 				(item) => (item as { id: string }).id !== id,
 			) as typeof current.postings;
 			return write(() => {}, undefined);
+		}
+		const convertMatch = path.match(/^\/v1\/transactions\/([^/]+)\/convert$/);
+		if (convertMatch && method === "POST") {
+			const [, id] = convertMatch;
+			const kind = (body as { kind?: string }).kind;
+			const payload = body as {
+				posting?: Record<string, unknown>;
+				rule?: Record<string, unknown>;
+			};
+			return write(() => {
+				if (kind === "posting") {
+					current.recurrenceRules = (
+						current.recurrenceRules as unknown[]
+					).filter(
+						(item) => (item as { id: string }).id !== id,
+					) as typeof current.recurrenceRules;
+					(current.postings as unknown[]).push({
+						...structuredClone(payload.posting),
+						id,
+					});
+				} else if (kind === "rule") {
+					current.postings = (current.postings as unknown[]).filter(
+						(item) => (item as { id: string }).id !== id,
+					) as typeof current.postings;
+					(current.recurrenceRules as unknown[]).push({
+						...structuredClone(payload.rule),
+						id,
+					});
+				}
+			}, undefined);
 		}
 		if (path === "/v1/postings/reorder" && method === "POST")
 			return write(() => {
@@ -275,16 +476,36 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			}, undefined);
 		if (path === "/v1/recurrence-rules" && method === "POST")
 			return write(() => {
-				(current.recurrenceRules as unknown[]).push(structuredClone(body));
+				const rules = current.recurrenceRules as unknown as Record<
+					string,
+					unknown
+				>[];
+				const next = structuredClone(body) as Record<string, unknown>;
+				if (typeof next.priority !== "number") {
+					let max = -1;
+					for (const rule of rules) {
+						if (typeof rule.priority === "number" && rule.priority > max)
+							max = rule.priority as number;
+					}
+					next.priority = max + 1;
+				}
+				rules.push(next);
 			}, body);
 		match = path.match(/^\/v1\/recurrence-rules\/([^/]+)$/);
 		if (match) {
 			const [, id] = match;
 			if (method === "PATCH")
 				return write(() => {
-					current.recurrenceRules = (current.recurrenceRules as unknown[]).map(
-						(item) =>
-							(item as { id: string }).id === id ? structuredClone(body) : item,
+					const rules = current.recurrenceRules as unknown[];
+					const stored = rules.find(
+						(item) => (item as { id: string }).id === id,
+					) as Record<string, unknown> | undefined;
+					const next = structuredClone(body) as Record<string, unknown>;
+					// Omitted optionals keep their stored values.
+					if (next.priority === undefined) next.priority = stored?.priority;
+					if (next.annualCap === undefined) next.annualCap = stored?.annualCap;
+					current.recurrenceRules = rules.map((item) =>
+						(item as { id: string }).id === id ? { ...next, id } : item,
 					) as typeof current.recurrenceRules;
 				}, body);
 			current.recurrenceRules = (current.recurrenceRules as unknown[]).filter(
@@ -346,10 +567,20 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			const [, instanceId] = match;
 			return write(() => {
 				if (typeof evaluationType === "string") {
-					const rows = evalRows(evaluationType);
-					const at = rows.findIndex((item) => item.instanceId === instanceId);
-					if (at >= 0)
-						rows[at] = structuredClone(evaluationRow) as { instanceId: string };
+					const tables = (
+						current as unknown as {
+							evaluations: Record<string, { instanceId: string }[]>;
+						}
+					).evaluations as unknown as Record<string, { instanceId: string }[]>;
+					for (const table of Object.values(tables)) {
+						const at = table.findIndex(
+							(item) => item.instanceId === instanceId,
+						);
+						if (at >= 0) table.splice(at, 1);
+					}
+					evalRows(evaluationType).push(
+						structuredClone(evaluationRow) as { instanceId: string },
+					);
 				}
 			}, evaluationRow);
 		}

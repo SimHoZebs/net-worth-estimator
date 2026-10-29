@@ -76,7 +76,7 @@ describe("failure ledger", () => {
 			failure,
 		});
 		// November stays out; December reads in time order with the same
-		// figures the account dialog shows for these movements.
+		// figures the account dialog shows for these transactions.
 		expect(ledger?.month).toBe("Dec 2026");
 		expect(ledger?.overflow).toBe(0);
 		expect(ledger?.rows.map((row) => row.transaction.name)).toEqual([
@@ -97,8 +97,8 @@ describe("failure ledger", () => {
 			shortfall: 2650,
 			counterparty: "External spending",
 		});
-		expect(failing?.movement?.id).toBe("renovation");
-		expect(ledger?.rows[0]?.movement?.id).toBe("pay");
+		expect(failing?.planTransaction?.id).toBe("renovation");
+		expect(ledger?.rows[0]?.planTransaction?.id).toBe("pay");
 		expect(ledger?.summary).toContain(
 			"during Dec 2026: Take-home pay Dec 1 +$11,200; " +
 				"Home renovation Dec 5 −$6,350, short $2,650; " +
@@ -106,7 +106,7 @@ describe("failure ledger", () => {
 		);
 	});
 
-	it("caps peers at the nearest movements and always shows the failure", () => {
+	it("caps peers at the nearest transactions and always shows the failure", () => {
 		const failure = move({
 			date: "2026-12-15",
 			movementId: "renovation",

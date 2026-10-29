@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { updateEvaluation } from "@/api/generated/endpoints.ts";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
 import { InputField } from "@/components/Field.tsx";
-import { finite, isRecord } from "@/domain/guards.ts";
+import { finite, isRecord, parseUnion } from "@/domain/guards.ts";
 import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
+import { updateEvaluation } from "@/api/generated/endpoints.ts";
+import { useEvaluationSummary } from "@/state/evaluationQueries.ts";
+import { performSave } from "@/state/workspaceWrites.ts";
 import {
-	reloadWorkspace,
-	useServerModel,
+	refreshEvaluations,
+	useAccountBalances,
+	useTransactionCatalog,
 	useServerStatus,
 } from "@/state/workspaceResources.ts";
 
@@ -109,35 +112,48 @@ export function buildFiConfig(
 
 /** Editable minimum, test duration, and funding sources for one FI evaluation. */
 export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
-	const document = useServerModel().data?.document ?? null;
+	const summary = useEvaluationSummary();
+	const balances = useAccountBalances();
+	const catalog = useTransactionCatalog();
 	const readOnly = useServerStatus().data?.readOnly ?? false;
 	const row = useMemo(
 		() =>
-			document?.evaluations.financialIndependence.find(
+			summary.data?.evaluations.financialIndependence.find(
 				(item) => item.instanceId === instanceId,
 			) ?? null,
-		[document, instanceId],
+		[summary.data, instanceId],
 	);
-	const accounts = useMemo(() => document?.accounts ?? [], [document]);
+	const accounts = useMemo(
+		() =>
+			(balances.data?.accounts ?? []).map((account) => ({
+				id: account.id,
+				name: account.name,
+				kind:
+					parseUnion(account.kind, [
+						"cash",
+						"investment",
+						"debt",
+						"property",
+					] as const) ?? "cash",
+				color: account.color ?? null,
+			})),
+		[balances.data],
+	);
 	const incomeCandidates = useMemo(() => {
-		const postings = (document?.postings ?? []).map((posting) => ({
-			id: posting.id,
-			name: posting.name,
-			detail: "One-time",
-		}));
-		const rules = (document?.recurrenceRules ?? []).map((rule) => ({
-			id: rule.id,
-			name: rule.name,
-			detail: "Recurring",
-		}));
 		const seen = new Set<string>();
-		return [...postings, ...rules].filter((item) =>
-			seen.has(item.id) ? false : (seen.add(item.id), true),
-		);
-	}, [document]);
+		return (catalog.data?.items ?? [])
+			.map((item) => ({
+				id: item.id,
+				name: item.name,
+				detail: item.kind === "rule" ? "Recurring" : "One-time",
+			}))
+			.filter((item) =>
+				seen.has(item.id) ? false : (seen.add(item.id), true),
+			);
+	}, [catalog.data]);
 
 	const initial = useMemo(
-		() => fiConfigureState(row?.config),
+		() => fiConfigureState(row?.config as JsonValue | undefined),
 		// Reset when a different evaluation or a saved config arrives.
 		// oxlint-disable-next-line react/exhaustive-deps
 		[instanceId, JSON.stringify(row?.config ?? null)],
@@ -158,6 +174,14 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 		setSaved(false);
 		setError(null);
 	}, [initial]);
+
+	if (summary.isFetching || balances.isFetching || catalog.isFetching) {
+		return (
+			<p className="m-0 text-xs text-muted" role="status">
+				Loading configuration…
+			</p>
+		);
+	}
 
 	if (!row) {
 		return <p className="m-0 text-xs text-muted">Configuration unavailable.</p>;
@@ -186,30 +210,27 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 		setSaving(true);
 		setError(null);
 		setSaved(false);
-		try {
-			const config = buildFiConfig(initial.raw, {
-				minimum: Math.max(0, minimum),
-				years: Math.max(1, Math.min(50, Math.trunc(years) || 1)),
-				assets,
-				income,
-			});
-			await updateEvaluation(instanceId, {
-				name: row.name,
-				enabled: row.enabled,
-				type: "financialIndependence",
-				config,
-			});
-			await reloadWorkspace();
-			setSaved(true);
-		} catch (cause) {
-			setError(
-				cause instanceof Error
-					? cause.message
-					: "The configuration could not be saved.",
-			);
-		} finally {
-			setSaving(false);
-		}
+		const config = buildFiConfig(initial.raw, {
+			minimum: Math.max(0, minimum),
+			years: Math.max(1, Math.min(50, Math.trunc(years) || 1)),
+			assets,
+			income,
+		});
+		const ok = await performSave({
+			call: () =>
+				updateEvaluation(instanceId, {
+					instanceId,
+					name: row.name,
+					enabled: row.enabled,
+					type: "financialIndependence",
+					config,
+				}),
+			refresh: refreshEvaluations,
+			failureMessage: "The configuration could not be saved.",
+		});
+		setSaving(false);
+		if (ok) setSaved(true);
+		else setError("The configuration could not be saved. Try again.");
 	};
 
 	return (

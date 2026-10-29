@@ -53,7 +53,7 @@ afterEach(() => {
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
 	const model = setServerModelFixture();
 	const scope = getResourceScope();
-	useWorkspaceStore.setState({ draft: testPlan, volatile: true });
+	useWorkspaceStore.setState({ draft: testPlan });
 	suspendResourceScope();
 	await cancelResourceQueries();
 	expect(getServerModel()).toBeUndefined();
@@ -104,13 +104,12 @@ it("does not publish a retired account's late model result", async () => {
 	expect(getServerModel()).toEqual(current);
 });
 
-it("retains only unsaved volatile data for an explicit same-owner recovery", () => {
+it("retains only unsaved in-memory data for an explicit same-owner recovery", () => {
 	useWorkspaceStore.setState({
 		draft: testPlan,
-		volatile: true,
 		baseRevision: "a",
 	});
-	resetWorkspaceForResource({ preserveVolatile: true });
+	resetWorkspaceForResource({ preserveDraft: true });
 	expect(useWorkspaceStore.getState().draft).toBe(testPlan);
 	expect(useWorkspaceStore.getState().scope).toBeNull();
 	resetWorkspaceForResource();

@@ -1,10 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import {
-	readSavedServerPlan,
-	readTemporaryVersion,
-	resetFixture,
-} from "./fixture.ts";
+import type { FinancialModelDocument } from "../src/api/contracts.ts";
+import { FIXTURE_API, readSavedServerPlan, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
 	await resetFixture();
@@ -87,7 +84,7 @@ test("account names in the plan open incoming transfers with the correct other a
 	await expect(dialog.getByRole("status")).toHaveText(
 		"Showing 1–1 of 1 transactions",
 	);
-	// The only incoming movement to savings is the monthly contribution.
+	// The only incoming transaction to savings is the monthly contribution.
 	await expect(dialog.getByText("+$400.00", { exact: true })).toBeVisible();
 	await dialog
 		.getByRole("button", {
@@ -152,25 +149,25 @@ test("transaction values edit in place with save and discard", async ({
 	// a value actually changes; the first change reveals Save/Discard.
 	await page.getByLabel("Amount (USD)").click();
 	await expect(page.getByLabel("Amount (USD)")).toBeFocused();
-	await expect(
-		page.getByRole("button", { name: "Apply unsaved changes" }),
-	).toHaveCount(0);
+	await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(
+		0,
+	);
 	// Discard restores the read view with the original value.
 	await page.getByLabel("Amount (USD)").fill("999");
 	await expect(
-		page.getByRole("button", { name: "Apply unsaved changes" }),
+		page.getByRole("button", { name: "Save changes" }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Discard changes" }).click();
-	await expect(
-		page.getByRole("button", { name: "Apply unsaved changes" }),
-	).toHaveCount(0);
+	await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(
+		0,
+	);
 	await expect(dialog.getByText("+$400.00", { exact: true })).toBeVisible();
 	// Changing the source chip summons Save; Discard restores the route.
 	await page.getByLabel("From", { exact: true }).focus();
 	await expect(page.getByLabel("From", { exact: true })).toBeFocused();
 	await page.getByLabel("From", { exact: true }).selectOption("brokerage");
 	await expect(
-		page.getByRole("button", { name: "Apply unsaved changes" }),
+		page.getByRole("button", { name: "Save changes" }),
 	).toBeVisible();
 	await page.getByRole("button", { name: "Discard changes" }).click();
 	await expect(page.getByLabel("From", { exact: true })).toContainText(
@@ -182,7 +179,7 @@ test("transaction values edit in place with save and discard", async ({
 	await page.getByLabel("Amount (USD)").click();
 	await expect(page.getByLabel("Amount (USD)")).toBeFocused();
 	await page.getByLabel("Amount (USD)").fill("450");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(dialog.getByText("+$450.00", { exact: true })).toBeVisible();
 });
 
@@ -210,10 +207,10 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await page.getByLabel("Date posted").fill("2026-03-10");
 	await page.getByLabel("Amount (USD)").click();
 	await page.getByLabel("Amount (USD)").fill("3000");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await page.getByRole("button", { name: "Save changes" }).click();
 	dialog = page.getByRole("dialog", { name: "Everyday checking" });
 	await expect(dialog).toBeVisible();
-	await expect(dialog).toContainText("Account activity · Changes");
+	await expect(dialog).toContainText("Account activity · Saved");
 	// Returning from the editor remounts the list with default filters.
 	await dialog.getByLabel("Transaction source").selectOption("all");
 	await dialog
@@ -221,20 +218,16 @@ test("a shortfall can be inspected and edited while preserving account context a
 		.fill("renovation");
 	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
-	// The saved plan is untouched: only the unsaved changes changed.
+	// The editor saves immediately: the dialog shows the edited −$3,000.00
+	// with no Shortfall (asserted above) and the saved plan carries it too.
 	// Posting CSV ids are replaced with server UUIDs on import, so the
-	// renovation is located by name on both sides.
-	const draft = await readTemporaryVersion(page);
-	const renovation = (plan: {
-		movements: { name: string; amount: number; postedDate: string | null }[];
-	}) => plan.movements.find((movement) => movement.name === "Home renovation");
-	expect(renovation(draft)?.amount).toBe(3000);
-	expect(renovation(draft)?.postedDate).toBe("2026-03-10");
+	// renovation is located by name on the saved side.
+	await expect(dialog).toContainText("Account activity · Saved");
 	const saved = await readSavedServerPlan();
 	const savedExpression = saved.postings.find(
 		(posting) => posting.name === "Home renovation",
 	)?.amount.config.expression;
-	expect(savedExpression).toBe("9000");
+	expect(savedExpression).toBe("3000");
 });
 
 test("filters reset pagination and keep projected transfers distinct from recorded income", async ({
@@ -317,26 +310,33 @@ test("growth-only accounts have an honest empty state and retain account details
 		dialog.getByRole("checkbox", { name: "No ceiling" }),
 	).toBeChecked();
 	await expect(
-		dialog.getByRole("button", { name: "Apply unsaved changes" }),
+		dialog.getByRole("button", { name: "Save changes" }),
 	).toBeDisabled();
 	await expect(
 		dialog.getByRole("button", { name: "Edit account", exact: true }),
 	).toHaveCount(0);
-	// Editing applies to the draft without opening another dialog.
+	// Editing saves immediately without opening another dialog.
 	await dialog.getByLabel("Protected balance in USD").fill("5000");
 	await expect(
-		dialog.getByRole("button", { name: "Apply unsaved changes" }),
+		dialog.getByRole("button", { name: "Save changes" }),
 	).toBeEnabled();
-	await dialog.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(dialog).toContainText("Account activity · Changes");
+	await dialog.getByRole("button", { name: "Save changes" }).click();
 	await expect(dialog.getByLabel("Protected balance in USD")).toHaveValue(
 		"5000",
 	);
-	// The inline edit changed the draft only; the saved plan is untouched.
-	const draft = await readTemporaryVersion(page);
-	const home = (
-		draft as { accounts: { id: string; minBalance: number }[] }
-	).accounts.find((account) => account.id === "home");
+	// The save runs async after staging; the eyebrow flipping back to
+	// Saved means it reached the server.
+	await expect(dialog).toContainText("Account activity · Saved");
+	// The inline edit reached the server: the saved plan carries the new
+	// floor while the dialog shows the same 5000.
+	const savedModel = await page.request
+		.get(`${FIXTURE_API}/v1/financial-model`)
+		.then(async (response) => {
+			expect(response.ok()).toBe(true);
+			return ((await response.json()) as { document: FinancialModelDocument })
+				.document;
+		});
+	const home = savedModel.accounts.find((account) => account.id === "home");
 	expect(home?.minBalance).toBe(5000);
 });
 

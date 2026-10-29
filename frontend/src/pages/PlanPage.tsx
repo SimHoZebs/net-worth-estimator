@@ -2,7 +2,6 @@ import { Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../components/activity/TransactionSortButton.tsx";
 import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
-import { AccountCardGrid } from "../components/cards/AccountCardGrid.tsx";
 import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { TablePagination } from "../components/DataTable.tsx";
 import { Button } from "../components/Button.tsx";
@@ -16,20 +15,24 @@ import {
 import {
 	type Plan,
 	visibleAccounts,
-	visibleMovements,
+	visibleTransactions,
+	type Account,
 } from "../domain/model.ts";
-import {
-	type EditorTarget,
-	type RemovalTarget,
-	removePlanItem,
-} from "../domain/planEdits.ts";
+import { parseUnion } from "../domain/guards.ts";
+import type { EditorTarget } from "../domain/planEdits.ts";
 import { resolveMovementAmounts } from "../domain/resolvedMovementAmounts.ts";
 import type { Projection } from "../domain/result.ts";
-import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { stageAndSave } from "../state/workspaceWrites.ts";
+import { performSave } from "../state/workspaceWrites.ts";
+import {
+	refreshAccounts,
+	useAccountBalances,
+	useTransactions,
+} from "../state/workspaceResources.ts";
+import { transactionToPlan } from "../domain/transactionRows.ts";
+import { deleteAccount } from "@/api/generated/endpoints.ts";
 import { usePlan } from "../state/useWorkspacePlan.ts";
 import { AccountsPanel } from "./plan/AccountsPanel.tsx";
-import { MovementsPanel } from "./plan/MovementsPanel.tsx";
+import { TransactionsPanel } from "./plan/TransactionsPanel.tsx";
 
 export type PlanView = "accounts" | "transactions";
 
@@ -51,14 +54,7 @@ export function PlanPage({
 	const plan = usePlan();
 	if (!plan) return null;
 	if (view === "accounts") {
-		return (
-			<AccountsView
-				plan={plan}
-				onEdit={onEdit}
-				onUpdate={stageAndSave}
-				onAccount={onAccount}
-			/>
-		);
+		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;
 	}
 	return (
 		<BaseProjectionView>
@@ -69,94 +65,73 @@ export function PlanPage({
 	);
 }
 
-function AccountsWithProjection({
-	plan,
-	query,
-}: {
-	plan: Plan;
-	query: string;
-}) {
-	const projection = useRemoteProjection({ ranges: false });
-	const base =
-		projection.base instanceof Error || projection.base === null
-			? null
-			: projection.base;
-	return <AccountCardGrid plan={plan} projection={base} query={query} />;
-}
-
-function usePlanRemoval({
-	plan,
-	onUpdate,
-}: {
-	plan: Plan;
-	onUpdate: (plan: Plan) => boolean;
-}) {
-	const [remove, setRemove] = useState<RemovalTarget | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const requestRemoval = (target: RemovalTarget) => {
-		setRemove(target);
-		setError(null);
-	};
-	const deleteItem = () => {
-		if (!remove) return;
-		const next = removePlanItem({ plan, target: remove });
-		if (next instanceof Error) {
-			setError(next.message);
-			return;
-		}
-		if (onUpdate(next)) {
-			setRemove(null);
-			setError(null);
-		}
-	};
-	const dialog = remove && (
-		<ConfirmDialog
-			title={`Remove ${remove.name}?`}
-			eyebrow="Changes"
-			onCancel={() => setRemove(null)}
-			onConfirm={deleteItem}
-			cancelLabel="Keep item"
-			confirmLabel="Remove and save"
-			error={error}
-		>
-			<p>
-				This removes the item and saves immediately.
-			</p>
-			{remove.kind === "movements" && (
-				<p>
-					Saving this removal also deletes any receipts attached to the
-					transaction.
-				</p>
-			)}
-		</ConfirmDialog>
-	);
-	return { requestRemoval, dialog };
-}
-
 function AccountsView({
-	plan,
 	onEdit,
-	onUpdate,
 	onAccount,
 }: {
-	plan: Plan;
 	onEdit: (target: EditorTarget) => void;
-	onUpdate: (plan: Plan) => boolean;
 	onAccount: (id: string) => void;
 }) {
 	const [query, setQuery] = useState("");
-	const { requestRemoval, dialog } = usePlanRemoval({ plan, onUpdate });
-	const visible = visibleAccounts(plan.accounts);
+	const [remove, setRemove] = useState<Account | null>(null);
+	const [removing, setRemoving] = useState(false);
+	const [removeError, setRemoveError] = useState<string | null>(null);
+	const balances = useAccountBalances();
+	const visible = useMemo(
+		() =>
+			visibleAccounts(
+				(balances.data?.accounts ?? []).map((row): Account => ({
+					id: row.id,
+					name: row.name,
+					kind:
+						parseUnion(row.kind, [
+							"cash",
+							"investment",
+							"debt",
+							"property",
+						] as const) ?? "cash",
+					enabled: row.enabled,
+					archived: row.archived,
+					balance: row.balance,
+					minBalance: row.minBalance ?? 0,
+					maxBalance: row.maxBalance,
+					color: row.color ?? null,
+					observedOn: row.observedOn,
+					balanceCheck: row.hasCheckpoint,
+					source: row.syncOwned ? "Synced account" : "Manual entry",
+					readOnly: row.readOnly,
+				})),
+			),
+		[balances.data],
+	);
 	const accounts = visible.filter((account) =>
 		account.name.toLowerCase().includes(query.toLowerCase()),
 	);
+	const deleteItem = async () => {
+		if (!remove || removing) return;
+		if (visible.length <= 1) {
+			setRemoveError(
+				"Keep at least one account. Add a replacement before removing this one.",
+			);
+			return;
+		}
+		setRemoving(true);
+		setRemoveError(null);
+		const ok = await performSave({
+			call: () => deleteAccount(remove.id),
+			refresh: refreshAccounts,
+			failureMessage: "The account could not be removed.",
+		});
+		setRemoving(false);
+		if (ok) setRemove(null);
+		else setRemoveError("The account could not be removed.");
+	};
 	return (
 		<>
-			<AccountsWithProjection plan={plan} query={query} />
 			<section>
 				<div className="flex flex-wrap items-center justify-between gap-4 px-0.5 pb-4">
 					<SearchField
-						label="Search plan"
+						label="Search accounts"
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
 						placeholder="Find an account…"
@@ -172,16 +147,50 @@ function AccountsView({
 						Add account
 					</Button>
 				</div>
-				<AccountsPanel
-					accounts={accounts}
-					onAccount={onAccount}
-					onEdit={(item) => onEdit({ kind: "account", item })}
-					onRemove={(item) =>
-						requestRemoval({ kind: "accounts", id: item.id, name: item.name })
-					}
-				/>
+				{balances.isPending ? (
+					<p role="status">Loading accounts…</p>
+				) : balances.isError ? (
+					<p role="alert">
+						Accounts could not be loaded.{" "}
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							onClick={() => void balances.refetch()}
+						>
+							Retry
+						</Button>
+					</p>
+				) : (
+					<AccountsPanel
+						accounts={accounts}
+						onAccount={onAccount}
+						onEdit={(item) => onEdit({ kind: "account", item })}
+						onRemove={setRemove}
+					/>
+				)}
 			</section>
-			{dialog}
+			{remove && (
+				<ConfirmDialog
+					title={`Remove ${remove.name}?`}
+					eyebrow="Changes"
+					onCancel={() => {
+						setRemove(null);
+						setRemoveError(null);
+					}}
+					onConfirm={() => void deleteItem()}
+					cancelLabel="Keep account"
+					confirmLabel="Remove account"
+					busyLabel="Removing…"
+					busy={removing}
+					error={removeError}
+				>
+					<p>
+						This deletes the account immediately. Balance history for this
+						account goes with it.
+					</p>
+				</ConfirmDialog>
+			)}
 		</>
 	);
 }
@@ -202,24 +211,32 @@ function TransactionsView({
 	);
 	const [page, setPage] = useState(0);
 	const listId = useId();
+	const transactionsQuery = useTransactions();
 	const resolvedAmounts = useMemo(
 		() =>
 			projection ? resolveMovementAmounts(projection.movements) : new Map(),
 		[projection],
 	);
+	const rows = useMemo(
+		() =>
+			(transactionsQuery.data?.transactions ?? []).map((row) =>
+				transactionToPlan(row, resolvedAmounts.get(row.id)),
+			),
+		[transactionsQuery.data, resolvedAmounts],
+	);
 	const visible = useMemo(
 		() =>
-			visibleMovements({
-				movements: plan.movements,
+			visibleTransactions({
+				transactions: rows,
 				accounts: plan.accounts,
 			}),
-		[plan.movements, plan.accounts],
+		[rows, plan.accounts],
 	);
 	const recurringCount = visible.filter(
-		(movement) => movement.frequency !== "once",
+		(transaction) => transaction.frequency !== "once",
 	).length;
 	const transactionsCount = visible.filter(
-		(movement) => movement.frequency === "once",
+		(transaction) => transaction.frequency === "once",
 	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
@@ -229,28 +246,28 @@ function TransactionsView({
 		},
 		{ id: "recurring", label: "Recurring", count: recurringCount },
 	];
-	const movements = useMemo(
+	const sortedTransactions = useMemo(
 		() =>
 			sortTransactionsByDate({
 				items: visible.filter(
-					(movement) =>
-						movement.name.toLowerCase().includes(query.toLowerCase()) &&
+					(transaction) =>
+						transaction.name.toLowerCase().includes(query.toLowerCase()) &&
 						(schedule === "all"
-							? movement.frequency === "once"
-							: movement.frequency !== "once"),
+							? transaction.frequency === "once"
+							: transaction.frequency !== "once"),
 				),
-				getDate: (movement) => movement.startDate,
-				getId: (movement) => movement.id,
+				getDate: (transaction) => transaction.startDate,
+				getId: (transaction) => transaction.id,
 				order,
 			}),
 		[visible, query, schedule, order],
 	);
 	const pageCount = Math.max(
 		1,
-		Math.ceil(movements.length / TRANSACTIONS_PAGE_SIZE),
+		Math.ceil(sortedTransactions.length / TRANSACTIONS_PAGE_SIZE),
 	);
 	const currentPage = Math.min(page, pageCount - 1);
-	const pagedMovements = movements.slice(
+	const pagedTransactions = sortedTransactions.slice(
 		currentPage * TRANSACTIONS_PAGE_SIZE,
 		(currentPage + 1) * TRANSACTIONS_PAGE_SIZE,
 	);
@@ -292,7 +309,7 @@ function TransactionsView({
 						type="button"
 						variant="primary"
 						size="sm"
-						onClick={() => onEdit({ kind: "movement", item: null })}
+						onClick={() => onEdit({ kind: "transaction", item: null })}
 					>
 						<Plus size={16} />
 						Add transaction
@@ -300,12 +317,28 @@ function TransactionsView({
 				</div>
 			</div>
 			<div id={listId}>
-				<MovementsPanel
-					movements={pagedMovements}
-					accounts={visibleAccounts(plan.accounts)}
-					plan={plan}
-					resolvedAmounts={resolvedAmounts}
-				/>
+				{transactionsQuery.isPending ? (
+					<p role="status">Loading transactions…</p>
+				) : transactionsQuery.isError ? (
+					<p role="alert">
+						Transactions could not be loaded.{" "}
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							onClick={() => void transactionsQuery.refetch()}
+						>
+							Retry
+						</Button>
+					</p>
+				) : (
+					<TransactionsPanel
+						transactions={pagedTransactions}
+						accounts={visibleAccounts(plan.accounts)}
+						plan={plan}
+						resolvedAmounts={resolvedAmounts}
+					/>
+				)}
 			</div>
 			{pageCount > 1 && (
 				<TablePagination
@@ -313,7 +346,7 @@ function TransactionsView({
 					className="px-0.5"
 					page={currentPage}
 					pageCount={pageCount}
-					total={movements.length}
+					total={sortedTransactions.length}
 					pageSize={TRANSACTIONS_PAGE_SIZE}
 					onPage={turnPage}
 				/>

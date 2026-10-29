@@ -134,8 +134,8 @@ func TestReceiptLifecyclePostingEditsAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	loaded, _ = s.LoadDocument()
-	if loaded.Postings[0].Purchase != nil {
-		t.Fatal("purchase policy not removed")
+	if loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 2 {
+		t.Fatal("omitted policy must keep the stored policy")
 	}
 	if err := s.Close(); err != nil {
 		t.Fatal(err)

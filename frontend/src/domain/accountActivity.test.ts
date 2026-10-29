@@ -26,10 +26,10 @@ describe("account-scoped transactions", () => {
 
 	it("does not duplicate recorded evidence from server events on or before the plan start", () => {
 		const source = projection.movements.find(
-			(movement) =>
-				movement.fromId === "checking" || movement.toId === "checking",
+			(transaction) =>
+				transaction.fromId === "checking" || transaction.toId === "checking",
 		);
-		if (!source) throw new Error("Expected a checking movement fixture.");
+		if (!source) throw new Error("Expected a checking transaction fixture.");
 		const historical = {
 			...source,
 			movementId: "historical-server-event",
@@ -75,9 +75,9 @@ describe("account-scoped transactions", () => {
 
 	it("includes secondary destinations from server account deltas", () => {
 		const source = projection.movements.find(
-			(movement) => movement.movementId === "invest",
+			(transaction) => transaction.movementId === "invest",
 		);
-		if (!source) throw new Error("Expected an investment movement fixture.");
+		if (!source) throw new Error("Expected an investment transaction fixture.");
 		const multi = {
 			...source,
 			movementId: "multi-destination",
@@ -119,9 +119,9 @@ describe("account-scoped transactions", () => {
 
 	it("keeps excluded recorded facts visible and excludes disabled planned rules", () => {
 		const plan = structuredClone(examplePlan);
-		for (const movement of plan.movements) {
-			if (movement.id === "pay-record-0" || movement.id === "invest")
-				movement.enabled = false;
+		for (const transaction of plan.transactions) {
+			if (transaction.id === "pay-record-0" || transaction.id === "invest")
+				transaction.enabled = false;
 		}
 		const rows = accountTransactions({
 			accountId: "checking",
@@ -136,7 +136,7 @@ describe("account-scoped transactions", () => {
 
 	it("flags sync pending charges instead of reporting them as user-excluded", () => {
 		const plan = structuredClone(examplePlan);
-		plan.movements.push({
+		plan.transactions.push({
 			id: "01900000-0000-7000-8000-000000000001",
 			name: "Mock Corner Store",
 			pending: true,
@@ -172,7 +172,7 @@ describe("account-scoped transactions", () => {
 
 	it("marks holds that did not post without pending status", () => {
 		const plan = structuredClone(examplePlan);
-		plan.movements.push({
+		plan.transactions.push({
 			id: "01900000-0000-7000-8000-000000000002",
 			name: "Hold that did not post",
 			pending: false,
@@ -209,7 +209,7 @@ describe("account-scoped transactions", () => {
 
 	it("does not infer pending status from a legacy ID prefix", () => {
 		const plan = structuredClone(examplePlan);
-		plan.movements.push({
+		plan.transactions.push({
 			id: "sfin-pending-checking-mock-pend1",
 			name: "Mock Corner Store",
 			amount: 42.1,
@@ -247,8 +247,8 @@ describe("account-scoped transactions", () => {
 		"keeps pending UUID %s after the balance checkpoint visible without projecting it",
 		(id) => {
 			const plan = structuredClone(examplePlan);
-			plan.movements.push({
-				...plan.movements[0]!,
+			plan.transactions.push({
+				...plan.transactions[0]!,
 				id,
 				amount: 42.1,
 				fromId: "checking",
@@ -278,7 +278,7 @@ describe("account-scoped transactions", () => {
 				false,
 			);
 			expect(
-				plan.movements.find((movement) => movement.id === id)?.enabled,
+				plan.transactions.find((transaction) => transaction.id === id)?.enabled,
 			).toBe(false);
 		},
 	);
@@ -321,7 +321,7 @@ describe("transaction filtering", () => {
 			filters: { ...defaultActivityFilters, ...filters },
 		});
 
-	it("searches both movement names and the other account", () => {
+	it("searches both transaction names and the other account", () => {
 		expect(apply({ query: "RENOVATION" })).toHaveLength(1);
 		const investCounterparty = transactions.find(
 			(row) => row.movementId === "invest",

@@ -1,11 +1,11 @@
-import type { Account, Evaluation, Movement, Plan } from "./model.ts";
+import type { Account, Evaluation, Plan, Transaction } from "./model.ts";
 
 export type EditorTarget =
 	| { kind: "account"; item: Account | null }
-	| { kind: "movement"; item: Movement | null }
+	| { kind: "transaction"; item: Transaction | null }
 	| { kind: "evaluation"; item: Evaluation | null };
 export type RemovalTarget = {
-	kind: "accounts" | "movements";
+	kind: "accounts" | "transactions";
 	id: string;
 	name: string;
 };
@@ -35,14 +35,14 @@ export function removePlanItem({
 				"Keep at least one account. Add a replacement before removing this one.",
 			);
 		if (
-			plan.movements.some(
-				(movement) =>
-					movement.fromId === target.id || movement.toId === target.id,
+			plan.transactions.some(
+				(transaction) =>
+					transaction.fromId === target.id || transaction.toId === target.id,
 			) ||
 			plan.evaluations.some((evaluation) => evaluation.accountId === target.id)
 		)
 			return new Error(
-				"This account is used by a movement or evaluation. Update those references before removing it.",
+				"This account is used by a transaction or evaluation. Update those references before removing it.",
 			);
 		return {
 			...plan,
@@ -51,7 +51,9 @@ export function removePlanItem({
 	}
 	return {
 		...plan,
-		movements: plan.movements.filter((movement) => movement.id !== target.id),
+		transactions: plan.transactions.filter(
+			(transaction) => transaction.id !== target.id,
+		),
 	};
 }
 

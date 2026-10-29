@@ -57,9 +57,7 @@ describe("draft bar presence", () => {
 				baseline: testPlan,
 			}),
 		);
-		expect(
-			view.getByText("1 unsaved change · not saved yet"),
-		).toBeTruthy();
+		expect(view.getByText("1 unsaved change · not saved yet")).toBeTruthy();
 		act(() => useWorkspaceStore.setState({ draft: null, baseline: null }));
 		expect(view.container.querySelector("[data-draft-bar]")).toBeNull();
 	});

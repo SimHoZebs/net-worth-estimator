@@ -1,48 +1,107 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	acceptResourceScope,
+	canonicalApiBaseUrl,
+	suspendResourceScope,
+} from "@/auth/resourceScope.ts";
+import {
 	buildFiConfig,
 	fiConfigureState,
 	IndependenceConfigure,
 } from "./IndependenceConfigure.tsx";
 
-const modelState = vi.hoisted(() => ({
-	document: null as unknown,
-	readOnly: false,
+const summaryState = vi.hoisted(() => ({
+	summary: null as unknown,
+	pending: false,
 }));
-const endpointState = vi.hoisted(() => ({
-	saved: [] as { instanceId: string; body: unknown }[],
+const balancesState = vi.hoisted(() => ({
+	accounts: [] as { id: string; name: string; kind: string; color: null }[],
+	pending: false,
+}));
+const catalogState = vi.hoisted(() => ({
+	items: [] as { id: string; kind: string; name: string }[],
+	pending: false,
+}));
+const statusState = vi.hoisted(() => ({ readOnly: false }));
+const writesState = vi.hoisted(() => ({
+	saved: [] as { instanceId: string; input: unknown }[],
+	result: true,
 }));
 
-vi.mock("@/state/workspaceResources.ts", () => ({
-	useServerModel: () => ({ data: { document: modelState.document } }),
-	useServerStatus: () => ({ data: { readOnly: modelState.readOnly } }),
-	reloadWorkspace: vi.fn(async () => {}),
-}));
-
-vi.mock("@/api/generated/endpoints.ts", () => ({
-	updateEvaluation: vi.fn(async (instanceId: string, body: unknown) => {
-		endpointState.saved.push({ instanceId, body });
-		return { data: { persisted: true }, status: 200, headers: new Headers() };
+vi.mock("@/state/evaluationQueries.ts", () => ({
+	useEvaluationSummary: () => ({
+		data: summaryState.summary,
+		isPending: summaryState.pending,
+		isFetching: summaryState.pending,
 	}),
 }));
 
+vi.mock("@/state/workspaceResources.ts", () => ({
+	useAccountBalances: () => ({
+		data: { accounts: balancesState.accounts },
+		isPending: balancesState.pending,
+		isFetching: balancesState.pending,
+	}),
+	useTransactionCatalog: () => ({
+		data: { items: catalogState.items },
+		isPending: catalogState.pending,
+		isFetching: catalogState.pending,
+	}),
+	useServerStatus: () => ({ data: { readOnly: statusState.readOnly } }),
+	refreshEvaluations: vi.fn(async () => {}),
+	workspaceIsBusy: () => false,
+}));
+
+vi.mock("@/api/generated/endpoints.ts", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("@/api/generated/endpoints.ts")>();
+	return {
+		...actual,
+		updateEvaluation: vi.fn(async (instanceId: string, body: unknown) => {
+			writesState.saved.push({ instanceId, input: body });
+			return {
+				data: writesState.result
+					? { persisted: true, issues: [], revision: "test" }
+					: {
+							persisted: false,
+							issues: [{ severity: "error", message: "Choose an account." }],
+							revision: "test",
+						},
+			};
+		}),
+	};
+});
+
 afterEach(() => {
 	cleanup();
-	modelState.document = null;
-	modelState.readOnly = false;
-	endpointState.saved.length = 0;
+	summaryState.summary = null;
+	summaryState.pending = false;
+	balancesState.accounts = [];
+	balancesState.pending = false;
+	catalogState.items = [];
+	catalogState.pending = false;
+	statusState.readOnly = false;
+	writesState.saved.length = 0;
+	writesState.result = true;
+	suspendResourceScope();
 	vi.clearAllMocks();
 });
 
-function seedDocument() {
-	modelState.document = {
-		accounts: [
-			{ id: "cash", name: "Cash", kind: "cash", color: null },
-			{ id: "brokerage", name: "Brokerage", kind: "investment", color: null },
-		],
-		postings: [{ id: "salary", name: "Salary" }],
-		recurrenceRules: [],
+function seedServerState() {
+	acceptResourceScope(
+		{
+			apiBaseUrl: canonicalApiBaseUrl(""),
+			resource: {
+				id: "plans/a",
+				kind: "private",
+				permissions: ["plan:read", "plan:write"],
+			},
+			subject: "plans/a",
+		},
+		suspendResourceScope(),
+	);
+	summaryState.summary = {
 		evaluations: {
 			financialIndependence: [
 				{
@@ -61,7 +120,13 @@ function seedDocument() {
 				},
 			],
 		},
+		revision: "test",
 	};
+	balancesState.accounts = [
+		{ id: "cash", name: "Cash", kind: "cash", color: null },
+		{ id: "brokerage", name: "Brokerage", kind: "investment", color: null },
+	];
+	catalogState.items = [{ id: "salary", kind: "posting", name: "Salary" }];
 }
 
 describe("fiConfigureState", () => {
@@ -137,8 +202,14 @@ describe("IndependenceConfigure", () => {
 		expect(view.getByText("Configuration unavailable.")).toBeTruthy();
 	});
 
+	it("shows loading state while the summary arrives", () => {
+		summaryState.pending = true;
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		expect(view.getByText("Loading configuration…")).toBeTruthy();
+	});
+
 	it("edits minimum, duration, and funding sources then saves", async () => {
-		seedDocument();
+		seedServerState();
 		const view = render(<IndependenceConfigure instanceId="fi-1" />);
 		const minimum = view.getByLabelText(
 			"Minimum net worth ($)",
@@ -160,20 +231,36 @@ describe("IndependenceConfigure", () => {
 		fireEvent.click(view.getByRole("button", { name: /Salary/ }));
 		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
 		await view.findByText("Saved. Updating projection…");
-		expect(endpointState.saved).toHaveLength(1);
-		const body = endpointState.saved[0]!.body as {
+		expect(writesState.saved).toHaveLength(1);
+		expect(writesState.saved[0]?.instanceId).toBe("fi-1");
+		const input = writesState.saved[0]?.input as {
+			name: string;
+			enabled: boolean;
+			type: string;
 			config: {
 				minimumNetWorth: number;
 				evaluationYears: number;
 				sources: unknown;
 			};
 		};
-		expect(body.config.minimumNetWorth).toBe(5000);
-		expect(body.config.evaluationYears).toBe(12);
-		expect(body.config.sources).toEqual([
+		expect(input.name).toBe("Financial independence");
+		expect(input.enabled).toBe(true);
+		expect(input.type).toBe("financialIndependence");
+		expect(input.config.minimumNetWorth).toBe(5000);
+		expect(input.config.evaluationYears).toBe(12);
+		expect(input.config.sources).toEqual([
 			{ type: "asset", accountId: "brokerage", included: true },
 			{ type: "asset", accountId: "cash", included: true },
 			{ type: "cashflow", postingId: "salary", included: true },
 		]);
+	});
+
+	it("shows an error when the row write fails", async () => {
+		seedServerState();
+		writesState.result = false;
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
+		await view.findByText("The configuration could not be saved. Try again.");
+		expect(view.queryByText("Saved. Updating projection…")).toBeNull();
 	});
 });

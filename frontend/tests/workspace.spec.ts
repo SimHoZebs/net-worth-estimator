@@ -5,7 +5,6 @@ import {
 	FIXTURE_API,
 	REMOTE_STORAGE_KEY,
 	readSavedServerPlan,
-	readTemporaryVersion,
 	resetFixture,
 	seedResourceStorage,
 } from "./fixture.ts";
@@ -14,8 +13,8 @@ test.beforeEach(async () => {
 	await resetFixture({ pinnedEvaluationIds: ["posting-fulfillment"] });
 });
 
-/** Open the movement editor for the fixture's investing transfer. */
-async function openInvestingMovementEditor(page: Page) {
+/** Open the transaction editor for the fixture's investing transfer. */
+async function openInvestingTransactionEditor(page: Page) {
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
 	await page.getByRole("tab", { name: /Recurring/ }).click();
 	await page.getByRole("button", { name: "Monthly investing" }).click();
@@ -100,80 +99,119 @@ test("saved target pins control Outlook without an evidence dialog", async ({
 	await expect(page.getByText(evaluation.name, { exact: true })).toHaveCount(0);
 });
 
-test("edits remain temporary, persist across reload, and save deliberately", async ({
-	page,
-}) => {
+test("edits save immediately and survive a reload", async ({ page }) => {
 	await page.goto("/");
-	await openInvestingMovementEditor(page);
+	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.reload();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
 	await page.getByRole("button", { name: "Save changes" }).click();
-	// Synchronize on save completion, not on the banner flipping to its
-	// loading text: the "unsaved change" copy disappears the moment the
-	// save starts, while the draft is only cleared after the server
-	// roundtrips finish. Reloading on the loading text races the save and
-	// restores a stale draft.
-	await expect(page.getByText("Plan saved on the server.")).toBeVisible();
+	// The save lands async after the editor closes; poll the server for it.
+	await expect
+		.poll(async () => {
+			const saved = await readSavedServerPlan();
+			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+				.config.expression;
+		})
+		.toBe("900");
 	await page.reload();
-	// The save reached the server, and the unsaved changes are gone.
+	// The save reached the server, so the reload keeps it.
+	const after = await readSavedServerPlan();
+	expect(
+		after.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("900");
+});
+
+test("discard is explicit and restores the editor value", async ({ page }) => {
+	await page.goto("/");
+	await openInvestingTransactionEditor(page);
+	await page.getByLabel("Amount (USD)").fill("999");
+	// Closing a dirty edit asks first instead of dropping it silently.
+	await page.getByRole("button", { name: "Close dialog" }).click();
+	await expect(page.getByRole("dialog")).toContainText(
+		"Discard the changes in this form?",
+	);
+	await page.getByRole("button", { name: "Continue", exact: true }).click();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("999");
+	// The header Discard restores the saved value without closing.
+	await page.getByRole("button", { name: "Discard changes" }).first().click();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
+	// A clean close asks nothing and leaves the server untouched.
+	await page.getByRole("button", { name: "Close dialog" }).click();
 	const saved = await readSavedServerPlan();
 	expect(
 		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
-	).toBe("900");
-	expect(await readTemporaryVersion(page)).toBeNull();
+	).toBe("600");
 });
 
-test("discard is explicit and restores the saved plan", async ({ page }) => {
-	await page.goto("/");
-	await openInvestingMovementEditor(page);
-	await page.getByLabel("Amount (USD)").fill("999");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await page.getByRole("button", { name: "Discard", exact: true }).click();
-	await expect(page.getByRole("dialog")).toContainText(
-		"Return to your saved plan?",
+test("a transaction converts across once and recurring in one save each way", async ({
+	page,
+}) => {
+	await page.goto("/#transactions/invest/edit");
+	const editor = page.getByRole("dialog", { name: "Edit planned transaction" });
+	await expect(editor.getByLabel("Transaction name")).toHaveValue(
+		"Monthly investing",
 	);
-	await page.getByRole("button", { name: "Keep exploring" }).click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).toBeVisible();
-	await page.getByRole("button", { name: "Discard", exact: true }).click();
-	await page
-		.getByRole("button", { name: "Discard changes", exact: true })
-		.click();
-	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
-	).not.toBeVisible();
+	await editor.getByLabel("Frequency").selectOption("once");
+	await editor.getByRole("button", { name: "Save transaction" }).click();
+	await expect(editor).not.toBeVisible();
+	const once = await readSavedServerPlan();
+	expect(
+		once.postings.some((posting) => posting.name === "Monthly investing"),
+	).toBe(true);
+	expect(once.recurrenceRules.some((rule) => rule.id === "invest")).toBe(false);
+	await page.goto("/#transactions/invest/edit");
+	const again = page.getByRole("dialog", { name: "Edit planned transaction" });
+	await expect(again.getByLabel("Transaction name")).toHaveValue(
+		"Monthly investing",
+	);
+	await again.getByLabel("Frequency").selectOption("monthly");
+	await again.getByRole("button", { name: "Save transaction" }).click();
+	await expect(again).not.toBeVisible();
+	const recurring = await readSavedServerPlan();
+	expect(recurring.recurrenceRules.some((rule) => rule.id === "invest")).toBe(
+		true,
+	);
+	expect(recurring.postings.some((posting) => posting.id === "invest")).toBe(
+		false,
+	);
 });
 
-test("account, movement and evaluation maintenance plus search work", async ({
+test("account, transaction and evaluation maintenance plus search work", async ({
 	page,
 }) => {
 	await page.goto("/#accounts");
 	await page.getByRole("button", { name: "Add account" }).click();
-	await page.getByLabel("Account name").fill("Travel savings");
-	await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await page.getByRole("textbox", { name: "Search plan" }).fill("Travel");
+	const accountDialog = page.getByRole("dialog", { name: "Add account" });
+	await accountDialog.getByLabel("Account name").fill("Travel savings");
+	await accountDialog.getByLabel("Balance (USD)", { exact: true }).fill("2500");
+	await accountDialog
+		.getByRole("button", { name: "Add account", exact: true })
+		.click();
+	// The row saves straight to the server and the dialog closes.
+	await expect(page.getByRole("dialog", { name: "Add account" })).toHaveCount(
+		0,
+	);
+	await page.getByRole("textbox", { name: "Search accounts" }).fill("Travel");
 	await expect(page.getByRole("row", { name: /Travel savings/ })).toBeVisible();
 	await page.getByRole("link", { name: "Evaluations", exact: true }).click();
 	await page
 		.getByRole("button", { name: "Add evaluation", exact: true })
 		.click();
-	await page.getByLabel("Evaluation name").fill("Next big trip");
-	await page.getByLabel("Measure", { exact: true }).selectOption("reserve");
-	await page
+	const evaluationDialog = page.getByRole("dialog", {
+		name: "Add evaluation",
+	});
+	await evaluationDialog.getByLabel("Evaluation name").fill("Next big trip");
+	await evaluationDialog
+		.getByLabel("Measure", { exact: true })
+		.selectOption("reserve");
+	await evaluationDialog
 		.getByLabel("Account", { exact: true })
 		.selectOption({ label: "Travel savings" });
-	await page.getByLabel("Target (USD)").fill("5000");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
+	await evaluationDialog.getByLabel("Target (USD)").fill("5000");
+	await evaluationDialog
+		.getByRole("button", { name: "Add evaluation", exact: true })
+		.click();
 	await expect(
 		page.getByRole("heading", { name: "Next big trip" }),
 	).toBeVisible();
@@ -181,10 +219,11 @@ test("account, movement and evaluation maintenance plus search work", async ({
 
 test("failed saves retain the intended plan", async ({ page }) => {
 	await page.goto("/#sources");
-	await openInvestingMovementEditor(page);
+	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	// The server rejects the write, so the unsaved changes must survive.
+	// The editor saves immediately, so the failure injection must be armed
+	// before pressing Save. The server rejects the write, and the unsaved
+	// changes must survive for a banner retry.
 	await page.route("**/v1/recurrence-rules/*", async (route) => {
 		if (route.request().method() === "PATCH")
 			return route.fulfill({
@@ -199,33 +238,25 @@ test("failed saves retain the intended plan", async ({ page }) => {
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
-	const draft = await readTemporaryVersion(page);
+	const saved = await readSavedServerPlan();
 	expect(
-		draft?.movements.find(
-			(movement: { id: string }) => movement.id === "invest",
-		)?.amount,
-	).toBe(900);
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("600");
 });
 
-test("corrupt persisted data never silently falls back to example content", async ({
-	page,
-}) => {
-	// The remote workspace key holds the unsaved changes. Corrupt it and the
-	// app must surface a recovery path rather than invent a plan.
+test("corrupt persisted data never blocks the saved plan", async ({ page }) => {
+	// No draft is restored from the remote workspace key anymore, but a
+	// corrupt value there must not break loading or fall back to example
+	// content.
 	await seedResourceStorage(page, REMOTE_STORAGE_KEY, "invalid");
 	await page.goto("/");
-	const storageNotice = page
-		.getByRole("alert")
-		.filter({ hasText: "could not be read" });
-	await expect(storageNotice).toContainText(
-		"Stored remote workspace data could not be read",
-	);
-	await expect(storageNotice).toContainText(
-		"Your saved plan has not been replaced",
-	);
-	// The canonical server model is still shown, not example content: the
+	await expect(
+		page.getByRole("alert").filter({ hasText: "could not be read" }),
+	).toHaveCount(0);
+	// The canonical server model is shown, not example content: the
 	// cash-flow evidence comes from the engine running on the fixture plan.
 	await page.getByRole("button", { name: "Inspect cash flow" }).click();
 	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
@@ -250,7 +281,7 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 		expect(issues(results.violations), path).toEqual([]);
 	}
 	await page.goto("/");
-	await openInvestingMovementEditor(page);
+	await openInvestingTransactionEditor(page);
 	const results = await new AxeBuilder({ page })
 		.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
 		.analyze();
@@ -405,7 +436,8 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	await page.route("**/v1/projections/stochastic", (route) => route.abort());
 	await page.goto("/");
 	await expect(page.getByRole("alert")).toContainText("The API request failed");
-	await expect(page.getByRole("button", { name: "Retry scenario calculation" }),
+	await expect(
+		page.getByRole("button", { name: "Retry scenario calculation" }),
 	).toBeVisible();
 	// The pinned threshold card shows the current value with a "today"
 	// qualifier.
@@ -424,39 +456,61 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 	await expect(
 		page.getByRole("button", { name: "Connect SimpleFIN" }),
 	).toBeDisabled();
-	await openInvestingMovementEditor(page);
+	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	// Unsaved changes are allowed; saving them back to the source is not.
+	await page.getByRole("button", { name: "Save changes" }).click();
+	// The edit stages locally, but the read-only server rejects the save,
+	// so the banner Save stays disabled and the server is untouched.
 	await expect(
-		page.getByText("1 unsaved change · saved plan unchanged"),
+		page.getByText("1 unsaved change · not saved yet"),
 	).toBeVisible();
 	await expect(
 		page.getByRole("button", { name: "Save changes" }),
 	).toBeDisabled();
+	const saved = await readSavedServerPlan();
+	expect(
+		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("600");
 });
 
-test("a second tab cannot overwrite newer financial work", async ({
+test("tabs save independently with last write winning", async ({
 	page,
 	context,
 }) => {
 	await page.goto("/");
 	const other = await context.newPage();
 	await other.goto("/");
-	await openInvestingMovementEditor(other);
+	await openInvestingTransactionEditor(other);
 	await other.getByLabel("Amount (USD)").fill("1200");
-	await other.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await openInvestingMovementEditor(page);
+	await other.getByRole("button", { name: "Save changes" }).click();
+	// The other tab's save lands first; last write wins below.
+	await expect
+		.poll(async () => {
+			const saved = await readSavedServerPlan();
+			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+				.config.expression;
+		})
+		.toBe("1200");
+	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("1300");
-	await page.getByRole("button", { name: "Apply unsaved changes" }).click();
-	await expect(page.getByRole("alert")).toContainText("another tab");
-	const stored = await readTemporaryVersion(page);
-	// The newer write from the other tab is what survives.
+	await page.getByRole("button", { name: "Save changes" }).click();
+	await expect
+		.poll(async () => {
+			const saved = await readSavedServerPlan();
+			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
+				.config.expression;
+		})
+		.toBe("1300");
+	// Independent saves warn about nothing across tabs.
+	await expect(
+		page.getByRole("alert").filter({ hasText: "another tab" }),
+	).toHaveCount(0);
+	const final = await readSavedServerPlan();
 	expect(
-		stored.movements.find(
-			(movement: { id: string }) => movement.id === "invest",
-		).amount,
-	).toBe(1200);
+		final.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+			.expression,
+	).toBe("1300");
 	await other.close();
 });
 

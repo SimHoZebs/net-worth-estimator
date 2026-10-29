@@ -49,6 +49,14 @@ func (s *Server) updateEvaluation(_ context.Context, input *struct {
 	item := input.Body
 	item.InstanceID = input.InstanceID
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+		// A type change moves the instance across tables: remove it
+		// everywhere first, then insert into the target table. The store
+		// does the same atomically and keeps the pin.
+		for _, evalType := range types.EvaluationTypeOrder {
+			if slice := evalSlice(document, evalType); slice != nil {
+				*slice = removeByID(*slice, item.InstanceID, instanceIDOf)
+			}
+		}
 		if slice := evalSlice(document, item.Type); slice != nil {
 			*slice = replaceByID(*slice, item.InstanceID, instanceIDOf, evalToInstance(item))
 		}
