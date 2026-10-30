@@ -306,7 +306,7 @@ func TestConvertTransactionRespectsReadOnly(t *testing.T) {
 	}
 }
 
-func TestUpdatePostingKeepsPurchasePolicy(t *testing.T) {
+func TestPostingAPIRejectsRetiredPurchaseMarker(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
@@ -316,26 +316,15 @@ func TestUpdatePostingKeepsPurchasePolicy(t *testing.T) {
 	}
 	posting := `{"id":"01900000-0000-7000-8000-000000000021","name":"Laptop","sourceAccountId":"cash","postedTime":1782950400,"transactionTime":1782950400,"amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"enabled":true,"purchase":{"priority":0}}`
 	created := doRowRequest(t, handler, http.MethodPost, "/v1/postings", posting)
-	if created.Code != http.StatusOK {
-		t.Fatalf("create status = %d, body %s", created.Code, created.Body.String())
-	}
-	// An update without a purchase body must keep the stored policy instead
-	// of dropping the wishlist link.
-	renamed := `{"name":"Laptop Pro","sourceAccountId":"cash","postedTime":1782950400,"transactionTime":1782950400,"amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"enabled":true}`
-	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000021", renamed)
-	if updated.Code != http.StatusOK {
-		t.Fatalf("update status = %d, body %s", updated.Code, updated.Body.String())
+	if created.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("retired marker accepted: %d %s", created.Code, created.Body.String())
 	}
 	document, err := database.LoadDocument()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	stored := document.Postings[0]
-	if stored.Name != "Laptop Pro" {
-		t.Fatalf("posting = %+v", stored)
-	}
-	if stored.Purchase == nil || stored.Purchase.Priority != 0 {
-		t.Fatalf("purchase policy = %+v, want priority 0 kept", stored.Purchase)
+	if document != nil && len(document.Postings) != 0 {
+		t.Fatal("retired payload became a real movement")
 	}
 }
 

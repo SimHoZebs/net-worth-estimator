@@ -17,9 +17,9 @@ func validatePlannedPurchasesConfig(config any) error {
 }
 
 type PurchaseOutcome struct {
-	PostingID string  `json:"postingId"`
-	Date      *string `json:"date"`
-	Amount    float64 `json:"amount"`
+	PurchaseID string  `json:"purchaseId"`
+	Date       *string `json:"date"`
+	Amount     float64 `json:"amount"`
 }
 
 type PlannedPurchasesPathResult struct {
@@ -63,43 +63,12 @@ func evaluatePlannedPurchases(ctx *EvaluationContext, _ any) (PathResult, error)
 	}
 	result := &PlannedPurchasesPathResult{Purchases: []PurchaseOutcome{}, AllFunded: true}
 	completed := ctx.Path.ProjectionStartDate
-	// New planned-purchase rows first, then legacy posting purchases.
 	for _, planned := range document.PlannedPurchases {
 		if !planned.Enabled {
 			continue
 		}
-		outcome := PurchaseOutcome{PostingID: planned.ID, Amount: planned.Cost}
+		outcome := PurchaseOutcome{PurchaseID: planned.ID, Amount: planned.Cost}
 		if event := fullyFundedPurchase(&run, planned.ID); event != nil {
-			date := event.Date
-			outcome.Date = &date
-			if date > completed {
-				completed = date
-			}
-		} else {
-			result.AllFunded = false
-		}
-		result.Purchases = append(result.Purchases, outcome)
-	}
-	for _, posting := range request.Model.Postings {
-		if !posting.Enabled || posting.Purchase == nil {
-			continue
-		}
-		duplicate := false
-		for _, planned := range document.PlannedPurchases {
-			if planned.ID == posting.ID {
-				duplicate = true
-				break
-			}
-		}
-		if duplicate {
-			continue
-		}
-		cost, err := purchaseCost(&posting)
-		if err != nil {
-			return nil, err
-		}
-		outcome := PurchaseOutcome{PostingID: posting.ID, Amount: cost}
-		if event := fullyFundedPurchase(&run, posting.ID); event != nil {
 			date := event.Date
 			outcome.Date = &date
 			if date > completed {

@@ -8,10 +8,8 @@ import (
 )
 
 type scheduledPurchase struct {
-	posting  *types.Posting
+	purchase *types.PlannedPurchase
 	date     string
-	priority int
-	cost     float64
 }
 
 // purchasesCandidateRequest rebuilds the purchases candidate simulation
@@ -62,16 +60,13 @@ func plannedToPosting(p *types.PlannedPurchase) *types.Posting {
 		PostedTime:      midnightUnix(p.EarliestDate),
 		TransactionTime: midnightUnix(p.EarliestDate),
 		Enabled:         p.Enabled,
-		Purchase:        &types.PurchasePolicy{Priority: p.Priority},
 	}
 }
-
-func purchaseEarliestDay(posting *types.Posting) string { return postingDay(posting) }
 
 func appendScheduledPurchases(byDate map[string][]DatedPostingOccurrence, purchases []scheduledPurchase) {
 	for index, purchase := range purchases {
 		byDate[purchase.date] = append(byDate[purchase.date], DatedPostingOccurrence{
-			Posting: purchase.posting, Index: index,
+			Posting: plannedToPosting(purchase.purchase), Purchase: purchase.purchase, Index: index,
 		})
 	}
 }
@@ -80,14 +75,13 @@ func appendScheduledPurchases(byDate map[string][]DatedPostingOccurrence, purcha
 // candidate simulation uses the same kernel and funding-gap assessment as public projections.
 // Rejected candidates never change the accepted state or the canonical document.
 //
-// New planned-purchase rows (Model.PlannedPurchases) are the primary queue;
-// legacy Posting.Purchase rows are merged for backward compatibility.
+// Planned purchases remain separate from canonical money movements. Only this
+// private branch synthesizes executable movements for accepted candidates.
 func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, error) {
 	if err := requireResimulationAllowed("simulatePurchases"); err != nil {
 		return types.SimulationRun{}, err
 	}
-	queue := []*types.Posting{}
-	seenIDs := map[string]bool{}
+	queue := []*types.PlannedPurchase{}
 	for index := range request.Model.PlannedPurchases {
 		p := &request.Model.PlannedPurchases[index]
 		if !p.Enabled {
@@ -96,27 +90,19 @@ func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, er
 		if err := validatePlannedPurchaseCost(p.Cost, p.ID); err != nil {
 			return types.SimulationRun{}, err
 		}
-		synthetic := plannedToPosting(p)
-		queue = append(queue, synthetic)
-		seenIDs[p.ID] = true
-	}
-	for index := range request.Model.Postings {
-		posting := &request.Model.Postings[index]
-		if posting.Enabled && posting.Purchase != nil && !seenIDs[posting.ID] {
-			queue = append(queue, posting)
-		}
+		queue = append(queue, p)
 	}
 	if len(queue) == 0 {
 		return simulateScheduled(request, nil, nil)
 	}
 	firstDate := request.StartDate
 	dateSet := map[string]bool{}
-	for _, posting := range queue {
-		if day := postingDay(posting); day >= firstDate && day <= request.EndDate {
+	for _, purchase := range queue {
+		if day := purchase.EarliestDate; day >= firstDate && day <= request.EndDate {
 			dateSet[day] = true
 		}
 	}
-	sort.SliceStable(queue, func(i, j int) bool { return queue[i].Purchase.Priority < queue[j].Purchase.Priority })
+	sort.SliceStable(queue, func(i, j int) bool { return queue[i].Priority < queue[j].Priority })
 	if firstDate <= request.EndDate {
 		dateSet[firstDate] = true
 	}
@@ -136,27 +122,24 @@ func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, er
 	scheduled := []scheduledPurchase{}
 	accounts := accountIndex(request.Model.Accounts)
 	lastDate := firstDate
-	for _, posting := range queue {
+	for _, purchase := range queue {
 		found := false
-		cost, err := purchaseCost(posting)
-		if err != nil {
-			return types.SimulationRun{}, err
-		}
+		cost := purchase.Cost
 		for _, snapshot := range accepted.Snapshots {
 			date := snapshot.Date
-			if date < lastDate || date < postingDay(posting) {
+			if date < lastDate || date < purchase.EarliestDate {
 				continue
 			}
 			// Avoid a full simulation when the current source cannot buy the whole item.
-			if posting.SourceAccountID == nil || GetWithdrawableAmount(snapshot.Balances, accounts, *posting.SourceAccountID)+transactionEpsilon < cost {
+			if purchase.FundingAccountID == nil || GetWithdrawableAmount(snapshot.Balances, accounts, *purchase.FundingAccountID)+transactionEpsilon < cost {
 				continue
 			}
-			candidateSchedule := append(append([]scheduledPurchase{}, scheduled...), scheduledPurchase{posting: posting, date: date})
+			candidateSchedule := append(append([]scheduledPurchase{}, scheduled...), scheduledPurchase{purchase: purchase, date: date})
 			candidate, err := simulateScheduled(request, candidateSchedule, dates)
 			if err != nil {
 				return types.SimulationRun{}, err
 			}
-			purchaseEvent := fullyFundedPurchase(&candidate, posting.ID)
+			purchaseEvent := fullyFundedPurchase(&candidate, purchase.ID)
 			if purchaseEvent == nil || hasFundingGapAfter(simulationPath(&candidate), date, purchaseEvent.Sequence) {
 				continue
 			}

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 import type {
-	BackendPosting,
+	BackendPlannedPurchase,
 	FinancialModelDocument,
 } from "../api/contracts.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
@@ -121,47 +121,30 @@ describe("saved rows", () => {
 		expect(purchases.result.current).toEqual([]);
 	});
 
-	it("reads the purchase queue from legacy purchase-marker postings", async () => {
-		const laptop: BackendPosting = {
+	it("reads the purchase queue from standalone rows", async () => {
+		const laptop: BackendPlannedPurchase = {
 			id: "laptop",
 			name: "Laptop",
-			sourceAccountId: "cash",
-			destinations: null,
-			amount: {
-				resolver: "expression",
-				config: { expression: "500" },
-				inputs: {},
-			},
-			postedTime: 1769904000,
-			transactionTime: 1769904000,
-			purchase: { priority: 1 },
+			fundingAccountId: "cash",
+			cost: 500,
+			earliestDate: "2026-02-01",
+			priority: 1,
 			enabled: true,
 		};
-		const chair: BackendPosting = {
+		const chair: BackendPlannedPurchase = {
 			...laptop,
 			id: "chair",
 			name: "Chair",
-			amount: {
-				resolver: "expression",
-				config: { expression: "150" },
-				inputs: {},
-			},
-			purchase: { priority: 0 },
-		};
-		const plain: BackendPosting = {
-			...laptop,
-			id: "plain",
-			name: "Plain outflow",
-			purchase: null,
+			cost: 150,
+			priority: 0,
 		};
 		stubTestServer(undefined, {
 			...emptyDocument(),
-			postings: [laptop, plain, chair],
+			plannedPurchases: [laptop, chair],
 		});
 		const purchases = renderHook(() => useSavedPurchases());
 		await waitFor(() => expect(purchases.result.current).not.toBeNull());
-		// Priority order, plain postings ignored: the queue is visible even
-		// though the backend still persists wishlist rows as postings.
+		// Queue priority does not depend on document order.
 		expect(purchases.result.current).toEqual([
 			{
 				id: "chair",
@@ -184,25 +167,9 @@ describe("saved rows", () => {
 		]);
 	});
 
-	it("dedupes standalone and legacy rows for the same purchase", async () => {
-		const legacy: BackendPosting = {
-			id: "laptop",
-			name: "Laptop",
-			sourceAccountId: "cash",
-			destinations: null,
-			amount: {
-				resolver: "expression",
-				config: { expression: "999" },
-				inputs: {},
-			},
-			postedTime: 1769904000,
-			transactionTime: 1769904000,
-			purchase: { priority: 4 },
-			enabled: true,
-		};
+	it("keeps wishlist rows out of saved transactions", async () => {
 		stubTestServer(undefined, {
 			...emptyDocument(),
-			postings: [legacy],
 			plannedPurchases: [
 				{
 					id: "laptop",
@@ -216,8 +183,10 @@ describe("saved rows", () => {
 			],
 		});
 		const purchases = renderHook(() => useSavedPurchases());
+		const transactions = renderHook(() => useSavedTransactions());
 		await waitFor(() => expect(purchases.result.current).not.toBeNull());
-		// The canonical standalone row wins; the legacy mirror collapses.
+		await waitFor(() => expect(transactions.result.current).not.toBeNull());
+		expect(transactions.result.current).toEqual([]);
 		expect(purchases.result.current).toEqual([
 			{
 				id: "laptop",

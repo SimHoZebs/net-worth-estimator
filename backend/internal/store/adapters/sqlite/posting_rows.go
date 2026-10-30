@@ -70,7 +70,6 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 }
 
 // UpdatePosting preserves the parent row, its order, and dependent evidence.
-// Purchase policy remains replace-on-write, independently of other dependents.
 func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error) {
 	err := withRowTx(s.db, func(tx *userTx) error {
 		lifecycle, err := postingLifecycleOf(tx, posting.ID)
@@ -85,18 +84,6 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		posting.Source, posting.Pending, posting.Void = lifecycle.source, lifecycle.pending, lifecycle.void
 		if err := tx.QueryRow(`SELECT execution_order FROM postings WHERE id = ? AND user_id = :user_id`, posting.ID).Scan(&posting.ExecutionOrder); err != nil {
 			return err
-		}
-		if posting.Purchase == nil {
-			// The editor never models the wishlist link: an omitted policy
-			// keeps the stored one instead of dropping it.
-			var priority int
-			if err := tx.QueryRow(`SELECT priority FROM purchase_policies WHERE posting_id = ? AND user_id = :user_id`, posting.ID).Scan(&priority); err != nil {
-				if err != sql.ErrNoRows {
-					return fmt.Errorf("read purchase policy %s: %w", posting.ID, err)
-				}
-			} else {
-				posting.Purchase = &types.PurchasePolicy{Priority: priority}
-			}
 		}
 		destinations, err := json.Marshal(posting.Destinations)
 		if err != nil {
@@ -114,10 +101,7 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 			posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, rule, date, boolToInt(posting.Enabled), posting.ID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`DELETE FROM purchase_policies WHERE posting_id = ? AND user_id = :user_id`, posting.ID); err != nil {
-			return err
-		}
-		return insertPurchasePolicy(tx, &posting)
+		return nil
 	})
 	if err != nil {
 		return types.Posting{}, err
@@ -149,8 +133,7 @@ func (s *sqliteStore) MovePosting(id, beforeID string) error {
 
 // ConvertPostingToRule moves one posting across to a recurrence rule in a
 // single transaction. The entity ID stays claimed, the rule appends at the
-// end of the execution order, and the posting's purchase policy (if any)
-// cascades away with its row. Sync-owned bank rows stay put: convert, like
+// end of the execution order. Sync-owned bank rows stay put: convert, like
 // delete, refuses live pending and void rows.
 func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error) {
 	rule.ID = postingID

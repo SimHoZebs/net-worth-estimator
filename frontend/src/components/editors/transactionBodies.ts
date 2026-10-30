@@ -170,9 +170,6 @@ export function postingUpdateBody({
 			startChanged || timeChanged
 				? (values.transactionTime ?? midnightOfDay(values.startDate))
 				: raw.transactionTime,
-		// The editor never models the wishlist link; the backend replaces the
-		// row, so an omitted purchase would wipe it.
-		...(raw.purchase ? { purchase: raw.purchase } : {}),
 		...(claimChanged
 			? values.claimRuleId && values.claimOccurrenceDate
 				? {
@@ -249,7 +246,7 @@ export function ruleUpdateBody({
 
 /**
  * Subscription claim body: the original posting raw row with only the claim
- * changed. Timestamps, amount descriptor, destinations, and purchase policy
+ * changed. Timestamps, amount descriptor, and destinations
  * stay byte-identical; the source posting is preserved, never rebuilt.
  */
 export function claimPostingBody(
@@ -266,7 +263,6 @@ export function claimPostingBody(
 		postedTime: raw.postedTime,
 		transactionTime: raw.transactionTime,
 		claim: { ruleId, occurrenceDate },
-		...(raw.purchase ? { purchase: raw.purchase } : {}),
 	};
 }
 

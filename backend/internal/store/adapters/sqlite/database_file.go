@@ -10,7 +10,7 @@ import (
 )
 
 // existingDatabaseFile checks paths and schemas without creating files or
-// changing permissions. Setup accepts empty files and the current schema marker.
+// changing permissions. Setup accepts empty files or a complete current schema.
 func existingDatabaseFile(path string, setup bool) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -66,7 +66,7 @@ func existingDatabaseFile(path string, setup bool) (string, error) {
 		var count int
 		err = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).Scan(&count)
 		if err == nil && count != 0 {
-			err = checkSharedSchemaMarker(db)
+			err = checkExistingSchema(db)
 		}
 	} else {
 		err = checkExistingSchema(db)
@@ -175,7 +175,17 @@ func checkExistingSchema(db queryer) error {
 	if err := checkSharedSchemaMarker(db); err != nil {
 		return err
 	}
-	return validateSchemaObjects(db)
+	if err := validateSchemaObjects(db); err != nil {
+		return err
+	}
+	var retiredSource bool
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM postings WHERE source = 'model') OR EXISTS(SELECT 1 FROM checkpoints WHERE source = 'model')`).Scan(&retiredSource); err != nil {
+		return err
+	}
+	if retiredSource {
+		return fmt.Errorf("%w: retired owner source is unsupported; restore a current-schema backup or prepare a reviewed offline upgrade", ErrSetupRequired)
+	}
+	return nil
 }
 
 func checkSharedSchemaMarker(db queryer) error {
@@ -191,6 +201,14 @@ func checkSharedSchemaMarker(db queryer) error {
 	}
 	if count != 1 {
 		return ErrLegacyDatabase
+	}
+	// Setup and runtime reject the retired purchase schema. Only the standalone
+	// operator script under scripts/one-time/planned-purchases can convert it.
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'purchase_policies'`).Scan(&count); err != nil {
+		return err
+	}
+	if count != 0 {
+		return fmt.Errorf("%w: retired purchase schema requires the one-time planned-purchases script before setupdb", ErrSetupRequired)
 	}
 	return nil
 }

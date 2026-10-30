@@ -171,9 +171,6 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 		detailCaps := RuleCapsByID(&path.EffectiveDocument)
 		for index := range detailTransactions {
 			posting := &detailTransactions[index]
-			if posting.Purchase != nil {
-				continue // Evaluation inputs are not established payment evidence.
-			}
 			if selectedIDs != nil && !selectedIDs[posting.ID] {
 				continue
 			}

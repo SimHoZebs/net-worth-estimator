@@ -187,7 +187,6 @@ export interface BackendPosting extends HumaMetadata {
 	postedTime: number;
 	transactionTime: number;
 	claim?: PostingClaim | null;
-	purchase?: { priority: number } | null;
 	executionOrder?: number;
 	enabled: boolean;
 	source?: string;

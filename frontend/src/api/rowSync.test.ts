@@ -208,7 +208,7 @@ describe("diffFinancialModelDocuments", () => {
 });
 
 describe("applyRowOperations", () => {
-	it("diffs planned purchases with moves and translates writes to legacy postings", async () => {
+	it("diffs planned purchases and uses their dedicated endpoints", async () => {
 		const base: FinancialModelDocument = {
 			...emptyDocument(),
 			plannedPurchases: [
@@ -242,16 +242,19 @@ describe("applyRowOperations", () => {
 		const result = await applyRowOperations(operations);
 		expect(result).toEqual({ ok: true, issues: [] });
 		const urls = seen.map((call) => call.url);
-		// Compat shim: standalone rows persist through legacy posting calls.
-		expect(urls).toContain("/v1/postings");
-		expect(urls).toContain("/v1/postings/reorder");
-		expect(urls.some((url) => url.startsWith("/v1/postings/"))).toBe(true);
+		expect(urls).toContain("/v1/planned-purchases");
+		expect(urls).toContain("/v1/planned-purchases/reorder");
+		expect(urls.some((url) => url.startsWith("/v1/planned-purchases/"))).toBe(
+			true,
+		);
+		expect(urls.some((url) => url.startsWith("/v1/postings"))).toBe(false);
 		const create = seen.find(
-			(call) => call.url === "/v1/postings" && call.init?.method === "POST",
+			(call) =>
+				call.url === "/v1/planned-purchases" && call.init?.method === "POST",
 		);
 		expect(JSON.parse(String(create?.init?.body))).toMatchObject({
-			purchase: { priority: 0 },
-			sourceAccountId: "a",
+			priority: 0,
+			fundingAccountId: "a",
 		});
 	});
 

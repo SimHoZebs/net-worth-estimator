@@ -160,13 +160,7 @@ func schemaStatements() []string {
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,
-		`CREATE TABLE IF NOT EXISTS purchase_policies (
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			posting_id TEXT NOT NULL,
-			priority INTEGER NOT NULL CHECK (priority >= 0),
-			PRIMARY KEY(user_id, posting_id),
-			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
-		)`,
+		plannedPurchaseSchema,
 		`CREATE TABLE IF NOT EXISTS recurrence_rules (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
@@ -445,7 +439,7 @@ var requiredSchemaColumns = map[string]string{
 	"posting_sync_keys":        "user_id, provider, bridge_account_id, transaction_id, posting_id",
 	"posting_id_migrations":    "user_id, old_id, new_id",
 	"schema_migrations":        "name",
-	"purchase_policies":        "user_id, posting_id, priority",
+	"planned_purchases":        "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
 	"recurrence_rules":         "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
 	"evaluations":              "user_id, type, instance_id, position, name, enabled, config_json",
 	"projection_artifacts":     "user_id, identity, kind, created_at, payload",
@@ -513,7 +507,7 @@ func expectedSchemaTables() []string {
 		"posting_sync_keys",
 		"posting_id_migrations",
 		"schema_migrations",
-		"purchase_policies",
+		"planned_purchases",
 		"recurrence_rules",
 		"evaluations",
 		"projection_artifacts",

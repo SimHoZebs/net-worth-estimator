@@ -8,6 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -114,7 +115,6 @@ func TestReceiptLifecyclePostingEditsAndRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Name = "Updated expense"
-	p.Purchase = &types.PurchasePolicy{Priority: 2}
 	updated, err := s.UpdatePosting(p)
 	if err != nil || updated.ExecutionOrder != p.ExecutionOrder {
 		t.Fatalf("posting = %+v, %v", updated, err)
@@ -124,18 +124,6 @@ func TestReceiptLifecyclePostingEditsAndRestart(t *testing.T) {
 	}
 	if _, err := s.GetReceipt(r.ID); err != nil {
 		t.Fatalf("edit removed receipt: %v", err)
-	}
-	loaded, _ := s.LoadDocument()
-	if loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 2 {
-		t.Fatal("purchase policy not replaced")
-	}
-	p.Purchase = nil
-	if _, err := s.UpdatePosting(p); err != nil {
-		t.Fatal(err)
-	}
-	loaded, _ = s.LoadDocument()
-	if loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 2 {
-		t.Fatal("omitted policy must keep the stored policy")
 	}
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
@@ -165,16 +153,13 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	if _, err := s.CreateReceipt(context.Background(), "missing", "a.png", image); !errors.Is(err, ErrReceiptNotFound) {
 		t.Fatal(err)
 	}
-	p.Purchase = &types.PurchasePolicy{}
-	if _, err := s.UpdatePosting(p); err != nil {
+	account := "checking"
+	purchase, err := s.CreatePlannedPurchase(types.PlannedPurchase{Name: "Desk", FundingAccountID: &account, Cost: 100, EarliestDate: "2026-02-01", Enabled: true})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateReceipt(context.Background(), p.ID, "a.png", image); err != nil {
-		t.Fatal("planned purchase rejected evidence", err)
-	}
-	p.Purchase = nil
-	if _, err := s.UpdatePosting(p); err != nil {
-		t.Fatal(err)
+	if _, err := s.CreateReceipt(context.Background(), purchase.ID, "a.png", image); !errors.Is(err, ErrReceiptNotFound) {
+		t.Fatal("standalone purchase accepted posting evidence", err)
 	}
 	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
 		t.Fatal(err)
@@ -204,7 +189,7 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	}
 }
 
-func TestReceiptSchemaRequiresExplicitSetup(t *testing.T) {
+func TestSetupRejectsMissingReceiptSchema(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	if _, err := d.db.Exec(`DROP TABLE receipts`); err != nil {
 		t.Fatal(err)
@@ -212,11 +197,12 @@ func TestReceiptSchemaRequiresExplicitSetup(t *testing.T) {
 	if err := checkExistingSchema(d.db); !errors.Is(err, ErrSetupRequired) {
 		t.Fatalf("missing receipt schema = %v", err)
 	}
-	if err := d.setupSchema(); err != nil {
-		t.Fatal(err)
+	before := databaseSchemaSnapshot(t, d)
+	if err := d.setupSchema(); !errors.Is(err, ErrSetupRequired) {
+		t.Fatalf("setup accepted missing receipt schema: %v", err)
 	}
-	if err := checkExistingSchema(d.db); err != nil {
-		t.Fatal(err)
+	if after := databaseSchemaSnapshot(t, d); !reflect.DeepEqual(before, after) {
+		t.Fatal("setup repaired an existing schema")
 	}
 }
 
@@ -321,34 +307,40 @@ func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
 	}
 }
 
-func TestSetupRestoresPostingReceiptFieldFromReceipts(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "field-backfill.db")
+func TestRepeatedSetupPreservesPostingReceiptField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "receipt-field.db")
 	d, err := SetupDatabase(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := privateTestPlan(t, d, "backfill")
+	s := privateTestPlan(t, d, "owner")
 	p := seedReceiptPosting(t, s)
 	r, err := s.CreateReceipt(context.Background(), p.ID, "a.png", types.ReceiptImage{Bytes: []byte("pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.db.Exec(`ALTER TABLE postings DROP COLUMN receipt_ids`); err != nil {
+	other, err := s.CreateReceipt(context.Background(), p.ID, "b.png", types.ReceiptImage{Bytes: []byte("other pixels"), MediaType: "image/png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Valid stored order and formatting belong to the row, not deployment setup.
+	want := " [\"" + other.ID + "\", \"" + r.ID + "\"] "
+	if _, err := s.db.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND user_id = :user_id`, want, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	d.Close()
-	d, err = SetupDatabase(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer d.Close()
-	scoped, err := d.User("backfill")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s = scoped.(*sqliteStore)
-	links, err := s.ListPostingReceiptIDs()
-	if err != nil || len(links[p.ID]) != 1 || links[p.ID][0] != r.ID {
-		t.Fatalf("backfilled links = %+v, %v", links, err)
+	for range 2 {
+		d, err = SetupDatabase(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got string
+		err = d.SQL().QueryRow(`SELECT receipt_ids FROM postings WHERE user_id = 'owner' AND id = ?`, p.ID).Scan(&got)
+		if err != nil || got != want {
+			t.Fatalf("setup rewrote receipt links: %q, %v", got, err)
+		}
+		if err := d.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

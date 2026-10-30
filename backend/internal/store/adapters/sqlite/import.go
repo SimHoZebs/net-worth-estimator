@@ -30,6 +30,7 @@ func (s *sqliteStore) ImportDocument(document *types.FinancialModelDocument) (*t
 	}{
 		{"account", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'account', :user_id FROM accounts WHERE user_id = :user_id`},
 		{"posting", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'posting', :user_id FROM postings WHERE user_id = :user_id`},
+		{"planned-purchase", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'planned-purchase', :user_id FROM planned_purchases WHERE user_id = :user_id`},
 		{"rule", `INSERT INTO entity_ids (id, kind, user_id) SELECT id, 'rule', :user_id FROM recurrence_rules WHERE user_id = :user_id`},
 		{"evaluation", `INSERT INTO entity_ids (id, kind, user_id) SELECT instance_id, 'evaluation', :user_id FROM evaluations WHERE user_id = :user_id`},
 	} {

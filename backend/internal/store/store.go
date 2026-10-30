@@ -48,6 +48,10 @@ type Store interface {
 	UpdatePosting(posting types.Posting) (types.Posting, error)
 	DeletePosting(id string) error
 	MovePosting(id, beforeID string) error
+	CreatePlannedPurchase(purchase types.PlannedPurchase) (types.PlannedPurchase, error)
+	UpdatePlannedPurchase(purchase types.PlannedPurchase) (types.PlannedPurchase, error)
+	DeletePlannedPurchase(id string) error
+	MovePlannedPurchase(id, beforeID string) error
 	// ConvertPostingToRule and ConvertRuleToPosting move one entry
 	// across the posting/rule tables in one store transaction, keeping its ID.
 	ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error)

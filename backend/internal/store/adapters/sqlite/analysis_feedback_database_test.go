@@ -1,7 +1,9 @@
 package sqlite
 
 import (
+	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -51,7 +53,7 @@ func TestAnalysisFeedbackSameIDsStayUserScoped(t *testing.T) {
 	}
 }
 
-func TestAnalysisFeedbackExplicitSchemaUpgradeAndRestart(t *testing.T) {
+func TestAnalysisFeedbackRejectsPriorSchemaWithoutChanges(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "upgrade.db")
 	d, err := SetupDatabase(path)
 	if err != nil {
@@ -59,7 +61,7 @@ func TestAnalysisFeedbackExplicitSchemaUpgradeAndRestart(t *testing.T) {
 	}
 	s := privateTestPlan(t, d, "owner")
 	seedAnalysisEvidence(t, s)
-	finding := completeTestAnalysis(t, s, "v1")
+	completeTestAnalysis(t, s, "v1")
 	// Recreate the immediately preceding Analysis schema with its saved finding.
 	for _, query := range []string{
 		`DROP TABLE analysis_feedback`,
@@ -81,16 +83,32 @@ func TestAnalysisFeedbackExplicitSchemaUpgradeAndRestart(t *testing.T) {
 		}
 		t.Fatalf("runtime accepted pre-feedback schema: %v", err)
 	}
-	d, err = SetupDatabase(path)
+	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s = privateTestPlan(t, d, "owner")
-	upgraded := onlyFinding(t, s)
-	if upgraded.ID != finding.ID || !upgraded.Dismissed || upgraded.Review != nil || upgraded.FeedbackRevision != 0 {
-		t.Fatalf("upgrade lost original=%+v", upgraded)
+	if opened, err := SetupDatabase(path); !errors.Is(err, ErrSetupRequired) {
+		if opened != nil {
+			opened.Close()
+		}
+		t.Fatalf("setup accepted pre-feedback schema: %v", err)
 	}
-	input := feedbackInput(t, upgraded, "confirm")
+	after, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("rejected setup changed source: %v", err)
+	}
+}
+
+func TestAnalysisFeedbackRepeatedSetupAndRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "current.db")
+	d, err := SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := privateTestPlan(t, d, "owner")
+	seedAnalysisEvidence(t, s)
+	finding := completeTestAnalysis(t, s, "v1")
+	input := feedbackInput(t, finding, "confirm")
 	event, err := s.ReviewAnalysisFinding(finding.ID, input)
 	if err != nil {
 		t.Fatal(err)

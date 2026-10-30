@@ -445,12 +445,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			if (method === "PATCH")
 				return write(() => {
 					const postings = current.postings as unknown[];
-					const stored = postings.find(
-						(item) => (item as { id: string }).id === id,
-					) as Record<string, unknown> | undefined;
 					const next = structuredClone(body) as Record<string, unknown>;
-					// An omitted purchase policy keeps the stored wishlist link.
-					if (next.purchase === undefined) next.purchase = stored?.purchase;
 					current.postings = postings.map((item) =>
 						(item as { id: string }).id === id ? { ...next, id } : item,
 					) as typeof current.postings;
@@ -497,6 +492,46 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					(body as { beforeId: string | null }).beforeId ?? null,
 				);
 			}, undefined);
+		if (path === "/v1/planned-purchases" && method === "POST")
+			return write(() => {
+				const rows = (current.plannedPurchases ??= []);
+				const row = structuredClone(body) as NonNullable<
+					typeof current.plannedPurchases
+				>[number];
+				if (row.priority === undefined)
+					row.priority =
+						rows.reduce((max, p) => Math.max(max, p.priority), -1) + 1;
+				rows.push(row);
+			}, body);
+		if (path === "/v1/planned-purchases/reorder" && method === "POST")
+			return write(() => {
+				const rows = (current.plannedPurchases ??= []);
+				moveIn(rows)(
+					(body as { id: string }).id,
+					(body as { beforeId?: string }).beforeId ?? null,
+				);
+				rows.forEach((row, priority) => {
+					row.priority = priority;
+				});
+			}, undefined);
+		match = path.match(/^\/v1\/planned-purchases\/([^/]+)$/);
+		if (match) {
+			const [, id] = match;
+			return write(
+				() => {
+					const rows = current.plannedPurchases ?? [];
+					current.plannedPurchases =
+						method === "PATCH"
+							? rows.map((row) =>
+									row.id === id
+										? { ...(structuredClone(body) as typeof row), id }
+										: row,
+								)
+							: rows.filter((row) => row.id !== id);
+				},
+				method === "PATCH" ? body : undefined,
+			);
+		}
 		if (path === "/v1/recurrence-rules" && method === "POST")
 			return write(() => {
 				const rules = current.recurrenceRules as unknown as Record<

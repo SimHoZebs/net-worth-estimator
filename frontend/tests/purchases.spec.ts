@@ -187,7 +187,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 				if (!response.ok()) return null;
 				const body = (await response.json()) as FinancialModelResponse;
 				return (
-					body.document?.postings.find(
+					body.document?.plannedPurchases?.find(
 						(posting) => posting.name === "Synced-account laptop",
 					) ?? null
 				);
@@ -201,17 +201,15 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		(await savedResponse.json()) as FinancialModelResponse;
 	expect(saved?.accounts).toEqual(baseline?.accounts);
 	expect(saved?.checkpoints).toEqual(baseline?.checkpoints);
+	expect(saved?.postings).toEqual(baseline?.postings);
 	expect(
-		saved?.postings.filter(
-			(posting) => posting.name !== "Synced-account laptop",
+		saved?.plannedPurchases?.find(
+			(purchase) => purchase.name === "Synced-account laptop",
 		),
-	).toEqual(baseline?.postings);
-	expect(
-		saved?.postings.find((posting) => posting.name === "Synced-account laptop"),
 	).toMatchObject({
-		sourceAccountId: "checking",
-		amount: { config: { expression: "500" } },
-		purchase: { priority: 0 },
+		fundingAccountId: "checking",
+		cost: 500,
+		priority: 0,
 	});
 
 	await page.reload();
@@ -222,6 +220,81 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	).toContainText("Synced-account laptop");
 	expect(unexpectedWrites).toEqual([]);
 	expect(errors).toEqual([]);
+});
+
+test("standalone purchase CRUD and priority survive reload without posting writes", async ({
+	page,
+	request,
+}) => {
+	const baseline = (await (
+		await request.get(`${FIXTURE_API}/v1/financial-model`)
+	).json()) as FinancialModelResponse;
+	const purchaseWrites: string[] = [];
+	const postingWrites: string[] = [];
+	page.on("request", (event) => {
+		if (!/^(POST|PATCH|DELETE)$/.test(event.method())) return;
+		const path = new URL(event.url()).pathname;
+		if (path.startsWith("/v1/planned-purchases"))
+			purchaseWrites.push(event.method());
+		if (path.startsWith("/v1/postings")) postingWrites.push(path);
+	});
+	await openPurchases(page);
+	await addPurchase(page, "API desk", "500");
+	await addPurchase(page, "API chair", "150");
+	const read = async () =>
+		(await (
+			await request.get(`${FIXTURE_API}/v1/financial-model`)
+		).json()) as FinancialModelResponse;
+	await expect
+		.poll(async () => (await read()).document?.plannedPurchases?.length)
+		.toBe(2);
+	await page.getByRole("button", { name: "Move API chair up" }).click();
+	await expect
+		.poll(async () => (await read()).document?.plannedPurchases?.[0]?.name)
+		.toBe("API chair");
+	await page.getByRole("button", { name: /Inspect API chair/ }).click();
+	await page
+		.getByRole("dialog", { name: "API chair", exact: true })
+		.getByRole("button", { name: "Edit purchase" })
+		.click();
+	const editor = page.getByRole("dialog", {
+		name: "Edit purchase",
+		exact: true,
+	});
+	await editor.getByLabel("Cost (USD)").fill("200");
+	await editor.getByLabel("Include in purchase queue").uncheck();
+	await editor.getByRole("button", { name: "Save purchase" }).click();
+	await expect
+		.poll(async () => (await read()).document?.plannedPurchases?.[0])
+		.toMatchObject({
+			name: "API chair",
+			cost: 200,
+			enabled: false,
+			priority: 0,
+		});
+	await page.reload();
+	await expect(
+		page
+			.getByRole("region", { name: "Purchase priority" })
+			.locator("li")
+			.first(),
+	).toContainText("API chair");
+	await page.getByRole("button", { name: /Inspect API chair/ }).click();
+	await page
+		.getByRole("dialog", { name: "API chair", exact: true })
+		.getByRole("button", { name: "Remove", exact: true })
+		.click();
+	await page.getByRole("button", { name: "Remove and save" }).click();
+	await expect
+		.poll(async () => (await read()).document?.plannedPurchases?.length)
+		.toBe(1);
+	expect((await read()).document?.postings).toEqual(
+		baseline.document?.postings,
+	);
+	expect(purchaseWrites).toEqual(
+		expect.arrayContaining(["POST", "PATCH", "DELETE"]),
+	);
+	expect(postingWrites).toEqual([]);
 });
 
 // QUARANTINED: the purchase-dates assertions below read the funding schedule
@@ -262,8 +335,10 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	const { document } = (await response.json()) as {
 		document: FinancialModelDocument;
 	};
-	const chair = document.postings.find((item) => item.name === "Chair")!;
-	expect(chair.purchase).toEqual({ priority: 0 });
+	const chair = document.plannedPurchases!.find(
+		(item) => item.name === "Chair",
+	)!;
+	expect(chair.priority).toBe(0);
 	const projection = await request.post(
 		`${FIXTURE_API}/v1/projections/deterministic`,
 		{
@@ -292,8 +367,8 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	const { result } = await projection.json();
 	const purchasesInBaseline = result.transactionEvents.filter(
 		(event: { origin: { postingId: string } }) =>
-			document.postings.some(
-				(posting) => posting.purchase && posting.id === event.origin.postingId,
+			document.plannedPurchases!.some(
+				(purchase) => purchase.id === event.origin.postingId,
 			),
 	);
 	expect(purchasesInBaseline).toHaveLength(0);
@@ -309,7 +384,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 			data: {
 				document: {
 					...document,
-					postings: document.postings.filter((item) => !item.purchase),
+					plannedPurchases: [],
 				},
 				settings: {
 					fallbackProjectionStartDate: "2026-01-31",

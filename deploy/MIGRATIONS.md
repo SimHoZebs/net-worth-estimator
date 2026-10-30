@@ -15,18 +15,24 @@ The image also provides `sqlite3` for offline SQL and SQLite-safe backups.
 The current body performs one combined offline upgrade. It converts the
 deployed user-scoped date-only checkpoints to exact UTC day-close instants
 and enables legacy settled bank rows with their posted event time, then
-provisions the Analysis evidence, findings, and feedback schema. Conversion
-and repair run inside a candidate copy of a verified backup; the existing
-`setupdb` then provisions Analysis on that candidate. Only the verified
+provisions the Analysis evidence, findings, and feedback schema from frozen SQL
+in `analysis-schema.sql`. It then runs the independent
+`/app/upgrade-planned-purchases` tool to convert retired purchase policies.
+Conversion and repair run inside a candidate copy of a verified backup;
+`setupdb` only validates the complete current schema on that candidate. A logical
+database digest proves that validation changes no schema or rows. Only the verified
 candidate is published over the original database, so the original file is
 never mutated before publication. It accepts current `shared-accounts-v1`
-storage with date-only or final checkpoints and with or without Analysis
-tables, or the complete target schema on repeat runs. Partial application or
+storage with date-only or final checkpoints, zero or all Analysis tables, and
+either the retired or standalone purchase shape. Complete targets repeat read-only.
+Mixed purchase shapes and partial application or
 Analysis schemas fail before any backup. It checks integrity and foreign
 keys, creates a private `<database>.analysis-backup.XXXXXX/before.db` with
 the SQLite backup API, and compares every preexisting application table,
 except the schema-marker table, against that backup. Only the checkpoint
-date-to-instant conversion and the settled-bank repair may differ. A
+date-to-instant conversion, settled-bank repair, and explicit purchase-row
+conversion may differ. Purchase conversion preserves all other rows, identities,
+and Analysis evidence. Unsafe purchase inputs leave the original unchanged. A
 complete target repeat performs read-only checks only and never reactivates
 a post-upgrade owner disable.
 

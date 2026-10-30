@@ -15,11 +15,11 @@ func purchaseEvaluation() []types.EvaluationInstance[types.JsonValue] {
 
 func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T) {
 	request := purchaseRequest(1000,
-		purchasePosting("laptop", "2025-01-01", "500", 0),
-		purchasePosting("chair", "2026-02-01", "150", 1),
+		plannedPurchase("laptop", "2025-01-01", "500", 0),
+		plannedPurchase("chair", "2026-02-01", "150", 1),
 		establishedPosting("rent", "2026-02-02", "900", false),
 		establishedPosting("pay", "2026-02-05", "1000", true))
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings,
+	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	settings.Evaluations.PlannedPurchases = purchaseEvaluation()
@@ -40,6 +40,9 @@ func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T)
 		t.Fatalf("analysis = %+v", analysis)
 	}
 	for _, purchase := range analysis.Purchases {
+		if purchase.PurchaseID != "laptop" && purchase.PurchaseID != "chair" {
+			t.Fatalf("outcome lost purchase identity: %+v", purchase)
+		}
 		if purchase.Date == nil || *purchase.Date != "2026-02-05" {
 			t.Fatalf("purchase = %+v", purchase)
 		}
@@ -72,11 +75,11 @@ func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, priority := range []int{0, 2} {
-		purchase := purchasePosting("laptop", "2026-02-01", "500", priority)
-		purchase.SourceAccountID = &document.Accounts[0].ID
-		other := purchasePosting("chair", "2026-02-03", "150", 1)
-		other.SourceAccountID = purchase.SourceAccountID
-		document.Postings = []types.Posting{purchase, other}
+		purchase := plannedPurchase("laptop", "2026-02-01", "500", priority)
+		purchase.FundingAccountID = &document.Accounts[0].ID
+		other := plannedPurchase("chair", "2026-02-03", "150", 1)
+		other.FundingAccountID = purchase.FundingAccountID
+		document.PlannedPurchases = []types.PlannedPurchase{purchase, other}
 		settings.Evaluations.PlannedPurchases = purchaseEvaluation()
 		result, err := ProjectFinancialModelDocument(document, settings, types.ModelOverrides{}, nil)
 		if err != nil {
@@ -105,14 +108,14 @@ func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 }
 
 func TestPlannedPurchasesSampleUsesTheBaselineSample(t *testing.T) {
-	request := purchaseRequest(0, purchasePosting("want", "2026-02-01", "50", 0))
+	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "50", 0))
 	end := "2026-03-01"
 	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
 		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
 		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
 	}}
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules}
+	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	for _, rate := range []float64{0, 100} {
 		sample := &types.MonteCarloSample{AnnualRatesByPostingID: map[string][]float64{"pay": {rate}}}

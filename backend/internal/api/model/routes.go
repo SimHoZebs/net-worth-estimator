@@ -16,6 +16,7 @@ type handler struct {
 func Register(api huma.API, st store.Store, receiptService *receipts.Service, readOnly bool) {
 	s := &handler{store: st, receipts: receiptService, readOnly: readOnly}
 	api = huma.NewGroup(api, "/v1")
+	s.registerPlannedPurchaseRoutes(api)
 	huma.Register(api, huma.Operation{OperationID: "get-safe-spending-settings", Method: "GET", Path: "/safe-spending-settings", Summary: "Load safe card spending settings"}, s.getSafeSpendingSettings)
 	huma.Register(api, huma.Operation{OperationID: "set-safe-spending-settings", Method: "PUT", Path: "/safe-spending-settings", Summary: "Save safe card spending settings"}, s.setSafeSpendingSettings)
 	huma.Register(api, huma.Operation{

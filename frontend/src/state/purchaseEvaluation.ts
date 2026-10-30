@@ -35,14 +35,14 @@ export function purchaseSchedule(
 	for (const item of value.purchases) {
 		if (
 			!isRecord(item) ||
-			typeof item.postingId !== "string" ||
+			typeof item.purchaseId !== "string" ||
 			(item.date !== null && typeof item.date !== "string") ||
 			typeof item.amount !== "number" ||
 			!Number.isFinite(item.amount)
 		)
 			return null;
 		purchases.push({
-			postingId: item.postingId,
+			purchaseId: item.purchaseId,
 			date: item.date,
 			amount: item.amount,
 		});

@@ -30,8 +30,9 @@ func TestExactCutChangesArtifactIdentity(t *testing.T) {
 }
 
 func TestArtifactIdentityPreservesStoredResultKeys(t *testing.T) {
-	// Timestamped replay changes the result contract and orphans older artifacts.
-	const want = "deterministic:8:ddae3ceab09a9f17ef8a44bf11555519b0c88087b061fc1544b917d8a072dfb1"
+	// Standalone purchases expose purchaseId instead of postingId. Pin the
+	// new envelope so old payloads cannot survive the contract change.
+	const want = "deterministic:9:596ee79a5b8b67317f3f55ea0b72244f416ddab28c8511774831daaceb5c3d6d"
 	if got := artifactKey("deterministic", map[string]any{"example": "identity"}); got != want {
 		t.Fatalf("result identity = %q, want %q", got, want)
 	}

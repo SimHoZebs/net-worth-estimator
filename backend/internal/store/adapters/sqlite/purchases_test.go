@@ -9,53 +9,32 @@ import (
 )
 
 func TestPurchaseEvaluationPersistsThroughRowAndModelWrites(t *testing.T) {
-	database, err := Open(filepath.Join(t.TempDir(), "evaluations.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer database.Close()
+	database := openTestStore(t)
 	item := EvaluationUpdate{Type: types.EvaluationTypePlannedPurchases, InstanceID: "purchases", Name: "Purchases", Enabled: true, Config: map[string]any{}}
 	if _, err := database.CreateEvaluation(item); err != nil {
 		t.Fatal(err)
 	}
 	document, err := database.LoadDocument()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(document.Evaluations.PlannedPurchases) != 1 {
-		t.Fatalf("evaluations = %+v", document.Evaluations)
+	if err != nil || len(document.Evaluations.PlannedPurchases) != 1 {
+		t.Fatalf("document: %+v %v", document, err)
 	}
 	before := document.Evaluations
-	tx, err := database.(*sqliteStore).db.Begin()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback()
-	if err := replaceDocument(tx, document); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-	loaded, err := database.LoadDocument()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(before, loaded.Evaluations) {
-		t.Fatal("model replacement lost evaluation")
+	loaded, err := database.ImportDocument(document)
+	if err != nil || !reflect.DeepEqual(before, loaded.Evaluations) {
+		t.Fatalf("model replacement lost evaluation: %+v %v", loaded, err)
 	}
 }
 
-func TestPurchasePolicyPersistsWithPosting(t *testing.T) {
+func TestStandalonePurchasePersistsAcrossRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "purchases.db")
 	database, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	posting := testPostingFixture("01900000-0000-7000-8000-000000000021")
 	seedAccount(t, database, "checking")
-	posting.Purchase = &types.PurchasePolicy{Priority: 7}
-	if _, err := database.CreatePosting(posting); err != nil {
+	account := "checking"
+	purchase := types.PlannedPurchase{ID: "01900000-0000-7000-8000-000000000021", Name: "Laptop", FundingAccountID: &account, Cost: 500, EarliestDate: "2026-02-01", Priority: 7, Enabled: true}
+	if _, err := database.CreatePlannedPurchase(purchase); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.Close(); err != nil {
@@ -67,43 +46,25 @@ func TestPurchasePolicyPersistsWithPosting(t *testing.T) {
 	}
 	defer database.Close()
 	loaded, err := database.LoadDocument()
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || len(loaded.Postings) != 0 || len(loaded.PlannedPurchases) != 1 || !reflect.DeepEqual(loaded.PlannedPurchases[0], purchase) {
+		t.Fatalf("loaded = %+v %v", loaded, err)
 	}
-	if loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 7 {
-		t.Fatalf("loaded = %+v", loaded.Postings)
-	}
-	posting.Purchase.Priority = 1
-	if _, err := database.UpdatePosting(posting); err != nil {
+	purchase.Priority = 1
+	if _, err := database.UpdatePlannedPurchase(purchase); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = database.LoadDocument()
-	if err != nil || loaded.Postings[0].Purchase.Priority != 1 {
-		t.Fatalf("updated = %+v, %v", loaded, err)
+	if err != nil || loaded.PlannedPurchases[0].Priority != 1 {
+		t.Fatalf("updated = %+v %v", loaded, err)
 	}
-	posting.Purchase = nil
-	if _, err := database.UpdatePosting(posting); err != nil {
+	if err := database.DeletePlannedPurchase(purchase.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.CreatePosting(testPostingFixture(purchase.ID)); err != nil {
 		t.Fatal(err)
 	}
 	loaded, err = database.LoadDocument()
-	if err != nil || loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 1 {
-		t.Fatalf("omitted policy must keep the stored policy: %+v, %v", loaded, err)
-	}
-	posting.Purchase = &types.PurchasePolicy{Priority: 0}
-	if _, err := database.UpdatePosting(posting); err != nil {
-		t.Fatal(err)
-	}
-	if err := database.DeletePosting(posting.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.CreatePosting(testPostingFixture(posting.ID)); err != nil {
-		t.Fatal(err)
-	}
-	loaded, err = database.LoadDocument()
-	if err != nil || loaded.Postings[0].Purchase != nil {
-		t.Fatalf("stale policy survived deletion: %+v, %v", loaded, err)
-	}
-	if err := database.Clear(); err != nil {
-		t.Fatal(err)
+	if err != nil || len(loaded.PlannedPurchases) != 0 || len(loaded.Postings) != 1 {
+		t.Fatalf("stale purchase survived: %+v %v", loaded, err)
 	}
 }

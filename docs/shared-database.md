@@ -37,9 +37,19 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
 ```
 
 `setupdb` creates the private parent directory, database, and complete financial
-and identity schema. Repeat setup preserves existing data. Run schema setup with
-the API stopped when a deployment requires a schema change. Legacy unscoped
-databases are unsupported.
+and identity schema for a fresh database. Existing databases must already have
+the complete current schema. Repeat setup validates that schema and preserves
+stored rows. It can tighten file permissions, but it never adds missing tables,
+columns, indexes, or triggers to an existing database.
+
+Schema and data upgrades require a separately reviewed offline operation. Stop the
+API and create a verified backup before an upgrade. Setup and runtime reject
+incomplete schemas, inline receipt images, missing posting fields, and the retired
+owner source value `model`. Older automatic conversions are removed.
+This tree supplies the [planned-purchase upgrade](purchase-queue.md#persistence)
+and the separate [Analysis deployment operation](../deploy/MIGRATIONS.md).
+For other unsupported shapes, restore a verified current-schema backup or prepare
+an operator upgrade specific to the source. No replacement converter is supplied.
 
 To provision any user's empty financial rows, pass both `--issuer` and
 `--subject`. Use the guest's provider subject for its application workspace:
@@ -68,9 +78,10 @@ docker compose up -d
 ```
 
 Use the same private environment file and volume for setup and the API. Komodo
-runs this setup automatically as the stack `post_deploy` step on every deploy,
-so app schema changes apply without manual intervention (re-runs are
-harmless). Do not put setup in the server entrypoint or an automatic startup
+runs this setup as the stack `post_deploy` step on every deploy. That step
+provisions a fresh database or validates a current one. It does not perform
+version upgrades. Complete any required one-time upgrade before the new API
+starts. Do not put setup in the server entrypoint or an automatic startup
 dependency. Outside Komodo, run this maintenance command explicitly.
 Dev setup and the isolated fixture harness also provision explicitly.
 

@@ -8,10 +8,8 @@ import { modelOptions, userResourceKey } from "@/state/workspaceResources.ts";
 import { performSave } from "./workspaceWrites.ts";
 
 /**
- * Row-first purchase writes. The backend still persists wishlist rows as
- * postings with a purchase marker, so every operation below targets the
- * plannedPurchase row shape and lets rowSync translate it onto the legacy
- * posting shape. No whole-document diff is ever built here.
+ * Row-first purchase writes use the dedicated planned-purchase API.
+ * No whole-document diff is built here.
  */
 
 /** Backend row for one wishlist item. Priority is the queue index. */

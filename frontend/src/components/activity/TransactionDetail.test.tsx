@@ -351,7 +351,7 @@ it("converts a subscription through row endpoints and preserves the source posti
 
 it("retries a rejected claim without creating a second rule", async () => {
 	// Raw source carries non-midnight times, a custom amount resolver with
-	// extra inputs, and a wishlist purchase link; the claim body must keep
+	// extra inputs; the claim body must keep
 	// all of them byte-identical.
 	const document = fixtureDocument(financialModelFixture);
 	const day = Math.floor(Date.parse("2028-06-15T00:00:00Z") / 1000);
@@ -369,7 +369,6 @@ it("retries a rejected claim without creating a second rule", async () => {
 			},
 		},
 	};
-	raw.purchase = { priority: 2 };
 	const server = stubTestServer(undefined, document);
 	acceptTestResource();
 	setServerModelFixture(financialModelFixture, { document });
@@ -413,7 +412,7 @@ it("retries a rejected claim without creating a second rule", async () => {
 	expect(claimBody.postedTime).toBe(day + 45245);
 	expect(claimBody.transactionTime).toBe(day + 123);
 	expect(claimBody.amount).toEqual(raw.amount);
-	expect(claimBody.purchase).toEqual({ priority: 2 });
+	expect(claimBody.purchase).toBeUndefined();
 	expect(claimBody.claim).toEqual({
 		ruleId: ruleCreates().map((call) => call.body as { id: string })[0]?.id,
 		occurrenceDate: "2028-06-15",

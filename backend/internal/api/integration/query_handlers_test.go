@@ -224,7 +224,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	}
 }
 
-func TestListTransactionsExcludesPurchaseMarkers(t *testing.T) {
+func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	account := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"id":"cash","name":"Cash","kind":"cash","minBalance":0,"enabled":true}`)
@@ -236,10 +236,10 @@ func TestListTransactionsExcludesPurchaseMarkers(t *testing.T) {
 	if normal.Code != http.StatusOK {
 		t.Fatalf("create posting status = %d, body %s", normal.Code, normal.Body.String())
 	}
-	marker := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"id":"01900000-0000-7000-8000-000000000032","name":"Laptop","sourceAccountId":"cash","amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"postedTime":1769904000,"transactionTime":1769904000,"enabled":true,"purchase":{"priority":0}}`)
+	marker := doRowRequest(t, handler, http.MethodPost, "/v1/planned-purchases",
+		`{"id":"01900000-0000-7000-8000-000000000032","name":"Laptop","fundingAccountId":"cash","cost":500,"earliestDate":"2026-02-01","enabled":true,"priority":0}`)
 	if marker.Code != http.StatusOK {
-		t.Fatalf("create purchase posting status = %d, body %s", marker.Code, marker.Body.String())
+		t.Fatalf("create purchase status = %d, body %s", marker.Code, marker.Body.String())
 	}
 
 	for _, path := range []string{"/v1/transactions", "/v1/transactions?recurring=once"} {
@@ -273,17 +273,17 @@ func TestListTransactionsExcludesPurchaseMarkers(t *testing.T) {
 	if err := json.Unmarshal(model.Body.Bytes(), &read); err != nil {
 		t.Fatalf("decode model: %v", err)
 	}
-	if len(read.Document.Postings) != 2 {
-		t.Fatalf("postings = %d, want 2", len(read.Document.Postings))
+	if len(read.Document.Postings) != 1 {
+		t.Fatalf("postings = %d, want 1", len(read.Document.Postings))
 	}
 	kept := false
-	for _, posting := range read.Document.Postings {
-		if posting.Purchase != nil && posting.ID == "01900000-0000-7000-8000-000000000032" {
+	for _, purchase := range read.Document.PlannedPurchases {
+		if purchase.ID == "01900000-0000-7000-8000-000000000032" {
 			kept = true
 		}
 	}
 	if !kept {
-		t.Fatal("purchase marker missing from saved model")
+		t.Fatal("planned purchase missing from saved model")
 	}
 
 	// Reads keep working under read-only grants; only writes are blocked.

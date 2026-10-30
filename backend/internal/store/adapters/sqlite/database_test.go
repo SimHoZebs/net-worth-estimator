@@ -167,7 +167,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { return a.MoveAccount("second", "checking") },
 		func() error {
 			p := testPostingFixture(postingID)
-			p.Purchase = &types.PurchasePolicy{Priority: 9}
+			p.Name = "A only"
 			_, err := a.UpdatePosting(p)
 			return err
 		},

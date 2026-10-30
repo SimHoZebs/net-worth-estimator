@@ -207,7 +207,6 @@ type Posting struct {
 	PostedTime      int64                   `json:"postedTime"`
 	TransactionTime int64                   `json:"transactionTime"`
 	Claim           *PostingClaim           `json:"claim,omitempty"`
-	Purchase        *PurchasePolicy         `json:"purchase,omitempty"`
 	Enabled         bool                    `json:"enabled"`
 	// Pending is bank lifecycle metadata, independent of identity and Enabled.
 	// Owner writes cannot set it.

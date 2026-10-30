@@ -1,9 +1,6 @@
 package sqlite
 
-import (
-	"database/sql"
-	"fmt"
-)
+import "fmt"
 
 const blobObjectSchema = `CREATE TABLE IF NOT EXISTS blob_objects (
 	key TEXT PRIMARY KEY,
@@ -29,77 +26,6 @@ var receiptBlobSchemaObjects = []string{
 		WHEN OLD.blob_key != NEW.blob_key BEGIN
 		UPDATE blob_objects SET state='deleting', expires_at=0 WHERE key=OLD.blob_key
 		AND NOT EXISTS (SELECT 1 FROM receipts WHERE blob_key=OLD.blob_key); END`,
-}
-
-// migrateInlineReceiptImages runs only inside explicit SetupDatabase. It
-// preserves receipt identities, metadata, financial rows, and normalized bytes.
-func migrateInlineReceiptImages(tx *sql.Tx, defaultSQLite bool) error {
-	rows, err := tx.Query(`PRAGMA table_info(receipts)`)
-	if err != nil {
-		return err
-	}
-	inline := false
-	for rows.Next() {
-		var cid, notnull, pk int
-		var name, kind string
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &kind, &notnull, &defaultValue, &pk); err != nil {
-			rows.Close()
-			return err
-		}
-		inline = inline || name == "image"
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil || !inline {
-		return err
-	}
-	if !defaultSQLite {
-		return fmt.Errorf("migrate inline receipt images with the default SQLite adapter before selecting another blob store")
-	}
-	if _, err := tx.Exec(`ALTER TABLE receipts RENAME TO receipts_inline`); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(receiptSchema); err != nil {
-		return err
-	}
-	rows, err = tx.Query(`SELECT user_id,id FROM receipts_inline`)
-	if err != nil {
-		return err
-	}
-	type identity struct{ user, id string }
-	var identities []identity
-	for rows.Next() {
-		var id identity
-		if err := rows.Scan(&id.user, &id.id); err != nil {
-			rows.Close()
-			return err
-		}
-		identities = append(identities, id)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	for _, id := range identities {
-		key, err := newRowID()
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO blob_objects(key,state,expires_at) VALUES (?,'live',0)`, key); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO blob_data(key,data) SELECT ?,image FROM receipts_inline WHERE user_id=? AND id=?`, key, id.user, id.id); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload)
-			SELECT user_id,id,posting_id,digest,size,?,revision,payload FROM receipts_inline WHERE user_id=? AND id=?`, key, id.user, id.id); err != nil {
-			return err
-		}
-	}
-	_, err = tx.Exec(`DROP TABLE receipts_inline`)
-	return err
 }
 
 func checkReceiptBlobSchemaObjects(db queryer) error {
