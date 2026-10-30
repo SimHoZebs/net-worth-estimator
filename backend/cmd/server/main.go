@@ -65,7 +65,6 @@ func main() {
 	}
 	host := envOr("HOST", "127.0.0.1")
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", defaultDBPath())
-	frontendPath := envOr("NET_WORTH_ESTIMATOR_FRONTEND_PATH", "")
 	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
 		log.Fatalf("configure allowed origins: %v", err)
@@ -109,7 +108,6 @@ func main() {
 		AllowedOrigins: allowedOrigins,
 		ReadOnly:       readOnly,
 		SyncRunner:     syncRunner,
-		FrontendDir:    frontendPath,
 	}
 	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig)
 	if err != nil {

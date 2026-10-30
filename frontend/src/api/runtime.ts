@@ -4,10 +4,6 @@ export const DEFAULT_RUNTIME_API_BASE_URL = "";
 export interface WaypointRuntimeConfig {
 	/** Canonical key. Use this for new config. */
 	apiBaseUrl?: string;
-	/** Deprecated alias for apiBaseUrl. Kept for old embeds. */
-	apiBase?: string;
-	/** Deprecated alias for apiBaseUrl. Kept for old embeds. */
-	baseUrl?: string;
 }
 
 declare global {
@@ -23,27 +19,10 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
 	return trimmed.replace(/\/+$/, "") || DEFAULT_RUNTIME_API_BASE_URL;
 }
 
-function buildApiBaseUrl(): string | null {
-	return normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
-}
-
 function configuredBaseUrl(
 	config: WaypointRuntimeConfig | null | undefined,
 ): string | null {
-	if (
-		config &&
-		config.apiBaseUrl == null &&
-		(config.apiBase ?? config.baseUrl)
-	) {
-		console.warn(
-			"Waypoint config uses deprecated apiBase/baseUrl; use apiBaseUrl.",
-		);
-	}
-	return (
-		normalizeBaseUrl(
-			config?.apiBaseUrl ?? config?.apiBase ?? config?.baseUrl,
-		) ?? buildApiBaseUrl()
-	);
+	return normalizeBaseUrl(config?.apiBaseUrl);
 }
 
 export function getRuntimeConfig(): WaypointRuntimeConfig {
@@ -61,6 +40,3 @@ export function getApiBaseUrl(
 		return normalizeBaseUrl(config) ?? DEFAULT_RUNTIME_API_BASE_URL;
 	return configuredBaseUrl(config) ?? DEFAULT_RUNTIME_API_BASE_URL;
 }
-
-export const runtimeConfig = getRuntimeConfig;
-export const getRuntimeApiBaseUrl = getApiBaseUrl;

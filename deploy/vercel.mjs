@@ -6,8 +6,6 @@ export function vercelConfig(env) {
   if (backend === publicOrigin) throw new Error("BACKEND_URL must differ from the frontend origin");
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(env[secretVariable] || ""))
     throw new Error(`${secretVariable} must contain 32–256 URL-safe characters`);
-  if (env.VITE_API_BASE_URL?.trim())
-    throw new Error("Leave VITE_API_BASE_URL unset; browser requests use the same-origin proxy");
 
   return {
     $schema: "https://openapi.vercel.sh/vercel.json",
