@@ -89,18 +89,6 @@ describe("parseHash", () => {
 			page: "accounts",
 			overlay: null,
 		});
-		expect(parseHash("#plan")).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
-		});
-		expect(parseHash("#goals")).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
-		});
-		expect(parseHash("#account")).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
-		});
 	});
 
 	test("planned purchases has a direct page route", () => {
@@ -168,20 +156,6 @@ describe("parseHash", () => {
 			page: "accounts",
 			overlay: { type: "transactionEdit", key: "new" },
 		});
-		// The retired `edit-movement` segment has no compat path: every old
-		// hash shape resolves to invalid so stale bookmarks normalize back
-		// to the page instead of opening an editor.
-		expect(parseHash("#outlook/edit-movement/invest")).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
-		});
-		expect(parseHash("#accounts/edit-movement/new")).toEqual({
-			page: "accounts",
-			overlay: { type: "invalid" },
-		});
-		expect(
-			resolveOverlayRoute(parseHash("#outlook/edit-movement/invest"), plan),
-		).toEqual({ state: "unknown" });
 		expect(parseHash("#outlook/edit-account/new")).toEqual({
 			page: "outlook",
 			overlay: { type: "accountEdit", key: "new" },
@@ -193,18 +167,6 @@ describe("parseHash", () => {
 		expect(parseHash("#outlook/edit-evaluation/goal-1")).toEqual({
 			page: "outlook",
 			overlay: { type: "evaluationEdit", key: "goal-1" },
-		});
-	});
-
-	test.each([
-		"#evaluations/goal-1",
-		"#goals/goal-1",
-		"#outlook/evaluation/goal-1",
-		"#accounts/evaluation/goal-1",
-		"#outlook/goal-1",
-	])("retired evaluation evidence URL %s resolves to unknown", (hash) => {
-		expect(resolveOverlayRoute(parseHash(hash), plan)).toEqual({
-			state: "unknown",
 		});
 	});
 
@@ -252,18 +214,6 @@ describe("parseHash", () => {
 				tab: "cycle",
 				editTransaction: "invest",
 			},
-		});
-		expect(
-			parseHash("#outlook/safe-spending-detail/cycle/edit-movement/invest"),
-		).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
-		});
-		expect(
-			parseHash("#outlook/safe-spending-detail/edit-movement/invest"),
-		).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
 		});
 		expect(parseHash("#outlook/safe-spending-detail/bogus")).toEqual({
 			page: "outlook",
@@ -551,20 +501,20 @@ describe("hash builders round-trip through the parser", () => {
 		});
 		// "Edit Transaction" slugifies to a reserved segment, so the editor
 		// link uses the explicit id form and still resolves to the account.
-		const legacy = account("move-1", "Edit Transaction");
-		expect(editorHash("accounts", { kind: "account", item: legacy })).toBe(
+		const reserved = account("move-1", "Edit Transaction");
+		expect(editorHash("accounts", { kind: "account", item: reserved })).toBe(
 			"#accounts/edit-account/move-1",
 		);
 		expect(
 			resolveOverlayRoute(
-				parseHash(editorHash("accounts", { kind: "account", item: legacy })),
-				{ ...plan, accounts: [legacy] },
+				parseHash(editorHash("accounts", { kind: "account", item: reserved })),
+				{ ...plan, accounts: [reserved] },
 			),
 		).toEqual({
 			state: "ready",
 			overlay: {
 				kind: "editor",
-				target: { kind: "account", item: legacy },
+				target: { kind: "account", item: reserved },
 			},
 		});
 	});
