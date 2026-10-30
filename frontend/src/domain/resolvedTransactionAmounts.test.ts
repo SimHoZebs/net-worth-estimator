@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { resolveMovementAmounts } from "./resolvedMovementAmounts.ts";
-import type { MovementResult } from "./result.ts";
+import { resolveTransactionAmounts } from "./resolvedTransactionAmounts.ts";
+import type { TransactionResult } from "./result.ts";
 
 function event(
-	movementId: string,
+	transactionId: string,
 	date: string,
 	requested: number,
 	realized: number,
-): MovementResult {
+): TransactionResult {
 	return {
 		date,
-		movementId,
-		name: movementId,
+		transactionId,
+		name: transactionId,
 		requested,
 		realized,
 		fromId: null,
@@ -22,9 +22,9 @@ function event(
 	};
 }
 
-describe("resolveMovementAmounts", () => {
-	it("picks the earliest projected occurrence per movement", () => {
-		const resolved = resolveMovementAmounts([
+describe("resolveTransactionAmounts", () => {
+	it("picks the earliest projected occurrence per transaction", () => {
+		const resolved = resolveTransactionAmounts([
 			event("growth", "2026-03-01", 50, 50),
 			event("growth", "2026-02-01", 40, 40),
 		]);
@@ -36,7 +36,7 @@ describe("resolveMovementAmounts", () => {
 	});
 
 	it("prefers realized over requested and flags shortfalls", () => {
-		const resolved = resolveMovementAmounts([
+		const resolved = resolveTransactionAmounts([
 			event("payoff", "2026-02-01", 500, 300),
 		]);
 		expect(resolved.get("payoff")).toMatchObject({
@@ -47,6 +47,6 @@ describe("resolveMovementAmounts", () => {
 	});
 
 	it("returns an empty map when there are no projected events", () => {
-		expect(resolveMovementAmounts([]).size).toBe(0);
+		expect(resolveTransactionAmounts([]).size).toBe(0);
 	});
 });

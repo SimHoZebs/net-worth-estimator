@@ -63,17 +63,17 @@ func roundRow(row types.ProjectionRow) types.ProjectionRow {
 	return row
 }
 
-type movementAccountDelta = struct {
+type transactionAccountDelta = struct {
 	AccountID string  `json:"accountId"`
 	Delta     float64 `json:"delta"`
 }
 
-func cloneMovementEvent(event types.MovementEvent) types.MovementEvent {
+func cloneTransactionEvent(event types.TransactionEvent) types.TransactionEvent {
 	cloned := event
 	cloned.RequestedAmount = roundCurrency(event.RequestedAmount)
 	cloned.RealizedAmount = roundCurrency(event.RealizedAmount)
 	if event.AccountDeltas != nil {
-		cloned.AccountDeltas = make([]movementAccountDelta, len(event.AccountDeltas))
+		cloned.AccountDeltas = make([]transactionAccountDelta, len(event.AccountDeltas))
 		for index, delta := range event.AccountDeltas {
 			cloned.AccountDeltas[index] = delta
 			cloned.AccountDeltas[index].Delta = roundCurrency(delta.Delta)
@@ -90,21 +90,21 @@ func cloneMovementEvent(event types.MovementEvent) types.MovementEvent {
 	return cloned
 }
 
-func publicMovementEvents(path *types.ProjectionPath) []types.MovementEvent {
-	if path.MovementEvents == nil {
+func publicTransactionEvents(path *types.ProjectionPath) []types.TransactionEvent {
+	if path.TransactionEvents == nil {
 		return nil
 	}
 	// Single-pass display: the shared assessment already reconstructed
 	// pre-event balances, replayed the cap ledger in sorted order, and derived
 	// fulfillment, binding constraints, remaining cap, and available amount.
 	// Formatting reads those results without re-deriving them.
-	evaluatedBySequence := make(map[int]evaluatedMovementEvent, len(path.MovementEvents))
-	for _, evaluated := range evaluateMovementEvents(path) {
+	evaluatedBySequence := make(map[int]evaluatedTransactionEvent, len(path.TransactionEvents))
+	for _, evaluated := range evaluateTransactionEvents(path) {
 		evaluatedBySequence[evaluated.event.Sequence] = evaluated
 	}
-	events := make([]types.MovementEvent, len(path.MovementEvents))
-	for index, source := range path.MovementEvents {
-		event := cloneMovementEvent(source)
+	events := make([]types.TransactionEvent, len(path.TransactionEvents))
+	for index, source := range path.TransactionEvents {
+		event := cloneTransactionEvent(source)
 		event.BindingConstraints = nil
 		event.AvailableAmount = nil
 		evaluated := evaluatedBySequence[source.Sequence]
@@ -133,7 +133,7 @@ type classifiedAttempts struct {
 	internalTransferAmount float64
 }
 
-func classifyAttempts(attempts []*types.MovementEvent, postingsByID map[string]*types.Posting) classifiedAttempts {
+func classifyAttempts(attempts []*types.TransactionEvent, postingsByID map[string]*types.Posting) classifiedAttempts {
 	result := classifiedAttempts{accountImpacts: map[string][]types.AccountDelta{}}
 	for _, attempt := range attempts {
 		posting, ok := postingsByID[attempt.Origin.PostingID]
@@ -168,7 +168,7 @@ func BuildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 
 // BuildStochasticSamplePath adapts one Monte Carlo sample run. Sample
 // consumers (percentile bands plus the threshold, fulfillment, and FI
-// accumulators) read row dates, net worth, per-account balances, movement
+// accumulators) read row dates, net worth, per-account balances, transaction
 // events, and posting state — never per-account impacts or classified
 // cashflow totals — so impact classification is skipped. Every retained
 // field is bit-identical to BuildProjectionPath.
@@ -179,17 +179,17 @@ func BuildStochasticSamplePath(prepared *types.PreparedProjection, run *types.Si
 func buildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun, detailed bool) *types.ProjectionPath {
 	effectiveDocument := prepared.EffectiveDocument
 	var postingsByID map[string]*types.Posting
-	var attemptsByDate map[string][]*types.MovementEvent
+	var attemptsByDate map[string][]*types.TransactionEvent
 	if detailed {
-		movements := ResolvedMovementPostings(&effectiveDocument)
+		transactions := ResolvedTransactionPostings(&effectiveDocument)
 		postingsByID = map[string]*types.Posting{}
-		for index := range movements {
-			posting := &movements[index]
+		for index := range transactions {
+			posting := &transactions[index]
 			postingsByID[posting.ID] = posting
 		}
-		attemptsByDate = map[string][]*types.MovementEvent{}
-		for index := range run.MovementAttempts {
-			attempt := &run.MovementAttempts[index]
+		attemptsByDate = map[string][]*types.TransactionEvent{}
+		for index := range run.TransactionAttempts {
+			attempt := &run.TransactionAttempts[index]
 			attemptsByDate[attempt.Date] = append(attemptsByDate[attempt.Date], attempt)
 		}
 	}
@@ -217,7 +217,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 
 	path := &types.ProjectionPath{
 		Rows:                rows,
-		MovementEvents:      run.MovementAttempts,
+		TransactionEvents:   run.TransactionAttempts,
 		EffectiveDocument:   effectiveDocument,
 		ProjectionStartDate: run.Request.StartDate,
 		ProjectionEndDate:   run.Request.EndDate,
@@ -297,7 +297,7 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 		finalNetWorth = latestRow.NetWorth
 	}
 	result.Summary.FinalNetWorth = roundCurrency(finalNetWorth)
-	result.MovementEvents = publicMovementEvents(path)
+	result.TransactionEvents = publicTransactionEvents(path)
 
 	copyResultTables := func(dst *types.EvaluationResultTables) {}
 	_ = copyResultTables

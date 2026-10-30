@@ -73,7 +73,7 @@ func buildSampleCountsByPostingId(rules []types.RecurrenceRule, postings []types
 			}
 		}
 	}
-	// Occurrence dates extend short horizons: a movement executing in
+	// Occurrence dates extend short horizons: a transaction executing in
 	// projection year N needs at least N+1 samples.
 	resolved := ResolveOccurrences(rules, postings, startDate, endDate, includeStartDateEvents)
 	for date, occurrences := range resolved.ByDate {
@@ -90,7 +90,7 @@ func buildSampleCountsByPostingId(rules []types.RecurrenceRule, postings []types
 	return sampleCounts
 }
 
-// samplingParamsByID indexes volatile sampling parameters by movement ID:
+// samplingParamsByID indexes volatile sampling parameters by transaction ID:
 // rules in stored order, then manual postings. The sampler draws in this
 // order, so iteration order is part of the seeded contract.
 func samplingParamsByID(rules []types.RecurrenceRule, postings []types.Posting) []struct {

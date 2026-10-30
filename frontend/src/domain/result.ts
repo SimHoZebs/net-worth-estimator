@@ -1,4 +1,4 @@
-import type { MovementFulfillment } from "../api/contracts.ts";
+import type { TransactionFulfillment } from "../api/contracts.ts";
 import type {
 	FinancialIndependenceAnalysis,
 	FinancialIndependenceRange,
@@ -16,13 +16,13 @@ export interface Occurrence {
 	transaction: import("./model.ts").Transaction;
 	amount: number;
 }
-export interface MovementAccountDelta {
+export interface TransactionAccountDelta {
 	accountId: string;
 	delta: number;
 }
-export interface MovementResult {
+export interface TransactionResult {
 	date: string;
-	movementId: string;
+	transactionId: string;
 	name: string;
 	requested: number;
 	realized: number;
@@ -30,9 +30,9 @@ export interface MovementResult {
 	toId: string | null;
 	available: number | null;
 	constraint: string | null;
-	accountDeltas: MovementAccountDelta[];
+	accountDeltas: TransactionAccountDelta[];
 	constraintTypes?: string[];
-	fulfillment?: MovementFulfillment;
+	fulfillment?: TransactionFulfillment;
 }
 export interface EvaluationResult {
 	evaluation: Evaluation;
@@ -86,8 +86,8 @@ export interface OtherEvaluation {
 export interface Projection {
 	points: Point[];
 	currentNetWorth: number;
-	movements: MovementResult[];
-	firstFailure: MovementResult | null;
+	transactions: TransactionResult[];
+	firstFailure: TransactionResult | null;
 	evaluations: EvaluationResult[];
 	otherEvaluations: OtherEvaluation[];
 	inflows: number;

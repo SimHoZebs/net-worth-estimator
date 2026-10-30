@@ -430,7 +430,7 @@ func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
 	}
 }
 
-func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
+func TestDeterministicResponseIncludesTransactionEvents(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
@@ -471,21 +471,21 @@ func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode projection response: %v", err)
 	}
-	if payload.Result == nil || len(payload.Result.MovementEvents) != 4 {
-		t.Fatalf("movement events = %+v", payload.Result)
+	if payload.Result == nil || len(payload.Result.TransactionEvents) != 4 {
+		t.Fatalf("transaction events = %+v", payload.Result)
 	}
-	event := payload.Result.MovementEvents[0]
+	event := payload.Result.TransactionEvents[0]
 	if event.Date != "2026-02-05" || event.RequestedAmount != 1000 || event.RealizedAmount != 1000 {
-		t.Fatalf("movement event amounts/date = %+v", event)
+		t.Fatalf("transaction event amounts/date = %+v", event)
 	}
 	if event.Origin.Type != "posting" || event.Origin.PostingID != "salary" {
-		t.Fatalf("movement event origin = %+v", event.Origin)
+		t.Fatalf("transaction event origin = %+v", event.Origin)
 	}
 	if len(event.AccountDeltas) != 1 || event.AccountDeltas[0].AccountID != "checking" || event.AccountDeltas[0].Delta != 1000 {
-		t.Fatalf("movement event account deltas = %+v", event.AccountDeltas)
+		t.Fatalf("transaction event account deltas = %+v", event.AccountDeltas)
 	}
 	if event.BindingConstraints != nil || event.AvailableAmount != nil {
-		t.Fatalf("fully funded movement evidence = constraints %+v available %v", event.BindingConstraints, event.AvailableAmount)
+		t.Fatalf("fully funded transaction evidence = constraints %+v available %v", event.BindingConstraints, event.AvailableAmount)
 	}
 
 	storedResponse := httptest.NewRecorder()
@@ -501,12 +501,12 @@ func TestDeterministicResponseIncludesMovementEvents(t *testing.T) {
 	if err := json.Unmarshal(storedResponse.Body.Bytes(), &storedPayload); err != nil {
 		t.Fatalf("decode stored projection response: %v", err)
 	}
-	if storedPayload.Result == nil || len(storedPayload.Result.MovementEvents) != len(payload.Result.MovementEvents) {
-		t.Fatalf("stored movement events = %+v", storedPayload.Result)
+	if storedPayload.Result == nil || len(storedPayload.Result.TransactionEvents) != len(payload.Result.TransactionEvents) {
+		t.Fatalf("stored transaction events = %+v", storedPayload.Result)
 	}
 }
 
-func TestDeterministicMovementEvidenceIncludesBindingConstraints(t *testing.T) {
+func TestDeterministicTransactionEvidenceIncludesBindingConstraints(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
@@ -552,15 +552,15 @@ func TestDeterministicMovementEvidenceIncludesBindingConstraints(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode projection response: %v", err)
 	}
-	if payload.Result == nil || len(payload.Result.MovementEvents) != 4 {
-		t.Fatalf("movement events = %+v", payload.Result)
+	if payload.Result == nil || len(payload.Result.TransactionEvents) != 4 {
+		t.Fatalf("transaction events = %+v", payload.Result)
 	}
-	event := payload.Result.MovementEvents[1]
+	event := payload.Result.TransactionEvents[1]
 	if event.RequestedAmount != 200 || event.RealizedAmount != 100 || event.AvailableAmount == nil || *event.AvailableAmount != 100 {
-		t.Fatalf("rounded movement amounts = %+v", event)
+		t.Fatalf("rounded transaction amounts = %+v", event)
 	}
 	if len(event.AccountDeltas) != 1 || event.AccountDeltas[0].Delta != -100 {
-		t.Fatalf("rounded movement account deltas = %+v", event.AccountDeltas)
+		t.Fatalf("rounded transaction account deltas = %+v", event.AccountDeltas)
 	}
 	if len(event.BindingConstraints) != 1 {
 		t.Fatalf("binding constraints = %+v", event.BindingConstraints)
@@ -586,20 +586,20 @@ func TestDeterministicMovementEvidenceIncludesBindingConstraints(t *testing.T) {
 	if storedPayload.Result == nil {
 		t.Fatal("stored projection has no result")
 	}
-	computedEvents, err := json.Marshal(payload.Result.MovementEvents)
+	computedEvents, err := json.Marshal(payload.Result.TransactionEvents)
 	if err != nil {
-		t.Fatalf("encode computed movement events: %v", err)
+		t.Fatalf("encode computed transaction events: %v", err)
 	}
-	storedEvents, err := json.Marshal(storedPayload.Result.MovementEvents)
+	storedEvents, err := json.Marshal(storedPayload.Result.TransactionEvents)
 	if err != nil {
-		t.Fatalf("encode stored movement events: %v", err)
+		t.Fatalf("encode stored transaction events: %v", err)
 	}
 	if !bytes.Equal(storedEvents, computedEvents) {
-		t.Fatalf("stored movement evidence differs from computed response")
+		t.Fatalf("stored transaction evidence differs from computed response")
 	}
 }
 
-func TestDeterministicMovementEvidenceReportsAnnualCapAvailability(t *testing.T) {
+func TestDeterministicTransactionEvidenceReportsAnnualCapAvailability(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
@@ -637,19 +637,19 @@ func TestDeterministicMovementEvidenceReportsAnnualCapAvailability(t *testing.T)
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode projection response: %v", err)
 	}
-	for _, event := range payload.Result.MovementEvents {
+	for _, event := range payload.Result.TransactionEvents {
 		if event.Origin.PostingID != "invest" {
 			continue
 		}
 		if event.RealizedAmount != 500 || event.AvailableAmount == nil || *event.AvailableAmount != 500 {
-			t.Fatalf("annual-cap movement evidence = %+v", event)
+			t.Fatalf("annual-cap transaction evidence = %+v", event)
 		}
 		return
 	}
-	t.Fatal("investment movement was not returned")
+	t.Fatal("investment transaction was not returned")
 }
 
-func TestDeterministicMovementEvidenceCarriesHistoricalAnnualCapUsage(t *testing.T) {
+func TestDeterministicTransactionEvidenceCarriesHistoricalAnnualCapUsage(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
@@ -690,7 +690,7 @@ func TestDeterministicMovementEvidenceCarriesHistoricalAnnualCapUsage(t *testing
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode projection response: %v", err)
 	}
-	for _, event := range payload.Result.MovementEvents {
+	for _, event := range payload.Result.TransactionEvents {
 		if event.Origin.PostingID != "invest" || event.Date <= fixture.Settings.FallbackProjectionStartDate {
 			continue
 		}
@@ -699,10 +699,10 @@ func TestDeterministicMovementEvidenceCarriesHistoricalAnnualCapUsage(t *testing
 		}
 		return
 	}
-	t.Fatal("post-start investment movement was not returned")
+	t.Fatal("post-start investment transaction was not returned")
 }
 
-func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
+func TestDeterministicTransactionEvidenceReportsDestinationHeadroom(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "checkpoints.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
@@ -749,7 +749,7 @@ func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode projection response: %v", err)
 	}
-	for _, event := range payload.Result.MovementEvents {
+	for _, event := range payload.Result.TransactionEvents {
 		if event.Origin.PostingID != "paydown" {
 			continue
 		}
@@ -766,7 +766,7 @@ func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
 			t.Fatalf("paydown binding constraints = %+v", event.BindingConstraints)
 		}
 		if event.AvailableAmount == nil {
-			t.Fatalf("destination-capped movement has no available amount = %+v", event)
+			t.Fatalf("destination-capped transaction has no available amount = %+v", event)
 		}
 		if *event.AvailableAmount != event.RealizedAmount {
 			t.Fatalf("destination available %v != realized %v", *event.AvailableAmount, event.RealizedAmount)
@@ -776,10 +776,10 @@ func TestDeterministicMovementEvidenceReportsDestinationHeadroom(t *testing.T) {
 		}
 		return
 	}
-	t.Fatal("paydown movement was not returned")
+	t.Fatal("paydown transaction was not returned")
 }
 
-func TestDeterministicMovementEvidenceRoundsPayrollFields(t *testing.T) {
+func TestDeterministicTransactionEvidenceRoundsPayrollFields(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "payroll.json")
 	fixtureBytes, err := os.ReadFile(fixturePath)
 	if err != nil {
@@ -815,13 +815,13 @@ func TestDeterministicMovementEvidenceRoundsPayrollFields(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode payroll projection response: %v", err)
 	}
-	if payload.Result == nil || len(payload.Result.MovementEvents) == 0 {
-		t.Fatalf("payroll movement events = %+v", payload.Result)
+	if payload.Result == nil || len(payload.Result.TransactionEvents) == 0 {
+		t.Fatalf("payroll transaction events = %+v", payload.Result)
 	}
-	for _, event := range payload.Result.MovementEvents {
+	for _, event := range payload.Result.TransactionEvents {
 		for _, delta := range event.AccountDeltas {
 			if delta.Delta != math.Trunc(delta.Delta) {
-				t.Fatalf("public movement amount is not rounded: %v", delta.Delta)
+				t.Fatalf("public transaction amount is not rounded: %v", delta.Delta)
 			}
 		}
 		if event.RequestedAmount != math.Trunc(event.RequestedAmount) {

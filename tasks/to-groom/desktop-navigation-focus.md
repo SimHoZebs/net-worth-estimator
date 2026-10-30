@@ -1,6 +1,6 @@
 # Desktop navigation: release focus after the final control
 
-At desktop width `1440`, navigation is non-modal. Its shared drawer still wraps Tab from `Theme · System` to `Waypoint home`, which prevents normal forward keyboard movement into the page.
+At desktop width `1440`, navigation is non-modal. Its shared drawer still wraps Tab from `Theme · System` to `Waypoint home`, which prevents normal forward keyboard navigation into the page.
 
 Apply the drawer's Tab-wrapping code only when its existing `modal` setting is true. Focus-on-open and page inertness already use that distinction.
 

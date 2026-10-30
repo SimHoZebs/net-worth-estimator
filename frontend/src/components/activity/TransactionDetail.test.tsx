@@ -110,7 +110,7 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 	const planTransaction = calculatedTransaction();
 	const transaction: AccountTransaction = {
 		id: "projected-sapphire-payoff-2026-10-31-0",
-		movementId: planTransaction.id,
+		transactionId: planTransaction.id,
 		date: "2026-10-31",
 		name: planTransaction.name,
 		source: "projected",
@@ -209,7 +209,7 @@ it("marks holds that did not post instead of posted", () => {
 	};
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000099",
-		movementId: planTransaction.id,
+		transactionId: planTransaction.id,
 		date: "2026-10-20",
 		name: planTransaction.name,
 		source: "historical",

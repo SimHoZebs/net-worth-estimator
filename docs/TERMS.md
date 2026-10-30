@@ -6,7 +6,7 @@ The names are display names. The engine keeps its own vocabulary: the Go API, th
 
 ## A. Transaction
 
-A planned or recorded movement of money into, out of, or between accounts.
+A planned or recorded transaction of money into, out of, or between accounts.
 
 Use **transaction**, qualified as **planned** or **recorded**. The saved model's "Transactions" tab holds the rules and dated entries you edit. An account's activity view holds the rows the engine computed from those rules.
 

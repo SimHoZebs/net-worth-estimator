@@ -8,7 +8,7 @@ import (
 )
 
 // Rate behavior lives in amount inputs, shared by one-time and recurring
-// movements. These tests pin the provider math the simulation kernel
+// transactions. These tests pin the provider math the simulation kernel
 // relies on.
 
 func rateTestContext(divisor int, startDate string, sampled *float64) *AmountProviderContext {

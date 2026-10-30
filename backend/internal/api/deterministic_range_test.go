@@ -75,7 +75,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 	handler := New(database, Config{})
 
 	full := decodeRangeResult(t, rangeRequest(t, handler, rangeBody(t, fullSpanRange())))
-	if len(full.Timeline.Rows) == 0 || len(full.MovementEvents) == 0 {
+	if len(full.Timeline.Rows) == 0 || len(full.TransactionEvents) == 0 {
 		t.Fatal("fixture has no rows or events to clip")
 	}
 	var histEnd, projStart types.IsoDate
@@ -97,7 +97,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 			t.Fatalf("clipped row %s past end %s", row.Date, mid)
 		}
 	}
-	for _, event := range before.MovementEvents {
+	for _, event := range before.TransactionEvents {
 		if event.Date > mid {
 			t.Fatalf("clipped event %s past end %s", event.Date, mid)
 		}
@@ -122,7 +122,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 	if !reflect.DeepEqual(historyOnly.Evaluations, full.Evaluations) {
 		t.Fatal("history-only response changed evaluations")
 	}
-	for _, event := range historyOnly.MovementEvents {
+	for _, event := range historyOnly.TransactionEvents {
 		if event.Date > histEnd {
 			t.Fatalf("history event %s past end %s", event.Date, histEnd)
 		}

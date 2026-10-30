@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { testAccount } from "../mocks/account.ts";
-import { movementFixture } from "../mocks/projection.ts";
+import { transactionFixture } from "../mocks/projection.ts";
 import {
 	cashCushion,
 	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
-	filterMovementsById,
+	filterTransactionsById,
 	groupMandatorySpending,
 	monthEndIso,
 	nextMonthObligations,
@@ -64,37 +64,37 @@ describe("cashCushion", () => {
 });
 
 describe("realizedCheckingOutflows", () => {
-	const movements = [
-		movementFixture({
+	const transactions = [
+		transactionFixture({
 			date: "2026-10-02",
-			movementId: "start-day",
+			transactionId: "start-day",
 			name: "Start day",
 			fromId: "checking",
 			toId: null,
 			requested: 100,
 			realized: 100,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-05",
-			movementId: "rent",
+			transactionId: "rent",
 			name: "Rent",
 			fromId: "checking",
 			toId: null,
 			requested: 2874,
 			realized: 2874,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-05",
-			movementId: "shortfall-bill",
+			transactionId: "shortfall-bill",
 			name: "Shortfall",
 			fromId: "checking",
 			toId: null,
 			requested: 500,
 			realized: 200,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-20",
-			movementId: "later",
+			transactionId: "later",
 			name: "Later",
 			fromId: "checking",
 			toId: null,
@@ -106,7 +106,7 @@ describe("realizedCheckingOutflows", () => {
 	it("sums realized outflows after the start through today", () => {
 		expect(
 			realizedCheckingOutflows({
-				movements,
+				transactions,
 				checkingIds: ["checking"],
 				after: "2026-10-02",
 				through: "2026-10-08",
@@ -117,7 +117,7 @@ describe("realizedCheckingOutflows", () => {
 	it("returns zero when today is the projection start", () => {
 		expect(
 			realizedCheckingOutflows({
-				movements,
+				transactions,
 				checkingIds: ["checking"],
 				after: "2026-10-02",
 				through: "2026-10-02",
@@ -127,37 +127,37 @@ describe("realizedCheckingOutflows", () => {
 });
 
 describe("checkingShortfall", () => {
-	const movements = [
-		movementFixture({
+	const transactions = [
+		transactionFixture({
 			date: "2026-10-13",
-			movementId: "car-loan",
+			transactionId: "car-loan",
 			name: "Car loan",
 			fromId: "checking",
 			toId: null,
 			requested: 403,
 			realized: 276,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-15",
-			movementId: "living",
+			transactionId: "living",
 			name: "Living",
 			fromId: "checking",
 			toId: null,
 			requested: 2400,
 			realized: 0,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-15",
-			movementId: "paid",
+			transactionId: "paid",
 			name: "Paid",
 			fromId: "checking",
 			toId: null,
 			requested: 91,
 			realized: 91,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-11-15",
-			movementId: "later",
+			transactionId: "later",
 			name: "Later",
 			fromId: "checking",
 			toId: null,
@@ -169,7 +169,7 @@ describe("checkingShortfall", () => {
 	it("sums canonical unfulfilled amounts with the first short date", () => {
 		expect(
 			checkingShortfall({
-				movements,
+				transactions,
 				checkingIds: ["checking"],
 				after: "2026-10-09",
 				through: "2026-10-31",
@@ -177,10 +177,10 @@ describe("checkingShortfall", () => {
 		).toEqual({ total: 2527, firstDate: "2026-10-13" });
 	});
 
-	it("ignores fully paid movements and other windows", () => {
+	it("ignores fully paid transactions and other windows", () => {
 		expect(
 			checkingShortfall({
-				movements,
+				transactions,
 				checkingIds: ["checking"],
 				after: "2026-10-31",
 				through: "2026-11-30",
@@ -191,7 +191,7 @@ describe("checkingShortfall", () => {
 	it("returns zero when nothing is short", () => {
 		expect(
 			checkingShortfall({
-				movements: movements.filter((item) => item.movementId === "paid"),
+				transactions: transactions.filter((item) => item.transactionId === "paid"),
 				checkingIds: ["checking"],
 				after: "2026-10-09",
 				through: "2026-10-31",
@@ -202,15 +202,15 @@ describe("checkingShortfall", () => {
 	it("ignores destination limits and nonreportable residuals", () => {
 		expect(
 			checkingShortfall({
-				movements: [
-					movementFixture({
+				transactions: [
+					transactionFixture({
 						date: "2026-10-13",
 						fulfillment: {
 							unfulfilledAmount: 0,
 							destinationLimitedAmount: 2650,
 						},
 					}),
-					movementFixture({
+					transactionFixture({
 						date: "2026-10-14",
 						requested: 101,
 						realized: 100,
@@ -230,8 +230,8 @@ describe("checkingShortfall", () => {
 	it("keeps a reportable shortfall when public amounts round to the same value", () => {
 		expect(
 			checkingShortfall({
-				movements: [
-					movementFixture({
+				transactions: [
+					transactionFixture({
 						date: "2026-10-13",
 						requested: 100,
 						realized: 100,
@@ -296,37 +296,37 @@ describe("paycheckBeforeReserve", () => {
 });
 
 describe("projection-derived safe spending", () => {
-	const movements = [
-		movementFixture({
+	const transactions = [
+		transactionFixture({
 			date: "2026-10-10",
-			movementId: "housing",
+			transactionId: "housing",
 			name: "Housing",
 			fromId: "checking",
 			toId: null,
 			requested: 3200,
 			realized: 3200,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-20",
-			movementId: "living",
+			transactionId: "living",
 			name: "Living",
 			fromId: "checking",
 			toId: null,
 			requested: 1000,
 			realized: 1000,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-11-01",
-			movementId: "housing",
+			transactionId: "housing",
 			name: "Housing",
 			fromId: "checking",
 			toId: null,
 			requested: 3200,
 			realized: 3200,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-15",
-			movementId: "pay",
+			transactionId: "pay",
 			name: "Pay",
 			fromId: null,
 			toId: "checking",
@@ -338,7 +338,7 @@ describe("projection-derived safe spending", () => {
 	it("sums remaining obligations through month end", () => {
 		expect(
 			remainingMonthlyObligations({
-				movements,
+				transactions,
 				checkingIds: ["checking"],
 				todayIso: "2026-10-08",
 			}),
@@ -348,7 +348,7 @@ describe("projection-derived safe spending", () => {
 	it("sums next month obligations", () => {
 		expect(
 			nextMonthObligations({
-				movements,
+				transactions,
 				checkingIds: ["checking"],
 				todayIso: "2026-10-08",
 			}),
@@ -357,37 +357,37 @@ describe("projection-derived safe spending", () => {
 });
 
 describe("groupMandatorySpending", () => {
-	const movements = [
-		movementFixture({
+	const transactions = [
+		transactionFixture({
 			date: "2026-10-10",
-			movementId: "housing",
+			transactionId: "housing",
 			name: "Housing",
 			fromId: "checking",
 			toId: null,
 			requested: 3200,
 			realized: 3200,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-20",
-			movementId: "living",
+			transactionId: "living",
 			name: "Living",
 			fromId: "checking",
 			toId: null,
 			requested: 1000,
 			realized: 1000,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-10-25",
-			movementId: "living",
+			transactionId: "living",
 			name: "Living",
 			fromId: "checking",
 			toId: null,
 			requested: 500,
 			realized: 500,
 		}),
-		movementFixture({
+		transactionFixture({
 			date: "2026-11-01",
-			movementId: "housing",
+			transactionId: "housing",
 			name: "Housing",
 			fromId: "checking",
 			toId: null,
@@ -396,45 +396,45 @@ describe("groupMandatorySpending", () => {
 		}),
 	];
 
-	it("groups a window by movement with totals and dates", () => {
+	it("groups a window by transaction with totals and dates", () => {
 		const groups = groupMandatorySpending({
-			movements,
+			transactions,
 			checkingIds: ["checking"],
 			start: "2026-10-09",
 			end: "2026-10-31",
 		});
 		expect(groups).toHaveLength(2);
 		expect(groups[0]).toMatchObject({
-			movementId: "housing",
+			transactionId: "housing",
 			total: 3200,
 			count: 1,
 		});
 		expect(groups[1]).toMatchObject({
-			movementId: "living",
+			transactionId: "living",
 			total: 1500,
 			count: 2,
 			dates: ["2026-10-20", "2026-10-25"],
 		});
 	});
 
-	it("excludes movements outside the window", () => {
+	it("excludes transactions outside the window", () => {
 		const groups = groupMandatorySpending({
-			movements,
+			transactions,
 			checkingIds: ["checking"],
 			start: "2026-11-01",
 			end: "2026-11-30",
 		});
 		expect(groups).toHaveLength(1);
-		expect(groups[0]).toMatchObject({ movementId: "housing", total: 3200 });
+		expect(groups[0]).toMatchObject({ transactionId: "housing", total: 3200 });
 	});
 
 	it("combines outflows from every selected account", () => {
 		const groups = groupMandatorySpending({
-			movements: [
-				...movements,
-				movementFixture({
+			transactions: [
+				...transactions,
+				transactionFixture({
 					date: "2026-10-12",
-					movementId: "savings-transfer",
+					transactionId: "savings-transfer",
 					name: "Savings transfer",
 					fromId: "savings",
 					toId: null,
@@ -447,7 +447,7 @@ describe("groupMandatorySpending", () => {
 			end: "2026-10-31",
 		});
 		expect(groups).toHaveLength(3);
-		expect(groups.map((group) => group.movementId).sort()).toEqual([
+		expect(groups.map((group) => group.transactionId).sort()).toEqual([
 			"housing",
 			"living",
 			"savings-transfer",
@@ -463,19 +463,19 @@ describe("spendingBalance", () => {
 	});
 });
 
-describe("filterMovementsById", () => {
-	const movements = [
-		movementFixture({ movementId: "housing", date: "2026-10-10" }),
-		movementFixture({ movementId: "living", date: "2026-10-11" }),
+describe("filterTransactionsById", () => {
+	const transactions = [
+		transactionFixture({ transactionId: "housing", date: "2026-10-10" }),
+		transactionFixture({ transactionId: "living", date: "2026-10-11" }),
 	];
 
-	it("keeps every movement when no selection exists", () => {
-		expect(filterMovementsById(movements, null)).toHaveLength(2);
+	it("keeps every transaction when no selection exists", () => {
+		expect(filterTransactionsById(transactions, null)).toHaveLength(2);
 	});
 
 	it("keeps only selected bills", () => {
-		const filtered = filterMovementsById(movements, ["living"]);
+		const filtered = filterTransactionsById(transactions, ["living"]);
 		expect(filtered).toHaveLength(1);
-		expect(filtered[0]!.movementId).toBe("living");
+		expect(filtered[0]!.transactionId).toBe("living");
 	});
 });

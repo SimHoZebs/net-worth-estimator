@@ -76,14 +76,14 @@ func parseWhatIfConfig(config any) (any, error) {
 
 type WhatIfPathResult struct {
 	FinalNetWorth        float64 `json:"finalNetWorth"`
-	MovementCount        int     `json:"movementCount"`
+	TransactionCount     int     `json:"transactionCount"`
 	FirstUnfulfilledDate *string `json:"firstUnfulfilledDate"`
 	AllFunded            bool    `json:"allFunded"`
 }
 
 func (r *WhatIfPathResult) ToJSON() types.JsonValue {
 	return map[string]any{
-		"finalNetWorth": r.FinalNetWorth, "movementCount": r.MovementCount,
+		"finalNetWorth": r.FinalNetWorth, "transactionCount": r.TransactionCount,
 		"firstUnfulfilledDate": r.FirstUnfulfilledDate, "allFunded": r.AllFunded,
 	}
 }
@@ -126,8 +126,8 @@ func evaluateWhatIf(ctx *EvaluationContext, config any) (PathResult, error) {
 		}
 		result.FinalNetWorth = total
 	}
-	result.MovementCount = len(run.MovementAttempts)
-	for _, event := range run.MovementAttempts {
+	result.TransactionCount = len(run.TransactionAttempts)
+	for _, event := range run.TransactionAttempts {
 		if event.Fulfillment != nil && event.Fulfillment.UnfulfilledAmount > 0 {
 			date := event.Date
 			if result.FirstUnfulfilledDate == nil {

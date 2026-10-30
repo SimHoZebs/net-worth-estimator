@@ -82,7 +82,6 @@ const RESERVED_SLUGS = new Set([
 	"evaluations",
 	"edit-account",
 	"edit-transaction",
-	"edit-movement",
 	"edit-evaluation",
 ]);
 
@@ -151,7 +150,7 @@ function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 	const [requestedTab, maybeEdit, key, ...extra] = parts;
 	const tabOrEdit = requestedTab === "mandatory" ? "cycle" : requestedTab;
 	if (extra.length > 0) return { type: "invalid" };
-	if (tabOrEdit === "edit-transaction" || tabOrEdit === "edit-movement") {
+	if (tabOrEdit === "edit-transaction") {
 		// `#outlook/safe-spending-detail/edit-transaction/<id>`
 		return maybeEdit
 			? {
@@ -165,8 +164,7 @@ function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 	if (maybeEdit === undefined)
 		return { type: "safeSpendingDetail", tab: tabOrEdit };
 	// `#outlook/safe-spending-detail/<tab>/edit-transaction/<id>`
-	return (maybeEdit === "edit-transaction" || maybeEdit === "edit-movement") &&
-		key
+	return maybeEdit === "edit-transaction" && key
 		? { type: "safeSpendingDetail", tab: tabOrEdit, editTransaction: key }
 		: { type: "invalid" };
 }
@@ -223,9 +221,6 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 		case "edit-account":
 			return { type: "accountEdit", key: second ?? "" };
 		case "edit-transaction":
-		// Legacy `edit-movement` hashes resolve the same way: only the
-		// segment name changed, and editor URLs are ephemeral.
-		case "edit-movement":
 			return { type: "transactionEdit", key: second ?? "" };
 		case "edit-evaluation":
 			return { type: "evaluationEdit", key: second ?? "" };

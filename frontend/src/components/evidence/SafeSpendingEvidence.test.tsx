@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { testAccount } from "../../mocks/account.ts";
-import { movementFixture, projectionFixture } from "../../mocks/projection.ts";
+import { transactionFixture, projectionFixture } from "../../mocks/projection.ts";
 import { SafeSpendingEvidence } from "./SafeSpendingEvidence.tsx";
 
 // This test covers evidence content rather than the native modal lifecycle.
@@ -18,14 +18,14 @@ afterEach(cleanup);
 describe("SafeSpendingEvidence", () => {
 	it("retains table headings, shortfall evidence, and date sorting", () => {
 		const projection = projectionFixture({
-			movements: [
-				movementFixture({
-					movementId: "living",
+			transactions: [
+				transactionFixture({
+					transactionId: "living",
 					name: "Earlier bill",
 					date: "2026-10-01",
 				}),
-				movementFixture({
-					movementId: "mortgage-payment",
+				transactionFixture({
+					transactionId: "mortgage-payment",
 					name: "Later bill",
 					date: "2026-10-05",
 					constraint: null,

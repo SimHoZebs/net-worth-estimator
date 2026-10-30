@@ -42,7 +42,7 @@ type withdrawalAttempt struct {
 	accountID          *string
 	requestedAmount    float64
 	realizedAmount     float64
-	bindingConstraints []accountMovementConstraint
+	bindingConstraints []accountTransactionConstraint
 }
 
 // FIWithdrawalSummary is the wire shape for withdrawal results.
@@ -200,7 +200,7 @@ func expenseBaselineDate(plan *types.FIPlan, projectionStartDate, candidateDate 
 	return candidateDate
 }
 
-func realizedCashflowBetween(events []types.MovementEvent, cashflowIDs map[string]bool, startDate, endDate IsoDate) float64 {
+func realizedCashflowBetween(events []types.TransactionEvent, cashflowIDs map[string]bool, startDate, endDate IsoDate) float64 {
 	if len(cashflowIDs) == 0 {
 		return 0
 	}
@@ -220,7 +220,7 @@ func realizedCashflowBetween(events []types.MovementEvent, cashflowIDs map[strin
 	return total
 }
 
-func realizedCashflowByMonth(events []types.MovementEvent, cashflowIDs map[string]bool, candidateDate IsoDate, monthCount int) []float64 {
+func realizedCashflowByMonth(events []types.TransactionEvent, cashflowIDs map[string]bool, candidateDate IsoDate, monthCount int) []float64 {
 	amounts := make([]float64, monthCount)
 	if len(cashflowIDs) == 0 {
 		return amounts
@@ -273,7 +273,7 @@ const (
 
 func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, continuingIDs map[string]bool) map[string]postingDisposition {
 	dispositions := map[string]postingDisposition{}
-	for id := range MovementIDs(&path.EffectiveDocument) {
+	for id := range TransactionIDs(&path.EffectiveDocument) {
 		switch {
 		case cashflowIDs[id]:
 			dispositions[id] = dispositionObserveBasePath
@@ -286,7 +286,7 @@ func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, contin
 	return dispositions
 }
 
-func initializeBranchSimulationState(balances map[string]float64, events []types.MovementEvent, candidateDate IsoDate, startState *types.ProjectionPath) SimulationState {
+func initializeBranchSimulationState(balances map[string]float64, events []types.TransactionEvent, candidateDate IsoDate, startState *types.ProjectionPath) SimulationState {
 	// Deep-copy the prepared projection-start posting ledger through the
 	// shared cloner (the same copy the purchases candidate rebuilds from),
 	// then replay base-path events up to the candidate date. Losses are
@@ -326,7 +326,7 @@ type branchEventGroup struct {
 	occurrences []DatedPostingOccurrence
 }
 
-func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPosting map[string]float64, baseEventsByDateAndPosting map[string]*types.MovementEvent, dispositions map[string]postingDisposition, transitions *TransitionRuntime) (float64, error) {
+func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPosting map[string]float64, baseEventsByDateAndPosting map[string]*types.TransactionEvent, dispositions map[string]postingDisposition, transitions *TransitionRuntime) (float64, error) {
 	observedDirectIncome := 0.0
 	for _, group := range events {
 		sorted := make([]DatedPostingOccurrence, len(group.occurrences))
@@ -372,7 +372,7 @@ type fiCycleShared struct {
 	branchPostings               []types.Posting
 	branchRules                  []types.RecurrenceRule
 	baseRealizedByDateAndPosting map[string]float64
-	baseEventsByDateAndPosting   map[string]*types.MovementEvent
+	baseEventsByDateAndPosting   map[string]*types.TransactionEvent
 }
 
 func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleShared {
@@ -404,10 +404,10 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 			branchRules = append(branchRules, *rule)
 		}
 	}
-	baseRealizedByDateAndPosting := make(map[string]float64, len(path.MovementEvents))
-	baseEventsByDateAndPosting := make(map[string]*types.MovementEvent, len(path.MovementEvents))
-	for index := range path.MovementEvents {
-		event := &path.MovementEvents[index]
+	baseRealizedByDateAndPosting := make(map[string]float64, len(path.TransactionEvents))
+	baseEventsByDateAndPosting := make(map[string]*types.TransactionEvent, len(path.TransactionEvents))
+	for index := range path.TransactionEvents {
+		event := &path.TransactionEvents[index]
 		key := event.Date + ":" + event.Origin.PostingID
 		baseRealizedByDateAndPosting[key] = event.RealizedAmount
 		baseEventsByDateAndPosting[key] = event
@@ -462,7 +462,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 			candidate.Date,
 			plan.EvaluationYears,
 			func(date IsoDate) float64 { return expenseAt(plan, expenseBaseline, date) },
-			realizedCashflowByMonth(path.MovementEvents, cashflowIDs, candidate.Date, monthCount),
+			realizedCashflowByMonth(path.TransactionEvents, cashflowIDs, candidate.Date, monthCount),
 		)
 		if HasInsufficientOptimisticWithdrawalCapacity(minimumWithdrawals, candidate.AnnualWithdrawalCapacity, optimisticLaterYearWithdrawalCapacity(candidateBalances, assetRateOrder, assetRates, accountsByID)) {
 			return &FIRunOutcome{
@@ -491,7 +491,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 		Postings:        branchPostings,
 		RecurrenceRules: branchRules,
 		PaymentTerms:    path.EffectiveDocument.PaymentTerms,
-	}, initializeBranchSimulationState(candidateBalances, path.MovementEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
+	}, initializeBranchSimulationState(candidateBalances, path.TransactionEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
 	if err != nil {
 		return nil, err
 	}
@@ -606,18 +606,18 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 				if !summaryOnly {
 					balancesBefore = SnapshotBalances(balances)
 				}
-				movement, _ := transitions.ExecuteGeneratedMovement(AccountMovementAction{
+				transaction, _ := transitions.ExecuteGeneratedTransaction(AccountTransactionAction{
 					SourceAccountID: &entry.accountID,
 					Destinations:    nil,
 					RequestedAmount: requestedAmount,
 					LimitRemaining:  &actionLimitCopy,
 				})
 				if balancesBefore != nil {
-					constraints := ClassifyMovementConstraints(movementConstraintInput{
+					constraints := ClassifyTransactionConstraints(transactionConstraintInput{
 						SourceAccountID: &entry.accountID,
 						Destinations:    nil,
 						RequestedAmount: requestedAmount,
-						RealizedAmount:  movement.Result.RealizedAmount,
+						RealizedAmount:  transaction.Result.RealizedAmount,
 						BalancesBefore:  balancesBefore,
 						AccountsByID:    accountsByID,
 						LimitRemaining:  &actionLimitCopy,
@@ -627,12 +627,12 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 						date:               attemptDate,
 						accountID:          &entry.accountID,
 						requestedAmount:    requestedAmount,
-						realizedAmount:     movement.Result.RealizedAmount,
+						realizedAmount:     transaction.Result.RealizedAmount,
 						bindingConstraints: constraints,
 					})
 				}
-				state.remainingWithdrawalByAccount[entry.accountID] = math.Max(0, state.remainingWithdrawalByAccount[entry.accountID]-movement.Result.RealizedAmount)
-				remainingExpense -= movement.Result.RealizedAmount
+				state.remainingWithdrawalByAccount[entry.accountID] = math.Max(0, state.remainingWithdrawalByAccount[entry.accountID]-transaction.Result.RealizedAmount)
+				remainingExpense -= transaction.Result.RealizedAmount
 			}
 			if len(capacities) == 0 && requestedExpense > fiEpsilon {
 				zeroLimit := 0.0
@@ -640,18 +640,18 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 				if !summaryOnly {
 					balancesBefore = SnapshotBalances(balances)
 				}
-				movement, _ := transitions.ExecuteGeneratedMovement(AccountMovementAction{
+				transaction, _ := transitions.ExecuteGeneratedTransaction(AccountTransactionAction{
 					SourceAccountID: nil,
 					Destinations:    nil,
 					RequestedAmount: requestedExpense,
 					LimitRemaining:  &zeroLimit,
 				})
 				if balancesBefore != nil {
-					constraints := ClassifyMovementConstraints(movementConstraintInput{
+					constraints := ClassifyTransactionConstraints(transactionConstraintInput{
 						SourceAccountID: nil,
 						Destinations:    nil,
 						RequestedAmount: requestedExpense,
-						RealizedAmount:  movement.Result.RealizedAmount,
+						RealizedAmount:  transaction.Result.RealizedAmount,
 						BalancesBefore:  balancesBefore,
 						AccountsByID:    accountsByID,
 						LimitRemaining:  &zeroLimit,
@@ -661,7 +661,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 						date:               attemptDate,
 						accountID:          nil,
 						requestedAmount:    requestedExpense,
-						realizedAmount:     movement.Result.RealizedAmount,
+						realizedAmount:     transaction.Result.RealizedAmount,
 						bindingConstraints: constraints,
 					})
 				}
@@ -774,7 +774,7 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 	result := &FIAnalysisResult{}
 	for _, date := range filtered {
 		row := latestRowAtOrBefore(path.Rows, date)
-		annualDirectIncome := realizedCashflowBetween(path.MovementEvents, cashflowIDs, date, AddYearsClamped(date, 1))
+		annualDirectIncome := realizedCashflowBetween(path.TransactionEvents, cashflowIDs, date, AddYearsClamped(date, 1))
 		analysisRow := FIRow{Date: date}
 		analysisRow.MinimumNetWorth = plan.MinimumNetWorth
 		// One balance map per candidate (O(A)) instead of one snapshot scan
@@ -864,7 +864,7 @@ func AvailableFIPlan(path *types.ProjectionPath, config *types.FIPlan) *types.FI
 	for _, account := range path.EffectiveDocument.Accounts {
 		accountIDs[account.ID] = true
 	}
-	postingIDs := MovementIDs(&path.EffectiveDocument)
+	postingIDs := TransactionIDs(&path.EffectiveDocument)
 	filtered := *config
 	filtered.Sources = []types.FISource{}
 	for _, source := range config.Sources {
@@ -944,7 +944,7 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 		for _, account := range ctx.Path.EffectiveDocument.Accounts {
 			accountIDs[account.ID] = true
 		}
-		postingIDs := MovementIDs(&ctx.Path.EffectiveDocument)
+		postingIDs := TransactionIDs(&ctx.Path.EffectiveDocument)
 		diagnostics := []types.EvaluationDiagnostic{}
 		for _, source := range typed.Sources {
 			if !source.Included {

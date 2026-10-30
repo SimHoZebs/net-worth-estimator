@@ -44,7 +44,7 @@ func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T)
 			t.Fatalf("purchase = %+v", purchase)
 		}
 	}
-	if result.Summary.FinalNetWorth != 1100 || result.Totals.ExternalOutflowAmount != 900 || len(result.MovementEvents) != 2 {
+	if result.Summary.FinalNetWorth != 1100 || result.Totals.ExternalOutflowAmount != 900 || len(result.TransactionEvents) != 2 {
 		t.Fatalf("branch affected baseline: %+v", result)
 	}
 	if !reflect.DeepEqual(before, toAny(t, document)) {

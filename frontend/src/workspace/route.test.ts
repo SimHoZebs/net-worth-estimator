@@ -170,7 +170,7 @@ describe("parseHash", () => {
 		});
 		expect(parseHash("#outlook/edit-movement/invest")).toEqual({
 			page: "outlook",
-			overlay: { type: "transactionEdit", key: "invest" },
+			overlay: { type: "invalid" },
 		});
 		expect(parseHash("#outlook/edit-account/new")).toEqual({
 			page: "outlook",
@@ -247,11 +247,7 @@ describe("parseHash", () => {
 			parseHash("#outlook/safe-spending-detail/cycle/edit-movement/invest"),
 		).toEqual({
 			page: "outlook",
-			overlay: {
-				type: "safeSpendingDetail",
-				tab: "cycle",
-				editTransaction: "invest",
-			},
+			overlay: { type: "invalid" },
 		});
 		expect(parseHash("#outlook/safe-spending-detail/bogus")).toEqual({
 			page: "outlook",
@@ -537,9 +533,9 @@ describe("hash builders round-trip through the parser", () => {
 			page: "outlook",
 			overlay: { type: "transactionEdit", key: "invest" },
 		});
-		// "Edit Movement" slugifies to the retired segment, so the editor
+		// "Edit Transaction" slugifies to a reserved segment, so the editor
 		// link uses the explicit id form and still resolves to the account.
-		const legacy = account("move-1", "Edit Movement");
+		const legacy = account("move-1", "Edit Transaction");
 		expect(editorHash("accounts", { kind: "account", item: legacy })).toBe(
 			"#accounts/edit-account/move-1",
 		);

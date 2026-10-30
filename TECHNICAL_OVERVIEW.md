@@ -125,7 +125,7 @@ Resolution rules:
 - A supplied document affects only that request and exists for tests, fixtures, and offline tooling.
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
 - What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
-- `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and movement events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
+- `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
 
 A successful response has `result` and `Projection-Source: stored|computed`. `stored` means the backend retrieved the identified simulation result. `computed` means this request took the simulation execution path. The header does not guarantee successful completion or storage; preparation and execution errors also report `computed`.
 
@@ -342,7 +342,7 @@ Accounts are ordered rows with a unique ID, label, bounds, optional color, and e
 
 ### Posting and recurrence-rule structure
 
-Postings are single timed movements: one record of money moved, carrying
+Postings are single timed transactions: one record of money moved, carrying
 posted time (when the bank posts it) and transaction time (when the money
 moves), both Unix seconds. Repetition is owned by recurrence rules, which
 expand into occurrences at projection time. A posting with a `claim`
@@ -386,21 +386,21 @@ Current general resolvers:
 - `expression`;
 - `progressive-bracket` (progressive tax liability on gross minus pre-tax contributions minus deduction).
 
-`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring movements resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary movements.
+`expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring transactions resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary transactions.
 
 Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets and they never affect artifact identity. The wire shape is unchanged; presets only author it.
 
-### Constraints and movement records
+### Constraints and transaction records
 
-`ResolveAccountMovement` clamps a nonnegative requested amount by:
+`ResolveAccountTransaction` clamps a nonnegative requested amount by:
 
 1. an optional action limit, such as remaining annual cap;
 2. positive source withdrawable balance;
 3. total destination headroom.
 
-`TransitionRuntime` applies the realized amount and records ordered account deltas. Every movement exposes requested and realized amounts, which is the causal evidence used by fulfillment and financial-independence diagnostics.
+`TransitionRuntime` applies the realized amount and records ordered account deltas. Every transaction exposes requested and realized amounts, which is the causal evidence used by fulfillment and financial-independence diagnostics.
 
-Annual-cap usage is observed from realized amounts by movement ID (posting or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own posting ID, matching how one-time postings behaved before rules existed.
+Annual-cap usage is observed from realized amounts by transaction ID (posting or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own posting ID, matching how one-time postings behaved before rules existed.
 
 ## 6. Validation and Preparation
 
@@ -409,7 +409,7 @@ Annual-cap usage is observed from realized amounts by movement ID (posting or ru
 - duplicate account, posting, rule, and cross-type evaluation IDs;
 - account/posting/rule ID collisions (one shared namespace);
 - checkpoint account, date, and duplicate key validity;
-- amount resolver config, exact required inputs, provider references, and movement dependency cycles spanning postings and rules;
+- amount resolver config, exact required inputs, provider references, and transaction dependency cycles spanning postings and rules;
 - posting and rule source/destination references, duplicate destinations, same-account routing, rule schedules, and claim validity (named rule exists, date is a real scheduled occurrence, no double claims);
 - account bounds;
 - evaluation instance IDs and config.
@@ -436,10 +436,10 @@ Historical preparation uses the same `TransitionRuntime` as projection execution
 - Without a start-date checkpoint, projection includes start-date occurrences.
 - With a start-date checkpoint, projection excludes start-date occurrences.
 - Historical dates execute in ascending calendar order.
-- Same-date movements execute one-time postings first (by transaction time, posted time, then ID), then rule occurrences by ascending priority and resolution sequence.
+- Same-date transactions execute one-time postings first (by transaction time, posted time, then ID), then rule occurrences by ascending priority and resolution sequence.
 - Checkpoints execute after same-date postings and overwrite only their account balance.
 
-Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected movement totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers.
+Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers.
 
 `BuildProjectionPath` prefixes these historical observations with projected snapshots. `ProjectionRow.isHistorical` marks the boundary.
 
@@ -453,14 +453,14 @@ The kernel:
 2. expands enabled occurrences through the projection window;
 3. sorts dates and same-date occurrences;
 4. executes each occurrence through the shared transition path;
-5. records every requested/realized movement and ordered account deltas;
+5. records every requested/realized transaction and ordered account deltas;
 6. snapshots balances after each event date;
-7. returns exact initial state, final state, snapshots, movements, and sample metadata.
+7. returns exact initial state, final state, snapshots, transactions, and sample metadata.
 
 `BuildProjectionPath` adapts exact results for evaluators. `AdaptSimulationRun` then creates the public `ProjectionResult` by:
 
 - separating historical and projected rows;
-- classifying each projected movement structurally;
+- classifying each projected transaction structurally;
 - computing current and final net worth;
 - accumulating external inflow, external outflow, and internal transfer totals;
 - rounding public monetary values with `roundCurrency`.
@@ -495,7 +495,7 @@ The kernel:
 
 An evaluator failure is isolated to that instance as an error diagnostic. Other configured instances continue.
 
-Posting fulfillment and public transaction evidence share the per-event assessment in `evaluateMovementEvents`. Public `movementEvents[].fulfillment` reports unfulfilled and destination-limited amounts, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
+Posting fulfillment and public transaction evidence share the per-event assessment in `evaluateTransactionEvents`. Public `transactionEvents[].fulfillment` reports unfulfilled and destination-limited amounts, including the canonical reportable threshold and rounding. Funding gaps and Safe spending consume these amounts rather than classify failures themselves. This evidence remains available when configured fulfillment evaluations are absent, disabled, or limited to selected transactions. The Funding gaps account-history ledger explains the result; it does not determine fundability.
 
 Outlook renders only saved evaluation pins, using the same compact evaluation card components as the Evaluations page. Net-worth and account-balance targets have no automatic preview or fallback selection. Funding gaps has no separate always-visible panel. Pins control Outlook visibility; unpinning does not disable an evaluation. Threshold cards show the first-crossing date, current amount, target, and scenario result directly, without an evidence dialog. The shared Funding gaps card's cash-flow inspector follows the evaluation's configured transaction selection.
 
@@ -506,7 +506,7 @@ Outlook renders only saved evaluation pins, using the same compact evaluation ca
 The full principal-preservation cycle uses the generic monthly behavior loop and `TransitionRuntime`:
 
 - selected cashflow sources are observed from the base path;
-- only explicitly selected continuing movements (postings or rules) execute in the branch;
+- only explicitly selected continuing transactions (postings or rules) execute in the branch;
 - monthly expenses are covered by reactive withdrawals;
 - withdrawals obey account floors, nonnegative balance, and annual withdrawal limits;
 - a cycle fails at the first unresolved expense shortfall;
@@ -515,7 +515,7 @@ The full principal-preservation cycle uses the generic monthly behavior loop and
 - detailed deterministic output reruns the selected candidate with full withdrawal and balance evidence;
 - stochastic output aggregates first-success dates and coverage distributions against required confidence.
 
-Continuing movements are never inferred from IDs, labels, categories, or nonzero rates.
+Continuing transactions are never inferred from IDs, labels, categories, or nonzero rates.
 
 ### Net-worth threshold
 
@@ -593,7 +593,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/csvio/import.go`                  | canonical model CSV parsing                             |
 | `backend/internal/domain/validation.go`             | authoritative model validation                          |
 | `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state                |
-| `backend/internal/domain/transitions.go`            | shared movement execution                               |
+| `backend/internal/domain/transitions.go`            | shared transaction execution                               |
 | `backend/internal/domain/simulate.go`               | deterministic kernel                                    |
 | `backend/internal/domain/path.go`                   | path and public-result adaptation                       |
 | `backend/internal/domain/evaluation_runtime.go`     | registry and evaluator lifecycle                        |

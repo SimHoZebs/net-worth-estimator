@@ -115,7 +115,7 @@ func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
 		t.Fatalf("project: %v", err)
 	}
 	found := false
-	for _, event := range path.MovementEvents {
+	for _, event := range path.TransactionEvents {
 		if event.Origin.PostingID == "rent" && event.Date == "2026-03-01" {
 			found = true
 			if event.RealizedAmount != 1000 {

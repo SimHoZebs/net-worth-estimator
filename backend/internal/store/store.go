@@ -47,8 +47,8 @@ type Store interface {
 	UpdatePosting(posting types.Posting) (types.Posting, error)
 	DeletePosting(id string) error
 	MovePosting(id, beforeID string) error
-	// ConvertPostingToRule and ConvertRuleToPosting move one movement
-	// across the posting/rule tables in one transaction, keeping its ID.
+	// ConvertPostingToRule and ConvertRuleToPosting move one entry
+	// across the posting/rule tables in one store transaction, keeping its ID.
 	ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error)
 	ConvertRuleToPosting(ruleID string, posting types.Posting) (types.Posting, error)
 	CreateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)

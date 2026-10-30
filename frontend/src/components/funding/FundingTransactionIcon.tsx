@@ -11,9 +11,9 @@ import {
 	Zap,
 	type LucideIcon,
 } from "lucide-react";
-import type { FundingMovementKind } from "../../domain/fundingGaps.ts";
+import type { FundingTransactionKind } from "../../domain/fundingGaps.ts";
 
-const movementIcons: Record<FundingMovementKind, LucideIcon> = {
+const transactionIcons: Record<FundingTransactionKind, LucideIcon> = {
 	income: BriefcaseBusiness,
 	housing: Home,
 	utilities: Zap,
@@ -26,13 +26,13 @@ const movementIcons: Record<FundingMovementKind, LucideIcon> = {
 	other: Wallet,
 };
 
-export function FundingMovementIcon({
+export function FundingTransactionIcon({
 	kind,
 	size = 16,
 }: {
-	kind: FundingMovementKind;
+	kind: FundingTransactionKind;
 	size?: number;
 }) {
-	const Icon = movementIcons[kind];
+	const Icon = transactionIcons[kind];
 	return <Icon size={size} aria-hidden="true" />;
 }

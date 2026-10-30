@@ -2,7 +2,7 @@
 
 Planned purchases are canonical postings with an optional `purchase: { priority }`
 marker. They use the existing posting CRUD API, shared ID namespace, draft/save
-workflow, artifact identity, and account movement transitions. Priority is
+workflow, artifact identity, and account transaction transitions. Priority is
 nonnegative. Lower numbers come first. Document order breaks ties.
 
 ## Authoring
@@ -29,7 +29,7 @@ sampled rates as the baseline. It returns `purchases` with posting IDs, costs,
 and dates (null when unfunded), plus `allFunded` and `firstReachedDate`.
 Stochastic results report the probability and date percentiles for full-queue
 completion. Neither purchase inputs nor their priority changes affect baseline
-balances, movements, totals, scenario bands, or financial-independence results.
+balances, transactions, totals, scenario bands, or financial-independence results.
 
 The page requests this evaluation on demand through the existing projection
 endpoint. It replaces the request's evaluation scope without saving an evaluation
@@ -52,8 +52,8 @@ queue, even when a cheaper item uses another account.
 `domain.HasFundingGapFrom` exposes the reusable assessment in
 `domain/funding.go` for date-window checks. The scheduler checks events after
 the candidate purchase. This separates earlier same-day gaps from future
-payments. Public movement evidence and fulfillment evaluations use the same
-assessment. It checks every movement, regardless of configured evaluation
+payments. Public transaction evidence and fulfillment evaluations use the same
+assessment. It checks every transaction, regardless of configured evaluation
 selection or enablement. It retains the
 destination-ceiling distinction. Protection uses exact residual amounts, even
 below the 0.5 threshold used to display public shortfall reports.

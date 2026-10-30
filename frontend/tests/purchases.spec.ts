@@ -290,7 +290,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	);
 	expect(projection.ok()).toBe(true);
 	const { result } = await projection.json();
-	const purchasesInBaseline = result.movementEvents.filter(
+	const purchasesInBaseline = result.transactionEvents.filter(
 		(event: { origin: { postingId: string } }) =>
 			document.postings.some(
 				(posting) => posting.purchase && posting.id === event.origin.postingId,
@@ -326,7 +326,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	expect(result.totals).toEqual(baseline.totals);
 	expect(result.summary).toEqual(baseline.summary);
 	expect(result.accountSummaries).toEqual(baseline.accountSummaries);
-	expect(result.movementEvents).toEqual(baseline.movementEvents);
+	expect(result.transactionEvents).toEqual(baseline.transactionEvents);
 	expect(result.evaluations.financialIndependence).toEqual(
 		baseline.evaluations.financialIndependence,
 	);

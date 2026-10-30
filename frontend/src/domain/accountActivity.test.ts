@@ -17,22 +17,22 @@ describe("account-scoped transactions", () => {
 			projection,
 		});
 		expect(rows.filter((row) => row.source === "historical")).toHaveLength(3);
-		expect(rows.some((row) => row.movementId === "renovation")).toBe(true);
+		expect(rows.some((row) => row.transactionId === "renovation")).toBe(true);
 		expect(
-			rows.filter((row) => row.movementId === "invest").length,
+			rows.filter((row) => row.transactionId === "invest").length,
 		).toBeGreaterThan(100);
 		expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
 	});
 
 	it("does not duplicate recorded evidence from server events on or before the plan start", () => {
-		const source = projection.movements.find(
+		const source = projection.transactions.find(
 			(transaction) =>
 				transaction.fromId === "checking" || transaction.toId === "checking",
 		);
 		if (!source) throw new Error("Expected a checking transaction fixture.");
 		const historical = {
 			...source,
-			movementId: "historical-server-event",
+			transactionId: "historical-server-event",
 			date: examplePlan.startDate,
 		};
 		const rows = accountTransactions({
@@ -40,11 +40,11 @@ describe("account-scoped transactions", () => {
 			plan: examplePlan,
 			projection: {
 				...projection,
-				movements: [historical, ...projection.movements],
+				transactions: [historical, ...projection.transactions],
 			},
 		});
 		expect(
-			rows.some((row) => row.movementId === "historical-server-event"),
+			rows.some((row) => row.transactionId === "historical-server-event"),
 		).toBe(false);
 	});
 
@@ -59,8 +59,8 @@ describe("account-scoped transactions", () => {
 			plan: examplePlan,
 			projection,
 		});
-		const outgoing = checking.find((row) => row.movementId === "invest");
-		const incoming = brokerage.find((row) => row.movementId === "invest");
+		const outgoing = checking.find((row) => row.transactionId === "invest");
+		const incoming = brokerage.find((row) => row.transactionId === "invest");
 		expect(outgoing).toMatchObject({
 			category: "transfer",
 			direction: "out",
@@ -74,13 +74,13 @@ describe("account-scoped transactions", () => {
 	});
 
 	it("includes secondary destinations from server account deltas", () => {
-		const source = projection.movements.find(
-			(transaction) => transaction.movementId === "invest",
+		const source = projection.transactions.find(
+			(transaction) => transaction.transactionId === "invest",
 		);
 		if (!source) throw new Error("Expected an investment transaction fixture.");
 		const multi = {
 			...source,
-			movementId: "multi-destination",
+			transactionId: "multi-destination",
 			requested: 100,
 			realized: 100,
 			accountDeltas: [
@@ -92,11 +92,11 @@ describe("account-scoped transactions", () => {
 		const rows = accountTransactions({
 			accountId: "savings",
 			plan: examplePlan,
-			projection: { ...projection, movements: [multi] },
+			projection: { ...projection, transactions: [multi] },
 		});
 		expect(rows).toContainEqual(
 			expect.objectContaining({
-				movementId: "multi-destination",
+				transactionId: "multi-destination",
 				direction: "in",
 				category: "transfer",
 				amount: 40,
@@ -110,7 +110,7 @@ describe("account-scoped transactions", () => {
 			plan: examplePlan,
 			projection,
 		});
-		const failure = rows.find((row) => row.movementId === "renovation");
+		const failure = rows.find((row) => row.transactionId === "renovation");
 		expect(failure?.requested).toBe(48000);
 		expect(failure?.amount).toBeLessThan(48000);
 		expect(failure?.shortfall).toBeCloseTo(48000 - (failure?.amount ?? 0));
@@ -129,9 +129,9 @@ describe("account-scoped transactions", () => {
 			projection: activityProjection(plan),
 		});
 		expect(
-			rows.find((row) => row.movementId === "pay-record-0")?.excluded,
+			rows.find((row) => row.transactionId === "pay-record-0")?.excluded,
 		).toBe(true);
-		expect(rows.some((row) => row.movementId === "invest")).toBe(false);
+		expect(rows.some((row) => row.transactionId === "invest")).toBe(false);
 	});
 
 	it("flags sync pending charges instead of reporting them as user-excluded", () => {
@@ -162,7 +162,7 @@ describe("account-scoped transactions", () => {
 		});
 		expect(
 			rows.find(
-				(row) => row.movementId === "01900000-0000-7000-8000-000000000001",
+				(row) => row.transactionId === "01900000-0000-7000-8000-000000000001",
 			),
 		).toMatchObject({
 			pending: true,
@@ -198,7 +198,7 @@ describe("account-scoped transactions", () => {
 		});
 		expect(
 			rows.find(
-				(row) => row.movementId === "01900000-0000-7000-8000-000000000002",
+				(row) => row.transactionId === "01900000-0000-7000-8000-000000000002",
 			),
 		).toMatchObject({
 			pending: false,
@@ -233,7 +233,7 @@ describe("account-scoped transactions", () => {
 			projection: activityProjection(plan),
 		});
 		expect(
-			rows.find((row) => row.movementId === "sfin-pending-checking-mock-pend1"),
+			rows.find((row) => row.transactionId === "sfin-pending-checking-mock-pend1"),
 		).toMatchObject({
 			pending: false,
 			excluded: true,
@@ -265,7 +265,7 @@ describe("account-scoped transactions", () => {
 				plan,
 				projection,
 			});
-			expect(rows.filter((row) => row.movementId === id)).toEqual([
+			expect(rows.filter((row) => row.transactionId === id)).toEqual([
 				expect.objectContaining({
 					date: "2026-09-25",
 					amount: 42.1,
@@ -274,7 +274,7 @@ describe("account-scoped transactions", () => {
 					excluded: true,
 				}),
 			]);
-			expect(projection.movements.some((row) => row.movementId === id)).toBe(
+			expect(projection.transactions.some((row) => row.transactionId === id)).toBe(
 				false,
 			);
 			expect(
@@ -324,12 +324,12 @@ describe("transaction filtering", () => {
 	it("searches both transaction names and the other account", () => {
 		expect(apply({ query: "RENOVATION" })).toHaveLength(1);
 		const investCounterparty = transactions.find(
-			(row) => row.movementId === "invest",
+			(row) => row.transactionId === "invest",
 		)?.counterparty;
 		if (!investCounterparty) throw new Error("Expected an invest counterparty");
 		expect(
 			apply({ query: investCounterparty }).every(
-				(row) => row.movementId === "invest",
+				(row) => row.transactionId === "invest",
 			),
 		).toBe(true);
 		expect(apply({ query: "no matching record" })).toEqual([]);

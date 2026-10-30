@@ -4,12 +4,12 @@ import { testAccount } from "../mocks/account.ts";
 import { projectionFixture } from "../mocks/projection.ts";
 import type {
 	FinancialModelDocument,
-	MovementEvent,
+	TransactionEvent,
 	ProjectionResult,
 } from "./contracts.ts";
-import { projectionMovements } from "./projectionMovements.ts";
+import { projectionTransactions } from "./projectionTransactions.ts";
 
-function serverProjection(events: MovementEvent[]): ProjectionResult {
+function serverProjection(events: TransactionEvent[]): ProjectionResult {
 	return {
 		timeline: { rows: [] },
 		accountSummaries: [],
@@ -29,11 +29,11 @@ function serverProjection(events: MovementEvent[]): ProjectionResult {
 			accountBalance: [],
 			postingFulfillment: [],
 		},
-		movementEvents: events,
+		transactionEvents: events,
 	};
 }
 
-function event(overrides: Partial<MovementEvent> = {}): MovementEvent {
+function event(overrides: Partial<TransactionEvent> = {}): TransactionEvent {
 	return {
 		date: "2026-02-05",
 		sequence: 1,
@@ -48,11 +48,11 @@ function event(overrides: Partial<MovementEvent> = {}): MovementEvent {
 	};
 }
 
-describe("projection movement evidence", () => {
+describe("projection transaction evidence", () => {
 	it("retains canonical fulfillment without a configured evaluation", () => {
-		const movements = projectionMovements(serverProjection([event()]), null);
-		expect(movements[0]).toMatchObject({
-			movementId: "bill",
+		const transactions = projectionTransactions(serverProjection([event()]), null);
+		expect(transactions[0]).toMatchObject({
+			transactionId: "bill",
 			fromId: "checking",
 			available: 100,
 			constraintTypes: ["source-floor"],
@@ -60,14 +60,14 @@ describe("projection movement evidence", () => {
 		});
 		const gaps = deriveFundingGaps({
 			plan: testAccount,
-			projection: projectionFixture({ movements }),
+			projection: projectionFixture({ transactions }),
 		});
 		expect(gaps).toHaveLength(1);
 		expect(gaps[0]?.unfulfilledAmount).toBe(100);
 	});
 
 	it("does not turn a destination ceiling into a funding gap", () => {
-		const movements = projectionMovements(
+		const transactions = projectionTransactions(
 			serverProjection([
 				event({
 					bindingConstraints: [
@@ -78,17 +78,17 @@ describe("projection movement evidence", () => {
 			]),
 			null,
 		);
-		expect(movements[0]?.constraintTypes).toEqual(["destination-ceiling"]);
+		expect(transactions[0]?.constraintTypes).toEqual(["destination-ceiling"]);
 		expect(
 			deriveFundingGaps({
 				plan: testAccount,
-				projection: projectionFixture({ movements }),
+				projection: projectionFixture({ transactions }),
 			}),
 		).toEqual([]);
 	});
 
 	it("preserves same-day execution order and excludes historical events", () => {
-		const movements = projectionMovements(
+		const transactions = projectionTransactions(
 			serverProjection([
 				event({ date: "2026-01-30", sequence: 0 }),
 				event({
@@ -102,7 +102,7 @@ describe("projection movement evidence", () => {
 			]),
 			null,
 		);
-		expect(movements.map((movement) => movement.movementId)).toEqual([
+		expect(transactions.map((transaction) => transaction.transactionId)).toEqual([
 			"z-first",
 			"a-second",
 		]);
@@ -130,12 +130,12 @@ describe("projection movement evidence", () => {
 				},
 			],
 		} as unknown as FinancialModelDocument;
-		const movements = projectionMovements(
+		const transactions = projectionTransactions(
 			serverProjection([event()]),
 			document,
 		);
-		expect(movements[0]).toMatchObject({
-			movementId: "bill",
+		expect(transactions[0]).toMatchObject({
+			transactionId: "bill",
 			name: "Electric bill",
 			fromId: "checking",
 			toId: "utility",

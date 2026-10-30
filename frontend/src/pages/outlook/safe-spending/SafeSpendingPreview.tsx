@@ -22,7 +22,7 @@ import {
 	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
-	filterMovementsById,
+	filterTransactionsById,
 	mandatoryTransactions,
 	monthEndIso,
 	nextMonthObligations,
@@ -55,7 +55,7 @@ import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/sa
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
-const EMPTY_MOVEMENTS: Projection["movements"] = [];
+const EMPTY_TRANSACTIONS: Projection["transactions"] = [];
 
 export function SafeSpendingPreview({
 	plan,
@@ -82,7 +82,7 @@ export function SafeSpendingPreview({
 	// progressive enhancement. Client math stays instant either way.
 	const serverView = safeSpendingFromEnvelope(envelope);
 	void serverView;
-	const movements = projection?.movements ?? EMPTY_MOVEMENTS;
+	const transactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
 	const cards = useMemo(
 		() =>
 			visibleAccounts(plan.accounts).filter(
@@ -158,38 +158,38 @@ export function SafeSpendingPreview({
 		() => spendingBalance(plan, spendingIds),
 		[plan, spendingIds],
 	);
-	const obligationMovements = useMemo(
-		() => filterMovementsById(movements, settings.movementIds),
-		[movements, settings.movementIds],
+	const obligationTransactions = useMemo(
+		() => filterTransactionsById(transactions, settings.transactionIds),
+		[transactions, settings.transactionIds],
 	);
 	const remainingDerived = useMemo(() => {
 		if (!spendingIds.length)
 			return { total: 0, monthEnd: monthEndIso(displayToday) };
 		return remainingMonthlyObligations({
-			movements: obligationMovements,
+			transactions: obligationTransactions,
 			checkingIds: spendingIds,
 			todayIso: displayToday,
 		});
-	}, [obligationMovements, spendingIds, displayToday]);
+	}, [obligationTransactions, spendingIds, displayToday]);
 	const fixedDerived = useMemo(() => {
 		if (!spendingIds.length)
 			return { total: 0, start: displayToday, end: displayToday };
 		return nextMonthObligations({
-			movements: obligationMovements,
+			transactions: obligationTransactions,
 			checkingIds: spendingIds,
 			todayIso: displayToday,
 		});
-	}, [obligationMovements, spendingIds, displayToday]);
+	}, [obligationTransactions, spendingIds, displayToday]);
 	const income = useMemo(
 		() =>
 			safeSpendingIncome({
 				plan,
-				movements,
+				transactions,
 				incomeAccountIds: incomeIds,
 				incomeRuleIds: settings.incomeRuleIds,
 				todayIso: displayToday,
 			}),
-		[plan, movements, incomeIds, settings.incomeRuleIds, displayToday],
+		[plan, transactions, incomeIds, settings.incomeRuleIds, displayToday],
 	);
 	const paycheckDerived = income.paycheck;
 	// Past cash outflow stays filter-proof: bill toggles shape the bills
@@ -198,64 +198,64 @@ export function SafeSpendingPreview({
 		() =>
 			spendingIds.length
 				? realizedCheckingOutflows({
-						movements,
+						transactions,
 						checkingIds: spendingIds,
 						after: plan.startDate,
 						through: displayToday,
 					})
 				: 0,
-		[movements, spendingIds, plan.startDate, displayToday],
+		[transactions, spendingIds, plan.startDate, displayToday],
 	);
 	const shortWindow = useMemo(
 		() =>
 			spendingIds.length
 				? checkingShortfall({
-						movements: obligationMovements,
+						transactions: obligationTransactions,
 						checkingIds: spendingIds,
 						after: displayToday,
 						through: remainingDerived.monthEnd,
 					})
 				: { total: 0, firstDate: null as string | null },
-		[obligationMovements, spendingIds, displayToday, remainingDerived.monthEnd],
+		[obligationTransactions, spendingIds, displayToday, remainingDerived.monthEnd],
 	);
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return plan.transactions
 			.filter(
-				(movement) =>
-					movement.fromId !== null &&
-					spendingIds.includes(movement.fromId) &&
-					movement.frequency !== "once",
+				(transaction) =>
+					transaction.fromId !== null &&
+					spendingIds.includes(transaction.fromId) &&
+					transaction.frequency !== "once",
 			)
-			.map((movement) => ({
-				id: movement.id,
-				name: movement.name,
-				amount: movement.amount,
-				frequency: movement.frequency,
+			.map((transaction) => ({
+				id: transaction.id,
+				name: transaction.name,
+				amount: transaction.amount,
+				frequency: transaction.frequency,
 			}));
 	}, [plan.transactions, spendingIds]);
 
 	const trackedBillIds = useMemo(() => {
 		const knownIds = billCandidates.map((bill) => bill.id);
-		return resolveEffectiveIds(settings.movementIds, knownIds);
-	}, [settings.movementIds, billCandidates]);
+		return resolveEffectiveIds(settings.transactionIds, knownIds);
+	}, [settings.transactionIds, billCandidates]);
 
 	const billsStart = shiftDate({ date: displayToday, days: 1 });
 
 	// Bills list shows tracked bills only; one-time purchases live under
 	// direct cash spending so the two sections partition upcoming checking
 	// outflows with no duplication. Cushion math (remaining/fixed) stays on
-	// obligationMovements and is unchanged.
-	const billMovements = useMemo(() => {
+	// obligationTransactions and is unchanged.
+	const billBaseTransactions = useMemo(() => {
 		const bills = new Set(trackedBillIds);
-		return movements.filter((movement) => bills.has(movement.movementId));
-	}, [movements, trackedBillIds]);
+		return transactions.filter((transaction) => bills.has(transaction.transactionId));
+	}, [transactions, trackedBillIds]);
 	const billTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return sortTransactionsByDate({
 			items: mandatoryTransactions({
-				movements: billMovements,
+				transactions: billBaseTransactions,
 				checkingIds: spendingIds,
 				start: billsStart,
 				end: cycle.cycleEnd,
@@ -266,7 +266,7 @@ export function SafeSpendingPreview({
 			order: transactionOrder,
 		});
 	}, [
-		billMovements,
+		billBaseTransactions,
 		spendingIds,
 		plan,
 		billsStart,
@@ -282,42 +282,42 @@ export function SafeSpendingPreview({
 	// same upcoming window as bills (after today through cycle end) so
 	// section totals stay comparable; past direct spend lives only in the
 	// since-balance summary rows, matching past bills.
-	const directMovements = useMemo(() => {
+	const directBaseTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		const bills = new Set(trackedBillIds);
 		const rules = new Set(
 			plan.transactions
-				.filter((movement) => movement.frequency !== "once")
-				.map((movement) => movement.id),
+				.filter((transaction) => transaction.frequency !== "once")
+				.map((transaction) => transaction.id),
 		);
 		const sources = new Set(spendingIds);
-		return movements.filter(
-			(movement) =>
-				movement.fromId !== null &&
-				sources.has(movement.fromId) &&
-				!bills.has(movement.movementId) &&
-				!rules.has(movement.movementId),
+		return transactions.filter(
+			(transaction) =>
+				transaction.fromId !== null &&
+				sources.has(transaction.fromId) &&
+				!bills.has(transaction.transactionId) &&
+				!rules.has(transaction.transactionId),
 		);
-	}, [movements, spendingIds, trackedBillIds, plan.transactions]);
+	}, [transactions, spendingIds, trackedBillIds, plan.transactions]);
 
 	const directSpentSinceStart = useMemo(
 		() =>
 			spendingIds.length
 				? realizedCheckingOutflows({
-						movements: directMovements,
+						transactions: directBaseTransactions,
 						checkingIds: spendingIds,
 						after: plan.startDate,
 						through: displayToday,
 					})
 				: 0,
-		[directMovements, spendingIds, plan.startDate, displayToday],
+		[directBaseTransactions, spendingIds, plan.startDate, displayToday],
 	);
 
 	const directTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return sortTransactionsByDate({
 			items: mandatoryTransactions({
-				movements: directMovements,
+				transactions: directBaseTransactions,
 				checkingIds: spendingIds,
 				start: cycle.cycleStart,
 				end: cycle.cycleEnd,
@@ -328,7 +328,7 @@ export function SafeSpendingPreview({
 			order: transactionOrder,
 		});
 	}, [
-		directMovements,
+		directBaseTransactions,
 		spendingIds,
 		plan,
 		cycle.cycleStart,
@@ -455,14 +455,14 @@ export function SafeSpendingPreview({
 		updateSettings({ accountIds: next.length ? next : null });
 	};
 
-	const toggleBill = (movementId: string) => {
+	const toggleBill = (transactionId: string) => {
 		const explicit =
-			settings.movementIds ?? billCandidates.map((bill) => bill.id);
-		const next = explicit.includes(movementId)
-			? explicit.filter((id) => id !== movementId)
-			: [...explicit, movementId];
+			settings.transactionIds ?? billCandidates.map((bill) => bill.id);
+		const next = explicit.includes(transactionId)
+			? explicit.filter((id) => id !== transactionId)
+			: [...explicit, transactionId];
 		updateSettings({
-			movementIds:
+			transactionIds:
 				next.length === billCandidates.length || next.length === 0
 					? null
 					: next,

@@ -20,7 +20,7 @@ Examples include:
 - ■ for stop
 - 🔍 for search
 - trash can for delete
-- arrows for navigation, movement, sending, or progression where convention makes the meaning clear
+- arrows for navigation, motion, sending, or progression where convention makes the meaning clear
 - sparkle-style iconography for AI-assisted actions when that convention is established for the audience
 
 Do not replace a well-understood visual convention with prose.

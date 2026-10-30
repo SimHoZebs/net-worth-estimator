@@ -115,7 +115,7 @@ export function AccountDetailsModal({
 			null)
 		: null;
 	const selectedPlanTransaction = selected
-		? (planTransactions.get(selected.movementId) ?? null)
+		? (planTransactions.get(selected.transactionId) ?? null)
 		: null;
 	return (
 		<Modal
@@ -216,7 +216,7 @@ export function AccountDetailsModal({
 								key={transaction.id}
 								transaction={transaction}
 								planTransaction={
-									planTransactions.get(transaction.movementId) ?? null
+									planTransactions.get(transaction.transactionId) ?? null
 								}
 								onEdit={() => setSelectedId(transaction.id)}
 							/>

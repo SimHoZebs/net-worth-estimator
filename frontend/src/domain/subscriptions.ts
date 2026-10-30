@@ -44,10 +44,10 @@ function isIsoDate(value: string): boolean {
  */
 export function markAsSubscription(
 	plan: Plan,
-	movementId: string,
+	transactionId: string,
 	options: MarkAsRecurringOptions = {},
 ): Plan | Error {
-	return markAsRecurring(plan, movementId, { ...options, endDate: null });
+	return markAsRecurring(plan, transactionId, { ...options, endDate: null });
 }
 
 /**
@@ -59,18 +59,18 @@ export function markAsSubscription(
  */
 export function markAsInstallment(
 	plan: Plan,
-	movementId: string,
+	transactionId: string,
 	payments: number,
 	options: MarkAsRecurringOptions = {},
 ): Plan | Error {
 	if (!Number.isInteger(payments) || payments < 2 || payments > 600) {
 		return new Error("Choose between 2 and 600 payments for an installment.");
 	}
-	const source = plan.transactions.find((item) => item.id === movementId);
+	const source = plan.transactions.find((item) => item.id === transactionId);
 	if (!source) return new Error("That transaction no longer exists.");
 	const frequency: SubscriptionFrequency = options.frequency ?? "monthly";
 	const step = frequency === "monthly" ? 1 : 12;
-	return markAsRecurring(plan, movementId, {
+	return markAsRecurring(plan, transactionId, {
 		...options,
 		frequency,
 		endDate: addMonthsClamped(source.startDate, step * (payments - 1)),
@@ -79,10 +79,10 @@ export function markAsInstallment(
 
 function markAsRecurring(
 	plan: Plan,
-	movementId: string,
+	transactionId: string,
 	options: MarkAsRecurringOptions,
 ): Plan | Error {
-	const source = plan.transactions.find((item) => item.id === movementId);
+	const source = plan.transactions.find((item) => item.id === transactionId);
 	if (!source) {
 		return new Error("That transaction no longer exists.");
 	}
@@ -138,7 +138,7 @@ function markAsRecurring(
 	return {
 		...plan,
 		transactions: plan.transactions
-			.map((item) => (item.id === movementId ? claimed : item))
+			.map((item) => (item.id === transactionId ? claimed : item))
 			.concat([rule]),
 	};
 }

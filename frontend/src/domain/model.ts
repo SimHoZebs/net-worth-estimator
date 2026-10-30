@@ -111,58 +111,58 @@ function migrateLegacyVoidFlag(value: unknown): unknown {
 	if (typeof value !== "object" || value === null || Array.isArray(value))
 		return value;
 	const record = value as Record<string, unknown>;
-	if (!Array.isArray(record.movements)) return value;
+	if (!Array.isArray(record.transactions)) return value;
 	let changed = false;
-	const movements = record.movements.map((movement) => {
-		if (typeof movement !== "object" || movement === null || "void" in movement)
-			return movement;
+	const transactions = record.transactions.map((transaction) => {
+		if (typeof transaction !== "object" || transaction === null || "void" in transaction)
+			return transaction;
 		changed = true;
-		return { ...(movement as Record<string, unknown>), void: false };
+		return { ...(transaction as Record<string, unknown>), void: false };
 	});
-	return changed ? { ...record, movements } : value;
+	return changed ? { ...record, transactions } : value;
 }
 
 /**
- * Legacy drafts stored wishlist items as movements carrying
+ * Legacy drafts stored wishlist items as transactions carrying
  * `purchasePriority`. The display plan now keeps them in
  * `plannedPurchases` ordered by priority, so lift them out before parsing:
- * zod strips unknown movement keys, which would otherwise turn old wishes
+ * zod strips unknown transaction keys, which would otherwise turn old wishes
  * into real one-time postings.
  */
 function migrateLegacyPurchases(value: unknown): unknown {
 	if (typeof value !== "object" || value === null || Array.isArray(value))
 		return value;
 	const record = value as Record<string, unknown>;
-	if (!Array.isArray(record.movements)) return value;
+	if (!Array.isArray(record.transactions)) return value;
 	const planned: Record<string, unknown>[] = Array.isArray(
 		record.plannedPurchases,
 	)
 		? [...(record.plannedPurchases as Record<string, unknown>[])]
 		: [];
-	const movements: unknown[] = [];
-	for (const item of record.movements) {
+	const transactions: unknown[] = [];
+	for (const item of record.transactions) {
 		if (
 			typeof item === "object" &&
 			item !== null &&
 			(item as Record<string, unknown>).purchasePriority != null &&
 			typeof (item as Record<string, unknown>).fromId === "string"
 		) {
-			const movement = item as Record<string, unknown>;
+			const transaction = item as Record<string, unknown>;
 			planned.push({
-				id: movement.id,
-				name: movement.name,
-				amount: movement.amount,
-				fromId: movement.fromId,
-				startDate: movement.startDate,
-				enabled: movement.enabled ?? true,
-				readOnly: movement.readOnly ?? false,
+				id: transaction.id,
+				name: transaction.name,
+				amount: transaction.amount,
+				fromId: transaction.fromId,
+				startDate: transaction.startDate,
+				enabled: transaction.enabled ?? true,
+				readOnly: transaction.readOnly ?? false,
 				__priority:
-					typeof movement.purchasePriority === "number"
-						? movement.purchasePriority
+					typeof transaction.purchasePriority === "number"
+						? transaction.purchasePriority
 						: 0,
 			});
 		} else {
-			movements.push(item);
+			transactions.push(item);
 		}
 	}
 	planned.sort(
@@ -170,30 +170,12 @@ function migrateLegacyPurchases(value: unknown): unknown {
 			Number(left.__priority ?? 0) - Number(right.__priority ?? 0),
 	);
 	for (const item of planned) delete item.__priority;
-	return { ...record, movements, plannedPurchases: planned };
-}
-
-/**
- * Legacy drafts stored the union under `movements`. The display name is now
- * `transactions`, so lift the array across after the older migrations (which
- * still read `movements`) have run. Unknown keys are stripped on parse, but
- * an explicit rename keeps the intent readable in stored payloads.
- */
-function migrateLegacyMovementsField(value: unknown): unknown {
-	if (typeof value !== "object" || value === null || Array.isArray(value))
-		return value;
-	const record = value as Record<string, unknown>;
-	if (Array.isArray(record.transactions) || !Array.isArray(record.movements))
-		return value;
-	const { movements, ...rest } = record;
-	return { ...rest, transactions: movements };
+	return { ...record, transactions, plannedPurchases: planned };
 }
 
 function migrateLegacyPlan(value: unknown): unknown {
-	return migrateLegacyMovementsField(
-		migrateLegacyVoidFlag(
-			migrateLegacyPurchases(migrateLegacyEvaluations(value)),
-		),
+	return migrateLegacyVoidFlag(
+		migrateLegacyPurchases(migrateLegacyEvaluations(value)),
 	);
 }
 

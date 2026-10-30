@@ -70,32 +70,32 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 	})
 	validateEvaluationInstanceIDs(&issues, document)
 
-	// Movement identity checks: posting, rule, and planned-purchase IDs share
+	// Transaction identity checks: posting, rule, and planned-purchase IDs share
 	// one namespace with account IDs.
-	movementIDs := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
+	transactionIDs := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
 	for _, posting := range document.Postings {
-		movementIDs[posting.ID] = true
+		transactionIDs[posting.ID] = true
 	}
 	for index, rule := range document.RecurrenceRules {
-		if movementIDs[rule.ID] {
+		if transactionIDs[rule.ID] {
 			addIssue(&issues, types.SeverityError, "rule.id.collision",
 				fmt.Sprintf("Rule ID '%s' collides with a posting ID. Posting and rule IDs share one namespace.", rule.ID),
 				pathWithField([]any{"recurrenceRules", index}, "id")...)
 		}
-		movementIDs[rule.ID] = true
+		transactionIDs[rule.ID] = true
 	}
 	for index, purchase := range document.PlannedPurchases {
-		if movementIDs[purchase.ID] {
+		if transactionIDs[purchase.ID] {
 			addIssue(&issues, types.SeverityError, "plannedPurchase.id.collision",
-				fmt.Sprintf("Planned purchase ID '%s' collides with a posting or rule ID. IDs must be unique across movements and purchases.", purchase.ID),
+				fmt.Sprintf("Planned purchase ID '%s' collides with a posting or rule ID. IDs must be unique across transactions and purchases.", purchase.ID),
 				pathWithField([]any{"plannedPurchases", index}, "id")...)
 		}
-		movementIDs[purchase.ID] = true
+		transactionIDs[purchase.ID] = true
 	}
 
 	// Account identity checks.
 	for index, account := range document.Accounts {
-		if movementIDs[account.ID] {
+		if transactionIDs[account.ID] {
 			addIssue(&issues, types.SeverityError, "account.id.collision",
 				fmt.Sprintf("Account ID '%s' collides with a posting or rule ID. IDs must be unique across accounts, postings, and rules.", account.ID),
 				pathWithField([]any{"accounts", index}, "id")...)
@@ -133,7 +133,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 		checkpointKeys[key] = true
 	}
 
-	dependencies := validateMovementAmounts(&issues, document, accountIDs)
+	dependencies := validateTransactionAmounts(&issues, document, accountIDs)
 	validatePurchases(&issues, document, dependencies)
 	validatePostingDependencies(&issues, document, dependencies)
 	validatePostingRoutes(&issues, document.Postings, accountIDs)
@@ -231,16 +231,16 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 	}
 }
 
-// validateMovementAmounts validates amount descriptors for manual postings
+// validateTransactionAmounts validates amount descriptors for manual postings
 // and rule templates together. References may name posting or rule IDs, so
 // the dependency graph spans both.
-func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) map[string][]string {
-	movementIDsSet := MovementIDs(document)
+func validateTransactionAmounts(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) map[string][]string {
+	transactionIDsSet := TransactionIDs(document)
 	dependencies := map[string][]string{}
 	validateAmount := func(id string, amount types.PostingAmountResolution, path []any) {
 		deps, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{
 			AccountIDs: accountIDs,
-			PostingIDs: movementIDsSet,
+			PostingIDs: transactionIDsSet,
 		})
 		if err != nil {
 			message := err.Error()
@@ -262,7 +262,7 @@ func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *typ
 		validateAmount(posting.ID, posting.Amount, []any{"postings", index})
 		if CountVolatileRateInputs(posting.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
-				"Amounts carry at most one volatile provider input: one movement shares one pre-sampled annual rate.",
+				"Amounts carry at most one volatile provider input: one transaction shares one pre-sampled annual rate.",
 				pathWithField([]any{"postings", index}, "amount")...)
 		}
 	}
@@ -271,7 +271,7 @@ func validateMovementAmounts(issues *[]types.ModelValidationIssue, document *typ
 		validateAmount(rule.ID, rule.Amount, []any{"recurrenceRules", index})
 		if CountVolatileRateInputs(rule.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
-				"Amounts carry at most one volatile provider input: one movement shares one pre-sampled annual rate.",
+				"Amounts carry at most one volatile provider input: one transaction shares one pre-sampled annual rate.",
 				pathWithField([]any{"recurrenceRules", index}, "amount")...)
 		}
 	}

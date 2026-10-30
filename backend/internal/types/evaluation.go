@@ -56,7 +56,7 @@ type PostingFulfillmentConfig struct {
 // CycleFulfillmentConfig targets a statement cycle shared across a
 // configured account set. It answers whether combined cycle spend stays
 // within one total set-aside: the statement window derives from StatementDay
-// anchored at the projection start, and spend derives from realized movement
+// anchored at the projection start, and spend derives from realized transaction
 // amounts across all listed accounts.
 type CycleFulfillmentConfig struct {
 	AccountIDs   []string `json:"accountIds"`

@@ -109,7 +109,7 @@ describe("chart presentation data", () => {
 			availableAmount: 2500,
 			unfulfilledAmount: 6500,
 			windowStartDate: "2030-09-01",
-			movements: [
+			transactions: [
 				{
 					id: "pay",
 					date: "2030-09-10",
@@ -138,12 +138,12 @@ describe("chart presentation data", () => {
 				expect(path).toMatch(/^M/);
 				expect(path).not.toMatch(/NaN|Infinity/);
 			}
-			// Refusal vector lands past the last executed movement, below it.
+			// Refusal vector lands past the last executed transaction, below it.
 			expect(model.failX).toBeGreaterThan(model.endX);
 			expect(model.failY).toBeGreaterThan(model.endY);
 			expect(model.summary.shortfall).toBe(9000 - 2500);
 		});
-		it("keeps lookup and geometry in bounds for a single movement", () => {
+		it("keeps lookup and geometry in bounds for a single transaction", () => {
 			const geometry = lineChartModel({
 				xMax: 1,
 				low: -100,

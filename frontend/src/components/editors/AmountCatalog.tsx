@@ -383,7 +383,7 @@ export function AmountCatalog({
 					}}
 				>
 					<p>
-						The recipe stops appearing as a starting point. Movements already
+						The recipe stops appearing as a starting point. Transactions already
 						using its amounts are unaffected.
 					</p>
 				</ConfirmDialog>

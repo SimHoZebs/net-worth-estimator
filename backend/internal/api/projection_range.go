@@ -48,7 +48,7 @@ func (r *projectionRange) contains(date types.IsoDate) bool {
 		(r.EndDate == "" || date <= types.IsoDate(r.EndDate))
 }
 
-// clipProjectionRange filters rows and movement events by validated date bounds.
+// clipProjectionRange filters rows and transaction events by validated date bounds.
 // All other sections remain unchanged. New slices preserve the source arrays;
 // nested values remain shared and must be treated as read-only.
 func clipProjectionRange(result *types.ProjectionResult, r *projectionRange) *types.ProjectionResult {
@@ -63,12 +63,12 @@ func clipProjectionRange(result *types.ProjectionResult, r *projectionRange) *ty
 		}
 	}
 	filtered.Timeline.Rows = rows
-	events := make([]types.MovementEvent, 0, len(result.MovementEvents))
-	for _, event := range result.MovementEvents {
+	events := make([]types.TransactionEvent, 0, len(result.TransactionEvents))
+	for _, event := range result.TransactionEvents {
 		if r.contains(event.Date) {
 			events = append(events, event)
 		}
 	}
-	filtered.MovementEvents = events
+	filtered.TransactionEvents = events
 	return &filtered
 }

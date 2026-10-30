@@ -65,7 +65,7 @@ func (r *PostingFulfillmentPathResult) ToJSON() types.JsonValue {
 // halves toward +Infinity for percentile buffers and differs on negative .5.
 func roundAmount(value float64) float64 { return roundCurrency(value) }
 
-func toFulfillmentEvent(evaluated evaluatedMovementEvent) fulfillmentEventJSON {
+func toFulfillmentEvent(evaluated evaluatedTransactionEvent) fulfillmentEventJSON {
 	event := evaluated.event
 	fulfillment := evaluated.fulfillment()
 	constraints := make([]types.JsonValue, 0, len(evaluated.bindingConstraints))
@@ -109,7 +109,7 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 			selectedIDs[id] = true
 		}
 	}
-	evaluatedEvents := evaluateMovementEvents(path)
+	evaluatedEvents := evaluateTransactionEvents(path)
 	result := &PostingFulfillmentPathResult{Events: []fulfillmentEventJSON{}, Dates: []map[string]any{}, Postings: []map[string]any{}}
 	totalsByPostingID := map[string]*postingTotals{}
 	type dateTotals struct {
@@ -167,10 +167,10 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 		}
 	}
 	if includeDetails {
-		detailMovements := ResolvedMovementPostings(&path.EffectiveDocument)
+		detailTransactions := ResolvedTransactionPostings(&path.EffectiveDocument)
 		detailCaps := RuleCapsByID(&path.EffectiveDocument)
-		for index := range detailMovements {
-			posting := &detailMovements[index]
+		for index := range detailTransactions {
+			posting := &detailTransactions[index]
 			if posting.Purchase != nil {
 				continue // Evaluation inputs are not established payment evidence.
 			}
@@ -265,7 +265,7 @@ func diagnoseFulfillmentConfig(path *types.ProjectionPath, config types.PostingF
 	if config.PostingIDs == nil {
 		return nil
 	}
-	postingIDs := MovementIDs(&path.EffectiveDocument)
+	postingIDs := TransactionIDs(&path.EffectiveDocument)
 	diagnostics := []types.EvaluationDiagnostic{}
 	for _, postingID := range config.PostingIDs {
 		if !postingIDs[postingID] {
@@ -290,7 +290,7 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 	Type: types.EvaluationTypePostingFulfillment,
 	Name: "Posting fulfillment",
 
-	// Reader: answers from the cached path's movement events only.
+	// Reader: answers from the cached path's transaction events only.
 	Kind: EvaluationKindReader,
 
 	ValidateConfig: ValidateFulfillmentConfig,
@@ -307,7 +307,7 @@ var postingFulfillmentDefinition = &EvaluationDefinition{
 		// Served projections always use summary detail: the only reader of
 		// this envelope takes scalars (firstUnderfulfilledDate,
 		// completionRate) while per-event evidence travels once on the
-		// public movementEvents timeline. Building the per-event, per-date,
+		// public transactionEvents timeline. Building the per-event, per-date,
 		// and per-posting arrays here duplicated those 7446 events (~2.3 MB).
 		// EvaluatePostingFulfillment keeps its detail capability for direct
 		// callers; the served path never pays for it.

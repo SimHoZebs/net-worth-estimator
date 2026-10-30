@@ -1412,83 +1412,6 @@
 				"required": ["type", "instanceId"],
 				"type": "object"
 			},
-			"MovementEvent": {
-				"additionalProperties": false,
-				"properties": {
-					"accountDeltas": {
-						"items": {
-							"$ref": "#/components/schemas/Item1"
-						},
-						"type": ["array", "null"]
-					},
-					"availableAmount": {
-						"format": "double",
-						"type": "number"
-					},
-					"bindingConstraints": {
-						"items": {},
-						"type": ["array", "null"]
-					},
-					"date": {
-						"type": "string"
-					},
-					"fulfillment": {
-						"$ref": "#/components/schemas/MovementFulfillment"
-					},
-					"origin": {
-						"$ref": "#/components/schemas/MovementOrigin"
-					},
-					"realizedAmount": {
-						"format": "double",
-						"type": "number"
-					},
-					"requestedAmount": {
-						"format": "double",
-						"type": "number"
-					},
-					"sequence": {
-						"format": "int64",
-						"type": "integer"
-					}
-				},
-				"required": [
-					"date",
-					"sequence",
-					"origin",
-					"requestedAmount",
-					"realizedAmount",
-					"accountDeltas"
-				],
-				"type": "object"
-			},
-			"MovementFulfillment": {
-				"additionalProperties": false,
-				"properties": {
-					"destinationLimitedAmount": {
-						"format": "double",
-						"type": "number"
-					},
-					"unfulfilledAmount": {
-						"format": "double",
-						"type": "number"
-					}
-				},
-				"required": ["unfulfilledAmount", "destinationLimitedAmount"],
-				"type": "object"
-			},
-			"MovementOrigin": {
-				"additionalProperties": false,
-				"properties": {
-					"postingId": {
-						"type": "string"
-					},
-					"type": {
-						"type": "string"
-					}
-				},
-				"required": ["type", "postingId"],
-				"type": "object"
-			},
 			"ParseResultBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2005,12 +1928,6 @@
 					"milestones": {
 						"$ref": "#/components/schemas/ProjectionResultMilestonesStruct"
 					},
-					"movementEvents": {
-						"items": {
-							"$ref": "#/components/schemas/MovementEvent"
-						},
-						"type": ["array", "null"]
-					},
 					"summary": {
 						"$ref": "#/components/schemas/ProjectionResultSummaryStruct"
 					},
@@ -2019,6 +1936,12 @@
 					},
 					"totals": {
 						"$ref": "#/components/schemas/ProjectionResultTotalsStruct"
+					},
+					"transactionEvents": {
+						"items": {
+							"$ref": "#/components/schemas/TransactionEvent"
+						},
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -2832,12 +2755,6 @@
 						},
 						"type": ["array", "null"]
 					},
-					"movementIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
 					"reserve": {
 						"format": "double",
 						"minimum": 0,
@@ -2857,6 +2774,12 @@
 					},
 					"statementDaySet": {
 						"type": "boolean"
+					},
+					"transactionIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -2866,7 +2789,7 @@
 					"spendingAccountIds",
 					"incomeAccountIds",
 					"incomeRuleIds",
-					"movementIds",
+					"transactionIds",
 					"statementDaySet"
 				],
 				"type": "object"
@@ -3226,6 +3149,70 @@
 				"required": ["items", "revision"],
 				"type": "object"
 			},
+			"TransactionEvent": {
+				"additionalProperties": false,
+				"properties": {
+					"accountDeltas": {
+						"items": {
+							"$ref": "#/components/schemas/Item1"
+						},
+						"type": ["array", "null"]
+					},
+					"availableAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"bindingConstraints": {
+						"items": {},
+						"type": ["array", "null"]
+					},
+					"date": {
+						"type": "string"
+					},
+					"fulfillment": {
+						"$ref": "#/components/schemas/TransactionFulfillment"
+					},
+					"origin": {
+						"$ref": "#/components/schemas/TransactionOrigin"
+					},
+					"realizedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"requestedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"sequence": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"date",
+					"sequence",
+					"origin",
+					"requestedAmount",
+					"realizedAmount",
+					"accountDeltas"
+				],
+				"type": "object"
+			},
+			"TransactionFulfillment": {
+				"additionalProperties": false,
+				"properties": {
+					"destinationLimitedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"unfulfilledAmount": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["unfulfilledAmount", "destinationLimitedAmount"],
+				"type": "object"
+			},
 			"TransactionListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -3249,6 +3236,19 @@
 					}
 				},
 				"required": ["transactions", "revision"],
+				"type": "object"
+			},
+			"TransactionOrigin": {
+				"additionalProperties": false,
+				"properties": {
+					"postingId": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					}
+				},
+				"required": ["type", "postingId"],
 				"type": "object"
 			},
 			"TransactionRow": {

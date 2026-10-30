@@ -20,7 +20,7 @@ vi.mock("../state/useRemoteProjection.ts", () => ({
 const blankPlan = {
 	...testAccount,
 	accounts: [],
-	movements: [],
+	transactions: [],
 	evaluations: [],
 };
 const props = {

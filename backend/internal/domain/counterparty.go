@@ -5,7 +5,7 @@ import (
 )
 
 // External counterparty classification. A nil source means the external
-// counterparty funds the movement; nil destinations mean it receives it.
+// counterparty funds the transaction; nil destinations mean it receives it.
 // This file is the single definition of that meaning. Call sites classify
 // through these helpers instead of re-deriving nil semantics, while
 // execution clamps and presence checks keep their direct pointer tests.

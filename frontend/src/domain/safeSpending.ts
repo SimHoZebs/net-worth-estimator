@@ -4,10 +4,10 @@ import {
 } from "./accountActivity.ts";
 import { isoDate, utcDate } from "./format.ts";
 import { isPendingTransaction, type Plan } from "./model.ts";
-import type { MovementResult } from "./result.ts";
+import type { TransactionResult } from "./result.ts";
 
 // Server ownership: every amount summed here originates server-side.
-// `movements` are adapted `ProjectionResult.movementEvents` (requested and
+// `transactions` are adapted `ProjectionResult.transactionEvents` (requested and
 // realized per event); `spendingBalance` reads saved Plan balances surfaced
 // as `ProjectionAccountSummary.startingBalance`. The Gap check
 // (`requested - realized`) is the same gap the posting-fulfillment Goal
@@ -73,52 +73,52 @@ export function spendingBalance(plan: Plan, accountIds: string[]): number {
  * calendar month.
  */
 export function remainingMonthlyObligations({
-	movements,
+	transactions,
 	checkingIds,
 	todayIso,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	checkingIds: string[];
 	todayIso: string;
 }): { total: number; monthEnd: string } {
 	const today = todayIso.slice(0, 10);
 	const monthEnd = monthEndIso(today);
 	const sources = new Set(checkingIds);
-	const total = movements
+	const total = transactions
 		.filter(
-			(movement) =>
-				movement.fromId !== null &&
-				sources.has(movement.fromId) &&
-				movement.date > today &&
-				movement.date <= monthEnd &&
-				movement.requested > 0,
+			(transaction) =>
+				transaction.fromId !== null &&
+				sources.has(transaction.fromId) &&
+				transaction.date > today &&
+				transaction.date <= monthEnd &&
+				transaction.requested > 0,
 		)
-		.reduce((sum, movement) => sum + movement.requested, 0);
+		.reduce((sum, transaction) => sum + transaction.requested, 0);
 	return { total, monthEnd };
 }
 
 /** Next calendar month's fixed obligations from the spendable accounts. */
 export function nextMonthObligations({
-	movements,
+	transactions,
 	checkingIds,
 	todayIso,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	checkingIds: string[];
 	todayIso: string;
 }): { total: number; start: string; end: string } {
 	const { start, end } = nextMonthRange(todayIso);
 	const sources = new Set(checkingIds);
-	const total = movements
+	const total = transactions
 		.filter(
-			(movement) =>
-				movement.fromId !== null &&
-				sources.has(movement.fromId) &&
-				movement.date >= start &&
-				movement.date <= end &&
-				movement.requested > 0,
+			(transaction) =>
+				transaction.fromId !== null &&
+				sources.has(transaction.fromId) &&
+				transaction.date >= start &&
+				transaction.date <= end &&
+				transaction.requested > 0,
 		)
-		.reduce((sum, movement) => sum + movement.requested, 0);
+		.reduce((sum, transaction) => sum + transaction.requested, 0);
 	return { total, start, end };
 }
 
@@ -183,7 +183,7 @@ export function paycheckBeforeReserve({
 }
 
 export interface MandatorySpendingGroup {
-	movementId: string;
+	transactionId: string;
 	name: string;
 	total: number;
 	count: number;
@@ -191,17 +191,17 @@ export interface MandatorySpendingGroup {
 }
 
 /**
- * Narrow projection movements to a selected bill set. Null keeps every
- * movement, so the safe spending card counts all spendable-account outflows by
+ * Narrow projection transactions to a selected bill set. Null keeps every
+ * transaction, so the safe spending card counts all spendable-account outflows by
  * default.
  */
-export function filterMovementsById(
-	movements: MovementResult[],
-	movementIds: string[] | null,
-): MovementResult[] {
-	if (!movementIds) return movements;
-	const selected = new Set(movementIds);
-	return movements.filter((movement) => selected.has(movement.movementId));
+export function filterTransactionsById(
+	transactions: TransactionResult[],
+	transactionIds: string[] | null,
+): TransactionResult[] {
+	if (!transactionIds) return transactions;
+	const selected = new Set(transactionIds);
+	return transactions.filter((transaction) => selected.has(transaction.transactionId));
 }
 
 /**
@@ -211,12 +211,12 @@ export function filterMovementsById(
  * after the projection start still move today's figures.
  */
 export function realizedCheckingOutflows({
-	movements,
+	transactions,
 	checkingIds,
 	after,
 	through,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	checkingIds: string[];
 	after: string;
 	through: string;
@@ -225,16 +225,16 @@ export function realizedCheckingOutflows({
 	const end = through.slice(0, 10);
 	if (end <= start) return 0;
 	const sources = new Set(checkingIds);
-	return movements
+	return transactions
 		.filter(
-			(movement) =>
-				movement.fromId !== null &&
-				sources.has(movement.fromId) &&
-				movement.date > start &&
-				movement.date <= end &&
-				movement.realized > 0,
+			(transaction) =>
+				transaction.fromId !== null &&
+				sources.has(transaction.fromId) &&
+				transaction.date > start &&
+				transaction.date <= end &&
+				transaction.realized > 0,
 		)
-		.reduce((sum, movement) => sum + movement.realized, 0);
+		.reduce((sum, transaction) => sum + transaction.realized, 0);
 }
 
 /**
@@ -243,12 +243,12 @@ export function realizedCheckingOutflows({
  * destination-limit classification, just as for posting fulfillment.
  */
 export function checkingShortfall({
-	movements,
+	transactions,
 	checkingIds,
 	after,
 	through,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	checkingIds: string[];
 	after: string;
 	through: string;
@@ -259,14 +259,14 @@ export function checkingShortfall({
 	const sources = new Set(checkingIds);
 	let total = 0;
 	let firstDate: string | null = null;
-	for (const movement of movements) {
-		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
-		if (movement.date <= start || movement.date > end) continue;
-		const gap = movement.fulfillment?.unfulfilledAmount ?? 0;
+	for (const transaction of transactions) {
+		if (transaction.fromId === null || !sources.has(transaction.fromId)) continue;
+		if (transaction.date <= start || transaction.date > end) continue;
+		const gap = transaction.fulfillment?.unfulfilledAmount ?? 0;
 		if (gap <= 0) continue;
 		total += gap;
-		if (firstDate === null || movement.date < firstDate) {
-			firstDate = movement.date;
+		if (firstDate === null || transaction.date < firstDate) {
+			firstDate = transaction.date;
 		}
 	}
 	return { total: Math.round(total * 100) / 100, firstDate };
@@ -274,42 +274,42 @@ export function checkingShortfall({
 
 /**
  * Bills in an inclusive date window: outflows from the spendable accounts
- * grouped by movement, sorted by total descending. Powers the bills
+ * grouped by transaction, sorted by total descending. Powers the bills
  * visualization (remaining bills this month, fixed obligations next month).
  */
 export function groupMandatorySpending({
-	movements,
+	transactions,
 	checkingIds,
 	start,
 	end,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	checkingIds: string[];
 	start: string;
 	end: string;
 }): MandatorySpendingGroup[] {
 	const sources = new Set(checkingIds);
 	const groups = new Map<string, MandatorySpendingGroup>();
-	for (const movement of movements) {
-		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
-		if (movement.requested <= 0) continue;
-		if (movement.date < start || movement.date > end) continue;
-		const key = movement.movementId;
+	for (const transaction of transactions) {
+		if (transaction.fromId === null || !sources.has(transaction.fromId)) continue;
+		if (transaction.requested <= 0) continue;
+		if (transaction.date < start || transaction.date > end) continue;
+		const key = transaction.transactionId;
 		const existing = groups.get(key);
 		if (existing) {
-			existing.total += movement.requested;
+			existing.total += transaction.requested;
 			existing.count += 1;
-			if (!existing.dates.includes(movement.date)) {
-				existing.dates.push(movement.date);
+			if (!existing.dates.includes(transaction.date)) {
+				existing.dates.push(transaction.date);
 				existing.dates.sort();
 			}
 		} else {
 			groups.set(key, {
-				movementId: movement.movementId,
-				name: movement.name || movement.movementId,
-				total: movement.requested,
+				transactionId: transaction.transactionId,
+				name: transaction.name || transaction.transactionId,
+				total: transaction.requested,
 				count: 1,
-				dates: [movement.date],
+				dates: [transaction.date],
 			});
 		}
 	}
@@ -325,13 +325,13 @@ export function groupMandatorySpending({
  * the group totals; partially paid occurrences surface as shortfalls.
  */
 export function mandatoryTransactions({
-	movements,
+	transactions,
 	checkingIds,
 	start,
 	end,
 	plan,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	checkingIds: string[];
 	start: string;
 	end: string;
@@ -348,31 +348,31 @@ export function mandatoryTransactions({
 			.map((transaction) => transaction.id),
 	);
 	let index = 0;
-	for (const movement of movements) {
-		if (movement.fromId === null || !sources.has(movement.fromId)) continue;
-		if (movement.requested <= 0) continue;
-		if (movement.date < start || movement.date > end) continue;
-		const counterparty = movement.toId
-			? (names.get(movement.toId) ?? "Unknown account")
+	for (const transaction of transactions) {
+		if (transaction.fromId === null || !sources.has(transaction.fromId)) continue;
+		if (transaction.requested <= 0) continue;
+		if (transaction.date < start || transaction.date > end) continue;
+		const counterparty = transaction.toId
+			? (names.get(transaction.toId) ?? "Unknown account")
 			: externalCounterpartyName("out");
-		const amount = Math.max(0, movement.realized);
+		const amount = Math.max(0, transaction.realized);
 		rows.push({
-			id: `mandatory-${movement.movementId}-${movement.date}-${index++}`,
-			movementId: movement.movementId,
-			date: movement.date,
-			name: movement.name || movement.movementId,
+			id: `mandatory-${transaction.transactionId}-${transaction.date}-${index++}`,
+			transactionId: transaction.transactionId,
+			date: transaction.date,
+			name: transaction.name || transaction.transactionId,
 			source: "projected",
 			direction: "out",
-			category: movement.toId ? "transfer" : "expense",
+			category: transaction.toId ? "transfer" : "expense",
 			counterparty,
-			from: names.get(movement.fromId) ?? "Unknown account",
+			from: names.get(transaction.fromId) ?? "Unknown account",
 			to: counterparty,
 			amount,
-			requested: movement.requested,
-			shortfall: Math.max(0, movement.requested - amount),
-			constraint: movement.constraint,
+			requested: transaction.requested,
+			shortfall: Math.max(0, transaction.requested - amount),
+			constraint: transaction.constraint,
 			excluded: false,
-			pending: pendingIds.has(movement.movementId),
+			pending: pendingIds.has(transaction.transactionId),
 			void: false,
 		});
 	}

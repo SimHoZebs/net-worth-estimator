@@ -1,6 +1,6 @@
 import type {
 	EvaluationResult,
-	MovementResult,
+	TransactionResult,
 	Point,
 	Projection,
 } from "../domain/result.ts";
@@ -22,7 +22,7 @@ export function projectionFixture(
 	return {
 		points,
 		currentNetWorth: 1000,
-		movements: [],
+		transactions: [],
 		firstFailure: null,
 		evaluations: [],
 		otherEvaluations: [],
@@ -34,12 +34,12 @@ export function projectionFixture(
 	};
 }
 
-export function movementFixture(
-	overrides: Partial<MovementResult> = {},
-): MovementResult {
+export function transactionFixture(
+	overrides: Partial<TransactionResult> = {},
+): TransactionResult {
 	return {
 		date: "2026-03-06",
-		movementId: "renovation",
+		transactionId: "renovation",
 		name: "Home renovation",
 		requested: 9000,
 		realized: 6350,
@@ -73,19 +73,19 @@ export function evaluationFixture(
 
 function event(
 	plan: typeof testAccount,
-	movementId: string,
+	transactionId: string,
 	date: string,
 	requested: number,
 	realized: number,
 	constraint: string | null,
-): MovementResult {
-	const transaction = plan.transactions.find((item) => item.id === movementId);
+): TransactionResult {
+	const transaction = plan.transactions.find((item) => item.id === transactionId);
 	const fromId = transaction?.fromId ?? null;
 	const toId = transaction?.toId ?? null;
 	return {
 		date,
-		movementId,
-		name: transaction?.name ?? movementId,
+		transactionId,
+		name: transaction?.name ?? transactionId,
 		requested,
 		realized,
 		fromId,
@@ -110,19 +110,19 @@ function event(
  */
 /**
  * A household projection shaped like the engine output: every enabled recurring
- * movement expanded monthly on its own day of month, a one-time renovation that
+ * transaction expanded monthly on its own day of month, a one-time renovation that
  * exceeds the protected balance, and a mortgage paid off after five years so its
  * scheduled payment continues at zero.
  */
 export function activityProjection(
 	plan: typeof testAccount = testAccount,
 ): Projection {
-	const movements: MovementResult[] = [];
+	const transactions: TransactionResult[] = [];
 	for (const transaction of plan.transactions) {
 		if (!transaction.enabled) continue;
 		if (transaction.frequency === "once") {
 			const shortfall = transaction.id === "renovation";
-			movements.push(
+			transactions.push(
 				event(
 					plan,
 					transaction.id,
@@ -144,7 +144,7 @@ export function activityProjection(
 			// The mortgage is paid off after five years; the scheduled payment then
 			// continues at zero and must not appear as a transaction.
 			const paidOff = transaction.id === "mortgage-payment" && month >= 60;
-			movements.push(
+			transactions.push(
 				event(
 					plan,
 					transaction.id,
@@ -156,5 +156,5 @@ export function activityProjection(
 			);
 		}
 	}
-	return projectionFixture({ movements });
+	return projectionFixture({ transactions });
 }

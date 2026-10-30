@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { testAccount } from "../mocks/account.ts";
-import { movementFixture, projectionFixture } from "../mocks/projection.ts";
+import { transactionFixture, projectionFixture } from "../mocks/projection.ts";
 import { deriveFundingGaps, summarizeFundingGap } from "./fundingGaps.ts";
 
 describe("derive funding gaps", () => {
 	it("keeps evidence within the configured transaction selection", () => {
 		const projection = projectionFixture({
-			movements: [movementFixture(), movementFixture({ movementId: "other" })],
+			transactions: [transactionFixture(), transactionFixture({ transactionId: "other" })],
 		});
 		expect(
 			deriveFundingGaps({ plan: testAccount, projection, postingIds: [] }),
@@ -37,10 +37,10 @@ describe("derive funding gaps", () => {
 				{ date: "2026-03-05", total: 0, balances: { checking: 6350 } },
 				{ date: "2026-03-06", total: 0, balances: { checking: 6350 } },
 			],
-			movements: [
-				movementFixture({
+			transactions: [
+				transactionFixture({
 					date: "2026-03-01",
-					movementId: "salary",
+					transactionId: "salary",
 					name: "Salary",
 					requested: 5600,
 					realized: 5600,
@@ -50,9 +50,9 @@ describe("derive funding gaps", () => {
 					constraint: null,
 					accountDeltas: [{ accountId: "checking", delta: 5600 }],
 				}),
-				movementFixture({
+				transactionFixture({
 					date: "2026-03-05",
-					movementId: "spend",
+					transactionId: "spend",
 					name: "Housing and living",
 					requested: 3800,
 					realized: 3800,
@@ -62,9 +62,9 @@ describe("derive funding gaps", () => {
 					constraint: null,
 					accountDeltas: [{ accountId: "checking", delta: -3800 }],
 				}),
-				movementFixture({
+				transactionFixture({
 					date: "2026-03-06",
-					movementId: "renovation",
+					transactionId: "renovation",
 					name: "Home renovation",
 					requested: 9000,
 					realized: 6350,
@@ -87,7 +87,7 @@ describe("derive funding gaps", () => {
 	});
 
 	it("uses fulfillment amounts instead of the reconstructed account balance", () => {
-		const projection = projectionFixture({ movements: [movementFixture()] });
+		const projection = projectionFixture({ transactions: [transactionFixture()] });
 		const [gap] = deriveFundingGaps({ plan: testAccount, projection });
 		expect(gap).toBeDefined();
 		const summary = summarizeFundingGap(gap!);
@@ -111,15 +111,15 @@ describe("derive funding gaps", () => {
 		{ name: "missing assessment", fulfillment: undefined },
 	])("does not invent a funding gap for $name", ({ fulfillment }) => {
 		const projection = projectionFixture({
-			movements: [movementFixture({ fulfillment })],
+			transactions: [transactionFixture({ fulfillment })],
 		});
 		expect(deriveFundingGaps({ plan: testAccount, projection })).toEqual([]);
 	});
 
 	it("retains a reportable gap when requested and realized public amounts match", () => {
 		const projection = projectionFixture({
-			movements: [
-				movementFixture({
+			transactions: [
+				transactionFixture({
 					requested: 100,
 					realized: 100,
 					available: 100,
@@ -134,8 +134,8 @@ describe("derive funding gaps", () => {
 
 	it("does not hide annual-limit shortfalls when the account has enough cash", () => {
 		const projection = projectionFixture({
-			movements: [
-				movementFixture({
+			transactions: [
+				transactionFixture({
 					constraintTypes: ["action-limit"],
 					available: 500,
 					requested: 1000,
@@ -151,20 +151,20 @@ describe("derive funding gaps", () => {
 	it("excludes later same-day deposits from the explanatory ledger", () => {
 		const date = "2026-03-06";
 		const projection = projectionFixture({
-			movements: [
-				movementFixture({
+			transactions: [
+				transactionFixture({
 					date,
-					movementId: "prior-income",
+					transactionId: "prior-income",
 					fromId: null,
 					toId: "checking",
 					requested: 500,
 					realized: 500,
 					accountDeltas: [{ accountId: "checking", delta: 500 }],
 				}),
-				movementFixture({ date }),
-				movementFixture({
+				transactionFixture({ date }),
+				transactionFixture({
 					date,
-					movementId: "later-income",
+					transactionId: "later-income",
 					fromId: null,
 					toId: "checking",
 					requested: 10000,
@@ -178,7 +178,7 @@ describe("derive funding gaps", () => {
 			projection,
 		});
 		expect(gaps).toHaveLength(1);
-		expect(gaps[0]?.movements.map((movement) => movement.amount)).toEqual([
+		expect(gaps[0]?.transactions.map((transaction) => transaction.amount)).toEqual([
 			500,
 		]);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(2650);

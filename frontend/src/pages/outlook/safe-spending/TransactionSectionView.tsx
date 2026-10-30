@@ -68,7 +68,7 @@ export function TransactionSectionView({
 				<TransactionRow
 					key={transaction.id}
 					transaction={transaction}
-					planTransaction={planTransactions.get(transaction.movementId) ?? null}
+					planTransaction={planTransactions.get(transaction.transactionId) ?? null}
 					onEdit={(planTransaction) => onInspect(transaction, planTransaction)}
 				/>
 			))}

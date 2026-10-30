@@ -173,7 +173,7 @@ type transactionListOutput struct {
 // listTransactions answers "which transactions touch this account" (or all
 // of them). Postings and rules arrive as the single combined list the
 // activity screens render; amount display resolution still comes from
-// projection movement events, which already travel with projection results.
+// projection transaction events, which already travel with projection results.
 func (s *Server) listTransactions(_ context.Context, input *struct {
 	AccountID string `query:"accountId" doc:"Only transactions touching this account"`
 	Recurring string `query:"recurring" doc:"once, recurring, or all" default:"all"`

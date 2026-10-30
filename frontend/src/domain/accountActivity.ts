@@ -15,7 +15,7 @@ import {
 
 export interface AccountTransaction {
 	id: string;
-	movementId: string;
+	transactionId: string;
 	date: string;
 	name: string;
 	source: "historical" | "projected";
@@ -56,8 +56,8 @@ export const defaultAccountViewFilters: ActivityFilters = {
 	source: "historical",
 };
 
-type ConnectionMovement = Pick<
-	Projection["movements"][number],
+type ConnectionTransaction = Pick<
+	Projection["transactions"][number],
 	"fromId" | "toId" | "accountDeltas" | "requested" | "realized"
 >;
 
@@ -86,16 +86,16 @@ export function accountTransactions({
 	const names = new Map(
 		plan.accounts.map((account) => [account.id, account.name]),
 	);
-	const connection = (movement: ConnectionMovement) => {
+	const connection = (transaction: ConnectionTransaction) => {
 		const deltas =
-			movement.accountDeltas.length > 0
-				? movement.accountDeltas
+			transaction.accountDeltas.length > 0
+				? transaction.accountDeltas
 				: [
-						...(movement.fromId
-							? [{ accountId: movement.fromId, delta: -movement.requested }]
+						...(transaction.fromId
+							? [{ accountId: transaction.fromId, delta: -transaction.requested }]
 							: []),
-						...(movement.toId
-							? [{ accountId: movement.toId, delta: movement.realized }]
+						...(transaction.toId
+							? [{ accountId: transaction.toId, delta: transaction.realized }]
 							: []),
 					];
 		const delta = deltas.find((item) => item.accountId === accountId);
@@ -105,15 +105,15 @@ export function accountTransactions({
 		const direction =
 			(delta?.delta ?? 0) < 0 ? ("out" as const) : ("in" as const);
 		const category =
-			movement.fromId && destinationIds.length > 0
+			transaction.fromId && destinationIds.length > 0
 				? ("transfer" as const)
-				: movement.fromId
+				: transaction.fromId
 					? ("expense" as const)
 					: ("income" as const);
-		const from = movement.fromId
-			? (names.get(movement.fromId) ?? "Unknown account")
+		const from = transaction.fromId
+			? (names.get(transaction.fromId) ?? "Unknown account")
 			: externalCounterpartyName("in");
-		const selectedIsSource = movement.fromId === accountId;
+		const selectedIsSource = transaction.fromId === accountId;
 		const otherDestination = destinationIds.find((id) => id !== accountId);
 		const to = selectedIsSource
 			? otherDestination
@@ -139,7 +139,7 @@ export function accountTransactions({
 		)
 		.map((transaction) => ({
 			id: `recorded-${transaction.id}`,
-			movementId: transaction.id,
+			transactionId: transaction.id,
 			date: transaction.startDate,
 			name: transaction.name,
 			source: "historical",
@@ -169,48 +169,48 @@ export function accountTransactions({
 			.map((transaction) => transaction.id),
 	);
 	const startDateHasCheckpoint = projection.startDateHasCheckpoint ?? true;
-	const projected: AccountTransaction[] = projection.movements
+	const projected: AccountTransaction[] = projection.transactions
 		.filter(
-			(movement) =>
-				(movement.date > plan.startDate ||
-					(movement.date === plan.startDate && !startDateHasCheckpoint)) &&
-				(movement.accountDeltas.length > 0
-					? movement.accountDeltas.some(
+			(transaction) =>
+				(transaction.date > plan.startDate ||
+					(transaction.date === plan.startDate && !startDateHasCheckpoint)) &&
+				(transaction.accountDeltas.length > 0
+					? transaction.accountDeltas.some(
 							(delta) => delta.accountId === accountId,
 						)
-					: movement.fromId === accountId || movement.toId === accountId) &&
-				movement.requested > 0,
+					: transaction.fromId === accountId || transaction.toId === accountId) &&
+				transaction.requested > 0,
 		)
-		.map((movement, index) => {
-			const selectedDelta = movement.accountDeltas.find(
+		.map((transaction, index) => {
+			const selectedDelta = transaction.accountDeltas.find(
 				(delta) => delta.accountId === accountId,
 			);
-			const destinationCount = movement.accountDeltas.filter(
+			const destinationCount = transaction.accountDeltas.filter(
 				(delta) => delta.delta > 0,
 			).length;
 			const accountAmount = selectedDelta
 				? Math.abs(selectedDelta.delta)
-				: movement.realized;
+				: transaction.realized;
 			const accountRequested =
 				selectedDelta && selectedDelta.delta < 0
-					? movement.requested
+					? transaction.requested
 					: destinationCount > 1
 						? accountAmount
-						: movement.requested;
+						: transaction.requested;
 			return {
-				id: `projected-${movement.movementId}-${movement.date}-${index}`,
-				movementId: movement.movementId,
-				date: movement.date,
-				name: movement.name,
+				id: `projected-${transaction.transactionId}-${transaction.date}-${index}`,
+				transactionId: transaction.transactionId,
+				date: transaction.date,
+				name: transaction.name,
 				source: "projected",
-				...connection(movement),
+				...connection(transaction),
 				amount: accountAmount,
 				requested: accountRequested,
 				shortfall: Math.max(0, accountRequested - accountAmount),
-				constraint: movement.constraint,
+				constraint: transaction.constraint,
 				excluded: false,
-				pending: pendingIds.has(movement.movementId),
-				void: voidIds.has(movement.movementId),
+				pending: pendingIds.has(transaction.transactionId),
+				void: voidIds.has(transaction.transactionId),
 			};
 		});
 	return [...recorded, ...projected];
@@ -259,7 +259,7 @@ export function ruleTransaction({
 		: (resolved?.requested ?? amount);
 	return {
 		id: `rule-${transaction.id}`,
-		movementId: transaction.id,
+		transactionId: transaction.id,
 		date: resolved?.date ?? transaction.startDate,
 		name: transaction.name,
 		source: historical ? "historical" : "projected",

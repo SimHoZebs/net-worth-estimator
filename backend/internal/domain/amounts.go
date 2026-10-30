@@ -34,8 +34,8 @@ type AmountProviderContext struct {
 	// RuleStartDate is the owning rule's start date, or "" for manual
 	// postings. It anchors the growth-factor provider.
 	RuleStartDate string
-	// SampledAnnualRate is the pre-sampled annual rate for this movement
-	// in this projection year, or nil when the movement is not sampled
+	// SampledAnnualRate is the pre-sampled annual rate for this transaction
+	// in this projection year, or nil when the transaction is not sampled
 	// (deterministic runs and non-volatile amounts). Sampling stays
 	// coordinator-owned; providers only look the value up.
 	SampledAnnualRate *float64
@@ -160,11 +160,11 @@ type AmountProviderInfo struct {
 	ArgFields   []AmountFieldSpec `json:"argFields,omitempty"`
 }
 
-// Design: accounts stay dumb, movements carry behavior. Accounts expose
+// Design: accounts stay dumb, transactions carry behavior. Accounts expose
 // only floor/ceiling/withdrawable/headroom (see accounts.go). Fees and
 // minimums live in PaymentTerms plus the providers below, and a posting or
 // rule reads them to move money. Terms declare what is owed; an enabled
-// movement behind them moves it.
+// transaction behind them moves it.
 //
 // Live plan uses: model-value, account-balance, occurrence-rate and
 // growth-factor with the expression resolver. Payroll modeling (tested,
@@ -216,7 +216,7 @@ var amountProviders = map[string]providerDefinition{
 		},
 	},
 	"occurrence-rate": {
-		// occurrence-rate carries a movement's rate behavior: the annual
+		// occurrence-rate carries a transaction's rate behavior: the annual
 		// rate plus the volatility sampled per projection year. The
 		// divisor comes from context (rule frequency, 1 for manuals) and
 		// the sampled annual rate arrives pre-sampled from the stochastic
@@ -248,10 +248,10 @@ var amountProviders = map[string]providerDefinition{
 			return annualRate, volatility, true
 		},
 	},
-	// growth-factor resolves the compounding factor for a movement's
+	// growth-factor resolves the compounding factor for a transaction's
 	// annual growth rate over the days from the rule start date to the
 	// occurrence date. Expressions multiply it explicitly, so one-time
-	// and recurring movements resolve through the same path. Manual
+	// and recurring transactions resolve through the same path. Manual
 	// postings have no start date and resolve 1.
 	"growth-factor": {
 		resolve: func(args map[string]types.JsonValue, ctx *AmountProviderContext) (float64, error) {
@@ -418,10 +418,10 @@ func termsMinimum(terms types.PaymentTerms, balance float64) float64 {
 	return minimum
 }
 
-// VolatileRateParams is one movement's stochastic sampling configuration:
+// VolatileRateParams is one transaction's stochastic sampling configuration:
 // the annual rate and volatility reported by its single volatile provider
-// input. Movements carry at most one volatile input; every volatile input
-// in a movement shares the movement's one pre-sampled annual rate.
+// input. Transactions carry at most one volatile input; every volatile input
+// in a transaction shares the transaction's one pre-sampled annual rate.
 type VolatileRateParams struct {
 	AnnualRate float64
 	Volatility float64
@@ -465,7 +465,7 @@ func VolatileRateInputOf(amount types.PostingAmountResolution) (params VolatileR
 
 // CountVolatileRateInputs reports how many provider inputs in an amount
 // descriptor carry volatility. Validation rejects more than one: one
-// movement shares one pre-sampled annual rate.
+// transaction shares one pre-sampled annual rate.
 func CountVolatileRateInputs(amount types.PostingAmountResolution) int {
 	count := 0
 	for _, binding := range amount.Inputs {

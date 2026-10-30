@@ -82,7 +82,7 @@ func resolveStatementCycle(todayIso string, statementDay int) (cycleStart, cycle
 // cycleOutflow sums realized outflow magnitude for an account set on an
 // event: negative account deltas. Payments into an account are positive
 // deltas and never count as spend.
-func cycleOutflow(event *types.MovementEvent, accountIDs map[string]bool) float64 {
+func cycleOutflow(event *types.TransactionEvent, accountIDs map[string]bool) float64 {
 	spent := 0.0
 	for _, delta := range event.AccountDeltas {
 		if accountIDs[delta.AccountID] && delta.Delta < 0 {
@@ -98,8 +98,8 @@ func cycleOutflow(event *types.MovementEvent, accountIDs map[string]bool) float6
 // in [cycleStart, projectionStart]: for a one-time posting the yearly
 // realized bucket holds exactly its single replayed occurrence, so the
 // bucket is precisely attributable. A start-date occurrence already covered
-// by a movement event (no checkpoint suppression) is skipped to avoid double
-// counting. Scheduled spend covers realized outflow in movement events dated
+// by a transaction event (no checkpoint suppression) is skipped to avoid double
+// counting. Scheduled spend covers realized outflow in transaction events dated
 // in [windowStart, cycleEnd). Recurring history is checkpoint truth baked
 // into starting balances, not attributable spend, so it stays out.
 func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulfillmentConfig) *CycleFulfillmentPathResult {
@@ -116,8 +116,8 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		accountSet[id] = true
 	}
 	startDateEvents := map[string]bool{}
-	for index := range path.MovementEvents {
-		event := &path.MovementEvents[index]
+	for index := range path.TransactionEvents {
+		event := &path.TransactionEvents[index]
 		if event.Date == projectionStart {
 			startDateEvents[event.Origin.PostingID] = true
 		}
@@ -147,8 +147,8 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		}
 	}
 	scheduled := 0.0
-	for index := range path.MovementEvents {
-		event := &path.MovementEvents[index]
+	for index := range path.TransactionEvents {
+		event := &path.TransactionEvents[index]
 		if CompareIsoDates(event.Date, windowStart) < 0 || CompareIsoDates(event.Date, cycleEndExclusive) >= 0 {
 			continue
 		}

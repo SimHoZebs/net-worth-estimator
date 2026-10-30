@@ -15,7 +15,7 @@ import {
 	type StochasticProjectionRequest,
 	type StochasticProjectionResult,
 } from "../api/index.ts";
-import { projectionMovements } from "../api/projectionMovements.ts";
+import { projectionTransactions } from "../api/projectionTransactions.ts";
 import {
 	OTHER_EVAL_OUTCOME_RENDERERS,
 	balanceEvaluation,
@@ -203,7 +203,7 @@ export function projectionResultToLocal(
 		document?.checkpoints.some(
 			(checkpoint) => checkpoint.Date === projectionStartDate,
 		) ?? false;
-	const movements = projectionMovements(result, document);
+	const transactions = projectionTransactions(result, document);
 	const balances = new Map(
 		result.accountSummaries.map((summary) => [summary.accountId, summary]),
 	);
@@ -284,9 +284,9 @@ export function projectionResultToLocal(
 	return {
 		points,
 		currentNetWorth: result.summary.currentNetWorth,
-		movements,
+		transactions,
 		firstFailure:
-			movements.find((movement) => movement.constraint !== null) ?? null,
+			transactions.find((transaction) => transaction.constraint !== null) ?? null,
 		evaluations,
 		otherEvaluations,
 		inflows: result.totals.externalInflowAmount,
@@ -361,7 +361,7 @@ export function stochasticResultToLocal(
 
 /**
  * Overlay the eval-scoped envelopes onto the cached base path. The base
- * result owns timeline, movements, totals, and summary; the overlay owns
+ * result owns timeline, transactions, totals, and summary; the overlay owns
  * evaluation envelopes. Overlay tables win per instance ID so request-local
  * evaluations replace the base scope without touching the path.
  */

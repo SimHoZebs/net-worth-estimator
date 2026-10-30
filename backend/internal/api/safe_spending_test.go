@@ -14,7 +14,7 @@ func TestSafeSpendingSettingsHTTP(t *testing.T) {
 	if empty.Code != 200 || !json.Valid(empty.Body.Bytes()) {
 		t.Fatalf("GET = %d %s", empty.Code, empty.Body.String())
 	}
-	const valid = `{"statementDay":15,"statementDaySet":true,"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeAccountIds":null,"incomeRuleIds":[],"movementIds":["rent"]}`
+	const valid = `{"statementDay":15,"statementDaySet":true,"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeAccountIds":null,"incomeRuleIds":[],"transactionIds":["rent"]}`
 	saved := doRowRequest(t, handler, http.MethodPut, path, valid)
 	if saved.Code != 200 {
 		t.Fatalf("PUT = %d %s", saved.Code, saved.Body.String())

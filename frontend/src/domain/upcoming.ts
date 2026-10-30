@@ -1,7 +1,7 @@
 import { shiftDate } from "./format.ts";
 import type { Projection } from "./result.ts";
 
-export function upcomingMovements({
+export function upcomingTransactions({
 	startDate,
 	projection,
 	days = 30,
@@ -13,6 +13,6 @@ export function upcomingMovements({
 	const end = shiftDate({ date: startDate, days });
 	return {
 		end,
-		events: projection.movements.filter((movement) => movement.date <= end),
+		events: projection.transactions.filter((transaction) => transaction.date <= end),
 	};
 }

@@ -121,10 +121,10 @@ describe("purchase queue", () => {
 
 	it("migrates legacy purchase transactions into the wishlist slice", () => {
 		// Intentionally the pre-rename shape: old drafts stored wishlist
-		// items in `movements` with a purchasePriority field.
+		// items in `transactions` with a purchasePriority field.
 		const legacy = {
 			...testAccount,
-			movements: [
+			transactions: [
 				...testAccount.transactions,
 				{
 					...testAccount.transactions[0]!,

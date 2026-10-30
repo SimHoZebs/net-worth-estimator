@@ -42,11 +42,11 @@ type SimulationRun struct {
 		EndDate                IsoDate        `json:"endDate"`
 		IncludeStartDateEvents bool           `json:"includeStartDateEvents"`
 	} `json:"request"`
-	InitialState     SimulationState      `json:"initialState"`
-	FinalState       SimulationState      `json:"finalState"`
-	Snapshots        []SimulationSnapshot `json:"snapshots"`
-	MovementAttempts []MovementEvent      `json:"movementAttempts"`
-	MonteCarloSample *MonteCarloSample    `json:"monteCarloSample,omitempty"`
+	InitialState        SimulationState      `json:"initialState"`
+	FinalState          SimulationState      `json:"finalState"`
+	Snapshots           []SimulationSnapshot `json:"snapshots"`
+	TransactionAttempts []TransactionEvent   `json:"transactionAttempts"`
+	MonteCarloSample    *MonteCarloSample    `json:"monteCarloSample,omitempty"`
 }
 
 type HistoricalObservationSnapshot struct {

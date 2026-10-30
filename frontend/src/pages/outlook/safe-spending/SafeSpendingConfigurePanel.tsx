@@ -30,7 +30,7 @@ export function SafeSpendingConfigurePanel({
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
 	accounts: Plan["accounts"];
-	onToggleBill: (movementId: string) => void;
+	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;
 	onToggleIncomeAccount: (accountId: string) => void;
