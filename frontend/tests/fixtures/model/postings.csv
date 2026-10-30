@@ -1,5 +1,5 @@
 id,name,sourceAccountId,destinations,amount,postedTime,transactionTime,ruleId,occurrenceDate,enabled
-payroll,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",1768435200,1768435200,,,true
-payroll_2,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",1769644800,1769644800,,,true
-take_home,Household take-home pay,,checking,"{""resolver"":""expression"",""config"":{""expression"":""3980.75""},""inputs"":{}}",1769558400,1769558400,,,true
-renovation,Home renovation,checking,,"{""resolver"":""expression"",""config"":{""expression"":""9000""},""inputs"":{}}",1772928000,1772755200,,,true
+76b4f4bc-368e-5e6c-93df-9a85082a22fb,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",1768435200,1768435200,,,true
+96e30468-9bc3-5473-8b6a-664bc2d56ce9,Household payroll,,checking,"{""resolver"":""expression"",""config"":{""expression"":""1450.25""},""inputs"":{}}",1769644800,1769644800,,,true
+efd3efff-9cb9-5803-b0b1-5adbf8f0d2b4,Household take-home pay,,checking,"{""resolver"":""expression"",""config"":{""expression"":""3980.75""},""inputs"":{}}",1769558400,1769558400,,,true
+c9cc20ed-121a-565b-86a4-b576b5c71e6f,Home renovation,checking,,"{""resolver"":""expression"",""config"":{""expression"":""9000""},""inputs"":{}}",1772928000,1772755200,,,true

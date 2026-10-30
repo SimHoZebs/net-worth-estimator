@@ -52,17 +52,11 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		RequireResourceHeader: true,
 		AllowPrivateHTTP:      authorization.AllowPrivateHTTP(getenv),
 	}
-	if getenv("NET_WORTH_ESTIMATOR_AUTH_TOKEN") != "" {
-		return c, fmt.Errorf("AUTH_TOKEN is retired; configure Casdoor session authentication")
-	}
 	if c.Provider == "" {
 		c.Provider = "casdoor"
 	}
 	if c.Provider != "casdoor" {
-		return c, fmt.Errorf("AUTH_PROVIDER must be casdoor; unauthenticated server mode is retired")
-	}
-	if v := getenv("NET_WORTH_ESTIMATOR_AUTH_SESSION_DB"); v != "" {
-		return c, fmt.Errorf("AUTH_SESSION_DB is retired; migrate identity state into the application database")
+		return c, fmt.Errorf("AUTH_PROVIDER must be casdoor")
 	}
 	if v := getenv("NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME"); v != "" {
 		d, err := time.ParseDuration(v)

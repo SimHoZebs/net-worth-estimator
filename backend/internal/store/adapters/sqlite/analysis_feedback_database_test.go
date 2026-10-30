@@ -1,9 +1,7 @@
 package sqlite
 
 import (
-	"bytes"
 	"errors"
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -50,52 +48,6 @@ func TestAnalysisFeedbackSameIDsStayUserScoped(t *testing.T) {
 	other, _ := b.ListAnalysisFeedback(types.AnalysisFeedbackFilter{})
 	if len(items) != 0 || len(other) != 1 {
 		t.Fatal("deletion crossed scopes or retained feedback")
-	}
-}
-
-func TestAnalysisFeedbackRejectsPriorSchemaWithoutChanges(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "upgrade.db")
-	d, err := SetupDatabase(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := privateTestPlan(t, d, "owner")
-	seedAnalysisEvidence(t, s)
-	completeTestAnalysis(t, s, "v1")
-	// Recreate the immediately preceding Analysis schema with its saved finding.
-	for _, query := range []string{
-		`DROP TABLE analysis_feedback`,
-		`ALTER TABLE analysis_findings DROP COLUMN review_json`,
-		`ALTER TABLE analysis_findings DROP COLUMN feedback_revision`,
-		`UPDATE analysis_findings SET dismissed=1`,
-		`DELETE FROM schema_migrations WHERE name='analysis-feedback-v1'`,
-	} {
-		if _, err := d.SQL().Exec(query); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := d.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if runtime, err := OpenDatabase(path); !errors.Is(err, ErrSetupRequired) {
-		if runtime != nil {
-			runtime.Close()
-		}
-		t.Fatalf("runtime accepted pre-feedback schema: %v", err)
-	}
-	before, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if opened, err := SetupDatabase(path); !errors.Is(err, ErrSetupRequired) {
-		if opened != nil {
-			opened.Close()
-		}
-		t.Fatalf("setup accepted pre-feedback schema: %v", err)
-	}
-	after, err := os.ReadFile(path)
-	if err != nil || !bytes.Equal(before, after) {
-		t.Fatalf("rejected setup changed source: %v", err)
 	}
 }
 

@@ -19,7 +19,7 @@ import (
 // incompatible results are not retrieved. Storage retains at most maxArtifacts
 // across result kinds (store/artifacts.go).
 
-const artifactIdentityVersion = 10
+const artifactIdentityVersion = 11
 
 // Projection-Source identifies the result's origin, not persistence success.
 // Computed and shared responses may still end with an execution error.
@@ -46,10 +46,9 @@ func (s *handler) resourceArtifactKey(kind string, descriptor any) string {
 
 func artifactKey(kind string, descriptor any) string {
 	digest := sha256.Sum256([]byte(mustCanonical(map[string]any{
-		// Keep the serialized field name stable to preserve existing identities.
-		"artifactCacheVersion": artifactIdentityVersion,
-		"kind":                 kind,
-		"descriptor":           descriptor,
+		"artifactIdentityVersion": artifactIdentityVersion,
+		"kind":                    kind,
+		"descriptor":              descriptor,
 	})))
 	return fmt.Sprintf("%s:%d:%s", kind, artifactIdentityVersion, hex.EncodeToString(digest[:]))
 }

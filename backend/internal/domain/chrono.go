@@ -22,8 +22,8 @@ func dayCloseUnix(date string) int64 {
 }
 
 // ParseAsOfCut resolves an as-of cut to an instant and its calendar day.
-// A "YYYY-MM-DD" date means the legacy date-only cut at the end of that
-// UTC day (inclusive, backward compatible). An RFC 3339 timestamp means
+// A "YYYY-MM-DD" date means the day-close cut at the end of that
+// UTC day (inclusive). An RFC 3339 timestamp means
 // that exact instant. Anything else is an error.
 func ParseAsOfCut(asOf string) (cutInstant int64, cutDate string, err error) {
 	if IsValidIsoDate(asOf) {
@@ -44,11 +44,11 @@ func CheckpointInstant(checkpoint types.Checkpoint) int64 {
 }
 
 // IsSyncCheckpoint reports bank-owned observations. Row authorship is
-// "user" (owner-authored, including the legacy "model" value) or a
+// "user" (owner-authored) or a
 // sync-owned name set by the server; any other non-empty author is
 // system-owned sync output, matched by exclusion rather than by name.
 func IsSyncCheckpoint(source string) bool {
-	return source != "" && source != "user" && source != "model"
+	return source != "" && source != "user"
 }
 
 // IsOwnerAuthored reports owner-authored rows.

@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -440,33 +439,5 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("user A manual posting missing")
-	}
-}
-
-func TestSetupFailsClosedOnPreTimestampCheckpoints(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "old.db")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, stmt := range []string{
-		`CREATE TABLE users(id TEXT PRIMARY KEY, issuer TEXT NOT NULL, subject TEXT NOT NULL)`,
-		`INSERT INTO users(id, issuer, subject) VALUES ('u1', 'https://issuer.test', 's1')`,
-		`CREATE TABLE schema_migrations(name TEXT PRIMARY KEY)`,
-		`INSERT INTO schema_migrations(name) VALUES ('shared-accounts-v1')`,
-		`CREATE TABLE accounts(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id TEXT NOT NULL, position INTEGER NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'cash', min_balance REAL, max_balance REAL, color TEXT, enabled INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
-		`CREATE TABLE checkpoints(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id INTEGER NOT NULL, position INTEGER NOT NULL, date TEXT NOT NULL, model_account_id TEXT NOT NULL, balance REAL NOT NULL, source TEXT NOT NULL DEFAULT 'user', PRIMARY KEY(user_id, id), UNIQUE(user_id, model_account_id, date))`,
-		`INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance, source) VALUES ('u1', 1, 0, '2026-03-10', 'checking', 100, 'user')`,
-	} {
-		if _, err := db.Exec(stmt); err != nil {
-			db.Close()
-			t.Fatalf("old schema: %v: %s", err, stmt)
-		}
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := SetupDatabase(path); !errors.Is(err, ErrSetupRequired) {
-		t.Fatalf("setup on legacy checkpoints = %v, want setup-required failure", err)
 	}
 }

@@ -10,6 +10,7 @@
 #      event times, all inside a single candidate transaction.
 #   2. Frozen SQL provisions Analysis on that candidate when needed.
 #   3. The standalone purchase tool converts retired purchase policies.
+#   4. The completed posting-ID migration audit table is removed.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -95,7 +96,6 @@ check_base_columns() {
   SELECT user_id, id, position, name, kind, min_balance, max_balance, color, enabled FROM accounts LIMIT 0;
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids FROM postings LIMIT 0;
   SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys LIMIT 0;
-  SELECT user_id, old_id, new_id FROM posting_id_migrations LIMIT 0;
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
   SELECT user_id, identity, kind, created_at, payload FROM projection_artifacts LIMIT 0;
@@ -183,6 +183,8 @@ esac
 if [ "$analysis" = 5 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
 fi
+posting_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='posting_id_migrations';") \
+  || fail "Cannot inspect posting-ID audit table."
 
 mode=""
 if [ "$cols" = "$LEGACY_COLS" ]; then
@@ -222,7 +224,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ]; then
   info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
   exit 0
 fi
@@ -412,6 +414,12 @@ if [ "$purchases" = purchase_policies ]; then
   test "$purchase_delta" = 0 || fail "Purchase conversion changed unexpected rows. Original unchanged; backup retained at $backup."
 fi
 
+# Retire completed upgrade bookkeeping only in the verified offline candidate.
+if [ "$posting_audit" = 1 ]; then
+  sqlite3 "$candidate" 'DROP TABLE posting_id_migrations;' \
+    || fail "Cannot remove posting-ID audit table. Original unchanged; backup retained at $backup."
+fi
+
 # Setup validates the final shape only. A digest of the logical database also
 # proves that the validator did not rewrite any candidate rows or schema.
 validation_before=$(sqlite3 "$candidate" .dump | sha256sum)
@@ -433,5 +441,5 @@ check_integrity "$db" || fail "Published database failed integrity check. Recove
 if [ "$mode" = convert ]; then
   info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, and provisioned Analysis schema from $backup."
 else
-  info "Completed Analysis schema on final checkpoints from $backup."
+  info "Completed current application schema on final checkpoints from $backup."
 fi

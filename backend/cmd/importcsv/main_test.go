@@ -17,7 +17,7 @@ import (
 )
 
 func TestRequiresExplicitDatabaseAndUser(t *testing.T) {
-	for _, args := range [][]string{nil, {"--db", filepath.Join(t.TempDir(), "absent.db")}, {"--user", "users/sample"}} {
+	for _, args := range [][]string{nil, {"--db", filepath.Join(t.TempDir(), "absent.db")}, {"--user", "users/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}} {
 		var out, errOut bytes.Buffer
 		if code := run(args, &out, &errOut); code != 2 {
 			t.Fatalf("code=%d stderr=%s", code, errOut.String())

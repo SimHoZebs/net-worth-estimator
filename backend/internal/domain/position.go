@@ -4,8 +4,7 @@ import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 
 // ResolveCurrentPosition uses the same historical preparation as projections,
 // but never simulates future events or executes forecast evaluations.
-// asOfDate is a "YYYY-MM-DD" date (legacy day-close cut at the end of that
-// UTC day, inclusive, backward compatible) or an RFC 3339 timestamp for an
+// asOfDate is a "YYYY-MM-DD" date (inclusive end of that UTC day) or an RFC 3339 timestamp for an
 // exact cut: only events and observations at or before the cut apply, so
 // an 11:00 actual never affects a 10:00 balance. Balances are the adjusted
 // modeled balances at the cut, with the latest observation and its

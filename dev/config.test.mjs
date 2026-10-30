@@ -138,28 +138,6 @@ test("native Compose consumes the exported environment and isolates dev from pro
     );
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, "casdoor");
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_DB, "/data/net-worth-estimator.db");
-    for (const key of [
-      "NET_WORTH_ESTIMATOR_PLANS_DIR",
-      "NET_WORTH_ESTIMATOR_SAMPLE_DB",
-      "NET_WORTH_ESTIMATOR_AUTH_SESSION_DB",
-    ]) {
-      assert.equal(
-        backend.environment[key],
-        undefined,
-        `${key} must not configure split application storage`,
-      );
-    }
-    for (const key of [
-      "NET_WORTH_ESTIMATOR_SIMPLEFIN_ACCESS_URL",
-      "NET_WORTH_ESTIMATOR_SIMPLEFIN_CARDS",
-    ]) {
-      assert.equal(
-        backend.environment[key],
-        undefined,
-        `${key} is retired; the Bridge key lives in the user database`,
-      );
-    }
-    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_TOKEN, undefined);
     assert.equal(backend.user, `${process.getuid()}:${process.getgid()}`);
     assert.equal(backend.volumes[0].source, resolve("tmp/dev/data"));
     assert.deepEqual(
@@ -171,30 +149,6 @@ test("native Compose consumes the exported environment and isolates dev from pro
       assert.equal(service.ports[0].host_ip, "127.0.0.1");
     assert.equal(backend.depends_on.casdoor.condition, "service_healthy");
     assert.equal(frontend.depends_on.backend.condition, "service_healthy");
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("access needs no role configuration and retired grants do not reach the backend", async () => {
-  const example = await readFile(resolve(".env.example"), "utf8");
-  assert.ok(!example.includes("NET_WORTH_ESTIMATOR_AUTH_EDITORS="));
-  assert.ok(!example.includes("NET_WORTH_ESTIMATOR_AUTH_READERS="));
-  assert.ok(example.includes("NET_WORTH_ESTIMATOR_OWNER_SUBJECT="));
-  assert.ok(example.includes("NET_WORTH_ESTIMATOR_GUEST_SUBJECT="));
-  const config = newConfig();
-  assert.equal(Object.hasOwn(config, "editors"), false);
-  assert.equal(Object.hasOwn(config, "readers"), false);
-  const old = { ...config, readers: ["old-reader"], editors: ["old-owner"] };
-  const env = composeEnvironment(old);
-  assert.equal(env.NET_WORTH_ESTIMATOR_AUTH_EDITORS, undefined);
-  assert.equal(env.NET_WORTH_ESTIMATOR_AUTH_READERS, undefined);
-  const dir = await mkdtemp(resolve(tmpdir(), "waypoint-dev-policy-"));
-  try {
-    await saveConfig(dir, old);
-    const saved = await loadConfig(dir, true);
-    assert.equal(saved.identity.AUTH_CLIENT_SECRET, config.identity.AUTH_CLIENT_SECRET);
-    assert.deepEqual(saved.editors, old.editors);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -623,9 +623,7 @@ func (d *Database) RemoveGroupMembershipsForUser(userID string) error {
 }
 
 // DeleteGroupMemberships is the shared user-removal path for Database and
-// the identity revocation path, which holds only a *sql.DB handle. Databases
-// without group tables are tolerated so old schemas fail nowhere on logout
-// or revocation.
+// the identity revocation path, which holds only a *sql.DB handle.
 func DeleteGroupMemberships(db *sql.DB, userID string) error {
 	if userID == "" {
 		return fmt.Errorf("%w: user is required", ErrGroupInvalid)
@@ -639,9 +637,6 @@ func DeleteGroupMemberships(db *sql.DB, userID string) error {
 	// groups this user belonged to, never unrelated rows.
 	rows, err := tx.Query(`SELECT DISTINCT group_id FROM group_members WHERE user_id = ?`, userID)
 	if err != nil {
-		if isMissingGroupTable(err) {
-			return nil
-		}
 		return err
 	}
 	var owned []string
@@ -680,13 +675,4 @@ func DeleteGroupMemberships(db *sql.DB, userID string) error {
 		return err
 	}
 	return tx.Commit()
-}
-
-func isMissingGroupTable(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "no such table: group_members") ||
-		strings.Contains(err.Error(), "no such table: user_groups") ||
-		strings.Contains(err.Error(), "no such table: group_invites")
 }

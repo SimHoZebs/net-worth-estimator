@@ -44,13 +44,13 @@ func TestFixtureSessionUsesScopedProductionContract(t *testing.T) {
 	if w.Header().Get(identity.ResourceHeader) != fixtureResourceID || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("fixture session is missing its resource or cache boundary")
 	}
-	for _, expected := range []string{"", fixtureResourceID, "users/sample"} {
+	for _, expected := range []string{"", fixtureResourceID, "users/mismatched-user"} {
 		r := httptest.NewRequest("GET", "/v1/financial-model", nil)
 		r.Header.Set(identity.ResourceHeader, expected)
 		w = httptest.NewRecorder()
 		handler.ServeHTTP(w, r)
 		want := http.StatusNoContent
-		if expected == "users/sample" {
+		if expected == "users/mismatched-user" {
 			want = http.StatusConflict
 		}
 		if w.Code != want || w.Header().Get(identity.ResourceHeader) != fixtureResourceID {

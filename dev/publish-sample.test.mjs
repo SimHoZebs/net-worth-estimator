@@ -9,10 +9,6 @@ test("publication explicitly selects reviewed source and the provisioned guest d
     /provisioned guest scope/,
   );
   assert.throws(
-    () => validatePublish({ "source-user": "users/source", user: "users/sample" }),
-    /Legacy users\/sample/,
-  );
-  assert.throws(
     () => validatePublish({ "source-user": "users/source", user: "users/owner" }),
     /provisioned guest scope/,
   );

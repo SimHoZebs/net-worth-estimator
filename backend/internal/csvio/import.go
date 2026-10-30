@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -118,36 +117,13 @@ func isUUID(value string) bool {
 	return err == nil && parsed.String() == value
 }
 
-func newUUIDv7() string {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return uuid.NewString()
+// parseUnixTime parses required Unix seconds.
+func parseUnixTime(value string) (int64, error) {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid Unix time %q", value)
 	}
-	return id.String()
-}
-
-// parseUnixTime parses required Unix seconds. A legacy YYYY-MM-DD day
-// converts to UTC midnight to ease migration.
-func parseUnixTime(value, fallbackDate string) (int64, error) {
-	if value != "" {
-		parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-		if err != nil || parsed <= 0 {
-			return 0, fmt.Errorf("invalid Unix time %q", value)
-		}
-		return parsed, nil
-	}
-	if fallbackDate != "" {
-		parsed, err := time.ParseInLocation("2006-01-02", strings.TrimSpace(fallbackDate), time.UTC)
-		if err != nil {
-			return 0, fmt.Errorf("invalid date %q", fallbackDate)
-		}
-		stamp := parsed.Unix()
-		if stamp <= 0 {
-			return 0, fmt.Errorf("invalid date %q", fallbackDate)
-		}
-		return stamp, nil
-	}
-	return 0, fmt.Errorf("missing time")
+	return parsed, nil
 }
 
 // ParseNumberValue converts a JSON-decoded number to float64.
@@ -222,30 +198,22 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 		return nil, fmt.Errorf("read postings: %w", err)
 	}
 	index = headerIndex(records[0])
-	if _, legacy := index["frequency"]; legacy {
-		return nil, fmt.Errorf("postings.csv uses the legacy frequency column: move repeating rows to recurrence-rules.csv with time columns for one-time rows")
-	}
-	idMap := map[string]string{}
 	for _, record := range records[1:] {
 		if len(strings.Join(record, "")) == 0 {
 			continue
 		}
 		rawID := field(record, index, "id")
-		storedID := rawID
 		if !isUUID(rawID) {
-			storedID = newUUIDv7()
-			if rawID != "" {
-				idMap[rawID] = storedID
-			}
+			return nil, fmt.Errorf("posting id %q must be a canonical UUID", rawID)
 		}
-		postedTime, err := parseUnixTime(field(record, index, "postedTime"), field(record, index, "date"))
+		postedTime, err := parseUnixTime(field(record, index, "postedTime"))
 		if err != nil {
 			return nil, fmt.Errorf("posting %s: %w", rawID, err)
 		}
 		transactionRaw := field(record, index, "transactionTime")
 		var transactionTime int64
 		if transactionRaw != "" {
-			transactionTime, err = parseUnixTime(transactionRaw, "")
+			transactionTime, err = parseUnixTime(transactionRaw)
 			if err != nil {
 				return nil, fmt.Errorf("posting %s: %w", rawID, err)
 			}
@@ -253,7 +221,7 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 			transactionTime = postedTime
 		}
 		posting := types.Posting{
-			ID:              storedID,
+			ID:              rawID,
 			Name:            field(record, index, "name"),
 			SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
 			Destinations:    parseDestinations(field(record, index, "destinations")),
@@ -322,7 +290,6 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 	if err := importFulfillmentEvaluations(csvPath, model); err != nil {
 		return nil, err
 	}
-	types.RemapPostingReferences(model, idMap)
 	return model, nil
 }
 

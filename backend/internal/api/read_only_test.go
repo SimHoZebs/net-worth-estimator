@@ -150,21 +150,3 @@ func TestRowWriteReadOnlyMatrix(t *testing.T) {
 		})
 	}
 }
-
-func TestStatusOmitsRetiredTokenPolicy(t *testing.T) {
-	database := openAPIStore(t)
-	handler := New(database, Config{})
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d", response.Code)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode status response: %v", err)
-	}
-	if _, present := payload["authEnabled"]; present || payload["readOnly"] != false {
-		t.Fatalf("status = %+v", payload)
-	}
-}

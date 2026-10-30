@@ -20,11 +20,8 @@ func TestProviderConfiguration(t *testing.T) {
 	}{
 		{"valid", "", "", false}, {"casdoor", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "casdoor", false},
 		{"default provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "", false},
-		{"disabled provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "none", true},
 		{"unknown provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "typo", true},
 		{"archived provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "better-auth", true},
-		{"legacy bypass", "NET_WORTH_ESTIMATOR_AUTH_TOKEN", "legacy", true},
-		{"separate identity database", "NET_WORTH_ESTIMATOR_AUTH_SESSION_DB", "/data/sessions.db", true},
 		{"empty issuer", "NET_WORTH_ESTIMATOR_AUTH_ISSUER", "", true},
 		{"missing guest subject", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "", true},
 		{"blank guest subject", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "   ", true},

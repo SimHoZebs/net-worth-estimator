@@ -167,43 +167,31 @@ export function settings(config) {
   }
   const result = settingsFromEnv(config.identity);
   originProfile(result.appUrl, result.publicUrl);
-  if (config.ports !== undefined) {
-    if (typeof config.ports !== "object" || config.ports === null) {
-      throw new Error("Dev ports must map app, casdoor, and backend to loopback ports");
-    }
-    const app = validPort(config.ports.app, "App port");
-    const casdoor = validPort(config.ports.casdoor, "Casdoor port");
-    const backend = validPort(config.ports.backend, "Backend port");
-    if (app === casdoor) throw new Error("App and Casdoor loopback ports must differ");
-    if (config.slot) {
-      const parsedApp = isLoopbackOrigin(result.appUrl) ? Number(new URL(result.appUrl).port) : null;
-      const parsedIssuer = isLoopbackOrigin(result.publicUrl)
-        ? Number(new URL(result.publicUrl).port)
-        : null;
-      if (parsedApp !== app || parsedIssuer !== casdoor) {
-        throw new Error("Slot ports must match the slot identity URLs");
-      }
+  if (typeof config.ports !== "object" || config.ports === null) {
+    throw new Error("Dev ports must map app, casdoor, and backend to loopback ports");
+  }
+  const app = validPort(config.ports.app, "App port");
+  const casdoor = validPort(config.ports.casdoor, "Casdoor port");
+  validPort(config.ports.backend, "Backend port");
+  if (app === casdoor) throw new Error("App and Casdoor loopback ports must differ");
+  if (config.slot) {
+    const parsedApp = isLoopbackOrigin(result.appUrl) ? Number(new URL(result.appUrl).port) : null;
+    const parsedIssuer = isLoopbackOrigin(result.publicUrl)
+      ? Number(new URL(result.publicUrl).port)
+      : null;
+    if (parsedApp !== app || parsedIssuer !== casdoor) {
+      throw new Error("Slot ports must match the slot identity URLs");
     }
   }
   return result;
 }
 
 export function portsFor(config) {
-  if (config.ports) {
-    return {
-      app: validPort(config.ports.app, "App port"),
-      casdoor: validPort(config.ports.casdoor, "Casdoor port"),
-      backend: validPort(config.ports.backend, "Backend port"),
-    };
-  }
-  if (isLoopbackOrigin(config.identity.APP_PUBLIC_URL) && isLoopbackOrigin(config.identity.CASDOOR_PUBLIC_URL)) {
-    return {
-      app: Number(new URL(config.identity.APP_PUBLIC_URL).port),
-      casdoor: Number(new URL(config.identity.CASDOOR_PUBLIC_URL).port),
-      backend: defaultPorts.backend,
-    };
-  }
-  return { ...defaultPorts };
+  return {
+    app: validPort(config.ports.app, "App port"),
+    casdoor: validPort(config.ports.casdoor, "Casdoor port"),
+    backend: validPort(config.ports.backend, "Backend port"),
+  };
 }
 
 export function composeEnvironment(config) {

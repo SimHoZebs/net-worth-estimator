@@ -15,7 +15,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 function seed(path, value) {
   const db = new DatabaseSync(path);
   db.exec(
-    "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE model_metadata(id INTEGER PRIMARY KEY, document_present INTEGER); INSERT INTO model_metadata VALUES(1,1); CREATE TABLE facts(value TEXT)",
+    "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE users(id TEXT PRIMARY KEY); CREATE TABLE model_metadata(user_id TEXT, id INTEGER, document_present INTEGER); CREATE TABLE facts(value TEXT)",
   );
   db.prepare("INSERT INTO facts VALUES(?)").run(value);
   return db;
@@ -72,7 +72,7 @@ test("application snapshot includes multiple users and identity state in one fil
   const source = resolve(dir, "app.db");
   const writer = new DatabaseSync(source);
   writer.exec(
-    "PRAGMA journal_mode=WAL; CREATE TABLE users(id TEXT); INSERT INTO users VALUES('owner'),('second'),('sample'); CREATE TABLE model_metadata(user_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('sample',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');",
+    "PRAGMA journal_mode=WAL; CREATE TABLE users(id TEXT); INSERT INTO users VALUES('owner'),('second'),('guest'); CREATE TABLE model_metadata(user_id TEXT, id INTEGER, document_present INTEGER); INSERT INTO model_metadata VALUES('owner',1,1),('second',1,1),('guest',1,1); CREATE TABLE identity_grants(data TEXT); INSERT INTO identity_grants VALUES('sealed grant');",
   );
   try {
     const target = resolve(dir, "snapshot.db");
@@ -97,7 +97,7 @@ test("explicit setup provisions an empty application snapshot and repeat setup p
   try {
     await exec("go", ["-C", resolve(root, "backend"), "build", "-o", binary, "./cmd/setupdb"]);
     await exec(binary, ["--db", source]);
-    assert.equal(validateSnapshot(source), "application");
+    assert.doesNotThrow(() => validateSnapshot(source));
     const first = new DatabaseSync(source);
     try {
       assert.equal(first.prepare("SELECT COUNT(*) AS n FROM users").get().n, 0);

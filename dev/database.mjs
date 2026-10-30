@@ -13,23 +13,8 @@ export function validateSnapshot(path) {
     if (db.prepare("PRAGMA quick_check").get().quick_check !== "ok") {
       throw new Error("SQLite snapshot failed its integrity check");
     }
-    const scoped = db
-      .prepare("PRAGMA table_info(model_metadata)")
-      .all()
-      .some((column) => column.name === "user_id");
-    if (scoped) {
-      // An empty application database is valid. User ownership is separate
-      // from financial document presence, and identity tables share this backup.
-      db.prepare("SELECT id FROM users LIMIT 1").all();
-      return "application";
-    }
-    if (
-      db.prepare("SELECT document_present FROM model_metadata WHERE id=1").get()
-        ?.document_present !== 1
-    ) {
-      throw new Error("The source database has no financial model");
-    }
-    return "legacy";
+    db.prepare("SELECT user_id, id, document_present FROM model_metadata LIMIT 0").all();
+    db.prepare("SELECT id FROM users LIMIT 0").all();
   } finally {
     db.close();
   }

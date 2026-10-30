@@ -109,9 +109,6 @@ func TestStochasticSSESeededComputedThenStored(t *testing.T) {
 	body := stochasticTestBody(t, 4, &seed)
 
 	first := postStochastic(t, handler, body)
-	if got := first.Header().Get("Cache-Status"); got != "" {
-		t.Fatalf("obsolete Cache-Status header = %q", got)
-	}
 	if first.Code != http.StatusOK {
 		t.Fatalf("first status = %d, body %s", first.Code, first.Body.String())
 	}

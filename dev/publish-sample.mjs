@@ -23,11 +23,10 @@ export function validatePublish(values, positionals = []) {
   }
   if (!values["source-user"])
     throw new Error("--source-user is required. Select the reviewed financial scope explicitly.");
-  // The guest is a provisioned ordinary user, not a special sample row.
-  // refreshmodel rejects legacy 'sample' destinations; pass the guest scope.
+  // Publication targets the provisioned guest's user resource.
   if (!values.user || !/^users\/[0-9a-f]{64}$/.test(values.user))
     throw new Error(
-      "publish-sample requires --user users/<guest-hash> for the provisioned guest scope. Legacy users/sample destinations are retired.",
+      "publish-sample requires --user users/<guest-hash> for the provisioned guest scope.",
     );
 }
 

@@ -85,19 +85,8 @@ func selectSourceUser(path, selected string) (string, error) {
 	}
 	defer db.Close()
 	if selected != "" {
-		if selected == "sample" {
-			// Explicit offline recovery from a legacy historical row.
-			var present int
-			if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id=?", selected).Scan(&present); err != nil {
-				return "", fmt.Errorf("selected source user: %w", err)
-			}
-			if present != 1 {
-				return "", errors.New("setup source must be an existing user")
-			}
-			return selected, nil
-		}
 		var present int
-		if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id=? AND id NOT IN ('sample','fixture')", selected).Scan(&present); err != nil {
+		if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id=?", selected).Scan(&present); err != nil {
 			return "", fmt.Errorf("selected source user: %w", err)
 		}
 		if present != 1 {
@@ -105,7 +94,7 @@ func selectSourceUser(path, selected string) (string, error) {
 		}
 		return selected, nil
 	}
-	rows, err := db.Query("SELECT id FROM users WHERE id NOT IN ('sample','fixture') ORDER BY id LIMIT 2")
+	rows, err := db.Query("SELECT id FROM users ORDER BY id LIMIT 2")
 	if err != nil {
 		return "", fmt.Errorf("source must be a current application database: %w", err)
 	}

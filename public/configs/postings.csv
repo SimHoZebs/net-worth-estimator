@@ -1,225 +1,225 @@
 id,name,sourceAccountId,destinations,amount,postedTime,transactionTime,ruleId,occurrenceDate,enabled
-opening_20260406_rsu,Opening RSU balance,,rsu,"{""resolver"":""expression"",""config"":{""expression"":""140383.66""},""inputs"":{}}",1775433600,1775433600,,,true
-opening_20260430_checking,Opening checking balance,,checking,"{""resolver"":""expression"",""config"":{""expression"":""23182.42""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_brokerage,Opening brokerage balance,,brokerage,"{""resolver"":""expression"",""config"":{""expression"":""234.54""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_roth_ira,Opening Roth IRA balance,,roth_ira,"{""resolver"":""expression"",""config"":{""expression"":""1104.53""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_student_loan1_principal,Opening student loan 1 principal,student_loan1_principal,,"{""resolver"":""expression"",""config"":{""expression"":""11000""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_student_loan1_interest,Opening student loan 1 interest,student_loan1_interest,,"{""resolver"":""expression"",""config"":{""expression"":""1901.13""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_student_loan2_principal,Opening student loan 2 principal,student_loan2_principal,,"{""resolver"":""expression"",""config"":{""expression"":""12000""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_student_loan2_interest,Opening student loan 2 interest,student_loan2_interest,,"{""resolver"":""expression"",""config"":{""expression"":""203.44""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_student_loan3_principal,Opening student loan 3 principal,student_loan3_principal,,"{""resolver"":""expression"",""config"":{""expression"":""28788""},""inputs"":{}}",1777507200,1777507200,,,true
-opening_20260430_student_loan3_interest,Opening student loan 3 interest,student_loan3_interest,,"{""resolver"":""expression"",""config"":{""expression"":""6714.35""},""inputs"":{}}",1777507200,1777507200,,,true
-adjustment_20260501_student_loan3_principal,Student loan 3 principal adjustment,,student_loan3_principal,"{""resolver"":""expression"",""config"":{""expression"":""3259.88""},""inputs"":{}}",1777593600,1777593600,,,true
-adjustment_20260501_student_loan3_interest,Student loan 3 interest adjustment,,student_loan3_interest,"{""resolver"":""expression"",""config"":{""expression"":""6693.19""},""inputs"":{}}",1777593600,1777593600,,,true
-adjustment_20260501_student_loan2_principal,Student loan 2 principal adjustment,,student_loan2_principal,"{""resolver"":""expression"",""config"":{""expression"":""1082.3""},""inputs"":{}}",1777593600,1777593600,,,true
-adjustment_20260501_student_loan2_interest,Student loan 2 interest adjustment,,student_loan2_interest,"{""resolver"":""expression"",""config"":{""expression"":""199.33""},""inputs"":{}}",1777593600,1777593600,,,true
-adjustment_20260623_checking,Checking balance adjustment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""21486.53""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_k401,401(k) balance adjustment,,k401,"{""resolver"":""expression"",""config"":{""expression"":""640.81""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_brokerage,Brokerage balance adjustment,,brokerage,"{""resolver"":""expression"",""config"":{""expression"":""6.62""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_roth_ira,Roth IRA balance adjustment,,roth_ira,"{""resolver"":""expression"",""config"":{""expression"":""6.04""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_student_loan1_principal,Student loan 1 principal adjustment,,student_loan1_principal,"{""resolver"":""expression"",""config"":{""expression"":""11000""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_student_loan1_interest,Student loan 1 interest adjustment,,student_loan1_interest,"{""resolver"":""expression"",""config"":{""expression"":""1901.13""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_student_loan2_principal,Student loan 2 principal adjustment,,student_loan2_principal,"{""resolver"":""expression"",""config"":{""expression"":""10917.7""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_student_loan2_interest,Student loan 2 interest adjustment,,student_loan2_interest,"{""resolver"":""expression"",""config"":{""expression"":""4.11""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_student_loan3_principal,Student loan 3 principal adjustment,,student_loan3_principal,"{""resolver"":""expression"",""config"":{""expression"":""25528.12""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260623_student_loan3_interest,Student loan 3 interest adjustment,,student_loan3_interest,"{""resolver"":""expression"",""config"":{""expression"":""21.16""},""inputs"":{}}",1782172800,1782172800,,,true
-opening_20260623_sofi_loan_principal,Opening SoFi loan principal,sofi_loan_principal,,"{""resolver"":""expression"",""config"":{""expression"":""49606.68""},""inputs"":{}}",1782172800,1782172800,,,true
-adjustment_20260713_sofi_loan_principal,SoFi loan principal adjustment,,sofi_loan_principal,"{""resolver"":""expression"",""config"":{""expression"":""12399.05""},""inputs"":{}}",1783900800,1783900800,,,true
-opening_20260713_sallie_mae_principal,Opening Sallie Mae principal,sallie_mae_principal,,"{""resolver"":""expression"",""config"":{""expression"":""12000""},""inputs"":{}}",1783900800,1783900800,,,true
-opening_20260713_sallie_mae_interest,Opening Sallie Mae interest,sallie_mae_interest,,"{""resolver"":""expression"",""config"":{""expression"":""237.54""},""inputs"":{}}",1783900800,1783900800,,,true
-opening_20260713_car_loan_principal,Opening car loan principal,car_loan_principal,,"{""resolver"":""expression"",""config"":{""expression"":""20423.33""},""inputs"":{}}",1783900800,1783900800,,,true
-adjustment_20260727_sofi_loan_principal,SoFi loan principal adjustment,,sofi_loan_principal,"{""resolver"":""expression"",""config"":{""expression"":""790.05""},""inputs"":{}}",1785110400,1785110400,,,true
-opening_20260727_sofi_loan_interest,Opening SoFi loan interest,sofi_loan_interest,,"{""resolver"":""expression"",""config"":{""expression"":""66.35""},""inputs"":{}}",1785110400,1785110400,,,true
-adjustment_20260727_checking,Checking balance adjustment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""1298.15""},""inputs"":{}}",1785110400,1785110400,,,true
-adjustment_20260727_k401,401(k) balance adjustment,,k401,"{""resolver"":""expression"",""config"":{""expression"":""619.93""},""inputs"":{}}",1785110400,1785110400,,,true
-adjustment_20260727_roth_ira,Roth IRA balance adjustment,,roth_ira,"{""resolver"":""expression"",""config"":{""expression"":""2""},""inputs"":{}}",1785110400,1785110400,,,true
-amazon_payroll_20260430,Amazon Development Payroll 2026-04-30,,checking,"{""resolver"":""expression"",""config"":{""expression"":""41330.61""},""inputs"":{}}",1777507200,1777507200,,,true
-amazon_payroll_20260630_1,Amazon Development Payroll 2026-06-30 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7455.96""},""inputs"":{}}",1782777600,1782777600,,,true
-amazon_payroll_20260731_1,Amazon Development Payroll 2026-07-31 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7579.38""},""inputs"":{}}",1785456000,1785456000,,,true
-sapphire_20260818_dominos,Dominos 7063,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.94""},""inputs"":{}}",1787011200,1787011200,,,true
-sapphire_20260819_parks_refund,WA Parks Reservation Refund,,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""19.55""},""inputs"":{}}",1787097600,1787097600,,,true
-sapphire_20260819_chase_travel,Chase Travel,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""30.98""},""inputs"":{}}",1787097600,1787097600,,,true
-sapphire_20260821_walgreens_6194,Walgreens 6194,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.25""},""inputs"":{}}",1787270400,1787270400,,,true
-sapphire_20260821_hmart,H Mart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.52""},""inputs"":{}}",1787270400,1787270400,,,true
-sapphire_20260822_yardhouse,Yard House 0108343,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""71.18""},""inputs"":{}}",1787356800,1787356800,,,true
-sapphire_20260822_costco,Costco WHSE 0001,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""275.91""},""inputs"":{}}",1787356800,1787356800,,,true
-sapphire_20260822_kobuta,Kobuta and Ookami Kats,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""62.98""},""inputs"":{}}",1787356800,1787356800,,,true
-sapphire_20260823_regal_meridian,Reg Meridian 16,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.76""},""inputs"":{}}",1787443200,1787443200,,,true
-sapphire_20260823_orange_goose,Orange Goose Coffee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.36""},""inputs"":{}}",1787443200,1787443200,,,true
-sapphire_20260823_regal_cinemas,Regal Cinemas,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""33.58""},""inputs"":{}}",1787443200,1787443200,,,true
-sapphire_20260823_hmart,H Mart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.97""},""inputs"":{}}",1787443200,1787443200,,,true
-sapphire_20260823_racha_thai,Racha Thai Cuisine,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""42.48""},""inputs"":{}}",1787443200,1787443200,,,true
-sapphire_20260825_dental,Salt Lake Union Dental,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.40""},""inputs"":{}}",1787616000,1787616000,,,true
-sapphire_20260825_impeckable,Impeckable Chicken,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""41.43""},""inputs"":{}}",1787616000,1787616000,,,true
-sapphire_20260826_openai_chatgpt,OpenAI ChatGPT,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.11""},""inputs"":{}}",1787702400,1787702400,,,true
-sapphire_20260826_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",1787702400,1787702400,,,true
-sapphire_20260828_mcdonalds_35920,McDonalds F35920,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.18""},""inputs"":{}}",1787875200,1787875200,,,true
-sapphire_20260828_miero,Miero Coffee Bar,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.77""},""inputs"":{}}",1787875200,1787875200,,,true
-sapphire_20260828_rolled_flour,Rolled Flour,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.34""},""inputs"":{}}",1787875200,1787875200,,,true
-sapphire_20260828_ummadak,Ummadak,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.83""},""inputs"":{}}",1787875200,1787875200,,,true
-sapphire_20260828_multnomah_falls,Multnomah Falls,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.94""},""inputs"":{}}",1787875200,1787875200,,,true
-sapphire_20260829_mcmenamins,McMenamins Edgefield,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""62.54""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260829_walgreens_5816,Walgreens 5816,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.25""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260829_st_helens_gifts,Mt St Helens Gifts,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.77""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260829_safeway,Safeway 0424,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.77""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260829_ktown_bbq,K-Town Korean BBQ,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""78.20""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260829_starbucks,Starbucks 13327,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.95""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260829_deli_store,Deli Store LLC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""27.13""},""inputs"":{}}",1787961600,1787961600,,,true
-sapphire_20260830_walgreens_10056,Walgreens 10056,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.76""},""inputs"":{}}",1788048000,1788048000,,,true
-sapphire_20260830_mcdonalds_17185,McDonalds F17185,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.48""},""inputs"":{}}",1788048000,1788048000,,,true
-sapphire_20260830_lime_ride,Lime Ride,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.34""},""inputs"":{}}",1788048000,1788048000,,,true
-sapphire_20260830_kozy_korner,Kozy Korner,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""40.25""},""inputs"":{}}",1788048000,1788048000,,,true
-sapphire_20260830_best_buy,Best Buy 0001491,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.00""},""inputs"":{}}",1788048000,1788048000,,,true
-sapphire_20260830_pelican_brewing,Pelican Brewing,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""65.64""},""inputs"":{}}",1788048000,1788048000,,,true
-sapphire_20260831_card_payment,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""2000.76""},""inputs"":{}}",1788134400,1788134400,,,true
-sapphire_20260831_brooktree,Brooktree Film Lab,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""57.75""},""inputs"":{}}",1788134400,1788134400,,,true
-sapphire_20260831_vanmoof,Vanmoof Rybit,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""179.00""},""inputs"":{}}",1788134400,1788134400,,,true
-sapphire_20260831_wholefds_1104,Whole Foods WSL 10216,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.04""},""inputs"":{}}",1788134400,1788134400,,,true
-sapphire_20260831_wholefds_1826,Whole Foods WSL 10216,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.26""},""inputs"":{}}",1788134400,1788134400,,,true
-sapphire_20260831_costco_instacart,Costco Instacart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""49.93""},""inputs"":{}}",1788134400,1788134400,,,true
-sapphire_20260901_vanmoof_refund,Vanmoof Rybit Refund,,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""179.00""},""inputs"":{}}",1788220800,1788220800,,,true
-sapphire_20260901_opencode,Opencode Anomaly,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",1788220800,1788220800,,,true
-sapphire_20260901_midori,Midori Teriyaki,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.54""},""inputs"":{}}",1788220800,1788220800,,,true
-sapphire_20260901_lime_pass,Lime Pass,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""47.53""},""inputs"":{}}",1788220800,1788220800,,,true
-sapphire_20260901_annual_fee,Annual Membership Fee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""95.00""},""inputs"":{}}",1788220800,1788220800,,,true
-sapphire_20260902_aws,Amazon Web Services,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.57""},""inputs"":{}}",1788307200,1788307200,,,true
-sapphire_20260902_lime_rides,Lime 2 Rides,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.96""},""inputs"":{}}",1788307200,1788307200,,,true
-sapphire_20260903_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""35.63""},""inputs"":{}}",1788393600,1788393600,,,true
-sapphire_20260903_shake_shack,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""32.57""},""inputs"":{}}",1788393600,1788393600,,,true
-sapphire_20260904_usda,USDA Forest Service,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1788480000,1788480000,,,true
-sapphire_20260905_regal_meridian,Reg Meridian 16,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.21""},""inputs"":{}}",1788566400,1788566400,,,true
-sapphire_20260905_regal_cinemas,Regal Cinemas,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""37.78""},""inputs"":{}}",1788566400,1788566400,,,true
-sapphire_20260905_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.68""},""inputs"":{}}",1788566400,1788566400,,,true
-sapphire_20260905_heytea,Heytea South Lake Union,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.83""},""inputs"":{}}",1788566400,1788566400,,,true
-sapphire_20260906_steam,Steam Games,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.99""},""inputs"":{}}",1788652800,1788652800,,,true
-sapphire_20260906_yardhouse,Yard House 0108343,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""64.00""},""inputs"":{}}",1788652800,1788652800,,,true
-sapphire_20260906_hudson_news,Hudson News Seatac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.58""},""inputs"":{}}",1788652800,1788652800,,,true
-sapphire_20260906_levy_dbacks,Levy Dbacks Concession,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""30.65""},""inputs"":{}}",1788652800,1788652800,,,true
-sapphire_20260907_chase_field,Chase Field,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""54.55""},""inputs"":{}}",1788739200,1788739200,,,true
-sapphire_20260907_toasted_bagels,Toasted Bagels and Coffee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.65""},""inputs"":{}}",1788739200,1788739200,,,true
-sapphire_20260907_plaid_pantry,Plaid Pantry 309,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.18""},""inputs"":{}}",1788739200,1788739200,,,true
-sapphire_20260907_valley_metro,Valley Metro Mobile,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1788739200,1788739200,,,true
-sapphire_20260908_caffe_vita,Caffe Vita KEXP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.28""},""inputs"":{}}",1788825600,1788825600,,,true
-sapphire_20260910_qfc,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",1788998400,1788998400,,,true
-sapphire_20260910_tsuki,Tsuki Shokudo,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""63.57""},""inputs"":{}}",1788998400,1788998400,,,true
-sapphire_20260911_openai,OpenAI,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.71""},""inputs"":{}}",1789084800,1789084800,,,true
-sapphire_20260911_mcdonalds_39974,McDonalds F39974,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.90""},""inputs"":{}}",1789084800,1789084800,,,true
-sapphire_20260911_glazers,Glazers Camera,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""44.73""},""inputs"":{}}",1789084800,1789084800,,,true
-sapphire_20260912_costco_instacart,Costco Instacart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""49.18""},""inputs"":{}}",1789171200,1789171200,,,true
-sapphire_20260912_urban_animal,Urban Animal,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""207.21""},""inputs"":{}}",1789171200,1789171200,,,true
-sapphire_20260912_cafe_hagen,Cafe Hagen Uptown,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""16.02""},""inputs"":{}}",1789171200,1789171200,,,true
-sapphire_20260913_qfc_744,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.44""},""inputs"":{}}",1789257600,1789257600,,,true
-sapphire_20260913_qfc_1814,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.14""},""inputs"":{}}",1789257600,1789257600,,,true
-sapphire_20260913_target,Target T-0627,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.04""},""inputs"":{}}",1789257600,1789257600,,,true
-sapphire_20260913_goodwill,Goodwill Seattle,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.53""},""inputs"":{}}",1789257600,1789257600,,,true
-sapphire_20260914_bjs,BJs Restaurants,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""103.41""},""inputs"":{}}",1789344000,1789344000,,,true
-sapphire_20260915_impeckable_2,Impeckable Chicken 2,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.89""},""inputs"":{}}",1789430400,1789430400,,,true
-sapphire_20260915_made_in_house,Made In House,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""40.44""},""inputs"":{}}",1789430400,1789430400,,,true
-sapphire_20260915_miro_tea,Miro Tea,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.64""},""inputs"":{}}",1789430400,1789430400,,,true
-sapphire_20260916_pho_bac,Pho Bac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.46""},""inputs"":{}}",1789516800,1789516800,,,true
-sapphire_20260916_tous_les_jours,Tous Les Jours,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.10""},""inputs"":{}}",1789516800,1789516800,,,true
-sapphire_20260917_shake_shack,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.28""},""inputs"":{}}",1789603200,1789603200,,,true
-checking_20260722_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""200.00""},""inputs"":{}}",1784678400,1784678400,,,true
-checking_20260731_sapphire_payment,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""1916.17""},""inputs"":{}}",1785456000,1785456000,,,true
-checking_20260731_prime_payment,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""407.01""},""inputs"":{}}",1785456000,1785456000,,,true
-checking_20260803_zelle_lisa,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1785715200,1785715200,,,true
-checking_20260803_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""200.00""},""inputs"":{}}",1785715200,1785715200,,,true
-checking_20260812_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""400.00""},""inputs"":{}}",1786492800,1786492800,,,true
-checking_20260817_amazon_payment,Amazon Payment,,checking,"{""resolver"":""expression"",""config"":{""expression"":""32.11""},""inputs"":{}}",1786924800,1786924800,,,true
-checking_20260817_insurance,Progressive Insurance,checking,,"{""resolver"":""expression"",""config"":{""expression"":""63.58""},""inputs"":{}}",1786924800,1786924800,,,true
-prime_20260820_amazon_7857,Amazon Order 7857,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""55.56""},""inputs"":{}}",1787184000,1787184000,,,true
-prime_20260821_amazon_4607,Amazon Order 4607,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.47""},""inputs"":{}}",1787270400,1787270400,,,true
-prime_20260821_amazon_2643,Amazon Order 2643,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""27.63""},""inputs"":{}}",1787270400,1787270400,,,true
-prime_20260823_amazon_9469,Amazon Order 9469,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""32.05""},""inputs"":{}}",1787443200,1787443200,,,true
-checking_20260824_zelle_jennifer_700,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""700.00""},""inputs"":{}}",1787529600,1787529600,,,true
-checking_20260824_zelle_jennifer_100,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""100.00""},""inputs"":{}}",1787529600,1787529600,,,true
-prime_20260826_amazon_2237,Amazon Order 2237,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.65""},""inputs"":{}}",1787702400,1787702400,,,true
-prime_20260828_amazon_4601,Amazon Order 4601,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.72""},""inputs"":{}}",1787875200,1787875200,,,true
-prime_20260828_amazon_8605,Amazon Order 8605,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""28.13""},""inputs"":{}}",1787875200,1787875200,,,true
-prime_20260828_amazon_5463,Amazon Order 5463,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.90""},""inputs"":{}}",1787875200,1787875200,,,true
-amazon_payroll_20260831_1,Amazon Development Payroll 2026-08-31 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7579.40""},""inputs"":{}}",1788134400,1788134400,,,true
-prime_20260831_card_payment,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""852.46""},""inputs"":{}}",1788134400,1788134400,,,true
-prime_20260831_amazon_7823,Amazon Order 7823,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.47""},""inputs"":{}}",1788134400,1788134400,,,true
-checking_20260901_zelle_lisa,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1788220800,1788220800,,,true
-checking_20260902_zelle_jennifer,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""1000.00""},""inputs"":{}}",1788307200,1788307200,,,true
-prime_20260903_amazon_1464,Amazon Order 1464,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.32""},""inputs"":{}}",1788393600,1788393600,,,true
-prime_20260903_amazon_5023,Amazon Order 5023,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.20""},""inputs"":{}}",1788393600,1788393600,,,true
-prime_20260904_amazon_6642,Amazon Order 6642,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.02""},""inputs"":{}}",1788480000,1788480000,,,true
-prime_20260906_amazon_3861,Amazon Order 3861,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.08""},""inputs"":{}}",1788652800,1788652800,,,true
-prime_20260911_amazon_1863,Amazon Order 1863,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""60.81""},""inputs"":{}}",1789084800,1789084800,,,true
-prime_20260912_amazon_7016,Amazon Order 7016,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.99""},""inputs"":{}}",1789171200,1789171200,,,true
-checking_20260916_insurance,Progressive Insurance,checking,,"{""resolver"":""expression"",""config"":{""expression"":""159.89""},""inputs"":{}}",1789516800,1789516800,,,true
-prime_20260917_amazon_7840,Amazon Order 7840,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.44""},""inputs"":{}}",1789603200,1789603200,,,true
-prime_20260917_amazon_5l52,Amazon.com*5R9ZO5L52,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.80""},""inputs"":{}}",1789603200,1789603200,,,true
-sapphire_20260917_7_eleven_39656,7-ELEVEN 39656,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.02""},""inputs"":{}}",1789603200,1789603200,,,true
-sapphire_20260918_starbucks_8007827282,STARBUCKS 8007827282,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.00""},""inputs"":{}}",1789689600,1789689600,,,true
-prime_20260919_amazon_9gh2,AMAZON MKTPL*5R09P9GH2,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.84""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260919_ls_seattle_shirt_comp,LS SEATTLE SHIRT COMP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.14""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260919_mcdonald_s_f24206,MCDONALD'S F24206,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.53""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260919_midtown_market,MIDTOWN MARKET,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.42""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260919_publix_1233,PUBLIX #1233,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.31""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260919_sea_cap_fd_hall_ca10_1454,SEA CAP FD HALL CA10 1454,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.83""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260919_shaky_knees_food,SHAKY KNEES (FOOD),ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""28.42""},""inputs"":{}}",1789776000,1789776000,,,true
-sapphire_20260920_circlek_2745020,CIRCLEK #2745020,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.52""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_first_watch_0166_pat,FIRST WATCH 0166 PAT,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""60.47""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_marta_tap_and_go,MARTA TAP AND GO,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_marta_tap_and_go_2,MARTA TAP AND GO,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_metropolis_parking,METROPOLIS PARKING,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.04""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_murphy_express_8759,MURPHY EXPRESS 8759,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.01""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_mwj_vending,MWJ VENDING,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""4.75""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_p_f_chang_s_9205_pos,P.F.CHANG'S 9205 POS,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.00""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_starbucks_store_08291,STARBUCKS STORE 08291,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.79""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260920_wm_supercenter_6998,WM SUPERCENTER #6998,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.45""},""inputs"":{}}",1789862400,1789862400,,,true
-sapphire_20260921_ga_state_parks_dnr,GA STATE PARKS-DNR,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",1789948800,1789948800,,,true
-sapphire_20260922_doordash_mcdonalds,DOORDASH MCDONALDS,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.23""},""inputs"":{}}",1790035200,1790035200,,,true
-sapphire_20260922_facing_east_downto,FACING EAST - DOWNTO,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.90""},""inputs"":{}}",1790035200,1790035200,,,true
-prime_20260923_amazon_0vc1,AMAZON MKTPL*5X3350VC1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.99""},""inputs"":{}}",1790121600,1790121600,,,true
-sapphire_20260923_costco_by_instacart,COSTCO BY INSTACART,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""34.29""},""inputs"":{}}",1790121600,1790121600,,,true
-sapphire_20260923_impeckable_chicken_2,IMPECKABLE CHICKEN 2,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.89""},""inputs"":{}}",1790121600,1790121600,,,true
-sapphire_20260923_lime_pass_3dtm,LIME*PASS 3DTM,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""47.53""},""inputs"":{}}",1790121600,1790121600,,,true
-sapphire_20260923_qfc,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.48""},""inputs"":{}}",1790121600,1790121600,,,true
-sapphire_20260924_orc_00yrxrk_regional_4,ORC*00YRXRK REGIONAL 4,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",1790208000,1790208000,,,true
-sapphire_20260925_hot_cakes_cap_hill,HOT CAKES - CAP HILL,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.78""},""inputs"":{}}",1790294400,1790294400,,,true
-sapphire_20260925_lime_ride_3dtm,LIME*RIDE 3DTM,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""0.52""},""inputs"":{}}",1790294400,1790294400,,,true
-prime_20260926_amazon_1cn1,Amazon.com*5138W1CN1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.14""},""inputs"":{}}",1790380800,1790380800,,,true
-prime_20260926_amazon_6yq1,AMAZON MKTPL*5X71V6YQ1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.24""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_bellows_film_lab,BELLOWS FILM LAB,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.75""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_bp_1464800medal_bp,BP#1464800MEDAL BP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""3.63""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_fire_pot_llc,FIRE POT LLC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.02""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_honey_bea_market,HONEY BEA MARKET,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""53.25""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_openai_chatgpt_subscr,OPENAI *CHATGPT SUBSCR,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.11""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_pocha_93,POCHA 93,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""33.23""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_shell_oil_57444033104,SHELL OIL 57444033104,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.99""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_spirit_halloween_61384,SPIRIT HALLOWEEN 61384,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.00""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260926_tous_les_jours_s_terry,TOUS LES JOURS S-TERRY,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.50""},""inputs"":{}}",1790380800,1790380800,,,true
-sapphire_20260927_glazer_s_camera,GLAZER'S CAMERA,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""39.76""},""inputs"":{}}",1790467200,1790467200,,,true
-sapphire_20260929_gourmondo_sea33_blac,GOURMONDO SEA33 BLAC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.42""},""inputs"":{}}",1790640000,1790640000,,,true
-sapphire_20260929_hudson_news_st851,HUDSON NEWS ST851,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.60""},""inputs"":{}}",1790640000,1790640000,,,true
-sapphire_20260929_mcdonald_s_f17275,MCDONALD'S F17275,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.00""},""inputs"":{}}",1790640000,1790640000,,,true
-sapphire_20260929_qfc,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.96""},""inputs"":{}}",1790640000,1790640000,,,true
-checking_20260930_prime_payment,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""483.44""},""inputs"":{}}",1790726400,1790726400,,,true
-checking_20260930_sapphire_payment,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""2588.82""},""inputs"":{}}",1790726400,1790726400,,,true
-sapphire_20260930_tacos_chukis_south_la,TACOS CHUKIS SOUTH LA,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""25.37""},""inputs"":{}}",1790726400,1790726400,,,true
-sapphire_20260930_tanoor_lebanese_grill,Tanoor Lebanese Grill,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""79.30""},""inputs"":{}}",1790726400,1790726400,,,true
-sapphire_20260930_ticketmaster,TICKETMASTER,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",1790726400,1790726400,,,true
-prime_20261001_amazon_5nq2,AMAZON MKTPL*514YG5NQ2,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""16.41""},""inputs"":{}}",1790812800,1790812800,,,true
-sapphire_20261001_amazon_web_services,Amazon web services,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.31""},""inputs"":{}}",1790812800,1790812800,,,true
-sapphire_20261001_opencode,OPENCODE,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",1790812800,1790812800,,,true
-prime_20261002_amazon_6lr1,AMAZON MKTPL*594WB6LR1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.73""},""inputs"":{}}",1790899200,1790899200,,,true
-prime_20261002_amazon_9ad2,Amazon.com*517YC9AD2,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""4.39""},""inputs"":{}}",1790899200,1790899200,,,true
-sapphire_20261002_plaid_pantry_309,PLAID PANTRY #309,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.41""},""inputs"":{}}",1790899200,1790899200,,,true
-prime_20261003_wholefds_5872,Whole Foods WSL 10216,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""58.72""},""inputs"":{}}",1790985600,1790985600,,,true
-sapphire_20261003_matcha_magic_slu,MATCHA MAGIC SLU,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.45""},""inputs"":{}}",1790985600,1790985600,,,true
-sapphire_20261003_qfc,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.67""},""inputs"":{}}",1790985600,1790985600,,,true
-sapphire_20261003_toasted_bagels_coff,TOASTED BAGELS & COFF,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.83""},""inputs"":{}}",1790985600,1790985600,,,true
-sapphire_20261004_qfc,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.45""},""inputs"":{}}",1791072000,1791072000,,,true
-sapphire_20261004_sen_noodle_bar,SEN NOODLE BAR,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1791072000,1791072000,,,true
-sapphire_20261005_brooktree_film_lab,BROOKTREE FILM LAB,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.40""},""inputs"":{}}",1791158400,1791158400,,,true
-sapphire_20261005_costco_by_instacart,COSTCO BY INSTACART,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""91.14""},""inputs"":{}}",1791158400,1791158400,,,true
-sapphire_20261005_steamgames_com_4259522985,STEAMGAMES.COM 4259522985,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",1791158400,1791158400,,,true
-checking_20260925_zelle_golden_in,Zelle from Golden Lin,,checking,"{""resolver"":""expression"",""config"":{""expression"":""9.00""},""inputs"":{}}",1790294400,1790294400,,,true
-checking_20260925_zelle_golden,Zelle to Golden,checking,,"{""resolver"":""expression"",""config"":{""expression"":""38.00""},""inputs"":{}}",1790294400,1790294400,,,true
-checking_20260928_zelle_phillip,Zelle to Phillip,checking,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",1790553600,1790553600,,,true
-checking_20261001_zelle_lisa,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1790812800,1790812800,,,true
-checking_20261001_bilt_rent,BILT Rent Payment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""2874.67""},""inputs"":{}}",1790812800,1790812800,,,true
-checking_20261002_zelle_jennifer_500,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""500.00""},""inputs"":{}}",1790899200,1790899200,,,true
+554176fc-daf9-58b0-b7cb-fcd0f2c72afe,Opening RSU balance,,rsu,"{""resolver"":""expression"",""config"":{""expression"":""140383.66""},""inputs"":{}}",1775433600,1775433600,,,true
+e91a656d-add6-518d-87fd-48e6655764cf,Opening checking balance,,checking,"{""resolver"":""expression"",""config"":{""expression"":""23182.42""},""inputs"":{}}",1777507200,1777507200,,,true
+ce1c1878-2024-51c7-aa2d-78cee87a396b,Opening brokerage balance,,brokerage,"{""resolver"":""expression"",""config"":{""expression"":""234.54""},""inputs"":{}}",1777507200,1777507200,,,true
+97b03a44-ea78-5b77-93cc-666d7f573b42,Opening Roth IRA balance,,roth_ira,"{""resolver"":""expression"",""config"":{""expression"":""1104.53""},""inputs"":{}}",1777507200,1777507200,,,true
+cb2d262a-7045-578e-877f-bf820e0284ab,Opening student loan 1 principal,student_loan1_principal,,"{""resolver"":""expression"",""config"":{""expression"":""11000""},""inputs"":{}}",1777507200,1777507200,,,true
+fa33c695-fd7b-57c9-a16e-830fa4b504ec,Opening student loan 1 interest,student_loan1_interest,,"{""resolver"":""expression"",""config"":{""expression"":""1901.13""},""inputs"":{}}",1777507200,1777507200,,,true
+6fd6c07d-05b5-57ad-9fee-2c18d595658b,Opening student loan 2 principal,student_loan2_principal,,"{""resolver"":""expression"",""config"":{""expression"":""12000""},""inputs"":{}}",1777507200,1777507200,,,true
+bf953e1a-1c98-5bfc-b5de-fe33c28edb7c,Opening student loan 2 interest,student_loan2_interest,,"{""resolver"":""expression"",""config"":{""expression"":""203.44""},""inputs"":{}}",1777507200,1777507200,,,true
+732877dd-4c60-53fa-a41d-926c973db3f9,Opening student loan 3 principal,student_loan3_principal,,"{""resolver"":""expression"",""config"":{""expression"":""28788""},""inputs"":{}}",1777507200,1777507200,,,true
+e78f65c1-37e8-5f48-8e03-d409f453f93b,Opening student loan 3 interest,student_loan3_interest,,"{""resolver"":""expression"",""config"":{""expression"":""6714.35""},""inputs"":{}}",1777507200,1777507200,,,true
+972ebec3-e759-5efa-a34a-8c37fcd30ce5,Student loan 3 principal adjustment,,student_loan3_principal,"{""resolver"":""expression"",""config"":{""expression"":""3259.88""},""inputs"":{}}",1777593600,1777593600,,,true
+98b24e77-7184-51b7-b54b-4ff64247107c,Student loan 3 interest adjustment,,student_loan3_interest,"{""resolver"":""expression"",""config"":{""expression"":""6693.19""},""inputs"":{}}",1777593600,1777593600,,,true
+993cde00-c530-5ea1-be34-17fc5af5a8a5,Student loan 2 principal adjustment,,student_loan2_principal,"{""resolver"":""expression"",""config"":{""expression"":""1082.3""},""inputs"":{}}",1777593600,1777593600,,,true
+ac051e5f-c367-5f83-b6d6-13b0be70501c,Student loan 2 interest adjustment,,student_loan2_interest,"{""resolver"":""expression"",""config"":{""expression"":""199.33""},""inputs"":{}}",1777593600,1777593600,,,true
+79712031-4662-56e5-9a08-b6c5f58e5b29,Checking balance adjustment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""21486.53""},""inputs"":{}}",1782172800,1782172800,,,true
+2661a459-ccfe-5514-b871-75362e646ef2,401(k) balance adjustment,,k401,"{""resolver"":""expression"",""config"":{""expression"":""640.81""},""inputs"":{}}",1782172800,1782172800,,,true
+f396138c-d4fb-51de-a44a-0f49f68e19cf,Brokerage balance adjustment,,brokerage,"{""resolver"":""expression"",""config"":{""expression"":""6.62""},""inputs"":{}}",1782172800,1782172800,,,true
+9ef059b7-a573-5a74-abc6-a25011ea5c7e,Roth IRA balance adjustment,,roth_ira,"{""resolver"":""expression"",""config"":{""expression"":""6.04""},""inputs"":{}}",1782172800,1782172800,,,true
+ff7ddf04-d802-5faf-99eb-475942303abd,Student loan 1 principal adjustment,,student_loan1_principal,"{""resolver"":""expression"",""config"":{""expression"":""11000""},""inputs"":{}}",1782172800,1782172800,,,true
+877667fb-edc8-5eb5-8601-ec3bac0856a5,Student loan 1 interest adjustment,,student_loan1_interest,"{""resolver"":""expression"",""config"":{""expression"":""1901.13""},""inputs"":{}}",1782172800,1782172800,,,true
+231f6733-f59a-5c9d-8daf-3bc6af276b51,Student loan 2 principal adjustment,,student_loan2_principal,"{""resolver"":""expression"",""config"":{""expression"":""10917.7""},""inputs"":{}}",1782172800,1782172800,,,true
+99a2d7f4-aacd-58bc-b2f6-1e79d070602d,Student loan 2 interest adjustment,,student_loan2_interest,"{""resolver"":""expression"",""config"":{""expression"":""4.11""},""inputs"":{}}",1782172800,1782172800,,,true
+6be99021-d811-515a-bd14-ff82eb3fa536,Student loan 3 principal adjustment,,student_loan3_principal,"{""resolver"":""expression"",""config"":{""expression"":""25528.12""},""inputs"":{}}",1782172800,1782172800,,,true
+e72789cf-993b-5a22-85a5-312ad720db7c,Student loan 3 interest adjustment,,student_loan3_interest,"{""resolver"":""expression"",""config"":{""expression"":""21.16""},""inputs"":{}}",1782172800,1782172800,,,true
+5cfa10ed-95f5-5da9-875b-f50a97dbb7b1,Opening SoFi loan principal,sofi_loan_principal,,"{""resolver"":""expression"",""config"":{""expression"":""49606.68""},""inputs"":{}}",1782172800,1782172800,,,true
+c42c0e67-4af0-5797-9919-d5718e6b70c2,SoFi loan principal adjustment,,sofi_loan_principal,"{""resolver"":""expression"",""config"":{""expression"":""12399.05""},""inputs"":{}}",1783900800,1783900800,,,true
+3bc79a12-dc54-5621-a55d-b7edcb037e68,Opening Sallie Mae principal,sallie_mae_principal,,"{""resolver"":""expression"",""config"":{""expression"":""12000""},""inputs"":{}}",1783900800,1783900800,,,true
+fcbf3b42-feef-54c0-a536-149293470394,Opening Sallie Mae interest,sallie_mae_interest,,"{""resolver"":""expression"",""config"":{""expression"":""237.54""},""inputs"":{}}",1783900800,1783900800,,,true
+e7c81b99-8dd7-5d3a-962a-d247aac61987,Opening car loan principal,car_loan_principal,,"{""resolver"":""expression"",""config"":{""expression"":""20423.33""},""inputs"":{}}",1783900800,1783900800,,,true
+4d33ef98-dbc8-586d-8e56-7c8bbbaab854,SoFi loan principal adjustment,,sofi_loan_principal,"{""resolver"":""expression"",""config"":{""expression"":""790.05""},""inputs"":{}}",1785110400,1785110400,,,true
+8f47203c-6d6c-502b-906a-485f8b18f2be,Opening SoFi loan interest,sofi_loan_interest,,"{""resolver"":""expression"",""config"":{""expression"":""66.35""},""inputs"":{}}",1785110400,1785110400,,,true
+a1261c15-9f32-53ca-b302-7e3f0137cc92,Checking balance adjustment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""1298.15""},""inputs"":{}}",1785110400,1785110400,,,true
+464e0292-ac20-5774-be73-160e35f605c0,401(k) balance adjustment,,k401,"{""resolver"":""expression"",""config"":{""expression"":""619.93""},""inputs"":{}}",1785110400,1785110400,,,true
+bc5a6d67-293c-5ab6-9b23-2da8c17c8cda,Roth IRA balance adjustment,,roth_ira,"{""resolver"":""expression"",""config"":{""expression"":""2""},""inputs"":{}}",1785110400,1785110400,,,true
+690e2cc4-4c2d-50e3-ac73-cad3a0e38b56,Amazon Development Payroll 2026-04-30,,checking,"{""resolver"":""expression"",""config"":{""expression"":""41330.61""},""inputs"":{}}",1777507200,1777507200,,,true
+1d790414-9361-5285-8ac1-fbc091cc86b3,Amazon Development Payroll 2026-06-30 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7455.96""},""inputs"":{}}",1782777600,1782777600,,,true
+d9c8aaa1-f8aa-5149-9a0c-42383aefec61,Amazon Development Payroll 2026-07-31 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7579.38""},""inputs"":{}}",1785456000,1785456000,,,true
+c569a9aa-4f6c-5d3d-9379-2175d5bb5eb8,Dominos 7063,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.94""},""inputs"":{}}",1787011200,1787011200,,,true
+a4e2baaf-a18b-5df1-b776-0f0911078c24,WA Parks Reservation Refund,,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""19.55""},""inputs"":{}}",1787097600,1787097600,,,true
+6ff70ed1-af75-5916-a891-08c8305622cc,Chase Travel,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""30.98""},""inputs"":{}}",1787097600,1787097600,,,true
+88631434-72a6-5a43-93fb-f1ae784a0a84,Walgreens 6194,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.25""},""inputs"":{}}",1787270400,1787270400,,,true
+4bd2ef67-8fd6-545d-9acf-fb39ea3097f4,H Mart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.52""},""inputs"":{}}",1787270400,1787270400,,,true
+c0fdeba1-ad58-5b0a-ab25-fabb1fcc784f,Yard House 0108343,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""71.18""},""inputs"":{}}",1787356800,1787356800,,,true
+e8288cdd-801e-5971-ba10-be74c271b2f8,Costco WHSE 0001,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""275.91""},""inputs"":{}}",1787356800,1787356800,,,true
+4d07b23b-c171-531f-bc1b-94672270cd12,Kobuta and Ookami Kats,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""62.98""},""inputs"":{}}",1787356800,1787356800,,,true
+c59e169d-0816-503e-ac62-87e2c4fb0051,Reg Meridian 16,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.76""},""inputs"":{}}",1787443200,1787443200,,,true
+1260fd98-ec7e-5730-9f2f-a3aa18a04c76,Orange Goose Coffee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.36""},""inputs"":{}}",1787443200,1787443200,,,true
+da39a55b-8309-539b-b1ab-72ecbd2c21f5,Regal Cinemas,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""33.58""},""inputs"":{}}",1787443200,1787443200,,,true
+ba319d4e-cace-55b3-85c8-121b2b40cf77,H Mart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.97""},""inputs"":{}}",1787443200,1787443200,,,true
+037eaa62-78a8-567b-b4c6-71c7dc23518b,Racha Thai Cuisine,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""42.48""},""inputs"":{}}",1787443200,1787443200,,,true
+f4dc0e3c-0034-5a71-9404-5c9e45606478,Salt Lake Union Dental,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.40""},""inputs"":{}}",1787616000,1787616000,,,true
+8ae131fd-8ca7-5a4c-a899-da23180f001c,Impeckable Chicken,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""41.43""},""inputs"":{}}",1787616000,1787616000,,,true
+7eb9579d-9450-53c5-a598-7c1bed4ff508,OpenAI ChatGPT,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.11""},""inputs"":{}}",1787702400,1787702400,,,true
+18232405-ad25-5352-8651-93a1f5453b27,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",1787702400,1787702400,,,true
+d41c3f89-12a9-5dae-8bd4-4310458c675c,McDonalds F35920,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.18""},""inputs"":{}}",1787875200,1787875200,,,true
+55ae68ec-f485-52f9-964e-2f6cfc4055aa,Miero Coffee Bar,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.77""},""inputs"":{}}",1787875200,1787875200,,,true
+7d9968d4-940d-5c47-bf7a-d9f097efa1b0,Rolled Flour,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.34""},""inputs"":{}}",1787875200,1787875200,,,true
+5fb84704-ff7d-5817-bd43-f4200a062c12,Ummadak,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.83""},""inputs"":{}}",1787875200,1787875200,,,true
+603ea59b-6ce2-5608-8f41-b84e495b2a24,Multnomah Falls,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.94""},""inputs"":{}}",1787875200,1787875200,,,true
+e1aee5f6-3e06-55fb-a228-f098a4464ddb,McMenamins Edgefield,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""62.54""},""inputs"":{}}",1787961600,1787961600,,,true
+08d5792f-37e0-5209-a016-8eccff433a82,Walgreens 5816,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.25""},""inputs"":{}}",1787961600,1787961600,,,true
+dd63afde-33d8-5a17-9b5b-631086ede6cb,Mt St Helens Gifts,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.77""},""inputs"":{}}",1787961600,1787961600,,,true
+cc101749-8da6-5521-bb10-cda7d2baeaf3,Safeway 0424,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.77""},""inputs"":{}}",1787961600,1787961600,,,true
+b52163f2-276e-5a26-bc2c-9e9e95a2d809,K-Town Korean BBQ,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""78.20""},""inputs"":{}}",1787961600,1787961600,,,true
+07255edc-e963-5a74-8de1-167271a1b2b5,Starbucks 13327,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.95""},""inputs"":{}}",1787961600,1787961600,,,true
+4698f41f-0c5e-5deb-8de9-b299c0f70311,Deli Store LLC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""27.13""},""inputs"":{}}",1787961600,1787961600,,,true
+ebc6b06c-73f6-58b3-a690-53be66bfd572,Walgreens 10056,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.76""},""inputs"":{}}",1788048000,1788048000,,,true
+245ae430-32b7-5ca6-8051-13ca379c7b7c,McDonalds F17185,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.48""},""inputs"":{}}",1788048000,1788048000,,,true
+602bd1dd-feed-5da0-a613-48de9b3c44cb,Lime Ride,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.34""},""inputs"":{}}",1788048000,1788048000,,,true
+4344ac1b-1b51-5e8a-aa7f-5607f1347dec,Kozy Korner,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""40.25""},""inputs"":{}}",1788048000,1788048000,,,true
+41ddf3d0-1647-54b1-9e31-347e1bdc2a70,Best Buy 0001491,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.00""},""inputs"":{}}",1788048000,1788048000,,,true
+958b0a82-41d8-523e-8ad8-a2cf6d1ab401,Pelican Brewing,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""65.64""},""inputs"":{}}",1788048000,1788048000,,,true
+26c396bf-030d-5dbe-a91e-bbc5eea80518,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""2000.76""},""inputs"":{}}",1788134400,1788134400,,,true
+e2197c53-fe75-5f6e-a89d-6aa527eaff08,Brooktree Film Lab,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""57.75""},""inputs"":{}}",1788134400,1788134400,,,true
+75b593e8-da68-555b-946d-0a790f4c79db,Vanmoof Rybit,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""179.00""},""inputs"":{}}",1788134400,1788134400,,,true
+43ac6e8d-bcf0-511a-8034-aa28295c83b7,Whole Foods WSL 10216,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.04""},""inputs"":{}}",1788134400,1788134400,,,true
+fe62320c-f036-5599-b46b-13c4c601bd41,Whole Foods WSL 10216,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.26""},""inputs"":{}}",1788134400,1788134400,,,true
+396fbe02-4ddc-5800-b7b3-bf5044417515,Costco Instacart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""49.93""},""inputs"":{}}",1788134400,1788134400,,,true
+f0c02176-b349-5b6b-a618-bd74cc503b2a,Vanmoof Rybit Refund,,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""179.00""},""inputs"":{}}",1788220800,1788220800,,,true
+0f54d3a5-0ba5-581e-be66-cbc7a21d570a,Opencode Anomaly,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",1788220800,1788220800,,,true
+3e2d6cbf-fa9c-5bf6-aed2-415416ee7d27,Midori Teriyaki,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.54""},""inputs"":{}}",1788220800,1788220800,,,true
+78da82dd-0893-5aa2-ab2e-e4ee589e5ff6,Lime Pass,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""47.53""},""inputs"":{}}",1788220800,1788220800,,,true
+ce75793a-1ded-5009-bbcf-ce9d3de66521,Annual Membership Fee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""95.00""},""inputs"":{}}",1788220800,1788220800,,,true
+57b593b9-c0fe-58a3-b6c8-c88ee4090db5,Amazon Web Services,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.57""},""inputs"":{}}",1788307200,1788307200,,,true
+b52cf6b6-4024-56b6-8448-084bfad8b0bd,Lime 2 Rides,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.96""},""inputs"":{}}",1788307200,1788307200,,,true
+ac6278dc-986d-5f77-9076-f0f08af7b56e,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""35.63""},""inputs"":{}}",1788393600,1788393600,,,true
+91a27883-c9fa-5126-bdd5-f2143d11acbd,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""32.57""},""inputs"":{}}",1788393600,1788393600,,,true
+06598042-eaaa-5588-9a58-61cbfcc3dd3c,USDA Forest Service,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1788480000,1788480000,,,true
+d12fb6f5-5255-519e-bee5-c155641b8abf,Reg Meridian 16,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.21""},""inputs"":{}}",1788566400,1788566400,,,true
+981ba023-8930-5946-b9eb-91c6c918567c,Regal Cinemas,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""37.78""},""inputs"":{}}",1788566400,1788566400,,,true
+5b1a7112-d90c-57ab-9ecc-cda9cb31878b,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.68""},""inputs"":{}}",1788566400,1788566400,,,true
+20258f14-76a3-55d3-b1ac-31e1c6b5f35d,Heytea South Lake Union,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.83""},""inputs"":{}}",1788566400,1788566400,,,true
+e801c23e-a2c1-5b50-9d6c-f2ae3b4299ae,Steam Games,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.99""},""inputs"":{}}",1788652800,1788652800,,,true
+fb7bc092-b779-55bc-8aa9-45e8d3035e3b,Yard House 0108343,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""64.00""},""inputs"":{}}",1788652800,1788652800,,,true
+c2f5a3d2-0766-5569-a6c2-b8bfe92e55ca,Hudson News Seatac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.58""},""inputs"":{}}",1788652800,1788652800,,,true
+df29d6c7-9072-5674-9fad-70b45180593b,Levy Dbacks Concession,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""30.65""},""inputs"":{}}",1788652800,1788652800,,,true
+35e39a03-7527-58f1-8126-455faf8effd6,Chase Field,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""54.55""},""inputs"":{}}",1788739200,1788739200,,,true
+862d9e3d-2908-5dbc-8e65-a51538f7167a,Toasted Bagels and Coffee,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.65""},""inputs"":{}}",1788739200,1788739200,,,true
+8bcf91a9-faec-5c4a-af65-74f1be0bea47,Plaid Pantry 309,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.18""},""inputs"":{}}",1788739200,1788739200,,,true
+c42f1166-c020-5857-988c-57957bafe648,Valley Metro Mobile,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1788739200,1788739200,,,true
+31757b30-d303-5603-bfb7-f8343aae8fc6,Caffe Vita KEXP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.28""},""inputs"":{}}",1788825600,1788825600,,,true
+c2e90cf3-51c5-57d2-914a-4c2e6b839d09,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",1788998400,1788998400,,,true
+ae4611a2-cbeb-5e0d-921d-b542d693273c,Tsuki Shokudo,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""63.57""},""inputs"":{}}",1788998400,1788998400,,,true
+7bd1c832-e0ea-513c-9447-82471fc7265d,OpenAI,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.71""},""inputs"":{}}",1789084800,1789084800,,,true
+f9caeba8-5eaa-52e1-8824-0be8b6db7b05,McDonalds F39974,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""17.90""},""inputs"":{}}",1789084800,1789084800,,,true
+673416ef-6c91-5ea1-a197-d37778f71b6f,Glazers Camera,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""44.73""},""inputs"":{}}",1789084800,1789084800,,,true
+00682faa-2446-571c-bb36-29b5ddd433b3,Costco Instacart,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""49.18""},""inputs"":{}}",1789171200,1789171200,,,true
+05e8e2b8-dc6f-57c3-bdc3-e49bf844f05a,Urban Animal,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""207.21""},""inputs"":{}}",1789171200,1789171200,,,true
+ed49aef2-0b9c-5b1a-805a-6028ec994bdb,Cafe Hagen Uptown,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""16.02""},""inputs"":{}}",1789171200,1789171200,,,true
+a05c5940-ae46-585b-820b-ad5655fb44d0,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.44""},""inputs"":{}}",1789257600,1789257600,,,true
+1849186e-1e75-5afb-baf3-edbc6d93a3a0,QFC 5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.14""},""inputs"":{}}",1789257600,1789257600,,,true
+d14b186c-59e8-52e1-9e60-56cc22f456c0,Target T-0627,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.04""},""inputs"":{}}",1789257600,1789257600,,,true
+7c35a1ed-3754-5f5a-97f6-aa1c05c9d589,Goodwill Seattle,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.53""},""inputs"":{}}",1789257600,1789257600,,,true
+97600ef2-bc43-5ad0-b4f0-7deff618e1b1,BJs Restaurants,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""103.41""},""inputs"":{}}",1789344000,1789344000,,,true
+a27eb422-5cf9-552b-b657-47f07a810ea0,Impeckable Chicken 2,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.89""},""inputs"":{}}",1789430400,1789430400,,,true
+65188403-704d-5dad-ad4e-7cf465fd52c8,Made In House,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""40.44""},""inputs"":{}}",1789430400,1789430400,,,true
+e4275161-ddd6-5d09-851f-4fbec22592a5,Miro Tea,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.64""},""inputs"":{}}",1789430400,1789430400,,,true
+d3e231c8-e81a-56d4-a617-a5627789766d,Pho Bac,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.46""},""inputs"":{}}",1789516800,1789516800,,,true
+6a5793ee-17b7-5860-8547-b0f157d0e7f5,Tous Les Jours,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.10""},""inputs"":{}}",1789516800,1789516800,,,true
+6810129f-26f5-578d-8c52-2e50f5d71923,Shake Shack,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.28""},""inputs"":{}}",1789603200,1789603200,,,true
+7da64d10-7cc4-59e9-9c49-17dcec8dd6a3,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""200.00""},""inputs"":{}}",1784678400,1784678400,,,true
+d255d974-ef24-5cc5-8ebf-13e9dd9ad020,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""1916.17""},""inputs"":{}}",1785456000,1785456000,,,true
+a1b619c9-b9e1-5e16-82e6-045312dee554,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""407.01""},""inputs"":{}}",1785456000,1785456000,,,true
+88e505eb-5190-5c86-afe1-9b5908fb742d,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1785715200,1785715200,,,true
+eb213417-ba10-5db0-b211-abdbe7a39275,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""200.00""},""inputs"":{}}",1785715200,1785715200,,,true
+5dd2cad7-77f1-562c-8b22-b258b6233535,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""400.00""},""inputs"":{}}",1786492800,1786492800,,,true
+46570598-2075-5379-8a97-7b7908be38a2,Amazon Payment,,checking,"{""resolver"":""expression"",""config"":{""expression"":""32.11""},""inputs"":{}}",1786924800,1786924800,,,true
+368c66d8-65bc-55ff-8b6f-22e3d82ee9c3,Progressive Insurance,checking,,"{""resolver"":""expression"",""config"":{""expression"":""63.58""},""inputs"":{}}",1786924800,1786924800,,,true
+ad5bee75-0e7e-5d6f-a004-f9f056b91412,Amazon Order 7857,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""55.56""},""inputs"":{}}",1787184000,1787184000,,,true
+4e941e0e-4524-5454-bcf0-feb7b7d963cc,Amazon Order 4607,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.47""},""inputs"":{}}",1787270400,1787270400,,,true
+0c47047c-46a3-5a85-9e72-4f58f1df57f8,Amazon Order 2643,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""27.63""},""inputs"":{}}",1787270400,1787270400,,,true
+e4c727c1-e8ea-5d68-b415-791e59961708,Amazon Order 9469,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""32.05""},""inputs"":{}}",1787443200,1787443200,,,true
+bf42ba8a-c306-50c1-8e0d-e0b94c98aee8,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""700.00""},""inputs"":{}}",1787529600,1787529600,,,true
+d0219835-eca1-5931-8bfc-de4347747a82,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""100.00""},""inputs"":{}}",1787529600,1787529600,,,true
+e6bd4ddc-5806-5e73-83c7-ca90a1c9ca19,Amazon Order 2237,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.65""},""inputs"":{}}",1787702400,1787702400,,,true
+0773c0a2-454e-5786-8592-05a064866be5,Amazon Order 4601,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.72""},""inputs"":{}}",1787875200,1787875200,,,true
+c29714d0-09e4-5502-93cd-ae2e7d246a21,Amazon Order 8605,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""28.13""},""inputs"":{}}",1787875200,1787875200,,,true
+377409f3-d73f-5f3f-867c-e94371e79d15,Amazon Order 5463,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.90""},""inputs"":{}}",1787875200,1787875200,,,true
+04237eb8-52e7-52b1-b86a-b4c9a687ee7f,Amazon Development Payroll 2026-08-31 (1),,checking,"{""resolver"":""expression"",""config"":{""expression"":""7579.40""},""inputs"":{}}",1788134400,1788134400,,,true
+1756f581-e233-507a-8eb4-b288a566d6de,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""852.46""},""inputs"":{}}",1788134400,1788134400,,,true
+9cb54328-c4e1-508f-86ff-e7d2a44061ca,Amazon Order 7823,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.47""},""inputs"":{}}",1788134400,1788134400,,,true
+5b0553a9-17f9-5853-8b05-27492ad3a59b,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1788220800,1788220800,,,true
+71a67c23-3535-55c6-bfc6-ee58d367d709,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""1000.00""},""inputs"":{}}",1788307200,1788307200,,,true
+2ae49fb2-4833-50ee-aba8-05d8117cc91e,Amazon Order 1464,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.32""},""inputs"":{}}",1788393600,1788393600,,,true
+a1b1b8e2-abb5-51a3-aa91-c019401a3340,Amazon Order 5023,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.20""},""inputs"":{}}",1788393600,1788393600,,,true
+e1f5fefa-2770-514a-a0e8-0083efda0e68,Amazon Order 6642,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.02""},""inputs"":{}}",1788480000,1788480000,,,true
+ff7a1dc6-bfa6-5e44-a362-fc86ab9b04f6,Amazon Order 3861,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.08""},""inputs"":{}}",1788652800,1788652800,,,true
+ee4ce10d-2374-51a3-9d0a-4197a8264c06,Amazon Order 1863,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""60.81""},""inputs"":{}}",1789084800,1789084800,,,true
+b02b184d-ad00-534c-970d-74af1e151df1,Amazon Order 7016,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.99""},""inputs"":{}}",1789171200,1789171200,,,true
+7c326021-73c8-5461-88a4-b6e157c4b946,Progressive Insurance,checking,,"{""resolver"":""expression"",""config"":{""expression"":""159.89""},""inputs"":{}}",1789516800,1789516800,,,true
+21ca135f-9c76-5b61-b6c3-214c7f035da3,Amazon Order 7840,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""36.44""},""inputs"":{}}",1789603200,1789603200,,,true
+7d138b72-3603-56f6-b7f9-d8f523cd474f,Amazon.com*5R9ZO5L52,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.80""},""inputs"":{}}",1789603200,1789603200,,,true
+cde9faab-3868-5c69-85bb-fae6d66a0b91,7-ELEVEN 39656,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.02""},""inputs"":{}}",1789603200,1789603200,,,true
+36800258-0f8e-5f99-97de-60495cbef3e6,STARBUCKS 8007827282,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.00""},""inputs"":{}}",1789689600,1789689600,,,true
+dfff846c-41e0-59f5-8336-80bdeb52be32,AMAZON MKTPL*5R09P9GH2,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.84""},""inputs"":{}}",1789776000,1789776000,,,true
+f16b1210-fb5f-59f9-9aa1-e156e3c4aa70,LS SEATTLE SHIRT COMP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.14""},""inputs"":{}}",1789776000,1789776000,,,true
+63f6fbd6-729c-528e-af4a-e118b849fa30,MCDONALD'S F24206,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""8.53""},""inputs"":{}}",1789776000,1789776000,,,true
+473f6a25-3851-5482-aafa-714cb4a827a3,MIDTOWN MARKET,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.42""},""inputs"":{}}",1789776000,1789776000,,,true
+36e733ce-7b6d-526b-818f-fa6abdb14c9f,PUBLIX #1233,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.31""},""inputs"":{}}",1789776000,1789776000,,,true
+d537dd2b-53c6-528c-a1ef-aa1cad04bf46,SEA CAP FD HALL CA10 1454,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.83""},""inputs"":{}}",1789776000,1789776000,,,true
+ec533b6a-b7c3-5969-b03c-b27634f2cb6a,SHAKY KNEES (FOOD),ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""28.42""},""inputs"":{}}",1789776000,1789776000,,,true
+ee8d14be-c27a-5e9f-af26-905a68adaf50,CIRCLEK #2745020,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.52""},""inputs"":{}}",1789862400,1789862400,,,true
+2862569f-b757-580e-9b92-4ce7035d467f,FIRST WATCH 0166 PAT,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""60.47""},""inputs"":{}}",1789862400,1789862400,,,true
+e0215ea0-8118-5cb9-8bd5-a0361c29f01d,MARTA TAP AND GO,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1789862400,1789862400,,,true
+248c4e9d-3d77-5eae-974f-7f88caf34d7d,MARTA TAP AND GO,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""5.00""},""inputs"":{}}",1789862400,1789862400,,,true
+749e58e2-be7d-5e69-a888-fc5323c36e30,METROPOLIS PARKING,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.04""},""inputs"":{}}",1789862400,1789862400,,,true
+a763b0dc-8225-54af-8212-48deb595f16f,MURPHY EXPRESS 8759,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""38.01""},""inputs"":{}}",1789862400,1789862400,,,true
+680c1ea8-7b3c-518d-8f08-e4192e7b20aa,MWJ VENDING,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""4.75""},""inputs"":{}}",1789862400,1789862400,,,true
+0b0f19c1-d94e-509a-950b-3e7be1dabe6c,P.F.CHANG'S 9205 POS,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""31.00""},""inputs"":{}}",1789862400,1789862400,,,true
+3300b9b3-854d-50d0-ae1b-d9ca1f779919,STARBUCKS STORE 08291,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.79""},""inputs"":{}}",1789862400,1789862400,,,true
+3654e425-1c22-5692-9ae8-c01be793a8a0,WM SUPERCENTER #6998,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""11.45""},""inputs"":{}}",1789862400,1789862400,,,true
+5607f921-1e2b-58d8-8fcd-8ba71196b1cc,GA STATE PARKS-DNR,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",1789948800,1789948800,,,true
+c86f857a-baff-544c-ab02-5ec3daf0cf62,DOORDASH MCDONALDS,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.23""},""inputs"":{}}",1790035200,1790035200,,,true
+d59a51f0-4be7-51b2-8a50-a1c52ceb2298,FACING EAST - DOWNTO,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.90""},""inputs"":{}}",1790035200,1790035200,,,true
+ae666cf3-9214-5485-9e61-28f21c7a8bf8,AMAZON MKTPL*5X3350VC1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.99""},""inputs"":{}}",1790121600,1790121600,,,true
+4ead8597-fe5c-5344-82f9-96d04c2ab4f7,COSTCO BY INSTACART,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""34.29""},""inputs"":{}}",1790121600,1790121600,,,true
+689ccfcc-9314-56af-b490-e7165f9bf337,IMPECKABLE CHICKEN 2,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""19.89""},""inputs"":{}}",1790121600,1790121600,,,true
+fc72db85-dbd0-5c81-aa84-8adacd0a7624,LIME*PASS 3DTM,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""47.53""},""inputs"":{}}",1790121600,1790121600,,,true
+790d98f3-a06f-575e-b865-c62523d51744,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.48""},""inputs"":{}}",1790121600,1790121600,,,true
+24cfcf15-e9c6-5b60-aff7-9bbcc8d7b84c,ORC*00YRXRK REGIONAL 4,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",1790208000,1790208000,,,true
+d8f9cafa-a9d2-5dff-a9f9-87dca7bd8c33,HOT CAKES - CAP HILL,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.78""},""inputs"":{}}",1790294400,1790294400,,,true
+d096787d-c663-5e37-8462-254a2cb8c80b,LIME*RIDE 3DTM,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""0.52""},""inputs"":{}}",1790294400,1790294400,,,true
+0c365446-bf2c-5047-81a5-4148939f5fe8,Amazon.com*5138W1CN1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""24.14""},""inputs"":{}}",1790380800,1790380800,,,true
+04b1bdad-4b6b-52e8-89a1-c6c8ee178df4,AMAZON MKTPL*5X71V6YQ1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""13.24""},""inputs"":{}}",1790380800,1790380800,,,true
+277ada7c-57ee-54ce-b68e-b993006e2753,BELLOWS FILM LAB,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.75""},""inputs"":{}}",1790380800,1790380800,,,true
+905b18ea-f424-527e-8e0c-d80ce6347b7b,BP#1464800MEDAL BP,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""3.63""},""inputs"":{}}",1790380800,1790380800,,,true
+f6e20900-485a-5d89-8f43-3734da51786c,FIRE POT LLC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.02""},""inputs"":{}}",1790380800,1790380800,,,true
+16a3011d-0162-5457-9200-53d6b99a8847,HONEY BEA MARKET,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""53.25""},""inputs"":{}}",1790380800,1790380800,,,true
+709ba264-28c9-5837-acfb-46de2b88a9fa,OPENAI *CHATGPT SUBSCR,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.11""},""inputs"":{}}",1790380800,1790380800,,,true
+bbb482a2-7d24-5373-a83a-65b691a44bc5,POCHA 93,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""33.23""},""inputs"":{}}",1790380800,1790380800,,,true
+bafae94a-579b-5fa3-b66c-020254f019d1,SHELL OIL 57444033104,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.99""},""inputs"":{}}",1790380800,1790380800,,,true
+51072e76-ec08-5a44-b82c-4f3dae6e7e8e,SPIRIT HALLOWEEN 61384,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""22.00""},""inputs"":{}}",1790380800,1790380800,,,true
+ffd39904-742b-5fdb-97b7-3d073852aa46,TOUS LES JOURS S-TERRY,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""14.50""},""inputs"":{}}",1790380800,1790380800,,,true
+d9ec708f-18c0-5bfa-8cbb-199e97265e79,GLAZER'S CAMERA,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""39.76""},""inputs"":{}}",1790467200,1790467200,,,true
+d330e9b3-4253-5bfc-8f3d-f73b663a2192,GOURMONDO SEA33 BLAC,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""15.42""},""inputs"":{}}",1790640000,1790640000,,,true
+2b40497a-f1a2-53b1-a337-18fade8080fc,HUDSON NEWS ST851,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.60""},""inputs"":{}}",1790640000,1790640000,,,true
+3c947531-7aa3-5143-bdbb-c4645d92be31,MCDONALD'S F17275,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""9.00""},""inputs"":{}}",1790640000,1790640000,,,true
+81b448ca-7624-50d6-8fe8-79007a3cb4cc,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""18.96""},""inputs"":{}}",1790640000,1790640000,,,true
+079ea1df-9177-5f1b-a7e4-19fe28160b28,Prime Card Payment,checking,prime_card,"{""resolver"":""expression"",""config"":{""expression"":""483.44""},""inputs"":{}}",1790726400,1790726400,,,true
+f6bef305-5474-59d6-9598-570b1b98c914,Sapphire Card Payment,checking,ultimate_card,"{""resolver"":""expression"",""config"":{""expression"":""2588.82""},""inputs"":{}}",1790726400,1790726400,,,true
+6fa25dbe-de8b-5375-8639-50850d958709,TACOS CHUKIS SOUTH LA,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""25.37""},""inputs"":{}}",1790726400,1790726400,,,true
+98620ee5-89d7-521f-88e5-1e816b3eb16b,Tanoor Lebanese Grill,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""79.30""},""inputs"":{}}",1790726400,1790726400,,,true
+9e829c07-d583-5735-9e36-f7681efebc1e,TICKETMASTER,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",1790726400,1790726400,,,true
+f32fc246-1c4b-53d7-bbca-ca60f538c698,AMAZON MKTPL*514YG5NQ2,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""16.41""},""inputs"":{}}",1790812800,1790812800,,,true
+830fd0a9-36f8-5c51-8996-1d962793ce59,Amazon web services,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""1.31""},""inputs"":{}}",1790812800,1790812800,,,true
+de03a33e-c337-5221-9fa1-6a8276a326b3,OPENCODE,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""10.00""},""inputs"":{}}",1790812800,1790812800,,,true
+fa69637e-a99a-588a-b3f3-1fce2ca0929b,AMAZON MKTPL*594WB6LR1,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.73""},""inputs"":{}}",1790899200,1790899200,,,true
+a0aeec2a-124f-5425-85bd-72a50e51223b,Amazon.com*517YC9AD2,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""4.39""},""inputs"":{}}",1790899200,1790899200,,,true
+0afb3118-89f1-5888-ba8a-5653bb60bdb7,PLAID PANTRY #309,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""7.41""},""inputs"":{}}",1790899200,1790899200,,,true
+8e1aea23-6a7b-50db-acef-f4eed28b91a0,Whole Foods WSL 10216,prime_card,,"{""resolver"":""expression"",""config"":{""expression"":""58.72""},""inputs"":{}}",1790985600,1790985600,,,true
+45665ddf-67ca-5eba-8b54-5063e591a58a,MATCHA MAGIC SLU,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""20.45""},""inputs"":{}}",1790985600,1790985600,,,true
+ccd1c7b1-2ca6-5e00-8edd-707534b25ccc,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""12.67""},""inputs"":{}}",1790985600,1790985600,,,true
+27910413-fbfd-5630-8cc7-1250abb17a22,TOASTED BAGELS & COFF,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""21.83""},""inputs"":{}}",1790985600,1790985600,,,true
+8dc01839-6f42-5ad4-a0a9-2a52f817eac5,QFC #5881,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.45""},""inputs"":{}}",1791072000,1791072000,,,true
+60356d2a-16e2-56a8-b9b3-5663a6649fc4,SEN NOODLE BAR,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1791072000,1791072000,,,true
+a7310cac-4ec8-5fe3-8c18-7798bb015007,BROOKTREE FILM LAB,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""26.40""},""inputs"":{}}",1791158400,1791158400,,,true
+e1c5f32b-4941-5cee-8ba1-2ce1a2ba9638,COSTCO BY INSTACART,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""91.14""},""inputs"":{}}",1791158400,1791158400,,,true
+8f04da5e-e1ef-5128-b9df-78581b758913,STEAMGAMES.COM 4259522985,ultimate_card,,"{""resolver"":""expression"",""config"":{""expression"":""6.99""},""inputs"":{}}",1791158400,1791158400,,,true
+19fbda29-21e9-51df-8fe2-f219d82b93e8,Zelle from Golden Lin,,checking,"{""resolver"":""expression"",""config"":{""expression"":""9.00""},""inputs"":{}}",1790294400,1790294400,,,true
+28959a3b-dd65-5477-b0d2-14c1aa370d67,Zelle to Golden,checking,,"{""resolver"":""expression"",""config"":{""expression"":""38.00""},""inputs"":{}}",1790294400,1790294400,,,true
+55586bc4-ed4b-5335-954c-37a25eae4e9a,Zelle to Phillip,checking,,"{""resolver"":""expression"",""config"":{""expression"":""20.00""},""inputs"":{}}",1790553600,1790553600,,,true
+e40efff2-a0f5-5f6d-979d-d553dc7b5d31,Zelle to Lisa Tyler,checking,,"{""resolver"":""expression"",""config"":{""expression"":""50.00""},""inputs"":{}}",1790812800,1790812800,,,true
+bfef6f9d-5479-5b6e-adba-e235500c7151,BILT Rent Payment,checking,,"{""resolver"":""expression"",""config"":{""expression"":""2874.67""},""inputs"":{}}",1790812800,1790812800,,,true
+265add7d-65f6-5215-8433-34e58e9b4b3f,Zelle to Jennifer,checking,,"{""resolver"":""expression"",""config"":{""expression"":""500.00""},""inputs"":{}}",1790899200,1790899200,,,true

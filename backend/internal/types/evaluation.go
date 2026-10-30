@@ -123,7 +123,7 @@ type ProjectionRuntimeSettings struct {
 	// AsOfInstant is an optional exact cut (Unix seconds) refining the
 	// projection start date: history replays through this instant and the
 	// simulation suppresses the replayed start-day occurrences. It must
-	// fall on FallbackProjectionStartDate. Omitted means the legacy
-	// date-only cut at the end of the start day.
+	// fall on FallbackProjectionStartDate. Omitted means the
+	// day-close cut at the end of the start day.
 	AsOfInstant *int64 `json:"asOfInstant,omitempty"`
 }

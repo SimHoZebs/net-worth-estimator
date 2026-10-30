@@ -124,11 +124,7 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     await generate(settings(config), identityDir);
   const destination = resolve(stateDir, "data", databaseName);
   const fresh = !(await exists(destination));
-  if (!fresh && validateSnapshot(destination) !== "application") {
-    throw new Error(
-      "Existing dev database is a legacy format without migration support. Back it up, delete it, and run setup again.",
-    );
-  }
+  if (!fresh) validateSnapshot(destination);
   const bootstrapPath = resolve(identityDir, "bootstrap.json");
   if (!(await exists(bootstrapPath))) {
     compose(config, ["up", "-d", "--wait", "casdoor"]);
@@ -145,7 +141,7 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
   }
   if (!bootstrap.guest_subject || typeof bootstrap.guest_subject !== "string") {
     throw new Error(
-      "Dev identity predates the provisioned guest account. Back up data, remove the dev state, and run setup again so provision.mjs can discover the guest subject.",
+      "Dev identity metadata requires a provisioned guest subject.",
     );
   }
   if (config.ownerSubject === null) {
@@ -156,7 +152,7 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     throw new Error(
       `Set the verified Bridge ownerSubject in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. User ownership comes from the application database.`,
     );
-  if (config.guestSubject === null || config.guestSubject === undefined) {
+  if (config.guestSubject === null) {
     config.guestSubject = bootstrap.guest_subject;
     await saveConfig(stateDir, config);
   }
@@ -166,10 +162,7 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     );
   if (fresh) {
     const incoming = await snapshot(config, stateDir);
-    if (validateSnapshot(incoming) !== "application")
-      throw new Error(
-        `Legacy snapshot saved at ${incoming} has no migration path. Use a current application database instead.`,
-      );
+    validateSnapshot(incoming);
     const helper = resolve(stateDir, "refreshmodel");
     runCommand("go", ["-C", "backend", "build", "-o", helper, "./cmd/refreshmodel"]);
     runCommand(helper, [

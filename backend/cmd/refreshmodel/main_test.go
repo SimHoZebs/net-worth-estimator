@@ -198,7 +198,6 @@ func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 	}
 	_, err = db.SQL().Exec(`INSERT INTO account_links(user_id, bridge_account_id, model_account_id) VALUES ('owner','secret-bridge-id','checking');
 		INSERT INTO projection_artifacts(user_id, identity, kind, payload) VALUES ('owner','secret-artifact','deterministic','private');
-		INSERT INTO posting_id_migrations(user_id, old_id, new_id) VALUES ('owner','legacy','uuid');
 		UPDATE sync_state SET last_sync_at='2026-01-01' WHERE user_id='owner';
 		UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE user_id='owner';`)
 	db.Close()
@@ -211,7 +210,7 @@ func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='owner'"); got != "owner" {
 		t.Fatal(got)
 	}
-	for _, table := range []string{"account_links", "projection_artifacts", "posting_sync_keys", "posting_id_migrations"} {
+	for _, table := range []string{"account_links", "projection_artifacts", "posting_sync_keys"} {
 		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE user_id='owner'"); got != "0" {
 			t.Fatal(table, got)
 		}
@@ -233,33 +232,6 @@ func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 	}
 }
 
-func TestLegacySampleSourceRemainsRecoverable(t *testing.T) {
-	dir := t.TempDir()
-	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
-	seed(t, source)
-	seed(t, target)
-	db, err := sqlite.OpenDatabase(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.EnsureUser("sample", "sample", "sample"); err != nil {
-		db.Close()
-		t.Fatal(err)
-	}
-	_, err = db.SQL().Exec(`INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('sample','checking',0,'legacy sample','cash',1) ON CONFLICT(user_id,id) DO UPDATE SET name='legacy sample';
-		UPDATE model_metadata SET document_present=1, source_path='legacy' WHERE user_id='sample'`)
-	db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := refresh(target, source, "sample", "owner", false); err != nil {
-		t.Fatal(err)
-	}
-	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='owner'"); got != "legacy sample" {
-		t.Fatalf("legacy sample source not recoverable: %q", got)
-	}
-}
-
 func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
@@ -273,10 +245,6 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 		{source, "missing", "owner", false},
 		{source, "owner", "missing", false},
 		{source, "owner", "", false},
-		{source, "owner", "sample", false},
-		{source, "owner", "fixture", false},
-		{source, "owner", "sample", true},
-		{source, "sample", "owner", false},
 	} {
 		if err := refresh(target, args.source, args.sourceUser, args.user, args.financialOnly); err == nil {
 			t.Fatal("unsafe operation accepted", args)
