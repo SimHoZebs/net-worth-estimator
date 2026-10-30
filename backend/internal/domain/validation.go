@@ -34,50 +34,50 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 
 // ValidateFinancialModel runs all cross-field checks and returns issues in
 // stable validation order.
-func ValidateFinancialModel(document *types.FinancialModelDocument) []types.ModelValidationIssue {
+func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidationIssue {
 	issues := []types.ModelValidationIssue{}
-	accountIDs := make(map[string]bool, len(document.Accounts))
-	for _, account := range document.Accounts {
+	accountIDs := make(map[string]bool, len(model.Accounts))
+	for _, account := range model.Accounts {
 		accountIDs[account.ID] = true
 	}
 
-	accountIDList := make([]string, len(document.Accounts))
-	for i, account := range document.Accounts {
+	accountIDList := make([]string, len(model.Accounts))
+	for i, account := range model.Accounts {
 		accountIDList[i] = account.ID
 	}
 	validateUniqueIDs(&issues, accountIDList, "account.id", func(index int, field string) []any {
 		return pathWithField([]any{"accounts", index}, field)
 	})
-	postingIDList := make([]string, len(document.Postings))
-	for i, posting := range document.Postings {
+	postingIDList := make([]string, len(model.Postings))
+	for i, posting := range model.Postings {
 		postingIDList[i] = posting.ID
 	}
 	validateUniqueIDs(&issues, postingIDList, "posting.id", func(index int, field string) []any {
 		return pathWithField([]any{"postings", index}, field)
 	})
-	ruleIDList := make([]string, len(document.RecurrenceRules))
-	for i, rule := range document.RecurrenceRules {
+	ruleIDList := make([]string, len(model.RecurrenceRules))
+	for i, rule := range model.RecurrenceRules {
 		ruleIDList[i] = rule.ID
 	}
 	validateUniqueIDs(&issues, ruleIDList, "rule.id", func(index int, field string) []any {
 		return pathWithField([]any{"recurrenceRules", index}, field)
 	})
-	purchaseIDList := make([]string, len(document.PlannedPurchases))
-	for i, purchase := range document.PlannedPurchases {
+	purchaseIDList := make([]string, len(model.PlannedPurchases))
+	for i, purchase := range model.PlannedPurchases {
 		purchaseIDList[i] = purchase.ID
 	}
 	validateUniqueIDs(&issues, purchaseIDList, "plannedPurchase.id", func(index int, field string) []any {
 		return pathWithField([]any{"plannedPurchases", index}, field)
 	})
-	validateEvaluationInstanceIDs(&issues, document)
+	validateEvaluationInstanceIDs(&issues, model)
 
 	// Transaction identity checks: posting, rule, and planned-purchase IDs share
 	// one namespace with account IDs.
-	transactionIDs := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
-	for _, posting := range document.Postings {
+	transactionIDs := make(map[string]bool, len(model.Postings)+len(model.RecurrenceRules)+len(model.PlannedPurchases))
+	for _, posting := range model.Postings {
 		transactionIDs[posting.ID] = true
 	}
-	for index, rule := range document.RecurrenceRules {
+	for index, rule := range model.RecurrenceRules {
 		if transactionIDs[rule.ID] {
 			addIssue(&issues, types.SeverityError, "rule.id.collision",
 				fmt.Sprintf("Rule ID '%s' collides with a posting ID. Posting and rule IDs share one namespace.", rule.ID),
@@ -85,7 +85,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 		}
 		transactionIDs[rule.ID] = true
 	}
-	for index, purchase := range document.PlannedPurchases {
+	for index, purchase := range model.PlannedPurchases {
 		if transactionIDs[purchase.ID] {
 			addIssue(&issues, types.SeverityError, "plannedPurchase.id.collision",
 				fmt.Sprintf("Planned purchase ID '%s' collides with a posting or rule ID. IDs must be unique across transactions and purchases.", purchase.ID),
@@ -95,7 +95,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 	}
 
 	// Account identity checks.
-	for index, account := range document.Accounts {
+	for index, account := range model.Accounts {
 		if transactionIDs[account.ID] {
 			addIssue(&issues, types.SeverityError, "account.id.collision",
 				fmt.Sprintf("Account ID '%s' collides with a posting or rule ID. IDs must be unique across accounts, postings, and rules.", account.ID),
@@ -114,7 +114,7 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 	}
 
 	checkpointKeys := map[string]bool{}
-	for index, checkpoint := range document.Checkpoints {
+	for index, checkpoint := range model.Checkpoints {
 		if !accountIDs[checkpoint.AccountID] {
 			addIssue(&issues, types.SeverityError, "checkpoint.account.missing",
 				fmt.Sprintf("Checkpoint account '%s' does not exist.", checkpoint.AccountID),
@@ -136,17 +136,17 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 		checkpointKeys[key] = true
 	}
 
-	dependencies := validateTransactionAmounts(&issues, document, accountIDs)
-	validatePurchases(&issues, document, dependencies)
-	validatePostingDependencies(&issues, document, dependencies)
-	validatePostingRoutes(&issues, document.Postings, accountIDs)
-	validateRuleSchedules(&issues, document, accountIDs)
-	validatePostingClaims(&issues, document)
-	validateAccountBounds(&issues, document.Accounts)
-	validateEvaluationConfigs(&issues, document)
-	validateEvaluationAccountReferences(&issues, document, accountIDs)
-	validatePaymentTerms(&issues, document, accountIDs)
-	validatePaymentTermsCoverage(&issues, document)
+	dependencies := validateTransactionAmounts(&issues, model, accountIDs)
+	validatePurchases(&issues, model, dependencies)
+	validatePostingDependencies(&issues, model, dependencies)
+	validatePostingRoutes(&issues, model.Postings, accountIDs)
+	validateRuleSchedules(&issues, model, accountIDs)
+	validatePostingClaims(&issues, model)
+	validateAccountBounds(&issues, model.Accounts)
+	validateEvaluationConfigs(&issues, model)
+	validateEvaluationAccountReferences(&issues, model, accountIDs)
+	validatePaymentTerms(&issues, model, accountIDs)
+	validatePaymentTermsCoverage(&issues, model)
 
 	return issues
 }
@@ -157,10 +157,10 @@ func pathWithField(path []any, field string) []any {
 	return append(out, field)
 }
 
-func validateEvaluationInstanceIDs(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
+func validateEvaluationInstanceIDs(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
 	seen := map[string]bool{}
 	for _, evaluationType := range types.EvaluationTypeOrder {
-		for _, instance := range evaluationInstances(document, evaluationType) {
+		for _, instance := range evaluationInstances(model, evaluationType) {
 			if seen[instance.InstanceID] {
 				addIssue(issues, types.SeverityError, "evaluation.instanceId.duplicate",
 					fmt.Sprintf("ID '%s' is duplicated across behavior configuration files.", instance.InstanceID),
@@ -179,9 +179,9 @@ type instanceRef struct {
 	Config     any
 }
 
-func evaluationInstances(document *types.FinancialModelDocument, evaluationType string) []instanceRef {
+func evaluationInstances(model *types.FinancialModel, evaluationType string) []instanceRef {
 	refs := []instanceRef{}
-	if rows := document.Evaluations.ByType(evaluationType); rows != nil {
+	if rows := model.Evaluations.ByType(evaluationType); rows != nil {
 		for _, item := range *rows {
 			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
 		}
@@ -189,9 +189,9 @@ func evaluationInstances(document *types.FinancialModelDocument, evaluationType 
 	return refs
 }
 
-func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
+func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
 	for _, evaluationType := range types.EvaluationTypeOrder {
-		for index, instance := range evaluationInstances(document, evaluationType) {
+		for index, instance := range evaluationInstances(model, evaluationType) {
 			definition, ok := evaluationRegistryInstance.Get(evaluationType)
 			if !ok {
 				continue
@@ -205,10 +205,10 @@ func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, document *t
 }
 
 // validateEvaluationAccountReferences checks that an account balance evaluation names
-// an account the document actually contains. A dangling reference would
+// an account the model actually contains. A dangling reference would
 // otherwise evaluate as never reached with no diagnostic.
-func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) {
-	for index, item := range document.Evaluations.AccountBalance {
+func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) {
+	for index, item := range model.Evaluations.AccountBalance {
 		parsed, err := ParseAccountBalanceConfig(item.Config)
 		if err != nil {
 			continue // reported by validateEvaluationConfigs
@@ -219,7 +219,7 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 				"evaluations", types.EvaluationTypeAccountBalance, index, "config", "accountId")
 		}
 	}
-	for index, item := range document.Evaluations.CycleFulfillment {
+	for index, item := range model.Evaluations.CycleFulfillment {
 		parsed, err := ParseCycleFulfillmentConfig(item.Config)
 		if err != nil {
 			continue // reported by validateEvaluationConfigs
@@ -237,8 +237,8 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, d
 // validateTransactionAmounts validates amount descriptors for manual postings
 // and rule templates together. References may name posting or rule IDs, so
 // the dependency graph spans both.
-func validateTransactionAmounts(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) map[string][]string {
-	transactionIDsSet := TransactionIDs(document)
+func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) map[string][]string {
+	transactionIDsSet := TransactionIDs(model)
 	dependencies := map[string][]string{}
 	validateAmount := func(id string, amount types.PostingAmountResolution, path []any) {
 		deps, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{
@@ -260,8 +260,8 @@ func validateTransactionAmounts(issues *[]types.ModelValidationIssue, document *
 		}
 		dependencies[id] = deps
 	}
-	for index := range document.Postings {
-		posting := &document.Postings[index]
+	for index := range model.Postings {
+		posting := &model.Postings[index]
 		validateAmount(posting.ID, posting.Amount, []any{"postings", index})
 		if CountVolatileRateInputs(posting.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
@@ -269,8 +269,8 @@ func validateTransactionAmounts(issues *[]types.ModelValidationIssue, document *
 				pathWithField([]any{"postings", index}, "amount")...)
 		}
 	}
-	for index := range document.RecurrenceRules {
-		rule := &document.RecurrenceRules[index]
+	for index := range model.RecurrenceRules {
+		rule := &model.RecurrenceRules[index]
 		validateAmount(rule.ID, rule.Amount, []any{"recurrenceRules", index})
 		if CountVolatileRateInputs(rule.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
@@ -281,7 +281,7 @@ func validateTransactionAmounts(issues *[]types.ModelValidationIssue, document *
 	return dependencies
 }
 
-func validatePostingDependencies(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, dependencies map[string][]string) {
+func validatePostingDependencies(issues *[]types.ModelValidationIssue, model *types.FinancialModel, dependencies map[string][]string) {
 	visiting := map[string]bool{}
 	visited := map[string]bool{}
 	cyclic := map[string]bool{}
@@ -309,8 +309,8 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, document 
 		return hasCycle
 	}
 
-	for index := range document.Postings {
-		posting := &document.Postings[index]
+	for index := range model.Postings {
+		posting := &model.Postings[index]
 		if !visit(posting.ID) {
 			continue
 		}
@@ -318,8 +318,8 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, document 
 			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", posting.ID),
 			pathWithField([]any{"postings", index}, "amount")...)
 	}
-	for index := range document.RecurrenceRules {
-		rule := &document.RecurrenceRules[index]
+	for index := range model.RecurrenceRules {
+		rule := &model.RecurrenceRules[index]
 		if !visit(rule.ID) {
 			continue
 		}
@@ -377,9 +377,9 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 }
 
 // validateRuleSchedules checks rule routes, frequencies, and schedule bounds.
-func validateRuleSchedules(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) {
-	for index := range document.RecurrenceRules {
-		rule := &document.RecurrenceRules[index]
+func validateRuleSchedules(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) {
+	for index := range model.RecurrenceRules {
+		rule := &model.RecurrenceRules[index]
 		base := []any{"recurrenceRules", index}
 		if rule.SourceAccountID != nil && !accountIDs[*rule.SourceAccountID] {
 			addIssue(issues, types.SeverityError, "posting.source.missing",
@@ -443,15 +443,15 @@ func validateRuleSchedules(issues *[]types.ModelValidationIssue, document *types
 // validatePostingClaims checks that each claim names a real scheduled
 // occurrence of its rule, and that no occurrence is claimed twice. Claims
 // are manual: validation only verifies the named occurrence exists.
-func validatePostingClaims(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
-	rulesByID := make(map[string]*types.RecurrenceRule, len(document.RecurrenceRules))
-	for index := range document.RecurrenceRules {
-		rule := &document.RecurrenceRules[index]
+func validatePostingClaims(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
+	rulesByID := make(map[string]*types.RecurrenceRule, len(model.RecurrenceRules))
+	for index := range model.RecurrenceRules {
+		rule := &model.RecurrenceRules[index]
 		rulesByID[rule.ID] = rule
 	}
 	claimed := map[string]bool{}
-	for index := range document.Postings {
-		posting := &document.Postings[index]
+	for index := range model.Postings {
+		posting := &model.Postings[index]
 		if posting.Claim == nil {
 			continue
 		}

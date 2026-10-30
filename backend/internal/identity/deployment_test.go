@@ -56,7 +56,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := owner.InitializeDocument(); err != nil {
+			if err := owner.InitializeModel(); err != nil {
 				t.Fatal(err)
 			}
 			const secret = "0123456789abcdef0123456789abcdef"

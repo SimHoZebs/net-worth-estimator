@@ -162,13 +162,13 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 
 	accountByID := map[string]types.Account{}
 	if includeDetails {
-		for _, account := range path.EffectiveDocument.Accounts {
+		for _, account := range path.EffectiveModel.Accounts {
 			accountByID[account.ID] = account
 		}
 	}
 	if includeDetails {
-		detailTransactions := ResolvedTransactionPostings(&path.EffectiveDocument)
-		detailCaps := RuleCapsByID(&path.EffectiveDocument)
+		detailTransactions := ResolvedTransactionPostings(&path.EffectiveModel)
+		detailCaps := RuleCapsByID(&path.EffectiveModel)
 		for index := range detailTransactions {
 			posting := &detailTransactions[index]
 			if selectedIDs != nil && !selectedIDs[posting.ID] {
@@ -262,7 +262,7 @@ func diagnoseFulfillmentConfig(path *types.ProjectionPath, config types.PostingF
 	if config.PostingIDs == nil {
 		return nil
 	}
-	postingIDs := TransactionIDs(&path.EffectiveDocument)
+	postingIDs := TransactionIDs(&path.EffectiveModel)
 	diagnostics := []types.EvaluationDiagnostic{}
 	for _, postingID := range config.PostingIDs {
 		if !postingIDs[postingID] {

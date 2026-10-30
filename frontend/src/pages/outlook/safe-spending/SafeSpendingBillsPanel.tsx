@@ -279,7 +279,7 @@ export function SafeSpendingBillsPanel({
 					transactions={section.transactions}
 					caption={section.title}
 					emptyMessage="No bills due in this period."
-					planTransactions={savedById}
+					savedTransactions={savedById}
 					onInspect={inspect}
 					order={transactionOrder}
 					showHeaders={showHeaders}
@@ -288,14 +288,14 @@ export function SafeSpendingBillsPanel({
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}
-					planTransaction={selected.planTransaction}
+					savedTransaction={selected.savedTransaction}
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}
 					claimRuleName={
-						selected.planTransaction.claimRuleId
+						selected.savedTransaction.claimRuleId
 							? (transactions.find(
-									(item) => item.id === selected.planTransaction.claimRuleId,
+									(item) => item.id === selected.savedTransaction.claimRuleId,
 								)?.name ?? null)
 							: null
 					}

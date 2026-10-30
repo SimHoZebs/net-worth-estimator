@@ -1,6 +1,6 @@
 import * as errore from "errore";
 import { isRecord } from "../domain/guards.ts";
-import type { FinancialModelDocument } from "./index.ts";
+import type { FinancialModel } from "./index.ts";
 
 export class ModelImportError extends errore.createTaggedError({
 	name: "ModelImportError",
@@ -24,9 +24,7 @@ function isEvaluationTables(value: unknown): boolean {
 
 // Import preview checks only the envelope and displayed records. The server
 // remains responsible for authoritative cross-field validation before activation.
-export function isFinancialModelDocument(
-	value: unknown,
-): value is FinancialModelDocument {
+export function isFinancialModel(value: unknown): value is FinancialModel {
 	if (
 		!isRecord(value) ||
 		typeof value.sourcePath !== "string" ||
@@ -74,17 +72,17 @@ export function isFinancialModelDocument(
 	return accountsValid && checkpointsValid && postingsValid && rulesValid;
 }
 
-export function parseModelDocument({
+export function parseFinancialModel({
 	text,
 	malformedMessage,
 }: {
 	text: string;
 	malformedMessage: string;
-}): FinancialModelDocument | ModelImportError {
+}): FinancialModel | ModelImportError {
 	return errore.try({
 		try: () => {
 			const value: unknown = JSON.parse(text);
-			if (!isFinancialModelDocument(value))
+			if (!isFinancialModel(value))
 				return new ModelImportError({
 					detail:
 						"Choose a Waypoint server model JSON file with accounts, checkpoints, postings, and evaluations.",

@@ -21,7 +21,7 @@ import { stubTestServer } from "../mocks/waypointServer.ts";
 function stubWorkspaceFetch() {
 	const server = stubTestServer();
 	server.failModelOnce({
-		document: null,
+		model: null,
 		issues: [],
 		revision: "r1",
 	} as unknown as FinancialModelResponse);

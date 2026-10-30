@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { FinancialModelDocument } from "../api/contracts.ts";
+import type { FinancialModel } from "../api/contracts.ts";
 import {
 	acceptUserScope,
 	canonicalApiBaseUrl,
@@ -17,7 +17,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function model(balance = 100): FinancialModelDocument {
+function model(balance = 100): FinancialModel {
 	return {
 		sourcePath: "",
 		accounts: [],
@@ -91,7 +91,7 @@ it("exposes pending then success without any forecast request", async () => {
 		calls += 1;
 		return calls === 1 ? pending : { result };
 	});
-	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+	const hook = renderHook(() => useCurrentPosition({ model: model() }), {
 		wrapper,
 	});
 	expect(hook.result.current.status).toBe("pending");
@@ -109,13 +109,13 @@ it("clears previous-input data while the new position is pending", async () => {
 		if (!gate) return { result };
 		return new Promise(() => {});
 	});
-	const hook = renderHook(({ document }) => useCurrentPosition({ document }), {
+	const hook = renderHook(({ model }) => useCurrentPosition({ model }), {
 		wrapper,
-		initialProps: { document: model() },
+		initialProps: { model: model() },
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	gate = true;
-	hook.rerender({ document: model(200) });
+	hook.rerender({ model: model(200) });
 	expect(hook.result.current.status).toBe("pending");
 	expect(hook.result.current.data).toBeNull();
 });
@@ -129,7 +129,7 @@ it("exposes errors and retries explicitly", async () => {
 			return { issues: [{ severity: "error", message: "Invalid history" }] };
 		return { result };
 	});
-	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+	const hook = renderHook(() => useCurrentPosition({ model: model() }), {
 		wrapper,
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("error"));
@@ -151,7 +151,7 @@ it("does not request a disabled position", () => {
 	const hook = renderHook(
 		() =>
 			useCurrentPosition({
-				document: model(),
+				model: model(),
 				enabled: false,
 			}),
 		{ wrapper },
@@ -174,13 +174,13 @@ it("requests the saved model", async () => {
 		}),
 	);
 	const saved = model(100);
-	const hook = renderHook(() => useCurrentPosition({ document: saved }), {
+	const hook = renderHook(() => useCurrentPosition({ model: saved }), {
 		wrapper,
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
-	expect((bodies[0] as { document?: unknown }).document).toBeUndefined();
+	expect((bodies[0] as { model?: unknown }).model).toBeUndefined();
 });
 
 it("separates identical models by resource identity", async () => {
@@ -209,7 +209,7 @@ it("separates identical models by resource identity", async () => {
 			suspendUserScope(),
 		);
 	selectScope("users/one");
-	const hook = renderHook(() => useCurrentPosition({ document: model() }), {
+	const hook = renderHook(() => useCurrentPosition({ model: model() }), {
 		wrapper,
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
@@ -234,11 +234,11 @@ it("requests the saved model without local edits", async () => {
 		}),
 	);
 	const saved = model(100);
-	const hook = renderHook(() => useCurrentPosition({ document: saved }), {
+	const hook = renderHook(() => useCurrentPosition({ model: saved }), {
 		wrapper,
 	});
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(bodies).toHaveLength(1);
-	expect((bodies[0] as { document?: unknown }).document).toBeUndefined();
+	expect((bodies[0] as { model?: unknown }).model).toBeUndefined();
 	expect(bodies[0]).toMatchObject({ asOfDate: "2026-01-01" });
 });

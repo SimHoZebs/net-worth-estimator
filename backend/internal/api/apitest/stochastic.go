@@ -11,9 +11,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func StochasticDocument() *types.FinancialModelDocument {
+func StochasticModel() *types.FinancialModel {
 	end := "2027-01-01"
-	return &types.FinancialModelDocument{
+	return &types.FinancialModel{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
 		Postings: []types.Posting{},
 		RecurrenceRules: []types.RecurrenceRule{{
@@ -28,7 +28,7 @@ func StochasticDocument() *types.FinancialModelDocument {
 func StochasticBody(t *testing.T, runCount int, seed *int64) []byte {
 	t.Helper()
 	raw, err := json.Marshal(map[string]any{
-		"document": StochasticDocument(),
+		"model": StochasticModel(),
 		"settings": types.ProjectionRuntimeSettings{
 			FallbackProjectionStartDate: "2026-06-01", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables(),
 		},

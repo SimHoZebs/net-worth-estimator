@@ -14,7 +14,7 @@ exact verified issuer and subject, not a username or email.
 Each financial table carries a non-null `user_id`. Composite keys allow the same
 entity IDs and preset names in different users. Composite foreign keys prevent
 relational references across users. JSON references validate against the scoped
-financial document. The guest uses the same identity and table structure.
+financial model. The guest uses the same identity and table structure.
 
 Deployment owns database creation and schema setup. The running server only opens
 an existing, compatible database. A financial store holds

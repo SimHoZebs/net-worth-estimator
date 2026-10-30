@@ -26,7 +26,7 @@ function stubSync(lastSyncAt = "after") {
 				headers,
 			});
 		return new Response(
-			JSON.stringify({ document: null, issues: [], revision: "r1" }),
+			JSON.stringify({ model: null, issues: [], revision: "r1" }),
 			{ headers },
 		);
 	});
@@ -65,7 +65,7 @@ afterEach(() => {
 
 it("refreshes the model and invalidates only the current resource's financial calculations", async () => {
 	const fetcher = stubSync();
-	const key = deterministicQueryKey("document", 10);
+	const key = deterministicQueryKey("model", 10);
 	serverQueryClient().setQueryData(key, "result");
 	serverQueryClient().setQueryData(["unrelated"], "keep");
 	renderHook(() => useWorkspaceSyncMonitor(true));

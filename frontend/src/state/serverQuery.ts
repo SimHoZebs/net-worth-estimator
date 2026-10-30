@@ -13,16 +13,16 @@ import { getUserScope } from "../auth/resourceScope.ts";
  */
 
 export function deterministicQueryKey(
-	documentKey: string,
+	modelKey: string,
 	years: number,
 	rangeKey = "",
 ): readonly unknown[] {
 	const scope = getUserScope();
-	return ["deterministic-projection", scope.key, documentKey, years, rangeKey];
+	return ["deterministic-projection", scope.key, modelKey, years, rangeKey];
 }
 
 export function stochasticQueryKey(
-	documentKey: string,
+	modelKey: string,
 	years: number,
 	runCount: number,
 	seed: number,
@@ -32,7 +32,7 @@ export function stochasticQueryKey(
 	return [
 		"stochastic-projection",
 		scope.key,
-		documentKey,
+		modelKey,
 		years,
 		runCount,
 		seed,
@@ -63,10 +63,10 @@ export function evalOverlayQueryKey(
 }
 
 export function currentPositionQueryKey(
-	documentKey: string,
+	modelKey: string,
 	asOfDate: string,
 ): readonly unknown[] {
-	return ["current-position", getUserScope().key, documentKey, asOfDate];
+	return ["current-position", getUserScope().key, modelKey, asOfDate];
 }
 
 const FINANCIAL_QUERY_KINDS = [

@@ -44,7 +44,7 @@ func completeTestAnalysis(t *testing.T, s *sqliteStore, version string) types.An
 func TestAnalysisEvidenceIsIndependentAndDeduplicated(t *testing.T) {
 	s := openSQLiteStore(t)
 	id := seedAnalysisEvidence(t, s)
-	before, _ := s.LoadDocument()
+	before, _ := s.LoadModel()
 	finding := completeTestAnalysis(t, s, "v1")
 	if finding.Stale || finding.Status != "active" || finding.PostingID != id {
 		t.Fatalf("finding=%+v", finding)
@@ -69,7 +69,7 @@ func TestAnalysisEvidenceIsIndependentAndDeduplicated(t *testing.T) {
 	if next.ID != finding.ID || !next.Dismissed || next.FirstDetectedAt != finding.FirstDetectedAt {
 		t.Fatalf("review lost: %+v", next)
 	}
-	after, _ := s.LoadDocument()
+	after, _ := s.LoadModel()
 	// The explicit balance observation is the only financial change.
 	after.Checkpoints = before.Checkpoints
 	if !reflect.DeepEqual(before, after) {
@@ -174,8 +174,8 @@ func TestAnalysisIsolationImportAndClear(t *testing.T) {
 	if err != nil || len(owned) != 1 || owned[0].Dismissed {
 		t.Fatalf("same IDs crossed user scope: %+v %v", owned, err)
 	}
-	doc, _ := a.LoadDocument()
-	if _, err := a.ImportDocument(doc); err != nil {
+	doc, _ := a.LoadModel()
+	if _, err := a.ImportModel(doc); err != nil {
 		t.Fatal(err)
 	}
 	findings, err := a.ListAnalysisFindings(types.AnalysisFindingFilter{})

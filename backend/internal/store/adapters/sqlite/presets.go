@@ -9,12 +9,12 @@ import (
 )
 
 // Amount presets are saved amount recipes. They live outside the canonical
-// financial model document, so they never affect the document ETag,
+// financial model, so they never affect the model ETag,
 // validation, or the row-sync diff — exactly like pinned evaluations.
 // Table definition and seed rows live in schema.go (SetupDatabase);
 // this file owns only preset row methods.
 // Preset writes run in their own transaction and never mark the model
-// document present: saving a preset into an empty database must not fake
+// model present: saving a preset into an empty database must not fake
 // a model. Clear and CSV import leave presets alone: presets are user
 // configuration, not model data.
 //
@@ -65,7 +65,7 @@ func scanPresetRow(rows *sql.Rows) (types.AmountPreset, error) {
 	return preset, nil
 }
 
-// presetTx runs a preset write without marking the model document present.
+// presetTx runs a preset write without marking the model present.
 func presetTx(db *userDB, fn func(tx *userTx) error) error {
 	tx, err := db.Begin()
 	if err != nil {

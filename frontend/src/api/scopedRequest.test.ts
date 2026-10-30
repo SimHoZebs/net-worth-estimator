@@ -104,7 +104,7 @@ describe("resource assertion at the API boundary", () => {
 		expect(result).toBeInstanceOf(UserScopeError);
 		// The first write sends while scope A is current. The scope switch
 		// retires the second write before it sends, so nothing computed for
-		// plan A can land in plan B's workspace.
+		// user A can land in user B's workspace.
 		expect(fetcher).toHaveBeenCalledTimes(1);
 	});
 

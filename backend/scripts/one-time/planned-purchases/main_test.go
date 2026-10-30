@@ -95,7 +95,7 @@ func TestUpgradePreservesBothUsers(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		doc, err := s.LoadDocument()
+		doc, err := s.LoadModel()
 		if err != nil || len(doc.Postings) != 1 || len(doc.PlannedPurchases) != 2 {
 			t.Fatalf("upgrade: %+v %v", doc, err)
 		}
@@ -126,7 +126,7 @@ func TestUpgradePreservesBothUsers(t *testing.T) {
 	defer db.Close()
 	for user, want := range before {
 		s, _ := db.User(user)
-		doc, err := s.LoadDocument()
+		doc, err := s.LoadModel()
 		if err != nil || !reflect.DeepEqual(doc.PlannedPurchases, want) {
 			t.Fatal("repeated upgrade changed purchases", err)
 		}

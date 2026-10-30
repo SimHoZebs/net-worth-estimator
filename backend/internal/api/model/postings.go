@@ -18,7 +18,7 @@ type postingBody struct {
 	Claim           *types.PostingClaim           `json:"claim,omitempty"`
 	Enabled         bool                          `json:"enabled"`
 	// Source is accepted and ignored: ownership is server-computed,
-	// mirroring the retired whole-document PUT contract.
+	// mirroring the retired whole-model PUT contract.
 	Source *string `json:"source,omitempty"`
 	// Pending is also server-computed bank metadata.
 	Pending *bool `json:"pending,omitempty"`
@@ -66,8 +66,8 @@ func keepEchoedDestinations(stored, incoming []string) []string {
 
 func (s *handler) createPosting(_ context.Context, input *postingInput) (*postingOutput, error) {
 	posting := input.Body.toPosting("")
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Postings = replaceByID(document.Postings, posting.ID, postingID, posting)
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.CreatePosting(posting)
 	})
@@ -87,7 +87,7 @@ func (s *handler) updatePosting(_ context.Context, input *struct {
 	if len(input.Body.Destinations) == 1 {
 		// An unchanged display echo keeps the stored set (see
 		// keepEchoedDestinations); the editor never models extra legs.
-		if stored, err := s.store.LoadDocument(); err == nil && stored != nil {
+		if stored, err := s.store.LoadModel(); err == nil && stored != nil {
 			for _, existing := range stored.Postings {
 				if existing.ID == input.ID {
 					input.Body.Destinations = keepEchoedDestinations(existing.Destinations, input.Body.Destinations)
@@ -97,8 +97,8 @@ func (s *handler) updatePosting(_ context.Context, input *struct {
 		}
 	}
 	posting := input.Body.toPosting(input.ID)
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Postings = replaceByID(document.Postings, posting.ID, postingID, posting)
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.UpdatePosting(posting)
 	})
@@ -115,8 +115,8 @@ func (s *handler) deletePosting(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
 	id := input.ID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Postings = removeByID(document.Postings, id, postingID)
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Postings = removeByID(model.Postings, id, postingID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeletePosting(id)
 	})
@@ -130,8 +130,8 @@ func (s *handler) deletePosting(_ context.Context, input *struct {
 
 func (s *handler) movePosting(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Postings = moveBeforeID(document.Postings, id, beforeID, postingID)
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Postings = moveBeforeID(model.Postings, id, beforeID, postingID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MovePosting(id, beforeID)
 	})

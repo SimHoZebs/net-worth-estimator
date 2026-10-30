@@ -1,5 +1,5 @@
 import type {
-	FinancialModelDocument,
+	FinancialModel,
 	PostingAmountResolution,
 } from "../api/contracts.ts";
 import type { Transaction } from "../domain/model.ts";
@@ -34,10 +34,10 @@ export function fixtureAmount(row: Transaction): PostingAmountResolution {
 			};
 }
 
-/** Build canonical test data directly, without a production reverse adapter. */
-export function fixtureDocument(
+/** Build the financial model fixture from display rows. */
+export function fixtureModel(
 	data: FinancialModelFixture = financialModelFixture,
-): FinancialModelDocument {
+): FinancialModel {
 	return {
 		sourcePath: "/configs/household.json",
 		accounts: data.accounts.map(

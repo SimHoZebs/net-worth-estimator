@@ -20,7 +20,7 @@ import (
 //   - Writes are single-threaded by the caller discipline (one server, one
 //     instance); the backend must still serialize concurrent writes safely.
 //   - Readers always see the latest committed state (no stale replicas).
-//   - A fresh backend reports DocumentExists() == false. InitializeDocument
+//   - A fresh backend reports ModelExists() == false. InitializeModel
 //     activates an empty model without replacing existing data.
 //   - Clear resets this user's model, sync state (including the Bridge key
 //     and card selection), settings, and artifacts. It preserves amount
@@ -31,10 +31,10 @@ import (
 type Store interface {
 	ReceiptStore
 	AnalysisStore
-	LoadDocument() (*types.FinancialModelDocument, error)
-	DocumentExists() (bool, error)
-	InitializeDocument() error
-	ImportDocument(doc *types.FinancialModelDocument) (*types.FinancialModelDocument, error)
+	LoadModel() (*types.FinancialModel, error)
+	ModelExists() (bool, error)
+	InitializeModel() error
+	ImportModel(doc *types.FinancialModel) (*types.FinancialModel, error)
 	CreateAccount(account types.Account) (types.Account, error)
 	UpdateAccount(account types.Account) (types.Account, error)
 	DeleteAccount(id string) error

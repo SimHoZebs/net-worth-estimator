@@ -9,7 +9,6 @@ import { performSave } from "./workspaceWrites.ts";
 
 /**
  * Row-first purchase writes use the dedicated planned-purchase API.
- * No whole-document diff is built here.
  */
 
 /** Backend row for one wishlist item. Priority is the queue index. */

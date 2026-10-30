@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Waypoint — Planned Purchases",
-  "description": "Capture a purchase, review its cost, and add it to your Waypoint plan.",
+  "description": "Capture a purchase, review its cost, and add it to your Waypoint financial model.",
   "version": "0.1.0",
   "minimum_chrome_version": "120",
   "permissions": ["activeTab", "scripting", "storage", "sidePanel"],

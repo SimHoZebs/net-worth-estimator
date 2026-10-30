@@ -18,7 +18,7 @@ export type TransactionItemSlots = {
 
 /**
  * Single visual transaction row. Domain mapping stays with the callers
- * (plan definitions vs projected occurrences); this owns only the shared
+ * (saved definitions vs projected occurrences); this owns only the shared
  * table layout, class names, and interaction shape.
  */
 export function TransactionItemRow({

@@ -4,7 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
-import { fixtureDocument } from "../mocks/document.ts";
+import { fixtureModel } from "../mocks/model.ts";
 import type {
 	DeterministicProjectionRequest,
 	EvaluationResultTables,
@@ -47,10 +47,10 @@ function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
 
 describe("isolated purchase evaluation", () => {
 	it("never derives a baseline start date from a planned purchase", () => {
-		const document = fixtureDocument();
-		document.checkpoints = [];
-		document.recurrenceRules = [];
-		document.postings = [
+		const model = fixtureModel();
+		model.checkpoints = [];
+		model.recurrenceRules = [];
+		model.postings = [
 			{
 				id: "real",
 				name: "Real",
@@ -66,8 +66,8 @@ describe("isolated purchase evaluation", () => {
 				transactionTime: 1769904000,
 			},
 		];
-		expect(projectionStartDate(document)).toBe("2026-02-01");
-		document.plannedPurchases = [
+		expect(projectionStartDate(model)).toBe("2026-02-01");
+		model.plannedPurchases = [
 			{
 				id: "row",
 				name: "Row",
@@ -78,7 +78,7 @@ describe("isolated purchase evaluation", () => {
 				priority: 0,
 			},
 		];
-		expect(projectionStartDate(document)).toBe("2026-02-01");
+		expect(projectionStartDate(model)).toBe("2026-02-01");
 	});
 	it("maps only the evaluation schedule, including explicitly unfunded items", () => {
 		expect(
@@ -133,8 +133,8 @@ describe("isolated purchase evaluation", () => {
 		});
 		const wrapper = ({ children }: { children: ReactNode }) =>
 			createElement(QueryClientProvider, { client: queryClient }, children);
-		const document = fixtureDocument();
-		document.plannedPurchases = [
+		const model = fixtureModel();
+		model.plannedPurchases = [
 			{
 				id: "laptop",
 				name: "Laptop",
@@ -145,7 +145,7 @@ describe("isolated purchase evaluation", () => {
 				enabled: true,
 			},
 		];
-		const before = JSON.stringify(document);
+		const before = JSON.stringify(model);
 		const deterministicCalls: unknown[] = [];
 		let purchasesCalls = 0;
 		const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
@@ -195,18 +195,18 @@ describe("isolated purchase evaluation", () => {
 		const rendered = renderHook(
 			({ active }) => ({
 				baseline: useRemoteProjection({
-					document: active,
+					model: active,
 					years: 1,
 					ranges: false,
 				}),
 				purchases: useRemoteProjection({
-					document: active,
+					model: active,
 					years: 1,
 					ranges: false,
 					evaluations: PURCHASE_EVALUATIONS,
 				}),
 			}),
-			{ wrapper, initialProps: { active: document } },
+			{ wrapper, initialProps: { active: model } },
 		);
 		await waitFor(() => expect(deterministicCalls).toHaveLength(2));
 		await waitFor(() =>
@@ -217,8 +217,8 @@ describe("isolated purchase evaluation", () => {
 		expect(rendered.result.current.baseline.base).toMatchObject({
 			plannedPurchases: null,
 		});
-		expect(JSON.stringify(document)).toBe(before);
-		const changed = structuredClone(document);
+		expect(JSON.stringify(model)).toBe(before);
+		const changed = structuredClone(model);
 		changed.plannedPurchases!.find((item) => item.id === "laptop")!.priority =
 			1;
 		rendered.rerender({ active: changed });

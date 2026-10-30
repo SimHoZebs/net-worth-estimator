@@ -3,7 +3,7 @@
 Planned purchases are standalone canonical rows in `plannedPurchases`, separate
 from postings and recurrence rules. They use their own CRUD API, the shared ID
 namespace, and the direct row-save workflow. Priority is nonnegative. Lower
-numbers come first. Document order breaks ties.
+numbers come first. Model order breaks ties.
 
 ## Authoring
 
@@ -33,7 +33,7 @@ details remain local to the extension.
 
 ## API
 
-- `GET /v1/planned-purchases` reads the queue and document revision.
+- `GET /v1/planned-purchases` reads the queue and model revision.
 - `POST /v1/planned-purchases` creates a purchase. Omitted priority appends it.
 - `PATCH /v1/planned-purchases/{id}` replaces purchase values. Omitted priority preserves it.
 - `DELETE /v1/planned-purchases/{id}` removes a purchase.
@@ -48,7 +48,7 @@ ordinary financial transaction from an old client payload.
 ## Isolated evaluation
 
 `plannedPurchases` is a registered evaluation, like financial independence.
-Its empty config `{}` selects the effective document's enabled purchase queue.
+Its empty config `{}` selects the effective model's enabled purchase queue.
 It runs a private simulation branch with the same start state, horizon, and
 sampled rates as the baseline. It returns `purchases` with `purchaseId`, amounts,
 and dates (null when unfunded), plus `allFunded` and `firstReachedDate`.

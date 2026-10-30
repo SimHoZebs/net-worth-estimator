@@ -11,7 +11,7 @@ import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 // modeled balances at the cut, with the latest observation and its
 // timestamp carried per account, identical to the projection baseline at
 // the same cut.
-func ResolveCurrentPosition(document *types.FinancialModelDocument, asOfDate string, overrides types.ModelOverrides) (*types.CurrentPosition, error) {
+func ResolveCurrentPosition(model *types.FinancialModel, asOfDate string, overrides types.ModelOverrides) (*types.CurrentPosition, error) {
 	cutInstant, cutDay, err := ParseAsOfCut(asOfDate)
 	if err != nil {
 		return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
@@ -21,16 +21,16 @@ func ResolveCurrentPosition(document *types.FinancialModelDocument, asOfDate str
 			Path:     []any{"asOfDate"},
 		}}}
 	}
-	position, err := preparePositionAt(document, cutDay, cutInstant, overrides)
+	position, err := preparePositionAt(model, cutDay, cutInstant, overrides)
 	if err != nil {
 		return nil, err
 	}
 	result := &types.CurrentPosition{
 		AsOfDate: asOfDate,
-		NetWorth: roundCurrency(ComputeNetWorth(position.state.Balances, position.document.Accounts)),
-		Accounts: make([]types.PositionAccount, 0, len(position.document.Accounts)),
+		NetWorth: roundCurrency(ComputeNetWorth(position.state.Balances, position.model.Accounts)),
+		Accounts: make([]types.PositionAccount, 0, len(position.model.Accounts)),
 	}
-	for _, account := range position.document.Accounts {
+	for _, account := range position.model.Accounts {
 		row := types.PositionAccount{
 			AccountID: account.ID,
 			Balance:   roundCurrency(position.state.Balances[account.ID]),

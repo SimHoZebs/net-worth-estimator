@@ -24,7 +24,7 @@ func New(st store.Store, config Config) http.Handler {
 
 var openAPIStore = apitest.OpenStore
 var apiProjectRoot = apitest.ProjectRoot
-var stochasticTestDocument = apitest.StochasticDocument
+var stochasticTestModel = apitest.StochasticModel
 var stochasticTestBody = apitest.StochasticBody
 var postStochastic = apitest.PostStochastic
 var sseEvents = apitest.SSEEvents
@@ -43,15 +43,15 @@ type projectionRange struct {
 }
 
 type projectionRequestBody struct {
-	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
+	Model     *types.FinancialModel           `json:"model,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
 	Range     *projectionRange                `json:"range,omitempty"`
 }
 
 type positionRequestBody struct {
-	Document *types.FinancialModelDocument `json:"document,omitempty"`
-	AsOfDate string                        `json:"asOfDate"`
+	Model    *types.FinancialModel `json:"model,omitempty"`
+	AsOfDate string                `json:"asOfDate"`
 }
 
 type presetResultBody struct {

@@ -178,18 +178,18 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	}}); err != nil {
 		t.Fatalf("bank upsert: %v", err)
 	}
-	document, err := database.LoadDocument()
-	if err != nil || len(document.Postings) != 2 {
-		t.Fatalf("postings = %+v, err %v", document.Postings, err)
+	model, err := database.LoadModel()
+	if err != nil || len(model.Postings) != 2 {
+		t.Fatalf("postings = %+v, err %v", model.Postings, err)
 	}
 	var bankID string
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if posting.Source == store.SourceSimpleFIN {
 			bankID = posting.ID
 		}
 	}
 	if bankID == "" {
-		t.Fatalf("bank posting missing in %+v", document.Postings)
+		t.Fatalf("bank posting missing in %+v", model.Postings)
 	}
 	if _, err := database.ApplySyncPlan(nil, []store.BankDirective{{Void: bankID}}); err != nil {
 		t.Fatalf("bank void: %v", err)
@@ -217,7 +217,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	if !seen[bankID] {
 		t.Fatalf("bank row void = false, want the sync void flag reported")
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if posting.Source != store.SourceSimpleFIN && seen[posting.ID] {
 			t.Fatalf("owner row %s void = true, want false", posting.ID)
 		}
@@ -261,23 +261,23 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 		}
 	}
 
-	// The purchase row stays in the document: planned purchases remain
+	// The purchase row stays in the model: planned purchases remain
 	// distinct from transactions instead of vanishing.
 	model := doRowRequest(t, handler, http.MethodGet, "/v1/financial-model", "")
 	if model.Code != http.StatusOK {
 		t.Fatalf("model status = %d, body %s", model.Code, model.Body.String())
 	}
 	var read struct {
-		Document types.FinancialModelDocument `json:"document"`
+		Model types.FinancialModel `json:"model"`
 	}
 	if err := json.Unmarshal(model.Body.Bytes(), &read); err != nil {
 		t.Fatalf("decode model: %v", err)
 	}
-	if len(read.Document.Postings) != 1 {
-		t.Fatalf("postings = %d, want 1", len(read.Document.Postings))
+	if len(read.Model.Postings) != 1 {
+		t.Fatalf("postings = %d, want 1", len(read.Model.Postings))
 	}
 	kept := false
-	for _, purchase := range read.Document.PlannedPurchases {
+	for _, purchase := range read.Model.PlannedPurchases {
 		if purchase.ID == "01900000-0000-7000-8000-000000000032" {
 			kept = true
 		}
@@ -504,7 +504,7 @@ func TestAccountBalancesRejectsMalformedCut(t *testing.T) {
 			t.Fatalf("cut %s status = %d, want 200, body %s", cut, response.Code, response.Body.String())
 		}
 	}
-	// Omitted cut still uses the documented default.
+	// Omitted cut still uses the modeled default.
 	defCut := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances", "")
 	if defCut.Code != http.StatusOK {
 		t.Fatalf("default cut status = %d, want 200, body %s", defCut.Code, defCut.Body.String())

@@ -139,7 +139,7 @@ func TestSyncCardsValidation(t *testing.T) {
 	}, nil)
 	handler := New(database, Config{SyncRunner: runner})
 
-	// Unknown account is 422 when a document exists.
+	// Unknown account is 422 when a model exists.
 	bad := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPut, "/v1/sync/simplefin/cards", bytes.NewReader([]byte(`{"cards":["ghost"]}`)))
 	request.Header.Set("Content-Type", "application/json")

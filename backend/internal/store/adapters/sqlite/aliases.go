@@ -54,7 +54,7 @@ var (
 	IsAccountMissing = store.IsAccountMissing
 
 	ValidateAmountPresetName  = store.ValidateAmountPresetName
-	DocumentETag              = store.DocumentETag
+	ModelETag                 = store.ModelETag
 	PostingReceiptFingerprint = store.PostingReceiptFingerprint
 	NotFound                  = store.NotFound
 	IDConflict                = store.IDConflict

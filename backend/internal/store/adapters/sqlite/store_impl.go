@@ -55,7 +55,7 @@ func (s *sqliteStore) Clear() error {
 		return fmt.Errorf("clear begin: %w", err)
 	}
 	defer tx.Rollback()
-	if err := clearDocument(tx); err != nil {
+	if err := clearModel(tx); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {

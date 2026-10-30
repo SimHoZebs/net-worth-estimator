@@ -16,8 +16,8 @@ func TestReceiptImageReplacementClearsContentAtomically(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "replace-image")
 	p := seedReceiptPosting(t, s)
-	before, _ := s.LoadDocument()
-	financialRevision, _ := DocumentETag(before)
+	before, _ := s.LoadModel()
+	financialRevision, _ := ModelETag(before)
 	r, err := s.CreateReceipt(context.Background(), p.ID, "old.png", types.ReceiptImage{Bytes: []byte("old pixels"), MediaType: "image/png"})
 	if err != nil {
 		t.Fatal(err)
@@ -59,8 +59,8 @@ func TestReceiptImageReplacementClearsContentAtomically(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(stored, updated) {
 		t.Fatal("failed replacement changed receipt", err)
 	}
-	after, _ := s.LoadDocument()
-	got, _ := DocumentETag(after)
+	after, _ := s.LoadModel()
+	got, _ := ModelETag(after)
 	if got != financialRevision {
 		t.Fatal("image replacement changed financial revision")
 	}

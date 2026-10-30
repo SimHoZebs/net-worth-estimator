@@ -62,15 +62,15 @@ func TestImportModelRemapsFICashflowSources(t *testing.T) {
 			t.Fatalf("write %s: %v, close: %v", name, err, closeErr)
 		}
 	}
-	document, err := ImportModel(path)
+	model, err := ImportModel(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := document.Postings[0].ID
-	if !isUUID(id) || id == existingUUID || document.Postings[1].ID != existingUUID {
+	id := model.Postings[0].ID
+	if !isUUID(id) || id == existingUUID || model.Postings[1].ID != existingUUID {
 		t.Fatal("import changed an existing UUID or did not generate a new posting UUID")
 	}
-	fi := document.Evaluations.FinancialIndependence[0]
+	fi := model.Evaluations.FinancialIndependence[0]
 	config := fi.Config.(map[string]any)
 	wantSources := []any{
 		map[string]any{"type": "cashflow", "postingId": id, "included": true},
@@ -80,7 +80,7 @@ func TestImportModelRemapsFICashflowSources(t *testing.T) {
 	if !reflect.DeepEqual(config["sources"], wantSources) || !reflect.DeepEqual(config["continuingPostingIds"], []any{id}) {
 		t.Fatalf("imported FI references = %+v", config)
 	}
-	if document.Accounts[0].ID != "old-payment" || document.Postings[0].Name != "old-payment" || fi.Name != "old-payment" {
+	if model.Accounts[0].ID != "old-payment" || model.Postings[0].Name != "old-payment" || fi.Name != "old-payment" {
 		t.Fatal("import rewrote an account ID or presentation string")
 	}
 }
@@ -138,11 +138,11 @@ func TestImportCheckpointsRequireInstants(t *testing.T) {
 	for k, v := range base {
 		stamped[k] = v
 	}
-	document, err := ImportModel(writeCSVDir(t, stamped))
+	model, err := ImportModel(writeCSVDir(t, stamped))
 	if err != nil {
 		t.Fatalf("timestamped checkpoint must import: %v", err)
 	}
-	if len(document.Checkpoints) != 1 || document.Checkpoints[0].ObservedAt != 1773187199 {
-		t.Fatalf("checkpoint = %+v, want the exact instant", document.Checkpoints)
+	if len(model.Checkpoints) != 1 || model.Checkpoints[0].ObservedAt != 1773187199 {
+		t.Fatalf("checkpoint = %+v, want the exact instant", model.Checkpoints)
 	}
 }

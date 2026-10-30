@@ -1,7 +1,7 @@
 import { FileUp, LockKeyhole, RotateCcw } from "lucide-react";
 import { type ReactNode, type RefObject, useRef } from "react";
-import type { FinancialModelDocument } from "../api/index.ts";
-import { parseModelDocument } from "../api/modelImport.ts";
+import type { FinancialModel } from "../api/index.ts";
+import { parseFinancialModel } from "../api/modelImport.ts";
 import { Button } from "../components/Button.tsx";
 import { Notice } from "../components/Notice.tsx";
 import { ModelImportPreview } from "../components/imports/ModelImportPreview.tsx";
@@ -14,7 +14,7 @@ import {
 	useServerModel,
 	useServerStatus,
 } from "../state/workspaceResources.ts";
-import { importServerDocument } from "../state/workspaceWrites.ts";
+import { importServerModel } from "../state/workspaceWrites.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { WorkspaceTopbar } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
@@ -24,22 +24,22 @@ export function ServerWorkspaceRecovery() {
 	// Terminal load states subscribe everything they display, including the
 	// model import flow and access control.
 	const status = useServerStatus().data;
-	const serverDocument = useServerModel().data?.document;
+	const serverModel = useServerModel().data?.model;
 	const readOnly = useUserReadOnly();
 	const retry = reloadWorkspace;
-	const { importDocument } = useServerModelImport({
+	const { importModel } = useServerModelImport({
 		preconditions: {
 			hasWorkspace: false,
 			readOnly,
 			loading: false,
 		},
-		recover: importServerDocument,
+		recover: importServerModel,
 		reload: retry,
 	});
 	const { candidate, reading, readFile, clearCandidate } =
-		useFileReview<FinancialModelDocument>({
+		useFileReview<FinancialModel>({
 			parse: (text) =>
-				parseModelDocument({
+				parseFinancialModel({
 					text,
 					malformedMessage: "The selected model file is not valid JSON.",
 				}),
@@ -51,12 +51,12 @@ export function ServerWorkspaceRecovery() {
 	const failImport = (message: string) => {
 		notifyError("model-import", message);
 	};
-	const missingModel = status !== undefined && serverDocument === null;
+	const missingModel = status !== undefined && serverModel === null;
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();
 		dismissKey("model-import");
-		const imported = await importDocument(candidate);
+		const imported = await importModel(candidate);
 		if (!imported)
 			failImport(
 				"The server did not activate this model. Review the recovery message before trying again.",
@@ -90,7 +90,7 @@ export function ServerWorkspaceRecovery() {
 			</ServerRecovery>
 			{candidate && (
 				<ModelImportPreview
-					document={candidate}
+					model={candidate}
 					eyebrow="The server has no active model"
 					onClose={clearCandidate}
 					footer={

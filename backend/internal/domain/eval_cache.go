@@ -31,7 +31,7 @@ import (
 // vice versa: neither system recomputes for the other's changes.
 //
 // Shared collections are read-only like the cached base path: callers must
-// not mutate envelopes. ProjectFinancialModelDocument copies the result shell
+// not mutate envelopes. ProjectFinancialModel copies the result shell
 // before attaching evaluations, same as the base result.
 
 // evalCollectionCache is a bounded oldest-evicted store of shared collections.
@@ -158,7 +158,7 @@ func runtimeSubsetHash(runtimes []*instanceRuntime) string {
 // projectReaderEvaluationsWithCache evaluates the reader subset against the
 // cached path, storing one collection per (base, reader subset) change and
 // serving the stored one to every later identical request. baseHash must be
-// the BaseDocumentHash of the request.
+// the BaseModelHash of the request.
 func projectReaderEvaluationsWithCache(path *types.ProjectionPath, baseHash string, readers *EvaluationRuntimeSet) *types.EvaluationResultCollection {
 	key := baseHash + "\x00" + runtimeSubsetHash(readers.runtimes)
 	if entry, ok := readerEvalCache.lookup(key); ok {
@@ -177,7 +177,7 @@ func projectReaderEvaluationsWithCache(path *types.ProjectionPath, baseHash stri
 
 // projectSimulatorEvaluationsWithCache evaluates the simulator subset against
 // the cached path, storing one collection per (base, simulator subset, detail)
-// change. baseHash must be the BaseDocumentHash of the request: it already covers
+// change. baseHash must be the BaseModelHash of the request: it already covers
 // postings, accounts, and the Monte Carlo sample, so candidate simulations
 // with volatile amounts key correctly.
 func projectSimulatorEvaluationsWithCache(path *types.ProjectionPath, baseHash string, simulators *EvaluationRuntimeSet, monteCarloSample *types.MonteCarloSample, detailLevel string) *types.EvaluationResultCollection {
@@ -195,7 +195,7 @@ func projectSimulatorEvaluationsWithCache(path *types.ProjectionPath, baseHash s
 		}
 		simulators.EvaluateDeterministic(&EvaluationContext{
 			Path:             path,
-			Document:         &path.EffectiveDocument,
+			Model:            &path.EffectiveModel,
 			MonteCarloSample: monteCarloSample,
 			DetailLevel:      detailLevel,
 		})
@@ -218,7 +218,7 @@ func projectSimulatorEvaluationsWithCache(path *types.ProjectionPath, baseHash s
 func evaluateReaderSubset(path *types.ProjectionPath, readers *EvaluationRuntimeSet) *types.EvaluationResultCollection {
 	readers.EvaluateDeterministic(&EvaluationContext{
 		Path:        path,
-		Document:    &path.EffectiveDocument,
+		Model:       &path.EffectiveModel,
 		DetailLevel: "detailed",
 	})
 	collection := readers.Result()

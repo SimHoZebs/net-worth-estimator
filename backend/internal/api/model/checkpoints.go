@@ -24,8 +24,8 @@ func checkpointKey(checkpoint types.Checkpoint) string {
 
 func (s *handler) saveCheckpoint(_ context.Context, input *checkpointInput) (*checkpointOutput, error) {
 	checkpoint := input.Body
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Checkpoints = replaceByID(document.Checkpoints, checkpointKey(checkpoint), checkpointKey, checkpoint)
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Checkpoints = replaceByID(model.Checkpoints, checkpointKey(checkpoint), checkpointKey, checkpoint)
 	}, func() (types.Checkpoint, error) {
 		return s.store.SaveCheckpoint(checkpoint)
 	})
@@ -41,17 +41,17 @@ func (s *handler) deleteCheckpoint(_ context.Context, input *struct {
 }) (*reorderOutput, error) {
 	accountID := input.AccountID
 	observedAt := input.ObservedAt
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		kept := document.Checkpoints[:0]
-		for _, checkpoint := range document.Checkpoints {
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		kept := model.Checkpoints[:0]
+		for _, checkpoint := range model.Checkpoints {
 			if checkpoint.AccountID != accountID || checkpoint.ObservedAt != observedAt {
 				kept = append(kept, checkpoint)
 			}
 		}
 		if len(kept) == 0 {
-			document.Checkpoints = []types.Checkpoint{}
+			model.Checkpoints = []types.Checkpoint{}
 		} else {
-			document.Checkpoints = kept
+			model.Checkpoints = kept
 		}
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteCheckpointAt(accountID, observedAt)

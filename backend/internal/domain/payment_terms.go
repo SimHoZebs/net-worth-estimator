@@ -11,9 +11,9 @@ import (
 // back-pointer. The reverse direction (account to terms) is always derived
 // through PaymentTermsByAccount, so the two can never drift out of sync.
 
-// PaymentTermsByAccount indexes a document's terms rows by account ID.
-func PaymentTermsByAccount(document *types.FinancialModelDocument) map[string]types.PaymentTerms {
-	return paymentTermsByAccount(document.PaymentTerms)
+// PaymentTermsByAccount indexes a model's terms rows by account ID.
+func PaymentTermsByAccount(model *types.FinancialModel) map[string]types.PaymentTerms {
+	return paymentTermsByAccount(model.PaymentTerms)
 }
 
 func paymentTermsByAccount(terms []types.PaymentTerms) map[string]types.PaymentTerms {
@@ -24,13 +24,13 @@ func paymentTermsByAccount(terms []types.PaymentTerms) map[string]types.PaymentT
 	return byAccount
 }
 
-func validatePaymentTerms(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, accountIDs map[string]bool) {
+func validatePaymentTerms(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) {
 	seen := map[string]bool{}
 	accountsByID := map[string]types.Account{}
-	for _, account := range document.Accounts {
+	for _, account := range model.Accounts {
 		accountsByID[account.ID] = account
 	}
-	for index, terms := range document.PaymentTerms {
+	for index, terms := range model.PaymentTerms {
 		path := []any{"paymentTerms", index}
 		if seen[terms.AccountID] {
 			addIssue(issues, types.SeverityError, "terms.account.duplicate",
@@ -81,9 +81,9 @@ func isNonFinite(value float64) bool {
 // rule behind it. Terms declare what is owed; an enabled rule naming the
 // account as a destination moves it. The warning keeps half-configured terms
 // saveable while refusing silent no-ops.
-func validatePaymentTermsCoverage(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument) {
+func validatePaymentTermsCoverage(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
 	covered := map[string]bool{}
-	for _, rule := range document.RecurrenceRules {
+	for _, rule := range model.RecurrenceRules {
 		if !rule.Enabled {
 			continue
 		}
@@ -91,7 +91,7 @@ func validatePaymentTermsCoverage(issues *[]types.ModelValidationIssue, document
 			covered[destination] = true
 		}
 	}
-	for index, terms := range document.PaymentTerms {
+	for index, terms := range model.PaymentTerms {
 		if covered[terms.AccountID] {
 			continue
 		}

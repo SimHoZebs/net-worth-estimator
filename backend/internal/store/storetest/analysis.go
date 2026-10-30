@@ -23,11 +23,11 @@ func testAnalysisConformance(t *testing.T, newStore func(*testing.T) store.Store
 	if err != nil {
 		t.Fatal(err)
 	}
-	document, err := s.LoadDocument()
+	model, err := s.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,11 +49,11 @@ func testAnalysisConformance(t *testing.T, newStore func(*testing.T) store.Store
 	if _, _, claimed, err := s.ClaimAnalysis("test", "v1"); err != nil || claimed {
 		t.Fatalf("duplicate run claimed=%v err=%v", claimed, err)
 	}
-	after, err := s.LoadDocument()
+	after, err := s.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	afterRevision, err := store.DocumentETag(after)
+	afterRevision, err := store.ModelETag(after)
 	if err != nil || afterRevision != revision {
 		t.Fatal("analysis changed the financial model")
 	}

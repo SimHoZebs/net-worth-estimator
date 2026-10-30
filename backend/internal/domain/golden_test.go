@@ -34,17 +34,17 @@ func loadGolden(t *testing.T, name string) map[string]any {
 	return payload
 }
 
-func decodeDocument(t *testing.T, raw any) *types.FinancialModelDocument {
+func decodeModel(t *testing.T, raw any) *types.FinancialModel {
 	t.Helper()
 	data, err := json.Marshal(raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var document types.FinancialModelDocument
-	if err := json.Unmarshal(data, &document); err != nil {
-		t.Fatalf("decode document: %v", err)
+	var model types.FinancialModel
+	if err := json.Unmarshal(data, &model); err != nil {
+		t.Fatalf("decode model: %v", err)
 	}
-	return &document
+	return &model
 }
 
 func decodeSettings(t *testing.T, raw any) *types.ProjectionRuntimeSettings {
@@ -185,12 +185,12 @@ func itoa(value int) string {
 
 func TestGoldenDeterministic(t *testing.T) {
 	payload := loadGolden(t, "deterministic.json")
-	document := decodeDocument(t, payload["document"])
+	model := decodeModel(t, payload["model"])
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
 	expectedResult := payload["result"].(map[string]any)
 
-	result, err := ProjectFinancialModelDocument(document, settings, overrides, nil)
+	result, err := ProjectFinancialModel(model, settings, overrides, nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -199,11 +199,11 @@ func TestGoldenDeterministic(t *testing.T) {
 
 func TestGoldenCheckpoints(t *testing.T) {
 	payload := loadGolden(t, "checkpoints.json")
-	document := decodeDocument(t, payload["document"])
+	model := decodeModel(t, payload["model"])
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
 
-	path, result, err := ProjectRawFinancialModelDocument(document, settings, overrides, nil)
+	path, result, err := ProjectRawFinancialModel(model, settings, overrides, nil)
 	if err != nil {
 		t.Fatalf("project raw: %v", err)
 	}
@@ -217,10 +217,10 @@ func TestGoldenCheckpoints(t *testing.T) {
 
 func TestGoldenPayroll(t *testing.T) {
 	payload := loadGolden(t, "payroll.json")
-	document := decodeDocument(t, payload["document"])
+	model := decodeModel(t, payload["model"])
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
-	result, err := ProjectFinancialModelDocument(document, settings, overrides, nil)
+	result, err := ProjectFinancialModel(model, settings, overrides, nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -229,14 +229,14 @@ func TestGoldenPayroll(t *testing.T) {
 
 func TestGoldenStochasticSeeded(t *testing.T) {
 	payload := loadGolden(t, "stochastic.json")
-	document := decodeDocument(t, payload["document"])
+	model := decodeModel(t, payload["model"])
 	settings := decodeSettings(t, payload["settings"])
 	overrides := decodeOverrides(t, payload["overrides"])
 	configRaw := payload["config"].(map[string]any)
 	seed := int64(configRaw["seed"].(float64))
 	config := types.StochasticConfig{RunCount: int(configRaw["runCount"].(float64)), Seed: &seed}
 
-	result, err := StochasticProjection(context.Background(), document, settings, overrides, config, nil)
+	result, err := StochasticProjection(context.Background(), model, settings, overrides, config, nil)
 	if err != nil {
 		t.Fatalf("stochastic: %v", err)
 	}

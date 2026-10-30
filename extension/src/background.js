@@ -5,7 +5,7 @@ import { capturePage } from "./capture-page.js";
 import { pickElement } from "./picker.js";
 import { autofill } from "./ai.js";
 import { createPurchaseSaver } from "./save.js";
-import { loadPlan } from "./plan.js";
+import { loadModel } from "./model.js";
 
 const storage = chrome.storage;
 const ready = Promise.all([
@@ -62,13 +62,13 @@ async function publicState() {
 async function loadConnection() {
   const identity = await connection.identity();
   const resource = identity.resource.id;
-  const plan = await loadPlan(connection, resource);
+  const model = await loadModel(connection, resource);
   await captures.change((state) => {
     const scope = `${state.settings?.app}|${resource}`;
     if (state.financialScope !== scope && !state.pendingSave) state.draft.fromId = "";
     state.financialScope = scope;
   });
-  return { ...(await publicState()), accounts: plan.accounts, readOnly: plan.readOnly };
+  return { ...(await publicState()), accounts: model.accounts, readOnly: model.readOnly };
 }
 
 async function activePage() {

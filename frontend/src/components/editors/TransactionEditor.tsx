@@ -172,10 +172,8 @@ export function TransactionEditor({
 		const raw =
 			item && wasOnce === nowOnce
 				? nowOnce
-					? getServerModel()?.document?.postings.find(
-							(row) => row.id === item.id,
-						)
-					: getServerModel()?.document?.recurrenceRules.find(
+					? getServerModel()?.model?.postings.find((row) => row.id === item.id)
+					: getServerModel()?.model?.recurrenceRules.find(
 							(row) => row.id === item.id,
 						)
 				: undefined;

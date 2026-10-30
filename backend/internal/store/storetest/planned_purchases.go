@@ -28,11 +28,11 @@ func testPlannedPurchases(t *testing.T, newStore func(*testing.T) store.Store) {
 	if err := s.MovePlannedPurchase(b.ID, a.ID); err != nil {
 		t.Fatal(err)
 	}
-	doc, err := s.LoadDocument()
+	doc, err := s.LoadModel()
 	if err != nil || len(doc.Postings) != 0 || len(doc.PlannedPurchases) != 2 || doc.PlannedPurchases[0].ID != b.ID || doc.PlannedPurchases[0].Priority != 0 {
 		t.Fatalf("queue: %+v %v", doc, err)
 	}
-	imported, err := s.ImportDocument(doc)
+	imported, err := s.ImportModel(doc)
 	if err != nil || !reflect.DeepEqual(doc.PlannedPurchases, imported.PlannedPurchases) {
 		t.Fatalf("import lost purchases: %+v %v", imported, err)
 	}
@@ -61,14 +61,14 @@ func testPlannedPurchases(t *testing.T, newStore func(*testing.T) store.Store) {
 	if err := s.MovePlannedPurchase(b.ID, "missing"); !store.IsNotFound(err) {
 		t.Fatalf("move target missing: %v", err)
 	}
-	doc, _ = s.LoadDocument()
+	doc, _ = s.LoadModel()
 	if len(doc.PlannedPurchases) != 1 || !reflect.DeepEqual(doc.PlannedPurchases[0], b) {
 		t.Fatalf("update lost values: %+v", doc.PlannedPurchases)
 	}
 	if err := s.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	doc, err = s.LoadDocument()
+	doc, err = s.LoadModel()
 	if err != nil || doc != nil {
 		t.Fatalf("clear: %+v %v", doc, err)
 	}

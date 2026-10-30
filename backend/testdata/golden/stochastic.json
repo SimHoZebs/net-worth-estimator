@@ -3,7 +3,7 @@
     "runCount": 20,
     "seed": 42
   },
-  "document": {
+  "model": {
     "accounts": [
       {
         "color": null,

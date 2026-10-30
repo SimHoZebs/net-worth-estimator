@@ -25,13 +25,13 @@ func WriteError(err error) error {
 	}
 }
 
-// CurrentRevision identifies the current stored document, including an empty one.
+// CurrentRevision identifies the current stored model, including an empty one.
 func CurrentRevision(st store.Store) (string, error) {
-	document, err := st.LoadDocument()
+	model, err := st.LoadModel()
 	if err != nil {
 		return "", err
 	}
-	return store.DocumentETag(document)
+	return store.ModelETag(model)
 }
 
 // ReorderOutput carries the model revision after a reorder or deletion.

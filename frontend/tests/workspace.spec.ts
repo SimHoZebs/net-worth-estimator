@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import type { FinancialModelDocument } from "../src/api/contracts.ts";
+import type { FinancialModel } from "../src/api/contracts.ts";
 import {
 	FIXTURE_API,
 	REMOTE_STORAGE_KEY,
@@ -61,10 +61,10 @@ test("saved target pins control Outlook without an evidence dialog", async ({
 }) => {
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	expect(response.ok()).toBe(true);
-	const { document } = (await response.json()) as {
-		document: FinancialModelDocument;
+	const { model } = (await response.json()) as {
+		model: FinancialModel;
 	};
-	const evaluation = document.evaluations.netWorthThreshold.find(
+	const evaluation = model.evaluations.netWorthThreshold.find(
 		(item) => item.enabled,
 	)!;
 	const card = () =>
@@ -437,10 +437,10 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	// cards stay visible.
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	expect(response.ok()).toBe(true);
-	const { document } = (await response.json()) as {
-		document: FinancialModelDocument;
+	const { model } = (await response.json()) as {
+		model: FinancialModel;
 	};
-	const evaluation = document.evaluations.netWorthThreshold.find(
+	const evaluation = model.evaluations.netWorthThreshold.find(
 		(item) => item.enabled,
 	)!;
 	await resetFixture({ pinnedEvaluationIds: [evaluation.instanceId] });

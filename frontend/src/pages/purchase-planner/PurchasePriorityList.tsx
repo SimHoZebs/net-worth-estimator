@@ -17,7 +17,7 @@ export function PurchasePriorityList({
 		<section aria-label="Purchase priority">
 			<p className="mb-2 text-xs text-muted">
 				Higher priorities are considered first. Move an item to recalculate the
-				plan.
+				projection.
 			</p>
 			<ol
 				className="m-0 list-none p-0"

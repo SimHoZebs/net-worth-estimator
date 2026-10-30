@@ -15,25 +15,25 @@ import (
 // deterministicResultVersion covers the deterministic payload shape.
 // See artifactIdentityVersion in artifacts.go: bump both together so
 // incompatible stored results are not retrieved.
-const deterministicResultVersion = 10
+const deterministicResultVersion = 11
 
-// resolveDocument returns the request document or the stored one.
-func (s *handler) resolveDocument(requested *types.FinancialModelDocument) (*types.FinancialModelDocument, error) {
+// resolveModel returns the request model or the stored one.
+func (s *handler) resolveModel(requested *types.FinancialModel) (*types.FinancialModel, error) {
 	if requested != nil {
 		return requested, nil
 	}
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, err
 	}
-	if document == nil {
+	if model == nil {
 		return nil, fmt.Errorf("financial model is not initialized")
 	}
-	return document, nil
+	return model, nil
 }
 
 type projectionRequestBody struct {
-	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
+	Model     *types.FinancialModel           `json:"model,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
 	// Range selects response rows and transaction events by inclusive ISO dates.
@@ -57,17 +57,17 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 	if err := validateProjectionRange(input.Body.Range); err != nil {
 		return nil, err
 	}
-	document, err := s.resolveDocument(input.Body.Document)
+	model, err := s.resolveModel(input.Body.Model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
-	// Key the RESOLVED document so omitted fields track the
+	// Key the RESOLVED model so omitted fields track the
 	// stored state: a model save changes stored content and therefore the key.
 	// Response ranges stay out of the key: all ranges share the complete artifact.
 	resultKey := s.resourceArtifactKey("deterministic", map[string]any{
 		"publicResultVersion": deterministicResultVersion,
-		"document":            document,
+		"model":               model,
 		"overrides":           input.Body.Overrides,
 		"settings":            projectionSettingsDescriptor(input.Body.Settings),
 	})
@@ -79,10 +79,10 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 	}
 	_, prefix := parseArtifactKeyMeta(resultKey)
 	log.Printf("deterministic simulation key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
-		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
+		prefix, len(model.Accounts), len(model.Postings), len(model.Checkpoints),
 		input.Body.Settings.HorizonYears, formatProjectionRange(input.Body.Range))
 
-	result, err := domain.ProjectFinancialModelDocument(document, &input.Body.Settings, input.Body.Overrides, nil)
+	result, err := domain.ProjectFinancialModel(model, &input.Body.Settings, input.Body.Overrides, nil)
 	// huma writes this status verbatim; default to 200 and only raise it for
 	// unexpected failures.
 	output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceComputed}

@@ -86,7 +86,7 @@ type EvaluationInstance[T any] struct {
 }
 
 // Evaluation tables carry raw JSON configs, validated lazily by
-// the evaluation runtime / document validators.
+// the evaluation runtime / model validators.
 type (
 	FIEvaluation          = EvaluationInstance[JsonValue]
 	ThresholdEvaluation   = EvaluationInstance[JsonValue]

@@ -16,9 +16,9 @@ func TestEvalCachesShareCollectionsAcrossRequests(t *testing.T) {
 	ResetBasePathCache()
 	ResetReaderCache()
 	ResetSimulatorCache()
-	document, settings := kindTestDocument()
+	model, settings := kindTestModel()
 
-	first, err := ProjectFinancialModelDocument(document, settings, types.EmptyModelOverrides(), nil)
+	first, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestEvalCachesShareCollectionsAcrossRequests(t *testing.T) {
 	if hits, misses := SimulatorCacheStats(); hits != 0 || misses != 1 {
 		t.Fatalf("first projection must compute simulator evals once, got hits=%d misses=%d", hits, misses)
 	}
-	second, err := ProjectFinancialModelDocument(document, settings, types.EmptyModelOverrides(), nil)
+	second, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestEvalCachesShareCollectionsAcrossRequests(t *testing.T) {
 	withEval.Evaluations.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
 		{InstanceID: "t", Name: "T", Enabled: true, Config: map[string]any{"target": 50.0}},
 	}
-	third, err := ProjectFinancialModelDocument(document, &withEval, types.EmptyModelOverrides(), nil)
+	third, err := ProjectFinancialModel(model, &withEval, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestPartitionAndMergePreserveGlobalOrder(t *testing.T) {
 		t.Fatalf("simulator subset must hold the enabled purchase, got %q", simulators.runtimes[0].instanceID)
 	}
 
-	ctx := &EvaluationContext{Path: path, Document: &path.EffectiveDocument, DetailLevel: "detailed"}
+	ctx := &EvaluationContext{Path: path, Model: &path.EffectiveModel, DetailLevel: "detailed"}
 	readers.EvaluateDeterministic(ctx)
 	simulators.EvaluateDeterministic(ctx)
 	readerCollection := readers.Result()
@@ -119,7 +119,7 @@ func TestEvalCacheServesIdenticalResultsConcurrently(t *testing.T) {
 	ResetBasePathCache()
 	ResetReaderCache()
 	ResetSimulatorCache()
-	document, settings := kindTestDocument()
+	model, settings := kindTestModel()
 
 	const callers = 8
 	results := make([]*types.ProjectionResult, callers)
@@ -129,7 +129,7 @@ func TestEvalCacheServesIdenticalResultsConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			results[i], errs[i] = ProjectFinancialModelDocument(document, settings, types.EmptyModelOverrides(), nil)
+			results[i], errs[i] = ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 		}(i)
 	}
 	wg.Wait()

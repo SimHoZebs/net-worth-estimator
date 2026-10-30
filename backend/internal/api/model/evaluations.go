@@ -15,8 +15,8 @@ type evaluationOutput struct {
 	Body rowResultBody[store.EvaluationUpdate] `json:"body"`
 }
 
-func evalSlice(document *types.FinancialModelDocument, evalType string) *[]types.EvaluationInstance[types.JsonValue] {
-	return document.Evaluations.ByType(evalType)
+func evalSlice(model *types.FinancialModel, evalType string) *[]types.EvaluationInstance[types.JsonValue] {
+	return model.Evaluations.ByType(evalType)
 }
 
 func evalToInstance(item store.EvaluationUpdate) types.EvaluationInstance[types.JsonValue] {
@@ -29,8 +29,8 @@ func instanceIDOf(instance types.EvaluationInstance[types.JsonValue]) string {
 
 func (s *handler) createEvaluation(_ context.Context, input *evaluationInput) (*evaluationOutput, error) {
 	item := input.Body
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		if slice := evalSlice(document, item.Type); slice != nil {
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		if slice := evalSlice(model, item.Type); slice != nil {
 			*slice = replaceByID(*slice, item.InstanceID, instanceIDOf, evalToInstance(item))
 		}
 	}, func() (store.EvaluationUpdate, error) {
@@ -48,16 +48,16 @@ func (s *handler) updateEvaluation(_ context.Context, input *struct {
 }) (*evaluationOutput, error) {
 	item := input.Body
 	item.InstanceID = input.InstanceID
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		// A type change moves the instance across tables: remove it
 		// everywhere first, then insert into the target table. The store
 		// does the same atomically and keeps the pin.
 		for _, evalType := range types.EvaluationTypeOrder {
-			if slice := evalSlice(document, evalType); slice != nil {
+			if slice := evalSlice(model, evalType); slice != nil {
 				*slice = removeByID(*slice, item.InstanceID, instanceIDOf)
 			}
 		}
-		if slice := evalSlice(document, item.Type); slice != nil {
+		if slice := evalSlice(model, item.Type); slice != nil {
 			*slice = replaceByID(*slice, item.InstanceID, instanceIDOf, evalToInstance(item))
 		}
 	}, func() (store.EvaluationUpdate, error) {
@@ -73,9 +73,9 @@ func (s *handler) deleteEvaluation(_ context.Context, input *struct {
 	InstanceID string `path:"instanceId"`
 }) (*reorderOutput, error) {
 	instanceID := input.InstanceID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		for _, evalType := range types.EvaluationTypeOrder {
-			if slice := evalSlice(document, evalType); slice != nil {
+			if slice := evalSlice(model, evalType); slice != nil {
 				*slice = removeByID(*slice, instanceID, instanceIDOf)
 			}
 		}
@@ -98,8 +98,8 @@ func (s *handler) moveEvaluation(_ context.Context, input *struct {
 	} `json:"body"`
 }) (*reorderOutput, error) {
 	evalType, instanceID, beforeID := input.Body.Type, input.Body.InstanceID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		if slice := evalSlice(document, evalType); slice != nil {
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		if slice := evalSlice(model, evalType); slice != nil {
 			*slice = moveBeforeID(*slice, instanceID, beforeID, instanceIDOf)
 		}
 	}, func() (struct{}, error) {

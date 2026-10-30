@@ -24,17 +24,17 @@ func deterministicTestBody(t *testing.T) []byte {
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	if fixture.Document == nil {
-		t.Fatal("projection fixture has no document")
+	if fixture.Model == nil {
+		t.Fatal("projection fixture has no model")
 	}
 	raw, err := json.Marshal(projectionRequestBody{
-		Document: fixture.Document,
+		Model:    fixture.Model,
 		Settings: fixture.Settings,
 		Range:    fullSpanRange(),
 	})

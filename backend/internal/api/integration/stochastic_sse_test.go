@@ -137,7 +137,7 @@ func TestStochasticSSEErrorEventOnBadSettings(t *testing.T) {
 	handler := New(database, Config{})
 	seed := int64(1)
 	raw, err := json.Marshal(map[string]any{
-		"document": stochasticTestDocument(),
+		"model": stochasticTestModel(),
 		"settings": types.ProjectionRuntimeSettings{
 			FallbackProjectionStartDate: "not-a-date",
 			HorizonYears:                1,

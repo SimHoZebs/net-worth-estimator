@@ -1,5 +1,5 @@
 // Package testseed seeds a Store from CSV fixtures for tests.
-// Production code uses ImportDocument with an already-loaded document;
+// Production code uses ImportModel with an already-loaded model;
 // only tests and sqlite-specific ops tools read CSV files.
 package testseed
 
@@ -9,10 +9,10 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func Seed(s store.Store, path string) (*types.FinancialModelDocument, error) {
+func Seed(s store.Store, path string) (*types.FinancialModel, error) {
 	doc, err := csvio.ImportModel(path)
 	if err != nil {
 		return nil, err
 	}
-	return s.ImportDocument(doc)
+	return s.ImportModel(doc)
 }

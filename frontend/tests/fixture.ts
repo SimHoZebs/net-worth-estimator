@@ -82,9 +82,9 @@ export async function readSavedServerModel() {
 		};
 		type account = { id: string; minBalance: number };
 		return {
-			accounts: body.document.accounts as account[],
-			postings: body.document.postings as transaction[],
-			recurrenceRules: (body.document.recurrenceRules ?? []) as transaction[],
+			accounts: body.model.accounts as account[],
+			postings: body.model.postings as transaction[],
+			recurrenceRules: (body.model.recurrenceRules ?? []) as transaction[],
 		};
 	} finally {
 		await api.dispose();

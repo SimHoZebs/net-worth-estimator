@@ -22,7 +22,7 @@ export function ReceiptPanel({
 	const scope = useReceiptScope();
 	const model = useServerModel({ enabled: false });
 	const status = useServerStatus({ enabled: false });
-	const saved = model.data?.document?.postings.find(
+	const saved = model.data?.model?.postings.find(
 		(posting) => posting.id === postingId,
 	);
 	const collection = useReceipts(postingId, Boolean(saved));
@@ -151,8 +151,8 @@ export function ReceiptPanel({
 								/>
 							</div>
 							<p id="receipt-size-hint" className="text-xs text-muted">
-								JPEG or PNG, up to 10 MiB. Large images must fit within 3
-								MiB after normalization.
+								JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB
+								after normalization.
 							</p>
 						</fieldset>
 					)}

@@ -28,7 +28,7 @@ async function smoke(t, finalEvent = "result", readiness = 200) {
     if (request.url === "/v1/status") return send(200, { readOnly: true });
     if (request.url === "/v1/financial-model")
       return send(200, {
-        document: { checkpoints: [
+        model: { checkpoints: [
           { observedAt: Date.parse("2026-10-21T23:59:59Z") / 1000 },
           { observedAt: Date.parse("2026-10-22T09:00:00Z") / 1000 },
         ] },

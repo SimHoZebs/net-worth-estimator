@@ -82,6 +82,52 @@ func TestRawRoutesAppearInOpenAPI(t *testing.T) {
 	}
 }
 
+func TestFinancialModelContract(t *testing.T) {
+	response := httptest.NewRecorder()
+	New(openAPIStore(t), Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("OpenAPI status = %d", response.Code)
+	}
+	type schemaContract struct {
+		Properties map[string]struct {
+			Ref string `json:"$ref"`
+		} `json:"properties"`
+	}
+	var spec struct {
+		Components struct {
+			Schemas map[string]*schemaContract `json:"schemas"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &spec); err != nil {
+		t.Fatal(err)
+	}
+	schemas := spec.Components.Schemas
+	model := schemas["FinancialModel"]
+	if model == nil {
+		t.Fatal("financial model schema is missing")
+	}
+	for _, name := range []string{"sourcePath", "accounts", "checkpoints", "postings", "recurrenceRules", "paymentTerms", "plannedPurchases", "evaluations"} {
+		if _, ok := model.Properties[name]; !ok {
+			t.Errorf("financial model field %q is missing", name)
+		}
+	}
+	for _, name := range []string{"FinancialModelResponse", "ProjectionRequestBody", "StochasticRequest", "PositionRequestBody"} {
+		schema := schemas[name]
+		if schema == nil {
+			t.Errorf("%s schema is missing", name)
+			continue
+		}
+		field, ok := schema.Properties["model"]
+		if !ok {
+			t.Errorf("%s must expose its financial model as model", name)
+			continue
+		}
+		if got := field.Ref; got != "#/components/schemas/FinancialModel" {
+			t.Errorf("%s model schema = %q", name, got)
+		}
+	}
+}
+
 func TestStochasticStreamDocumentsHumaErrors(t *testing.T) {
 	response := httptest.NewRecorder()
 	New(openAPIStore(t), Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))

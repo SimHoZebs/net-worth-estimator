@@ -107,14 +107,14 @@ export function Transactions({
 								<TransactionRow
 									key={transaction.id}
 									transaction={transaction}
-									planTransaction={
+									savedTransaction={
 										savedRows.get(transaction.transactionId) ?? null
 									}
 									onEdit={() => {
-										const planTransaction = savedRows.get(
+										const savedTransaction = savedRows.get(
 											transaction.transactionId,
 										);
-										if (planTransaction) inspect(transaction);
+										if (savedTransaction) inspect(transaction);
 									}}
 								/>
 							))}
@@ -130,15 +130,15 @@ export function Transactions({
 					{selected && (
 						<TransactionDetail
 							transaction={selected.transaction}
-							planTransaction={selected.planTransaction}
+							savedTransaction={selected.savedTransaction}
 							accounts={accounts}
 							transactions={rows}
 							readOnly={readOnly}
 							claimRuleName={
-								selected.planTransaction.claimRuleId
+								selected.savedTransaction.claimRuleId
 									? (rows.find(
 											(item) =>
-												item.id === selected.planTransaction.claimRuleId,
+												item.id === selected.savedTransaction.claimRuleId,
 										)?.name ?? null)
 									: null
 							}

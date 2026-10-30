@@ -147,7 +147,7 @@ func TestClearPreservesAmountPresets(t *testing.T) {
 	if len(presets) != 8 {
 		t.Fatalf("presets after clear = %d, want 8 seeds kept", len(presets))
 	}
-	if exists, err := store.DocumentExists(); err != nil || exists {
-		t.Fatalf("document exists after clear = %v, err %v", exists, err)
+	if exists, err := store.ModelExists(); err != nil || exists {
+		t.Fatalf("model exists after clear = %v, err %v", exists, err)
 	}
 }

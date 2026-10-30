@@ -30,16 +30,15 @@ func TestExactCutChangesArtifactIdentity(t *testing.T) {
 }
 
 func TestArtifactIdentityPreservesStoredResultKeys(t *testing.T) {
-	// Standalone purchases expose purchaseId instead of postingId. Pin the
-	// new envelope so old payloads cannot survive the contract change.
-	const want = "deterministic:9:596ee79a5b8b67317f3f55ea0b72244f416ddab28c8511774831daaceb5c3d6d"
+	// Pin the current artifact envelope and its canonical input identity.
+	const want = "deterministic:10:40ccc9c43271e8a5a308cd661dfc74ada839315342eee33df044cce217c20b82"
 	if got := artifactKey("deterministic", map[string]any{"example": "identity"}); got != want {
 		t.Fatalf("result identity = %q, want %q", got, want)
 	}
 }
 
-func TestProjectionArtifactsAreScopedToPlanResources(t *testing.T) {
-	request := map[string]any{"document": "same input", "seed": 42}
+func TestProjectionArtifactsAreScopedToUserResources(t *testing.T) {
+	request := map[string]any{"model": "same input", "seed": 42}
 	a := &handler{resourceID: "users/a"}
 	b := &handler{resourceID: "users/b"}
 	for _, kind := range []string{"deterministic", "stochastic"} {

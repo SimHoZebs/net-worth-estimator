@@ -55,7 +55,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "import: %v\n", err)
 		return 1
 	}
-	if _, err := user.ImportDocument(doc); err != nil {
+	if _, err := user.ImportModel(doc); err != nil {
 		fmt.Fprintf(stderr, "import: %v\n", err)
 		return 1
 	}

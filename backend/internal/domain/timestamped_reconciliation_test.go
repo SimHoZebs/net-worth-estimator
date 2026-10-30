@@ -19,9 +19,9 @@ func expenseAmount(expression string) types.PostingAmountResolution {
 	return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
 }
 
-func observerFixture() *types.FinancialModelDocument {
+func observerFixture() *types.FinancialModel {
 	account := "checking"
-	return &types.FinancialModelDocument{
+	return &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
@@ -56,9 +56,9 @@ func TestTimestampedSameDayObservationAndLaterActual(t *testing.T) {
 // Later 15:00 observation 850 anchors again with a -50 correction and no
 // provisional layer.
 func TestTimestampedLaterObservationAnchorsAgain(t *testing.T) {
-	document := observerFixture()
-	document.Checkpoints[1].Balance = 850
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	model := observerFixture()
+	model.Checkpoints[1].Balance = 850
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestTimestampedLaterObservationAnchorsAgain(t *testing.T) {
 // no same-day observation.
 func TestExactCutIncludesTodayAfterYesterdayAnchor(t *testing.T) {
 	account := "checking"
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(9, 9)},
@@ -88,7 +88,7 @@ func TestExactCutIncludesTodayAfterYesterdayAnchor(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,13 +100,13 @@ func TestExactCutIncludesTodayAfterYesterdayAnchor(t *testing.T) {
 // A day-close rule is absent at an intraday cut and executes exactly once
 // in the continuation.
 func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
-	document := observerFixture()
-	document.Checkpoints = document.Checkpoints[:1]
-	document.Postings = nil
-	document.RecurrenceRules = []types.RecurrenceRule{
+	model := observerFixture()
+	model.Checkpoints = model.Checkpoints[:1]
+	model.Postings = nil
+	model.RecurrenceRules = []types.RecurrenceRule{
 		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T10:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 	}
 	cut := unixAt(10, 10)
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1, AsOfInstant: &cut}
-	prepared, err := PrepareSimulationRequest(document, settings, types.ModelOverrides{}, nil)
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,11 +140,11 @@ func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 // An exact 00:00 actual is timed: it precedes the 09:00 observation
 // rather than running at day-close.
 func TestExactMidnightActualIsTimed(t *testing.T) {
-	document := observerFixture()
-	document.Checkpoints = document.Checkpoints[:1]
-	document.Postings[0].TransactionTime = unixAt(10, 0)
-	document.Postings[0].PostedTime = unixAt(10, 0)
-	position, err := ResolveCurrentPosition(document, "2026-03-10T10:00:00Z", types.ModelOverrides{})
+	model := observerFixture()
+	model.Checkpoints = model.Checkpoints[:1]
+	model.Postings[0].TransactionTime = unixAt(10, 0)
+	model.Postings[0].PostedTime = unixAt(10, 0)
+	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestExactMidnightActualIsTimed(t *testing.T) {
 // governs, and the backdated row is retained.
 func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 	account := "checking"
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
@@ -166,7 +166,7 @@ func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 func TestTimestampedTiePolicyPostingsFirst(t *testing.T) {
 	account := "checking"
 	instant := unixAt(10, 9)
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: instant},
@@ -193,7 +193,7 @@ func TestTimestampedTiePolicyPostingsFirst(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestTimestampedTiePolicyPostingsFirst(t *testing.T) {
 func TestTimestampedOwnerWinsSameInstantOnly(t *testing.T) {
 	account := "checking"
 	instant := unixAt(10, 12)
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 700, Source: "simplefin", ObservedAt: instant},
@@ -218,7 +218,7 @@ func TestTimestampedOwnerWinsSameInstantOnly(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestTimestampedOwnerWinsSameInstantOnly(t *testing.T) {
 func TestTransferLegsAnchorIndependently(t *testing.T) {
 	a, b := "checking", "savings"
 	source := a
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(a), cashAccount(b)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: a, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
@@ -244,7 +244,7 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 func TestPendingAndVoidHaveNoBalanceEffect(t *testing.T) {
 	account := "checking"
 	source := account
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
@@ -275,7 +275,7 @@ func TestPendingAndVoidHaveNoBalanceEffect(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,13 +286,13 @@ func TestPendingAndVoidHaveNoBalanceEffect(t *testing.T) {
 
 func TestPositionAndProjectionBaselineAgree(t *testing.T) {
 	account := "checking"
-	document := observerFixture()
-	position, err := ResolveCurrentPosition(document, "2026-03-10", types.ModelOverrides{})
+	model := observerFixture()
+	position, err := ResolveCurrentPosition(model, "2026-03-10", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1}
-	prepared, err := PrepareSimulationRequest(document, settings, types.ModelOverrides{}, nil)
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +309,7 @@ func TestPositionAndProjectionBaselineAgree(t *testing.T) {
 	if position.Accounts[0].ObservedAt == nil || *position.Accounts[0].ObservedAt != unixAt(10, 15) {
 		t.Fatalf("position must carry the observation timestamp: %+v", position.Accounts[0])
 	}
-	_, projection, err := ProjectRawFinancialModelDocument(document, settings, types.ModelOverrides{}, nil)
+	_, projection, err := ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,16 +322,16 @@ func TestPositionAndProjectionBaselineAgree(t *testing.T) {
 // cut identity changes the cache key.
 func TestExactCutProjectionAgreesWithPositionAndAccountList(t *testing.T) {
 	account := "checking"
-	document := observerFixture()
-	document.Checkpoints = document.Checkpoints[:1]
+	model := observerFixture()
+	model.Checkpoints = model.Checkpoints[:1]
 	cut := "2026-03-10T10:00:00Z"
-	position, err := ResolveCurrentPosition(document, cut, types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, cut, types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	instant := unixAt(10, 10)
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1, AsOfInstant: &instant}
-	prepared, err := PrepareSimulationRequest(document, settings, types.ModelOverrides{}, nil)
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,15 +355,15 @@ func TestExactCutProjectionAgreesWithPositionAndAccountList(t *testing.T) {
 	if manualMoves != 1 {
 		t.Fatalf("11:00 actual simulated %d times, want exactly once", manualMoves)
 	}
-	base := BaseDocumentHash(document, types.ModelOverrides{}, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1}, nil)
-	if got := BaseDocumentHash(document, types.ModelOverrides{}, settings, nil); got == base {
+	base := BaseModelHash(model, types.ModelOverrides{}, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1}, nil)
+	if got := BaseModelHash(model, types.ModelOverrides{}, settings, nil); got == base {
 		t.Fatalf("exact cut must change the cache identity")
 	}
 }
 
 func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 	account := "checking"
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
@@ -376,7 +376,7 @@ func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 	}
 	cut := unixAt(10, 10)
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1, AsOfInstant: &cut}
-	prepared, err := PrepareSimulationRequest(document, settings, types.ModelOverrides{}, nil)
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +386,7 @@ func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 	if prepared.Request.HistoryCutInstant != cut {
 		t.Fatalf("simulation request must carry the history cut, got %v", prepared.Request.HistoryCutInstant)
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T10:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 	accountRow := cashAccount(account)
 	accountRow.MinBalance = &floor
 	cap := 150.0
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{accountRow},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
@@ -427,10 +427,10 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 	drain := account
-	document.Postings = []types.Posting{
+	model.Postings = []types.Posting{
 		{ID: "drain", Name: "Drain", SourceAccountID: &drain, Amount: expenseAmount("1500"), TransactionTime: unixAt(10, 10), PostedTime: unixAt(10, 10), Enabled: true, Source: "user"},
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,13 +446,13 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 }
 
 func TestExactCutDoesNotExecuteDayCloseRuleEarly(t *testing.T) {
-	document := observerFixture()
-	document.Checkpoints = document.Checkpoints[:1]
-	document.Postings = nil
-	document.RecurrenceRules = []types.RecurrenceRule{
+	model := observerFixture()
+	model.Checkpoints = model.Checkpoints[:1]
+	model.Postings = nil
+	model.RecurrenceRules = []types.RecurrenceRule{
 		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T10:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,7 +467,7 @@ func TestExactCutDoesNotExecuteDayCloseRuleEarly(t *testing.T) {
 func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 	account := "checking"
 	source := account
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
@@ -477,7 +477,7 @@ func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -485,7 +485,7 @@ func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 		t.Fatalf("12:00 balance = %v, want 900 (settled bank actual applies)", got)
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1, AsOfInstant: &[]int64{unixAt(10, 12)}[0]}
-	prepared, err := PrepareSimulationRequest(document, settings, types.ModelOverrides{}, nil)
+	prepared, err := PrepareSimulationRequest(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +499,7 @@ func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 	account := "checking"
 	source := account
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
@@ -510,7 +510,7 @@ func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(document, "2026-03-10")
+	replay, err := replayChronologicalHistory(model, "2026-03-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -531,7 +531,7 @@ func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 func TestBankActualsBeforeAndAfterAnchor(t *testing.T) {
 	account := "checking"
 	source := account
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 10)},
@@ -542,7 +542,7 @@ func TestBankActualsBeforeAndAfterAnchor(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -557,7 +557,7 @@ func TestBankActualsBeforeAndAfterAnchor(t *testing.T) {
 func TestImportedTransferLegsAnchorIndependently(t *testing.T) {
 	a, b := "checking", "savings"
 	source := a
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(a), cashAccount(b)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: a, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
@@ -568,7 +568,7 @@ func TestImportedTransferLegsAnchorIndependently(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	position, err := ResolveCurrentPosition(document, "2026-03-10T13:00:00Z", types.ModelOverrides{})
+	position, err := ResolveCurrentPosition(model, "2026-03-10T13:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}

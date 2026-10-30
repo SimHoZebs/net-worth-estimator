@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CaptureState } from "../src/state.js";
 import { createPurchaseSaver } from "../src/save.js";
-import { loadPlan } from "../src/plan.js";
+import { loadModel } from "../src/model.js";
 import { memoryStorage } from "./storage.js";
 
 async function fixture() {
@@ -15,7 +15,7 @@ async function fixture() {
   });
   const identity = { resource: { id: "users/owner", permissions: ["user:write"] } };
   const model = {
-    document: {
+    model: {
       accounts: [{ id: "cash", name: "Cash", kind: "cash", enabled: true }],
       plannedPurchases: [],
     },
@@ -34,7 +34,7 @@ test("unknown saves retry the same purchase UUID and recover duplicate-ID 409", 
       assert.equal(path, "/v1/planned-purchases");
       payloads.push(structuredClone(payload));
       if (payloads.length === 1) {
-        model.document.plannedPurchases.push({
+        model.model.plannedPurchases.push({
           ...structuredClone(payload),
         });
         throw new Error("Network interrupted");
@@ -93,7 +93,7 @@ test("a conflicting saved purchase stays locked and never becomes a false succes
     api: async (path, payload) => {
       if (path === "/v1/financial-model") return model;
       if (path === "/v1/status") return { readOnly: false };
-      model.document.plannedPurchases = [{ ...payload, name: "Changed in the app" }];
+      model.model.plannedPurchases = [{ ...payload, name: "Changed in the app" }];
       throw Object.assign(new Error("Duplicate ID"), { status: 409 });
     },
   };
@@ -124,17 +124,17 @@ test("retry rejections retain an earlier uncertain-save record", async () => {
 
 test("existing model/status reads expose only eligible account labels to the panel", async () => {
   const { model } = await fixture();
-  model.document.accounts.push(
+  model.model.accounts.push(
     { id: "debt", kind: "debt", enabled: true },
     { id: "off", kind: "cash", enabled: false },
     { id: "archived", kind: "cash", enabled: true, archived: true },
   );
-  model.document.accounts[0].balance = "PRIVATE_BALANCE";
-  const plan = await loadPlan(
+  model.model.accounts[0].balance = "PRIVATE_BALANCE";
+  const loaded = await loadModel(
     { api: async (path) => (path === "/v1/status" ? { readOnly: true } : model) },
     "users/owner",
   );
-  assert.deepEqual(plan.accounts, [{ id: "cash", name: "Cash" }]);
-  assert.equal(plan.readOnly, true);
-  assert.doesNotMatch(JSON.stringify(plan), /PRIVATE_BALANCE/);
+  assert.deepEqual(loaded.accounts, [{ id: "cash", name: "Cash" }]);
+  assert.equal(loaded.readOnly, true);
+  assert.doesNotMatch(JSON.stringify(loaded), /PRIVATE_BALANCE/);
 });

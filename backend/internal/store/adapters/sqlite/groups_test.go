@@ -332,7 +332,7 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, err := plan.LoadDocument()
+	before, err := plan.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,12 +350,12 @@ func TestGroupsLeaveFinancialTablesAlone(t *testing.T) {
 	if err := d.RemoveMember(group.ID, alice, bob); err != nil {
 		t.Fatal(err)
 	}
-	after, err := plan.LoadDocument()
+	after, err := plan.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if (before == nil) != (after == nil) {
-		t.Fatalf("document presence changed: %+v -> %+v", before, after)
+		t.Fatalf("model presence changed: %+v -> %+v", before, after)
 	}
 	var counts [2]int
 	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM accounts WHERE user_id = ?`, alice).Scan(&counts[0]); err != nil {

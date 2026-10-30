@@ -17,7 +17,7 @@ type scheduledPurchase struct {
 // cut instant, so candidates always include start-day events and rely on
 // the shared HistoryCutInstant to skip already-replayed occurrences.
 func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCarloSample) types.SimulationRequest {
-	document := path.EffectiveDocument
+	model := path.EffectiveModel
 	var latestHistorical *types.ProjectionRow
 	for index := range path.Rows {
 		row := &path.Rows[index]
@@ -28,15 +28,15 @@ func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCa
 	}
 	includeStartDateEvents := true
 	return types.SimulationRequest{
-		Model: types.FinancialModel{
-			Accounts:         document.Accounts,
-			Postings:         document.Postings,
-			RecurrenceRules:  document.RecurrenceRules,
-			PaymentTerms:     document.PaymentTerms,
-			PlannedPurchases: document.PlannedPurchases,
+		Model: types.SimulationInputs{
+			Accounts:         model.Accounts,
+			Postings:         model.Postings,
+			RecurrenceRules:  model.RecurrenceRules,
+			PaymentTerms:     model.PaymentTerms,
+			PlannedPurchases: model.PlannedPurchases,
 		},
 		InitialState: CloneSimulationState(SimulationState{
-			Balances:                     balancesAt(latestHistorical, document.Accounts),
+			Balances:                     balancesAt(latestHistorical, model.Accounts),
 			LatestRealizedPostingAmounts: path.ProjectionStartPostingState.LatestRealizedPostingAmounts,
 			LatestRealizedPostingDates:   path.ProjectionStartPostingState.LatestRealizedPostingDates,
 			RealizedPostingAmountsByYear: path.ProjectionStartPostingState.RealizedPostingAmountsByYear,
@@ -73,7 +73,7 @@ func appendScheduledPurchases(byDate map[string][]DatedPostingOccurrence, purcha
 
 // simulatePurchases greedily schedules whole purchases in priority order. Each
 // candidate simulation uses the same kernel and funding-gap assessment as public projections.
-// Rejected candidates never change the accepted state or the canonical document.
+// Rejected candidates never change the accepted state or the canonical model.
 //
 // Planned purchases remain separate from canonical money movements. Only this
 // private branch synthesizes executable movements for accepted candidates.
@@ -173,7 +173,7 @@ func fullyFundedPurchase(run *types.SimulationRun, id string) *types.Transaction
 
 func simulationPath(run *types.SimulationRun) *types.ProjectionPath {
 	return BuildStochasticSamplePath(&types.PreparedProjection{
-		EffectiveDocument: types.FinancialModelDocument{
+		EffectiveModel: types.FinancialModel{
 			Accounts: run.Request.Model.Accounts, Postings: run.Request.Model.Postings,
 			RecurrenceRules:  run.Request.Model.RecurrenceRules,
 			PaymentTerms:     run.Request.Model.PaymentTerms,

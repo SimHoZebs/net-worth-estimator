@@ -1,7 +1,7 @@
 package types
 
 // PlannedPurchase is a standalone planned-purchase row, separated from
-// postings. Lower Priority executes first; document order breaks ties.
+// postings. Lower Priority executes first; model order breaks ties.
 // EarliestDate is the earliest buy day; Cost is the fixed positive cost.
 type PlannedPurchase struct {
 	ID               string  `json:"id"`

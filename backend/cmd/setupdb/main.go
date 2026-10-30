@@ -46,8 +46,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 			_ = database.Close()
 			return 1
 		}
-		if err := user.InitializeDocument(); err != nil {
-			fmt.Fprintf(stderr, "initialize document: %v\n", err)
+		if err := user.InitializeModel(); err != nil {
+			fmt.Fprintf(stderr, "initialize model: %v\n", err)
 			_ = database.Close()
 			return 1
 		}

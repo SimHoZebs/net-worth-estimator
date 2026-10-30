@@ -21,13 +21,13 @@ import {
 
 export function TransactionRow({
 	transaction,
-	planTransaction,
+	savedTransaction,
 	onEdit,
 	shortfallLabel,
 }: {
 	transaction: AccountTransaction;
-	planTransaction: Transaction | null;
-	onEdit: (planTransaction: Transaction) => void;
+	savedTransaction: Transaction | null;
+	onEdit: (savedTransaction: Transaction) => void;
 	shortfallLabel?: string;
 }) {
 	const DirectionIcon =
@@ -51,11 +51,11 @@ export function TransactionRow({
 		transaction.counterparty === externalCounterpartyName("out")
 			? null
 			: transaction.counterparty;
-	const receipts = useReceiptLinks(planTransaction?.id ?? "");
-	const finding = useTransactionBNPL(planTransaction?.id ?? "");
+	const receipts = useReceiptLinks(savedTransaction?.id ?? "");
+	const finding = useTransactionBNPL(savedTransaction?.id ?? "");
 	const analysisBadge =
 		finding &&
-		planTransaction?.frequency === "once" &&
+		savedTransaction?.frequency === "once" &&
 		!transaction.pending &&
 		!transaction.void ? (
 			<Badge tone="neutral" className={transactionBadgeStyles()}>
@@ -63,7 +63,7 @@ export function TransactionRow({
 			</Badge>
 		) : null;
 	const receiptBadge =
-		planTransaction && receipts.length > 0 ? (
+		savedTransaction && receipts.length > 0 ? (
 			<Badge tone="neutral" className={transactionBadgeStyles()}>
 				<ReceiptText size={10} aria-hidden="true" />
 				{receipts.length}
@@ -147,9 +147,9 @@ export function TransactionRow({
 			}
 			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}${analysisBadge && finding ? `; ${findingLabel(finding)}` : ""}`}
 			onSelect={() => {
-				if (planTransaction) onEdit(planTransaction);
+				if (savedTransaction) onEdit(savedTransaction);
 			}}
-			selectDisabled={!planTransaction}
+			selectDisabled={!savedTransaction}
 		/>
 	);
 }

@@ -15,16 +15,16 @@ func TestCurrentPositionHTTP(t *testing.T) {
 	handler := New(database, Config{ReadOnly: true})
 	// Reuse the complete golden request, but ask only for its historical position.
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(deterministicTestBody(t), &fixture); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.InitializeDocument(); err != nil {
+	if err := database.InitializeModel(); err != nil {
 		t.Fatal(err)
 	}
-	account := fixture.Document.Accounts[0]
+	account := fixture.Model.Accounts[0]
 	if _, err := database.CreateAccount(account); err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestCurrentPositionHTTP(t *testing.T) {
 	for _, supplied := range []bool{true, false} {
 		body := positionRequestBody{AsOfDate: fixture.Settings.FallbackProjectionStartDate}
 		if supplied {
-			body.Document = fixture.Document
+			body.Model = fixture.Model
 		}
 		encoded, err := json.Marshal(body)
 		if err != nil {

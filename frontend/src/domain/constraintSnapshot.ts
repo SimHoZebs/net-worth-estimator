@@ -8,7 +8,7 @@ import type { TransactionResult, Projection } from "./result.ts";
 
 export interface LedgerRow {
 	transaction: AccountTransaction;
-	planTransaction: Transaction | null;
+	savedTransaction: Transaction | null;
 	failing: boolean;
 }
 
@@ -101,7 +101,7 @@ export function failureLedger({
 		isFailing: boolean,
 	): LedgerRow => ({
 		transaction,
-		planTransaction: transactionsById.get(transaction.transactionId) ?? null,
+		savedTransaction: transactionsById.get(transaction.transactionId) ?? null,
 		failing: isFailing,
 	});
 	const rows = [

@@ -88,8 +88,8 @@ func TestWorkerIsIndependentFromSyncAndRecoversSavedInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, _ := scoped.LoadDocument()
-	revision, _ := store.DocumentETag(before)
+	before, _ := scoped.LoadModel()
+	revision, _ := store.ModelETag(before)
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -100,8 +100,8 @@ func TestWorkerIsIndependentFromSyncAndRecoversSavedInputs(t *testing.T) {
 	if err := runner.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	after, _ := scoped.LoadDocument()
-	afterRevision, _ := store.DocumentETag(after)
+	after, _ := scoped.LoadModel()
+	afterRevision, _ := store.ModelETag(after)
 	if afterRevision != revision || len(after.RecurrenceRules) != 0 {
 		t.Fatal("analysis changed financial state")
 	}

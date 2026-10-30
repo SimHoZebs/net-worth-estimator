@@ -5,12 +5,12 @@ import {
 	userResourceKey,
 	type ServerModel,
 } from "../state/workspaceResources.ts";
-import { serverDocumentFingerprint } from "../state/remoteStorage.ts";
+import { serverModelFingerprint } from "../state/remoteStorage.ts";
 import {
 	financialModelFixture,
 	type FinancialModelFixture,
 } from "./financialModel.ts";
-import { fixtureAmount, fixtureDocument } from "./document.ts";
+import { fixtureAmount, fixtureModel } from "./model.ts";
 
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
@@ -19,15 +19,15 @@ export function setServerModelFixture(
 	data: FinancialModelFixture = financialModelFixture,
 	overrides: Partial<ServerModel> = {},
 ) {
-	const document = fixtureDocument(data);
-	const model: ServerModel = {
-		document,
+	const model = fixtureModel(data);
+	const response: ServerModel = {
+		model,
 		issues: [],
 		revision: '"test-revision"',
-		fingerprint: serverDocumentFingerprint(document),
+		fingerprint: serverModelFingerprint(model),
 		...overrides,
 	};
-	serverQueryClient().setQueryData(userResourceKey("model"), model);
+	serverQueryClient().setQueryData(userResourceKey("model"), response);
 	serverQueryClient().setQueryData([...userResourceKey("balances"), "latest"], {
 		accounts: data.accounts.map((account) => ({
 			...account,
@@ -35,7 +35,7 @@ export function setServerModelFixture(
 			syncOwned: account.readOnly,
 		})),
 		asOf: data.startDate,
-		revision: model.revision,
+		revision: response.revision,
 	});
 	serverQueryClient().setQueryData(
 		[...userResourceKey("transactions"), "", "all"],
@@ -62,14 +62,14 @@ export function setServerModelFixture(
 					Date.parse(`${row.startDate}T00:00:00Z`) / 1000,
 				),
 			})),
-			revision: model.revision,
+			revision: response.revision,
 		},
 	);
 	serverQueryClient().setQueryData(userResourceKey("eval-summary"), {
-		evaluations: document.evaluations,
-		revision: model.revision,
+		evaluations: model.evaluations,
+		revision: response.revision,
 	});
-	return model;
+	return response;
 }
 export function setServerRevisionFixture(revision: string) {
 	const model = getServerModel();

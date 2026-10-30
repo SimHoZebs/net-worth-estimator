@@ -409,9 +409,9 @@ describe("transaction filtering", () => {
 });
 
 describe("bank evidence statuses", () => {
-	function recordedPlan() {
-		const plan = structuredClone(financialModelFixture);
-		plan.transactions.push({
+	function recordedModel() {
+		const model = structuredClone(financialModelFixture);
+		model.transactions.push({
 			id: "01900000-0000-7000-8000-000000000010",
 			name: "Bank settled charge",
 			amount: 18.5,
@@ -419,7 +419,7 @@ describe("bank evidence statuses", () => {
 			fromId: "checking",
 			toId: null,
 			frequency: "once",
-			startDate: plan.startDate,
+			startDate: model.startDate,
 			endDate: null,
 			annualIncrease: 0,
 			enabled: true,
@@ -431,7 +431,7 @@ describe("bank evidence statuses", () => {
 			void: false,
 			syncOwned: true,
 		});
-		plan.transactions.push({
+		model.transactions.push({
 			id: "01900000-0000-7000-8000-000000000011",
 			name: "Owner disabled",
 			amount: 5,
@@ -439,7 +439,7 @@ describe("bank evidence statuses", () => {
 			fromId: "checking",
 			toId: null,
 			frequency: "once",
-			startDate: plan.startDate,
+			startDate: model.startDate,
 			endDate: null,
 			annualIncrease: 0,
 			enabled: false,
@@ -450,17 +450,17 @@ describe("bank evidence statuses", () => {
 			pending: false,
 			void: false,
 		});
-		return plan;
+		return model;
 	}
 
 	it("participates a settled bank row and excludes only owner-disabled rows", () => {
-		const plan = recordedPlan();
+		const model = recordedModel();
 		const rows = accountTransactions({
 			accountId: "checking",
-			accounts: plan.accounts,
-			transactions: plan.transactions,
-			startDate: plan.startDate,
-			projection: activityProjection(plan),
+			accounts: model.accounts,
+			transactions: model.transactions,
+			startDate: model.startDate,
+			projection: activityProjection(model),
 		});
 		expect(
 			rows.find(
@@ -475,8 +475,8 @@ describe("bank evidence statuses", () => {
 	});
 
 	it("excludes an owner-disabled settled bank row like any disabled actual", () => {
-		const plan = recordedPlan();
-		plan.transactions.push({
+		const model = recordedModel();
+		model.transactions.push({
 			id: "01900000-0000-7000-8000-000000000012",
 			name: "Disabled settled bank row",
 			amount: 7.5,
@@ -484,7 +484,7 @@ describe("bank evidence statuses", () => {
 			fromId: "checking",
 			toId: null,
 			frequency: "once",
-			startDate: plan.startDate,
+			startDate: model.startDate,
 			endDate: null,
 			annualIncrease: 0,
 			enabled: false,
@@ -498,10 +498,10 @@ describe("bank evidence statuses", () => {
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
-			accounts: plan.accounts,
-			transactions: plan.transactions,
-			startDate: plan.startDate,
-			projection: activityProjection(plan),
+			accounts: model.accounts,
+			transactions: model.transactions,
+			startDate: model.startDate,
+			projection: activityProjection(model),
 		});
 		expect(
 			rows.find(

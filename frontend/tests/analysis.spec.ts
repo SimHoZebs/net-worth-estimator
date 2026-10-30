@@ -120,7 +120,7 @@ test("Yes confirms BNPL, collects total duration, and preserves the financial mo
 	expect(audit[0].analyzerVersion).toBeTruthy();
 	const after = await (await page.request.get("/v1/financial-model")).json();
 	expect(after.revision).toBe(before.revision);
-	expect(after.document).toEqual(before.document);
+	expect(after.model).toEqual(before.model);
 	const results = await new AxeBuilder({ page })
 		.disableRules(["color-contrast"])
 		.analyze();

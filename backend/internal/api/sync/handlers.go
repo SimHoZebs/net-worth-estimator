@@ -114,9 +114,9 @@ func (s *handler) getSyncCredential(_ context.Context, _ *struct{}) (*syncCreden
 	return &syncCredentialOutput{Body: body}, nil
 }
 
-// connectSyncCredential stores a per-plan Bridge key. Like account links,
-// the credential is scoped to the calling plan; only the primary owner's
-// runner consumes it, so a non-primary plan reports configured here while
+// connectSyncCredential stores a user-scoped Bridge key. Like account links,
+// the credential belongs to the calling user; only the primary owner's
+// runner consumes it, so a non-primary user reports configured here while
 // its own trigger stays 503.
 func (s *handler) connectSyncCredential(ctx context.Context, input *syncCredentialInput) (*syncCredentialOutput, error) {
 	setupToken := strings.TrimSpace(input.Body.SetupToken)
@@ -157,7 +157,7 @@ func (s *handler) connectSyncCredential(ctx context.Context, input *syncCredenti
 	// the manual interval: it still honors the in-flight guard and the
 	// post-429 blackout, and it leaves lastTrigger untouched so the manual
 	// throttle is not overridden. Best-effort: a throttled or failed sync
-	// never fails the connect itself. Only the primary plan has a runner;
+	// never fails the connect itself. Only the primary user has a runner;
 	// other plans just store their key.
 	if wasInitial && s.runner != nil {
 		if summary, err := s.runner.Sync(ctx); err != nil {
@@ -207,11 +207,11 @@ func (s *handler) setSyncCards(_ context.Context, input *syncCardsInput) (*syncC
 		seen[trimmed] = struct{}{}
 		cleaned = append(cleaned, trimmed)
 	}
-	if document, err := s.store.LoadDocument(); err != nil {
+	if model, err := s.store.LoadModel(); err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
-	} else if document != nil && len(cleaned) > 0 {
+	} else if model != nil && len(cleaned) > 0 {
 		known := map[string]struct{}{}
-		for _, account := range document.Accounts {
+		for _, account := range model.Accounts {
 			known[account.ID] = struct{}{}
 		}
 		for _, id := range cleaned {

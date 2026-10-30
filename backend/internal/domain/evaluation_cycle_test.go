@@ -24,7 +24,7 @@ func cycleEvent(date, postingID, accountID string, delta float64, sequence int) 
 func cyclePath(start string, postings []types.Posting, events []types.TransactionEvent, buckets map[string]map[string]float64) *types.ProjectionPath {
 	path := &types.ProjectionPath{
 		TransactionEvents:   events,
-		EffectiveDocument:   types.FinancialModelDocument{Postings: postings},
+		EffectiveModel:      types.FinancialModel{Postings: postings},
 		ProjectionStartDate: types.IsoDate(start),
 		ProjectionEndDate:   types.IsoDate("2027-09-20"),
 	}
@@ -78,10 +78,10 @@ func TestParseCycleFulfillmentConfig(t *testing.T) {
 	}
 }
 
-// A cycle evaluation pointing at an account the document does not contain must be
+// A cycle evaluation pointing at an account the model does not contain must be
 // reported rather than silently evaluating against nothing.
 func TestValidateFinancialModelFlagsDanglingCycleFulfillmentEvaluation(t *testing.T) {
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		SourcePath: "test",
 		Accounts: []types.Account{
 			{ID: "checking", Name: "Checking", Enabled: true},
@@ -97,7 +97,7 @@ func TestValidateFinancialModelFlagsDanglingCycleFulfillmentEvaluation(t *testin
 			}},
 		},
 	}
-	issues := ValidateFinancialModel(document)
+	issues := ValidateFinancialModel(model)
 	found := false
 	for _, issue := range issues {
 		if issue.Code == "evaluation.cycleFulfillment.accountId.invalid" {
@@ -112,7 +112,7 @@ func TestValidateFinancialModelFlagsDanglingCycleFulfillmentEvaluation(t *testin
 // A valid cycle evaluation must not raise an account reference issue for its own
 // table.
 func TestValidateFinancialModelAcceptsLiveCycleFulfillmentEvaluation(t *testing.T) {
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		SourcePath: "test",
 		Accounts: []types.Account{
 			{ID: "prime_card", Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
@@ -128,7 +128,7 @@ func TestValidateFinancialModelAcceptsLiveCycleFulfillmentEvaluation(t *testing.
 			}},
 		},
 	}
-	for _, issue := range ValidateFinancialModel(document) {
+	for _, issue := range ValidateFinancialModel(model) {
 		if issue.Code == "evaluation.cycleFulfillment.accountId.invalid" || issue.Code == "evaluation.config.invalid" {
 			t.Fatalf("unexpected cycle issue: %+v", issue)
 		}

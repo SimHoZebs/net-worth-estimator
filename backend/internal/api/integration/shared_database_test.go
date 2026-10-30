@@ -37,7 +37,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 		}
 		handlers[i] = New(stores[i], Config{ResourceID: resource.ID})
 	}
-	read := func(handler http.Handler) *types.FinancialModelDocument {
+	read := func(handler http.Handler) *types.FinancialModel {
 		t.Helper()
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
@@ -45,17 +45,17 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 			t.Fatalf("read: %d %s", response.Code, response.Body.String())
 		}
 		var payload struct {
-			Document *types.FinancialModelDocument `json:"document"`
+			Model *types.FinancialModel `json:"model"`
 		}
 		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 			t.Fatal(err)
 		}
-		return payload.Document
+		return payload.Model
 	}
 	for i, name := range []string{"alice", "bob"} {
-		document := read(handlers[i])
-		if document == nil || len(document.Accounts) != 1 || document.Accounts[0].Name != name {
-			t.Fatalf("account %s read another scope: %+v", name, document)
+		model := read(handlers[i])
+		if model == nil || len(model.Accounts) != 1 || model.Accounts[0].Name != name {
+			t.Fatalf("account %s read another scope: %+v", name, model)
 		}
 	}
 	request := httptest.NewRequest(http.MethodPatch, "/v1/accounts/same-id", bytes.NewBufferString(`{"name":"Alice edited","kind":"cash","enabled":true}`))
@@ -65,11 +65,11 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("update: %d %s", response.Code, response.Body.String())
 	}
-	if document := read(handlers[0]); document == nil || len(document.Accounts) != 1 || document.Accounts[0].Name != "Alice edited" {
-		t.Fatalf("update did not persist in selected scope: %+v", document)
+	if model := read(handlers[0]); model == nil || len(model.Accounts) != 1 || model.Accounts[0].Name != "Alice edited" {
+		t.Fatalf("update did not persist in selected scope: %+v", model)
 	}
-	if document := read(handlers[1]); document == nil || len(document.Accounts) != 1 || document.Accounts[0].Name != "bob" {
-		t.Fatalf("update crossed the API plan boundary: %+v", document)
+	if model := read(handlers[1]); model == nil || len(model.Accounts) != 1 || model.Accounts[0].Name != "bob" {
+		t.Fatalf("update crossed the API plan boundary: %+v", model)
 	}
 	if _, err := stores[1].CreateAccount(types.Account{ID: "bob-only", Name: "Private destination", Kind: "cash", Enabled: true}); err != nil {
 		t.Fatal(err)
@@ -95,8 +95,8 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	if err := stores[0].Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if document := read(handlers[1]); document == nil || len(document.Accounts) != 2 || document.Accounts[0].Name != "bob" {
-		t.Fatalf("clear crossed the API plan boundary: %+v", document)
+	if model := read(handlers[1]); model == nil || len(model.Accounts) != 2 || model.Accounts[0].Name != "bob" {
+		t.Fatalf("clear crossed the API plan boundary: %+v", model)
 	}
 }
 
@@ -111,13 +111,13 @@ func TestSharedDatabaseAPIProjectionResultsRemainUserScoped(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatal(err)
 	}

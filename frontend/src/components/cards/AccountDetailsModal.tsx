@@ -120,7 +120,7 @@ export function AccountDetailsModal({
 	const selected = selectedId
 		? (ledger.find((transaction) => transaction.id === selectedId) ?? null)
 		: null;
-	const selectedPlanTransaction = selected
+	const selectedSavedTransaction = selected
 		? (savedById.get(selected.transactionId) ?? null)
 		: null;
 	return (
@@ -221,7 +221,7 @@ export function AccountDetailsModal({
 							<TransactionRow
 								key={transaction.id}
 								transaction={transaction}
-								planTransaction={
+								savedTransaction={
 									savedById.get(transaction.transactionId) ?? null
 								}
 								onEdit={() => setSelectedId(transaction.id)}
@@ -259,10 +259,10 @@ export function AccountDetailsModal({
 					</span>
 				)}
 			</p>
-			{selected && selectedPlanTransaction && (
+			{selected && selectedSavedTransaction && (
 				<TransactionDetail
 					transaction={selected}
-					planTransaction={selectedPlanTransaction}
+					savedTransaction={selectedSavedTransaction}
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}

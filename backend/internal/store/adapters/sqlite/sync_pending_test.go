@@ -53,7 +53,7 @@ func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	if first.PendingInserted != 1 {
 		t.Fatalf("insert = %+v", first)
 	}
-	before, err := database.LoadDocument()
+	before, err := database.LoadModel()
 	if err != nil || len(before.Postings) != 1 {
 		t.Fatalf("rows = %+v, err %v", before, err)
 	}
@@ -67,7 +67,7 @@ func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	if second.PendingUpdated != 1 || second.PendingInserted != 0 {
 		t.Fatalf("update = %+v", second)
 	}
-	after, err := database.LoadDocument()
+	after, err := database.LoadModel()
 	if err != nil || len(after.Postings) != 1 || after.Postings[0].ID != id || after.Postings[0].Name != "Corner Store updated" {
 		t.Fatalf("update changed identity or missed values: %+v", after)
 	}
@@ -88,7 +88,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 		Posting: bankSeedPosting("Pending", "prime_card", "10", true),
 		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
 	}}})
-	loaded, err := database.LoadDocument()
+	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 1 {
 		t.Fatal("seed missing")
 	}
@@ -102,7 +102,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 	if summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v", summary)
 	}
-	after, err := database.LoadDocument()
+	after, err := database.LoadModel()
 	if err != nil || len(after.Postings) != 1 {
 		t.Fatal("convert changed row count")
 	}
@@ -123,7 +123,7 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 		Posting: bankSeedPosting("Pending", "prime_card", "10", true),
 		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
 	}}})
-	loaded, err := database.LoadDocument()
+	loaded, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 	if second.PendingDeleted != 0 {
 		t.Fatalf("repeat void churned: %+v", second)
 	}
-	after, err := database.LoadDocument()
+	after, err := database.LoadModel()
 	if err != nil || len(after.Postings) != 1 || after.Postings[0].Pending || !after.Postings[0].Void {
 		t.Fatalf("void row = %+v, %v", after, err)
 	}

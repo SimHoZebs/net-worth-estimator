@@ -14,9 +14,9 @@ import {
 
 export function useWorkspaceSyncMonitor(enabled: boolean): void {
 	// Keyed on the scope epoch: the caller re-renders on scope change, so a
-	// ready-to-ready plan switch re-runs the effect and recaptures scope.
+	// ready-to-ready user switch re-runs the effect and recaptures scope.
 	// Keying on `enabled` alone left a stale capture whose guard bailed on
-	// every poll after a plan switch.
+	// every poll after a user switch.
 	const scopeKey = getUserScope().key;
 	useEffect(() => {
 		if (!enabled) return;

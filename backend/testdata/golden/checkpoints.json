@@ -1,5 +1,5 @@
 {
-  "document": {
+  "model": {
     "sourcePath": "/configs",
     "accounts": [
       {
@@ -492,7 +492,7 @@
         ]
       }
     ],
-    "effectiveDocument": {
+    "effectiveModel": {
       "sourcePath": "/configs",
       "accounts": [
         {

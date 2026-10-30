@@ -56,31 +56,31 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 	})
 }
 
-// seedOwnerDocument writes the owner fixture through row CRUD, replacing
-// the retired whole-document save in tests.
-func seedOwnerDocument(t *testing.T, store store.Store) {
+// seedOwnerModel writes the owner fixture through row CRUD, replacing
+// the retired whole-model save in tests.
+func seedOwnerModel(t *testing.T, store store.Store) {
 	t.Helper()
-	document := ownerDocument()
-	for _, account := range document.Accounts {
+	model := ownerModel()
+	for _, account := range model.Accounts {
 		if _, err := store.CreateAccount(account); err != nil {
 			t.Fatalf("seed account %s: %v", account.ID, err)
 		}
 	}
-	for _, checkpoint := range document.Checkpoints {
+	for _, checkpoint := range model.Checkpoints {
 		if _, err := store.SaveCheckpoint(checkpoint); err != nil {
 			t.Fatalf("seed checkpoint: %v", err)
 		}
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if _, err := store.CreatePosting(posting); err != nil {
 			t.Fatalf("seed posting %s: %v", posting.ID, err)
 		}
 	}
 }
 
-func ownerDocument() *types.FinancialModelDocument {
+func ownerModel() *types.FinancialModel {
 	checking := "checking"
-	return &types.FinancialModelDocument{
+	return &types.FinancialModel{
 		SourcePath: "test-source",
 		Accounts: []types.Account{{
 			ID: "checking", Name: "Checking", Enabled: true,
@@ -115,19 +115,19 @@ func seedSyncState(t *testing.T, store store.Store) {
 
 func loadPostingIDs(t *testing.T, store store.Store) (ids []string, sources map[string]string) {
 	t.Helper()
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
-	return postingIDsFromDocument(loaded)
+	return postingIDsFromModel(loaded)
 }
 
-func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []string, sources map[string]string) {
+func postingIDsFromModel(model *types.FinancialModel) (ids []string, sources map[string]string) {
 	sources = map[string]string{}
-	if document == nil {
+	if model == nil {
 		return ids, sources
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		ids = append(ids, posting.ID)
 		sources[posting.ID] = posting.Source
 	}
@@ -136,7 +136,7 @@ func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []strin
 
 func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 	store := openTestStore(t)
-	seedOwnerDocument(t, store)
+	seedOwnerModel(t, store)
 	seedSyncState(t, store)
 	if _, err := store.SaveAccountLink(AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", BridgeName: "College"}); err != nil {
 		t.Fatalf("seed link: %v", err)
@@ -144,7 +144,7 @@ func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 	if err := store.DeleteAccount("checking"); err == nil {
 		t.Fatal("deleted an account referenced by financial rows")
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil || loaded == nil {
 		t.Fatalf("load after account delete = %+v, err %v", loaded, err)
 	}
@@ -185,10 +185,10 @@ func TestPostingIDsMustBeUUIDs(t *testing.T) {
 
 func TestRemergePreservesProviderSources(t *testing.T) {
 	// A second bank-data provider (stand-in "plaid") coexists with SimpleFIN
-	// rows. Document replace must keep every provider's source value so
+	// rows. Model replace must keep every provider's source value so
 	// metrics and debugging can tell origins apart.
 	store := openSQLiteStore(t)
-	seedOwnerDocument(t, store)
+	seedOwnerModel(t, store)
 	seedSyncRows(t, store)
 	execSyncSetup(t, store, []string{
 		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, observed_at, user_id) VALUES (11, 11, 'checking', 222, 'plaid', 1785715199, :user_id)`,
@@ -201,13 +201,13 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 		t.Fatalf("begin replace: %v", err)
 	}
 	defer tx.Rollback()
-	if err := replaceDocument(tx, ownerDocument()); err != nil {
+	if err := replaceModel(tx, ownerModel()); err != nil {
 		t.Fatalf("replace: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("commit replace: %v", err)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -263,13 +263,13 @@ func countRows(t *testing.T, store *sqliteStore, table, where string) int {
 	return count
 }
 
-// findCheckpoint locates one checkpoint in a loaded document for
+// findCheckpoint locates one checkpoint in a loaded model for
 // interface-level assertions (replacing raw SQL row checks).
-func findCheckpoint(document *types.FinancialModelDocument, accountID string, observedAt int64) (types.Checkpoint, bool) {
-	if document == nil {
+func findCheckpoint(model *types.FinancialModel, accountID string, observedAt int64) (types.Checkpoint, bool) {
+	if model == nil {
 		return types.Checkpoint{}, false
 	}
-	for _, checkpoint := range document.Checkpoints {
+	for _, checkpoint := range model.Checkpoints {
 		if checkpoint.AccountID == accountID && checkpoint.ObservedAt == observedAt {
 			return checkpoint, true
 		}
@@ -278,13 +278,13 @@ func findCheckpoint(document *types.FinancialModelDocument, accountID string, ob
 }
 
 // syncedPendingIDs lists explicitly pending sync posting IDs in a loaded
-// document, replacing raw COUNT queries over the postings table.
-func syncedPendingIDs(document *types.FinancialModelDocument) []string {
+// model, replacing raw COUNT queries over the postings table.
+func syncedPendingIDs(model *types.FinancialModel) []string {
 	var ids []string
-	if document == nil {
+	if model == nil {
 		return ids
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if posting.Pending && posting.Source != SourceUser {
 			ids = append(ids, posting.ID)
 		}
@@ -329,11 +329,11 @@ func TestApplySyncPlanConvertsNamedRowKeepingUUID(t *testing.T) {
 	if _, err := store.ApplySyncPlan(nil, []BankDirective{syncPendingDirective(seed)}); err != nil {
 		t.Fatal(err)
 	}
-	document, err := store.LoadDocument()
-	if err != nil || len(document.Postings) != 1 {
+	model, err := store.LoadModel()
+	if err != nil || len(model.Postings) != 1 {
 		t.Fatal("seed pending missing")
 	}
-	id := document.Postings[0].ID
+	id := model.Postings[0].ID
 	settled := syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03")
 	settled.Source = SourceSimpleFIN
 	summary, err := store.ApplySyncPlan(nil, []BankDirective{{Convert: &BankConvert{
@@ -344,7 +344,7 @@ func TestApplySyncPlanConvertsNamedRowKeepingUUID(t *testing.T) {
 	if err != nil || summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v, err %v", summary, err)
 	}
-	converted, err := store.LoadDocument()
+	converted, err := store.LoadModel()
 	if err != nil || len(converted.Postings) != 1 {
 		t.Fatal("convert changed row count")
 	}
@@ -369,12 +369,12 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	}}}); err != nil {
 		t.Fatal(err)
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	var id string
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if posting.Name == "Corner Store" {
 			id = posting.ID
 		}

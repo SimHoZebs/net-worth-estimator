@@ -55,7 +55,7 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	config.Components.Schemas = huma.NewMapRegistry("#/components/schemas/", waypointSchemaNamer)
 	api := humachi.New(router, config)
 	api.UseMiddleware(readOnlyMiddleware(api, serverConfig.ReadOnly))
-	documentRawRoutes(api)
+	modelRawRoutes(api)
 	receiptService := receipts.NewService(st, serverConfig.ReceiptSource, serverConfig.ResourceID)
 	receipthttp.Register(api, receiptService, st)
 	analyses.Register(api, st, serverConfig.CanWrite, serverConfig.Actor)

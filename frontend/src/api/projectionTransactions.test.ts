@@ -3,7 +3,7 @@ import { deriveFundingGaps } from "../domain/fundingGaps.ts";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import { projectionFixture } from "../mocks/projection.ts";
 import type {
-	FinancialModelDocument,
+	FinancialModel,
 	TransactionEvent,
 	ProjectionResult,
 } from "./contracts.ts";
@@ -114,8 +114,8 @@ describe("projection transaction evidence", () => {
 		).toEqual(["z-first", "a-second"]);
 	});
 
-	it("resolves names from the document index with postings winning ties", () => {
-		const document = {
+	it("resolves names from the model index with postings winning ties", () => {
+		const model = {
 			checkpoints: [],
 			postings: [
 				{
@@ -135,10 +135,10 @@ describe("projection transaction evidence", () => {
 					enabled: true,
 				},
 			],
-		} as unknown as FinancialModelDocument;
+		} as unknown as FinancialModel;
 		const transactions = projectionTransactions(
 			serverProjection([event()]),
-			document,
+			model,
 		);
 		expect(transactions[0]).toMatchObject({
 			transactionId: "bill",

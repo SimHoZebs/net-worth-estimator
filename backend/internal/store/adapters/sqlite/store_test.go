@@ -10,23 +10,23 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestRowWritesMarkDocumentPresent(t *testing.T) {
+func TestRowWritesMarkModelPresent(t *testing.T) {
 	store := openTestStore(t)
-	exists, err := store.DocumentExists()
+	exists, err := store.ModelExists()
 	if err != nil || exists {
 		t.Fatalf("fresh presence = %v, err %v", exists, err)
 	}
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
 		t.Fatalf("create account: %v", err)
 	}
-	exists, err = store.DocumentExists()
+	exists, err = store.ModelExists()
 	if err != nil || !exists {
 		t.Fatalf("presence after write = %v, err %v", exists, err)
 	}
 	if err := store.Clear(); err != nil {
 		t.Fatalf("clear: %v", err)
 	}
-	exists, err = store.DocumentExists()
+	exists, err = store.ModelExists()
 	if err != nil || exists {
 		t.Fatalf("presence after clear = %v, err %v", exists, err)
 	}
@@ -80,9 +80,9 @@ func TestStoreRoundTripsPaymentTerms(t *testing.T) {
 			t.Fatalf("save terms: %v", err)
 		}
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
 	if !reflect.DeepEqual(loaded.PaymentTerms, want) {
 		t.Fatalf("payment terms changed: got %+v, want %+v", loaded.PaymentTerms, want)

@@ -118,7 +118,7 @@ func TestExtractionFailureCasesKeepAttachment(t *testing.T) {
 		{"timeout", receipts.ExtractionResult{}, context.DeadlineExceeded, "timeout"},
 		{"canceled", receipts.ExtractionResult{}, context.Canceled, "canceled"},
 		{"rate-limit", receipts.ExtractionResult{}, &receipts.Error{ReceiptProblem: types.ReceiptProblem{Code: "rate-limited", Message: "Try later.", Retryable: true, RetryAfterSeconds: 30}}, "rate-limited"},
-		{"non-receipt", receipts.ExtractionResult{}, receipts.Failure("unrecognized-document", "No receipt details found.", false), "unrecognized-document"},
+		{"non-receipt", receipts.ExtractionResult{}, receipts.Failure("unrecognized-model", "No receipt details found.", false), "unrecognized-model"},
 		{"unavailable", receipts.ExtractionResult{}, errors.New("secret upstream URL and private text"), "unavailable"},
 		{"malformed", receipts.ExtractionResult{Details: types.ReceiptDetails{Currency: "EUR"}}, nil, "invalid-result"},
 	}
@@ -196,7 +196,7 @@ func TestManualModeStalenessAndDiagnostics(t *testing.T) {
 	if _, err := svc.Review(r.ID, r.Revision-1, *r.Confirmed, true); !errors.Is(err, store.ErrReceiptConflict) {
 		t.Fatal(err)
 	}
-	doc, _ := db.LoadDocument()
+	doc, _ := db.LoadModel()
 	p := doc.Postings[0]
 	p.Name = "Changed"
 	if _, err := db.UpdatePosting(p); err != nil {

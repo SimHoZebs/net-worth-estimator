@@ -6,7 +6,7 @@ import type {
 	BackendPosting,
 	BackendRecurrenceRule,
 	EvaluationInstance,
-	FinancialModelDocument,
+	FinancialModel,
 	ModelValidationIssue,
 } from "@/api/contracts.ts";
 import {
@@ -176,11 +176,11 @@ function diffOrdered<T>(
 	return operations;
 }
 
-export function diffFinancialModelDocuments(
-	base: FinancialModelDocument | null,
-	next: FinancialModelDocument,
+export function diffFinancialModels(
+	base: FinancialModel | null,
+	next: FinancialModel,
 ): RowOperation[] {
-	const empty: FinancialModelDocument = {
+	const empty: FinancialModel = {
 		sourcePath: "",
 		accounts: [],
 		checkpoints: [],
@@ -279,21 +279,21 @@ export function diffFinancialModelDocuments(
 	}
 
 	const evalTables = (
-		document: FinancialModelDocument,
+		model: FinancialModel,
 	): { type: string; rows: EvaluationInstance[] }[] => [
 		{
 			type: "financialIndependence",
-			rows: document.evaluations.financialIndependence,
+			rows: model.evaluations.financialIndependence,
 		},
-		{ type: "netWorthThreshold", rows: document.evaluations.netWorthThreshold },
-		{ type: "accountBalance", rows: document.evaluations.accountBalance },
+		{ type: "netWorthThreshold", rows: model.evaluations.netWorthThreshold },
+		{ type: "accountBalance", rows: model.evaluations.accountBalance },
 		{
 			type: "postingFulfillment",
-			rows: document.evaluations.postingFulfillment,
+			rows: model.evaluations.postingFulfillment,
 		},
 		{
 			type: "cycleFulfillment",
-			rows: document.evaluations.cycleFulfillment ?? [],
+			rows: model.evaluations.cycleFulfillment ?? [],
 		},
 	];
 	const baseEvalByID = new Map<
@@ -370,7 +370,7 @@ export async function applyRowOperations(
 		if (options.signal?.aborted)
 			return issues.length ? { ok: false, issues } : { ok: true, issues };
 		// A scope change retires the remaining writes instead of sending a
-		// request computed for one plan against another plan's workspace.
+		// request computed for one user against another user's workspace.
 		if (scope !== getUserScope()) return new UserScopeError();
 		let outcome: Error | ModelValidationIssue[] | null;
 		switch (operation.kind) {

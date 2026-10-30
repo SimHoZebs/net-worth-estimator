@@ -5,7 +5,7 @@ import {
 	canonicalApiBaseUrl,
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
-import type { FinancialModelDocument } from "../api/index.ts";
+import type { FinancialModel } from "../api/index.ts";
 import type { PlannedPurchase } from "../domain/model.ts";
 import { acceptOwnerResource } from "../mocks/resource.ts";
 import { ok } from "../mocks/fetch.ts";
@@ -51,7 +51,7 @@ function wish(
 	};
 }
 
-function seedPurchases(): FinancialModelDocument {
+function seedPurchases(): FinancialModel {
 	const model = modelFixture();
 	model.plannedPurchases = [
 		purchaseRow(wish("laptop"), 0),
@@ -297,7 +297,7 @@ it("fails on resource switch during the refresh, not just the request", async ()
 	// resource that is no longer current: no success, no stale notice.
 	acceptOwnerResource("users/b");
 	releaseModel(
-		ok({ document: seedPurchases(), issues: [], revision: '"sha256-test"' }),
+		ok({ model: seedPurchases(), issues: [], revision: '"sha256-test"' }),
 	);
 	await expect(pending).resolves.toBe(false);
 	expect(

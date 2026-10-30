@@ -40,13 +40,13 @@ func rangeBody(t *testing.T, r *projectionRange) []byte {
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	raw, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: r})
+	raw, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: r})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}

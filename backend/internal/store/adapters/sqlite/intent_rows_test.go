@@ -19,7 +19,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create with balance: %v", err)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	); err != nil {
 		t.Fatalf("update with balance: %v", err)
 	}
-	loaded, err = store.LoadDocument()
+	loaded, err = store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	); err != nil {
 		t.Fatalf("update without balance: %v", err)
 	}
-	loaded, err = store.LoadDocument()
+	loaded, err = store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	); !IsNotFound(err) {
 		t.Fatalf("update missing err = %v, want not-found", err)
 	}
-	loaded, err = store.LoadDocument()
+	loaded, err = store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestConvertPostingToRuleKeepsIdentity(t *testing.T) {
 	if rule.ID != "01900000-0000-7000-8000-000000000001" {
 		t.Fatalf("converted rule id = %q, want the posting id", rule.ID)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestConvertRuleToPostingAppendsOwnerRow(t *testing.T) {
 	if posting.ID != "once-day" || posting.Source != SourceUser || posting.Pending {
 		t.Fatalf("converted posting = %+v", posting)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestPostingEditLeavesStandalonePurchasesUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestUpdateEvaluationMovesType(t *testing.T) {
 	if moved.Type != "accountBalance" {
 		t.Fatalf("type = %q, want accountBalance", moved.Type)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

@@ -34,21 +34,21 @@ func TestCreateAccountWithBalanceWritesCheckpoint(t *testing.T) {
 	if !created.Persisted || created.Row.ID == "" {
 		t.Fatalf("create = %+v", created)
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.Accounts) != 1 || document.Accounts[0].ID != created.Row.ID {
-		t.Fatalf("accounts = %+v", document.Accounts)
+	if len(model.Accounts) != 1 || model.Accounts[0].ID != created.Row.ID {
+		t.Fatalf("accounts = %+v", model.Accounts)
 	}
-	if len(document.Checkpoints) != 1 {
-		t.Fatalf("checkpoints = %+v, want the opening observation", document.Checkpoints)
+	if len(model.Checkpoints) != 1 {
+		t.Fatalf("checkpoints = %+v, want the opening observation", model.Checkpoints)
 	}
-	got := document.Checkpoints[0]
+	got := model.Checkpoints[0]
 	if got.AccountID != created.Row.ID || got.ObservedAt != 1772409599 || got.Balance != 2500 || got.Source != store.SourceUser {
 		t.Fatalf("checkpoint = %+v", got)
 	}
-	assertSavedPlanIdentity(t, database, created.Revision)
+	assertSavedModelIdentity(t, database, created.Revision)
 }
 
 func TestAccountBalanceValidation(t *testing.T) {
@@ -66,12 +66,12 @@ func TestAccountBalanceValidation(t *testing.T) {
 	if rejected.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422, body %s", rejected.Code, rejected.Body.String())
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if document != nil && (len(document.Accounts) != 0 || len(document.Checkpoints) != 0) {
-		t.Fatalf("rejected writes must leave no rows: %+v", document)
+	if model != nil && (len(model.Accounts) != 0 || len(model.Checkpoints) != 0) {
+		t.Fatalf("rejected writes must leave no rows: %+v", model)
 	}
 }
 
@@ -88,12 +88,12 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 	if updated.Code != http.StatusOK {
 		t.Fatalf("update status = %d, body %s", updated.Code, updated.Body.String())
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.Checkpoints) != 2 {
-		t.Fatalf("checkpoints = %+v, want both observations", document.Checkpoints)
+	if len(model.Checkpoints) != 2 {
+		t.Fatalf("checkpoints = %+v, want both observations", model.Checkpoints)
 	}
 	// Balance omitted: the account updates without touching checkpoints.
 	renamed := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/checking",
@@ -101,12 +101,12 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 	if renamed.Code != http.StatusOK {
 		t.Fatalf("rename status = %d, body %s", renamed.Code, renamed.Body.String())
 	}
-	document, err = database.LoadDocument()
+	model, err = database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.Checkpoints) != 2 || document.Accounts[0].Name != "Renamed" {
-		t.Fatalf("rename must not write checkpoints: %+v", document)
+	if len(model.Checkpoints) != 2 || model.Accounts[0].Name != "Renamed" {
+		t.Fatalf("rename must not write checkpoints: %+v", model)
 	}
 	// Updating a missing account writes nothing, including no checkpoint.
 	missing := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/ghost",
@@ -114,12 +114,12 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404, body %s", missing.Code, missing.Body.String())
 	}
-	document, err = database.LoadDocument()
+	model, err = database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.Checkpoints) != 2 {
-		t.Fatalf("failed update must not write checkpoints: %+v", document.Checkpoints)
+	if len(model.Checkpoints) != 2 {
+		t.Fatalf("failed update must not write checkpoints: %+v", model.Checkpoints)
 	}
 }
 
@@ -185,11 +185,11 @@ func TestUpdateRuleKeepsUnmodeledFields(t *testing.T) {
 	if updated.Row.AnnualCap == nil || *updated.Row.AnnualCap != 500 {
 		t.Fatalf("annualCap = %+v, want stored 500 kept", updated.Row.AnnualCap)
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	stored := document.RecurrenceRules[0]
+	stored := model.RecurrenceRules[0]
 	if stored.Priority != 7 || stored.AnnualCap == nil || *stored.AnnualCap != 500 {
 		t.Fatalf("stored rule = %+v", stored)
 	}
@@ -217,15 +217,15 @@ func TestUpdateEvaluationMovesType(t *testing.T) {
 	if moved.Code != http.StatusOK {
 		t.Fatalf("move status = %d, body %s", moved.Code, moved.Body.String())
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.Evaluations.NetWorthThreshold) != 0 {
-		t.Fatalf("old table = %+v, want empty", document.Evaluations.NetWorthThreshold)
+	if len(model.Evaluations.NetWorthThreshold) != 0 {
+		t.Fatalf("old table = %+v, want empty", model.Evaluations.NetWorthThreshold)
 	}
-	if len(document.Evaluations.AccountBalance) != 1 || document.Evaluations.AccountBalance[0].InstanceID != "goal" {
-		t.Fatalf("new table = %+v", document.Evaluations.AccountBalance)
+	if len(model.Evaluations.AccountBalance) != 1 || model.Evaluations.AccountBalance[0].InstanceID != "goal" {
+		t.Fatalf("new table = %+v", model.Evaluations.AccountBalance)
 	}
 	pins, err := database.ListPinnedEvaluations()
 	if err != nil {
@@ -256,15 +256,15 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 	if convert.Code != http.StatusOK {
 		t.Fatalf("convert status = %d, body %s", convert.Code, convert.Body.String())
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.RecurrenceRules) != 0 {
-		t.Fatalf("rules = %+v, want the old row gone", document.RecurrenceRules)
+	if len(model.RecurrenceRules) != 0 {
+		t.Fatalf("rules = %+v, want the old row gone", model.RecurrenceRules)
 	}
-	if len(document.Postings) != 1 || document.Postings[0].ID != created.Row.ID || document.Postings[0].Name != "Invest" {
-		t.Fatalf("postings = %+v", document.Postings)
+	if len(model.Postings) != 1 || model.Postings[0].ID != created.Row.ID || model.Postings[0].Name != "Invest" {
+		t.Fatalf("postings = %+v", model.Postings)
 	}
 
 	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Row.ID+"/convert",
@@ -272,12 +272,12 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 	if back.Code != http.StatusOK {
 		t.Fatalf("convert back status = %d, body %s", back.Code, back.Body.String())
 	}
-	document, err = database.LoadDocument()
+	model, err = database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(document.Postings) != 0 || len(document.RecurrenceRules) != 1 {
-		t.Fatalf("round trip tables = %+v / %+v", document.Postings, document.RecurrenceRules)
+	if len(model.Postings) != 0 || len(model.RecurrenceRules) != 1 {
+		t.Fatalf("round trip tables = %+v / %+v", model.Postings, model.RecurrenceRules)
 	}
 
 	sameKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Row.ID+"/convert",
@@ -319,11 +319,11 @@ func TestPostingAPIRejectsRetiredPurchaseMarker(t *testing.T) {
 	if created.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("retired marker accepted: %d %s", created.Code, created.Body.String())
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if document != nil && len(document.Postings) != 0 {
+	if model != nil && len(model.Postings) != 0 {
 		t.Fatal("retired payload became a real movement")
 	}
 }
@@ -340,14 +340,14 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	}
 	storedDestinations := func() []string {
 		t.Helper()
-		document, err := database.LoadDocument()
+		model, err := database.LoadModel()
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
-		if len(document.Postings) != 1 {
-			t.Fatalf("postings = %+v, want 1", document.Postings)
+		if len(model.Postings) != 1 {
+			t.Fatalf("postings = %+v, want 1", model.Postings)
 		}
-		return document.Postings[0].Destinations
+		return model.Postings[0].Destinations
 	}
 	amount := `{"resolver":"expression","config":{"expression":"10"},"inputs":{}}`
 	postingBody := func(destinations string) string {
@@ -397,11 +397,11 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	if toRule.Code != http.StatusOK {
 		t.Fatalf("convert status = %d, body %s", toRule.Code, toRule.Body.String())
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	for _, existing := range document.RecurrenceRules {
+	for _, existing := range model.RecurrenceRules {
 		if existing.ID == split.Row.ID && len(existing.Destinations) != 2 {
 			t.Fatalf("converted rule destinations = %+v, want echoed legs kept", existing.Destinations)
 		}
@@ -411,11 +411,11 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	if back.Code != http.StatusOK {
 		t.Fatalf("convert back status = %d, body %s", back.Code, back.Body.String())
 	}
-	document, err = database.LoadDocument()
+	model, err = database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	for _, existing := range document.Postings {
+	for _, existing := range model.Postings {
 		if existing.ID == split.Row.ID && len(existing.Destinations) != 2 {
 			t.Fatalf("converted posting destinations = %+v, want echoed legs kept", existing.Destinations)
 		}

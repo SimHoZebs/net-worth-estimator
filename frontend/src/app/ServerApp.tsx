@@ -12,7 +12,7 @@ export function ServerApp() {
 	useWorkspaceStartup();
 	const navigation = useWorkspaceNavigation();
 	const model = useServerModel();
-	const hasModel = model.data?.document != null;
+	const hasModel = model.data?.model != null;
 	const loading = model.isPending;
 	const importing = useUiStore((state) => state.importing);
 

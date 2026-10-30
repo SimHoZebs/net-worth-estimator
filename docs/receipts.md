@@ -1,7 +1,7 @@
 # Receipt evidence
 
 Receipts attach to saved one-time expenses. Images, extraction, review drafts,
-and confirmed corrections stay outside `FinancialModelDocument`. Receipt
+and confirmed corrections stay outside `FinancialModel`. Receipt
 operations do not change financial revisions or projection identities.
 
 ## Setup and use
@@ -113,7 +113,7 @@ The mock proves workflow contracts, not OCR accuracy or provider reliability.
 
 | Endpoint | Behavior |
 | --- | --- |
-| `GET /v1/financial-model` | Canonical document, issues, revision, and stored `receiptLinks` (posting ID to receipt IDs). |
+| `GET /v1/financial-model` | Financial model, issues, revision, and stored `receiptLinks` (posting ID to receipt IDs). |
 | `GET /v1/postings/{id}/receipts` | Metadata and extraction availability. |
 | `POST /v1/receipts` | Multipart `postingId` string and `image` file. No automatic extraction. |
 | `GET /v1/receipts/{id}` | Extraction, drafts, confirmed values, provenance, diagnostics, revision. |
@@ -181,7 +181,7 @@ provider outage can delay removal of stored bytes. Cleanup retries after restart
 
 Each posting row carries a stored `receipt_ids` back-reference (storage column
 only; see `scanPostingRow` in `backend/internal/store/model.go` — it never
-enters `FinancialModelDocument`, financial revisions, or projection
+enters `FinancialModel`, financial revisions, or projection
 identities). Receipt creation appends and receipt deletion removes the ID in the
 same transaction as the receipt row, so the field never drifts. Posting edits
 leave it untouched, posting deletion removes it with the row, and CSV

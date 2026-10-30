@@ -8,7 +8,7 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { NO_CEILING_SENTINEL } from "../../api/contracts.ts";
-import { fixtureDocument } from "../../mocks/document.ts";
+import { fixtureModel } from "../../mocks/model.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { setServerModelFixture } from "../../mocks/workspace.ts";
@@ -155,13 +155,13 @@ it("unchecking the ceiling enables the maximum input", async () => {
 });
 
 it("preserves raw null floors and sentinel ceilings on a name-only save", async () => {
-	const document = fixtureDocument(financialModelFixture);
-	const raw = document.accounts.find((row) => row.id === "home")!;
+	const model = fixtureModel(financialModelFixture);
+	const raw = model.accounts.find((row) => row.id === "home")!;
 	raw.minBalance = null;
 	raw.maxBalance = NO_CEILING_SENTINEL;
-	const server = stubTestServer(undefined, document);
+	const server = stubTestServer(undefined, model);
 	acceptTestResource();
-	setServerModelFixture(financialModelFixture, { document });
+	setServerModelFixture(financialModelFixture, { model });
 	render(<AccountDetails account={home} endingBalance={480000} />);
 	fireEvent.change(input("Account name"), {
 		target: { value: "Home value revised" },
@@ -188,13 +188,13 @@ it("preserves raw null floors and sentinel ceilings on a name-only save", async 
 });
 
 it("keeps a raw negative floor verbatim on a name-only save", async () => {
-	const document = fixtureDocument(financialModelFixture);
-	const raw = document.accounts.find((row) => row.id === "home")!;
+	const model = fixtureModel(financialModelFixture);
+	const raw = model.accounts.find((row) => row.id === "home")!;
 	raw.minBalance = -2500;
 	raw.maxBalance = null;
-	const server = stubTestServer(undefined, document);
+	const server = stubTestServer(undefined, model);
 	acceptTestResource();
-	setServerModelFixture(financialModelFixture, { document });
+	setServerModelFixture(financialModelFixture, { model });
 	render(<AccountDetails account={home} endingBalance={480000} />);
 	fireEvent.change(input("Account name"), {
 		target: { value: "Home value revised" },

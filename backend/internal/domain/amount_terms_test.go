@@ -136,11 +136,11 @@ func TestLateFeeValidatesReferences(t *testing.T) {
 	}
 }
 
-func termsPaymentModel() types.FinancialModel {
+func termsPaymentModel() types.SimulationInputs {
 	checking := "checking"
 	card := "prime_card"
 	percent := 0.02
-	return types.FinancialModel{
+	return types.SimulationInputs{
 		Accounts: []types.Account{
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 			{ID: card, Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
@@ -170,7 +170,7 @@ func termsPaymentModel() types.FinancialModel {
 	}
 }
 
-func executeTermsOccurrence(t *testing.T, model types.FinancialModel, balances map[string]float64, date string) PostingExecutionTransition {
+func executeTermsOccurrence(t *testing.T, model types.SimulationInputs, balances map[string]float64, date string) PostingExecutionTransition {
 	t.Helper()
 	runtime, err := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     balances,
@@ -316,7 +316,7 @@ func TestBalanceFeeValidatesReferences(t *testing.T) {
 
 func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 	checking := "checking"
-	model := types.FinancialModel{
+	model := types.SimulationInputs{
 		Accounts: []types.Account{
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},

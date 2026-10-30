@@ -91,7 +91,7 @@ func CloneSimulationState(state SimulationState) SimulationState {
 // TransitionRuntime executes postings/generated transactions against one state.
 type TransitionRuntime struct {
 	State            SimulationState
-	model            types.FinancialModel
+	model            types.SimulationInputs
 	accountByID      map[string]types.Account
 	accountOrder     []string
 	paymentTerms     map[string]types.PaymentTerms
@@ -100,7 +100,7 @@ type TransitionRuntime struct {
 }
 
 // CreateTransitionRuntime clones initialState and binds model context.
-func CreateTransitionRuntime(model types.FinancialModel, initialState SimulationState, projectionStartDate string, monteCarloSample *types.MonteCarloSample) (*TransitionRuntime, error) {
+func CreateTransitionRuntime(model types.SimulationInputs, initialState SimulationState, projectionStartDate string, monteCarloSample *types.MonteCarloSample) (*TransitionRuntime, error) {
 	accountByID := make(map[string]types.Account, len(model.Accounts))
 	accountOrder := make([]string, 0, len(model.Accounts))
 	seenAccounts := map[string]bool{}

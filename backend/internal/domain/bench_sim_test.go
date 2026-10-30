@@ -16,7 +16,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func loadBenchFixture(b *testing.B) (*types.FinancialModelDocument, *types.ProjectionRuntimeSettings, types.ModelOverrides) {
+func loadBenchFixture(b *testing.B) (*types.FinancialModel, *types.ProjectionRuntimeSettings, types.ModelOverrides) {
 	b.Helper()
 	scenario := os.Getenv("BENCH_SCENARIO")
 	if scenario == "" {
@@ -27,16 +27,16 @@ func loadBenchFixture(b *testing.B) (*types.FinancialModelDocument, *types.Proje
 		b.Fatalf("read fixture %s: %v", scenario, err)
 	}
 	var payload struct {
-		Document  json.RawMessage `json:"document"`
+		Model     json.RawMessage `json:"model"`
 		Settings  json.RawMessage `json:"settings"`
 		Overrides json.RawMessage `json:"overrides"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
 		b.Fatal(err)
 	}
-	var document types.FinancialModelDocument
-	if err := json.Unmarshal(payload.Document, &document); err != nil {
-		b.Fatalf("decode document: %v", err)
+	var model types.FinancialModel
+	if err := json.Unmarshal(payload.Model, &model); err != nil {
+		b.Fatalf("decode model: %v", err)
 	}
 	var settings types.ProjectionRuntimeSettings
 	if err := json.Unmarshal(payload.Settings, &settings); err != nil {
@@ -48,14 +48,14 @@ func loadBenchFixture(b *testing.B) (*types.FinancialModelDocument, *types.Proje
 			b.Fatalf("decode overrides: %v", err)
 		}
 	}
-	return &document, &settings, overrides
+	return &model, &settings, overrides
 }
 
 func BenchmarkSim(b *testing.B) {
-	document, settings, overrides := loadBenchFixture(b)
+	model, settings, overrides := loadBenchFixture(b)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := ProjectFinancialModelDocument(document, settings, overrides, nil); err != nil {
+		if _, err := ProjectFinancialModel(model, settings, overrides, nil); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -19,12 +19,12 @@ func init() {
 	evaluationRegistryInstance.Register(whatIfDefinition)
 }
 
-// ProjectFinancialModelDocument produces the full public projection result.
+// ProjectFinancialModel produces the full public projection result.
 // The base path comes from the base-path cache (keyed without evaluations);
 // evaluations run separately against the cached path, so eval-only changes
 // never rerun the base simulation.
-func ProjectFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionResult, error) {
-	_, path, baseResult, err := projectBaseWithCache(document, settings, overrides, monteCarloSample)
+func ProjectFinancialModel(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionResult, error) {
+	_, path, baseResult, err := projectBaseWithCache(model, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func ProjectFinancialModelDocument(document *types.FinancialModelDocument, setti
 	// eval configuration changes: serve each stored system to every later
 	// identical request instead of recomputing per request. Detail stays in
 	// the simulator key because simulators honor it; readers ignore it.
-	baseHash := BaseDocumentHash(document, overrides, settings, monteCarloSample)
+	baseHash := BaseModelHash(model, overrides, settings, monteCarloSample)
 	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
 	readers, simulators := set.PartitionByKind()
 	readerCollection := projectReaderEvaluationsWithCache(path, baseHash, readers)

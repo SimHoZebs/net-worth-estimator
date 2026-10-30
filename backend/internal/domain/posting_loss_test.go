@@ -14,8 +14,8 @@ import (
 
 func lossFloatPtr(value float64) *float64 { return &value }
 
-func lossTestModel(minBalance *float64) types.FinancialModel {
-	return types.FinancialModel{
+func lossTestModel(minBalance *float64) types.SimulationInputs {
+	return types.SimulationInputs{
 		Accounts: []types.Account{
 			{ID: "growth", Name: "Growth", Kind: types.AccountKindInvestment, MinBalance: minBalance, Enabled: true},
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
@@ -45,7 +45,7 @@ func lossTestModel(minBalance *float64) types.FinancialModel {
 	}
 }
 
-func lossTestRuntime(t *testing.T, model types.FinancialModel, balances map[string]float64, sample *types.MonteCarloSample) *TransitionRuntime {
+func lossTestRuntime(t *testing.T, model types.SimulationInputs, balances map[string]float64, sample *types.MonteCarloSample) *TransitionRuntime {
 	t.Helper()
 	runtime, err := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     balances,
@@ -58,7 +58,7 @@ func lossTestRuntime(t *testing.T, model types.FinancialModel, balances map[stri
 	return runtime
 }
 
-func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *types.FinancialModel, date string) PostingExecutionTransition {
+func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *types.SimulationInputs, date string) PostingExecutionTransition {
 	t.Helper()
 	if len(model.RecurrenceRules) == 0 {
 		t.Fatalf("loss test model has no rules")
@@ -123,7 +123,7 @@ func TestPositiveGrowthUnchanged(t *testing.T) {
 
 func TestNegativeSourcedOutflowStillClampsToZero(t *testing.T) {
 	checking := "checking"
-	model := types.FinancialModel{
+	model := types.SimulationInputs{
 		Accounts: []types.Account{
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
@@ -162,7 +162,7 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 	// a deterministic negative rate (losses are general kernel semantics,
 	// not sampler-specific); the gain leg then proves the loss accrued
 	// nothing to the cap ledger.
-	model := types.FinancialModel{
+	model := types.SimulationInputs{
 		Accounts: []types.Account{
 			{ID: "vault", Name: "Vault", Kind: types.AccountKindInvestment, Enabled: true},
 		},

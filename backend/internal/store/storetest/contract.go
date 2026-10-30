@@ -31,11 +31,11 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("PlannedPurchases", func(t *testing.T) { testPlannedPurchases(t, newStore) })
 	t.Run("ReceiptEvidence", func(t *testing.T) { testReceiptConformance(t, newStore) })
 	t.Run("AnalysisEvidence", func(t *testing.T) { testAnalysisConformance(t, newStore) })
-	t.Run("InitializeDocument", func(t *testing.T) {
-		testInitializeDocument(t, newStore)
+	t.Run("InitializeModel", func(t *testing.T) {
+		testInitializeModel(t, newStore)
 	})
-	t.Run("RoundTripsCanonicalDocumentMetadataAndOrder", func(t *testing.T) {
-		testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t, newStore)
+	t.Run("RoundTripsCanonicalModelMetadataAndOrder", func(t *testing.T) {
+		testStoreRoundTripsCanonicalModelMetadataAndOrder(t, newStore)
 	})
 	t.Run("RowWritesUseStoredSyncOwnership", func(t *testing.T) {
 		testRowWritesUseStoredSyncOwnership(t, newStore)
@@ -150,37 +150,37 @@ func testArtifactsRoundTripAndKeepFirstWrite(t *testing.T, newStore func(*testin
 	}
 }
 
-func testInitializeDocument(t *testing.T, newStore func(*testing.T) store.Store) {
+func testInitializeModel(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	database := newStore(t)
-	if document, err := database.LoadDocument(); err != nil || document != nil {
-		t.Fatalf("uninitialized document = %+v, %v", document, err)
+	if model, err := database.LoadModel(); err != nil || model != nil {
+		t.Fatalf("uninitialized model = %+v, %v", model, err)
 	}
 	for range 2 {
-		if err := database.InitializeDocument(); err != nil {
+		if err := database.InitializeModel(); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if exists, err := database.DocumentExists(); err != nil || !exists {
+	if exists, err := database.ModelExists(); err != nil || !exists {
 		t.Fatalf("initialized presence = %v, %v", exists, err)
 	}
-	document, err := database.LoadDocument()
-	if err != nil || document == nil || len(document.Accounts) != 0 || document.SourcePath != "" {
-		t.Fatalf("blank document = %+v, %v", document, err)
+	model, err := database.LoadModel()
+	if err != nil || model == nil || len(model.Accounts) != 0 || model.SourcePath != "" {
+		t.Fatalf("blank model = %+v, %v", model, err)
 	}
 	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "My checking", Kind: "cash", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	before, err := database.LoadDocument()
+	before, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.InitializeDocument(); err != nil {
+	if err := database.InitializeModel(); err != nil {
 		t.Fatal(err)
 	}
-	after, err := database.LoadDocument()
+	after, err := database.LoadModel()
 	if err != nil || !reflect.DeepEqual(before, after) {
-		t.Fatalf("initialization changed existing document: %+v, %v", after, err)
+		t.Fatalf("initialization changed existing model: %+v, %v", after, err)
 	}
 }
 
@@ -290,7 +290,7 @@ func testRowRoundTripsPreserveOrder(t *testing.T, newStore func(*testing.T) stor
 	if err := st.MoveAccount("c", "a"); err != nil {
 		t.Fatalf("move: %v", err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -315,7 +315,7 @@ func testPostingFixture(id string) types.Posting {
 	}
 }
 
-func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore func(*testing.T) store.Store) {
+func testStoreRoundTripsCanonicalModelMetadataAndOrder(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
 	if _, err := st.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
@@ -329,12 +329,12 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 			t.Fatalf("save checkpoint: %v", err)
 		}
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
 	if loaded == nil {
-		t.Fatal("loaded document is nil")
+		t.Fatal("loaded model is nil")
 	}
 	if !reflect.DeepEqual(loaded.Checkpoints, withSourceUser([]types.Checkpoint{
 		{ObservedAt: 1777593599, AccountID: "checking", Balance: 200},
@@ -349,24 +349,24 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 		t.Fatalf("maximum balance was not normalized: %+v", loaded.Accounts[0].MaxBalance)
 	}
 
-	empty, err := st.LoadDocument()
+	empty, err := st.LoadModel()
 	if err != nil || empty == nil {
-		t.Fatalf("load document = %+v, err %v", empty, err)
+		t.Fatalf("load model = %+v, err %v", empty, err)
 	}
 	if empty.Accounts == nil || empty.Checkpoints == nil || empty.Postings == nil {
 		t.Fatalf("empty collections were not normalized: %+v", empty)
 	}
 
 	if err := st.Clear(); err != nil {
-		t.Fatalf("clear document: %v", err)
+		t.Fatalf("clear model: %v", err)
 	}
-	exists, err := st.DocumentExists()
+	exists, err := st.ModelExists()
 	if err != nil || exists {
-		t.Fatalf("cleared document presence = %v, err %v", exists, err)
+		t.Fatalf("cleared model presence = %v, err %v", exists, err)
 	}
-	loaded, err = st.LoadDocument()
+	loaded, err = st.LoadModel()
 	if err != nil || loaded != nil {
-		t.Fatalf("cleared document = %+v, err %v", loaded, err)
+		t.Fatalf("cleared model = %+v, err %v", loaded, err)
 	}
 }
 
@@ -400,7 +400,7 @@ func testSyncStateDefaultsEmptyAndRoundTrips(t *testing.T, newStore func(*testin
 func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	seedSyncState(t, st)
 
 	// UUIDs carry no ownership meaning. Owner writes cannot assert sync metadata.
@@ -412,9 +412,9 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	}
 
 	// Sync-owned rows refuse owner updates and deletes.
-	stored, err := st.LoadDocument()
+	stored, err := st.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
 	var synced types.Posting
 	for _, posting := range stored.Postings {
@@ -439,9 +439,9 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	if saved.Source != store.SourceUser {
 		t.Fatalf("checkpoint source = %q, want recomputed owner", saved.Source)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
 	if len(loaded.Checkpoints) != 2 {
 		t.Fatalf("checkpoints = %+v, want owner + synced", loaded.Checkpoints)
@@ -463,7 +463,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	seedSyncState(t, st)
 
 	if _, err := st.SaveCheckpoint(types.Checkpoint{
@@ -472,9 +472,9 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 		t.Fatalf("save correction: %v", err)
 	}
 
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
 	count := 0
 	for _, checkpoint := range loaded.Checkpoints {
@@ -493,9 +493,9 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	// An owner document first, mirroring production (seeded DB): sync rows
-	// merge into the visible document instead of an empty store.
-	seedOwnerDocument(t, st)
+	// An owner model first, mirroring production (seeded DB): sync rows
+	// merge into the visible model instead of an empty store.
+	seedOwnerModel(t, st)
 	seedAccount(t, st, "prime_card")
 
 	summary, err := st.ApplySyncPlan(
@@ -518,7 +518,7 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 	if err != nil || changed.CheckpointsUpdated != 1 {
 		t.Fatalf("update = %+v, err %v", changed, err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -532,7 +532,7 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	extra, err := st.SaveCheckpoint(types.Checkpoint{
 		ObservedAt: 1785974399, AccountID: "checking", Balance: 999,
 	})
@@ -546,7 +546,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -559,7 +559,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	seedAccount(t, st, "prime_card")
 
 	first, err := st.ApplySyncPlan(nil, []store.BankDirective{
@@ -569,7 +569,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	if err != nil || first.PendingInserted != 2 {
 		t.Fatalf("first apply = %+v, err %v", first, err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -590,7 +590,7 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	if err != nil || second.PendingDeleted != 1 || second.PendingInserted != 1 || second.PendingUpdated != 1 {
 		t.Fatalf("second apply = %+v, err %v", second, err)
 	}
-	reloaded, err := st.LoadDocument()
+	reloaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,20 +643,20 @@ func syncPendingDirective(item store.SyncPosting) store.BankDirective {
 
 const ownerPostingID = "01900000-0000-7000-8000-000000000010"
 
-func seedOwnerDocument(t *testing.T, st store.Store) {
+func seedOwnerModel(t *testing.T, st store.Store) {
 	t.Helper()
-	document := ownerDocument()
-	for _, account := range document.Accounts {
+	model := ownerModel()
+	for _, account := range model.Accounts {
 		if _, err := st.CreateAccount(account); err != nil {
 			t.Fatalf("seed account %s: %v", account.ID, err)
 		}
 	}
-	for _, checkpoint := range document.Checkpoints {
+	for _, checkpoint := range model.Checkpoints {
 		if _, err := st.SaveCheckpoint(checkpoint); err != nil {
 			t.Fatalf("seed checkpoint: %v", err)
 		}
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if _, err := st.CreatePosting(posting); err != nil {
 			t.Fatalf("seed posting %s: %v", posting.ID, err)
 		}
@@ -679,18 +679,18 @@ func seedSyncState(t *testing.T, st store.Store) {
 
 func loadPostingIDs(t *testing.T, st store.Store) (ids []string, sources map[string]string) {
 	t.Helper()
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
-		t.Fatalf("load document: %v", err)
+		t.Fatalf("load model: %v", err)
 	}
-	return postingIDsFromDocument(loaded)
+	return postingIDsFromModel(loaded)
 }
 
-func findCheckpoint(document *types.FinancialModelDocument, accountID string, observedAt int64) (types.Checkpoint, bool) {
-	if document == nil {
+func findCheckpoint(model *types.FinancialModel, accountID string, observedAt int64) (types.Checkpoint, bool) {
+	if model == nil {
 		return types.Checkpoint{}, false
 	}
-	for _, checkpoint := range document.Checkpoints {
+	for _, checkpoint := range model.Checkpoints {
 		if checkpoint.AccountID == accountID && checkpoint.ObservedAt == observedAt {
 			return checkpoint, true
 		}
@@ -698,9 +698,9 @@ func findCheckpoint(document *types.FinancialModelDocument, accountID string, ob
 	return types.Checkpoint{}, false
 }
 
-func ownerDocument() *types.FinancialModelDocument {
+func ownerModel() *types.FinancialModel {
 	checking := "checking"
-	return &types.FinancialModelDocument{
+	return &types.FinancialModel{
 		SourcePath: "test-source",
 		Accounts: []types.Account{{
 			ID: "checking", Name: "Checking", Enabled: true,
@@ -717,24 +717,24 @@ func ownerDocument() *types.FinancialModelDocument {
 	}
 }
 
-func postingIDsFromDocument(document *types.FinancialModelDocument) (ids []string, sources map[string]string) {
+func postingIDsFromModel(model *types.FinancialModel) (ids []string, sources map[string]string) {
 	sources = map[string]string{}
-	if document == nil {
+	if model == nil {
 		return ids, sources
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		ids = append(ids, posting.ID)
 		sources[posting.ID] = posting.Source
 	}
 	return ids, sources
 }
 
-func syncedPendingIDs(document *types.FinancialModelDocument) []string {
+func syncedPendingIDs(model *types.FinancialModel) []string {
 	var ids []string
-	if document == nil {
+	if model == nil {
 		return ids
 	}
-	for _, posting := range document.Postings {
+	for _, posting := range model.Postings {
 		if posting.Pending && posting.Source != store.SourceUser {
 			ids = append(ids, posting.ID)
 		}
@@ -745,7 +745,7 @@ func syncedPendingIDs(document *types.FinancialModelDocument) []string {
 func testTimestampedCheckpointsPreserveMultipleObservationsPerDay(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	morning := types.Checkpoint{AccountID: "checking", Balance: 1000, ObservedAt: 1785882000}
 	evening := types.Checkpoint{AccountID: "checking", Balance: 900, ObservedAt: 1785903600}
 	if _, err := st.SaveCheckpoint(morning); err != nil {
@@ -754,7 +754,7 @@ func testTimestampedCheckpointsPreserveMultipleObservationsPerDay(t *testing.T, 
 	if _, err := st.SaveCheckpoint(evening); err != nil {
 		t.Fatalf("save evening: %v", err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -777,7 +777,7 @@ func testTimestampedCheckpointsPreserveMultipleObservationsPerDay(t *testing.T, 
 	if err := st.DeleteCheckpointAt("checking", 1785882000); err != nil {
 		t.Fatalf("delete one instant: %v", err)
 	}
-	loaded, err = st.LoadDocument()
+	loaded, err = st.LoadModel()
 	if err != nil {
 		t.Fatalf("reload: %v", err)
 	}
@@ -798,7 +798,7 @@ func testTimestampedCheckpointsPreserveMultipleObservationsPerDay(t *testing.T, 
 func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	fresh, err := st.ApplySyncPlan(
 		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 1000, ObservedAt: 1785903600}},
 		nil)
@@ -814,7 +814,7 @@ func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*t
 	if err != nil || late.CheckpointsInserted != 1 || late.CheckpointsSkipped != 0 {
 		t.Fatalf("backdated apply = %+v, err %v", late, err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -844,7 +844,7 @@ func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*t
 func testApplySyncPlanOwnerWinsSameInstant(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	const instant = int64(1785903600)
 	if _, err := st.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 999, ObservedAt: instant}); err != nil {
 		t.Fatalf("save owner: %v", err)
@@ -855,7 +855,7 @@ func testApplySyncPlanOwnerWinsSameInstant(t *testing.T, newStore func(*testing.
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -876,7 +876,7 @@ func testApplySyncPlanOwnerWinsSameInstant(t *testing.T, newStore func(*testing.
 func testSettledBankRowRoundTrip(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	st := newStore(t)
-	seedOwnerDocument(t, st)
+	seedOwnerModel(t, st)
 	settled := store.SyncPosting{
 		ProviderAccountID: "bridge-checking",
 		TransactionID:     "posted-1",
@@ -899,7 +899,7 @@ func testSettledBankRowRoundTrip(t *testing.T, newStore func(*testing.T) store.S
 	if err != nil || summary.SettledInserted != 1 {
 		t.Fatalf("settled apply = %+v, err %v", summary, err)
 	}
-	loaded, err := st.LoadDocument()
+	loaded, err := st.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

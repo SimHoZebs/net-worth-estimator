@@ -17,7 +17,7 @@ import (
 )
 
 type stochasticRequest struct {
-	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
+	Model     *types.FinancialModel           `json:"model,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
 	Config    types.StochasticConfig          `json:"config"`
@@ -146,7 +146,7 @@ func writeStochasticProgress(writeEvent sseEventWriter, progress types.Stochasti
 
 func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasticRequest }) (*huma.StreamResponse, error) {
 	body := input.Body
-	document, err := s.resolveDocument(body.Document)
+	model, err := s.resolveModel(body.Model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
@@ -158,7 +158,7 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 	var resultKey string
 	if identifiedRun {
 		resultKey = s.resourceArtifactKey("stochastic", map[string]any{
-			"document":  document,
+			"model":     model,
 			"overrides": body.Overrides,
 			"settings":  projectionSettingsDescriptor(body.Settings),
 			"config": map[string]any{
@@ -175,12 +175,12 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 		}
 	} else {
 		return stochasticStream(projectionSourceComputed, func(ctx context.Context, writeEvent sseEventWriter) {
-			s.serveStochasticInline(ctx, writeEvent, document, body.Settings, body.Overrides, body.Config)
+			s.serveStochasticInline(ctx, writeEvent, model, body.Settings, body.Overrides, body.Config)
 		}), nil
 	}
 	_, prefix := parseArtifactKeyMeta(resultKey)
 	log.Printf("stochastic simulation request key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d runs=%d",
-		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
+		prefix, len(model.Accounts), len(model.Postings), len(model.Checkpoints),
 		body.Settings.HorizonYears, body.Config.RunCount)
 	run, owner := getOrStartSharedRun(resultKey)
 	source := projectionSourceShared
@@ -199,7 +199,7 @@ func (s *handler) stochasticSSE(_ context.Context, input *struct{ Body stochasti
 				progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
 					run.publish(stochasticStreamEvent{progress: progress, partial: partial})
 				}
-				result, runErr := domain.StochasticProjection(computeCtx, document, &body.Settings, body.Overrides, body.Config, progressCallback)
+				result, runErr := domain.StochasticProjection(computeCtx, model, &body.Settings, body.Overrides, body.Config, progressCallback)
 				run.finish(resultKey, func(result *types.StochasticProjectionResult) {
 					putArtifact(s.store, resultKey, "stochastic", result)
 				}, result, runErr)
@@ -264,7 +264,7 @@ func (s *handler) writeSharedRunOutcome(writeEvent func(id, name string, payload
 func (s *handler) serveStochasticInline(
 	ctx context.Context,
 	writeEvent sseEventWriter,
-	document *types.FinancialModelDocument,
+	model *types.FinancialModel,
 	settings types.ProjectionRuntimeSettings,
 	overrides types.ModelOverrides,
 	config types.StochasticConfig,
@@ -273,7 +273,7 @@ func (s *handler) serveStochasticInline(
 		writeStochasticProgress(writeEvent, progress, partial)
 	}
 
-	result, runErr := domain.StochasticProjection(ctx, document, &settings, overrides, config, progressCallback)
+	result, runErr := domain.StochasticProjection(ctx, model, &settings, overrides, config, progressCallback)
 	if runErr != nil {
 		if err := writeEvent("error", "error", map[string]any{"error": runErr.Error()}); err != nil {
 			log.Printf("stochastic sse: error write failed: %v", err)

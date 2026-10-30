@@ -15,14 +15,14 @@ func validatePlannedPurchaseCost(cost float64, id string) error {
 	return nil
 }
 
-func validatePurchases(issues *[]types.ModelValidationIssue, document *types.FinancialModelDocument, dependencies map[string][]string) {
+func validatePurchases(issues *[]types.ModelValidationIssue, model *types.FinancialModel, dependencies map[string][]string) {
 	purchases := map[string]bool{}
 	accountIDs := map[string]bool{}
-	for _, account := range document.Accounts {
+	for _, account := range model.Accounts {
 		accountIDs[account.ID] = true
 	}
-	for index := range document.PlannedPurchases {
-		p := &document.PlannedPurchases[index]
+	for index := range model.PlannedPurchases {
+		p := &model.PlannedPurchases[index]
 		base := []any{"plannedPurchases", index}
 		if strings.TrimSpace(p.Name) == "" {
 			addIssue(issues, types.SeverityError, "purchase.name.empty", "A planned purchase needs a name.", append(base, "name")...)
@@ -42,7 +42,7 @@ func validatePurchases(issues *[]types.ModelValidationIssue, document *types.Fin
 		purchases[p.ID] = true
 	}
 	// Established payments cannot depend on an optional, unscheduled purchase.
-	for _, transaction := range ResolvedTransactionPostings(document) {
+	for _, transaction := range ResolvedTransactionPostings(model) {
 		for _, dependency := range dependencies[transaction.ID] {
 			if purchases[dependency] {
 				addIssue(issues, types.SeverityError, "purchase.reference.invalid", "Amounts cannot depend on a planned purchase.", "postings")

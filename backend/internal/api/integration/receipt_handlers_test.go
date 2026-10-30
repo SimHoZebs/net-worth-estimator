@@ -116,8 +116,8 @@ func TestReceiptHTTPContractSurvivesAdapterSwap(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			db := receiptAPIStore(t)
 			h := New(db, Config{ReceiptSource: source})
-			before, _ := db.LoadDocument()
-			revision, _ := store.DocumentETag(before)
+			before, _ := db.LoadModel()
+			revision, _ := store.ModelETag(before)
 			upload := receiptUpload(t, h, receiptmock.SampleImage)
 			r := decodeReceipt(t, upload)
 			if upload.Header().Get("Cache-Control") != "private, no-store" {
@@ -161,8 +161,8 @@ func TestReceiptHTTPContractSurvivesAdapterSwap(t *testing.T) {
 			if got := receiptRequest(h, "GET", "/v1/receipts/"+r.ID, nil); got.Code != 404 {
 				t.Fatal("deleted receipt remains")
 			}
-			after, _ := db.LoadDocument()
-			gotRevision, _ := store.DocumentETag(after)
+			after, _ := db.LoadModel()
+			gotRevision, _ := store.ModelETag(after)
 			if gotRevision != revision {
 				t.Fatal("receipt operation changed financial revision")
 			}

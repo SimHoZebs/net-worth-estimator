@@ -26,19 +26,19 @@ func post(t *testing.T, handler http.Handler, method, path, body string) *httpte
 	return w
 }
 
-func model(t *testing.T, handler http.Handler) *types.FinancialModelDocument {
+func model(t *testing.T, handler http.Handler) *types.FinancialModel {
 	t.Helper()
 	w := post(t, handler, "GET", "/v1/financial-model", "")
 	if w.Code != 200 {
 		t.Fatalf("read model=%d %s", w.Code, w.Body.String())
 	}
 	var out struct {
-		Document *types.FinancialModelDocument
+		Model *types.FinancialModel
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	return out.Document
+	return out.Model
 }
 
 func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
@@ -147,9 +147,9 @@ func TestUserProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				exists, err := scoped.DocumentExists()
+				exists, err := scoped.ModelExists()
 				if err != nil || !exists {
-					t.Fatalf("new user lacks initialized blank document: %v", err)
+					t.Fatalf("new user lacks initialized blank model: %v", err)
 				}
 				if _, err := resolve(context.Background(), test.subject); err != nil {
 					t.Fatalf("repeat authorized access: %v", err)
@@ -202,7 +202,7 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := owner.InitializeDocument(); err != nil {
+	if err := owner.InitializeModel(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := owner.CreateAccount(types.Account{ID: "primary", Name: "Private owner checking", Kind: "cash", Enabled: true}); err != nil {
@@ -212,7 +212,7 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := guestStore.InitializeDocument(); err != nil {
+	if err := guestStore.InitializeModel(); err != nil {
 		t.Fatal(err)
 	}
 	router, err := newUserRouter(database, userRouterConfig{PrimaryResourceID: ownerID})
@@ -224,7 +224,7 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := otherStore.InitializeDocument(); err != nil {
+	if err := otherStore.InitializeModel(); err != nil {
 		t.Fatal(err)
 	}
 	ownerHandler, err := router.handlerFor(authorization.ResourceFor(issuer, "a"))

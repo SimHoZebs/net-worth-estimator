@@ -43,13 +43,13 @@ func Register(api huma.API, st store.Store, runner *simplefin.Runner) {
 		OperationID: "get-sync-cards",
 		Method:      "GET",
 		Path:        "/cards",
-		Summary:     "List per-plan SimpleFIN card accounts",
+		Summary:     "List user-scoped SimpleFIN card accounts",
 	}, s.getSyncCards)
 	huma.Register(api, huma.Operation{
 		OperationID: "set-sync-cards",
 		Method:      "PUT",
 		Path:        "/cards",
-		Summary:     "Replace per-plan SimpleFIN card accounts",
+		Summary:     "Replace user-scoped SimpleFIN card accounts",
 	}, s.setSyncCards)
 	huma.Register(api, huma.Operation{OperationID: "list-account-links", Method: "GET", Path: "/accounts", Summary: "List bridge-to-model account links"}, s.listAccountLinks)
 	huma.Register(api, huma.Operation{OperationID: "save-account-link", Method: "PUT", Path: "/accounts/{bridgeAccountId}", Summary: "Link one bridge account"}, s.saveAccountLink)

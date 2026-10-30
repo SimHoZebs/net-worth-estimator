@@ -150,7 +150,7 @@ export function TransactionsPanel({
 						startDate,
 						resolved: selectedResolved,
 					})}
-					planTransaction={selected}
+					savedTransaction={selected}
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}

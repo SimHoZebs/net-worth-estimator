@@ -141,7 +141,7 @@ func buildStochasticRates(rules []types.RecurrenceRule, postings []types.Posting
 	return rates
 }
 
-func newStochasticSession(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, config types.StochasticConfig, onProgress StochasticProgressCallback) (*stochasticSession, error) {
+func newStochasticSession(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, config types.StochasticConfig, onProgress StochasticProgressCallback) (*stochasticSession, error) {
 	session := &stochasticSession{
 		config:              NormalizeStochasticConfig(config),
 		onProgress:          onProgress,
@@ -162,7 +162,7 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 	session.sampler = NewStochasticSampler(session.config.Seed)
 	// The deterministic base path is shared with deterministic projections
 	// through the base-path cache: identical base inputs never simulate twice.
-	prepared, path, baseResult, err := projectBaseWithCache(document, settings, overrides, nil)
+	prepared, path, baseResult, err := projectBaseWithCache(model, settings, overrides, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 	session.runtimes = NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
 	session.runtimes.PrepareStochasticWork(&EvaluationContext{
 		Path:        path,
-		Document:    &path.EffectiveDocument,
+		Model:       &path.EffectiveModel,
 		DetailLevel: "summary",
 	})
 	if onProgress != nil {
@@ -190,7 +190,7 @@ func newStochasticSession(document *types.FinancialModelDocument, settings *type
 	}
 	session.runtimes.EvaluateDeterministic(&EvaluationContext{
 		Path:        path,
-		Document:    &path.EffectiveDocument,
+		Model:       &path.EffectiveModel,
 		DetailLevel: "summary",
 	})
 	session.runtimes.StartStochastic()
@@ -249,7 +249,7 @@ func (s *stochasticSession) flushBatchLocked() *types.StochasticProjectionResult
 	}
 	s.pendingValuesByDate = map[string][]float64{}
 	s.runtimes.Finalize(&EvaluationFinalizeContext{
-		Document:          &s.deterministicPath.EffectiveDocument,
+		Model:             &s.deterministicPath.EffectiveModel,
 		DeterministicPath: s.deterministicPath,
 		RunCount:          s.completedRuns,
 	})

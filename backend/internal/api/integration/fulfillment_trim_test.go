@@ -22,13 +22,13 @@ func TestDeterministicFulfillmentOmitsDetailArrays(t *testing.T) {
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}

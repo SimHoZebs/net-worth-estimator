@@ -4,7 +4,7 @@ import { acceptTestResource } from "../mocks/resource.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 import type {
 	BackendPlannedPurchase,
-	FinancialModelDocument,
+	FinancialModel,
 } from "../api/contracts.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
 import {
@@ -15,7 +15,7 @@ import {
 	useSavedTransactions,
 } from "./savedRows.ts";
 
-function emptyDocument(): FinancialModelDocument {
+function emptyModel(): FinancialModel {
 	return {
 		sourcePath: "models/empty",
 		accounts: [],
@@ -106,7 +106,7 @@ describe("saved rows", () => {
 	});
 
 	it("returns loaded-empty arrays for a blank model instead of null", async () => {
-		stubTestServer(undefined, emptyDocument());
+		stubTestServer(undefined, emptyModel());
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
 		const evaluations = renderHook(() => useSavedEvaluations());
@@ -139,12 +139,12 @@ describe("saved rows", () => {
 			priority: 0,
 		};
 		stubTestServer(undefined, {
-			...emptyDocument(),
+			...emptyModel(),
 			plannedPurchases: [laptop, chair],
 		});
 		const purchases = renderHook(() => useSavedPurchases());
 		await waitFor(() => expect(purchases.result.current).not.toBeNull());
-		// Queue priority does not depend on document order.
+		// Queue priority does not depend on model order.
 		expect(purchases.result.current).toEqual([
 			{
 				id: "chair",
@@ -169,7 +169,7 @@ describe("saved rows", () => {
 
 	it("keeps wishlist rows out of saved transactions", async () => {
 		stubTestServer(undefined, {
-			...emptyDocument(),
+			...emptyModel(),
 			plannedPurchases: [
 				{
 					id: "laptop",

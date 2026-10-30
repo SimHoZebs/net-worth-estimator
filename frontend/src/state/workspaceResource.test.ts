@@ -72,7 +72,7 @@ it("does not publish a retired user's late model result", async () => {
 					headers: headers(),
 				});
 			if (path.endsWith("/v1/financial-model")) return pending;
-			return new Response(JSON.stringify({ document: null, issues: [] }), {
+			return new Response(JSON.stringify({ model: null, issues: [] }), {
 				headers: headers(),
 			});
 		}),
@@ -84,7 +84,7 @@ it("does not publish a retired user's late model result", async () => {
 	const current = setServerModelFixture(undefined, { revision: "b" });
 	finish(
 		new Response(
-			JSON.stringify({ document: null, revision: "private-a", issues: [] }),
+			JSON.stringify({ model: null, revision: "private-a", issues: [] }),
 			{ headers: headers() },
 		),
 	);

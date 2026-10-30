@@ -55,12 +55,12 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 		priority = *input.Body.Priority
 	}
 	rule := input.Body.toRule("", priority)
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			// Omitted priority appends after the current maximum, so callers
 			// that never model ordering leave it out.
 			max := -1
-			for _, existing := range document.RecurrenceRules {
+			for _, existing := range model.RecurrenceRules {
 				if existing.Priority > max {
 					max = existing.Priority
 				}
@@ -68,7 +68,7 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 			priority = max + 1
 			rule = input.Body.toRule("", priority)
 		}
-		document.RecurrenceRules = replaceByID(document.RecurrenceRules, rule.ID, ruleID, rule)
+		model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {
 		return s.store.CreateRule(rule)
 	})
@@ -90,7 +90,7 @@ func (s *handler) updateRule(_ context.Context, input *struct {
 		// models priority or caps, so absent means untouched, not cleared.
 		// Single destinations get the same echo treatment via
 		// keepEchoedDestinations, since the editor never models extra legs.
-		if stored, err := s.store.LoadDocument(); err == nil && stored != nil {
+		if stored, err := s.store.LoadModel(); err == nil && stored != nil {
 			for _, existing := range stored.RecurrenceRules {
 				if existing.ID != input.ID {
 					continue
@@ -113,8 +113,8 @@ func (s *handler) updateRule(_ context.Context, input *struct {
 	input.Body.Destinations = destinations
 	rule := input.Body.toRule(input.ID, rulePriority)
 	rule.AnnualCap = annualCap
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.RecurrenceRules = replaceByID(document.RecurrenceRules, rule.ID, ruleID, rule)
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {
 		return s.store.UpdateRule(rule)
 	})
@@ -128,8 +128,8 @@ func (s *handler) deleteRule(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
 	id := input.ID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.RecurrenceRules = removeByID(document.RecurrenceRules, id, ruleID)
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteRule(id)
 	})
@@ -143,8 +143,8 @@ func (s *handler) deleteRule(_ context.Context, input *struct {
 
 func (s *handler) moveRule(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.RecurrenceRules = moveBeforeID(document.RecurrenceRules, id, beforeID, ruleID)
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.RecurrenceRules = moveBeforeID(model.RecurrenceRules, id, beforeID, ruleID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MoveRule(id, beforeID)
 	})

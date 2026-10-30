@@ -55,8 +55,8 @@ Device sign-in uses the existing `/v1/auth/device/start`, `poll` and `refresh`
 routes. `/v1/auth/session` identifies the user and resource. The worker reads
 `/v1/financial-model` and `/v1/status` for funding choices, queue order and write
 permission. These reads include financial data. Only eligible account IDs and
-names reach the panel. The worker never persists that financial document or
-sends it to the AI provider.
+names reach the panel. The worker keeps the financial model in memory.
+AI requests contain only the captured product data.
 
 Save uses `POST /v1/planned-purchases`, exactly like the app's editor:
 `name`, `fundingAccountId`, `cost`, `earliestDate`, `priority`, and `enabled`.

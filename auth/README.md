@@ -1,7 +1,7 @@
 # Authentication with Casdoor
 
 Casdoor owns passwords, passkeys, and local SQLite identities. The Go API owns
-OpenID Connect (OIDC) verification, persistent application sessions, and plan access.
+OpenID Connect (OIDC) verification, persistent application sessions, and user-scoped financial model access.
 
 ## Start the split stack
 

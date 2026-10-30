@@ -6,17 +6,17 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// ImportDocument seeds the database from a canonical document, replacing content.
-func (s *sqliteStore) ImportDocument(document *types.FinancialModelDocument) (*types.FinancialModelDocument, error) {
-	if document == nil {
-		return nil, fmt.Errorf("import document is required")
+// ImportModel seeds the database from a canonical model, replacing content.
+func (s *sqliteStore) ImportModel(model *types.FinancialModel) (*types.FinancialModel, error) {
+	if model == nil {
+		return nil, fmt.Errorf("import model is required")
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("import begin: %w", err)
 	}
 	defer tx.Rollback()
-	if err := replaceDocument(tx, document); err != nil {
+	if err := replaceModel(tx, model); err != nil {
 		return nil, err
 	}
 	// Rebuild the ID registry from the seed; account links survive a
@@ -38,12 +38,12 @@ func (s *sqliteStore) ImportDocument(document *types.FinancialModelDocument) (*t
 			return nil, fmt.Errorf("import seed entity ids %s: %w", seed.kind, err)
 		}
 	}
-	storedDocument, err := loadDocument(tx)
+	storedModel, err := loadModel(tx)
 	if err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("import commit: %w", err)
 	}
-	return storedDocument, nil
+	return storedModel, nil
 }

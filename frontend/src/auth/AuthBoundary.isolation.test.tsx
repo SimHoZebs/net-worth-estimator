@@ -77,7 +77,7 @@ function route(input: RequestInfo | URL, init?: RequestInit) {
 		return ok({ settings: settingsByResource.get(resource) ?? null });
 	}
 	if (url.endsWith("/v1/financial-model"))
-		return ok({ document: null, issues: [] });
+		return ok({ model: null, issues: [] });
 	if (url.endsWith("/v1/amount-presets")) return ok({ presets: [] });
 	if (url.endsWith("/v1/status")) return ok({ readOnly: false });
 	return response(session());
@@ -281,7 +281,7 @@ describe("authentication resource isolation", () => {
 			renderWorkspace();
 			await screen.findByTestId("active-workspace");
 			act(() => setServerRevisionFixture("account-a-private-revision"));
-			const oldKey = deterministicQueryKey("private-a-document", 10);
+			const oldKey = deterministicQueryKey("private-a-model", 10);
 			serverQueryClient().setQueryData(oldKey, "private-a-result");
 			let finish: (value: Response) => void = () => {};
 			fetcher.mockImplementation(
@@ -372,7 +372,7 @@ describe("authentication resource isolation", () => {
 		vi.stubGlobal("fetch", fetcher);
 		renderWorkspace();
 		await screen.findByTestId("active-workspace");
-		const key = deterministicQueryKey("private-a-document", 10);
+		const key = deterministicQueryKey("private-a-model", 10);
 		act(() => {
 			setServerRevisionFixture("private-a-revision");
 			serverQueryClient().setQueryData(key, "private-a-result");
@@ -396,7 +396,7 @@ describe("authentication resource isolation", () => {
 		expect(
 			serverQueryClient().getQueryData(userResourceKey("presets")),
 		).toEqual([{ id: "private-a-recipe" }]);
-		expect(deterministicQueryKey("private-a-document", 10)).toEqual(key);
+		expect(deterministicQueryKey("private-a-model", 10)).toEqual(key);
 		expect(serverQueryClient().getQueryData(key)).toBe("private-a-result");
 	});
 
@@ -445,7 +445,7 @@ describe("authentication resource isolation", () => {
 		renderWorkspace();
 		await screen.findByTestId("active-workspace");
 		act(() => setServerRevisionFixture("old-write-capability"));
-		const key = deterministicQueryKey("private-a-document", 10);
+		const key = deterministicQueryKey("private-a-model", 10);
 		serverQueryClient().setQueryData(key, "old-permissions-result");
 		fetcher.mockImplementation(async () =>
 			response({
@@ -470,7 +470,7 @@ describe("authentication resource isolation", () => {
 		);
 		renderWorkspace();
 		await screen.findByTestId("active-workspace");
-		const key = deterministicQueryKey("private-a-document", 10);
+		const key = deterministicQueryKey("private-a-model", 10);
 		serverQueryClient().setQueryData(key, "first-api-result");
 		act(() => {
 			setServerRevisionFixture("first-api-data");

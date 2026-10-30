@@ -341,7 +341,7 @@ printf '\n'
 
 curl -fsS "$BASE_URL/v1/status" | jq .
 curl -fsS "$BASE_URL/v1/financial-model" \
-  | jq '{accounts: (.document.accounts | length), postings: (.document.postings | length), checkpoints: (.document.checkpoints | length), issues}'
+  | jq '{accounts: (.model.accounts | length), postings: (.model.postings | length), checkpoints: (.model.checkpoints | length), issues}'
 ```
 
 Expected baseline:
@@ -352,8 +352,8 @@ Expected baseline:
 - `issues` is an array;
 - warning-severity model issues may be present, but a projection must not run with error-severity issues.
 
-`POST /v1/position` accepts `{ "asOfDate": "YYYY-MM-DD", "document": ... }`.
-The document is optional and defaults to the scoped stored model. It returns
+`POST /v1/position` accepts `{ "asOfDate": "YYYY-MM-DD", "model": ... }`.
+The model is optional and defaults to the scoped stored model. It returns
 `result: { asOfDate, netWorth, accounts: [{ accountId, balance }] }` from the same
 historical preparation as projections, without a future simulation. It requires
 `user:project`, permits projection without write permission, and stores no additional history.
@@ -370,7 +370,7 @@ Choose a projection start on or after the latest checkpoint. The following comma
 
 ```bash
 START_DATE="$(curl -fsS "$BASE_URL/v1/financial-model" \
-  | jq -r '[.document.checkpoints[].Date] | max // empty')"
+  | jq -r '[.model.checkpoints[].Date] | max // empty')"
 START_DATE="${START_DATE:-$(date -u +%F)}"
 
 jq -n --arg start "$START_DATE" '{

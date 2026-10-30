@@ -17,7 +17,7 @@ import type { AccountBalanceRow } from "./generated/model/accountBalanceRow.ts";
 import {
 	type BackendPlannedPurchase,
 	type BackendPosting,
-	type FinancialModelDocument,
+	type FinancialModel,
 	NO_CEILING_SENTINEL,
 	NO_FLOOR_SENTINEL,
 } from "./contracts.ts";
@@ -166,10 +166,10 @@ describe("planned purchase rows to display purchases", () => {
 	});
 });
 
-function purchaseDocument(
+function purchaseModel(
 	postings: BackendPosting[] = [],
 	plannedPurchases: BackendPlannedPurchase[] = [],
-): FinancialModelDocument {
+): FinancialModel {
 	return {
 		sourcePath: "models/household.json",
 		accounts: [],
@@ -191,7 +191,7 @@ describe("saved standalone purchases", () => {
 	it("reads cost, date, and priority from standalone rows", () => {
 		expect(
 			savedPurchasesToDisplay(
-				purchaseDocument([], [purchaseRow({ priority: 2 })]),
+				purchaseModel([], [purchaseRow({ priority: 2 })]),
 			),
 		).toEqual([
 			{
@@ -206,13 +206,13 @@ describe("saved standalone purchases", () => {
 		]);
 	});
 
-	it("orders by priority without changing document order", () => {
+	it("orders by priority without changing model order", () => {
 		const purchases = [
 			purchaseRow({ id: "second", priority: 1 }),
 			purchaseRow({ id: "first", cost: 25, priority: 0 }),
 			purchaseRow({ id: "third", priority: 1 }),
 		];
-		const rows = savedPurchasesToDisplay(purchaseDocument([], purchases));
+		const rows = savedPurchasesToDisplay(purchaseModel([], purchases));
 		expect(rows.map((row) => row.id)).toEqual(["first", "second", "third"]);
 		expect(rows[0]).toMatchObject({ amount: 25, fromId: "cash" });
 		expect(purchases.map((row) => row.id)).toEqual([
@@ -224,7 +224,7 @@ describe("saved standalone purchases", () => {
 
 	it("does not treat postings as purchases", () => {
 		const rows = savedPurchasesToDisplay(
-			purchaseDocument(
+			purchaseModel(
 				[
 					{
 						id: "real",
@@ -247,7 +247,7 @@ describe("saved standalone purchases", () => {
 		expect(rows.map((row) => row.id)).toEqual(["laptop"]);
 	});
 
-	it("returns an empty queue for a missing document", () => {
+	it("returns an empty queue for a missing model", () => {
 		expect(savedPurchasesToDisplay(null)).toEqual([]);
 		expect(savedPurchasesToDisplay(undefined)).toEqual([]);
 	});

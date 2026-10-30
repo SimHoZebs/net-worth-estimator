@@ -47,7 +47,7 @@ func seedAPIFinding(t *testing.T, scoped store.Store) types.AnalysisFinding {
 func TestAnalysisFeedbackHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	finding := seedAPIFinding(t, scoped)
-	before, _ := scoped.LoadDocument()
+	before, _ := scoped.LoadModel()
 	request := func(handler http.Handler, method, path, body string) *httptest.ResponseRecorder {
 		t.Helper()
 		res := httptest.NewRecorder()
@@ -119,7 +119,7 @@ func TestAnalysisFeedbackHTTPContract(t *testing.T) {
 	if res.Code != 200 || json.Unmarshal(res.Body.Bytes(), &history) != nil || len(history.Feedback) != 1 || history.Feedback[0].Request.Action != "set-duration" {
 		t.Fatalf("next=%d %s", res.Code, res.Body.String())
 	}
-	after, _ := scoped.LoadDocument()
+	after, _ := scoped.LoadModel()
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("feedback changed financial model")
 	}

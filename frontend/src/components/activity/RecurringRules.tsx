@@ -395,7 +395,7 @@ export function RecurringRules({
 								accounts,
 								startDate,
 							})}
-							planTransaction={transaction}
+							savedTransaction={transaction}
 							accounts={accounts}
 							transactions={transactions}
 							readOnly={readOnly}

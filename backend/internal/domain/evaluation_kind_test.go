@@ -77,12 +77,12 @@ func (r *cannedResult) ToJSON() types.JsonValue { return map[string]any{"value":
 func kindTestPath(t *testing.T) *types.ProjectionPath {
 	t.Helper()
 	floor := 0.0
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-02-01", HorizonYears: 1}
-	path, _, err := ProjectRawFinancialModelDocument(document, settings, types.EmptyModelOverrides(), nil)
+	path, _, err := ProjectRawFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestReaderEvaluationCannotResimulate(t *testing.T) {
 		name:           "resim",
 		definition:     resimulating,
 	}}}
-	set.EvaluateDeterministic(&EvaluationContext{Path: path, Document: &path.EffectiveDocument})
+	set.EvaluateDeterministic(&EvaluationContext{Path: path, Model: &path.EffectiveModel})
 	runtime := set.runtimes[0]
 	if runtime.deterministic != nil {
 		t.Fatal("reader resimulation must not produce a result")
@@ -167,9 +167,9 @@ func TestResimulationGuardToleratesBriefCrossRequestOverlap(t *testing.T) {
 	wg.Wait()
 }
 
-func kindTestDocument() (*types.FinancialModelDocument, *types.ProjectionRuntimeSettings) {
+func kindTestModel() (*types.FinancialModel, *types.ProjectionRuntimeSettings) {
 	floor := 0.0
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts:    []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings: []types.Posting{{
@@ -180,34 +180,34 @@ func kindTestDocument() (*types.FinancialModelDocument, *types.ProjectionRuntime
 		}},
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-02-01", HorizonYears: 1}
-	return document, settings
+	return model, settings
 }
 
-func TestBaseDocumentHashIgnoresEvaluations(t *testing.T) {
-	document, settings := kindTestDocument()
-	base := BaseDocumentHash(document, types.EmptyModelOverrides(), settings, nil)
+func TestBaseModelHashIgnoresEvaluations(t *testing.T) {
+	model, settings := kindTestModel()
+	base := BaseModelHash(model, types.EmptyModelOverrides(), settings, nil)
 	withEval := *settings
 	withEval.Evaluations.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
 		{InstanceID: "t", Name: "T", Enabled: true, Config: map[string]any{"target": 50.0}},
 	}
-	if got := BaseDocumentHash(document, types.EmptyModelOverrides(), &withEval, nil); got != base {
-		t.Fatal("changing eval config must not change the base document hash")
+	if got := BaseModelHash(model, types.EmptyModelOverrides(), &withEval, nil); got != base {
+		t.Fatal("changing eval config must not change the base model hash")
 	}
 	if EvaluationsHash(&settings.Evaluations) == EvaluationsHash(&withEval.Evaluations) {
 		t.Fatal("evals must be keyed separately from the base path")
 	}
-	changed := *document
-	changed.Postings = append([]types.Posting{}, document.Postings...)
+	changed := *model
+	changed.Postings = append([]types.Posting{}, model.Postings...)
 	changed.Postings[0].Name = "Changed"
-	if BaseDocumentHash(&changed, types.EmptyModelOverrides(), settings, nil) == base {
-		t.Fatal("changing postings must change the base document hash")
+	if BaseModelHash(&changed, types.EmptyModelOverrides(), settings, nil) == base {
+		t.Fatal("changing postings must change the base model hash")
 	}
 }
 
 func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
 	ResetBasePathCache()
-	document, settings := kindTestDocument()
-	first, err := ProjectFinancialModelDocument(document, settings, types.EmptyModelOverrides(), nil)
+	model, settings := kindTestModel()
+	first, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
 	withEval.Evaluations.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
 		{InstanceID: "t", Name: "T", Enabled: true, Config: map[string]any{"target": 50.0}},
 	}
-	second, err := ProjectFinancialModelDocument(document, &withEval, types.EmptyModelOverrides(), nil)
+	second, err := ProjectFinancialModel(model, &withEval, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +235,7 @@ func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
 		t.Fatalf("second result must carry the threshold eval, got %+v", second.Evaluations.NetWorthThreshold)
 	}
 	// The cached base result stays evaluation-free for the next caller.
-	third, err := ProjectFinancialModelDocument(document, settings, types.EmptyModelOverrides(), nil)
+	third, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 	readerDone := make(chan struct{})
 	go func() {
 		defer close(readerDone)
-		readerSet.EvaluateDeterministic(&EvaluationContext{Path: path, Document: &path.EffectiveDocument})
+		readerSet.EvaluateDeterministic(&EvaluationContext{Path: path, Model: &path.EffectiveModel})
 	}()
 	<-entered
 	simulator := &EvaluationDefinition{
@@ -306,7 +306,7 @@ func TestSimulatorResimulationAllowedDuringConcurrentReader(t *testing.T) {
 		name:           "simulator",
 		definition:     simulator,
 	}}}
-	simulatorSet.EvaluateDeterministic(&EvaluationContext{Path: path, Document: &path.EffectiveDocument})
+	simulatorSet.EvaluateDeterministic(&EvaluationContext{Path: path, Model: &path.EffectiveModel})
 	unblock()
 	<-readerDone
 	runtime := simulatorSet.runtimes[0]

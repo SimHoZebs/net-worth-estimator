@@ -107,9 +107,9 @@ type ProjectionResult struct {
 
 // ProjectionPath is the evaluator-facing immutable timeline.
 type ProjectionPath struct {
-	Rows                        []ProjectionRow        `json:"rows"`
-	TransactionEvents           []TransactionEvent     `json:"transactionEvents"`
-	EffectiveDocument           FinancialModelDocument `json:"effectiveDocument"`
+	Rows                        []ProjectionRow    `json:"rows"`
+	TransactionEvents           []TransactionEvent `json:"transactionEvents"`
+	EffectiveModel              FinancialModel     `json:"effectiveModel"`
 	ProjectionStartPostingState struct {
 		LatestRealizedPostingAmounts map[string]float64            `json:"latestRealizedPostingAmounts"`
 		LatestRealizedPostingDates   map[string]string             `json:"latestRealizedPostingDates,omitempty"`

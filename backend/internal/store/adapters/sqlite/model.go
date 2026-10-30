@@ -15,7 +15,7 @@ type queryer interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
-func deleteDocumentRows(tx *userTx) error {
+func deleteModelRows(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM planned_purchases WHERE user_id = :user_id`); err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func deleteDocumentRows(tx *userTx) error {
 	return nil
 }
 
-func clearDocument(tx *userTx) error {
+func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM analysis_findings WHERE user_id = :user_id`); err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func clearDocument(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM safe_spending_settings WHERE user_id = :user_id`); err != nil {
 		return err
 	}
-	if err := deleteDocumentRows(tx); err != nil {
+	if err := deleteModelRows(tx); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE user_id = :user_id`); err != nil {
@@ -80,9 +80,9 @@ func clearDocument(tx *userTx) error {
 	return nil
 }
 
-// replaceDocument is the seed/import path: it wholesale replaces owner
+// replaceModel is the seed/import path: it wholesale replaces owner
 // rows while preserving sync-owned rows. Runtime writes use row CRUD.
-func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
+func replaceModel(tx *userTx, model *types.FinancialModel) error {
 	restoreAnalysis, err := preserveAnalysisEvidence(tx)
 	if err != nil {
 		return err
@@ -112,25 +112,25 @@ func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
 	if err != nil {
 		return err
 	}
-	storedDocument, err := loadDocument(tx)
+	storedModel, err := loadModel(tx)
 	if err != nil {
 		return err
 	}
-	accounts := append([]types.Account(nil), document.Accounts...)
+	accounts := append([]types.Account(nil), model.Accounts...)
 	accountIDs := make(map[string]struct{}, len(accounts))
 	for _, account := range accounts {
 		accountIDs[account.ID] = struct{}{}
 	}
 	storedByID := make(map[string]types.Account, len(accounts))
-	if storedDocument != nil {
-		for _, account := range storedDocument.Accounts {
+	if storedModel != nil {
+		for _, account := range storedModel.Accounts {
 			if _, ok := storedByID[account.ID]; !ok {
 				storedByID[account.ID] = account
 			}
 		}
 	}
 	preserveAccount := func(id string) {
-		if _, ok := accountIDs[id]; ok || storedDocument == nil {
+		if _, ok := accountIDs[id]; ok || storedModel == nil {
 			return
 		}
 		if account, ok := storedByID[id]; ok {
@@ -149,7 +149,7 @@ func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
 			preserveAccount(destinationID)
 		}
 	}
-	if err := deleteDocumentRows(tx); err != nil {
+	if err := deleteModelRows(tx); err != nil {
 		return err
 	}
 
@@ -166,13 +166,13 @@ func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
 		}
 		position++
 	}
-	if _, err := remergeCheckpoints(tx, document.Checkpoints, syncedCheckpoints, 0); err != nil {
+	if _, err := remergeCheckpoints(tx, model.Checkpoints, syncedCheckpoints, 0); err != nil {
 		return err
 	}
-	if _, err := remergePostings(tx, document.Postings, syncedPostings, 0); err != nil {
+	if _, err := remergePostings(tx, model.Postings, syncedPostings, 0); err != nil {
 		return err
 	}
-	for position, purchase := range document.PlannedPurchases {
+	for position, purchase := range model.PlannedPurchases {
 		if err := insertPlannedPurchase(tx, position, purchase); err != nil {
 			return err
 		}
@@ -189,23 +189,23 @@ func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
 		return err
 	}
 	position = 0
-	for _, rule := range document.RecurrenceRules {
+	for _, rule := range model.RecurrenceRules {
 		if err := insertRule(tx, position, &rule); err != nil {
 			return err
 		}
 		position++
 	}
-	for _, table := range document.Evaluations.Tables() {
+	for _, table := range model.Evaluations.Tables() {
 		if err := saveEvaluationTable(tx, table.Type, evaluationRowsOf(*table.Rows)); err != nil {
 			return err
 		}
 	}
-	if err := savePaymentTerms(tx, document.PaymentTerms); err != nil {
+	if err := savePaymentTerms(tx, model.PaymentTerms); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(
 		`UPDATE model_metadata SET source_path = ?, document_present = 1 WHERE id = 1 AND user_id = :user_id`,
-		document.SourcePath,
+		model.SourcePath,
 	); err != nil {
 		return fmt.Errorf("save model metadata: %w", err)
 	}
@@ -299,7 +299,7 @@ func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 
 func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	// postings.receipt_ids is a storage-only back-reference. It is never
-	// selected here, so it cannot enter FinancialModelDocument, financial
+	// selected here, so it cannot enter FinancialModel, financial
 	// revisions, or projection identities; the API exposes it separately as
 	// receiptLinks. Creation/deletion maintain it in the same transaction as
 	// the receipt row (see addPostingReceiptID/removePostingReceiptID).
@@ -406,36 +406,36 @@ func saveEvaluationTable(tx *userTx, evaluationType string, rows []evaluationRow
 	return nil
 }
 
-// LoadDocument reads the canonical document; returns nil if absent.
-func (s *sqliteStore) LoadDocument() (*types.FinancialModelDocument, error) {
+// LoadModel reads the canonical model; returns nil if absent.
+func (s *sqliteStore) LoadModel() (*types.FinancialModel, error) {
 	tx, err := s.db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
 	if err != nil {
-		return nil, fmt.Errorf("load document begin: %w", err)
+		return nil, fmt.Errorf("load model begin: %w", err)
 	}
 	defer tx.Rollback()
-	document, err := loadDocument(tx)
+	model, err := loadModel(tx)
 	if err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("load document commit: %w", err)
+		return nil, fmt.Errorf("load model commit: %w", err)
 	}
-	return document, nil
+	return model, nil
 }
 
-func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
+func loadModel(q queryer) (*types.FinancialModel, error) {
 	var sourcePath string
-	var documentPresent int
-	if err := q.QueryRow(`SELECT source_path, document_present FROM model_metadata WHERE id = 1 AND user_id = :user_id`).Scan(&sourcePath, &documentPresent); err != nil {
+	var modelPresent int
+	if err := q.QueryRow(`SELECT source_path, document_present FROM model_metadata WHERE id = 1 AND user_id = :user_id`).Scan(&sourcePath, &modelPresent); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("load model metadata: %w", err)
 	}
-	if documentPresent == 0 {
+	if modelPresent == 0 {
 		return nil, nil
 	}
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		SourcePath:  sourcePath,
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -473,7 +473,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 			account.Color = &value
 		}
 		account.Enabled = enabled != 0
-		document.Accounts = append(document.Accounts, account)
+		model.Accounts = append(model.Accounts, account)
 	}
 	if err := accountRows.Err(); err != nil {
 		accountRows.Close()
@@ -493,7 +493,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		if err != nil {
 			return nil, err
 		}
-		document.Checkpoints = append(document.Checkpoints, checkpoint)
+		model.Checkpoints = append(model.Checkpoints, checkpoint)
 	}
 	if err := checkpointRows.Err(); err != nil {
 		checkpointRows.Close()
@@ -513,7 +513,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		if err != nil {
 			return nil, err
 		}
-		document.Postings = append(document.Postings, posting)
+		model.Postings = append(model.Postings, posting)
 	}
 	if err := postingRows.Err(); err != nil {
 		postingRows.Close()
@@ -522,7 +522,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	if err := postingRows.Close(); err != nil {
 		return nil, fmt.Errorf("close postings: %w", err)
 	}
-	document.PlannedPurchases, err = loadPlannedPurchases(q)
+	model.PlannedPurchases, err = loadPlannedPurchases(q)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +537,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		if err != nil {
 			return nil, err
 		}
-		document.RecurrenceRules = append(document.RecurrenceRules, rule)
+		model.RecurrenceRules = append(model.RecurrenceRules, rule)
 	}
 	if err := ruleRows.Err(); err != nil {
 		ruleRows.Close()
@@ -558,7 +558,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		if err := evaluationRows.Scan(&evaluationType, &instanceID, &name, &enabled, &configJSON); err != nil {
 			return nil, err
 		}
-		if rows := document.Evaluations.ByType(evaluationType); rows != nil {
+		if rows := model.Evaluations.ByType(evaluationType); rows != nil {
 			config := map[string]any{}
 			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
 				return nil, fmt.Errorf("parse %s config %s: %w", evaluationType, instanceID, err)
@@ -596,7 +596,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 			value := int(statementDay.Int64)
 			term.StatementDay = &value
 		}
-		document.PaymentTerms = append(document.PaymentTerms, term)
+		model.PaymentTerms = append(model.PaymentTerms, term)
 	}
 	if err := termRows.Err(); err != nil {
 		termRows.Close()
@@ -606,26 +606,26 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close payment terms: %w", err)
 	}
 
-	if document.Accounts == nil {
-		document.Accounts = []types.Account{}
+	if model.Accounts == nil {
+		model.Accounts = []types.Account{}
 	}
-	if document.Checkpoints == nil {
-		document.Checkpoints = []types.Checkpoint{}
+	if model.Checkpoints == nil {
+		model.Checkpoints = []types.Checkpoint{}
 	}
-	if document.Postings == nil {
-		document.Postings = []types.Posting{}
+	if model.Postings == nil {
+		model.Postings = []types.Posting{}
 	}
-	if document.RecurrenceRules == nil {
-		document.RecurrenceRules = []types.RecurrenceRule{}
+	if model.RecurrenceRules == nil {
+		model.RecurrenceRules = []types.RecurrenceRule{}
 	}
-	if document.PaymentTerms == nil {
-		document.PaymentTerms = []types.PaymentTerms{}
+	if model.PaymentTerms == nil {
+		model.PaymentTerms = []types.PaymentTerms{}
 	}
-	return document, nil
+	return model, nil
 }
 
-// DocumentExists reports whether any canonical rows are present.
-func (s *sqliteStore) DocumentExists() (bool, error) {
+// ModelExists reports whether any canonical rows are present.
+func (s *sqliteStore) ModelExists() (bool, error) {
 	var present int
 	row := s.db.QueryRow(`SELECT document_present FROM model_metadata WHERE id = 1 AND user_id = :user_id`)
 	if err := row.Scan(&present); err != nil {

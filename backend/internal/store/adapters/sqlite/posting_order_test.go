@@ -26,11 +26,11 @@ func TestPostingExecutionOrderSurvivesOwnerUpdatesAndDisplayMoves(t *testing.T) 
 	if err := database.MovePosting(second.ID, first.ID); err != nil {
 		t.Fatal(err)
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if document.Postings[0].ID != second.ID || document.Postings[0].ExecutionOrder != 2 || document.Postings[1].ExecutionOrder != 1 {
+	if model.Postings[0].ID != second.ID || model.Postings[0].ExecutionOrder != 2 || model.Postings[1].ExecutionOrder != 1 {
 		t.Fatal("display move changed equal-time execution order")
 	}
 }

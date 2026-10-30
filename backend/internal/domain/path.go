@@ -177,11 +177,11 @@ func BuildStochasticSamplePath(prepared *types.PreparedProjection, run *types.Si
 }
 
 func buildProjectionPath(prepared *types.PreparedProjection, run *types.SimulationRun, detailed bool) *types.ProjectionPath {
-	effectiveDocument := prepared.EffectiveDocument
+	effectiveModel := prepared.EffectiveModel
 	var postingsByID map[string]*types.Posting
 	var attemptsByDate map[string][]*types.TransactionEvent
 	if detailed {
-		transactions := ResolvedTransactionPostings(&effectiveDocument)
+		transactions := ResolvedTransactionPostings(&effectiveModel)
 		postingsByID = map[string]*types.Posting{}
 		for index := range transactions {
 			posting := &transactions[index]
@@ -197,7 +197,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	historicalRows := make([]types.ProjectionRow, 0, len(prepared.HistoricalSnapshots))
 	for _, snapshot := range prepared.HistoricalSnapshots {
 		historicalRows = append(historicalRows, createRow(
-			snapshot.Date, true, snapshot.Balances, effectiveDocument.Accounts,
+			snapshot.Date, true, snapshot.Balances, effectiveModel.Accounts,
 			map[string][]types.AccountDelta{}, 0, 0, 0, snapshot.CheckpointCorrections,
 		))
 	}
@@ -208,7 +208,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 			classified = classifyAttempts(attemptsByDate[snapshot.Date], postingsByID)
 		}
 		projectedRows = append(projectedRows, createRow(
-			snapshot.Date, false, snapshot.Balances, effectiveDocument.Accounts,
+			snapshot.Date, false, snapshot.Balances, effectiveModel.Accounts,
 			classified.accountImpacts, classified.externalInflowAmount,
 			classified.externalOutflowAmount, classified.internalTransferAmount, nil,
 		))
@@ -218,7 +218,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 	path := &types.ProjectionPath{
 		Rows:                rows,
 		TransactionEvents:   run.TransactionAttempts,
-		EffectiveDocument:   effectiveDocument,
+		EffectiveModel:      effectiveModel,
 		ProjectionStartDate: run.Request.StartDate,
 		ProjectionEndDate:   run.Request.EndDate,
 		HistoryCutInstant:   prepared.Request.HistoryCutInstant,
@@ -233,7 +233,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 // AdaptSimulationRun produces RawProjectionOutput (path + public result).
 func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.SimulationRun) (*types.ProjectionPath, *types.ProjectionResult) {
 	path := BuildProjectionPath(prepared, run)
-	accounts := prepared.EffectiveDocument.Accounts
+	accounts := prepared.EffectiveModel.Accounts
 
 	var latestHistoricalRow *types.ProjectionRow
 	var latestRow *types.ProjectionRow
@@ -305,9 +305,9 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 	return path, result
 }
 
-// ProjectRawFinancialModelDocument prepares and simulates without evaluations.
-func ProjectRawFinancialModelDocument(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionPath, *types.ProjectionResult, error) {
-	prepared, err := orchestratedPrepare(document, settings, overrides, monteCarloSample)
+// ProjectRawFinancialModel prepares and simulates without evaluations.
+func ProjectRawFinancialModel(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionPath, *types.ProjectionResult, error) {
+	prepared, err := orchestratedPrepare(model, settings, overrides, monteCarloSample)
 	if err != nil {
 		return nil, nil, err
 	}
