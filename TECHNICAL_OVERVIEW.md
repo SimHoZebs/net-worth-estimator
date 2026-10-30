@@ -35,14 +35,14 @@ with SQLite and filesystem adapters, private references, and durable cleanup
 in `backend/internal/store/blob_storage.go`).
 
 `store.Database` owns the shared connection. Each financial store holds one
-immutable plan ID. The plan router creates that scope only after Casdoor verifies
-access. `app_accounts` identifies users by immutable issuer and subject. Private
-`plans` rows reference their owner. Financial `accounts` remain model entities.
+immutable user ID. The user router creates that scope only after Casdoor verifies
+access. `users` identifies users by immutable issuer and subject. Financial
+`accounts` remain model entities.
 
-Every financial table includes `plan_id`. Entity IDs and unique names can repeat
-between plans. Relational references use composite plan/entity keys. JSON model
+Every financial table includes `user_id`. Entity IDs and unique names can repeat
+between users. Relational references use composite user/entity keys. JSON model
 references validate against the scoped document. Imports, deletes, ordering,
-sync state, default presets, and artifact eviction operate within one plan.
+sync state, default presets, and artifact eviction operate within one user.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
@@ -51,7 +51,7 @@ unsupported.
 
 ## 2. HTTP Contracts
 
-`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, optional `simplefin.Runner`, and optional static frontend directory. The server always wraps plan APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, optional `simplefin.Runner`, and optional static frontend directory. The server always wraps user APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
 
 The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image.
 
@@ -177,8 +177,8 @@ An unseeded run does not use the shared registry or result storage. Its context 
 
 | Condition                                       | Status |
 | ----------------------------------------------- | ------ |
-| guest write                                     | 401    |
-| denied plan permission or read-only mode        | 403    |
+| denied action without interactive sign-in       | 401    |
+| denied user permission or read-only mode        | 403    |
 | sync unconfigured                               | 503    |
 | another run is active                           | 409    |
 | successful manual run was less than 6 hours ago | 429    |
@@ -190,12 +190,12 @@ An unseeded run does not use the shared registry or result storage. Its context 
 
 A request without an `Origin` header passes. Origin filtering does not grant write access.
 
-The identity boundary checks session and plan permissions for all plan reads, writes, and projections. `readOnlyMiddleware` adds the global write kill switch:
+The identity boundary checks session and user permissions for all user reads, writes, and projections. `readOnlyMiddleware` adds the global write kill switch:
 
 - `POST`, `PATCH`, `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`;
 - `POST /v1/sync/simplefin` and link writes under `/v1/sync/simplefin/accounts`.
 
-The kill switch rejects those writes with 403. Guests can read and project only the separate sample. Shared bearer tokens and unauthenticated server modes are unsupported in dev and production.
+The kill switch rejects those writes with 403. The provisioned guest's viewer membership grants read and projection actions on its own user resource. Every user uses the same permission enforcement. Shared bearer tokens and unauthenticated server modes are unsupported in dev and production.
 
 ## 3. Persistence
 
@@ -211,7 +211,7 @@ The kill switch rejects those writes with 403. Guests can read and project only 
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`Database.Plan` returns the scoped interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior. `store.Open` remains an isolated fixture helper, not the runtime constructor.
+`Database.User` returns the scoped interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior. `store.Open` remains an isolated fixture helper, not the runtime constructor.
 
 ### SQLite setup
 
@@ -244,23 +244,22 @@ The current schema stores:
 | `identity_grants`        | global provider grants and token credentials, bound to issuer and subject                                     |
 | `identity_logout_marks`  | global revocation markers that block delayed callbacks and stale grants                                       |
 | `identity_logout_tokens` | global signed logout token replay records                                                                     |
-| `app_accounts`           | verified application account identities, unique by issuer and subject                                         |
-| `plans`                  | private owner relationship or explicitly published guest sample                                               |
+| `users`                  | data owners, including the provisioned guest, unique by issuer and subject                                     |
 | `model_metadata`         | source path and document-present flag                                                                         |
 | `accounts`               | ordered account definitions                                                                                   |
 | `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |
 | `postings`               | ordered UUID posting definitions with owner and explicit pending state                                        |
-| `purchase_policies`      | account-scoped purchase priorities attached to posting identities                                                |
+| `purchase_policies`      | user-scoped purchase priorities attached to posting identities                                                |
 | `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
 | `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
 | `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
 | `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
-| `evaluations`            | type, account-scoped instance ID, order, label, enablement, and JSON config                                      |
+| `evaluations`            | type, user-scoped instance ID, order, label, enablement, and JSON config                                      |
 | `entity_ids`             | shared ID registry across accounts, postings, rules, and evaluations                                          |
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
-| `safe_spending_settings` | account-scoped safe-spending preferences                                                                         |
+| `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
 | `projection_artifacts`   | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
@@ -270,9 +269,9 @@ The current schema stores:
 
 ### First boot and import
 
-The authenticated plan router initializes a blank private account on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected account's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
+The authenticated user router initializes a blank private workspace on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected user's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
 
-`cmd/importcsv` requires both an existing shared database and an explicit existing account resource ID. It invokes the same import path for operator-controlled replacement within that plan.
+`cmd/importcsv` requires both an existing shared database and an explicit existing user resource ID. It invokes the same import path for operator-controlled replacement within that user's scope.
 
 ### Row writes and ownership
 
@@ -298,7 +297,7 @@ lives in `posting_sync_keys`, separate from local posting IDs (see
 
 ### Artifact durability
 
-Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. Each plan retains at most 256 rows across both kinds. Insertion evicts only that plan's oldest rows.
+Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. Each user retains at most 256 rows across both kinds. Insertion evicts only that user's oldest rows.
 
 Result writes are best-effort. A malformed stored payload is unavailable for retrieval. A storage failure does not prevent the requested simulation from execution.
 
@@ -558,9 +557,9 @@ Two rounding rules stay explicit: deterministic public currency, fulfillment amo
 
 `internal/simplefin` is configured once in `cmd/server`:
 
-- The Bridge key is connected per plan through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
+- The Bridge key is connected per user through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
 - Account links live in the `account_links` table.
-- Card selection is stored per plan in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
+- Card selection is stored per user in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 

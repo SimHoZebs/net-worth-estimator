@@ -22,9 +22,19 @@ export NET_WORTH_ESTIMATOR_OWNER_SUBJECT="$(
   node --input-type=module -e \
     'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).subject)'
 )"
+export NET_WORTH_ESTIMATOR_GUEST_SUBJECT="$(
+  node --input-type=module -e \
+    'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).guest_subject)'
+)"
 docker compose --env-file auth/casdoor/.env build backend
+# Provision the guest destination row before the API serves anonymous traffic.
+# setupdb is idempotent: repeat runs preserve the existing database and user rows.
 docker compose --env-file auth/casdoor/.env run --rm --no-deps \
   --entrypoint /app/setupdb backend --db /data/net-worth-estimator.db
+docker compose --env-file auth/casdoor/.env run --rm --no-deps \
+  --entrypoint /app/setupdb backend --db /data/net-worth-estimator.db \
+  --issuer "$(node --input-type=module -e 'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).issuer)')" \
+  --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
 docker compose --env-file auth/casdoor/.env up -d --build
 ```
 
@@ -49,13 +59,14 @@ Override its name or use a separate bind mount for disposable tests.
 
 ## Session and access contract
 
-- Anonymous visitors read/project only a separately published sample plan.
+- Anonymous visitors use a provisioned user with viewer permissions assigned at creation.
 - Each verified user automatically owns its own private data. Signup has no
   role choice or subject-grant step. Existing primary data needs an explicit owner.
 - Casdoor's built-in Casbin API checks roles, actions, and user resources.
-- One application SQLite database holds all plans and application sessions.
-- User data, artifacts, sync state, and browser drafts remain user-scoped.
-- Provider administrator status never grants access to another user's plan.
+- Normal signup assigns member-group access. The guest receives viewer-group access. The API uses one enforcement path for both.
+- One application SQLite database holds all users' financial data and application sessions.
+- User data, artifacts, and sync state remain user-scoped. Unsubmitted fields stay in their forms.
+- Provider administrator status never grants access to another user's data.
 - Application sessions persist across browser and API restarts, with a seven-day
   absolute limit by default. Managed refresh grants renew short-lived tokens.
 - Signed back-channel logout deletes application grants. Token introspection
@@ -97,6 +108,7 @@ environment from the contract, then supply:
 
 ```text
 AUTH_TEST_SUBJECT=<subject from private bootstrap.json>
+AUTH_TEST_GUEST_SUBJECT=<guest_subject from private bootstrap.json>
 AUTH_TEST_USERNAME=<CASDOOR_USER_NAME>
 AUTH_TEST_PASSWORD=<CASDOOR_USER_PASSWORD>
 ```
@@ -106,10 +118,11 @@ node auth/test-integration.mjs
 ```
 
 The script requires `CASDOOR_TEST_MUTATIONS=1` and a marked disposable identity
-fixture. It owns one temporary database with owner, sample, and second-user
-plans. It verifies Casdoor permissions, CSRF, restart persistence, projections,
-cross-user isolation, logout, and captured-cookie rejection. It refuses an
-occupied application port. Retained browser profiles contain credentials.
+fixture. It owns one temporary database with owner, provisioned-guest, and
+second-user scopes. It verifies the UUID profile lookup, signup default-group
+access, member-write and viewer-write-denied permissions, CSRF, restart
+persistence, projections, cross-user isolation, logout, and captured-cookie
+rejection. It refuses an occupied application port. Retained browser profiles contain credentials.
 
 Physical phone passkeys and security keys require the manual checklist in the
 contract. A virtual authenticator does not verify physical-device behavior.

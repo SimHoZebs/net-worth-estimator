@@ -1,6 +1,6 @@
 # Testing
 
-This checkout holds two packages: the Go backend in `backend/`, and the Waypoint frontend in `frontend/`. Both have their own gates. The backend is the calculation authority; the frontend renders its results and keeps local edits as a temporary review layer.
+This checkout holds two packages: the Go backend in `backend/`, and the Waypoint frontend in `frontend/`. Both have their own gates. The backend is the calculation authority; the frontend renders its results and saves each row through its editor. Failed edits stay local to the form for retry, and multi-row imports apply per row without an atomic whole-model promise.
 
 Use `./scripts/test` as the single entry point:
 
@@ -31,7 +31,7 @@ Configuration checks require the Docker Compose CLI, but no running daemon.
 
 Parallel agents use isolated slots instead of stopping the canonical stack or
 stealing its ports. Setup picks three free loopback ports, clones the canonical
-plan database when one exists, and prints the slot URLs plus the exact Compose
+application database when one exists, and prints the slot URLs plus the exact Compose
 invocation. State lives in `tmp/dev-<slot>/`, the env file is
 `.env.dev.<slot>`, and the Compose project is `waypoint-dev-<slot>`. Slots are
 loopback-only: `--tailnet` stays on the canonical stack.
@@ -78,7 +78,7 @@ Font roles live in `frontend/src/styles/typography.css`. `npm --prefix frontend 
 
 ## Frontend Browser Tests
 
-The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic user and plan through the production session contract. It does not enable a legacy authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
+The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic user and financial model through the production session contract. It does not enable a legacy authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
 
 ```bash
 npm --prefix frontend exec playwright install chromium
@@ -130,7 +130,7 @@ The pre-commit hook verifies the backend packages containing staged Go files, pl
 
 ## Shared Database Isolation
 
-The application stores all plans and application identity state in one SQLite
+The application stores all users and application identity state in one SQLite
 database. Isolation tests must use at least two users in that same physical file,
 with identical entity IDs, preset names, and upstream sync keys. Separate fixture
 files alone do not prove row-level isolation.
@@ -156,8 +156,8 @@ backend/scripts/verify.sh ./internal/api
 node --test auth/casdoor/*.test.mjs
 ```
 
-`scripts/smoke-compose.sh` checks the guest sample on the authenticated stack.
-Guests see only a separate sample.
+`scripts/smoke-compose.sh` checks the provisioned guest user on the authenticated stack.
+Its viewer grants allow reads and projections on its own data.
 Run its request-contract regressions with `node --test scripts/smoke-compose.test.mjs`.
 Run the real-Nginx provider-header regression with
 `NGINX_TEST_IMAGE=nginx:alpine node --test scripts/nginx-provider.test.mjs`.
@@ -181,14 +181,17 @@ proxy transport, and sibling-origin denial. Additional browser aliases keep the
 same issuer and user-owned resource IDs. See
 [browser address configuration](docs/authentication.md#lan-and-tailnet-browser-addresses).
 
-`auth/test-integration.mjs` checks owner, guest sample, and second-user isolation
+`auth/test-integration.mjs` checks owner, provisioned guest, and second-user isolation
 against a marked disposable Casdoor fixture. `CASDOOR_TEST_MUTATIONS=1` is required.
 Its `fixture.json` must identify isolated state under repository `tmp/` or
 `/tmp/opencode/`, never live `tmp/dev/`. The script verifies the real permission
-API, OIDC, CSRF, restart persistence, private writes, sample projection/SSE,
+API, OIDC, CSRF, restart persistence, private writes, guest projection/SSE,
 cross-user rejection, stale resource headers, and logout.
 Signup checks include immediate blank-workspace access without administrator
-approval or import, first-account editing, draft reload, and saved restart persistence.
+approval or import, first-account editing, page reload, and saved restart persistence.
+The provider gate also checks creation-time member/viewer assignment,
+application-credential UUID lookup, provider-granted anonymous writes, and
+immediate revocation. Unit checks also cover the same path for group-data routes.
 
 ---
 
@@ -319,7 +322,7 @@ Expected baseline:
 The document is optional and defaults to the scoped stored model. It returns
 `result: { asOfDate, netWorth, accounts: [{ accountId, balance }] }` from the same
 historical preparation as projections, without a future simulation. It requires
-`user:project`, allows read-only/sample access, and stores no additional history.
+`user:project`, permits projection without write permission, and stores no additional history.
 Model/date errors return HTTP 200 with `issues` and `error`, without `result`.
 
 `frontend/tests/position.spec.ts` holds forecast requests open to verify that the
@@ -382,9 +385,9 @@ A small seeded run should terminate with one `result` event. It may include `pro
 
 Exercise each row through the real identity boundary against disposable state.
 
-| Access                                        | Plan reads/projections                      | Canonical writes and manual sync                  |
+| Access                                        | User reads/projections                      | Canonical writes and manual sync                  |
 | --------------------------------------------- | ------------------------------------------- | ------------------------------------------------- |
-| Guest, sample resource                        | allowed                                     | 401                                               |
+| Provisioned guest viewer, own resource        | allowed                                     | 401                                               |
 | Signed-in owner, own resource                 | allowed                                     | allowed, subject to validation/sync configuration |
 | Signed-in owner, another resource             | 409 for stale resource assertion            | rejected                                          |
 | Owner without write permission                | allowed when read/project permissions exist | 403                                               |
@@ -397,8 +400,13 @@ After each rejected write, confirm financial data stays unchanged. Row validatio
 can return 200 with error-severity issues and `persisted: false`.
 
 `auth/test-integration.mjs` owns the disposable real-provider session, CSRF,
-owner/sample/second-user, and logout checks. Go identity tests also check that
+owner/provisioned-guest/second-user, and logout checks. Go identity tests also check that
 retired bearer headers cannot grant guest access.
+
+The provider gate must also verify creation-time member/viewer assignment,
+application-credential UUID lookup, viewer write denial, and permission revocation.
+A guest granted an action in the disposable provider must pass the same
+runtime enforcement as any other user. No user-kind branch may override that decision.
 
 ## CORS Checks
 

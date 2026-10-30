@@ -3,10 +3,10 @@
 ## Boundary
 
 `NET_WORTH_ESTIMATOR_DB` names one application SQLite database. It contains all
-private users, the approved guest sample, and application sessions and grants.
+users, including the provisioned guest, and application sessions and grants.
 Casdoor remains the external identity provider with its own state directory.
 
-An application user is a signed-in user. It differs from a financial account
+An application user owns a data scope, with or without an interactive sign-in. It differs from a financial account
 in the model's `accounts` table. `users` records immutable OIDC identities;
 the store row ID is the user scope itself. The owner key derives from the
 exact verified issuer and subject, not a username or email.
@@ -14,7 +14,7 @@ exact verified issuer and subject, not a username or email.
 Each financial table carries a non-null `user_id`. Composite keys allow the same
 entity IDs and preset names in different users. Composite foreign keys prevent
 relational references across users. JSON references validate against the scoped
-financial document. The sample uses the synthetic `sample` user.
+financial document. The guest uses the same identity and table structure.
 
 Deployment owns database creation and schema setup. The running server only opens
 an existing, compatible database. A financial store holds
@@ -24,7 +24,7 @@ that scope. An empty or missing scope never selects a default private user.
 Schema migration records are global. Model metadata, sync state, settings,
 ordering, presets, identity registries, and artifact retention are user-scoped.
 Application sessions, provider grants, and logout replay records remain global
-identity tables. Financial clear, CSV import, refresh, and sample publication
+identity tables. Financial clear, CSV import, refresh, and guest publication
 never replace those identity tables.
 
 ## Initial deployment and schema setup
@@ -40,6 +40,17 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
 and identity schema. Repeat setup preserves existing data. Run schema setup with
 the API stopped when a deployment requires a schema change. Legacy unscoped
 databases are unsupported.
+
+To provision any user's empty financial rows, pass both `--issuer` and
+`--subject`. Use the guest's provider subject for its application workspace:
+
+```bash
+CGO_ENABLED=0 go -C backend run ./cmd/setupdb \
+  --db /private/application.db --issuer "$ISSUER" --subject "$GUEST_SUBJECT"
+```
+
+Provider group membership assigns permissions separately at account creation.
+Schema setup does not grant access.
 
 The API never creates a missing directory, database, table, or index. It never
 repairs an incomplete schema. Missing, empty, and incompatible databases stop
@@ -78,7 +89,7 @@ writes. Do not silently restore an older backup over current user data.
 
 Treat the whole application database as a credential store. It contains provider
 tokens and financial data for every user. A full backup is private and must
-never serve as a guest sample or a frontend asset.
+never serve as published guest data or a frontend asset.
 
 A financial replacement selects one explicit user. It preserves all other users
 and all identity state. Sample publication creates an approved snapshot, not a
@@ -86,7 +97,7 @@ live alias. It removes private upstream identities, links, sync times, source
 paths, migration history, and projection history from the published content.
 
 Server-level SimpleFIN credentials remain bound to the configured owner.
-Other private users and the sample never inherit those credentials. The global
+Other users never inherit those credentials. The global
 read-only switch still blocks editor writes.
 
 ## Verification
@@ -111,18 +122,24 @@ The destination private user must already exist. Use a separate migrated source
 snapshot and stop the application before this operation:
 
 ```bash
-CGO_ENABLED=0 go -C backend run ./cmd/refreshplan \
+CGO_ENABLED=0 go -C backend run ./cmd/refreshmodel \
   --db /private/application.db \
   --source /private/approved-snapshot.db \
   --source-user "$SOURCE_USER" --user "$TARGET_USER"
 ```
 
-Use `--sample` instead of `--user` for approved guest publication. Replacement
+Use the normal guest `--user` destination with `--financial-only` for approved
+guest publication. The flag removes private attachments and sync state from
+the copy; it does not change the destination's permissions. Replacement
 discards derived projection artifacts. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
 
-The API container includes `setupdb`, `importcsv`, `refreshplan`, and the
+Legacy historical rows named `sample` remain recoverable as an explicit
+`--source-user sample` from a stopped-stack snapshot. Provision the ordinary
+destination user first. Runtime requests never select those legacy rows.
+
+The API container includes `setupdb`, `importcsv`, `refreshmodel`, and the
 temporary `migrate-plans-to-users` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active

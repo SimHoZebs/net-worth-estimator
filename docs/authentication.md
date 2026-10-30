@@ -21,10 +21,12 @@ Deployment `setupdb` creates all application identity tables before the API star
 Identity initialization never creates tables or opens a new session database.
 Missing schema stops startup. See [database setup](shared-database.md#initial-deployment-and-schema-setup).
 
-Casdoor's built-in Casbin system grants actions on user resources. Guests can
-read and project only a separate published sample. Each signed-in user can
-read and edit only their own private data. Signup has no role-selection or manual
-grant step. User data, artifacts, sync state, and browser drafts remain isolated.
+Casdoor's built-in Casbin system grants actions on user resources. The guest
+is a provisioned user with viewer-group membership assigned at creation.
+Normal signup assigns member-group membership without a role-selection step.
+Both use the same authorization and user-scoped storage path. User data,
+artifacts, and sync state remain isolated. Unsubmitted
+fields stay local to their mounted form.
 See [user-scoped authorization](authorization.md) for the resource and migration
 contract. The global read-only switch still rejects editor writes.
 
@@ -44,9 +46,10 @@ The default signup form does not collect email or require a mail service.
 | `NET_WORTH_ESTIMATOR_PUBLIC_URL`            | Frontend origin, without a path                                                 |
 | `NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL`      | Optional account/passkey page on the issuer origin                              |
 | `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/user-access`                                     |
+| `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Provider organization for immutable-subject lookups, default `waypoint` |
 | `NET_WORTH_ESTIMATOR_DB`                    | Shared application database for private users and application identity state    |
 | `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | Verified user whose scope may use server-level SimpleFIN credentials       |
-| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` (retired)  | Rejected with a deprecation error pointing at `OWNER_SUBJECT` |
+| `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | Required provisioned user subject used for anonymous visits; permissions remain provider-owned |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h`                                   |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m`                       |
 | `NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP`    | `1` opts into plain-HTTP origins on a trusted LAN; default requires HTTPS outside loopback |
@@ -71,8 +74,9 @@ Cross-origin session login is outside this integration.
 
 `GET /v1/auth/session` supplies identity and resource-capability discovery.
 The API checks Casdoor's resource permissions before any user-data read or write.
-Guests read only sample status, which reports `readOnly: true`. Authentication
-discovery belongs to `/v1/auth/session`.
+Guests read status for their own user scope. Default viewer grants make that
+status report `readOnly: true`; provider-assigned write access can change it.
+Authentication discovery belongs to `/v1/auth/session`.
 The frontend has no shared-token prompt or token state. Its API client uses
 session cookies and strips caller-supplied Authorization headers.
 
@@ -137,7 +141,7 @@ Application sessions have an absolute deadline. Refresh never extends it. The
 next request refreshes tokens near their expiry. Concurrent requests share one
 refresh per grant. Rotated credentials persist before the next provider check.
 Expired application sessions lose private access. A guest session uses
-only the sample resource. Casdoor can reuse its browser session for a new
+the configured guest user's own scope. Casdoor can reuse its browser session for a new
 sign-in without another credential prompt.
 
 App logout deletes its provider grant and SCS session, then returns Casdoor's

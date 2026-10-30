@@ -22,20 +22,20 @@ public/data/income/
 └── tax-profiles.csv
 ```
 
-Offline replacement from `backend/` requires an existing plan. Set `PLAN_ID` to
+Offline replacement from `backend/` requires an existing user. Set `USER_ID` to
 the verified resource ID from `/v1/auth/session`. Stop the application first:
 
 ```bash
 go run ./cmd/importcsv \
   -db /path/to/net-worth-estimator.db \
-  -plan "$PLAN_ID" \
+  -user "$USER_ID" \
   -model ../public/configs
 ```
 
 ## Persistence and Access
 
-- One application SQLite file holds all private plans, the published sample, and application sessions.
-- Every financial table is plan-scoped. Each private plan belongs to a verified application account.
+- One application SQLite file holds each user's financial data, including the guest's data, and application sessions.
+- Every financial table is user-scoped. The verified issuer and subject identify its owner.
 - There is no HTTP reset route. Use a database backup and the offline import tool for replacement.
 - Canonical edits and artifacts survive redeployment only when the SQLite file is on durable storage.
 
@@ -48,7 +48,7 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
 The server requires that existing, compatible database. It never creates a missing
 database or repairs its schema. Use the same path in `NET_WORTH_ESTIMATOR_DB`.
 
-Legacy per-plan databases are unsupported. See
+Legacy one-database-per-model layouts are unsupported. See
 [the shared database guide](docs/shared-database.md). Runtime startup never merges
 legacy files or assigns their ownership from the first login.
 
@@ -71,11 +71,11 @@ production snapshot. Daily Compose commands retain data and logins without a
 custom lifecycle wrapper. External sync stays disabled.
 
 Use `setup --from /path/backup.db` for an existing shared-schema backup. Use
-`--source-plan "$SOURCE_PLAN"` when the source contains several private plans.
+`--source-user "$SOURCE_USER"` when the source contains several private users.
 Use
-`./scripts/dev refresh-db --plan "$TARGET_PLAN" --source-plan "$SOURCE_PLAN"`
-to refresh one financial plan without resetting accounts or passkeys.
-See [the dev guide](dev/README.md) for tailnet setup, private plans, the guest sample,
+`./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"`
+to refresh one user's financial data without resetting identities or passkeys.
+See [the dev guide](dev/README.md) for tailnet setup, private user data, published guest data,
 logs, and state recovery.
 
 ## Run from Source (Advanced)
@@ -119,7 +119,7 @@ The frontend is available at `http://localhost:8080` and the API at `http://loca
 
 The root `Dockerfile` remains a legacy combined image. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
 
-Casdoor authentication is required in dev and production. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each account owns a separate private plan. Guests can read and project only a separately published sample. No role choice is required at signup. Identities and plans stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API must share one public origin. There are no shared bearer tokens or unauthenticated server modes. See [authentication](docs/authentication.md) and [plan authorization](docs/authorization.md) for boundaries and migration.
+Casdoor authentication is required in dev and production. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each user owns separate financial data. The guest is an ordinary provisioned user with limited grants assigned at creation. Normal signup assigns member access without a role-choice step. Every request uses the same authorization path. Identities and financial data stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API must share one public origin. There are no shared bearer tokens or unauthenticated server modes. See [authentication](docs/authentication.md) and [user authorization](docs/authorization.md) for boundaries and migration.
 
 Any frontend host must proxy `/v1` to the backend under the same public origin for session cookies and CSRF protection. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
 
@@ -135,7 +135,7 @@ Configure a backend service with this durable contract:
 | Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`              |
 | Public exposure        | only behind suitable access control                                |
 | Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`             |
-| Authentication         | Casdoor OIDC, durable sessions, and account-owned plan permissions |
+| Authentication         | Casdoor OIDC, durable sessions, and user-scoped permissions |
 | Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1`                                  |
 
 Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.
