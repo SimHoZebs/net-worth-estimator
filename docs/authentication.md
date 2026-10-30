@@ -99,8 +99,7 @@ session cookies and strips caller-supplied Authorization headers.
 The isolated `cmd/fixtureapi` browser-test harness intentionally omits identity.
 That executable is not a supported deployment or manual-development entry point.
 
-Legacy private databases are unsupported. New
-users receive their own empty private scope. Casdoor owns action/resource
+New users receive their own empty private scope. Casdoor owns action/resource
 policies.
 
 ## Session lifecycle

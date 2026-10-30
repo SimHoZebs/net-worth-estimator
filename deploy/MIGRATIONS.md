@@ -31,9 +31,10 @@ keys, creates a private `<database>.analysis-backup.XXXXXX/before.db` with
 the SQLite backup API, and compares every preexisting application table,
 except the schema-marker table, against that backup. Only the checkpoint
 date-to-instant conversion, settled-bank repair, and explicit purchase-row
-conversion may differ. Purchase conversion preserves all other rows, identities,
+conversion and removal of the completed `posting_id_migrations` audit table may
+differ. The audit remains in the verified backup. Purchase conversion preserves all other rows, identities,
 and Analysis evidence. Unsafe purchase inputs leave the original unchanged. A
-complete target repeat performs read-only checks only and never reactivates
+complete target without that audit table repeats read-only checks only and never reactivates
 a post-upgrade owner disable.
 
 The old import default and pre-upgrade API-set exclusions share the same

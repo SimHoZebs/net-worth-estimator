@@ -124,7 +124,7 @@ Before an existing authenticated deployment starts the new code:
    `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` variable no longer exists.
 
 See [the shared database guide](shared-database.md) for backup and rollback.
-Runtime startup rejects legacy unscoped financial databases. It never merges files or guesses an owner.
+Runtime startup never merges files or guesses an owner.
 
 No source update automatically publishes private data or changes live Casdoor
 permissions. The owner assignment is a one-time data migration, not signup role selection.

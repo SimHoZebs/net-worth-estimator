@@ -22,8 +22,8 @@ See [extension setup and verification](extension/README.md).
 Standalone planned-purchase CRUD and user isolation run in the API/store suites.
 The separate one-time upgrade script has its own tests under
 `backend/scripts/one-time/planned-purchases/`, included in the backend gate.
-Upgrade failures must roll back all users. Setup and runtime must reject the old
-schema without conversion. See [purchase persistence](docs/purchase-queue.md#persistence).
+Those tests cover conversion correctness, data safety, and rollback without
+partial changes. See [purchase persistence](docs/purchase-queue.md#persistence).
 
 ## Manual Development
 
@@ -91,7 +91,7 @@ Font roles live in `frontend/src/styles/typography.css`. `npm --prefix frontend 
 
 ## Frontend Browser Tests
 
-The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic user and financial model through the production session contract. It does not enable a legacy authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
+The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
 
 ```bash
 npm --prefix frontend exec playwright install chromium
@@ -162,10 +162,10 @@ regressions verify that missing, empty, and incompatible databases create no fil
 or schema. Identity initialization must also reject incomplete tables without repair.
 
 Setup creates schemas only for fresh databases. Store regressions verify that
-rejected old or incomplete databases retain identical bytes and permissions.
-Cases cover missing receipt/void fields, inline images, retired owner source
-values, and missing blob lifecycle objects. Repeated setup preserves receipt
-links without a backfill. Older automatic migrations are removed.
+rejected incomplete databases retain identical bytes and permissions.
+Cases cover missing receipt/void fields, inline images,
+and missing blob lifecycle objects. Repeated setup preserves receipt
+links without a backfill.
 
 ## Casdoor Authentication
 
@@ -370,7 +370,7 @@ Choose a projection start on or after the latest checkpoint. The following comma
 
 ```bash
 START_DATE="$(curl -fsS "$BASE_URL/v1/financial-model" \
-  | jq -r '[.model.checkpoints[].Date] | max // empty')"
+  | jq -r '[.model.checkpoints[].observedAt | gmtime | strftime("%Y-%m-%d")] | max // empty')"
 START_DATE="${START_DATE:-$(date -u +%F)}"
 
 jq -n --arg start "$START_DATE" '{
@@ -435,7 +435,7 @@ can return 200 with error-severity issues and `persisted: false`.
 
 `auth/test-integration.mjs` owns the disposable real-provider session, CSRF,
 owner/provisioned-guest/second-user, and logout checks. Go identity tests also check that
-retired bearer headers cannot grant guest access.
+bearer headers cannot grant guest access.
 
 The provider gate must also verify creation-time member/viewer assignment,
 application-credential UUID lookup, viewer write denial, and permission revocation.
@@ -485,8 +485,8 @@ Expected status: 200. Also verify unsupported preflight methods and request head
 ## SimpleFIN Checks
 
 For live Bridge verification, connect a key through the credential endpoint
-with a writable owner session and its resource assertion (the retired
-environment variables are ignored):
+with a writable owner session and its resource assertion
+(environment-based mapping overrides are ignored):
 
 ```bash
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin/credential" \

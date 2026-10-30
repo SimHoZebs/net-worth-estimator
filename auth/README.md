@@ -43,7 +43,7 @@ Never run two Casdoor processes against one SQLite directory. Keep the verified
 primary-data owner in private deployment configuration. Both dev and production require Casdoor;
 the server rejects token-only and unauthenticated configurations.
 
-`setupdb` is an explicit deployment step. Legacy per-user data is unsupported.
+`setupdb` is an explicit deployment step.
 The API never creates or repairs its application database. Repeat setup preserves current data.
 
 The overlay routes server requests to `http://casdoor:8000` while preserving the
@@ -51,7 +51,6 @@ public issuer and Host. The browser uses the public Casdoor URL. The frontend an
 API must share one public browser origin, but their hosts can differ. See
 [host-portable deployment](../deploy/README.md) for independent providers.
 Set `FRONTEND_PORT` to match `APP_PUBLIC_URL` for Compose.
-Use an empty `VITE_API_BASE_URL` for the frontend proxy.
 
 The base stack retains the existing `net-worth-estimator-data` financial volume.
 A different project name alone does **not** isolate that explicitly named volume.

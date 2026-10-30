@@ -43,11 +43,11 @@ stored rows. It can tighten file permissions, but it never adds missing tables,
 columns, indexes, or triggers to an existing database.
 
 Schema and data upgrades require a separately reviewed offline operation. Stop the
-API and create a verified backup before an upgrade. Setup and runtime reject
-incomplete schemas, inline receipt images, missing posting fields, and the retired
-owner source value `model`. Older automatic conversions are removed.
+API and create a verified backup before an upgrade. Setup and runtime validate
+the required objects of the current schema.
 This tree supplies the [planned-purchase upgrade](purchase-queue.md#persistence)
-and the separate [Analysis deployment operation](../deploy/MIGRATIONS.md).
+and the separate [deployment operation](../deploy/MIGRATIONS.md), which also
+removes completed posting-ID audit bookkeeping before model refresh or publication.
 For other unsupported shapes, restore a verified current-schema backup or prepare
 an operator upgrade specific to the source. No replacement converter is supplied.
 
@@ -146,10 +146,6 @@ discards derived projection artifacts. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
 
-Legacy historical rows named `sample` remain recoverable as an explicit
-`--source-user sample` from a stopped-stack snapshot. Provision the ordinary
-destination user first. Runtime requests never select those legacy rows.
-
 The API container includes `setupdb`, `importcsv`, and `refreshmodel` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
@@ -159,4 +155,4 @@ One-time upgrades belong in the deployment repository's single replaceable
 migration script, not in `setupdb` or server startup. Production uses the
 [migration SOP](../deploy/MIGRATIONS.md).
 The SOP requires a verified backup, an offline rehearsal, explicit postconditions,
-and a rollback plan. `setupdb` rejects legacy plan-scoped databases unchanged.
+and a rollback plan.
