@@ -341,7 +341,7 @@ Persistent hint text is allowed only in two cases:
 1. Non-obvious input behavior the user cannot infer from the control itself,
    and then prefer structure first: an explicit choice (a "No end date"
    checkbox) beats a sentence about leaving a field empty, and a validation
-   warning at apply time (debt sign, blocked by `validatePlan` with the same
+   warning at save time (debt sign, blocked by the row editor with the same
    message) beats a persistent reminder.
    A hint that duplicates a validation message is always removed.
 
@@ -350,8 +350,8 @@ Persistent hint text is allowed only in two cases:
    Methodology summaries, comparison caveats beyond the like-for-like badge, and validation-scope notes do not: they belong in on-demand evidence, if anywhere.
 
 Blocked-action guidance, pre-commit review notes, and error text are not hints.
-They already appear only in the state they describe: the draft-must-save warning shows
-only when a draft blocks import, and evidence qualifications show only when viewing that outcome.
+They already appear only in the state they describe: a busy warning shows
+only when an active request blocks import, and evidence qualifications show only when viewing that outcome.
 If guidance can move closer to the moment it matters, move it there rather than
 repeating it persistently.
 
@@ -359,7 +359,7 @@ Never announce a state the structure already shows.
 A disabled control, a lock icon, and a status readout together say "read-only";
 a sentence saying it again is not information.
 Text may only add the recourse the structure does not offer: where to go instead,
-what to do instead. "Change it at the source and import a refreshed plan" stays;
+what to do instead. "Change it at the source and import a refreshed copy" stays;
 "This record is owned by a read-only source" goes.
 
 Everything else goes:
@@ -377,7 +377,7 @@ Error messages, read-only locks, destructive-action confirmations, and empty sta
 
 Errors and confirmations float in the bottom-right notification stack instead
 of displacing content: one toast per failure with its retry action, dismissed
-manually, cleared on plan change. Only errors that gate an open native dialog
+manually, cleared on user-scope change. Only errors that gate an open native dialog
 stay inline inside it, where the top layer would hide a toast.
 
 ## Core Principle

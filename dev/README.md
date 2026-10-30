@@ -93,7 +93,7 @@ is the production container: stop it first so the file copies cleanly.
 ```bash
 ./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
 ./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
-./scripts/dev publish-sample --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
+./scripts/dev publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
 ```
 
 `refresh-db` backs up the shared application database under `tmp/dev/backups/`.
@@ -101,11 +101,15 @@ It replaces only the explicitly selected private user. It preserves identities,
 passkeys, application sessions, grants, logout records, and other users.
 `--from` selects a source for that operation. Plain Compose startup never refreshes data.
 
-`publish-sample` publishes a snapshot as `users/sample` in the shared application
-database. Without `--from`, it reads the selected user from the current dev database. Approve the exact
-financial data before publication. The copy omits private projection history,
-Bridge links, upstream sync keys, sync times, migration history, and the source
-path. Later private edits do not change the sample.
+`publish-sample` keeps its name but publishes into the provisioned guest scope
+(`--user users/<guest-hash>`, never a sample wire). Without `--from`, it reads
+the selected user from the current dev database. Approve the exact
+financial data before publication. The `--financial-only` copy omits receipts,
+private projection history, Bridge links and credentials, upstream sync keys
+and mappings, sync times, migration history, private defaults, and the source
+path. The guest destination row must already exist (setup provisions it via
+`setupdb --db PATH --issuer ISSUER --subject GUEST_SUBJECT`). Later private
+edits do not change the published guest scope.
 
 Use verified resource IDs for `TARGET_USER` and `SOURCE_USER`. The source must
 use the shared application schema. Legacy backups are unsupported. The commands
@@ -114,14 +118,17 @@ require explicit selection because one source snapshot can contain several owner
 ## Access and state
 
 Casdoor grants access to each user's private data. Signup needs no role choice
-or manual grant. Guests can read and project only the separate sample. Account
-controls appear above sidebar navigation.
+or manual grant: signups join the members group at creation, and the
+provisioned guest resolves anonymous traffic through the viewers group.
+Account controls appear above sidebar navigation.
 
-One shared application database holds every private user, the published sample,
-and application sessions. The verified `ownerSubject` in `tmp/dev/config.json`
-selects the user for server-level Bridge credentials. Dev keeps sync disabled.
+One shared application database holds every private user, the published guest
+scope, and application sessions. The verified `ownerSubject` in
+`tmp/dev/config.json` selects the user for server-level Bridge credentials,
+and `guestSubject` selects the provisioned guest for anonymous traffic. Dev
+keeps sync disabled.
 Fresh setup assigns the bootstrap
-user. Other users receive their own blank plan in the same database.
+user and provisions the guest destination row. Other users receive their own blank private workspace in the same database.
 
 Back up `.env.dev` and `tmp/dev/` to retain the full dev state. Files use `0600`,
 and private directories use `0700`. Compose `down` retains the bind-mounted data.

@@ -1,7 +1,7 @@
 # Planned purchase queue
 
 Planned purchases are canonical postings with an optional `purchase: { priority }`
-marker. They use the existing posting CRUD API, shared ID namespace, draft/save
+marker. They use the existing posting CRUD API, shared ID namespace, direct row-save
 workflow, artifact identity, and account transaction transitions. Priority is
 nonnegative. Lower numbers come first. Document order breaks ties.
 
@@ -9,7 +9,9 @@ nonnegative. Lower numbers come first. Document order breaks ties.
 
 Open **Planned purchases** from the navigation menu. Add a name, fixed positive cost, funding
 account, and earliest purchase date. Use the arrow buttons to change priority.
-Edits, exclusions, removals, and priority changes stay temporary until saved.
+Forms save each edit directly. Removals and priority changes persist immediately.
+Failed saves retain form fields for retry. A multi-row priority change can persist
+partially, so the queue reloads authoritative state after each attempt.
 
 A purchase is an external outflow, with `destinations: null`, no recurrence,
 and no occurrence claim. Amounts cannot reference purchase IDs. This prevents
@@ -17,7 +19,7 @@ established payments from depending on optional purchases.
 
 The posting's transaction day is an earliest date, not a recorded purchase date.
 Planned purchases never replay in history or execute in the main projection.
-A purchase remains a plan until the owner removes it or changes its marker. The evaluation never
+A purchase remains hypothetical until the owner removes it or changes its marker. The evaluation never
 places orders or writes generated transactions to the database.
 
 ## Isolated evaluation
@@ -76,5 +78,5 @@ full candidate simulations, not an optimizer.
 `purchase_policies` stores the optional priority beside its owning posting.
 The foreign key cascades posting deletion and replacement. Schema creation adds
 the table to existing current-shape databases without changing posting columns.
-Canonical JSON exports and browser drafts preserve the policy. Model CSVs
+Canonical JSON exports preserve the policy. Model CSVs
 do not represent it.

@@ -202,7 +202,7 @@ backend/scripts/verify.sh ./internal/receipts/...
 backend/scripts/verify.sh ./internal/store
 backend/scripts/verify.sh ./internal/api
 backend/scripts/verify.sh ./internal/identity
-backend/scripts/verify.sh ./cmd/refreshplan
+backend/scripts/verify.sh ./cmd/refreshmodel
 npm --prefix frontend test -- src/domain/receipt.test.ts src/api/waypoint-fetch.test.ts
 CI=1 TEST_API_PORT=18899 TEST_FRONTEND_PORT=5187 npm --prefix frontend run test:browser -- receipts.spec.ts
 NGINX_TEST_IMAGE=net-worth-frontend:main node --test scripts/nginx-receipts.test.mjs

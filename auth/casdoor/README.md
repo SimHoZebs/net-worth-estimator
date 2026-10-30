@@ -31,13 +31,22 @@ node --env-file=auth/casdoor/.env auth/casdoor/initialize.mjs
 ```
 
 The initializer generates private configuration and starts Casdoor **once**. It
-verifies the ordinary user's generated subject, seals future imports, and writes
-private `bootstrap.json`. It refuses existing configuration. If provisioning
-fails after startup, correct the cause, then run `provision.mjs` with the same
-environment. That command can finish an interrupted seal without another import.
+verifies the ordinary user's generated subject, discovers the provisioned
+guest subject, seals future imports, and writes private `bootstrap.json`
+(`subject` plus `guest_subject`). It refuses existing configuration. If
+provisioning fails after startup, correct the cause, then run `provision.mjs`
+with the same environment. That command can finish an interrupted seal without
+another import.
 
-Casdoor creates one normal user and a separate built-in administrator. The seed
-allows ordinary account creation and disables built-in administrator signup.
+Casdoor creates two normal users — the owner and the provisioned guest — plus
+a separate built-in administrator. The guest name defaults to `guest`
+(`CASDOOR_GUEST_NAME` overrides it, subject to the reserved-name and
+bootstrap-username collision rules) and its password is machine-generated.
+Provisioning discovers the guest through the application's BasicAuth
+credentials (the documented machine-to-machine path, also used by
+batch-enforce), never through the owner's login session, so cross-user
+profile reads stay denied with `isProfilePublic=false`.
+The seed allows ordinary account creation and disables built-in administrator signup.
 It uses a fresh application signing certificate. Initial
 merge mode modifies the built-in signup settings. After provisioning, the config
 uses `initDataNewOnly = true` and `initDataMerge = false`. Future restarts preserve
@@ -80,15 +89,18 @@ For combined Compose, set the private back-channel target to
 destinations. Native loopback development can use the API's bounded introspection
 fallback. Keep the public OIDC issuer unchanged when private routing is used.
 
-`bootstrap.json` records the provider's generated subject. Application permissions
-and per-account scopes follow [the authentication contract](../../docs/authentication.md).
-Branding does not change permissions, account policy, or account ownership.
+`bootstrap.json` records the provider's generated subject and the provisioned
+guest subject. Application permissions
+and per-user scopes follow [the authentication contract](../../docs/authentication.md).
+Branding does not change permissions, user policy, or user ownership.
 
 Application sign-in sends the browser to Casdoor. `sign up now` opens Casdoor's
 username, display-name, and password form. Signup returns through the existing
 OIDC callback. It does not require email or a configured mail service.
 New accounts receive an editable blank private workspace immediately. No
-administrator confirmation or financial-model import is required.
+administrator confirmation or financial-model import is required. Signup
+assigns the `waypoint/members` default group at creation; no role choice or
+permission write happens per request.
 
 Existing initialized instances retain their sealed settings. To enable account
 creation there, use Casdoor's application editor for `waypoint`. Enable signup,
@@ -112,8 +124,8 @@ go run ./backend/cmd/nwe api POST /v1/sync/simplefin --data @trigger.json
 
 `login` prints a verification URL plus a user code. Approve it in the
 browser. The CLI caches tokens owner-only (`0600`) and refreshes them
-without further approval. Every request carries the cached account resource,
-so `Waypoint-Resource` checks and `account:write` enforcement behave exactly
+without further approval. Every request carries the cached user resource,
+so `Waypoint-Resource` checks and `user:write` enforcement behave exactly
 like browser traffic. `logout` wipes the local cache; issued tokens expire
 on their own.
 
@@ -126,17 +138,42 @@ caches its base URL nowhere, so keep `NWE_API` exported (or pass `--api` to
 every command). Compromised tokens stop working immediately only when
 revoked from the account page; otherwise they expire on their own.
 
-## Plan permissions
+## User permissions
 
-Fresh initialization includes the `waypoint/account-access` Casbin model, the
-account-owner and guest roles, and one dedicated same-database policy adapter.
-Casdoor evaluates `account:read`, `account:project`, and `account:write` on account resources.
-Owners receive actions on their private account automatically. Guests receive only
-read/project actions on a separate sample. Signup needs no role choice or
-permission-object write.
+Fresh initialization includes the `waypoint/user-access` Casbin model, the
+member and viewer roles, the `waypoint/members` and `waypoint/viewers` groups,
+and one dedicated same-database policy adapter. Casdoor evaluates `user:read`,
+`user:project`, and `user:write` on `users/*` resources. Anonymous traffic
+resolves to the provisioned guest account, an ordinary user in the viewers
+group limited to read and project on its own scope. Signup needs no role
+choice or permission-object write: the application `defaultGroup` assigns new
+users to `waypoint/members` at creation, and the seeded owner and guest carry
+explicit group memberships. The runtime resolves each request through one
+enforcement path and never reapplies grants.
 
-Existing sealed instances require an explicit policy installation. Preview it
-offline, review the exact JSON, and approve its SHA-256 before any shared write:
+Existing sealed instances require explicit migration prerequisites before the
+policy installation below. The apply command only adds missing objects; it
+never overwrites operator policies, so each drift must be resolved by hand:
+
+1. Stop the application API and sync. Back up application and identity state.
+2. Create top-level enabled groups `waypoint/members` and `waypoint/viewers`.
+3. Set the `waypoint` application `defaultGroup` to `waypoint/members`.
+   Assign approved existing users to `waypoint/members` explicitly.
+4. Create the guest as an ordinary active user in `waypoint/viewers` and record
+   its provider-generated subject as the runtime guest subject.
+5. Preview and approve the new policy bundle. Remove the legacy
+   `own-private-user` and `guest-sample-user` permissions that share the model.
+   Replace the old `waypoint/user-access` model text with the exact approved
+   five-field model through Casdoor's editor. The add-only apply command
+   refuses the old model as drift; it cannot perform this replacement.
+6. Apply missing approved objects, configure the recorded guest subject, and
+   provision its application rows with `setupdb --issuer ... --subject ...`.
+   Verify decisions before the API resumes. Publish guest data separately.
+   Legacy `user-owner`/`guest` roles and `users/sample` rows stay inert once
+   unreferenced; remove them only after verifying the new decisions.
+
+Preview the exact plan offline, review the JSON, and approve its SHA-256 before
+any shared write:
 
 ```bash
 node --env-file=auth/casdoor/.env auth/casdoor/apply-permissions.mjs --preview
@@ -149,9 +186,10 @@ objects only. It refuses drift, extra model permissions, unknown versions,
 and mismatched application identity. It never overwrites operator policies.
 The API fails closed until the permission model resolves.
 
-The application still owns account storage isolation. See the
+The application still owns user storage isolation. See the
 [authorization contract](../../docs/authorization.md) for existing-data ownership,
-sample publication, per-account stores, and resource-header checks.
+guest publication into the provisioned guest scope, per-user stores, and
+resource-header checks.
 
 ## Waypoint hosted login and signup branding
 

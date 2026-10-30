@@ -89,6 +89,12 @@ Set these variables in Vercel's Environment Variables settings:
 | `BACKEND_URL` | `https://your-api.onrender.com` |
 | `NET_WORTH_ESTIMATOR_PUBLIC_URL` | `https://app.example.com` |
 | `NET_WORTH_ESTIMATOR_PROXY_SECRET` | The same private secret as the API |
+| `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | The Casdoor issuer origin |
+| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID` | The registered application client ID |
+| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET` | The registered application client secret |
+| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | The verified owner OIDC subject |
+| `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | The provisioned guest OIDC subject (anonymous traffic resolves to it) |
+| `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Optional; defaults to `waypoint` |
 | `VITE_API_BASE_URL` | Leave unset |
 
 Both URLs must be HTTPS origins without paths or credentials. Configuration
@@ -151,6 +157,15 @@ Shell/SSH session, which has the attached disk. For a fresh database, execute:
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
 ```
 
+Then provision the guest destination row with the issuer and guest subject from
+the private `bootstrap.json` (`subject` and `guest_subject`). Anonymous traffic
+resolves to this ordinary user; the provider's viewer group limits it. Repeat
+runs preserve the existing database and user rows:
+
+```sh
+/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer "$ISSUER" --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
+```
+
 For existing data, restore a verified SQLite-safe backup or use the
 [offline migration guide](../docs/shared-database.md). Back up before schema
 changes. Keep the API stopped. Ephemeral shells do not share the disk.
@@ -185,16 +200,18 @@ non-default port, readiness, non-root command override, explicit setup, and prox
 bypass rejection. Go integration tests use real HTTP/TLS, a mock OIDC provider,
 real API writes, CSRF rejection, incremental streaming, and restart persistence.
 
-For an actual deployment with an approved guest sample:
+For an actual deployment with a provisioned guest scope:
 
 ```sh
 FRONTEND_URL=https://app.example.com sh scripts/smoke-compose.sh
 ```
 
-This smoke checks public proxy access, readiness, origin rejection, and final
-SSE completion. Also verify real Casdoor login/logout, user isolation, private
-writes, passkeys, signed logout delivery, incremental streaming, and restarts
-with disposable users. Never use production financial data as a fixture.
+This smoke checks public proxy access, readiness, origin rejection, guest-scope
+resolution without a session kind, and final SSE completion. Also verify real
+Casdoor login/logout, user isolation, private writes, passkeys, signed logout
+delivery, incremental streaming, and restarts with disposable users. Never use
+production financial data as a fixture. The published `source_path` value
+`sample` is a content-only legacy label; it implies no permissions.
 
 ## Provider references
 

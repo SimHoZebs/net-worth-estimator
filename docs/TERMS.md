@@ -68,6 +68,19 @@ Use **income evidence**. Its parts stay distinct: **deposit** (the record), **ca
 - Retired from copy: posting-derived, observation, salary estimate, FI.
 - Retired from prose: evidence analysis, posting-derived net pay.
 
+## G. Saved model and user scope
+
+The **saved model** is the collection of saved financial rows used for calculation and import/export. It is not a separate owned resource.
+
+The **user** owns those rows. **Account** means a financial account, not the ownership scope.
+
+A **guest** is a provisioned user with limited assigned permissions. Guest access uses the same user resource and data tables as other users.
+
+- Retired as a product concept and frontend editing aggregate: **Plan**.
+- Base forms save row changes directly. Failed submissions retain their fields in the form, not a whole-model browser draft.
+- **Planned** remains valid for transactions and purchases. An implementation plan or a bank-sync operation plan is a different concept.
+- Access permissions do not describe data provenance. Do not infer "example" or "personal" data from a user's permissions or sign-in state.
+
 ## Evaluation and income evidence are different things
 
 **Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.
