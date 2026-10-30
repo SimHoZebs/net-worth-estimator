@@ -5,6 +5,10 @@ origin through a reverse proxy. Neither application contains provider addresses.
 SQLite and Casdoor remain separate stateful dependencies. Database-engine and
 identity-provider migrations are outside this contract.
 
+Application/data migrations use [the shared migration SOP](MIGRATIONS.md).
+Every configured deployment adapter invokes the target image's `/app/migrate.sh`
+with the API stopped. It is not part of server startup.
+
 ## Runtime contract
 
 | Component | Contract |

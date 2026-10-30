@@ -1,0 +1,39 @@
+name: Request Northflank release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  request-release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request the gated workflow for this exact commit
+        env:
+          RELEASE_WEBHOOK: ${{ secrets.NORTHFLANK_RELEASE_WEBHOOK }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'JS'
+          const sha = process.env.RELEASE_SHA;
+          if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
+          const raw = process.env.RELEASE_WEBHOOK;
+          let url;
+          try { url = new URL(raw); } catch { throw new Error("Release webhook is not configured"); }
+          if (url.protocol !== "https:" || url.hostname !== "webhooks.northflank.com" ||
+              url.username || url.password || url.search || url.hash ||
+              !url.pathname.startsWith("/workflows/")) {
+            throw new Error("Unexpected release webhook target");
+          }
+          url.searchParams.set("RELEASE_SHA", sha);
+          url.searchParams.set("name", `main-${sha.slice(0, 12)}`);
+          let response;
+          try {
+            response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15000) });
+          } catch { throw new Error("Northflank release request failed"); }
+          if (!response.ok) throw new Error(`Northflank rejected release request (HTTP ${response.status})`);
+          console.log(`Requested Northflank workflow for ${sha}. Track completion in Northflank.`);
+          JS

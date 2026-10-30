@@ -1,0 +1,40 @@
+{
+  "name": "waypoint-api-command",
+  "description": "Set only the API process command, then wait for its single mounted-volume container.",
+  "apiVersion": "v1.2",
+  "arguments": { "COMMAND": "" },
+  "options": { "autorun": false, "concurrencyPolicy": "forbid" },
+  "spec": {
+    "kind": "Workflow",
+    "spec": {
+      "type": "sequential",
+      "context": { "projectId": "net-worth" },
+      "steps": [
+        {
+          "kind": "CombinedService",
+          "updateMode": "patch",
+          "spec": {
+            "name": "nwe-api",
+            "deployment": {
+              "instances": 1,
+              "docker": {
+                "configType": "customCommand",
+                "customCommand": "${args.COMMAND}"
+              }
+            }
+          }
+        },
+        {
+          "kind": "Condition",
+          "spec": {
+            "kind": "Service",
+            "spec": {
+              "type": "running",
+              "data": { "serviceId": "nwe-api", "timeoutDuration": 600 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
