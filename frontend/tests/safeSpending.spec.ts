@@ -1,8 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { FIXTURE_API, resetFixture, seedResourceStorage } from "./fixture.ts";
+import { FIXTURE_API, resetFixture } from "./fixture.ts";
 import { SAFE_SPENDING_LABELS as labels } from "../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
-import { SAFE_SPENDING_STORAGE_KEY } from "../src/state/persisted.ts";
 
 test.beforeEach(async ({ page, request }) => {
 	await resetFixture();
@@ -199,7 +198,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		expect(response.ok()).toBe(true);
 		expect((await response.json()).persisted).toBe(true);
 	}
-	await page.goto("/#outlook/safe-spending-detail/mandatory");
+	await page.goto("/#outlook/safe-spending-detail/cycle");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
 	await expect(page).toHaveURL(/safe-spending-detail\/last-cycle$/);
 	const last = page.getByRole("dialog", {
@@ -250,129 +249,6 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		.include('[role="dialog"]')
 		.analyze();
 	expect(accessibility.violations).toEqual([]);
-});
-
-test("Configure only selects sources and settings, and ignores legacy overrides", async ({
-	page,
-	request,
-}) => {
-	const response = await request.post(`${FIXTURE_API}/v1/checkpoints`, {
-		data: { AccountId: "loan", Balance: -4321, observedAt: 1768867199 },
-	});
-	expect(response.ok()).toBe(true);
-	await seedResourceStorage(
-		page,
-		SAFE_SPENDING_STORAGE_KEY,
-		JSON.stringify({
-			state: {
-				statementDay: 20,
-				statementDaySet: true,
-				reserve: 725,
-				incomeRuleIds: ["salary"],
-				checkingOverride: 10000,
-				remainingOverride: 20000,
-				paycheckOverride: 30000,
-				fixedOverride: 40000,
-				spentOverride: 50000,
-			},
-			version: 4,
-		}),
-	);
-	const writes: string[] = [];
-	page.on("request", (request) => {
-		if (
-			request.url().includes("/v1/") &&
-			request.method() !== "GET" &&
-			!request.url().includes("/projections/") &&
-			!request.url().endsWith("/v1/position")
-		)
-			writes.push(`${request.method()} ${request.url()}`);
-	});
-	await page.goto("/#outlook/safe-spending-detail");
-	const metric = (label: string) =>
-		page
-			.getByRole("dialog")
-			.getByRole("region", { name: label, exact: true })
-			.getByTestId("metric-value");
-	await expect(metric(labels.cashAfterBills)).toHaveText("$4,200");
-	await expect(metric(labels.allowance)).toHaveText("-$375");
-	await page.getByRole("tab", { name: "Configure", exact: true }).click();
-	await expect(page.getByRole("spinbutton")).toHaveCount(2);
-	await expect(page.getByLabel("Calculated budget values")).toHaveCount(0);
-	for (const label of [
-		labels.cashBalance,
-		labels.remainingBills,
-		labels.nextPaycheck,
-		labels.fixedBills,
-		labels.cardSpending,
-	]) {
-		await expect(
-			page.getByRole("status", { name: label, exact: true }),
-		).toHaveCount(0);
-		await expect(page.getByLabel(`${label} ($)`, { exact: true })).toHaveCount(
-			0,
-		);
-	}
-	await page
-		.getByRole("group", { name: labels.cashAccounts })
-		.getByRole("button", { name: "Investment portfolio" })
-		.click();
-	await page.getByRole("tab", { name: /This cycle/ }).click();
-	await expect(metric(labels.cashAfterBills)).toHaveText("$19,200");
-	await expect(metric(labels.allowance)).toHaveText("-$375");
-	await expect(
-		page
-			.getByRole("table", { name: new RegExp(labels.scheduledBills) })
-			.locator("tbody tr"),
-	).toHaveCount(3);
-	await page.getByRole("tab", { name: "Configure", exact: true }).click();
-	await page
-		.getByRole("group", { name: "Included bills" })
-		.getByRole("button", { name: /^Housing and living/ })
-		.click();
-	const reserveSaved = page.waitForResponse(
-		(response) =>
-			response.url().endsWith("/v1/safe-spending-settings") &&
-			response.request().method() === "PUT" &&
-			response.request().postDataJSON().reserve === 100,
-	);
-	await page.getByLabel(`${labels.reserve} ($)`, { exact: true }).fill("100");
-	expect((await reserveSaved).ok()).toBe(true);
-	await page.reload();
-	await expect(
-		page.getByRole("button", { name: /^Housing and living/ }),
-	).toHaveAttribute("aria-pressed", "false");
-	await expect(
-		page
-			.getByRole("group", { name: labels.cashAccounts })
-			.getByRole("button", { name: "Investment portfolio" }),
-	).toHaveAttribute("aria-pressed", "true");
-	await page.getByRole("tab", { name: /This cycle/ }).click();
-	await expect(metric(labels.cashAfterBills)).toHaveText("$19,200");
-	await expect(metric(labels.allowance)).toHaveText("$4,050");
-	await expect(
-		page.getByText("No spending this cycle yet.", {
-			exact: true,
-		}),
-	).toBeVisible();
-	await page.getByRole("tab", { name: /Last cycle/ }).click();
-	const unallocated = page
-		.getByRole("dialog")
-		.getByText(labels.unallocated, { exact: true })
-		.locator("..")
-		.locator("dd");
-	await expect(unallocated).toHaveText("-$271.00");
-	await expect(
-		page.getByRole("list", { name: labels.closedCardBalances }),
-	).toContainText("$4,321.00");
-	expect(writes.length).toBeGreaterThan(0);
-	expect(
-		writes.every(
-			(write) =>
-				write.endsWith("/v1/safe-spending-settings") &&
-				write.startsWith("PUT "),
-		),
-	).toBe(true);
 });
 
 test("income sources combine independent recurrence rules and persist explicit deselection", async ({

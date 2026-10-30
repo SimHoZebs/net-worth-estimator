@@ -144,9 +144,8 @@ function scopedEditor(page: Page, key: string): OverlayRoute | null {
 
 function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 	const [requestedTab, maybeEdit, key, ...extra] = parts;
-	const tabOrEdit = requestedTab === "mandatory" ? "cycle" : requestedTab;
 	if (extra.length > 0) return { type: "invalid" };
-	if (tabOrEdit === "edit-transaction") {
+	if (requestedTab === "edit-transaction") {
 		// `#outlook/safe-spending-detail/edit-transaction/<id>`
 		return maybeEdit
 			? {
@@ -156,12 +155,12 @@ function parseSafeSpendingDetail(parts: string[]): OverlayRoute {
 				}
 			: { type: "invalid" };
 	}
-	if (!isSafeSpendingTab(tabOrEdit)) return { type: "invalid" };
+	if (!isSafeSpendingTab(requestedTab)) return { type: "invalid" };
 	if (maybeEdit === undefined)
-		return { type: "safeSpendingDetail", tab: tabOrEdit };
+		return { type: "safeSpendingDetail", tab: requestedTab };
 	// `#outlook/safe-spending-detail/<tab>/edit-transaction/<id>`
 	return maybeEdit === "edit-transaction" && key
-		? { type: "safeSpendingDetail", tab: tabOrEdit, editTransaction: key }
+		? { type: "safeSpendingDetail", tab: requestedTab, editTransaction: key }
 		: { type: "invalid" };
 }
 

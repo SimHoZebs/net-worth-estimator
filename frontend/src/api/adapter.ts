@@ -11,8 +11,8 @@ function accountKindOf(kind: string): Account["kind"] {
 
 /**
  * Saved balance row as a display account. The row query owns the data: the
- * balance, checkpoint presence, sync ownership, and archived state all come
- * from the server. Backend no-bound sentinels count as absent before
+ * balance, balance-check presence, sync ownership, and archived state all
+ * come from the server. Backend no-bound sentinels count as absent before
  * clamping, so a missing floor shows as zero and a missing ceiling as
  * unbounded; negative backend bounds clamp the same way.
  */
@@ -38,10 +38,10 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 		observedBalance: row.observedBalance ?? null,
 		balanceCheck: row.hasCheckpoint,
 		source: row.syncOwned
-			? "Synced checkpoint"
+			? "Synced balance check"
 			: row.hasCheckpoint
-				? "Backend checkpoint"
-				: "Backend account",
+				? "Balance check"
+				: "No balance check",
 		readOnly: row.readOnly,
 	};
 }

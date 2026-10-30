@@ -35,7 +35,12 @@ const props = {
 beforeEach(() => {
 	acceptTestResource();
 	setServerModelFixture(blankData);
-	setServerStatusFixture({ readOnly: false });
+	setServerStatusFixture({
+		readOnly: false,
+		syncConfigured: false,
+		syncQuotaUsed: 0,
+		syncQuotaLimit: 0,
+	});
 });
 
 afterEach(() => {
@@ -55,7 +60,12 @@ it("opens the first-account editor from an active blank workspace", () => {
 });
 
 it("honors the server write restriction on a blank workspace", () => {
-	setServerStatusFixture({ readOnly: true });
+	setServerStatusFixture({
+		readOnly: true,
+		syncConfigured: false,
+		syncQuotaUsed: 0,
+		syncQuotaLimit: 0,
+	});
 	render(<Outlook {...props} />);
 	expect(
 		screen.queryByRole("button", { name: "Add your first account" }),

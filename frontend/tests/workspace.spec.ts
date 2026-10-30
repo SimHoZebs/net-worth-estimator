@@ -1,13 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import type { FinancialModel } from "../src/api/contracts.ts";
-import {
-	FIXTURE_API,
-	REMOTE_STORAGE_KEY,
-	readSavedServerModel,
-	resetFixture,
-	seedResourceStorage,
-} from "./fixture.ts";
+import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
 	await resetFixture({ pinnedEvaluationIds: ["posting-fulfillment"] });
@@ -254,23 +248,6 @@ test("failed saves retain the intended edit", async ({ page }) => {
 			(rule) => rule.id === "invest",
 		)?.amount.config.expression,
 	).toBe("900");
-});
-
-test("corrupt persisted data never blocks the saved model", async ({
-	page,
-}) => {
-	// No draft is restored from the remote workspace key anymore, but a
-	// corrupt value there must not break loading or fall back to example
-	// content.
-	await seedResourceStorage(page, REMOTE_STORAGE_KEY, "invalid");
-	await page.goto("/");
-	await expect(
-		page.getByRole("alert").filter({ hasText: "could not be read" }),
-	).toHaveCount(0);
-	// The canonical server model is shown, not example content: the
-	// cash-flow evidence comes from the engine running on the fixture model.
-	await page.getByRole("button", { name: "Inspect cash flow" }).click();
-	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
 });
 
 test("desktop pages and edit dialogs meet automated accessibility checks", async ({

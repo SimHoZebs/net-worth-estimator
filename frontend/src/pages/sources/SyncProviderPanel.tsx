@@ -55,12 +55,9 @@ export function SyncProviderPanel({
 	const since = formatSyncTime(credential.data?.updatedAt);
 	const lastSynced = formatSyncTime(status.data?.lastSyncAt);
 	const syncUnavailable = status.data?.syncConfigured === false;
-	const quotaLimit =
-		typeof status.data?.syncQuotaLimit === "number"
-			? status.data.syncQuotaLimit
-			: null;
+	const quotaLimit = status.data ? status.data.syncQuotaLimit : null;
 	const quotaRemaining =
-		typeof status.data?.syncQuotaUsed === "number" && quotaLimit !== null
+		status.data && quotaLimit !== null
 			? quotaLimit - status.data.syncQuotaUsed
 			: null;
 

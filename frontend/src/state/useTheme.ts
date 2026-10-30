@@ -1,11 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { create } from "zustand";
-import { persist, type PersistStorage } from "zustand/middleware";
-import {
-	appJsonStorage,
-	appLocalStorage,
-	THEME_STORAGE_KEY,
-} from "./persisted.ts";
+import { persist } from "zustand/middleware";
+import { appJsonStorage, THEME_STORAGE_KEY } from "./persisted.ts";
 
 export type ThemePreference = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
@@ -17,89 +13,18 @@ function isPreference(value: unknown): value is ThemePreference {
 	return value === "light" || value === "dark" || value === "system";
 }
 
+/** Current merge input is the persisted state slice `{ preference }`. */
 function sanitizePreference(value: unknown): ThemePreference {
-	if (isPreference(value)) return value;
-	if (typeof value === "object" && value !== null) {
-		const record = value as Record<string, unknown>;
-		if (isPreference(record.preference)) return record.preference;
-		const state = record.state;
-		if (typeof state === "object" && state !== null) {
-			const inner = (state as Record<string, unknown>).preference;
-			if (isPreference(inner)) return inner;
-		}
-	}
+	if (
+		typeof value === "object" &&
+		value !== null &&
+		isPreference((value as Record<string, unknown>).preference)
+	)
+		return (value as Record<string, unknown>).preference as ThemePreference;
 	return "system";
 }
 
 type ThemePersisted = { preference: ThemePreference };
-
-/**
- * Reads both the legacy plain-string format (`dark`) and the persist
- * envelope (`{"state":{"preference":"dark"},"version":1}`) so the inline
- * head script in index.html keeps working across the migration.
- */
-function themeStorage(): PersistStorage<ThemePersisted> | undefined {
-	const fallback = appJsonStorage<ThemePersisted>();
-	return {
-		getItem: (name) => {
-			let raw: string | null = null;
-			try {
-				raw = appLocalStorage.getItem(name) as string | null;
-			} catch {
-				return null;
-			}
-			if (raw === null) return null;
-			if (isPreference(raw)) return { state: { preference: raw }, version: 0 };
-			try {
-				const parsed = JSON.parse(raw) as unknown;
-				if (typeof parsed === "string" && isPreference(parsed)) {
-					return { state: { preference: parsed }, version: 0 };
-				}
-				if (typeof parsed === "object" && parsed !== null) {
-					const record = parsed as Record<string, unknown>;
-					const state = record.state;
-					if (typeof state === "object" && state !== null) {
-						const preference = (state as Record<string, unknown>).preference;
-						if (isPreference(preference)) {
-							return {
-								state: { preference },
-								version:
-									typeof record.version === "number" ? record.version : 0,
-							};
-						}
-					}
-					// Tolerate a bare object written by a future hand-edit.
-					if (isPreference(record.preference)) {
-						return { state: { preference: record.preference }, version: 0 };
-					}
-				}
-			} catch {
-				// Fall through to null below.
-			}
-			return null;
-		},
-		setItem: (name, value) => {
-			if (fallback) fallback.setItem(name, value);
-			else {
-				try {
-					appLocalStorage.setItem(name, JSON.stringify(value));
-				} catch {
-					// Ignore persistence failures; theme still applies this session.
-				}
-			}
-		},
-		removeItem: (name) => {
-			if (fallback) fallback.removeItem(name);
-			else {
-				try {
-					appLocalStorage.removeItem(name);
-				} catch {
-					// Ignore.
-				}
-			}
-		},
-	};
-}
 
 interface ThemeState {
 	preference: ThemePreference;
@@ -141,11 +66,8 @@ export const useThemeStore = create<ThemeState>()(
 		{
 			name: THEME_STORAGE_KEY,
 			version: 1,
-			storage: themeStorage(),
+			storage: appJsonStorage<ThemePersisted>(),
 			partialize: (state) => ({ preference: state.preference }),
-			migrate: (persisted) => ({
-				preference: sanitizePreference(persisted),
-			}),
 			merge: (persisted, current) => ({
 				...current,
 				preference: sanitizePreference(persisted),

@@ -295,9 +295,6 @@ export async function parseSSE(
 	);
 }
 
-export const parsePostSSE = parseSSE;
-export const parsePostSse = parseSSE;
-export const createPostSSEParser = createSSEParser;
 export type { StochasticProgress, StochasticProjectionResult };
 
 export type StochasticRequestOptions = {

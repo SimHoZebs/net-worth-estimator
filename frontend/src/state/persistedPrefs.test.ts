@@ -6,17 +6,12 @@ import {
 	acceptUserScope,
 	canonicalApiBaseUrl,
 	getUserScope,
-	userStorageKey,
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
 	THEME_STORAGE_KEY,
-	SAFE_SPENDING_STORAGE_KEY,
 	UI_PREFS_STORAGE_KEY,
-	SAFE_SPENDING_LEGACY_KEYS,
-	appLocalStorage,
 	clearPersistedMemory,
-	accountLocalStorage,
 } from "./persisted.ts";
 import { resetUiStore, useUiStore } from "./uiStore.ts";
 import { useThemeStore } from "./useTheme.ts";
@@ -57,12 +52,6 @@ async function verifyOwner(
 	const scope = acceptOwner(id, apiBaseUrl);
 	expect(await hydrateFinancialPreferences(scope)).toBe(true);
 	return scope;
-}
-
-function financialKey(scope = getUserScope()) {
-	const key = userStorageKey(SAFE_SPENDING_STORAGE_KEY, scope);
-	if (!key) throw new Error("A verified fixture resource is required.");
-	return key;
 }
 
 function ok(body: unknown, resource: string | null = A) {
@@ -148,79 +137,6 @@ afterEach(() => {
 });
 
 describe("unified persisted prefs", () => {
-	it("keeps the browser import for later when the server is read-only", async () => {
-		window.localStorage.setItem(
-			financialKey(),
-			JSON.stringify({ reserve: 999 }),
-		);
-		server.putStatus = 403;
-		await verifyOwner();
-		expect(useSafeSpendingSettings.getState().reserve).toBe(
-			defaultSafeSpendingSettings().reserve,
-		);
-		expect(window.localStorage.getItem(financialKey())).toContain("999");
-	});
-
-	it("migrates a private-kind browser record forward once, then drops it", async () => {
-		const scope = getUserScope();
-		const primary = financialKey(scope);
-		const legacy = primary.replace(
-			`:${encodeURIComponent(scope.apiBaseUrl)}:`,
-			`:${encodeURIComponent(scope.apiBaseUrl)}:private:`,
-		);
-		expect(legacy).not.toBe(primary);
-		expect(legacy).toContain(":private:");
-		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
-		const storage = accountLocalStorage(scope);
-		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
-			JSON.stringify({ reserve: 999 }),
-		);
-		expect(window.localStorage.getItem(primary)).toBe(
-			JSON.stringify({ reserve: 999 }),
-		);
-		expect(window.localStorage.getItem(legacy)).toBeNull();
-	});
-
-	it("migrates an account-generation browser record forward once, then drops it", async () => {
-		const scope = getUserScope();
-		const primary = financialKey(scope);
-		const legacy = primary
-			.replace(":user:", ":account:")
-			.replaceAll("users%2F", "accounts%2F");
-		expect(legacy).not.toBe(primary);
-		expect(legacy).toContain(":account:");
-		expect(legacy).toContain("accounts%2F");
-		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
-		const storage = accountLocalStorage(scope);
-		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
-			JSON.stringify({ reserve: 999 }),
-		);
-		expect(window.localStorage.getItem(primary)).toBe(
-			JSON.stringify({ reserve: 999 }),
-		);
-		expect(window.localStorage.getItem(legacy)).toBeNull();
-	});
-
-	it("migrates a resource-generation browser record forward once, then drops it", async () => {
-		const scope = getUserScope();
-		const primary = financialKey(scope);
-		const legacy = primary
-			.replace(":user:", ":resource:")
-			.replaceAll("users%2F", "plans%2F");
-		expect(legacy).not.toBe(primary);
-		expect(legacy).toContain(":resource:");
-		expect(legacy).toContain("plans%2F");
-		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
-		const storage = accountLocalStorage(scope);
-		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
-			JSON.stringify({ reserve: 999 }),
-		);
-		expect(window.localStorage.getItem(primary)).toBe(
-			JSON.stringify({ reserve: 999 }),
-		);
-		expect(window.localStorage.getItem(legacy)).toBeNull();
-	});
-
 	it("reports a failed save and retries the latest settings", async () => {
 		server.putErrors.push(new Error("Offline"));
 		useSafeSpendingSettings.getState().updateSettings({ reserve: 123 });
@@ -235,20 +151,6 @@ describe("unified persisted prefs", () => {
 		);
 		expect((server.puts.at(-1) as { reserve?: number }).reserve).toBe(123);
 	});
-	it("prefers backend settings over an old browser record", async () => {
-		window.localStorage.setItem(
-			financialKey(),
-			JSON.stringify({ reserve: 999 }),
-		);
-		server.backend.set(backendKey(), {
-			...defaultSafeSpendingSettings(),
-			reserve: 123,
-		});
-		await refreshSafeSpendingSettings();
-		expect(useSafeSpendingSettings.getState().reserve).toBe(123);
-		expect(server.puts).toHaveLength(0);
-	});
-
 	it("does not mount financial preferences when the backend read fails", async () => {
 		const transport = new Error("Settings unavailable");
 		server.getError = transport;
@@ -273,7 +175,6 @@ describe("unified persisted prefs", () => {
 			server.puts.map((body) => (body as { reserve?: number }).reserve),
 		).toEqual([123, 456]);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(456);
-		expect(window.localStorage.getItem(financialKey())).toBeNull();
 	});
 	it("persists only UI years/ranges, without credential fields", async () => {
 		useUiStore.getState().setYears(10);
@@ -294,8 +195,11 @@ describe("unified persisted prefs", () => {
 		expect(useUiStore.getState().ranges).toBe(true);
 	});
 
-	it("reads legacy plain-string theme and envelope", async () => {
-		window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+	it("reads the current theme envelope and keeps corrupt data safe", async () => {
+		window.localStorage.setItem(
+			THEME_STORAGE_KEY,
+			JSON.stringify({ state: { preference: "dark" }, version: 1 }),
+		);
 		await useThemeStore.persist.rehydrate();
 		expect(useThemeStore.getState().preference).toBe("dark");
 
@@ -305,23 +209,11 @@ describe("unified persisted prefs", () => {
 		);
 		await useThemeStore.persist.rehydrate();
 		expect(useThemeStore.getState().preference).toBe("light");
-	});
 
-	it("reads raw financial settings only from the current resource namespace", async () => {
-		window.localStorage.setItem(
-			financialKey(),
-			JSON.stringify({
-				statementDay: 5,
-				reserve: 100,
-				mandatoryFrame: "cycle",
-			}),
-		);
-		await refreshSafeSpendingSettings();
-		const state = useSafeSpendingSettings.getState();
-		expect(state.statementDay).toBe(5);
-		expect(state.reserve).toBe(100);
-		expect(state.incomeRuleIds).toEqual([]);
-		expect(state).not.toHaveProperty("mandatoryFrame");
+		useThemeStore.setState({ preference: "system" });
+		window.localStorage.setItem(THEME_STORAGE_KEY, "{bad");
+		await useThemeStore.persist.rehydrate();
+		expect(useThemeStore.getState().preference).toBe("system");
 	});
 
 	it("persists explicit income sources and an empty selection across reloads", async () => {
@@ -338,39 +230,6 @@ describe("unified persisted prefs", () => {
 		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([]);
 	});
 
-	it("discards legacy amount overrides and preserves source settings", async () => {
-		const overrides = {
-			checkingOverride: 10000,
-			remainingOverride: 20000,
-			paycheckOverride: 30000,
-			fixedOverride: 40000,
-			spentOverride: 50000,
-		};
-		window.localStorage.setItem(
-			financialKey(),
-			JSON.stringify({
-				state: {
-					...overrides,
-					reserve: 100,
-					incomeRuleIds: ["salary"],
-					transactionIds: ["rent"],
-				},
-				version: 4,
-			}),
-		);
-		await refreshSafeSpendingSettings();
-		const state = useSafeSpendingSettings.getState();
-		expect(state.reserve).toBe(100);
-		expect(state.incomeRuleIds).toEqual(["salary"]);
-		expect(state.transactionIds).toEqual(["rent"]);
-		for (const key of Object.keys(overrides))
-			expect(state).not.toHaveProperty(key);
-		state.updateSettings({ reserve: 200 });
-		expect(window.localStorage.getItem(financialKey())).toBeNull();
-		await refreshSafeSpendingSettings();
-		expect(server.puts.at(-1)).not.toHaveProperty("checkingOverride");
-	});
-
 	it("sanitizes income rule IDs without an automatic fallback", () => {
 		expect(
 			sanitizeSafeSpendingSettings({
@@ -384,11 +243,14 @@ describe("unified persisted prefs", () => {
 		}
 	});
 
-	it("sanitizes safe spending settings with legacy 1st-day fallback", () => {
+	it("sanitizes safe spending settings with clamping and drops unknown fields", () => {
 		expect(
 			sanitizeSafeSpendingSettings({ statementDay: 1, reserve: -5 })
 				.statementDay,
-		).toBe(20);
+		).toBe(1);
+		expect(
+			sanitizeSafeSpendingSettings({ statementDay: 1, reserve: -5 }).reserve,
+		).toBe(0);
 		expect(
 			sanitizeSafeSpendingSettings({ statementDay: 99, reserve: 50 })
 				.statementDay,
@@ -396,6 +258,14 @@ describe("unified persisted prefs", () => {
 		expect(sanitizeSafeSpendingSettings(null).reserve).toBeGreaterThanOrEqual(
 			0,
 		);
+		const state = sanitizeSafeSpendingSettings({
+			statementDay: 5,
+			reserve: 100,
+			mandatoryFrame: "cycle",
+		});
+		expect(state.statementDay).toBe(5);
+		expect(state.reserve).toBe(100);
+		expect(state).not.toHaveProperty("mandatoryFrame");
 	});
 });
 
@@ -450,8 +320,6 @@ describe("financial preference owner isolation", () => {
 		const oldAction = useSafeSpendingSettings.getState().updateSettings;
 		oldAction({ reserve: 123, incomeRuleIds: ["private-a-income"] });
 		await refreshSafeSpendingSettings();
-		const keyA = financialKey();
-		const rawA = window.localStorage.getItem(keyA);
 		suspendUserScope();
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
@@ -461,7 +329,6 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
-		expect(window.localStorage.getItem(keyA)).toBe(rawA);
 		await verifyOwner(B);
 		oldAction({ reserve: 999, incomeRuleIds: ["stale-a-income"] });
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
@@ -472,29 +339,6 @@ describe("financial preference owner isolation", () => {
 			reserve: 123,
 			incomeRuleIds: ["private-a-income"],
 		});
-		expect(window.localStorage.getItem(keyA)).toBe(rawA);
-	});
-
-	it("never reads, migrates, or overwrites unscoped financial preferences, including in legacy mode", async () => {
-		const keys = [SAFE_SPENDING_STORAGE_KEY, ...SAFE_SPENDING_LEGACY_KEYS];
-		const raw = JSON.stringify({
-			statementDay: 7,
-			reserve: 98765,
-			incomeRuleIds: ["unscoped-private-income"],
-			spendingAccountIds: ["unscoped-private-cash"],
-		});
-		for (const key of keys) window.localStorage.setItem(key, raw);
-		const read = vi.spyOn(window.localStorage, "getItem");
-		for (const id of [A, B, GUEST_USER_ID]) {
-			await verifyOwner(id);
-			expect(useSafeSpendingSettings.getState()).toMatchObject(
-				defaultSafeSpendingSettings(),
-			);
-			useSafeSpendingSettings.getState().updateSettings({ reserve: 9 });
-		}
-		for (const key of keys) expect(read).not.toHaveBeenCalledWith(key);
-		read.mockRestore();
-		for (const key of keys) expect(window.localStorage.getItem(key)).toBe(raw);
 	});
 
 	it("isolates the sample and API origins without changing global display preferences", async () => {
@@ -558,50 +402,5 @@ describe("financial preference owner isolation", () => {
 			reserve: 111,
 			transactionIds: ["private-a-bill"],
 		});
-	});
-
-	it("rejects writes through a captured storage owner after verification changes", async () => {
-		const oldScope = getUserScope();
-		const oldStorage = accountLocalStorage(oldScope);
-		const oldKey = financialKey();
-		await verifyOwner(B);
-		oldStorage.setItem(SAFE_SPENDING_STORAGE_KEY, "private-a-stale-write");
-		expect(oldStorage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBeNull();
-		expect(window.localStorage.getItem(oldKey)).toBeNull();
-		expect(window.localStorage.getItem(financialKey())).toBeNull();
-	});
-
-	it("ignores a late asynchronous hydration after a newer owner completes", async () => {
-		const keyA = financialKey();
-		let finish: (value: string) => void = () => {};
-		const getItem = appLocalStorage.getItem;
-		vi.spyOn(appLocalStorage, "getItem").mockImplementation((key) =>
-			key === keyA
-				? new Promise<string>((resolve) => {
-						finish = resolve;
-					})
-				: getItem(key),
-		);
-		const oldScope = acceptOwner(A);
-		const oldHydration = hydrateFinancialPreferences(oldScope);
-		expect(useSafeSpendingSettings.getState()).toMatchObject(
-			defaultSafeSpendingSettings(),
-		);
-		await verifyOwner(B);
-		useSafeSpendingSettings
-			.getState()
-			.updateSettings({ reserve: 222, incomeRuleIds: ["private-b-income"] });
-		finish(
-			JSON.stringify({
-				state: { reserve: 999, incomeRuleIds: ["late-private-a-income"] },
-				version: 4,
-			}),
-		);
-		expect(await oldHydration).toBe(false);
-		expect(useSafeSpendingSettings.getState()).toMatchObject({
-			reserve: 222,
-			incomeRuleIds: ["private-b-income"],
-		});
-		expect(window.localStorage.getItem(financialKey())).toBeNull();
 	});
 });

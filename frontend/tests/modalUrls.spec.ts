@@ -81,17 +81,3 @@ test("target cards retain editing without an evidence dialog", async ({
 	await expect(page).toHaveURL(/#evaluations$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
-
-for (const [path, pageHash] of [
-	["evaluations/net-worth-750k", "evaluations"],
-	["outlook/evaluation/net-worth-750k", "outlook"],
-	["outlook/net-worth-750k", "outlook"],
-]) {
-	test(`retired evaluation evidence URL ${path} returns to its page`, async ({
-		page,
-	}) => {
-		await page.goto(`/#${path}`);
-		await expect(page).toHaveURL(new RegExp(`#${pageHash}$`));
-		await expect(page.getByRole("dialog")).not.toBeVisible();
-	});
-}

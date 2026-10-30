@@ -73,25 +73,25 @@ describe("balance rows to display accounts", () => {
 			observedAt: 1773133200,
 		});
 	});
-	it("maps checkpoint presence to balance verification and source labels", () => {
+	it("maps balance-check presence to balance verification and source labels", () => {
 		expect(balanceRowToDisplay(balanceRow())).toMatchObject({
 			id: "cash",
 			balance: 100,
 			observedOn: "2026-01-31",
 			balanceCheck: true,
-			source: "Backend checkpoint",
+			source: "Balance check",
 			readOnly: false,
 		});
 		expect(
 			balanceRowToDisplay(balanceRow({ hasCheckpoint: false })),
 		).toMatchObject({
 			balanceCheck: false,
-			source: "Backend account",
+			source: "No balance check",
 		});
 		expect(
 			balanceRowToDisplay(balanceRow({ syncOwned: true, readOnly: true })),
 		).toMatchObject({
-			source: "Synced checkpoint",
+			source: "Synced balance check",
 			readOnly: true,
 		});
 	});
@@ -267,7 +267,7 @@ describe("display visibility helpers over saved rows", () => {
 			color: null,
 			observedOn: "2026-01-31",
 			balanceCheck: true,
-			source: "Backend checkpoint",
+			source: "Balance check",
 			readOnly: false,
 		},
 		{
@@ -282,7 +282,7 @@ describe("display visibility helpers over saved rows", () => {
 			color: null,
 			observedOn: "2026-01-31",
 			balanceCheck: true,
-			source: "Backend checkpoint",
+			source: "Balance check",
 			readOnly: false,
 		},
 	];
