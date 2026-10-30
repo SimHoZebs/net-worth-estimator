@@ -190,12 +190,9 @@ An unseeded run does not use the shared registry or result storage. Its context 
 
 A request without an `Origin` header passes. Origin filtering does not grant write access.
 
-The identity boundary checks session and user permissions for all user reads, writes, and projections. `readOnlyMiddleware` adds the global write kill switch:
+The identity boundary checks session and user permissions for all user reads, writes, and projections. Huma's `readOnlyMiddleware` adds the global write kill switch before input parsing. Matched operations other than `GET`, `HEAD`, and `OPTIONS` are writes by default. The compute group marks position and projection operations with compute metadata so they remain available in read-only mode. Domain route groups share one Huma API and OpenAPI document. Receipt upload limits run as operation middleware after the write guard.
 
-- `POST`, `PATCH`, `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`;
-- `POST /v1/sync/simplefin` and link writes under `/v1/sync/simplefin/accounts`.
-
-The kill switch rejects those writes with 403. The provisioned guest's viewer membership grants read and projection actions on its own user resource. Every user uses the same permission enforcement. Shared bearer tokens and unauthenticated server modes are unsupported in dev and production.
+The kill switch rejects writes with 403 without a separate endpoint list. The provisioned guest's viewer membership grants read and projection actions on its own user resource. Every user uses the same permission enforcement. Shared bearer tokens and unauthenticated server modes are unsupported in dev and production.
 
 ## 3. Persistence
 
@@ -577,7 +574,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/cmd/server/sync.go`                        | SimpleFIN configuration and 6-hour scheduler            |
 | `backend/cmd/importcsv/main.go`                     | offline seed replacement                                |
 | `backend/internal/api/server.go`                    | router and operation registration                       |
-| `backend/internal/api/auth.go`                      | read-only write kill switch                             |
+| `backend/internal/api/read_only.go`                 | operation-based read-only write kill switch              |
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement                |
 | `backend/internal/api/model_handlers.go`            | model and status handlers                               |
 | `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers         |

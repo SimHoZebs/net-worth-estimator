@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
 )
 
 func (s *Server) registerReceiptRoutes(api huma.API) {
+	upload := huma.Middlewares{receiptUploadLimit(api)}
 	huma.Register(api, huma.Operation{OperationID: "list-receipts", Method: "GET", Path: "/v1/postings/{id}/receipts", Summary: "List private receipt evidence for a saved posting"}, s.listReceipts)
-	huma.Register(api, huma.Operation{OperationID: "attach-receipt", Method: "POST", Path: "/v1/receipts", Summary: "Attach a private receipt image", MaxBodyBytes: receipts.MaxUploadBytes + (64 << 10)}, s.attachReceipt)
+	huma.Register(api, huma.Operation{OperationID: "attach-receipt", Method: "POST", Path: "/v1/receipts", Summary: "Attach a private receipt image", MaxBodyBytes: receipts.MaxUploadBytes + (64 << 10), Middlewares: upload}, s.attachReceipt)
 	receiptMultipartSpec(api.OpenAPI().Paths["/v1/receipts"].Post)
-	huma.Register(api, huma.Operation{OperationID: "replace-receipt-image", Method: "PUT", Path: "/v1/receipts/{id}/image", Summary: "Replace receipt image and clear receipt content", MaxBodyBytes: receipts.MaxUploadBytes + (64 << 10)}, s.replaceReceiptImage)
+	huma.Register(api, huma.Operation{OperationID: "replace-receipt-image", Method: "PUT", Path: "/v1/receipts/{id}/image", Summary: "Replace receipt image and clear receipt content", MaxBodyBytes: receipts.MaxUploadBytes + (64 << 10), Middlewares: upload}, s.replaceReceiptImage)
 	receiptMultipartSpec(api.OpenAPI().Paths["/v1/receipts/{id}/image"].Put)
 	huma.Register(api, huma.Operation{OperationID: "get-receipt", Method: "GET", Path: "/v1/receipts/{id}", Summary: "Read receipt evidence and review details"}, s.getReceipt)
 	huma.Register(api, huma.Operation{OperationID: "review-receipt", Method: "PATCH", Path: "/v1/receipts/{id}", Summary: "Save or confirm reviewed receipt details"}, s.reviewReceipt)
@@ -42,28 +43,23 @@ func receiptMultipartSpec(operation *huma.Operation) {
 
 // Huma's multipart parser does not apply MaxBodyBytes. Bound the entire body,
 // including chunked requests, before it reaches that parser. Identity and the
-// global write guard run first. Multipart temp files are removed after parsing.
-func receiptUploadLimit(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attach := r.Method == http.MethodPost && r.URL.Path == "/v1/receipts"
-		replace := r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/v1/receipts/") && strings.HasSuffix(r.URL.Path, "/image")
-		if !attach && !replace {
-			next.ServeHTTP(w, r)
-			return
-		}
+// API write guard run first. Multipart temp files are removed after parsing.
+func receiptUploadLimit(api huma.API) func(huma.Context, func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		r, _ := humachi.Unwrap(ctx)
 		const limit = receipts.MaxUploadBytes + (64 << 10)
 		if r.ContentLength > limit {
-			writeAPIError(w, 413, "Receipt too large", "Choose a receipt image smaller than 10 MiB.")
+			_ = huma.WriteErr(api, ctx, http.StatusRequestEntityTooLarge, "Choose a receipt image smaller than 10 MiB.")
 			return
 		}
 		data, err := io.ReadAll(io.LimitReader(r.Body, limit+1))
 		_ = r.Body.Close()
 		if err != nil {
-			writeAPIError(w, 400, "Invalid upload", "The receipt upload could not be read.")
+			_ = huma.WriteErr(api, ctx, http.StatusBadRequest, "The receipt upload could not be read.")
 			return
 		}
 		if len(data) > limit {
-			writeAPIError(w, 413, "Receipt too large", "Choose a receipt image smaller than 10 MiB.")
+			_ = huma.WriteErr(api, ctx, http.StatusRequestEntityTooLarge, "Choose a receipt image smaller than 10 MiB.")
 			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(data))
@@ -72,6 +68,6 @@ func receiptUploadLimit(next http.Handler) http.Handler {
 				_ = r.MultipartForm.RemoveAll()
 			}
 		}()
-		next.ServeHTTP(w, r)
-	})
+		next(ctx)
+	}
 }

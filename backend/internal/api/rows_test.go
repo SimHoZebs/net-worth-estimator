@@ -128,7 +128,7 @@ func TestLinkEndpointsEndToEnd(t *testing.T) {
 	}
 }
 
-func TestWriteGuardCoversRowPrefixes(t *testing.T) {
+func TestWriteGuardCoversRowOperations(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{ReadOnly: true})
 
@@ -156,6 +156,10 @@ func TestWriteGuardCoversRowPrefixes(t *testing.T) {
 		{http.MethodPatch, "/v1/evaluations/x", `{"type":"netWorthThreshold","name":"x"}`},
 		{http.MethodDelete, "/v1/evaluations/x", ""},
 		{http.MethodPost, "/v1/evaluations/reorder", `{"type":"netWorthThreshold","instanceId":"x"}`},
+		{http.MethodPost, "/v1/amount-presets", `{}`},
+		{http.MethodPatch, "/v1/amount-presets/x", `{}`},
+		{http.MethodDelete, "/v1/amount-presets/x", ""},
+		{http.MethodPost, "/v1/amount-presets/reorder", `{"id":"x"}`},
 		{http.MethodPost, "/v1/payment-terms", `{"accountId":"x"}`},
 		{http.MethodDelete, "/v1/payment-terms/x", ""},
 		{http.MethodPost, "/v1/sync/simplefin", ""},
