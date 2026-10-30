@@ -2,30 +2,27 @@ import { useState } from "react";
 import { AccountPage } from "../auth/AccountPage.tsx";
 import { Tabs, type TabItem } from "../components/Tabs.tsx";
 import { AmountCatalog } from "../components/editors/AmountCatalog.tsx";
-import { stageAndSave } from "../state/workspaceWrites.ts";
-import { useUserPlan, useUserReadOnly } from "../state/useUserScope.ts";
+import { useUserReadOnly } from "../state/useUserScope.ts";
+import { useSavedAccounts } from "../state/savedRows.ts";
 import { useTransactionCatalog } from "../state/workspaceResources.ts";
-import { AssumptionsPanel } from "./accounts/AssumptionsPanel.tsx";
 import { SyncSettings } from "./sources/SyncSettings.tsx";
 
-type ConfigTab = "sync" | "amounts" | "assumptions" | "account";
+type ConfigTab = "sync" | "amounts" | "account";
 
 const configTabs: TabItem<ConfigTab>[] = [
 	{ id: "sync", label: "Bank sync" },
 	{ id: "amounts", label: "Amounts" },
-	{ id: "assumptions", label: "Assumptions" },
 	{ id: "account", label: "Account" },
 ];
 
 export function SourcesPage() {
 	// Everything subscribes here, including the access control.
 	const [tab, setTab] = useState<ConfigTab>("sync");
-	const plan = useUserPlan();
+	const savedAccounts = useSavedAccounts();
 	const catalog = useTransactionCatalog().data;
 	const readOnly = useUserReadOnly();
-	const onUpdatePlan = stageAndSave;
-	if (!plan) return null;
-	const accounts = plan.accounts.map((account) => ({
+	if (!savedAccounts) return null;
+	const accounts = savedAccounts.map((account) => ({
 		id: account.id,
 		name: account.name,
 		kind: account.kind,
@@ -48,15 +45,12 @@ export function SourcesPage() {
 			)}
 			{tab === "amounts" && (
 				<AmountCatalog
-					accounts={plan.accounts.map((account) => ({
+					accounts={savedAccounts.map((account) => ({
 						id: account.id,
 						name: account.name,
 					}))}
 					postings={postings}
 				/>
-			)}
-			{tab === "assumptions" && (
-				<AssumptionsPanel plan={plan} onUpdate={onUpdatePlan} />
 			)}
 			{tab === "account" && <AccountPage />}
 		</Tabs>

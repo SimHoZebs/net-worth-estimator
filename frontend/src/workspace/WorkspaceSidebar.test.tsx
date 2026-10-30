@@ -7,7 +7,6 @@ import {
 	resetNotifications,
 	useNotifications,
 } from "../state/notifications.ts";
-import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
 import { isSyncStale, LastSync, SYNC_STALE_AFTER_MS } from "./LastSync.tsx";
 import { acceptTestResource } from "../mocks/resource.ts";
@@ -40,14 +39,12 @@ function localSyncTime(value: string) {
 describe("sidebar sync signals", () => {
 	beforeEach(() => {
 		acceptTestResource();
-		resetWorkspaceStore();
 		resetServerQueryCache();
 		resetNotifications();
 		window.location.hash = "";
 	});
 	afterEach(() => {
 		cleanup();
-		resetWorkspaceStore();
 		resetNotifications();
 		window.location.hash = "";
 	});
@@ -219,7 +216,6 @@ describe("sidebar user placement", () => {
 			accountURL: "https://identity.example/account",
 			resource: {
 				id: `users/${"a".repeat(64)}`,
-				kind: "private",
 				permissions: ["user:read", "user:write"],
 			},
 			user: { subject: "editor", name: "Sam Lee" },

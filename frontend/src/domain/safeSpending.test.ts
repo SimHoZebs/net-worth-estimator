@@ -37,7 +37,7 @@ describe("month helpers", () => {
 
 describe("checking", () => {
 	it("prefers the checking account id", () => {
-		expect(checkingAccountId(financialModelFixture)).toBe("checking");
+		expect(checkingAccountId(financialModelFixture.accounts)).toBe("checking");
 	});
 });
 
@@ -460,12 +460,12 @@ describe("groupMandatorySpending", () => {
 describe("spendingBalance", () => {
 	it("sums the selected accounts and ignores unknown ids", () => {
 		expect(
-			spendingBalance(financialModelFixture, ["checking", "savings"]),
+			spendingBalance(financialModelFixture.accounts, ["checking", "savings"]),
 		).toBe(60250);
 		expect(
-			spendingBalance(financialModelFixture, ["checking", "missing"]),
+			spendingBalance(financialModelFixture.accounts, ["checking", "missing"]),
 		).toBe(18250);
-		expect(spendingBalance(financialModelFixture, [])).toBe(0);
+		expect(spendingBalance(financialModelFixture.accounts, [])).toBe(0);
 	});
 });
 

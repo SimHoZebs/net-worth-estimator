@@ -25,7 +25,7 @@ func TestResourceAssertionsPreventCrossIdentityRequests(t *testing.T) {
 	})))
 	defer server.Close()
 	client := testClient(t)
-	guestID := authorization.ResourceFor(p.server.URL, "").ID
+	guestID := authorization.ResourceFor(p.server.URL, s.config.GuestSubject).ID
 	ownerID := authorization.ResourceFor(p.server.URL, p.subject).ID
 	check := func(method, resource string, want int) {
 		t.Helper()
@@ -124,7 +124,7 @@ func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
 		Allowed  bool
 		User     Principal
 		Resource struct {
-			ID, Kind    string
+			ID          string
 			Permissions []string
 		}
 	}
@@ -132,8 +132,18 @@ func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.Body.Close()
-	if !session.Allowed || session.Resource.Kind != "private" || len(session.Resource.Permissions) != 1 || session.Resource.Permissions[0] != authorization.Read {
+	if !session.Allowed || session.Resource.ID != authorization.ResourceFor(p.server.URL, p.subject).ID || len(session.Resource.Permissions) != 1 || session.Resource.Permissions[0] != authorization.Read {
 		t.Fatalf("session did not reflect the resource permissions: %+v", session)
+	}
+	// Viewer revocation affects the guest exactly like any other account:
+	// no forced write denial by identity or kind, only provider permissions.
+	rq, _ := http.NewRequest("POST", server.URL+prefix+"logout", nil)
+	r, _ = client.Do(rq)
+	r.Body.Close()
+	r, _ = client.Post(server.URL+"/v1/accounts", "application/json", nil)
+	r.Body.Close()
+	if r.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("revoked guest bypassed denied write=%d", r.StatusCode)
 	}
 	s.config.ResolveAccess = func(context.Context, string) (authorization.Scope, error) {
 		return authorization.Scope{}, errors.New("provider unavailable")

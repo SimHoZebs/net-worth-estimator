@@ -46,7 +46,10 @@ describe("AccountDetailsModal", () => {
 		const view = render(
 			<AccountDetailsModal
 				card={card}
-				plan={financialModelFixture}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				startDate={financialModelFixture.startDate}
+				readOnly={financialModelFixture.readOnly}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -85,7 +88,10 @@ describe("AccountDetailsModal", () => {
 		const view = render(
 			<AccountDetailsModal
 				card={card}
-				plan={financialModelFixture}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				startDate={financialModelFixture.startDate}
+				readOnly={financialModelFixture.readOnly}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -121,7 +127,10 @@ describe("AccountDetailsModal", () => {
 		const view = render(
 			<AccountDetailsModal
 				card={card}
-				plan={financialModelFixture}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				startDate={financialModelFixture.startDate}
+				readOnly={financialModelFixture.readOnly}
 				projection={projection}
 				onClose={() => {}}
 			/>,

@@ -1,4 +1,4 @@
-import type { Account, Evaluation, Plan, Transaction } from "./model.ts";
+import type { Account, Evaluation, Transaction } from "./model.ts";
 
 export type EditorTarget =
 	| { kind: "account"; item: Account | null }
@@ -22,61 +22,35 @@ export function upsertItem<T extends { id: string }>({
 		: [...items, item];
 }
 
-/** Alias for removePlanItem; row-record removal pending — still operates on the Plan draft layer. */
-export function removeAccountItem({
-	plan,
-	target,
+/**
+ * Row-level delete guards. The writers live in the components (direct
+ * performSave calls); the domain only answers whether a delete is allowed
+ * so every entry point shares one message.
+ */
+export function accountDeleteError({
+	accounts,
+	transactions,
+	evaluations,
+	targetId,
 }: {
-	plan: Plan;
-	target: RemovalTarget;
-}): Plan | Error {
-	return removePlanItem({ plan, target });
-}
-
-export function removePlanItem({
-	plan,
-	target,
-}: {
-	plan: Plan;
-	target: RemovalTarget;
-}): Plan | Error {
-	if (target.kind === "accounts") {
-		if (plan.accounts.length === 1)
-			return new Error(
-				"Keep at least one account. Add a replacement before removing this one.",
-			);
-		if (
-			plan.transactions.some(
-				(transaction) =>
-					transaction.fromId === target.id || transaction.toId === target.id,
-			) ||
-			plan.evaluations.some((evaluation) => evaluation.accountId === target.id)
-		)
-			return new Error(
-				"This account is used by a transaction or evaluation. Update those references before removing it.",
-			);
-		return {
-			...plan,
-			accounts: plan.accounts.filter((account) => account.id !== target.id),
-		};
-	}
-	return {
-		...plan,
-		transactions: plan.transactions.filter(
-			(transaction) => transaction.id !== target.id,
-		),
-	};
-}
-
-export function removeEvaluation({
-	plan,
-	id,
-}: {
-	plan: Plan;
-	id: string;
-}): Plan {
-	return {
-		...plan,
-		evaluations: plan.evaluations.filter((item) => item.id !== id),
-	};
+	accounts: Account[];
+	transactions: Transaction[];
+	evaluations: Evaluation[];
+	targetId: string;
+}): Error | null {
+	if (accounts.length === 1)
+		return new Error(
+			"Keep at least one account. Add a replacement before removing this one.",
+		);
+	if (
+		transactions.some(
+			(transaction) =>
+				transaction.fromId === targetId || transaction.toId === targetId,
+		) ||
+		evaluations.some((evaluation) => evaluation.accountId === targetId)
+	)
+		return new Error(
+			"This account is used by a transaction or evaluation. Update those references before removing it.",
+		);
+	return null;
 }

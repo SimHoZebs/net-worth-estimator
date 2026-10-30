@@ -47,7 +47,7 @@ async function openExpense(page: Page) {
 	return page.getByRole("dialog", { name: /Receipt purchase/ });
 }
 
-test("private receipt upload, extraction, corrections, and reload preserve the saved plan", async ({
+test("private receipt upload, extraction, corrections, and reload preserve the saved model", async ({
 	page,
 }) => {
 	const postingId = await seedExpense(page);
@@ -367,7 +367,7 @@ test("receipt review supports narrow screens, keyboard dismissal, and accessible
 	await expect(receipt).toHaveCount(0);
 });
 
-test("read-only plans keep receipt mutations unavailable", async ({ page }) => {
+test("read-only mode keeps receipt mutations unavailable", async ({ page }) => {
 	await resetFixture({ readOnly: true });
 	await page.goto("/#accounts");
 	await page

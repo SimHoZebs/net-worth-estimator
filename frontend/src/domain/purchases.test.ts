@@ -1,149 +1,89 @@
 import { describe, expect, it } from "vitest";
 import {
-	backendToDisplayPlan,
-	displayPlanToBackendDocument,
-} from "../api/adapter.ts";
-import { accountTransactions } from "./accountActivity.ts";
-import {
-	isHistoricalTransaction,
-	validatePlan,
+	plannedPurchaseSchema,
+	transactionSchema,
 	type PlannedPurchase,
 } from "./model.ts";
 import { movePurchase, purchaseQueue } from "./purchases.ts";
-import { financialModelFixture } from "../mocks/financialModel.ts";
-import { projectionFixture } from "../mocks/projection.ts";
 
-function wish(id: string): PlannedPurchase {
+function wish(
+	id: string,
+	overrides: Partial<PlannedPurchase> = {},
+): PlannedPurchase {
 	return {
 		id,
 		name: id,
 		amount: 500,
 		fromId: "checking",
-		startDate: financialModelFixture.startDate,
+		startDate: "2026-09-24",
 		enabled: true,
 		readOnly: false,
+		...overrides,
 	};
 }
 
 describe("purchase queue", () => {
-	it("changes priorities without changing established payments or the input", () => {
-		const plan = {
-			...financialModelFixture,
-			plannedPurchases: [wish("laptop"), wish("chair")],
-		};
-		const next = movePurchase(plan, "chair", -1);
-		expect(purchaseQueue(next.plannedPurchases).map((item) => item.id)).toEqual(
-			["chair", "laptop"],
-		);
-		expect(purchaseQueue(plan.plannedPurchases).map((item) => item.id)).toEqual(
-			["laptop", "chair"],
-		);
-		expect(next.transactions[0]).toBe(plan.transactions[0]);
-		expect(movePurchase(next, "chair", -1)).toBe(next);
-		expect(movePurchase(next, "missing", 1)).toBe(next);
+	it("keeps array order as the queue priority", () => {
+		const purchases = [wish("laptop"), wish("chair")];
+		expect(purchaseQueue(purchases).map((item) => item.id)).toEqual([
+			"laptop",
+			"chair",
+		]);
+		// A copy, so callers cannot reorder the saved rows by accident.
+		expect(purchaseQueue(purchases)).not.toBe(purchases);
 	});
 
-	it("round-trips wishlist rows through saved and exported accounts", () => {
-		const plan = {
-			...financialModelFixture,
-			plannedPurchases: [{ ...wish("laptop"), amount: 1500 }],
-		};
-		const converted = displayPlanToBackendDocument(plan, {
-			presentation: {
-				name: plan.name,
-				origin: plan.origin,
-				updatedAt: plan.updatedAt,
-				revision: plan.revision,
-				assumptions: plan.assumptions,
-				accounts: {},
-				transactions: {},
-				plannedPurchases: {},
-			},
-		});
-		expect(converted.report.losses).toEqual([]);
+	it("moves a row up and down the queue", () => {
+		const purchases = [wish("laptop"), wish("chair"), wish("desk")];
+		expect(movePurchase(purchases, "chair", -1).map((item) => item.id)).toEqual(
+			["chair", "laptop", "desk"],
+		);
+		expect(movePurchase(purchases, "chair", 1).map((item) => item.id)).toEqual([
+			"laptop",
+			"desk",
+			"chair",
+		]);
+		// The input is never mutated.
+		expect(purchases.map((item) => item.id)).toEqual([
+			"laptop",
+			"chair",
+			"desk",
+		]);
+	});
+
+	it("leaves the queue unchanged for edge and unknown moves", () => {
+		const purchases = [wish("laptop"), wish("chair")];
+		expect(movePurchase(purchases, "laptop", -1)).toBe(purchases);
+		expect(movePurchase(purchases, "chair", 1)).toBe(purchases);
+		expect(movePurchase(purchases, "missing", 1)).toBe(purchases);
+	});
+
+	it("rejects invalid wishlist rows", () => {
 		expect(
-			converted.document.postings.find((item) => item.id === "laptop")
-				?.purchase,
-		).toEqual({ priority: 0 });
-		const loaded = backendToDisplayPlan({
-			document: converted.document,
-			status: { readOnly: false },
-		});
-		converted.document.evaluations.plannedPurchases = [
-			{
-				instanceId: "saved-purchases",
-				name: "Purchases",
-				enabled: true,
-				config: {},
-			},
-		];
-		const purchase = loaded.plan.plannedPurchases.find(
-			(item) => item.id === "laptop",
-		)!;
-		expect(purchase.amount).toBe(1500);
-		expect(
-			isHistoricalTransaction(loaded.plan.transactions[0]!, "2030-01-01"),
+			plannedPurchaseSchema.safeParse(wish("laptop", { amount: 0 })).success,
 		).toBe(false);
-		const roundTrip = displayPlanToBackendDocument(loaded.plan, {
-			sourceDocument: converted.document,
-			presentation: loaded.presentation,
-		});
-		expect(roundTrip.document.evaluations.plannedPurchases).toEqual(
-			converted.document.evaluations.plannedPurchases,
-		);
 		expect(
-			roundTrip.document.postings.find((item) => item.id === "laptop"),
-		).toEqual(converted.document.postings.find((item) => item.id === "laptop"));
-	});
-
-	it("never manufactures historical purchase activity", () => {
-		const plan = {
-			...financialModelFixture,
-			transactions: [],
-			plannedPurchases: [wish("laptop")],
-		};
-		const activity = accountTransactions({
-			accountId: "checking",
-			plan,
-			projection: projectionFixture(),
-		});
-		expect(activity).toEqual([]);
-	});
-
-	it("rejects wishes without funding accounts", () => {
+			plannedPurchaseSchema.safeParse(wish("laptop", { amount: -5 })).success,
+		).toBe(false);
 		expect(
-			validatePlan({
-				...financialModelFixture,
-				plannedPurchases: [{ ...wish("laptop"), fromId: null }],
-			}),
-		).toBeInstanceOf(Error);
+			plannedPurchaseSchema.safeParse(wish("laptop", { name: "  " })).success,
+		).toBe(false);
+		expect(
+			plannedPurchaseSchema.safeParse(wish("laptop", { fromId: "" })).success,
+		).toBe(false);
+		expect(plannedPurchaseSchema.safeParse(wish("laptop")).success).toBe(true);
 	});
 
-	it("migrates legacy purchase transactions into the wishlist slice", () => {
-		// Intentionally the pre-rename shape: old drafts stored wishlist
-		// items in `transactions` with a purchasePriority field.
-		const legacy = {
-			...financialModelFixture,
-			transactions: [
-				...financialModelFixture.transactions,
-				{
-					...financialModelFixture.transactions[0]!,
-					id: "laptop",
-					name: "laptop",
-					amount: 500,
-					fromId: "checking",
-					toId: null,
-					frequency: "once" as const,
-					purchasePriority: 0,
-				},
-			],
-		};
-		const parsed = validatePlan(legacy);
-		expect(parsed).not.toBeInstanceOf(Error);
-		if (parsed instanceof Error) throw parsed;
-		expect(parsed.plannedPurchases.map((item) => item.id)).toEqual(["laptop"]);
-		expect(parsed.transactions.some((item) => item.id === "laptop")).toBe(
-			false,
-		);
+	it("keeps a hypothetical wish distinct from a scheduled transaction", () => {
+		const item = wish("laptop");
+		// A wish is a placeholder for a future buy: it carries no schedule of
+		// its own, so it never validates as a transaction record.
+		expect(plannedPurchaseSchema.safeParse(item).success).toBe(true);
+		expect(transactionSchema.safeParse(item).success).toBe(false);
+		// Queue rows never grow transaction fields by moving.
+		for (const row of movePurchase([item, wish("chair")], "chair", -1)) {
+			expect(row).not.toHaveProperty("frequency");
+			expect(row).not.toHaveProperty("toId");
+		}
 	});
 });

@@ -169,7 +169,7 @@ func tokenDeadline(token *oauth2.Token, id *oidc.IDToken) int64 {
 func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 	endpoint, _ := s.browserEndpoint(r)
 	g, err := s.store.FindGrant(s.sessions.GetString(r.Context(), "grant_id"), s.config.Issuer)
-	if err == nil {
+	if err == nil && g.Subject != "" {
 		resource := authorization.ResourceFor(s.config.Issuer, g.Subject)
 		if expected := r.Header.Get(ResourceHeader); expected != "" && expected != resource.ID {
 			w.Header().Set(ResourceHeader, resource.ID)

@@ -1,6 +1,6 @@
 import { accountTransactions } from "./accountActivity.ts";
 import { dateLabel, money } from "./format.ts";
-import type { Plan } from "./model.ts";
+import type { Account, Transaction } from "./model.ts";
 import type { TransactionResult, Projection } from "./result.ts";
 
 export type FundingTransactionKind =
@@ -114,11 +114,15 @@ function monthStart(date: string): string {
  * evidence. The ledger explains the result; it never decides fundability.
  */
 export function deriveFundingGaps({
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
 	postingIds = null,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	projection: Projection | null;
 	postingIds?: readonly string[] | null;
 }): FundingGap[] {
@@ -133,7 +137,7 @@ export function deriveFundingGaps({
 	return failures.flatMap((failure: TransactionResult): FundingGap[] => {
 		const accountId = failure.fromId ?? failure.toId;
 		if (!accountId) return [];
-		const account = plan.accounts.find((item) => item.id === accountId);
+		const account = accounts.find((item) => item.id === accountId);
 		const accountName = account?.name ?? "Unknown account";
 		const windowStart = monthStart(failure.date);
 		// Opening is the balance before the window opens: the latest point
@@ -147,7 +151,13 @@ export function deriveFundingGaps({
 		// Only successfully executed transactions affecting this account before
 		// the failed payment, in execution order. Exclude the failed payment
 		// itself and any later deposits.
-		const ledger = accountTransactions({ accountId, plan, projection })
+		const ledger = accountTransactions({
+			accountId,
+			accounts,
+			transactions,
+			startDate,
+			projection,
+		})
 			.filter(
 				(transaction) =>
 					transaction.date >= windowStart &&
@@ -172,7 +182,7 @@ export function deriveFundingGaps({
 			);
 			return index === -1 || index < failureIndex;
 		});
-		const transactions: FundingGapTransaction[] = orderedLedger.map(
+		const entries: FundingGapTransaction[] = orderedLedger.map(
 			(transaction) => ({
 				id: transaction.id,
 				date: transaction.date,
@@ -201,7 +211,7 @@ export function deriveFundingGaps({
 				availableAmount: failure.available ?? failure.realized,
 				unfulfilledAmount: failure.fulfillment!.unfulfilledAmount,
 				windowStartDate: windowStart,
-				transactions,
+				transactions: entries,
 			},
 		];
 	});
@@ -213,14 +223,18 @@ export function fundingGapCaption(gap: FundingGap): string {
 }
 
 export function counterpartName(
-	plan: Plan,
+	accounts: Account[],
 	id: string | null,
 	fallback: string,
 ): string {
 	if (!id) return fallback;
-	return namesOrFallback(plan, id, fallback);
+	return namesOrFallback(accounts, id, fallback);
 }
 
-function namesOrFallback(plan: Plan, id: string, fallback: string): string {
-	return plan.accounts.find((account) => account.id === id)?.name ?? fallback;
+function namesOrFallback(
+	accounts: Account[],
+	id: string,
+	fallback: string,
+): string {
+	return accounts.find((account) => account.id === id)?.name ?? fallback;
 }

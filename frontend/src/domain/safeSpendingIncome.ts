@@ -1,4 +1,4 @@
-import type { Transaction, Plan } from "./model.ts";
+import type { Account, Transaction } from "./model.ts";
 import { nextProjectedPayments } from "./nextProjectedPayment.ts";
 import type { TransactionResult } from "./result.ts";
 
@@ -26,13 +26,15 @@ export interface SafeSpendingIncome {
  * rule.
  */
 export function safeSpendingIncome({
-	plan,
+	accounts,
+	rules,
 	transactions,
 	incomeAccountIds,
 	incomeRuleIds,
 	todayIso,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	rules: Transaction[];
 	transactions: TransactionResult[];
 	incomeAccountIds: string[];
 	incomeRuleIds: string[];
@@ -40,14 +42,14 @@ export function safeSpendingIncome({
 }): SafeSpendingIncome {
 	const today = todayIso.slice(0, 10);
 	const availableAccounts = new Set(
-		plan.accounts
+		accounts
 			.filter((account) => account.enabled && !account.archived)
 			.map((account) => account.id),
 	);
 	const destinations = new Set(
 		incomeAccountIds.filter((id) => availableAccounts.has(id)),
 	);
-	const rules = plan.transactions.filter(
+	const eligible = rules.filter(
 		(rule) =>
 			rule.enabled &&
 			rule.frequency !== "once" &&
@@ -60,17 +62,17 @@ export function safeSpendingIncome({
 	);
 	const nextPayments = nextProjectedPayments({
 		transactions,
-		rules,
+		rules: eligible,
 		todayIso,
 	});
 	const selected = new Set(incomeRuleIds);
-	const selectedRuleIds = rules
+	const selectedRuleIds = eligible
 		.filter((rule) => selected.has(rule.id))
 		.map((rule) => rule.id);
 	const payments = selectedRuleIds.flatMap((id) => nextPayments.get(id) ?? []);
 	const dates = payments.map((payment) => payment.date).sort();
 	return {
-		candidates: rules.map((rule) => ({
+		candidates: eligible.map((rule) => ({
 			id: rule.id,
 			name: rule.name,
 			frequency: rule.frequency,

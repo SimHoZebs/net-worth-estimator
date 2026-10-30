@@ -104,6 +104,7 @@ func TestIdentityStartupFailureDoesNotCloseSharedDatabase(t *testing.T) {
 	_, err = New(context.Background(), Config{
 		Provider: "casdoor", Issuer: provider.URL, PublicURL: "http://localhost:8080",
 		ClientID: "waypoint", ClientSecret: "secret", Store: database,
+		GuestSubject: "11111111-1111-1111-1111-111111111111",
 	})
 	if err == nil {
 		t.Fatal("identity accepted a provider without revocation support")

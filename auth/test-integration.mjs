@@ -1,18 +1,22 @@
-// Real-provider contract: owner, guest sample, and second user in one DB.
+// Real-provider contract: owner, provisioned guest, and second user in one DB.
+// Anonymous traffic resolves to the configured guest subject (a normal user
+// in the viewers group), never to a special sample wire.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, mkdtemp, realpath, readFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { chromium, expect } from "../frontend/node_modules/@playwright/test/index.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { snapshotFile } from "../dev/database.mjs";
+import { casdoorSession } from "./casdoor/provision.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const publicURL = process.env.NET_WORTH_ESTIMATOR_PUBLIC_URL;
 const subject = process.env.AUTH_TEST_SUBJECT;
+const guestSubject = process.env.AUTH_TEST_GUEST_SUBJECT;
 const username = process.env.AUTH_TEST_USERNAME;
 const password = process.env.AUTH_TEST_PASSWORD;
 assert.equal(
@@ -22,7 +26,14 @@ assert.equal(
 );
 assert.equal(process.env.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, "casdoor");
 assert.ok(
-  publicURL && subject && username && password && process.env.CASDOOR_STATE_DIR,
+  publicURL &&
+    subject &&
+    guestSubject &&
+    guestSubject !== subject &&
+    username &&
+    password &&
+    process.env.CASDOOR_STATE_DIR &&
+    process.env.NET_WORTH_ESTIMATOR_AUTH_ISSUER,
   "Supply app/identity configuration and disposable test credentials",
 );
 const state = await realpath(process.env.CASDOOR_STATE_DIR);
@@ -40,6 +51,15 @@ assert.equal(
 );
 assert.equal(await realpath(fixture.stateDir), state);
 assert.equal(fixture.settings.publicUrl, process.env.NET_WORTH_ESTIMATOR_AUTH_ISSUER);
+// Mirror the backend ActorKey: users/<hex(sha256(issuer + "\0" + subject))>.
+const actorResource = (issuer, subject) =>
+  `users/${createHash("sha256").update(`${issuer}\x00${subject}`, "utf8").digest("hex")}`;
+const issuer = process.env.NET_WORTH_ESTIMATOR_AUTH_ISSUER;
+const ownResource = actorResource(issuer, subject);
+const guestResource = actorResource(issuer, guestSubject);
+assert.match(ownResource, /^users\/[0-9a-f]{64}$/);
+assert.match(guestResource, /^users\/[0-9a-f]{64}$/);
+assert.notEqual(guestResource, ownResource);
 const origin = new URL(publicURL);
 assert.ok(
   ["localhost", "127.0.0.1"].includes(origin.hostname) && origin.protocol === "http:",
@@ -55,7 +75,7 @@ await mkdir(resolve(root, "tmp"), { recursive: true });
 const scratch = await mkdtemp(resolve(root, "tmp/auth-resource-integration-"));
 const binary = resolve(scratch, "server");
 const primaryDB = resolve(scratch, "financial.db");
-const publisher = resolve(scratch, "refreshplan");
+const publisher = resolve(scratch, "refreshmodel");
 const setupDB = resolve(scratch, "setupdb");
 const build = spawn("go", ["-C", resolve(root, "backend"), "build", "-o", binary, "./cmd/server"], {
   env: { ...process.env, CGO_ENABLED: "0" },
@@ -64,10 +84,10 @@ const build = spawn("go", ["-C", resolve(root, "backend"), "build", "-o", binary
 assert.equal((await once(build, "exit"))[0], 0, "Go build failed");
 const buildPublisher = spawn(
   "go",
-  ["-C", resolve(root, "backend"), "build", "-o", publisher, "./cmd/refreshplan"],
+  ["-C", resolve(root, "backend"), "build", "-o", publisher, "./cmd/refreshmodel"],
   { stdio: "inherit" },
 );
-assert.equal((await once(buildPublisher, "exit"))[0], 0, "Sample publisher build failed");
+assert.equal((await once(buildPublisher, "exit"))[0], 0, "Guest publisher build failed");
 const buildSetup = spawn(
   "go",
   ["-C", resolve(root, "backend"), "build", "-o", setupDB, "./cmd/setupdb"],
@@ -76,6 +96,12 @@ const buildSetup = spawn(
 assert.equal((await once(buildSetup, "exit"))[0], 0, "Database setup build failed");
 const provision = spawn(setupDB, ["--db", primaryDB], { stdio: "inherit" });
 assert.equal((await once(provision, "exit"))[0], 0, "Database setup failed");
+// Provision the guest destination row before publication. The guest is an
+// ordinary user; setupdb records its row and blank document, same as init.
+const provisionGuest = spawn(setupDB, ["--db", primaryDB, "--issuer", issuer, "--subject", guestSubject], {
+  stdio: "inherit",
+});
+assert.equal((await once(provisionGuest, "exit"))[0], 0, "Guest destination setup failed");
 const env = {
   ...process.env,
   HOST: "127.0.0.1",
@@ -83,6 +109,7 @@ const env = {
   NET_WORTH_ESTIMATOR_DB: primaryDB,
   NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, "frontend/dist"),
   NET_WORTH_ESTIMATOR_OWNER_SUBJECT: subject,
+  NET_WORTH_ESTIMATOR_GUEST_SUBJECT: guestSubject,
   NET_WORTH_ESTIMATOR_READ_ONLY: "",
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
 };
@@ -143,7 +170,7 @@ async function login(context, signup = false) {
   if (signup) {
     await page.getByRole("link", { name: /sign up now/i }).click();
     await page.locator("#username").fill(`isolated-${randomBytes(6).toString("hex")}`);
-    await page.locator("#name").fill("Separate plan owner");
+    await page.locator("#name").fill("Separate user owner");
     const secret = randomBytes(24).toString("hex");
     await page.locator("#password").fill(secret);
     await page.locator("#confirm").fill(secret);
@@ -169,7 +196,8 @@ try {
   const own = await session(owner);
   assert.equal(own.user.subject, subject);
   assert.ok(own.resource.permissions.includes("user:write"));
-  assert.equal(own.resource.kind, "private");
+  assert.equal(own.resource.id, ownResource);
+  assert.ok(!("kind" in own.resource), "Session resources carry id and permissions, no kind");
   const created = await request(owner, own, "POST", "/v1/accounts", {
     id: "owner-checking",
     name: "Owner checking",
@@ -179,20 +207,9 @@ try {
   assert.equal(created.status(), 200);
   assert.equal((await created.json()).persisted, true);
   await ownerPage.reload();
+  await ownerPage.goto(`${origin.origin}/#sources`);
+  await ownerPage.getByRole("tab", { name: "Account", exact: true }).click();
   await expect(ownerPage.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
-  assert.equal(
-    await ownerPage
-      .getByRole("button", { name: "Sign out", exact: true })
-      .evaluate(
-        (button) =>
-          !!(
-            button.compareDocumentPosition(
-              document.querySelector('nav[aria-label="Main navigation"]'),
-            ) & Node.DOCUMENT_POSITION_FOLLOWING
-          ),
-      ),
-    true,
-  );
   assert.equal(
     (
       await request(
@@ -214,10 +231,20 @@ try {
   await snapshotFile(primaryDB, approvedSnapshot);
   const publish = spawn(
     publisher,
-    ["--db", primaryDB, "--source", approvedSnapshot, "--source-user", own.resource.id, "--sample"],
+    [
+      "--db",
+      primaryDB,
+      "--source",
+      approvedSnapshot,
+      "--source-user",
+      own.resource.id,
+      "--user",
+      guestResource,
+      "--financial-only",
+    ],
     { stdio: "inherit" },
   );
-  assert.equal((await once(publish, "exit"))[0], 0, "Sample publication failed");
+  assert.equal((await once(publish, "exit"))[0], 0, "Guest publication failed");
   await start();
   assert.equal((await session(owner)).resource.id, own.resource.id);
   assert.equal(
@@ -231,27 +258,31 @@ try {
     ).status(),
     200,
   );
-  console.log("Owner OIDC login, persistent session, own-plan write, and CSRF protection PASS");
+  console.log("Owner OIDC login, persistent session, own-user write, and CSRF protection PASS");
 
   const guest = await browser.newContext();
-  const sample = await session(guest);
-  assert.equal(sample.authenticated, false);
-  assert.equal(sample.allowed, true);
-  assert.equal(sample.resource.kind, "sample");
+  const published = await session(guest);
+  assert.equal(published.authenticated, false);
+  assert.equal(published.allowed, true);
+  assert.equal(published.resource.id, guestResource);
+  assert.ok(!("kind" in published.resource), "Session resources carry id and permissions, no kind");
+  assert.ok(published.resource.permissions.includes("user:read"));
+  assert.ok(published.resource.permissions.includes("user:project"));
+  assert.ok(!published.resource.permissions.includes("user:write"));
   const guestPage = await guest.newPage();
-  await guestPage.goto(origin.origin);
-  await expect(guestPage.getByText("Guest", { exact: true })).toBeVisible();
+  await guestPage.goto(`${origin.origin}/#sources`);
+  await guestPage.getByRole("tab", { name: "Account", exact: true }).click();
   await expect(guestPage.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   await expect(guestPage.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
-  assert.equal((await (await request(guest, sample, "GET", "/v1/status")).json()).readOnly, true);
-  const guestModel = await (await request(guest, sample, "GET", "/v1/financial-model")).json();
+  assert.equal((await (await request(guest, published, "GET", "/v1/status")).json()).readOnly, true);
+  const guestModel = await (await request(guest, published, "GET", "/v1/financial-model")).json();
   assert.deepEqual(
     guestModel.document.accounts.map((item) => item.id),
     ["owner-checking"],
   );
   assert.equal(
     (
-      await request(guest, sample, "POST", "/v1/accounts", {
+      await request(guest, published, "POST", "/v1/accounts", {
         name: "Blocked guest",
         kind: "cash",
         enabled: true,
@@ -259,7 +290,7 @@ try {
     ).status(),
     401,
   );
-  assert.equal((await request(owner, sample, "GET", "/v1/financial-model")).status(), 409);
+  assert.equal((await request(owner, published, "GET", "/v1/financial-model")).status(), 409);
   const projection = {
     settings: {
       fallbackProjectionStartDate: "2026-01-01",
@@ -275,18 +306,62 @@ try {
     range: { startDate: "2000-01-01", endDate: "2100-01-01" },
   };
   assert.equal(
-    (await request(guest, sample, "POST", "/v1/projections/deterministic", projection)).status(),
+    (await request(guest, published, "POST", "/v1/projections/deterministic", projection)).status(),
     200,
   );
-  const stream = await request(guest, sample, "POST", "/v1/projections/stochastic", {
+  const stream = await request(guest, published, "POST", "/v1/projections/stochastic", {
     ...projection,
     config: { runCount: 1, seed: 42 },
   });
   assert.equal(stream.status(), 200);
   assert.match(await stream.text(), /event: result/);
   console.log(
-    "Separate published sample, guest read/project, denied guest writes, and stale-scope rejection PASS",
+    "Provisioned guest read/project, denied guest writes, and stale-scope rejection PASS",
   );
+
+  // Mutate only this marked disposable provider. Anonymous access follows
+  // provider grants, including additions and revocations, without a user-kind gate.
+  const admin = casdoorSession(issuer);
+  await admin("/api/login", {
+    method: "POST",
+    body: {
+      type: "login",
+      signinMethod: "Password",
+      application: "app-built-in",
+      organization: "built-in",
+      username: "admin",
+      password: fixture.settings.adminPassword,
+    },
+  });
+  const permissionPath = `?id=${encodeURIComponent("waypoint/viewer-guest-user")}`;
+  const originalPermission = (await admin(`/api/get-permission${permissionPath}`)).data;
+  assert.ok(originalPermission, "The disposable viewer permission must exist");
+  try {
+    await admin(`/api/update-permission${permissionPath}`, {
+      method: "POST",
+      body: { ...originalPermission, actions: ["user:read", "user:project", "user:write"] },
+    });
+    const writableGuest = await session(guest);
+    assert.equal(writableGuest.authenticated, false);
+    assert.equal(writableGuest.resource.id, guestResource);
+    assert.ok(writableGuest.resource.permissions.includes("user:write"));
+    assert.equal((await (await request(guest, writableGuest, "GET", "/v1/status")).json()).readOnly, false);
+    const probe = await request(guest, writableGuest, "POST", "/v1/accounts", {
+      id: "guest-policy-probe", name: "Guest policy probe", kind: "cash", enabled: true,
+    });
+    assert.equal(probe.status(), 200, "The provider can grant the ordinary guest write access");
+    assert.equal((await probe.json()).persisted, true);
+    assert.equal((await request(guest, writableGuest, "DELETE", "/v1/accounts/guest-policy-probe")).status(), 200);
+  } finally {
+    await admin(`/api/update-permission${permissionPath}`, { method: "POST", body: originalPermission });
+    await admin("/api/logout", { method: "POST" });
+  }
+  const restoredGuest = await session(guest);
+  assert.deepEqual(restoredGuest.resource.permissions, ["user:read", "user:project"]);
+  assert.equal((await request(guest, restoredGuest, "POST", "/v1/accounts", {
+    id: "revoked-policy-probe", name: "Revoked policy probe", kind: "cash", enabled: true,
+  })).status(), 401, "The next request must observe provider write revocation");
+  console.log("Ordinary guest provider grant, write, and immediate revocation PASS");
 
   const second = await browser.newContext();
   const secondPage = await login(second, true);
@@ -294,6 +369,14 @@ try {
   assert.equal(other.allowed, true);
   assert.ok(other.resource.permissions.includes("user:write"));
   assert.notEqual(other.resource.id, own.resource.id);
+  assert.notEqual(other.resource.id, guestResource);
+  // The runtime bridge resolves the signup UUID through the provider
+  // owner/name lookup; the session subject must be a fresh immutable subject
+  // and the resource must derive from it deterministically.
+  assert.ok(other.user.subject && other.user.subject !== subject);
+  assert.ok(other.user.subject !== guestSubject);
+  assert.equal(other.resource.id, actorResource(issuer, other.user.subject));
+  assert.ok(!("kind" in other.resource), "Session resources carry id and permissions, no kind");
   const blank = (await (await request(second, other, "GET", "/v1/financial-model")).json())
     .document;
   assert.ok(blank, "Signup activates a usable blank model without an import");
@@ -301,6 +384,8 @@ try {
   assert.deepEqual(blank.postings, []);
   assert.deepEqual(blank.recurrenceRules, []);
   await expect(secondPage.getByRole("heading", { name: "Your workspace is ready" })).toBeVisible();
+  await secondPage.goto(`${origin.origin}/#sources`);
+  await secondPage.getByRole("tab", { name: "Account", exact: true }).click();
   await expect(secondPage.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   // All normal pages work before the first account exists. No import or
   // administrator action occurs between native signup and the editor.
@@ -319,11 +404,10 @@ try {
   await secondPage.getByRole("button", { name: "Add your first account" }).click();
   await secondPage.getByLabel("Account name", { exact: true }).fill("Second checking");
   await secondPage.getByLabel("Balance (USD)", { exact: true }).fill("1250");
-  await secondPage.getByRole("button", { name: "Apply unsaved changes", exact: true }).click();
+  const accountDialog = secondPage.getByRole("dialog", { name: "Add account", exact: true });
+  await accountDialog.getByRole("button", { name: "Add account", exact: true }).click();
+  await expect(accountDialog).not.toBeVisible();
   await secondPage.reload();
-  await expect(secondPage.getByRole("button", { name: "Save changes", exact: true })).toBeEnabled();
-  await secondPage.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(secondPage.locator("[data-draft-bar]")).toHaveCount(0);
   await stop();
   await start();
   await secondPage.goto(`${origin.origin}/#accounts`);
@@ -358,10 +442,16 @@ try {
     assert.equal(
       new Set(users.map((row) => row.user_id)).size,
       3,
-      "Owner, sample, and second user must share one database",
+      "Owner, guest, and second user must share one database",
     );
+    assert.ok(
+      users.every((row) => !/sample/i.test(row.user_id)),
+      "No legacy sample rows remain; the guest uses an ordinary user scope",
+    );
+    // Application rows key users by the store row ID (user:<hash>).
+    const guestRow = `user:${guestResource.slice("users/".length)}`;
     assert.deepEqual(
-      users.filter((row) => row.user_id === sample.resource.id).map((row) => row.id),
+      users.filter((row) => row.user_id === guestRow).map((row) => row.id),
       ["owner-checking"],
     );
     assert.ok(
@@ -372,7 +462,7 @@ try {
     shared.close();
   }
   console.log(
-    "Signup without approval/import, blank navigation, first-account draft/save, restart persistence, and storage isolation PASS",
+    "Signup without approval/import, blank navigation, direct account save, restart persistence, and storage isolation PASS",
   );
 
   assert.equal((await request(owner, own, "POST", "/v1/auth/logout")).status(), 200);
@@ -387,9 +477,11 @@ try {
   });
   assert.equal(replay.status, 401);
   assert.equal((await request(owner, own, "GET", "/v1/financial-model")).status(), 409);
-  assert.equal((await session(owner)).resource.kind, "sample");
+  const loggedOut = await session(owner);
+  assert.equal(loggedOut.authenticated, false);
+  assert.equal(loggedOut.resource.id, guestResource);
   console.log(
-    "Logout removes private-plan access; captured cookies cannot restore write permission PASS",
+    "Logout removes private-user access; captured cookies cannot restore write permission PASS",
   );
 } finally {
   await browser?.close();

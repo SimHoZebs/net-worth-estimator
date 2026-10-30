@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/ \
-    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshplan ./cmd/migrate-plans-to-users
+    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel ./cmd/migrate-plans-to-users
 
 FROM alpine:3.22
 

@@ -14,7 +14,6 @@ const input = {
 	apiBaseUrl: "https://plan.example",
 	resource: {
 		id: "users/private-a",
-		kind: "private" as const,
 		permissions: ["user:read", "user:write"],
 	},
 	subject: "user-a",

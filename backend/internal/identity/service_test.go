@@ -204,10 +204,14 @@ func newIDP(t *testing.T) *testIDP {
 
 func newService(t *testing.T, p *testIDP, path string, options ...func(*Config)) *Service {
 	t.Helper()
-	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour,
+	const guestSubject = "11111111-1111-1111-1111-111111111111"
+	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour, GuestSubject: guestSubject,
 		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
+			if subject == "" {
+				return authorization.Scope{}, context.Canceled
+			}
 			permissions := []string{"user:read", "user:project"}
-			if subject != "" {
+			if subject != guestSubject {
 				permissions = append(permissions, "user:write")
 			}
 			return authorization.Scope{Resource: authorization.ResourceFor(p.server.URL, subject), Permissions: permissions}, nil

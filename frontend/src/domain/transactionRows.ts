@@ -84,7 +84,7 @@ function displayFrequencyOf(frequency: string): Transaction["frequency"] {
  * through the caller's projection figure; without one the transaction stays
  * Varies.
  */
-export function transactionToPlan(
+export function transactionToDisplay(
 	row: TransactionRow,
 	resolved?: { requested: number } | null,
 ): Transaction {

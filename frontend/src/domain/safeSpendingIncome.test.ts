@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture } from "../mocks/projection.ts";
-import type { Transaction, Plan } from "./model.ts";
+import type { Transaction } from "./model.ts";
 import { safeSpendingIncome } from "./safeSpendingIncome.ts";
 
 function rule(id: string, overrides: Partial<Transaction> = {}): Transaction {
@@ -25,16 +25,15 @@ function payment(transactionId: string, date: string, amount: number) {
 	});
 }
 
-const plan: Plan = {
-	...financialModelFixture,
-	transactions: [
-		rule("salary"),
-		rule("partner", { fromId: "savings", readOnly: true, amountKnown: false }),
-		rule("unselected"),
-	],
-};
+const accounts = financialModelFixture.accounts;
+const rules = [
+	rule("salary"),
+	rule("partner", { fromId: "savings", readOnly: true, amountKnown: false }),
+	rule("unselected"),
+];
 const input = {
-	plan,
+	accounts,
+	rules,
 	transactions: [
 		payment("partner", "2026-11-20", 2400),
 		payment("salary", "2026-10-15", 3000),
@@ -105,7 +104,7 @@ describe("safeSpendingIncome", () => {
 	});
 
 	it("exposes only enabled, current inflows into income accounts", () => {
-		const rules = [
+		const regulated = [
 			rule("active"),
 			rule("disabled", { enabled: false }),
 			rule("expired", { endDate: "2026-10-07" }),
@@ -118,9 +117,11 @@ describe("safeSpendingIncome", () => {
 		];
 		const result = safeSpendingIncome({
 			...input,
-			plan: { ...plan, transactions: rules },
-			incomeRuleIds: rules.map((item) => item.id),
-			transactions: rules.map((item) => payment(item.id, "2026-10-15", 100)),
+			rules: regulated,
+			incomeRuleIds: regulated.map((item) => item.id),
+			transactions: regulated.map((item) =>
+				payment(item.id, "2026-10-15", 100),
+			),
 		});
 		expect(result.selectedRuleIds).toEqual([
 			"active",
@@ -147,13 +148,10 @@ describe("safeSpendingIncome", () => {
 		for (const accountPatch of [{ enabled: false }, { archived: true }]) {
 			const result = safeSpendingIncome({
 				...input,
-				plan: {
-					...plan,
-					accounts: plan.accounts.map((account) => ({
-						...account,
-						...accountPatch,
-					})),
-				},
+				accounts: accounts.map((account) => ({
+					...account,
+					...accountPatch,
+				})),
 			});
 			expect(result.candidates).toEqual([]);
 			expect(result.paycheck).toBeNull();

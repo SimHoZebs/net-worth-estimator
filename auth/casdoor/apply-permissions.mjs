@@ -56,6 +56,7 @@ function fields(object, template) {
 const objectTypes = Object.freeze({
   models: "model",
   roles: "role",
+  groups: "group",
   adapters: "adapter",
   permissions: "permission",
 });
@@ -168,7 +169,7 @@ export async function applyPermissions(
       before.push(snapshot);
     }
     if (before.every((object) => object !== null)) return { changed: false };
-    // Only selected model/role/adapter/permission fields enter this private backup.
+    // Only selected model/role/group/adapter/permission fields enter this private backup.
     // No client credentials, user records, sessions, or passkeys enter the file.
     await writeFile(
       backupFile,

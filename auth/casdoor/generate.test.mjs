@@ -38,6 +38,10 @@ test("requires explicit distinct secrets and well-formed origins", () => {
   for (const override of [
     { CASDOOR_USER_PASSWORD: "x".repeat(73) },
     { CASDOOR_USER_NAME: "bad/name" },
+    { CASDOOR_GUEST_NAME: "bad/name" },
+    { CASDOOR_GUEST_NAME: "household" },
+    { CASDOOR_GUEST_NAME: "admin" },
+    { CASDOOR_GUEST_NAME: "built-in" },
     { CASDOOR_USER_EMAIL: "not-email" },
     { CASDOOR_USER_DISPLAY_NAME: "two\nlines" },
     { CASDOOR_BACKCHANNEL_LOGOUT_URL: "http://backend:8787/wrong" },
@@ -53,15 +57,32 @@ test("requires explicit distinct secrets and well-formed origins", () => {
   );
 });
 
-test("seeds one normal user, code/refresh/device grants, sessions, passkeys, and a fresh cert", () => {
+test("seeds owner and provisioned guest, code/refresh/device grants, sessions, passkeys, and a fresh cert", () => {
   const settings = settingsFromEnv(env);
   const seed = buildSeed(settings);
-  assert.equal(seed.users.length, 1);
-  assert.equal(seed.users[0].name, "household");
-  assert.equal(Object.hasOwn(seed.users[0], "id"), false);
+  assert.equal(seed.users.length, 2);
+  const [owner, guest] = seed.users;
+  assert.equal(owner.name, "household");
+  assert.deepEqual(owner.groups, ["waypoint/members"]);
+  assert.equal(guest.name, "guest");
+  assert.deepEqual(guest.groups, ["waypoint/viewers"]);
+  assert.equal(guest.type, "normal-user");
+  assert.equal(guest.displayName, "Guest");
+  assert.match(guest.password, /^[0-9a-f]{48}$/);
   assert.ok(seed.users.every((user) => user.owner === "waypoint" && !user.isAdmin));
+  assert.ok(seed.users.every((user) => Object.hasOwn(user, "id") === false));
+  assert.ok(
+    seed.users.every(
+      (user) => user.isForbidden === false && user.isDeleted === false,
+    ),
+  );
+  assert.deepEqual(
+    seed.groups.map(({ owner, name }) => `${owner}/${name}`),
+    ["waypoint/members", "waypoint/viewers"],
+  );
   assert.deepEqual(seed.organizations[0].passwordOptions, ["AtLeast8"]);
   const app = seed.applications.find((app) => app.name === "waypoint");
+  assert.equal(app.defaultGroup, "waypoint/members");
   assert.deepEqual(app.grantTypes, [
     "authorization_code",
     "refresh_token",
@@ -112,6 +133,12 @@ test("additional browser addresses add exact callbacks without changing identiti
   });
   const before = buildSeed(baseline);
   const after = buildSeed(settings);
+  // The guest password is machine-generated per settings object. It is the
+  // only volatile seed field; everything else must match across aliases.
+  for (const seed of [before, after]) {
+    assert.match(seed.users[1].password, /^[0-9a-f]{48}$/);
+    seed.users[1].password = "volatile-guest-password";
+  }
   const app = after.applications.find((app) => app.name === "waypoint");
   assert.deepEqual(app.redirectUris, [
     "http://localhost:5178/v1/auth/callback",
@@ -148,6 +175,16 @@ test("additional browser addresses add exact callbacks without changing identiti
   }
 });
 
+test("the guest name defaults to guest and accepts explicit overrides", () => {
+  assert.equal(settingsFromEnv(env).guestName, "guest");
+  const settings = settingsFromEnv({ ...env, CASDOOR_GUEST_NAME: "visitor" });
+  assert.equal(settings.guestName, "visitor");
+  assert.deepEqual(
+    buildSeed(settings).users.find((user) => user.name === "visitor").groups,
+    ["waypoint/viewers"],
+  );
+});
+
 test("creates private files without overwriting existing configuration", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "casdoor-generator-test-"));
   try {
@@ -158,7 +195,7 @@ test("creates private files without overwriting existing configuration", async (
     assert.equal((await stat(resolve(dir, "db"))).mode & 0o777, 0o700);
     assert.equal(
       JSON.parse(await readFile(resolve(dir, "conf/init_data.json"), "utf8")).users.length,
-      1,
+      2,
     );
     await assert.rejects(() => generate(settingsFromEnv(env), dir), /Config already exists/);
   } finally {

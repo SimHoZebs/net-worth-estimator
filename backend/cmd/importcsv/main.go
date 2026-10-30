@@ -40,7 +40,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	defer database.Close()
-	user, err := database.User(normalizeUserID(*userID))
+	rowID := normalizeUserID(*userID)
+	if rowID == "sample" || rowID == "fixture" {
+		fmt.Fprintln(stderr, "refusing to reset legacy historical rows")
+		return 1
+	}
+	user, err := database.User(rowID)
 	if err != nil {
 		fmt.Fprintf(stderr, "select existing user: %v\n", err)
 		return 1
@@ -61,9 +66,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 // normalizeUserID maps a user resource to its store row: users/<hash>
 // is owned by user:<hash>; raw row IDs pass through for offline operators.
 func normalizeUserID(id string) string {
-	if id == "users/sample" {
-		return sqlite.SampleUserID
-	}
 	if rest, ok := strings.CutPrefix(id, "users/"); ok {
 		return "user:" + rest
 	}

@@ -23,7 +23,9 @@ const funding: OtherEvaluation = {
 
 function props() {
 	return {
-		plan: financialModelFixture,
+		accounts: financialModelFixture.accounts,
+		transactions: financialModelFixture.transactions,
+		startDate: financialModelFixture.startDate,
 		projection: projectionFixture({ otherEvaluations: [funding] }),
 		range: null,
 		pinnedIds: [funding.id],

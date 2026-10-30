@@ -15,20 +15,21 @@ import {
 	isPendingTransaction,
 	type Account,
 	type Transaction,
-	type Plan,
 } from "../../domain/model.ts";
 import type { ResolvedTransactionAmount } from "../../domain/resolvedTransactionAmounts.ts";
 
 export function TransactionsPanel({
 	transactions,
 	accounts,
-	plan,
+	startDate,
+	readOnly,
 	resolvedAmounts,
 	showHeaders = false,
 }: {
 	transactions: Transaction[];
 	accounts: Account[];
-	plan: Plan;
+	startDate: string;
+	readOnly: boolean;
 	resolvedAmounts?: Map<string, ResolvedTransactionAmount>;
 	showHeaders?: boolean;
 }) {
@@ -145,12 +146,14 @@ export function TransactionsPanel({
 				<TransactionDetail
 					transaction={ruleTransaction({
 						transaction: selected,
-						plan,
+						accounts,
+						startDate,
 						resolved: selectedResolved,
 					})}
 					planTransaction={selected}
 					accounts={accounts}
-					plan={plan}
+					transactions={transactions}
+					readOnly={readOnly}
 					claimRuleName={selectedClaimRuleName}
 					onClose={() => setSelectedId(null)}
 				/>

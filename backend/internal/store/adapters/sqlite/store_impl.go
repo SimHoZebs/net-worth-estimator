@@ -3,6 +3,7 @@ package sqlite
 import (
 	"fmt"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 
 	_ "modernc.org/sqlite"
@@ -21,15 +22,16 @@ type sqliteStore struct {
 	application *Database
 }
 
-// Open creates or opens an explicit fixture user scope for isolated tests
-// and fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
+// Open creates or opens an ordinary isolated user scope for tests and
+// fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
 // databases are rejected and never converted here.
 func Open(path string) (store.Store, error) {
 	db, err := SetupDatabase(path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	st, err := db.ensureUser(FixtureUserID, FixtureUserID, FixtureUserID)
+	const issuer, subject = "https://issuer.test", "sqlite-open-test"
+	st, err := db.ensureUser(authorization.ActorKey(issuer, subject), issuer, subject)
 	if err != nil {
 		db.Close()
 		return nil, err
@@ -38,7 +40,7 @@ func Open(path string) (store.Store, error) {
 	return st, nil
 }
 
-// Close releases an owned fixture database. Shared user handles never close it.
+// Close releases an owned isolated database. Shared user handles never close it.
 func (s *sqliteStore) Close() error {
 	if s.owned != nil {
 		return s.owned.Close()

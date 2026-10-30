@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { AccountToggle } from "../../../components/AccountToggle.tsx";
 import { InputField } from "../../../components/Field.tsx";
-import type { Plan } from "../../../domain/model.ts";
+import type { Account } from "../../../domain/model.ts";
 import type { SafeSpendingIncome } from "../../../domain/safeSpendingIncome.ts";
 import type { TotalCycleSettings } from "../../../state/useSafeSpendingSettings.ts";
 import { clampStatementDay } from "../../../state/useSafeSpendingSettings.ts";
@@ -29,7 +29,7 @@ export function SafeSpendingConfigurePanel({
 	income: SafeSpendingIncome;
 	billCandidates: BillCandidate[];
 	trackedBillIds: string[];
-	accounts: Plan["accounts"];
+	accounts: Account[];
 	onToggleBill: (transactionId: string) => void;
 	onToggleAccount: (accountId: string) => void;
 	onToggleSpendingAccount: (accountId: string) => void;

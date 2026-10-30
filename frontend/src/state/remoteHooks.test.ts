@@ -14,20 +14,19 @@ import {
 	getUserScope,
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
+import { createAccount } from "../api/generated/endpoints.ts";
 import {
 	ApiHttpError,
 	type ApiRequestOptions,
-	type BackendPosting,
 	type FinancialModelDocument,
 	type FinancialModelResponse,
 	type ProjectionResult,
 	type StochasticProjectionResult,
 	type StochasticProjectionRequest,
 } from "../api/index.ts";
-import type { Plan } from "../domain/model.ts";
-
 import { serverDocumentFingerprint } from "./remoteStorage.ts";
-import { memoryStorage } from "../mocks/storage.ts";
+import { fixtureDocument } from "../mocks/document.ts";
+import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "../mocks/resource.ts";
 import {
 	clearResourceQueryCache,
 	resetServerQueryCache,
@@ -41,12 +40,7 @@ import {
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
 import { useWorkspaceStartup } from "./useWorkspaceStartup.ts";
-import {
-	deriveDraftDocument,
-	resetWorkspaceStore,
-	useWorkspaceStore,
-	draftConflict,
-} from "./workspaceStore.ts";
+import { useSavedAccounts } from "./savedRows.ts";
 import {
 	useServerModel,
 	useServerStatus,
@@ -56,72 +50,53 @@ import {
 	presetsOptions,
 	statusOptions,
 	reloadWorkspace,
+	refreshAccounts,
 	userResourceKey,
 } from "./workspaceResources.ts";
 import {
-	saveWorkspace,
 	importServerDocument,
-	reloadDraft,
-	stageAndSave,
+	performSave,
 	useWorkspaceWriteError,
 	useWorkspaceSaving,
 } from "./workspaceWrites.ts";
 import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
 
-// Test observations compose the public owners.
+// Test observations read the canonical saved state. Query owns every
+// request lifecycle and the server document is the only model: there is
+// no replacement aggregate to maintain here.
 function useRemoteWorkspace() {
 	useWorkspaceStartup();
-	const state = useWorkspaceStore();
 	const model = useServerModel();
 	const status = useServerStatus();
 	const presets = useAmountPresets();
 	const mutationError = useWorkspaceWriteError();
 	const saving = useWorkspaceSaving();
-	const conflict = draftConflict(state, model.data);
-	const saved = model.data?.conversion?.plan;
+	const savedAccounts = useSavedAccounts();
+	const document = model.data?.document ?? null;
 	const error =
-		state.error ??
-		conflict ??
 		(mutationError instanceof Error ? mutationError.message : null) ??
 		model.error?.message ??
 		(model.data && !model.data.document
 			? "The server has no financial model to display."
 			: null);
 	return {
-		...state,
-		plan: saved ? (state.draft ?? saved) : null,
-		workspace: saved
-			? {
-					saved,
-					draft: state.draft,
-					baseRevision: state.baseRevision,
-					baseFingerprint: state.baseFingerprint,
-					draftStale: Boolean(conflict),
-				}
-			: null,
-		serverDocument: model.data?.document ?? null,
+		serverDocument: document,
+		savedAccounts,
 		serverPresets: presets.data ?? null,
 		presetError: presets.error?.message ?? null,
-		savedPresentation: model.data?.conversion?.presentation ?? null,
-		adapterReport: model.data?.conversion?.report ?? null,
 		status: status.data ?? null,
-		recoveryDraft: saved ? null : state.draft,
 		error,
 		loading: model.isFetching,
 		saving,
-		stale: Boolean(conflict),
-		draftStale: Boolean(conflict),
 		readOnly: Boolean(
 			status.data?.readOnly ||
 			(mutationError instanceof ApiHttpError && mutationError.status === 403),
 		),
 		authRequired:
 			mutationError instanceof ApiHttpError && mutationError.status === 401,
-		save: () => saveWorkspace(),
 		retry: () => reloadWorkspace(),
-		reloadDraft: () => reloadDraft(),
-		importServerDocument: (document: FinancialModelDocument) =>
-			importServerDocument(document),
+		importServerDocument: (next: FinancialModelDocument) =>
+			importServerDocument(next),
 		refreshPresets: async () => {
 			await serverQueryClient().invalidateQueries({
 				queryKey: userResourceKey("presets"),
@@ -294,24 +269,6 @@ function scenarioStreamClient(cancelBody = true) {
 	return { client, stream, fetcher, deterministicCalls, stochasticCalls };
 }
 
-function withTransactionAmount(plan: Plan, amount: number): Plan {
-	return {
-		...plan,
-		transactions: plan.transactions.map((transaction) =>
-			transaction.id === "salary" ? { ...transaction, amount } : transaction,
-		),
-	};
-}
-
-function withAccountName(plan: Plan, name: string): Plan {
-	return {
-		...plan,
-		accounts: plan.accounts.map((account) =>
-			account.id === "cash" ? { ...account, name } : account,
-		),
-	};
-}
-
 function projectionFixture(): ProjectionResult {
 	return {
 		timeline: {
@@ -465,11 +422,10 @@ beforeEach(() => {
 		{
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
-				id: "users/sample",
-				kind: "sample",
+				id: GUEST_USER_ID,
 				permissions: ["user:read", "user:project"],
 			},
-			subject: null,
+			subject: GUEST_USER_SUBJECT,
 		},
 		suspendUserScope(),
 	);
@@ -480,13 +436,11 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 	resetServerQueryCache();
 	resetUiStore();
-	resetWorkspaceStore();
 	resetNotifications();
 });
 
 describe("remote workspace state", () => {
 	it("retains the loaded financial model after a failed background reload", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
 		const server = stubTestServer();
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
@@ -496,39 +450,12 @@ describe("remote workspace state", () => {
 		await act(async () => reloadWorkspace());
 		await view.settle();
 		expect(view.result().serverDocument).toBe(previous);
-		expect(view.result().workspace).not.toBeNull();
 		expect(view.result().error).not.toBeNull();
-		view.unmount();
-	});
-
-	it("preserves an unsaved draft during a background model reload", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		stubTestServer();
-		const view = renderHook(() => useRemoteWorkspace());
-		await waitFor(() => expect(view.result().loading).toBe(false));
-		const edited = withTransactionAmount(view.result().plan!, 125);
-		await act(async () => {
-			expect(view.result().updatePlan(edited)).toBe(true);
-		});
-		await act(async () => {
-			await reloadWorkspace();
-		});
-		expect(view.result().workspace?.draft?.transactions).toEqual(
-			edited.transactions,
-		);
-		view.unmount();
-	});
-
-	it("does not publish an empty in-memory draft when saved-only data is checked again", async () => {
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const view = renderHook(() => useRemoteWorkspace());
-		await waitFor(() => expect(view.result().loading).toBe(false));
-		expect(view.result().workspace?.draft).toBeNull();
+		// A later reload recovers without losing the saved document.
 		await act(async () => reloadWorkspace());
-		expect(view.result().workspace?.draft).toBeNull();
+		await view.settle();
+		expect(view.result().error).toBeNull();
+		expect(view.result().serverDocument).toEqual(previous);
 		view.unmount();
 	});
 
@@ -537,8 +464,6 @@ describe("remote workspace state", () => {
 	// the remount reused the same in-flight promise, so hydration never
 	// completed and the app stayed on "Connecting to your Waypoint server".
 	it("completes hydration across a strict-mode remount", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
 		const server = stubTestServer(() => ({
 			document: modelFixture(),
 			issues: [],
@@ -573,14 +498,12 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 
 		expect(rendered.result().loading).toBe(false);
-		expect(rendered.result().workspace).not.toBeNull();
-		expect(rendered.result().plan).not.toBeNull();
+		expect(rendered.result().serverDocument).not.toBeNull();
 		expect(rendered.result().error).toBeNull();
 		rendered.unmount();
 	});
 
 	it("lets Query cancel the initial load on its last observer's unmount", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
 		const server = stubTestServer();
 		let resolveModel!: (value: Response) => void;
 		server.holdModel(
@@ -607,12 +530,9 @@ describe("remote workspace state", () => {
 			);
 		});
 		expect(getServerModel()).toBeUndefined();
-		expect(useWorkspaceStore.getState().draft).toBeNull();
 	});
 
 	it("keeps session credentials out of workspace and UI state", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceStartup());
 		await waitFor(() =>
@@ -635,13 +555,11 @@ describe("remote workspace state", () => {
 				.filter(([url]) => String(url).endsWith("/v1/amount-presets"))
 				.at(-1)?.[1],
 		).not.toHaveProperty("authToken");
-		expect(useWorkspaceStore.getState()).not.toHaveProperty("authToken");
 		expect(useUiStore.getState()).not.toHaveProperty("authToken");
 		rendered.unmount();
 	});
 
 	it("uses a replacement client on an explicit Query refresh", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceStartup());
 		await waitFor(() => expect(getServerModel()?.document).toBeDefined());
@@ -650,45 +568,13 @@ describe("remote workspace state", () => {
 			"Replacement cash";
 		await act(async () => reloadWorkspace());
 		expect(server.modelFetches()).toHaveLength(2);
-		expect(getServerModel()?.conversion?.plan.accounts[0]?.name).toBe(
+		expect(getServerModel()?.document?.accounts[0]?.name).toBe(
 			"Replacement cash",
 		);
 		rendered.unmount();
 	});
 
-	it("ignores an active save's result after its resource retires", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		const server = stubTestServer();
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-		);
-		const saving = saveWorkspace();
-		await waitFor(() =>
-			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
-				),
-			).not.toHaveLength(0),
-		);
-		suspendUserScope();
-		rendered.unmount();
-		release(undefined);
-		expect(await saving).toBe(false);
-		expect(useWorkspaceStore.getState().draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		expect(server.modelFetches()).toHaveLength(1);
-	});
-
 	it("reuses a pending load on client change and uses the new binding on retry", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
 		const server = stubTestServer();
 		let resolveModel!: (value: Response) => void;
 		server.holdModel(
@@ -726,12 +612,11 @@ describe("remote workspace state", () => {
 	});
 
 	it("keeps preset load errors separate from workspace recovery", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
 		const server = stubTestServer();
 		server.failPresetsOnce(new Error("Recipes unavailable"));
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
-		expect(rendered.result().workspace).not.toBeNull();
+		expect(rendered.result().serverDocument).not.toBeNull();
 		expect(rendered.result().error).toBeNull();
 		expect(rendered.result().presetError).not.toBeNull();
 		await rendered.result().refreshPresets();
@@ -741,465 +626,162 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("hydrates server state and keeps a draft in memory without credentials", async () => {
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-
-		expect(rendered.result().status).toEqual({
-			readOnly: false,
+	it("saves an account row and projects the refreshed saved document", async () => {
+		stubTestServer();
+		const view = renderHook(() => useRemoteWorkspace());
+		await waitFor(() => expect(view.result().loading).toBe(false));
+		const ok = await performSave({
+			call: () =>
+				createAccount({
+					name: "Travel savings",
+					kind: "cash",
+					enabled: true,
+					balance: 2500,
+					observedOn: "2026-02-15",
+				}),
+			refresh: refreshAccounts,
+			failureMessage: "The account could not be saved.",
 		});
-		expect(
-			rendered.result().plan?.accounts.map((account) => account.id),
-		).toEqual(["cash", "loan"]);
-		expect(rendered.result().adapterReport?.warnings.length).toBeGreaterThan(0);
-
-		const edited = withTransactionAmount(rendered.result().plan!, 125);
-		expect(rendered.result().updatePlan(edited)).toBe(true);
-		await rendered.settle();
-		expect(useWorkspaceStore.getState().draft?.transactions).toEqual(
-			edited.transactions,
+		expect(ok).toBe(true);
+		await view.settle();
+		const document = view.result().serverDocument!;
+		expect(document.accounts.map((account) => account.name)).toContain(
+			"Travel savings",
 		);
-		rendered.unmount();
-		const rehydrated = renderHook(() => useRemoteWorkspace());
-		await rehydrated.settle();
-		expect(rehydrated.result().plan?.transactions[0]?.amount).toBe(125);
-		rehydrated.unmount();
-	});
-
-	it("keeps a draft stale when the authoritative server document changed", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
-		expect(
-			first
-				.result()
-				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
-		).toBe(true);
-		expect(useWorkspaceStore.getState().baseFingerprint).toBe(
-			serverDocumentFingerprint(modelFixture()),
+		await waitFor(() =>
+			expect(
+				view.result().savedAccounts?.map((account) => account.name),
+			).toContain("Travel savings"),
 		);
-		first.unmount();
+		expect(view.result().error).toBeNull();
+		view.unmount();
 
-		const changedModel = modelFixture();
-		const changedPosting = changedModel.postings[0]!;
-		changedModel.postings[0] = {
-			...changedPosting,
-			amount: {
-				resolver: "expression",
-				config: { expression: "200" },
-				inputs: {},
-			},
-		};
-		const changedServer = stubTestServer(
-			() => ({
-				document: changedModel,
-				issues: [],
+		// Projections consume the saved document as-is; no draft overlay exists.
+		// The stub echoes the resource scope like the other projection fakes
+		// so the client does not retire the scope on a mismatched response.
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				const headers = new Headers({ "content-type": "application/json" });
+				const resource = getUserScope().resource?.id;
+				if (resource) headers.set("Waypoint-Resource", resource);
+				return new Response(
+					JSON.stringify({ result: projectionFixture(), issues: [] }),
+					{ headers },
+				);
 			}),
-			changedModel,
 		);
-		changedServer.setRevision('"sha256-changed"');
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-
-		expect(rendered.result().stale).toBe(true);
-		expect(rendered.result().draftStale).toBe(true);
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
+		const projected = renderHook(() =>
+			useRemoteProjection({ document, years: 2, ranges: false }),
 		);
-		expect(rendered.result().error).not.toBeNull();
-		expect(await rendered.result().save()).toBe(false);
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 150)),
-		).toBe(false);
-		expect(rendered.result().discard()).toBe(false);
-		expect(
-			changedServer.calls.filter((call) =>
-				call.url.includes("/v1/recurrence-rules"),
-			),
-		).toHaveLength(0);
+		await projected.settle();
+		expect(projected.result().base).toMatchObject({ inflows: 100 });
+		expect(projected.result().baseError).toBeNull();
+		projected.unmount();
+		vi.unstubAllGlobals();
+	});
 
-		expect(await rendered.result().retry()).toBeUndefined();
-		await rendered.settle();
-		expect(rendered.result().stale).toBe(true);
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
+	it("row save rejection keeps the saved document and never reports success", async () => {
+		const server = stubTestServer();
+		const view = renderHook(() => useRemoteWorkspace());
+		await waitFor(() => expect(view.result().loading).toBe(false));
+		server.writeOnce(
+			(method, path) => method === "POST" && path === "/v1/accounts",
+			{
+				row: null,
+				issues: [{ severity: "error", message: "Name is required." }],
+				persisted: false,
+				revision: '"rejected"',
+			},
 		);
-		expect(await rendered.result().reloadDraft()).toBe(true);
-		await rendered.settle();
-		expect(rendered.result().stale).toBe(false);
-		expect(rendered.result().workspace?.draft).toBeNull();
-		rendered.unmount();
-	});
-
-	it("treats a draft without server identity metadata as recovery-only", async () => {
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
-		expect(
-			first
-				.result()
-				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
-		).toBe(true);
-		first.unmount();
-		useWorkspaceStore.setState({ baseFingerprint: null, baseRevision: null });
-
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(rendered.result().draftStale).toBe(true);
-		expect(rendered.result().error).not.toBeNull();
-		expect(await rendered.result().save()).toBe(false);
-		expect(
-			server.calls.filter((call) => call.url.includes("/v1/recurrence-rules")),
-		).toHaveLength(0);
-		rendered.unmount();
-	});
-
-	it("edits and saves without a server revision", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		await rendered.settle();
-		expect(await rendered.result().save()).toBe(true);
-		expect(
-			server.calls.filter((call) =>
-				call.url.endsWith("/v1/recurrence-rules/salary"),
-			),
-		).toHaveLength(1);
-		rendered.unmount();
-	});
-
-	it("keeps a stored draft for recovery when hydration fails", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
-		expect(
-			first
-				.result()
-				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
-		).toBe(true);
-		first.unmount();
-		resetServerQueryCache();
-
-		const failedServer = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		failedServer.failStatusOnce(new Error("connection unavailable"));
-		failedServer.failModelOnce(new Error("connection unavailable"));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(rendered.result().workspace).toBeNull();
-		expect(rendered.result().recoveryDraft?.transactions[0]?.amount).toBe(125);
-		expect(rendered.result().error).not.toBeNull();
-		rendered.unmount();
-	});
-
-	it("retains the last good model and draft when a refresh fails", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		server.failStatusOnce(new Error("connection unavailable"));
-		server.failModelOnce(new Error("connection unavailable"));
-
-		await rendered.result().retry();
-		await rendered.settle();
-		expect(rendered.result().workspace).not.toBeNull();
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		expect(rendered.result().error).not.toBeNull();
-		rendered.unmount();
-	});
-
-	it("defers refresh until a rejected save settles and retains the last good model", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => {
-			throw new ApiHttpError({ message: "stale", status: 412 });
+		const ok = await performSave({
+			call: () =>
+				createAccount({
+					name: "Travel savings",
+					kind: "cash",
+					enabled: true,
+					balance: 2500,
+					observedOn: "2026-02-15",
+				}),
+			refresh: refreshAccounts,
+			failureMessage: "The account could not be saved.",
 		});
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
+		expect(ok).toBe(false);
+		await view.settle();
+		// The rejection refreshes authoritative state first, and the saved
+		// rows are untouched.
+		expect(server.modelFetches().length).toBeGreaterThanOrEqual(2);
+		expect(view.result().serverDocument?.accounts).toHaveLength(2);
+		const items = useNotifications.getState().items;
 		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-
-		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-		);
-		const savePromise = rendered.result().save();
-		server.failStatusOnce(new Error("connection unavailable"));
-		server.failModelOnce(new Error("connection unavailable"));
-		const retryPromise = rendered.result().retry();
-		await waitFor(() =>
-			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
-				),
-			).not.toHaveLength(0),
-		);
-		release(undefined);
-		expect(await savePromise).toBe(false);
-		await retryPromise;
-		await rendered.settle();
-		expect(rendered.result().workspace).not.toBeNull();
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		rendered.unmount();
-	});
-
-	it("reconciles a successful save before a queued retry hydrates", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-
-		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-		);
-		const savePromise = rendered.result().save();
-		const retryPromise = rendered.result().retry();
-		await waitFor(() =>
-			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
-				),
-			).not.toHaveLength(0),
-		);
-		release(undefined);
-		expect(await savePromise).toBe(true);
-		await retryPromise;
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().plan?.transactions[0]?.amount).toBe(125);
-		expect(rendered.result().draftStale).toBe(false);
-		rendered.unmount();
-	});
-
-	it("preserves a queued save rejection through hydration", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [
-				{
-					severity: "error",
-					code: "invalid",
-					message: "The server rejected this transaction.",
-					path: [],
-				},
-			],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-
-		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-		);
-		const savePromise = rendered.result().save();
-		const retryPromise = rendered.result().retry();
-		await waitFor(() =>
-			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
-				),
-			).not.toHaveLength(0),
-		);
-		release(undefined);
-		expect(await savePromise).toBe(false);
-		await rendered.settle();
-		expect(rendered.result().error).not.toBeNull();
-		await retryPromise;
-		await rendered.settle();
-		expect(rendered.result().error).not.toBeNull();
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		rendered.unmount();
-	});
-
-	it("does not cancel or replay an unsettled save when refresh is requested", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => new Error("offline"));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-
-		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-		);
-		const savePromise = rendered.result().save();
-		let refreshed = false;
-		const refresh = rendered
-			.result()
-			.retry()
-			.then(() => {
-				refreshed = true;
-			});
-		await waitFor(() =>
-			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
-				),
-			).not.toHaveLength(0),
-		);
-		expect(refreshed).toBe(false);
-		expect(
-			server.calls.filter((call) =>
-				call.url.endsWith("/v1/recurrence-rules/salary"),
+			items.some(
+				(item) =>
+					item.kind === "error" && item.message.includes("Name is required."),
 			),
-		).toHaveLength(1);
-		release(undefined);
-		await savePromise;
-		await refresh;
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		expect(rendered.result().draftStale).toBe(false);
-		rendered.unmount();
+		).toBe(true);
+		expect(items.some((item) => item.kind === "success")).toBe(false);
+		view.unmount();
 	});
 
-	it("rejects draft disposal while a server save is active", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
+	it("a row save retired by a resource switch does not report success", async () => {
+		const server = stubTestServer();
+		const view = renderHook(() => useRemoteWorkspace());
+		await waitFor(() => expect(view.result().loading).toBe(false));
 		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
+			(method, path) => method === "POST" && path === "/v1/accounts",
 		);
-		const savePromise = rendered.result().save();
+		const saving = performSave({
+			call: () =>
+				createAccount({
+					name: "Travel savings",
+					kind: "cash",
+					enabled: true,
+					balance: 2500,
+					observedOn: "2026-02-15",
+				}),
+			refresh: refreshAccounts,
+			failureMessage: "The account could not be saved.",
+		});
 		await waitFor(() =>
 			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
+				server.calls.filter(
+					(call) => call.method === "POST" && call.url === "/v1/accounts",
 				),
 			).not.toHaveLength(0),
 		);
-		expect(rendered.result().discard()).toBe(false);
-		await rendered.settle();
-		expect(rendered.result().error).not.toBeNull();
+		suspendUserScope();
+		view.unmount();
 		release(undefined);
-		await savePromise;
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
-		rendered.unmount();
+		expect(await saving).toBe(false);
+		expect(getServerModel()).toBeUndefined();
+		expect(
+			useNotifications.getState().items.some((item) => item.kind === "success"),
+		).toBe(false);
 	});
 
-	it("lets Query prevent overlapping saves and edits", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => {
-			throw new ApiHttpError({ message: "stale", status: 412 });
-		});
+	it("creates rows when importing into an empty server", async () => {
+		const server = stubTestServer();
+		server.failModelOnce({
+			document: null,
+			issues: [],
+		} as unknown as FinancialModelResponse);
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
+		expect(rendered.result().serverDocument).toBeNull();
 		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
+			await rendered.result().importServerDocument(fixtureDocument()),
 		).toBe(true);
-
-		const release = server.holdWriteOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-		);
-		const firstSave = rendered.result().save();
-		await waitFor(() =>
-			expect(
-				server.calls.filter((call) =>
-					call.url.endsWith("/v1/recurrence-rules/salary"),
-				),
-			).toHaveLength(1),
-		);
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 150)),
-		).toBe(false);
-		expect(await rendered.result().save()).toBe(false);
-		release(undefined);
-		await firstSave;
 		await rendered.settle();
 		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 175)),
-		).toBe(true);
+			server.calls.filter(
+				(call) => call.method === "POST" && call.url === "/v1/accounts",
+			),
+		).not.toHaveLength(0);
+		expect(rendered.result().serverDocument).not.toBeNull();
 		rendered.unmount();
 	});
 
-	it("preserves a failed import hydration error after a conflict", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
+	it("surfaces a failed import without recording saved data", async () => {
 		const server = stubTestServer(() => {
 			throw new ApiHttpError({ message: "already exists", status: 409 });
 		});
@@ -1214,6 +796,7 @@ describe("remote workspace state", () => {
 			false,
 		);
 		await rendered.settle();
+		expect(rendered.result().serverDocument).toBeNull();
 		expect(rendered.result().error).not.toBeNull();
 		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
 			false,
@@ -1226,183 +809,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("exposes an in-memory draft when the server has no model", async () => {
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
-		expect(
-			first
-				.result()
-				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
-		).toBe(true);
-		first.unmount();
-
-		const emptyServer = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		emptyServer.failModelOnce({
-			document: null,
-			issues: [],
-		} as unknown as FinancialModelResponse);
-		const recovery = renderHook(() => useRemoteWorkspace());
-		await recovery.settle();
-		expect(recovery.result().workspace).toBeNull();
-		expect(recovery.result().recoveryDraft?.transactions[0]?.amount).toBe(125);
-		recovery.unmount();
-	});
-
-	it("keeps a clean in-memory draft usable and discardable", async () => {
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
-		expect(
-			first
-				.result()
-				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
-		).toBe(true);
-		first.unmount();
-
-		const rehydrated = renderHook(() => useRemoteWorkspace());
-		await rehydrated.settle();
-		expect(rehydrated.result().stale).toBe(false);
-		expect(rehydrated.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		expect(rehydrated.result().discard()).toBe(true);
-		await rehydrated.settle();
-		expect(rehydrated.result().workspace?.draft).toBeNull();
-		expect(useWorkspaceStore.getState().draft).toBeNull();
-		expect(useWorkspaceStore.getState().baseFingerprint).toBeNull();
-		rehydrated.unmount();
-	});
-
-	it("returns false from discard when there is no draft", async () => {
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		await rendered.settle();
-
-		expect(rendered.result().discard()).toBe(true);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(useWorkspaceStore.getState().draft).toBeNull();
-		rendered.unmount();
-	});
-
-	it("saves, re-fetches the authoritative model, and clears the local draft", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [
-				{
-					severity: "warning",
-					code: "reviewed-warning",
-					message: "Review the model warnings.",
-					path: [],
-				},
-			],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-
-		// Exercise reconciliation before the fetch promise returns, rather than rely on React's batched effects.
-		const stop = serverQueryClient()
-			.getQueryCache()
-			.subscribe(() => {
-				const model = getServerModel();
-				if (model) useWorkspaceStore.getState().reconcile(model);
-			});
-		expect(await rendered.result().save()).toBe(true);
-		stop();
-		await rendered.settle();
-		expect(
-			server.calls.filter((call) =>
-				call.url.startsWith("/v1/recurrence-rules/"),
-			),
-		).toHaveLength(1);
-		expect(server.modelFetches()).toHaveLength(2);
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(useWorkspaceStore.getState().draft).toBeNull();
-		rendered.unmount();
-	});
-
-	it("retains the draft when a row write is rejected without an error issue", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		const server = stubTestServer();
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		server.writeOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-			{
-				row: modelFixture().recurrenceRules[0]!,
-				revision: '"rejected"',
-				issues: [],
-				persisted: false,
-			},
-		);
-		expect(await rendered.result().save()).toBe(false);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		expect(server.modelFetches()).toHaveLength(1);
-		rendered.unmount();
-	});
-
-	it("clears a rejected write's temporary read-only guard after an authoritative reload", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		const server = stubTestServer();
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		server.writeOnce(
-			(_method, path) => path === "/v1/recurrence-rules/salary",
-			new ApiHttpError({ status: 403, message: "Read-only" }),
-		);
-		expect(await rendered.result().save()).toBe(false);
-		await rendered.settle();
-		expect(rendered.result().readOnly).toBe(true);
-		await rendered.result().retry();
-		await rendered.settle();
-		expect(rendered.result().readOnly).toBe(false);
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		rendered.unmount();
-	});
-
-	it("refuses a recovery import while the initial model query is pending", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
+	it("refuses an import while the initial model query is pending", async () => {
 		const server = stubTestServer();
 		let finish!: (value: Response) => void;
 		server.holdModel(
@@ -1428,646 +835,6 @@ describe("remote workspace state", () => {
 			),
 		);
 		await rendered.settle();
-		rendered.unmount();
-	});
-
-	it("does not announce discard when there is no draft", () => {
-		expect(useWorkspaceStore.getState().discard()).toBe(false);
-		expect(useNotifications.getState().items).toHaveLength(0);
-	});
-
-	it("applies transaction edits as rule updates", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-		).toBe(true);
-		expect(await rendered.result().save()).toBe(true);
-		expect(
-			server.calls.filter((call) =>
-				call.url.startsWith("/v1/recurrence-rules/"),
-			),
-		).toHaveLength(1);
-		rendered.unmount();
-	});
-
-	it("lets an editor add and save a planned purchase without rewriting synced accounts or postings", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		const model = modelFixture();
-		model.checkpoints[0]!.source = "simplefin";
-		const pending: BackendPosting = {
-			id: "01900000-0000-7000-8000-000000000001",
-			name: "Pending bank charge",
-			sourceAccountId: "cash",
-			destinations: null,
-			amount: {
-				resolver: "expression",
-				config: { expression: "25.15" },
-				inputs: {},
-			},
-			postedTime: 0,
-			transactionTime: 1769904300,
-			enabled: false,
-			source: "simplefin",
-			pending: true,
-		};
-		model.postings = [pending];
-		const server = stubTestServer(undefined, model);
-		server.setStatus({ readOnly: true });
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(rendered.result().plan?.readOnly).toBe(true);
-		server.setStatus({ readOnly: false });
-		await rendered.result().refreshStatus();
-		await rendered.settle();
-		const plan = rendered.result().plan!;
-		expect(rendered.result().readOnly).toBe(false);
-		expect(plan.readOnly).toBe(false);
-		expect(plan.accounts[0]?.readOnly).toBe(true);
-		expect(plan.accounts[1]?.readOnly).toBe(false);
-		expect(rendered.result().workspace?.draft).toBeNull();
-		const purchase = {
-			id: "01900000-0000-7000-8000-000000000002",
-			name: "New laptop",
-			amount: 1200,
-			fromId: "cash",
-			startDate: "2026-02-15",
-			enabled: true,
-			readOnly: false,
-		};
-
-		const accepted = rendered.result().updatePlan({
-			...plan,
-			plannedPurchases: [...plan.plannedPurchases, purchase],
-		});
-		await rendered.settle();
-		expect(rendered.result().error).toBeNull();
-		expect(accepted).toBe(true);
-		expect(rendered.result().workspace?.draft?.plannedPurchases).toContainEqual(
-			purchase,
-		);
-		server.setStatus({ readOnly: true });
-		await rendered.result().refreshStatus();
-		await rendered.settle();
-		expect(rendered.result().plan?.readOnly).toBe(true);
-		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(true);
-		expect(await rendered.result().save()).toBe(false);
-		expect(
-			server.calls.filter(
-				(call) => call.method === "POST" && call.url === "/v1/postings",
-			),
-		).toHaveLength(0);
-		server.setStatus({ readOnly: false });
-		await rendered.result().refreshStatus();
-		await rendered.settle();
-		expect(rendered.result().plan?.readOnly).toBe(false);
-		expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(false);
-		expect(rendered.result().workspace?.draft?.plannedPurchases).toContainEqual(
-			purchase,
-		);
-		expect(await rendered.result().save()).toBe(true);
-		await rendered.settle();
-
-		const postingCreates = server.calls.filter(
-			(call) => call.method === "POST" && call.url === "/v1/postings",
-		);
-		expect(postingCreates).toHaveLength(1);
-		expect(postingCreates[0]?.body).toMatchObject({
-			id: purchase.id,
-			sourceAccountId: "cash",
-			amount: {
-				resolver: "expression",
-				config: { expression: "1200" },
-				inputs: {},
-			},
-			purchase: { priority: 0 },
-		});
-		const otherWrites = server.calls.filter((call) =>
-			["/v1/accounts", "/v1/checkpoints"].some((prefix) =>
-				call.url.startsWith(prefix),
-			),
-		);
-		expect(otherWrites).toHaveLength(0);
-		expect(
-			server.calls.filter(
-				(call) =>
-					call.method === "PATCH" && call.url.startsWith("/v1/postings/"),
-			),
-		).toHaveLength(0);
-		expect(
-			server.calls.filter(
-				(call) =>
-					call.method === "DELETE" && call.url.startsWith("/v1/postings"),
-			),
-		).toHaveLength(0);
-		expect(rendered.result().serverDocument?.postings).toContainEqual(pending);
-		expect(rendered.result().serverDocument?.accounts).toEqual(model.accounts);
-		expect(rendered.result().serverDocument?.checkpoints).toEqual(
-			model.checkpoints,
-		);
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().plan?.plannedPurchases).toContainEqual(
-			expect.objectContaining({
-				id: purchase.id,
-				amount: purchase.amount,
-				fromId: purchase.fromId,
-			}),
-		);
-		expect(rendered.result().plan?.accounts[0]?.readOnly).toBe(true);
-		expect(rendered.result().error).toBeNull();
-		rendered.unmount();
-	});
-
-	it("saves immediately when an edit is staged through stageAndSave", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		const model = modelFixture();
-		const server = stubTestServer(undefined, model);
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const plan = rendered.result().plan!;
-		const purchase = {
-			id: "01900000-0000-7000-8000-000000000002",
-			name: "New laptop",
-			amount: 1200,
-			fromId: "cash",
-			startDate: "2026-02-15",
-			enabled: true,
-			readOnly: false,
-		};
-		expect(
-			stageAndSave({
-				...plan,
-				plannedPurchases: [...plan.plannedPurchases, purchase],
-			}),
-		).toBe(true);
-		await waitFor(() =>
-			expect(
-				server.calls.filter(
-					(call) => call.method === "POST" && call.url === "/v1/postings",
-				),
-			).toHaveLength(1),
-		);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().error).toBeNull();
-		expect(rendered.result().plan?.plannedPurchases).toContainEqual(purchase);
-		rendered.unmount();
-	});
-
-	it.each([
-		{ fromReadOnly: true, toReadOnly: false },
-		{ fromReadOnly: false, toReadOnly: true },
-	])(
-		"refreshes a stored draft's display locks on hydration from readOnly $fromReadOnly to $toReadOnly",
-		async ({ fromReadOnly, toReadOnly }) => {
-			vi.stubGlobal("localStorage", memoryStorage());
-			const model = modelFixture();
-			model.checkpoints[0]!.source = "simplefin";
-			const server = stubTestServer(undefined, model);
-			server.setStatus({ readOnly: fromReadOnly });
-			const rendered = renderHook(() => useRemoteWorkspace());
-			await rendered.settle();
-			expect(
-				rendered
-					.result()
-					.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-			).toBe(true);
-			await rendered.settle();
-			const baseFingerprint = rendered.result().workspace?.baseFingerprint;
-			server.setStatus({ readOnly: toReadOnly });
-
-			await rendered.result().retry();
-			await rendered.settle();
-			expect(rendered.result().plan?.readOnly).toBe(toReadOnly);
-			expect(rendered.result().plan?.accounts[0]?.readOnly).toBe(true);
-			expect(rendered.result().plan?.accounts[1]?.readOnly).toBe(toReadOnly);
-			expect(rendered.result().draftPresentation?.accounts.loan?.readOnly).toBe(
-				toReadOnly,
-			);
-			expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-				125,
-			);
-			expect(rendered.result().workspace?.baseFingerprint).toBe(
-				baseFingerprint,
-			);
-			expect(rendered.result().workspace?.draftStale).toBe(false);
-			expect(rendered.result().serverDocument).toEqual(model);
-			expect(
-				rendered
-					.result()
-					.updatePlan(withTransactionAmount(rendered.result().plan!, 130)),
-			).toBe(true);
-			expect(
-				server.calls.filter((call) =>
-					call.url.includes("/v1/recurrence-rules"),
-				),
-			).toHaveLength(0);
-			expect(
-				server.calls.filter(
-					(call) =>
-						call.url.startsWith("/v1/accounts") && call.method !== "GET",
-				),
-			).toHaveLength(0);
-			expect(
-				server.calls.filter(
-					(call) =>
-						call.url.startsWith("/v1/checkpoints") && call.method !== "GET",
-				),
-			).toHaveLength(0);
-			rendered.unmount();
-		},
-	);
-
-	it.each([
-		{ readOnly: true, writeBlocked: false },
-		{ readOnly: false, writeBlocked: true },
-	])(
-		"still blocks saves with synced accounts when server readOnly is $readOnly and writeBlocked is $writeBlocked",
-		async ({ readOnly, writeBlocked }) => {
-			vi.stubGlobal("localStorage", memoryStorage());
-			const model = modelFixture();
-			model.checkpoints[0]!.source = "simplefin";
-			const server = stubTestServer(undefined, model);
-			const rendered = renderHook(() => useRemoteWorkspace());
-			await rendered.settle();
-			expect(
-				rendered
-					.result()
-					.updatePlan(withTransactionAmount(rendered.result().plan!, 125)),
-			).toBe(true);
-			await rendered.settle();
-			serverQueryClient().setQueryData(userResourceKey("status"), {
-				readOnly: readOnly || writeBlocked,
-			});
-
-			expect(await rendered.result().save()).toBe(false);
-			await rendered.settle();
-			expect(rendered.result().error).toContain("The server is read-only.");
-			expect(rendered.result().workspace?.draft).not.toBeNull();
-			expect(
-				server.calls.filter((call) =>
-					call.url.includes("/v1/recurrence-rules"),
-				),
-			).toHaveLength(0);
-			expect(
-				server.calls.filter(
-					(call) =>
-						call.url.startsWith("/v1/accounts") && call.method !== "GET",
-				),
-			).toHaveLength(0);
-			expect(
-				server.calls.filter(
-					(call) =>
-						call.url.startsWith("/v1/checkpoints") && call.method !== "GET",
-				),
-			).toHaveLength(0);
-			rendered.unmount();
-		},
-	);
-
-	it("creates rows when importing into an empty server", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const empty = {
-			...modelFixture(),
-			accounts: [],
-			checkpoints: [],
-			postings: [],
-			recurrenceRules: [],
-			evaluations: {
-				financialIndependence: [],
-				netWorthThreshold: [],
-				accountBalance: [],
-				postingFulfillment: [],
-			},
-		} as FinancialModelDocument;
-		const server = stubTestServer(undefined, empty);
-		server.failModelOnce({
-			document: null,
-			issues: [],
-		} as unknown as FinancialModelResponse);
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
-			true,
-		);
-		expect(
-			server.calls.filter(
-				(call) => call.method === "POST" && call.url === "/v1/accounts",
-			),
-		).not.toHaveLength(0);
-		rendered.unmount();
-	});
-
-	it("retains the draft when a successful response contains validation errors", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [
-				{
-					severity: "error",
-					code: "invalid-posting",
-					message: "Posting salary is invalid.",
-					path: ["postings", 0],
-				},
-			],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		expect(
-			rendered
-				.result()
-				.updatePlan(
-					withAccountName(rendered.result().plan!, "Keep rejected draft"),
-				),
-		).toBe(true);
-
-		expect(await rendered.result().save()).toBe(false);
-		await rendered.settle();
-		expect(server.modelFetches()).toHaveLength(1);
-		expect(rendered.result().workspace?.draft?.accounts[0]?.name).toBe(
-			"Keep rejected draft",
-		);
-		expect(useWorkspaceStore.getState().draft?.accounts[0]?.name).toBe(
-			"Keep rejected draft",
-		);
-		expect(rendered.result().error).not.toBeNull();
-		rendered.unmount();
-	});
-
-	it("retains a draft on 401 and generic save failures", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		stubTestServer(() => {
-			throw new ApiHttpError({
-				message: "Authentication is required.",
-				status: 401,
-			});
-		});
-		const first = renderHook(() => useRemoteWorkspace());
-		await first.settle();
-		expect(
-			first
-				.result()
-				.updatePlan(withAccountName(first.result().plan!, "Keep me")),
-		).toBe(true);
-		expect(await first.result().save()).toBe(false);
-		await first.settle();
-		expect(first.result().workspace?.draft?.accounts[0]?.name).toBe("Keep me");
-		expect(first.result().authRequired).toBe(true);
-		expect(useWorkspaceStore.getState().draft?.accounts[0]?.name).toBe(
-			"Keep me",
-		);
-		first.unmount();
-
-		resetServerQueryCache();
-		stubTestServer(() => new Error("temporary failure"));
-		const second = renderHook(() => useRemoteWorkspace());
-		await second.settle();
-		expect(
-			second
-				.result()
-				.updatePlan(withAccountName(second.result().plan!, "Keep this too")),
-		).toBe(true);
-		expect(await second.result().save()).toBe(false);
-		await second.settle();
-		expect(second.result().workspace?.draft?.accounts[0]?.name).toBe(
-			"Keep this too",
-		);
-		expect(second.result().error).not.toBeNull();
-		second.unmount();
-
-		resetServerQueryCache();
-		stubTestServer(() => {
-			throw new ApiHttpError({
-				message: "The server is read-only.",
-				status: 403,
-			});
-		});
-		const third = renderHook(() => useRemoteWorkspace());
-		await third.settle();
-		expect(
-			third
-				.result()
-				.updatePlan(withAccountName(third.result().plan!, "Read-only draft")),
-		).toBe(true);
-		expect(await third.result().save()).toBe(false);
-		await third.settle();
-		expect(third.result().readOnly).toBe(true);
-		expect(third.result().workspace?.draft?.accounts[0]?.name).toBe(
-			"Read-only draft",
-		);
-		third.unmount();
-	});
-
-	it("rejects a lossy edit the server cannot represent", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const lossyPlan = {
-			...rendered.result().plan!,
-			assumptions: { inflation: 2, volatility: 0 },
-		};
-		expect(rendered.result().updatePlan(lossyPlan)).toBe(false);
-		await rendered.settle();
-		expect(rendered.result().error).not.toBeNull();
-		rendered.unmount();
-	});
-
-	it("rejects a new assumptions edit without mutating the workspace", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const plan = rendered.result().plan!;
-		const edited = { ...plan, assumptions: { inflation: 2, volatility: 0 } };
-
-		expect(rendered.result().updatePlan(edited)).toBe(false);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toBeNull();
-		expect(rendered.result().plan?.assumptions).toEqual({
-			inflation: 0,
-			volatility: 0,
-		});
-		expect(rendered.result().error).not.toBeNull();
-		expect(
-			server.calls.filter((call) => call.url.includes("/v1/recurrence-rules")),
-		).toHaveLength(0);
-		rendered.unmount();
-	});
-
-	// Adding an account is a first-class edit. It used to be rejected because
-	// the new account's presentation-only fields were reported as lost values.
-	it("accepts a new account and stages it as a draft", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const plan = rendered.result().plan!;
-		const edited = {
-			...plan,
-			accounts: [
-				...plan.accounts,
-				{
-					...plan.accounts[0]!,
-					id: "travel",
-					name: "Travel savings",
-					balance: 2500,
-				},
-			],
-		};
-
-		expect(rendered.result().updatePlan(edited)).toBe(true);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).not.toBeNull();
-		expect(
-			rendered.result().plan?.accounts.some((a) => a.id === "travel"),
-		).toBe(true);
-		expect(rendered.result().error).toBeNull();
-		rendered.unmount();
-	});
-
-	// A reserve evaluation is a backend account balance evaluation, so editing
-	// one into the plan is accepted and becomes a real draft.
-	it("accepts a new reserve evaluation and stages it as a draft", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const plan = rendered.result().plan!;
-		const edited = {
-			...plan,
-			evaluations: [
-				...plan.evaluations,
-				{
-					id: "reserve",
-					name: "Reserve",
-					kind: "reserve" as const,
-					target: 1000,
-					accountId: "cash",
-					enabled: true,
-				},
-			],
-		};
-
-		expect(rendered.result().updatePlan(edited)).toBe(true);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).not.toBeNull();
-		expect(
-			rendered
-				.result()
-				.plan?.evaluations.some((evaluation) => evaluation.id === "reserve"),
-		).toBe(true);
-		expect(rendered.result().error).toBeNull();
-		rendered.unmount();
-	});
-
-	it("allows a transaction amount edit represented by an expression posting", async () => {
-		const storage = memoryStorage();
-		vi.stubGlobal("localStorage", storage);
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const edited = withTransactionAmount(rendered.result().plan!, 125);
-
-		expect(rendered.result().updatePlan(edited)).toBe(true);
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft?.transactions[0]?.amount).toBe(
-			125,
-		);
-		expect(
-			deriveDraftDocument(
-				rendered.result().workspace?.draft ?? null,
-				rendered.result().serverDocument,
-				rendered.result().draftPresentation ??
-					rendered.result().savedPresentation,
-			)?.recurrenceRules[0]?.amount,
-		).toEqual({
-			resolver: "expression",
-			config: { expression: "125" },
-			inputs: {},
-		});
-		expect(rendered.result().error).toBeNull();
-
-		expect(await rendered.result().save()).toBe(true);
-		const ruleWrites = server.calls.filter((call) =>
-			call.url.startsWith("/v1/recurrence-rules/"),
-		);
-		expect(ruleWrites).toHaveLength(1);
-		expect(ruleWrites[0]?.body).toMatchObject({
-			amount: expect.objectContaining({
-				resolver: "expression",
-				config: expect.objectContaining({ expression: "125" }),
-			}),
-		});
-		rendered.unmount();
-	});
-
-	it("retains an in-memory draft when save finds conversion losses", async () => {
-		const server = stubTestServer(() => ({
-			document: modelFixture(),
-			issues: [],
-		}));
-		const rendered = renderHook(() => useRemoteWorkspace());
-		await rendered.settle();
-		const lossyPlan = {
-			...rendered.result().plan!,
-			assumptions: { inflation: 2, volatility: 0 },
-		};
-		// Bypass form validation to stage a draft the converter rejects,
-		// mirroring a draft that became lossy after the server model changed.
-		const model = getServerModel();
-		act(() => {
-			useWorkspaceStore.setState({
-				draft: lossyPlan,
-				baseline: model?.conversion?.plan ?? null,
-				draftPresentation:
-					rendered.result().savedPresentation ??
-					model?.conversion?.presentation ??
-					null,
-				baseFingerprint: model?.fingerprint ?? null,
-				baseRevision: model?.revision ?? null,
-				error: null,
-			});
-		});
-		await rendered.settle();
-		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
-		expect(await rendered.result().save()).toBe(false);
-		await rendered.settle();
-		expect(
-			server.calls.filter((call) => call.url.includes("/v1/recurrence-rules")),
-		).toHaveLength(0);
-		expect(rendered.result().workspace?.draft).toEqual(lossyPlan);
-		expect(rendered.result().error).not.toBeNull();
 		rendered.unmount();
 	});
 });
@@ -2133,7 +900,9 @@ describe("remote projection mapping and SSE", () => {
 		result.transactionEvents = [
 			{ ...result.transactionEvents![0]!, date: "2026-01-31" },
 		];
-		expect(projectionResultToLocal(result, document).transactions).toHaveLength(1);
+		expect(projectionResultToLocal(result, document).transactions).toHaveLength(
+			1,
+		);
 	});
 
 	it("accepts transaction events without account deltas", () => {
@@ -3075,7 +1844,6 @@ describe("remote projection mapping and SSE", () => {
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				resource: {
 					id: "users/other",
-					kind: "private",
 					permissions: ["user:read", "user:project"],
 				},
 				subject: "other",
@@ -3190,48 +1958,45 @@ describe("remote projection mapping and SSE", () => {
 	});
 });
 
-describe("in-memory draft scope", () => {
-	it("clears the in-memory draft when the active resource changes", async () => {
-		vi.stubGlobal("localStorage", memoryStorage());
-		const mount = async (id: string) => {
+describe("saved-state resource scope", () => {
+	it("isolates saved state per resource", async () => {
+		const mount = async (id: string, accountName: string) => {
 			acceptUserScope(
 				{
 					apiBaseUrl: canonicalApiBaseUrl(""),
 					resource: {
 						id,
-						kind: id === "users/sample" ? "sample" : "private",
 						permissions: ["user:read", "user:project", "user:write"],
 					},
-					subject: id === "users/sample" ? null : id,
+					subject: id === GUEST_USER_ID ? GUEST_USER_SUBJECT : id,
 				},
 				suspendUserScope(),
 			);
-			resetWorkspaceStore();
 			resetServerQueryCache();
-			stubTestServer();
+			const server = stubTestServer();
+			server.model.accounts[0]!.name = accountName;
 			const rendered = renderHook(() => useRemoteWorkspace());
-			await rendered.settle();
-			return rendered;
+			await waitFor(() => expect(rendered.result().loading).toBe(false));
+			return { rendered, scope: getUserScope() };
 		};
-		const first = await mount("users/a");
+		const first = await mount("users/a", "A cash");
+		expect(first.rendered.result().serverDocument?.accounts[0]?.name).toBe(
+			"A cash",
+		);
+		first.rendered.unmount();
+		const second = await mount("users/b", "B cash");
+		expect(second.rendered.result().serverDocument?.accounts[0]?.name).toBe(
+			"B cash",
+		);
 		expect(
-			first
-				.result()
-				.updatePlan(withTransactionAmount(first.result().plan!, 125)),
-		).toBe(true);
-		first.unmount();
-		const second = await mount("users/b");
-		expect(second.result().workspace?.draft).toBeNull();
-		expect(
-			second
-				.result()
-				.updatePlan(withTransactionAmount(second.result().plan!, 175)),
-		).toBe(true);
-		second.unmount();
-		const sample = await mount("users/sample");
-		expect(sample.result().workspace?.draft).toBeNull();
-		expect(sample.result().plan?.transactions[0]?.amount).toBe(100);
-		sample.unmount();
+			serverQueryClient().getQueryData(userResourceKey("model", first.scope)),
+		).toBeUndefined();
+		second.rendered.unmount();
+		const sample = await mount(GUEST_USER_ID, "Cash");
+		expect(sample.rendered.result().serverDocument?.accounts[0]?.name).toBe(
+			"Cash",
+		);
+		sample.rendered.unmount();
 	});
 
 	it("uses a stable semantic server fingerprint", () => {

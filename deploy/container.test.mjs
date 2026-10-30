@@ -20,6 +20,7 @@ set -eu
 test "$(id -u)" = 10001
 test -d "$HOME/.ssh"
 test "$(stat -c %a "$HOME/.ssh")" = 700
+test -x /app/refreshmodel
 mkdir -p /tmp/provider/.well-known
 cat > /tmp/provider/.well-known/openid-configuration <<'JSON'
 {"issuer":"http://127.0.0.1:18000","authorization_endpoint":"http://127.0.0.1:18000/authorize","token_endpoint":"http://127.0.0.1:18000/token","jwks_uri":"http://127.0.0.1:18000/jwks","introspection_endpoint":"http://127.0.0.1:18000/introspect","backchannel_logout_supported":true}
@@ -35,6 +36,7 @@ exec /app/server
     "--env", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID=fixture",
     "--env", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET=fixture-secret",
     "--env", "NET_WORTH_ESTIMATOR_PUBLIC_URL=http://localhost:8080",
+    "--env", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT=disposable-guest",
     "--env", "NET_WORTH_ESTIMATOR_PROXY_SECRET=0123456789abcdef0123456789abcdef",
     image, "/bin/sh", "-c", fixture,
   ]);

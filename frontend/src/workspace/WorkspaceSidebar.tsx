@@ -66,7 +66,7 @@ export function WorkspaceSidebar({
 	onClose: () => void;
 	pending?: boolean;
 }) {
-	// Plan display values subscribe here so navigation never waits on props.
+	// Saved data subscribes here so navigation never waits on props.
 	const status = useServerStatus().data;
 	return (
 		<>

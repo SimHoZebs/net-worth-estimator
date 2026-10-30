@@ -1,7 +1,6 @@
 import { Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
-import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { upcomingTransactions } from "../../domain/upcoming.ts";
 import {
@@ -16,16 +15,16 @@ import { Badge } from "../Badge.tsx";
 import { Modal } from "../Modal.tsx";
 
 export function SafeSpendingEvidence({
-	plan,
+	startDate,
 	projection,
 	onClose,
 }: {
-	plan: Plan;
+	startDate: string;
 	projection: Projection;
 	onClose: () => void;
 }) {
 	const { end, events } = upcomingTransactions({
-		startDate: plan.startDate,
+		startDate,
 		projection,
 	});
 	const [order, setOrder] = useState<TransactionOrder>(
@@ -44,7 +43,7 @@ export function SafeSpendingEvidence({
 	return (
 		<Modal
 			title="The next 30 days"
-			eyebrow={`${dateLabel(plan.startDate, true)} to ${dateLabel(end, true)}`}
+			eyebrow={`${dateLabel(startDate, true)} to ${dateLabel(end, true)}`}
 			onClose={onClose}
 			wide
 		>

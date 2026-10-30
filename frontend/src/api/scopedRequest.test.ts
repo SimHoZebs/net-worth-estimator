@@ -24,7 +24,6 @@ function owner(id = A, baseUrl = "") {
 			apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 			resource: {
 				id,
-				kind: "private",
 				permissions: ["user:read", "user:project", "user:write"],
 			},
 			subject: id,

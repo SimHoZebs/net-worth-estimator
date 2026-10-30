@@ -78,22 +78,30 @@ export function appJsonStorage<T>() {
 
 /**
  * One-time upgrade path for browser records written before the user
- * cutover. Current keys use `:user:` plus `users/*` ids. On a primary miss
- * the `:account:` plus `accounts/*` generation is tried first, then the
+ * cutover. Current keys use `:user:` plus `users/*` ids with no kind
+ * segment. On a primary miss the previous `:user:` plus `private:` ids are
+ * tried first, then the `:account:` plus `accounts/*` generation, then the
  * `:resource:` plus `plans/*` generation; the first hit is copied forward
- * and deleted. Nothing writes legacy keys.
+ * and deleted. Nothing writes legacy keys, and nothing reads a foreign
+ * user's data: every candidate key embeds the verified scope.
  */
 function legacyKeysFor(name: string, scope: UserScope): string[] {
 	const primary = userStorageKey(name, scope);
-	if (!primary) return [];
+	if (!primary || !scope.resource) return [];
+	const encoded = encodeURIComponent(scope.resource.id);
+	const privateKind = primary.endsWith(`:${encoded}`)
+		? `${primary.slice(0, -encoded.length)}private:${encoded}`
+		: null;
 	const accountGeneration = primary
 		.replace(":user:", ":account:")
 		.replaceAll("users%2F", "accounts%2F");
 	const resourceGeneration = primary
 		.replace(":user:", ":resource:")
 		.replaceAll("users%2F", "plans%2F");
-	const keys = [accountGeneration, resourceGeneration];
-	return keys.filter((key) => key !== primary);
+	const keys = [privateKind, accountGeneration, resourceGeneration].filter(
+		(key): key is string => typeof key === "string" && key !== primary,
+	);
+	return keys;
 }
 
 /** Financial preferences bind to one verified user, including memory fallbacks. */

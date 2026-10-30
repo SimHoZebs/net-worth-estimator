@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Account, Evaluation, Transaction } from "../domain/model.ts";
 import {
-	discardHash,
 	editorHash,
 	evidenceHash,
 	findAccount,
@@ -66,7 +65,7 @@ function evaluation(id: string): Evaluation {
 const investTransaction = transaction("invest");
 const goalEvaluation = evaluation("goal-1");
 
-const plan = {
+const model = {
 	accounts: [
 		account("checking", "Everyday checking"),
 		account("savings", "Investment portfolio"),
@@ -225,13 +224,6 @@ describe("parseHash", () => {
 		});
 	});
 
-	test("discard parses on any page", () => {
-		expect(parseHash("#sources/discard")).toEqual({
-			page: "sources",
-			overlay: { type: "discard" },
-		});
-	});
-
 	test("malformed overlays are invalid rather than silently dropped", () => {
 		expect(parseHash("#accounts/a/b/c")?.overlay).toEqual({
 			type: "invalid",
@@ -256,19 +248,55 @@ describe("slugifyAccount and findAccount", () => {
 	});
 
 	test("exact ids win over slugs and archived accounts hide", () => {
-		expect(findAccount(plan, "checking")?.id).toBe("checking");
-		expect(findAccount(plan, "everyday-checking")?.id).toBe("checking");
-		expect(findAccount(plan, "Everyday-Checking")?.id).toBe("checking");
-		expect(findAccount(plan, "old")).toBeUndefined();
-		expect(findAccount(plan, "nope")).toBeUndefined();
+		expect(findAccount(model, "checking")?.id).toBe("checking");
+		expect(findAccount(model, "everyday-checking")?.id).toBe("checking");
+		expect(findAccount(model, "Everyday-Checking")?.id).toBe("checking");
+		expect(findAccount(model, "old")).toBeUndefined();
+		expect(findAccount(model, "nope")).toBeUndefined();
 	});
 });
 
 describe("resolveOverlayRoute", () => {
+	test("account routes resolve without transaction or evaluation queries", () => {
+		expect(
+			resolveOverlayRoute(parseHash("#accounts/checking"), {
+				accounts: model.accounts,
+				transactions: null,
+				evaluations: null,
+			}),
+		).toMatchObject({
+			state: "ready",
+			overlay: {
+				kind: "evidence",
+				target: { kind: "account", id: "checking" },
+			},
+		});
+	});
+
+	test("transaction routes wait for their rows, not evaluation rows", () => {
+		const route = parseHash("#transactions/invest/edit");
+		expect(
+			resolveOverlayRoute(route, {
+				accounts: [],
+				transactions: null,
+				evaluations: [],
+			}),
+		).toEqual({ state: "pending" });
+		expect(
+			resolveOverlayRoute(route, {
+				accounts: null,
+				transactions: model.transactions,
+				evaluations: null,
+			}),
+		).toMatchObject({ state: "ready", overlay: { kind: "editor" } });
+	});
+
 	test("no overlay resolves to none, even without a plan", () => {
 		expect(
 			resolveOverlayRoute({ page: "accounts", overlay: null }, null),
-		).toEqual({ state: "none" });
+		).toEqual({
+			state: "none",
+		});
 	});
 
 	test("overlays wait for the plan instead of failing", () => {
@@ -289,7 +317,9 @@ describe("resolveOverlayRoute", () => {
 				{ page: "outlook", overlay: { type: "invalid" } },
 				null,
 			),
-		).toEqual({ state: "unknown" });
+		).toEqual({
+			state: "unknown",
+		});
 	});
 
 	test("account evidence resolves by id or slug", () => {
@@ -299,7 +329,7 @@ describe("resolveOverlayRoute", () => {
 					page: "accounts",
 					overlay: { type: "account", key: "everyday-checking" },
 				},
-				plan,
+				model,
 			),
 		).toEqual({
 			state: "ready",
@@ -311,13 +341,13 @@ describe("resolveOverlayRoute", () => {
 		expect(
 			resolveOverlayRoute(
 				{ page: "accounts", overlay: { type: "account", key: "nope" } },
-				plan,
+				model,
 			),
 		).toEqual({ state: "unknown" });
 		expect(
 			resolveOverlayRoute(
 				{ page: "accounts", overlay: { type: "account", key: "old" } },
-				plan,
+				model,
 			),
 		).toEqual({ state: "unknown" });
 	});
@@ -328,7 +358,7 @@ describe("resolveOverlayRoute", () => {
 		expect(
 			resolveOverlayRoute(
 				{ page: "accounts", overlay: { type: "account", key: "new" } },
-				plan,
+				model,
 			),
 		).toEqual({ state: "unknown" });
 	});
@@ -340,7 +370,7 @@ describe("resolveOverlayRoute", () => {
 					page: "transactions",
 					overlay: { type: "transactionEdit", key: "invest" },
 				},
-				plan,
+				model,
 			),
 		).toEqual({
 			state: "ready",
@@ -355,7 +385,7 @@ describe("resolveOverlayRoute", () => {
 					page: "transactions",
 					overlay: { type: "transactionEdit", key: "missing" },
 				},
-				plan,
+				model,
 			),
 		).toEqual({ state: "unknown" });
 		expect(
@@ -364,7 +394,7 @@ describe("resolveOverlayRoute", () => {
 					page: "evaluations",
 					overlay: { type: "evaluationEdit", key: "new" },
 				},
-				plan,
+				model,
 			),
 		).toEqual({
 			state: "ready",
@@ -377,7 +407,7 @@ describe("resolveOverlayRoute", () => {
 
 	test("outlook single segments resolve account evidence", () => {
 		expect(
-			resolveOverlayRoute(parseHash("#outlook/everyday-checking"), plan),
+			resolveOverlayRoute(parseHash("#outlook/everyday-checking"), model),
 		).toEqual({
 			state: "ready",
 			overlay: {
@@ -385,7 +415,7 @@ describe("resolveOverlayRoute", () => {
 				target: { kind: "account", id: "checking" },
 			},
 		});
-		expect(resolveOverlayRoute(parseHash("#outlook/nope"), plan)).toEqual({
+		expect(resolveOverlayRoute(parseHash("#outlook/nope"), model)).toEqual({
 			state: "unknown",
 		});
 	});
@@ -397,7 +427,7 @@ describe("resolveOverlayRoute", () => {
 					page: "outlook",
 					overlay: { type: "safeSpendingDetail", tab: "cycle" },
 				},
-				plan,
+				model,
 			),
 		).toEqual({
 			state: "ready",
@@ -412,7 +442,7 @@ describe("resolveOverlayRoute", () => {
 					editTransaction: "invest",
 				},
 			},
-			plan,
+			model,
 		);
 		expect(stacked).toEqual({
 			state: "ready",
@@ -432,7 +462,7 @@ describe("resolveOverlayRoute", () => {
 						editTransaction: "missing",
 					},
 				},
-				plan,
+				model,
 			),
 		).toEqual({ state: "unknown" });
 	});
@@ -445,15 +475,15 @@ describe("hash builders round-trip through the parser", () => {
 
 	test("account evidence prefers slugs and escapes reserved words", () => {
 		expect(
-			evidenceHash("accounts", { kind: "account", id: "checking" }, plan),
+			evidenceHash("accounts", { kind: "account", id: "checking" }, model),
 		).toBe("#accounts/everyday-checking");
 		expect(
-			evidenceHash("outlook", { kind: "account", id: "checking" }, plan),
+			evidenceHash("outlook", { kind: "account", id: "checking" }, model),
 		).toBe("#outlook/account/everyday-checking");
 		// The archived account named "New" slugifies to a reserved word, so
 		// the explicit id form keeps the link unambiguous.
 		const reserved = {
-			...plan,
+			...model,
 			accounts: [account("abc", "New")],
 		};
 		expect(
@@ -461,7 +491,7 @@ describe("hash builders round-trip through the parser", () => {
 		).toBe("#accounts/account/abc");
 		expect(
 			parseHash(
-				evidenceHash("accounts", { kind: "account", id: "checking" }, plan),
+				evidenceHash("accounts", { kind: "account", id: "checking" }, model),
 			),
 		).toEqual({
 			page: "accounts",
@@ -508,7 +538,10 @@ describe("hash builders round-trip through the parser", () => {
 		expect(
 			resolveOverlayRoute(
 				parseHash(editorHash("accounts", { kind: "account", item: reserved })),
-				{ ...plan, accounts: [reserved] },
+				{
+					...model,
+					accounts: [reserved],
+				},
 			),
 		).toEqual({
 			state: "ready",
@@ -519,7 +552,7 @@ describe("hash builders round-trip through the parser", () => {
 		});
 	});
 
-	test("safe spending detail and discard round-trip", () => {
+	test("safe spending detail round-trips", () => {
 		expect(
 			parseHash(safeSpendingDetailHash("outlook", "last-cycle", "invest")),
 		).toEqual({
@@ -536,7 +569,6 @@ describe("hash builders round-trip through the parser", () => {
 		expect(safeSpendingDetailHash("outlook", "cycle", "invest")).toBe(
 			"#outlook/safe-spending-detail/cycle/edit-transaction/invest",
 		);
-		expect(discardHash("sources")).toBe("#sources/discard");
 		expect(
 			parseHash(safeSpendingDetailHash("outlook", "cycle", "invest")),
 		).toEqual({
@@ -551,7 +583,7 @@ describe("hash builders round-trip through the parser", () => {
 
 	test("names with special characters survive the round trip", () => {
 		const special = {
-			...plan,
+			...model,
 			accounts: [account("a1", "Café & Sons!")],
 		};
 		const hash = evidenceHash(

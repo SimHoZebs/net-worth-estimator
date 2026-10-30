@@ -23,7 +23,12 @@ export function validatePublish(values, positionals = []) {
   }
   if (!values["source-user"])
     throw new Error("--source-user is required. Select the reviewed financial scope explicitly.");
-  if (values.user) throw new Error("publish-sample always targets users/sample; omit --user");
+  // The guest is a provisioned ordinary user, not a special sample row.
+  // refreshmodel rejects legacy 'sample' destinations; pass the guest scope.
+  if (!values.user || !/^users\/[0-9a-f]{64}$/.test(values.user))
+    throw new Error(
+      "publish-sample requires --user users/<guest-hash> for the provisioned guest scope. Legacy users/sample destinations are retired.",
+    );
 }
 
 export async function run(values, positionals) {
@@ -39,7 +44,7 @@ export async function run(values, positionals) {
       slot,
       source,
       sourceUser: values["source-user"],
-      user: undefined,
+      user: values.user,
       publishing: true,
     });
   });
@@ -50,7 +55,7 @@ export async function main(args) {
   const { values, positionals } = parsePublishArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev publish-sample --source-user SOURCE_ID [--from approved-app.db] [--slot NAME]",
+      "Usage: scripts/dev publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME]",
     );
     return;
   }

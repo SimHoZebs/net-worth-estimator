@@ -7,7 +7,13 @@ import { Notice } from "../components/Notice.tsx";
 import { TextButton } from "../components/Button.tsx";
 import { usePinnedEvaluations } from "../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useUserPlan, useUserReadOnly } from "../state/useUserScope.ts";
+import {
+	useSavedAccounts,
+	useSavedEvaluations,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "../state/savedRows.ts";
+import { useUserReadOnly } from "../state/useUserScope.ts";
 import {
 	useCheckpoints,
 	useServerStatus,
@@ -60,23 +66,27 @@ function OutlookContent({
 	onSafeSpendingTab,
 }: OutlookProps) {
 	// Every data input subscribes where the query is declared; only UI
-	// callbacks arrive as props.
+	// callbacks arrive as props. Saved rows arrive through the row hooks;
+	// null means not loaded yet, [] means loaded blank.
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
-	const plan = useUserPlan();
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
+	const evaluations = useSavedEvaluations();
 	const {
 		ids: pinnedIds,
 		toggle: togglePin,
 		loading: pinsLoading,
 	} = usePinnedEvaluations();
 	const projection = useRemoteProjection({
-		enabled: (plan?.accounts.length ?? 0) > 0,
+		enabled: (accounts?.length ?? 0) > 0,
 		// The chart no longer offers horizon or range switches, so Outlook
 		// pins the horizon instead of inheriting possibly stale persisted
 		// preferences. The stochastic range only feeds pinned threshold
 		// cards, so it is requested only while one is pinned.
 		years: 20,
 		ranges:
-			plan?.evaluations.some((evaluation) =>
+			evaluations?.some((evaluation) =>
 				(pinnedIds ?? []).includes(evaluation.id),
 			) ?? false,
 	});
@@ -90,9 +100,9 @@ function OutlookContent({
 	const pending =
 		projection.status === "pending" ||
 		(projection.isPlaceholderData && projection.loading);
-	if (!plan) return null;
-	if (plan.accounts.length === 0) {
-		const readOnly = plan.readOnly || status?.readOnly || writeBlocked;
+	if (!accounts || !transactions || !startDate) return null;
+	if (accounts.length === 0) {
+		const readOnly = writeBlocked;
 		return (
 			<EmptyState
 				icon={Wallet}
@@ -125,7 +135,9 @@ function OutlookContent({
 				pending={pending}
 			/>
 			<PinnedEvaluations
-				plan={plan}
+				accounts={accounts}
+				transactions={transactions}
+				startDate={startDate}
 				projection={base}
 				range={projection.range}
 				pinnedIds={pinnedIds}
@@ -138,7 +150,10 @@ function OutlookContent({
 			{(base || pending) && (
 				<div className="mt-6 max-sm:mt-5" aria-busy={pending}>
 					<SafeSpendingPreview
-						plan={plan}
+						accounts={accounts}
+						transactions={transactions}
+						startDate={startDate}
+						readOnly={writeBlocked}
 						checkpoints={checkpoints}
 						projection={base}
 						pending={pending}

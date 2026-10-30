@@ -18,7 +18,7 @@ func TestReceiptRoutesUseExistingIdentityAndWriteBoundary(t *testing.T) {
 	defer server.Close()
 	client := testClient(t)
 	owner := authorization.ResourceFor(p.server.URL, p.subject).ID
-	guest := authorization.ResourceFor(p.server.URL, "").ID
+	guest := authorization.ResourceFor(p.server.URL, s.config.GuestSubject).ID
 	check := func(method, path, resource string, want int) {
 		t.Helper()
 		rq, _ := http.NewRequest(method, server.URL+path, nil)

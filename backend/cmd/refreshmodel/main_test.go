@@ -11,66 +11,60 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
-func TestFailedSampleCopyIsAtomic(t *testing.T) {
-	for _, existing := range []bool{false, true} {
-		t.Run(fmt.Sprintf("existing=%t", existing), func(t *testing.T) {
-			dir := t.TempDir()
-			source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
-			seed(t, source)
-			seed(t, target)
-			if existing {
-				if err := refresh(target, source, "owner", "", true); err != nil {
-					t.Fatal(err)
-				}
-			}
-			before := sampleRows(t, target)
-			// A malformed snapshot passes shape checks but fails the destination's
-			// deferred foreign-key constraint at commit, after every row copy.
-			db, err := sqlite.OpenDatabase(source)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
-				INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance)
-				VALUES ('other', 1, 0, '2026-01-01', 'missing-account', 100)`)
-			db.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			sourceBefore, err := os.ReadFile(source)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := refresh(target, source, "other", "", true); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
-				t.Fatalf("expected foreign-key copy failure, got %v", err)
-			}
-			sourceAfter, err := os.ReadFile(source)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !bytes.Equal(sourceBefore, sourceAfter) {
-				t.Fatal("source snapshot changed")
-			}
-			db, err = sqlite.OpenDatabase(target)
-			if err != nil {
-				t.Fatal(err)
-			}
-			hasSample, err := db.HasUser("sample")
-			db.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if hasSample != existing {
-				t.Fatalf("HasUser(sample)=%t, want %t", hasSample, existing)
-			}
-			if after := sampleRows(t, target); after != before {
-				t.Fatal("failed copy changed sample financial rows")
-			}
-		})
+func TestFailedFinancialOnlyCopyIsAtomic(t *testing.T) {
+	dir := t.TempDir()
+	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
+	seed(t, source)
+	seed(t, target)
+	if err := refresh(target, source, "other", "owner", true); err != nil {
+		t.Fatal(err)
+	}
+	before := userRows(t, target, "owner")
+	// A malformed snapshot passes shape checks but fails the destination's
+	// deferred foreign-key constraint at commit, after every row copy.
+	db, err := sqlite.OpenDatabase(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
+		INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance)
+		VALUES ('other', 1, 0, '2026-01-01', 'missing-account', 100)`)
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceBefore, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := refresh(target, source, "other", "owner", true); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
+		t.Fatalf("expected foreign-key copy failure, got %v", err)
+	}
+	sourceAfter, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(sourceBefore, sourceAfter) {
+		t.Fatal("source snapshot changed")
+	}
+	db, err = sqlite.OpenDatabase(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasDest, err := db.HasUser("owner")
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasDest {
+		t.Fatal("destination user lost")
+	}
+	if after := userRows(t, target, "owner"); after != before {
+		t.Fatal("failed copy changed destination financial rows")
 	}
 }
 
-func sampleRows(t *testing.T, path string) string {
+func userRows(t *testing.T, path, userID string) string {
 	t.Helper()
 	db, err := sqlite.OpenDatabase(path)
 	if err != nil {
@@ -79,7 +73,7 @@ func sampleRows(t *testing.T, path string) string {
 	defer db.Close()
 	var result strings.Builder
 	for _, table := range financialTables {
-		rows, err := db.SQL().Query("SELECT * FROM " + quote(table) + " WHERE user_id='sample' ORDER BY rowid")
+		rows, err := db.SQL().Query("SELECT * FROM "+quote(table)+" WHERE user_id=? ORDER BY rowid", userID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +187,7 @@ func TestRefreshPreservesOtherUsersAndIdentity(t *testing.T) {
 	}
 }
 
-func TestSamplePublicationStripsPrivateHistory(t *testing.T) {
+func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
@@ -211,31 +205,58 @@ func TestSamplePublicationStripsPrivateHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := refresh(target, source, "owner", "", true); err != nil {
+	if err := refresh(target, source, "owner", "owner", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='sample'"); got != "owner" {
+	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='owner'"); got != "owner" {
 		t.Fatal(got)
 	}
 	for _, table := range []string{"account_links", "projection_artifacts", "posting_sync_keys", "posting_id_migrations"} {
-		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE user_id='sample'"); got != "0" {
+		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE user_id='owner'"); got != "0" {
 			t.Fatal(table, got)
 		}
 	}
-	if got := query(t, target, "SELECT source_path FROM model_metadata WHERE user_id='sample'"); got != "sample" {
+	if got := query(t, target, "SELECT source_path FROM model_metadata WHERE user_id='owner'"); got != "sample" {
 		t.Fatal(got)
 	}
-	if got := query(t, target, "SELECT last_sync_at FROM sync_state WHERE user_id='sample'"); got != "" {
+	if got := query(t, target, "SELECT last_sync_at FROM sync_state WHERE user_id='owner'"); got != "" {
 		t.Fatal(got)
 	}
-	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE user_id='sample'"); got != "" {
-		t.Fatalf("sample copied the Bridge secret: %q", got)
+	if got := query(t, target, "SELECT access_url FROM sync_credentials WHERE user_id='owner'"); got != "" {
+		t.Fatalf("financial-only copied the Bridge secret: %q", got)
 	}
-	if got := query(t, target, "SELECT cards_json FROM sync_credentials WHERE user_id='sample'"); got != `["prime_card"]` {
-		t.Fatalf("sample dropped card selection: %q", got)
+	if got := query(t, target, "SELECT cards_json FROM sync_credentials WHERE user_id='owner'"); got != `["prime_card"]` {
+		t.Fatalf("financial-only dropped card selection: %q", got)
 	}
 	if got := query(t, target, "SELECT data FROM identity_grants"); got != "sealed-credentials" {
 		t.Fatal(got)
+	}
+}
+
+func TestLegacySampleSourceRemainsRecoverable(t *testing.T) {
+	dir := t.TempDir()
+	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
+	seed(t, source)
+	seed(t, target)
+	db, err := sqlite.OpenDatabase(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.EnsureUser("sample", "sample", "sample"); err != nil {
+		db.Close()
+		t.Fatal(err)
+	}
+	_, err = db.SQL().Exec(`INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('sample','checking',0,'legacy sample','cash',1) ON CONFLICT(user_id,id) DO UPDATE SET name='legacy sample';
+		UPDATE model_metadata SET document_present=1, source_path='legacy' WHERE user_id='sample'`)
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := refresh(target, source, "sample", "owner", false); err != nil {
+		t.Fatal(err)
+	}
+	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='owner'"); got != "legacy sample" {
+		t.Fatalf("legacy sample source not recoverable: %q", got)
 	}
 }
 
@@ -246,15 +267,18 @@ func TestRefreshFailsClosedAndRollsBack(t *testing.T) {
 	seed(t, target)
 	for _, args := range []struct {
 		source, sourceUser, user string
-		sample                   bool
+		financialOnly            bool
 	}{
 		{target, "owner", "owner", false},
 		{source, "missing", "owner", false},
 		{source, "owner", "missing", false},
+		{source, "owner", "", false},
 		{source, "owner", "sample", false},
-		{source, "owner", "owner", true},
+		{source, "owner", "fixture", false},
+		{source, "owner", "sample", true},
+		{source, "sample", "owner", false},
 	} {
-		if err := refresh(target, args.source, args.sourceUser, args.user, args.sample); err == nil {
+		if err := refresh(target, args.source, args.sourceUser, args.user, args.financialOnly); err == nil {
 			t.Fatal("unsafe operation accepted", args)
 		}
 	}

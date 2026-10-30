@@ -19,8 +19,10 @@ import (
 //   - app_accounts rows copy verbatim to users (same id "user:<hash>").
 //   - private plan "plans/<hash>" owned by "user:<hash>" becomes user_id
 //     "user:<hash>" (owner_account_id).
-//   - "plans/sample" becomes user_id SampleUserID;
-//     "plans/fixture" becomes user_id FixtureUserID when present.
+//   - "plans/sample" becomes the legacy historical user row "sample";
+//     "plans/fixture" becomes the legacy historical user row "fixture" when
+//     present. These raw IDs stay recoverable offline and are never created
+//     by current provisioning.
 //   - group tables rename account columns to user columns (values already match).
 //   - checkpoints.account_id -> model_account_id,
 //     posting_sync_keys.account_id -> bridge_account_id,
@@ -139,9 +141,9 @@ func migratePlansToUsersTx(tx *sql.Tx) (bool, error) {
 			}
 			planToUser[p.id] = p.owner.String
 		case "sample":
-			planToUser["plans/sample"] = SampleUserID
+			planToUser["plans/sample"] = legacySampleUserID
 		case "fixture":
-			planToUser["plans/fixture"] = FixtureUserID
+			planToUser["plans/fixture"] = legacyFixtureUserID
 		default:
 			rows.Close()
 			return false, fmt.Errorf("unknown plan kind %s: %w", p.kind, ErrLegacyDatabase)
@@ -189,12 +191,12 @@ func migratePlansToUsersTx(tx *sql.Tx) (bool, error) {
 		return false, err
 	}
 	if _, ok := planToUser["plans/sample"]; ok {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO users(id, issuer, subject) VALUES (?, ?, ?)`, SampleUserID, SampleUserID, SampleUserID); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO users(id, issuer, subject) VALUES (?, ?, ?)`, legacySampleUserID, legacySampleUserID, legacySampleUserID); err != nil {
 			return false, err
 		}
 	}
 	if _, ok := planToUser["plans/fixture"]; ok {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO users(id, issuer, subject) VALUES (?, ?, ?)`, FixtureUserID, FixtureUserID, FixtureUserID); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO users(id, issuer, subject) VALUES (?, ?, ?)`, legacyFixtureUserID, legacyFixtureUserID, legacyFixtureUserID); err != nil {
 			return false, err
 		}
 	}
@@ -232,6 +234,14 @@ func migratePlansToUsersTx(tx *sql.Tx) (bool, error) {
 }
 
 const legacyPlansSchemaVersion = "shared-plans-v1"
+
+// legacySampleUserID and legacyFixtureUserID are private historical row IDs
+// retained only for the one-time plans-to-users migration. Current code must
+// not provision or reference them through an exported API.
+const (
+	legacySampleUserID  = "sample"
+	legacyFixtureUserID = "fixture"
+)
 
 func migrationTableExists(tx *sql.Tx, name string) bool {
 	var count int
@@ -304,9 +314,9 @@ func migrateInlinePlansReceipts(tx *sql.Tx) error {
 		var userID string
 		switch id.plan {
 		case "plans/sample":
-			userID = SampleUserID
+			userID = legacySampleUserID
 		case "plans/fixture":
-			userID = FixtureUserID
+			userID = legacyFixtureUserID
 		default:
 			var owner sql.NullString
 			if err := tx.QueryRow(`SELECT owner_account_id FROM plans WHERE id = ?`, id.plan).Scan(&owner); err != nil || !owner.Valid {

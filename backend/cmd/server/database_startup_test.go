@@ -59,6 +59,7 @@ func TestServerRequiresDeploymentDatabaseWithoutCreatingFiles(t *testing.T) {
 				"NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID=startup-test",
 				"NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET=startup-test-secret",
 				"NET_WORTH_ESTIMATOR_PUBLIC_URL=http://localhost:18882",
+				"NET_WORTH_ESTIMATOR_GUEST_SUBJECT=11111111-1111-1111-1111-111111111111",
 			)
 			output, err := command.CombinedOutput()
 			if err == nil || !strings.Contains(string(output), "open store:") {

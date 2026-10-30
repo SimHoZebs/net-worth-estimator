@@ -8,7 +8,7 @@ import {
 } from "../../../domain/cardCycle.ts";
 import { shiftDate } from "../../../domain/format.ts";
 import { closedCardBalances } from "../../../domain/closedCardBalances.ts";
-import type { Plan } from "../../../domain/model.ts";
+import type { Account, Transaction } from "../../../domain/model.ts";
 import type { Projection } from "../../../domain/result.ts";
 import {
 	sortTransactionsByDate,
@@ -21,7 +21,9 @@ import type {
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function useCardCycleActivity({
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	checkpoints,
 	projection,
 	cards,
@@ -30,7 +32,9 @@ export function useCardCycleActivity({
 	displayToday,
 	transactionOrder,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	checkpoints: BackendCheckpoint[];
 	projection: Projection | null;
 	cards: { id: string; name: string }[];
@@ -51,9 +55,11 @@ export function useCardCycleActivity({
 		const perAccount = !projection
 			? []
 			: trackedIds.map((accountId) => {
-					const transactions = accountTransactions({
+					const activity = accountTransactions({
 						accountId,
-						plan,
+						accounts,
+						transactions,
+						startDate,
 						projection,
 					});
 					return {
@@ -61,17 +67,17 @@ export function useCardCycleActivity({
 						name:
 							cards.find((card) => card.id === accountId)?.name ?? accountId,
 						derived: cycleSpentSoFar({
-							transactions,
+							transactions: activity,
 							cycleStart: cycle.cycleStart,
 							todayIso: displayToday,
 						}),
 						inCycle: cycleOutflowTransactions({
-							transactions,
+							transactions: activity,
 							cycleStart: cycle.cycleStart,
 							todayIso: displayToday,
 						}),
 						lastCycle: cycleOutflowTransactions({
-							transactions,
+							transactions: activity,
 							cycleStart: closed.cycleStart,
 							todayIso: closed.cycleEnd,
 						}),
@@ -94,7 +100,9 @@ export function useCardCycleActivity({
 			perAccount,
 		};
 	}, [
-		plan,
+		accounts,
+		transactions,
+		startDate,
 		checkpoints,
 		projection,
 		cards,

@@ -2,8 +2,8 @@ import { shiftDate } from "./format.ts";
 import {
 	isHistoricalTransaction,
 	isPendingTransaction,
+	type Account,
 	type Transaction,
-	type Plan,
 } from "./model.ts";
 import type { Projection } from "./result.ts";
 import { horizonDate } from "./result.ts";
@@ -70,29 +70,34 @@ export function externalCounterpartyName(direction: "in" | "out"): string {
 
 export function accountTransactions({
 	accountId,
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
 }: {
 	accountId: string;
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	projection: Projection;
 }): AccountTransaction[] {
 	if (
-		!plan.accounts.some(
-			(account) => account.id === accountId && !account.archived,
-		)
+		!accounts.some((account) => account.id === accountId && !account.archived)
 	)
 		return [];
-	const names = new Map(
-		plan.accounts.map((account) => [account.id, account.name]),
-	);
+	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	const connection = (transaction: ConnectionTransaction) => {
 		const deltas =
 			transaction.accountDeltas.length > 0
 				? transaction.accountDeltas
 				: [
 						...(transaction.fromId
-							? [{ accountId: transaction.fromId, delta: -transaction.requested }]
+							? [
+									{
+										accountId: transaction.fromId,
+										delta: -transaction.requested,
+									},
+								]
 							: []),
 						...(transaction.toId
 							? [{ accountId: transaction.toId, delta: transaction.realized }]
@@ -130,10 +135,10 @@ export function accountTransactions({
 	};
 	// Pending charges are bank evidence even after the latest checkpoint.
 	// They stay disabled for projections, so no projected event supplies them.
-	const recorded: AccountTransaction[] = plan.transactions
+	const recorded: AccountTransaction[] = transactions
 		.filter(
 			(transaction) =>
-				(isHistoricalTransaction(transaction, plan.startDate) ||
+				(isHistoricalTransaction(transaction, startDate) ||
 					isPendingTransaction(transaction)) &&
 				(transaction.fromId === accountId || transaction.toId === accountId),
 		)
@@ -159,12 +164,12 @@ export function accountTransactions({
 			void: transaction.void === true,
 		}));
 	const pendingIds = new Set(
-		plan.transactions
+		transactions
 			.filter(isPendingTransaction)
 			.map((transaction) => transaction.id),
 	);
 	const voidIds = new Set(
-		plan.transactions
+		transactions
 			.filter((transaction) => transaction.void === true)
 			.map((transaction) => transaction.id),
 	);
@@ -172,13 +177,14 @@ export function accountTransactions({
 	const projected: AccountTransaction[] = projection.transactions
 		.filter(
 			(transaction) =>
-				(transaction.date > plan.startDate ||
-					(transaction.date === plan.startDate && !startDateHasCheckpoint)) &&
+				(transaction.date > startDate ||
+					(transaction.date === startDate && !startDateHasCheckpoint)) &&
 				(transaction.accountDeltas.length > 0
 					? transaction.accountDeltas.some(
 							(delta) => delta.accountId === accountId,
 						)
-					: transaction.fromId === accountId || transaction.toId === accountId) &&
+					: transaction.fromId === accountId ||
+						transaction.toId === accountId) &&
 				transaction.requested > 0,
 		)
 		.map((transaction, index) => {
@@ -217,7 +223,7 @@ export function accountTransactions({
 }
 
 /**
- * Single rule-to-transaction adapter for plan-level detail views.
+ * Single rule-to-transaction adapter for rule detail views.
  * TransactionsPanel and RecurringRules list rules, not occurrences, but the
  * detail modal is the shared occurrence view (TransactionDetail). This
  * synthesizes the representative occurrence so every entry point renders
@@ -225,19 +231,18 @@ export function accountTransactions({
  */
 export function ruleTransaction({
 	transaction,
-	plan,
+	accounts,
+	startDate,
 	resolved,
 }: {
 	transaction: Transaction;
-	plan: Plan;
+	accounts: Account[];
+	startDate: string;
 	resolved?: { amount: number; requested: number; date: string };
 }): AccountTransaction {
-	const names = new Map(
-		plan.accounts.map((account) => [account.id, account.name]),
-	);
+	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	const pending = isPendingTransaction(transaction);
-	const historical =
-		isHistoricalTransaction(transaction, plan.startDate) || pending;
+	const historical = isHistoricalTransaction(transaction, startDate) || pending;
 	const direction = transaction.fromId ? ("out" as const) : ("in" as const);
 	const category =
 		transaction.fromId && transaction.toId

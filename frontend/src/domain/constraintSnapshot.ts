@@ -3,7 +3,7 @@ import {
 	type AccountTransaction,
 } from "./accountActivity.ts";
 import { dateLabel, money, monthDay } from "./format.ts";
-import type { Account, Transaction, Plan } from "./model.ts";
+import type { Account, Transaction } from "./model.ts";
 import type { TransactionResult, Projection } from "./result.ts";
 
 export interface LedgerRow {
@@ -46,17 +46,21 @@ function byTime(
 // dialog shows, with the failing transaction riding inline. Selection, cap,
 // and order live here so the component stays a thin table.
 export function failureLedger({
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
 	failure,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	projection: Projection;
 	failure: TransactionResult;
 }): FailureLedger | null {
 	const accountId = failure.fromId ?? failure.toId;
 	if (!accountId) return null;
-	const account = plan.accounts.find((item) => item.id === accountId);
+	const account = accounts.find((item) => item.id === accountId);
 	const accountName = account?.name ?? "Unknown account";
 	const accountIcon = account
 		? { id: account.id, kind: account.kind, color: account.color }
@@ -64,7 +68,9 @@ export function failureLedger({
 	const month = dateLabel(`${monthKey(failure.date)}-01`);
 	const candidates = accountTransactions({
 		accountId,
-		plan,
+		accounts,
+		transactions,
+		startDate,
 		projection,
 	}).filter(
 		(transaction) =>
@@ -89,15 +95,13 @@ export function failureLedger({
 					)
 					.slice(0, PEER_CAP)
 			: peers;
-	const transactions = new Map(
-		plan.transactions.map((item) => [item.id, item]),
-	);
+	const transactionsById = new Map(transactions.map((item) => [item.id, item]));
 	const toRow = (
 		transaction: AccountTransaction,
 		isFailing: boolean,
 	): LedgerRow => ({
 		transaction,
-		planTransaction: transactions.get(transaction.transactionId) ?? null,
+		planTransaction: transactionsById.get(transaction.transactionId) ?? null,
 		failing: isFailing,
 	});
 	const rows = [

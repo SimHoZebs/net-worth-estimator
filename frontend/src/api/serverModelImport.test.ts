@@ -56,7 +56,6 @@ function setup(
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: `users/${"a".repeat(64)}`,
-				kind: "private",
 				permissions: ["user:read", "user:write", "user:project"],
 			},
 			subject: "account-a",
@@ -79,7 +78,6 @@ function setup(
 		preconditions: {
 			hasWorkspace: true,
 			readOnly: false,
-			hasDraft: false,
 			loading: false,
 			...preconditions,
 		},
@@ -133,9 +131,6 @@ describe("server model replacement", () => {
 	it.each([
 		{
 			preconditions: { readOnly: true },
-		},
-		{
-			preconditions: { hasDraft: true },
 		},
 		{
 			preconditions: { loading: true },
@@ -282,7 +277,6 @@ describe("initial server model recovery", () => {
 			const { run, recover, fetcher, reload } = setup({
 				hasWorkspace: false,
 				readOnly: true,
-				hasDraft: true,
 				loading: true,
 			});
 			recover.mockResolvedValue(activated);

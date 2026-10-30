@@ -4,7 +4,7 @@ import { Button } from "@/components/Button.tsx";
 import { EmptyState } from "@/components/EmptyState.tsx";
 import { ErrorNotice } from "@/components/ErrorNotice.tsx";
 import { ProjectionUpdating } from "@/components/ProjectionUpdating.tsx";
-import type { Evaluation, Plan } from "@/domain/model.ts";
+import type { Account, Evaluation, Transaction } from "@/domain/model.ts";
 import type { Projection, RangeResult } from "@/domain/result.ts";
 import { deleteEvaluation } from "@/api/generated/endpoints.ts";
 import {
@@ -16,7 +16,11 @@ import { performSave } from "@/state/workspaceWrites.ts";
 import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
 
-import { useUserPlan } from "@/state/useUserScope.ts";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "@/state/savedRows.ts";
 import {
 	refreshEvaluations,
 	useAccountBalances,
@@ -30,9 +34,11 @@ export function EvaluationsPage({
 }: {
 	onEdit: (evaluation: Evaluation | null) => void;
 }) {
-	// Plan, actions, and projection subscribe where the query is declared;
+	// Saved rows and projection subscribe where the query is declared;
 	// only UI callbacks arrive as props.
-	const plan = useUserPlan();
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
 	const summary = useEvaluationSummary().data;
 	const savedEvaluations = useMemo(
 		() => summaryEvaluations(summary),
@@ -50,12 +56,14 @@ export function EvaluationsPage({
 		ranges: savedEvaluations.length > 0 || financialIndependenceEnabled,
 	});
 	const base = projection.base instanceof Error ? null : projection.base;
-	if (!plan) return null;
+	if (!accounts || !transactions || !startDate) return null;
 	return (
 		<>
 			{projection.loading && base && <ProjectionUpdating />}
 			<EvaluationsContent
-				plan={plan}
+				accounts={accounts}
+				transactions={transactions}
+				startDate={startDate}
 				projection={base}
 				range={projection.range}
 				onEdit={onEdit}
@@ -65,12 +73,16 @@ export function EvaluationsPage({
 }
 
 function EvaluationsContent({
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
 	range,
 	onEdit,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	projection: Projection | null;
 	range: RangeResult | null;
 	onEdit: (evaluation: Evaluation | null) => void;
@@ -166,7 +178,9 @@ function EvaluationsContent({
 					<OtherEvaluationCard
 						key={item.id}
 						item={item}
-						plan={plan}
+						accounts={accounts}
+						transactions={transactions}
+						startDate={startDate}
 						projection={projection}
 						range={range}
 						pin={{

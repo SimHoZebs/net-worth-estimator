@@ -3,12 +3,16 @@ import {
 	type AccountTransaction,
 } from "./accountActivity.ts";
 import { isoDate, utcDate } from "./format.ts";
-import { isPendingTransaction, type Plan } from "./model.ts";
+import {
+	isPendingTransaction,
+	type Account,
+	type Transaction,
+} from "./model.ts";
 import type { TransactionResult } from "./result.ts";
 
 // Server ownership: every amount summed here originates server-side.
 // `transactions` are adapted `ProjectionResult.transactionEvents` (requested and
-// realized per event); `spendingBalance` reads saved Plan balances surfaced
+// realized per event); `spendingBalance` reads saved account balances surfaced
 // as `ProjectionAccountSummary.startingBalance`. The Gap check
 // (`requested - realized`) is the same gap the posting-fulfillment Goal
 // check aggregates. Income source selection lives in safeSpendingIncome.ts.
@@ -44,8 +48,8 @@ export function nextMonthRange(todayIso: string): {
 	return { start: isoDate(start), end: isoDate(end) };
 }
 
-export function checkingAccountId(plan: Plan): string | null {
-	const visible = plan.accounts.filter((account) => !account.archived);
+export function checkingAccountId(accounts: Account[]): string | null {
+	const visible = accounts.filter((account) => !account.archived);
 	const byId = visible.find((account) => account.id === "checking");
 	if (byId) return byId.id;
 	const cash = visible.find(
@@ -60,9 +64,12 @@ export function checkingAccountId(plan: Plan): string | null {
  * Available-balance total: the summed balance of the accounts the user
  * counts as spendable. An empty set holds nothing.
  */
-export function spendingBalance(plan: Plan, accountIds: string[]): number {
+export function spendingBalance(
+	accounts: Account[],
+	accountIds: string[],
+): number {
 	const selected = new Set(accountIds);
-	return plan.accounts
+	return accounts
 		.filter((account) => selected.has(account.id) && !account.archived)
 		.reduce((sum, account) => sum + account.balance, 0);
 }
@@ -201,7 +208,9 @@ export function filterTransactionsById(
 ): TransactionResult[] {
 	if (!transactionIds) return transactions;
 	const selected = new Set(transactionIds);
-	return transactions.filter((transaction) => selected.has(transaction.transactionId));
+	return transactions.filter((transaction) =>
+		selected.has(transaction.transactionId),
+	);
 }
 
 /**
@@ -260,7 +269,8 @@ export function checkingShortfall({
 	let total = 0;
 	let firstDate: string | null = null;
 	for (const transaction of transactions) {
-		if (transaction.fromId === null || !sources.has(transaction.fromId)) continue;
+		if (transaction.fromId === null || !sources.has(transaction.fromId))
+			continue;
 		if (transaction.date <= start || transaction.date > end) continue;
 		const gap = transaction.fulfillment?.unfulfilledAmount ?? 0;
 		if (gap <= 0) continue;
@@ -291,7 +301,8 @@ export function groupMandatorySpending({
 	const sources = new Set(checkingIds);
 	const groups = new Map<string, MandatorySpendingGroup>();
 	for (const transaction of transactions) {
-		if (transaction.fromId === null || !sources.has(transaction.fromId)) continue;
+		if (transaction.fromId === null || !sources.has(transaction.fromId))
+			continue;
 		if (transaction.requested <= 0) continue;
 		if (transaction.date < start || transaction.date > end) continue;
 		const key = transaction.transactionId;
@@ -329,27 +340,28 @@ export function mandatoryTransactions({
 	checkingIds,
 	start,
 	end,
-	plan,
+	accounts,
+	savedTransactions,
 }: {
 	transactions: TransactionResult[];
 	checkingIds: string[];
 	start: string;
 	end: string;
-	plan: Plan;
+	accounts: Account[];
+	savedTransactions: Transaction[];
 }): AccountTransaction[] {
 	const sources = new Set(checkingIds);
-	const names = new Map(
-		plan.accounts.map((account) => [account.id, account.name]),
-	);
+	const names = new Map(accounts.map((account) => [account.id, account.name]));
 	const rows: AccountTransaction[] = [];
 	const pendingIds = new Set(
-		plan.transactions
+		savedTransactions
 			.filter(isPendingTransaction)
 			.map((transaction) => transaction.id),
 	);
 	let index = 0;
 	for (const transaction of transactions) {
-		if (transaction.fromId === null || !sources.has(transaction.fromId)) continue;
+		if (transaction.fromId === null || !sources.has(transaction.fromId))
+			continue;
 		if (transaction.requested <= 0) continue;
 		if (transaction.date < start || transaction.date > end) continue;
 		const counterparty = transaction.toId

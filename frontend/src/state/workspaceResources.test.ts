@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
-import { financialModelFixture } from "../mocks/financialModel.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
 import {
 	checkpointsOptions,
@@ -11,13 +10,11 @@ import {
 	userResourceKey,
 } from "./workspaceResources.ts";
 import { serverQueryClient, resetServerQueryCache } from "./serverQuery.ts";
-import { resetWorkspaceStore, useWorkspaceStore } from "./workspaceStore.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 
 beforeEach(() => {
 	acceptTestResource();
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
 });
@@ -66,24 +63,16 @@ describe("direct Query ownership", () => {
 			),
 		).toHaveLength(1);
 		expect(getServerModel()?.revision).toBe("current");
-		expect(useWorkspaceStore.getState()).not.toHaveProperty("engine");
-		expect(useWorkspaceStore.getState()).not.toHaveProperty("loading");
-		expect(useWorkspaceStore.getState()).not.toHaveProperty("serverDocument");
+		expect(getServerModel()).not.toHaveProperty("conversion");
+		expect(typeof getServerModel()?.fingerprint).toBe("string");
 	});
-	it("removes server data independently of the local draft", () => {
+	it("removes server data from the Query cache", () => {
 		setServerModelFixture();
-		useWorkspaceStore.setState({
-			draft: financialModelFixture,
-			baseline: financialModelFixture,
-			baseRevision: "base",
-		});
 		serverQueryClient().removeQueries({
 			queryKey: userResourceKey("model"),
 			exact: true,
 		});
 		expect(getServerModel()).toBeUndefined();
-		expect(useWorkspaceStore.getState().draft).toBe(financialModelFixture);
-		expect(useWorkspaceStore.getState().baseRevision).toBe("base");
 	});
 	it("lists checkpoints through the narrow query with account filters", async () => {
 		const server = stubTestServer();

@@ -32,8 +32,11 @@ import {
 } from "@/domain/safeSpending.ts";
 import { safeSpendingFromEnvelope } from "@/domain/safeSpendingEval.ts";
 import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
-import type { Plan } from "@/domain/model.ts";
-import { visibleAccounts } from "@/domain/model.ts";
+import {
+	visibleAccounts,
+	type Account,
+	type Transaction,
+} from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
 import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx";
@@ -58,7 +61,10 @@ import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/sa
 const EMPTY_TRANSACTIONS: Projection["transactions"] = [];
 
 export function SafeSpendingPreview({
-	plan,
+	accounts,
+	transactions,
+	startDate,
+	readOnly,
 	checkpoints,
 	projection,
 	pending = false,
@@ -67,7 +73,10 @@ export function SafeSpendingPreview({
 	onTabChange,
 	envelope = null,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
+	readOnly: boolean;
 	checkpoints: BackendCheckpoint[];
 	projection: Projection | null;
 	pending?: boolean;
@@ -82,13 +91,11 @@ export function SafeSpendingPreview({
 	// progressive enhancement. Client math stays instant either way.
 	const serverView = safeSpendingFromEnvelope(envelope);
 	void serverView;
-	const transactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
+	const projectionTransactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
 	const cards = useMemo(
 		() =>
-			visibleAccounts(plan.accounts).filter(
-				(account) => account.kind === "debt",
-			),
-		[plan.accounts],
+			visibleAccounts(accounts).filter((account) => account.kind === "debt"),
+		[accounts],
 	);
 	const settingsState = useSafeSpendingSettings();
 	const { updateSettings, ...settings } = settingsState;
@@ -97,14 +104,14 @@ export function SafeSpendingPreview({
 	);
 
 	// Safe spending display follows the real calendar day so due dates read
-	// correctly, while the projection math stays on plan.startDate (the
+	// correctly, while the projection math stays on startDate (the
 	// latest balance checkpoint). Never before the projection start.
 	const [displayToday] = useState(() => {
 		const today = todayIso();
-		const start = plan.startDate.slice(0, 10);
+		const start = startDate.slice(0, 10);
 		return today >= start ? today : start;
 	});
-	const staleData = displayToday > plan.startDate.slice(0, 10);
+	const staleData = displayToday > startDate.slice(0, 10);
 
 	const trackedIds = useMemo(() => {
 		// Spending cards are debt accounts by convention (`*_card`); loans
@@ -122,7 +129,9 @@ export function SafeSpendingPreview({
 
 	const { cycle, closedCycle, perAccount, chargeCycles } = useCardCycleActivity(
 		{
-			plan,
+			accounts,
+			transactions,
+			startDate,
 			checkpoints,
 			projection,
 			cards,
@@ -135,32 +144,31 @@ export function SafeSpendingPreview({
 
 	const spendableAccounts = useMemo(
 		() =>
-			visibleAccounts(plan.accounts).filter(
-				(account) => account.kind !== "debt",
-			),
-		[plan.accounts],
+			visibleAccounts(accounts).filter((account) => account.kind !== "debt"),
+		[accounts],
 	);
 	const spendingIds = useMemo(() => {
 		const knownIds = spendableAccounts.map((account) => account.id);
-		const fallbackId = checkingAccountId(plan);
+		const fallbackId = checkingAccountId(accounts);
 		const fallback =
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
-	}, [settings.spendingAccountIds, spendableAccounts, plan]);
+	}, [settings.spendingAccountIds, spendableAccounts, accounts]);
 	const incomeIds = useMemo(() => {
 		const knownIds = spendableAccounts.map((account) => account.id);
-		const fallbackId = checkingAccountId(plan);
+		const fallbackId = checkingAccountId(accounts);
 		const fallback =
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.incomeAccountIds, knownIds, fallback);
-	}, [settings.incomeAccountIds, spendableAccounts, plan]);
+	}, [settings.incomeAccountIds, spendableAccounts, accounts]);
 	const spendingDerived = useMemo(
-		() => spendingBalance(plan, spendingIds),
-		[plan, spendingIds],
+		() => spendingBalance(accounts, spendingIds),
+		[accounts, spendingIds],
 	);
 	const obligationTransactions = useMemo(
-		() => filterTransactionsById(transactions, settings.transactionIds),
-		[transactions, settings.transactionIds],
+		() =>
+			filterTransactionsById(projectionTransactions, settings.transactionIds),
+		[projectionTransactions, settings.transactionIds],
 	);
 	const remainingDerived = useMemo(() => {
 		if (!spendingIds.length)
@@ -183,13 +191,21 @@ export function SafeSpendingPreview({
 	const income = useMemo(
 		() =>
 			safeSpendingIncome({
-				plan,
-				transactions,
+				accounts,
+				rules: transactions,
+				transactions: projectionTransactions,
 				incomeAccountIds: incomeIds,
 				incomeRuleIds: settings.incomeRuleIds,
 				todayIso: displayToday,
 			}),
-		[plan, transactions, incomeIds, settings.incomeRuleIds, displayToday],
+		[
+			accounts,
+			transactions,
+			projectionTransactions,
+			incomeIds,
+			settings.incomeRuleIds,
+			displayToday,
+		],
 	);
 	const paycheckDerived = income.paycheck;
 	// Past cash outflow stays filter-proof: bill toggles shape the bills
@@ -198,13 +214,13 @@ export function SafeSpendingPreview({
 		() =>
 			spendingIds.length
 				? realizedCheckingOutflows({
-						transactions,
+						transactions: projectionTransactions,
 						checkingIds: spendingIds,
-						after: plan.startDate,
+						after: startDate,
 						through: displayToday,
 					})
 				: 0,
-		[transactions, spendingIds, plan.startDate, displayToday],
+		[projectionTransactions, spendingIds, startDate, displayToday],
 	);
 	const shortWindow = useMemo(
 		() =>
@@ -216,12 +232,17 @@ export function SafeSpendingPreview({
 						through: remainingDerived.monthEnd,
 					})
 				: { total: 0, firstDate: null as string | null },
-		[obligationTransactions, spendingIds, displayToday, remainingDerived.monthEnd],
+		[
+			obligationTransactions,
+			spendingIds,
+			displayToday,
+			remainingDerived.monthEnd,
+		],
 	);
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
-		return plan.transactions
+		return transactions
 			.filter(
 				(transaction) =>
 					transaction.fromId !== null &&
@@ -234,7 +255,7 @@ export function SafeSpendingPreview({
 				amount: transaction.amount,
 				frequency: transaction.frequency,
 			}));
-	}, [plan.transactions, spendingIds]);
+	}, [transactions, spendingIds]);
 
 	const trackedBillIds = useMemo(() => {
 		const knownIds = billCandidates.map((bill) => bill.id);
@@ -249,8 +270,10 @@ export function SafeSpendingPreview({
 	// obligationTransactions and is unchanged.
 	const billBaseTransactions = useMemo(() => {
 		const bills = new Set(trackedBillIds);
-		return transactions.filter((transaction) => bills.has(transaction.transactionId));
-	}, [transactions, trackedBillIds]);
+		return projectionTransactions.filter((transaction) =>
+			bills.has(transaction.transactionId),
+		);
+	}, [projectionTransactions, trackedBillIds]);
 	const billTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		return sortTransactionsByDate({
@@ -259,7 +282,8 @@ export function SafeSpendingPreview({
 				checkingIds: spendingIds,
 				start: billsStart,
 				end: cycle.cycleEnd,
-				plan,
+				accounts,
+				savedTransactions: transactions,
 			}),
 			getDate: (transaction) => transaction.date,
 			getId: (transaction) => transaction.id,
@@ -268,7 +292,8 @@ export function SafeSpendingPreview({
 	}, [
 		billBaseTransactions,
 		spendingIds,
-		plan,
+		accounts,
+		transactions,
 		billsStart,
 		cycle.cycleEnd,
 		transactionOrder,
@@ -285,20 +310,20 @@ export function SafeSpendingPreview({
 	const directBaseTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		const bills = new Set(trackedBillIds);
-		const rules = new Set(
-			plan.transactions
+		const ruleIds = new Set(
+			transactions
 				.filter((transaction) => transaction.frequency !== "once")
 				.map((transaction) => transaction.id),
 		);
 		const sources = new Set(spendingIds);
-		return transactions.filter(
+		return projectionTransactions.filter(
 			(transaction) =>
 				transaction.fromId !== null &&
 				sources.has(transaction.fromId) &&
 				!bills.has(transaction.transactionId) &&
-				!rules.has(transaction.transactionId),
+				!ruleIds.has(transaction.transactionId),
 		);
-	}, [transactions, spendingIds, trackedBillIds, plan.transactions]);
+	}, [projectionTransactions, spendingIds, trackedBillIds, transactions]);
 
 	const directSpentSinceStart = useMemo(
 		() =>
@@ -306,11 +331,11 @@ export function SafeSpendingPreview({
 				? realizedCheckingOutflows({
 						transactions: directBaseTransactions,
 						checkingIds: spendingIds,
-						after: plan.startDate,
+						after: startDate,
 						through: displayToday,
 					})
 				: 0,
-		[directBaseTransactions, spendingIds, plan.startDate, displayToday],
+		[directBaseTransactions, spendingIds, startDate, displayToday],
 	);
 
 	const directTransactions = useMemo(() => {
@@ -321,7 +346,8 @@ export function SafeSpendingPreview({
 				checkingIds: spendingIds,
 				start: cycle.cycleStart,
 				end: cycle.cycleEnd,
-				plan,
+				accounts,
+				savedTransactions: transactions,
 			}),
 			getDate: (transaction) => transaction.date,
 			getId: (transaction) => transaction.id,
@@ -330,7 +356,8 @@ export function SafeSpendingPreview({
 	}, [
 		directBaseTransactions,
 		spendingIds,
-		plan,
+		accounts,
+		transactions,
 		cycle.cycleStart,
 		cycle.cycleEnd,
 		transactionOrder,
@@ -404,7 +431,7 @@ export function SafeSpendingPreview({
 	const dailyTheoretical = theoretical / fullDaysLeft;
 
 	const spendingAccounts = spendingIds
-		.map((id) => plan.accounts.find((account) => account.id === id))
+		.map((id) => accounts.find((account) => account.id === id))
 		.filter((account) => account !== undefined);
 	const observedOn = spendingAccounts
 		.map((account) => account.observedOn)
@@ -471,7 +498,7 @@ export function SafeSpendingPreview({
 
 	const toggleSpendingAccount = (accountId: string) => {
 		const known = new Set(spendableAccounts.map((account) => account.id));
-		const fallbackId = checkingAccountId(plan);
+		const fallbackId = checkingAccountId(accounts);
 		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
 		const explicit = settings.spendingAccountIds ?? fallback;
 		const next = explicit.includes(accountId)
@@ -482,7 +509,7 @@ export function SafeSpendingPreview({
 
 	const toggleIncomeAccount = (accountId: string) => {
 		const known = new Set(spendableAccounts.map((account) => account.id));
-		const fallbackId = checkingAccountId(plan);
+		const fallbackId = checkingAccountId(accounts);
 		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
 		const explicit = settings.incomeAccountIds ?? fallback;
 		const next = explicit.includes(accountId)
@@ -498,7 +525,7 @@ export function SafeSpendingPreview({
 		transactions: billTransactions,
 	};
 
-	// Plan-derived frame (header, cycle dates) renders regardless; only the
+	// Saved-data frame (header, cycle dates) renders regardless; only the
 	// computed safe spending body skeletonizes while the projection is absent.
 	if (pending)
 		return (
@@ -516,7 +543,7 @@ export function SafeSpendingPreview({
 				<p className="m-0 text-xs">
 					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 					{fullDaysLeft === 1 ? "day" : "days"} left
-					{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
+					{staleData ? ` · balances ${dateLabel(startDate, true)}` : ""}
 				</p>
 				<div aria-busy="true">
 					<Skeleton className="h-32 w-full" />
@@ -546,7 +573,7 @@ export function SafeSpendingPreview({
 			<p className="m-0 text-xs">
 				{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 				{fullDaysLeft === 1 ? "day" : "days"} left
-				{staleData ? ` · balances ${dateLabel(plan.startDate, true)}` : ""}
+				{staleData ? ` · balances ${dateLabel(startDate, true)}` : ""}
 			</p>
 			<div className="flex flex-col">
 				<span className="text-xs text-muted">{labels.allowance}</span>
@@ -630,14 +657,16 @@ export function SafeSpendingPreview({
 										directSpentSinceStart,
 										bills: remainingObligations,
 										cushion,
-										since: plan.startDate.slice(0, 10),
+										since: startDate.slice(0, 10),
 										monthEnd: remainingDerived.monthEnd,
 										short: shortWindow.total,
 										firstShort: shortWindow.firstDate,
 									}}
 									paycheck={paycheckDetails}
 									section={billsSection}
-									plan={plan}
+									accounts={accounts}
+									transactions={transactions}
+									readOnly={readOnly}
 									transactionOrder={transactionOrder}
 									onTransactionOrderChange={setTransactionOrder}
 								/>
@@ -650,7 +679,9 @@ export function SafeSpendingPreview({
 							<SafeSpendingCyclePanel
 								key={detail}
 								cycle={tabChargeCycles[detail]}
-								plan={plan}
+								accounts={accounts}
+								transactions={transactions}
+								readOnly={readOnly}
 								transactionOrder={transactionOrder}
 								onTransactionOrderChange={setTransactionOrder}
 							/>
@@ -677,7 +708,7 @@ export function SafeSpendingPreview({
 							}}
 							billCandidates={billCandidates}
 							trackedBillIds={trackedBillIds}
-							accounts={plan.accounts}
+							accounts={accounts}
 							onToggleBill={toggleBill}
 							onToggleAccount={toggleAccount}
 							onToggleSpendingAccount={toggleSpendingAccount}

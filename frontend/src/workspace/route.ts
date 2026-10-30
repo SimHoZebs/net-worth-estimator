@@ -32,7 +32,6 @@ export type OverlayRoute =
 			tab: SafeSpendingDetailTab;
 			editTransaction?: string;
 	  }
-	| { type: "discard" }
 	// Well-formed page, unparseable overlay segments. Resolves to unknown so
 	// the URL normalizes back to the page instead of sticking.
 	| { type: "invalid" };
@@ -42,12 +41,11 @@ export interface WorkspaceRoute {
 	overlay: OverlayRoute | null;
 }
 
-// Only the id and name lookups below touch the plan, so tests and resolvers
-// depend on this narrow view rather than the full document shape.
-export type AccountLike = {
-	accounts: Account[];
-	transactions: Transaction[];
-	evaluations: Evaluation[];
+// Overlay resolution needs only the saved rows used by its lookups.
+export type OverlayRows = {
+	accounts: Account[] | null;
+	transactions: Transaction[] | null;
+	evaluations: Evaluation[] | null;
 };
 
 export type ResolvedOverlay =
@@ -58,8 +56,7 @@ export type ResolvedOverlay =
 			tab: SafeSpendingDetailTab;
 			edit: EditorTarget | null;
 	  }
-	| { kind: "group"; id: string }
-	| { kind: "discard" };
+	| { kind: "group"; id: string };
 
 export type OverlayResolution =
 	| { state: "none" }
@@ -72,7 +69,6 @@ export type OverlayResolution =
 const RESERVED_SLUGS = new Set([
 	"new",
 	"edit",
-	"discard",
 	"position",
 	"shortfall",
 	"safe-spending",
@@ -99,15 +95,15 @@ export function slugifyAccount(name: string): string {
 /** Exact id first, then a human-readable slug of the name. Archived accounts
  *  stay hidden: linking one resolves to unknown and the URL normalizes. */
 export function findAccount(
-	plan: AccountLike,
+	rows: Pick<OverlayRows, "accounts">,
 	key: string,
 ): Account | undefined {
-	const exact = plan.accounts.find(
+	const exact = rows.accounts?.find(
 		(account) => !account.archived && account.id === key,
 	);
 	if (exact) return exact;
 	const slug = key.toLowerCase();
-	return plan.accounts.find(
+	return rows.accounts?.find(
 		(account) => !account.archived && slugifyAccount(account.name) === slug,
 	);
 }
@@ -189,12 +185,9 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 	}
 	if (rest.length > 2) return { type: "invalid" };
 	if (rest.length === 1) {
-		// Group detail is a first-class view, not a plan overlay: the id
-		// resolves against group membership, never the financial plan.
+		// Group detail resolves against membership, not financial rows.
 		if (page === "groups") return { type: "group", key: first };
 		switch (first) {
-			case "discard":
-				return { type: "discard" };
 			case "position":
 				return { type: "position" };
 			case "shortfall":
@@ -268,17 +261,16 @@ function ready(overlay: ResolvedOverlay): OverlayResolution {
 
 export function resolveOverlayRoute(
 	route: WorkspaceRoute,
-	plan: AccountLike | null,
+	rows: OverlayRows | null,
 ): OverlayResolution {
 	const overlay = route.overlay;
 	if (!overlay) return { state: "none" };
 	if (overlay.type === "invalid") return unknown();
-	// Group detail resolves against membership, never the financial plan.
+	// Group detail resolves against membership, not financial rows.
 	if (overlay.type === "group")
 		return ready({ kind: "group", id: overlay.key });
-	// Data not fetched yet: keep the URL and render nothing until the plan
-	// arrives, then resolve or normalize.
-	if (!plan) return { state: "pending" };
+	// Keep unresolved URLs until their saved rows arrive.
+	if (!rows) return { state: "pending" };
 	switch (overlay.type) {
 		case "position":
 			return ready({ kind: "evidence", target: { kind: "position" } });
@@ -286,10 +278,9 @@ export function resolveOverlayRoute(
 			return ready({ kind: "evidence", target: { kind: "failure" } });
 		case "safe-spending":
 			return ready({ kind: "evidence", target: { kind: "safe-spending" } });
-		case "discard":
-			return ready({ kind: "discard" });
 		case "account": {
-			const account = findAccount(plan, overlay.key);
+			if (!rows.accounts) return { state: "pending" };
+			const account = findAccount(rows, overlay.key);
 			return account
 				? ready({
 						kind: "evidence",
@@ -298,12 +289,13 @@ export function resolveOverlayRoute(
 				: unknown();
 		}
 		case "accountEdit": {
+			if (!rows.accounts) return { state: "pending" };
 			if (overlay.key === "new")
 				return ready({
 					kind: "editor",
 					target: { kind: "account", item: null },
 				});
-			const account = findAccount(plan, overlay.key);
+			const account = findAccount(rows, overlay.key);
 			return account
 				? ready({ kind: "editor", target: { kind: "account", item: account } })
 				: unknown();
@@ -314,7 +306,8 @@ export function resolveOverlayRoute(
 					kind: "editor",
 					target: { kind: "transaction", item: null },
 				});
-			const transaction = plan.transactions.find(
+			if (!rows.transactions) return { state: "pending" };
+			const transaction = rows.transactions.find(
 				(item) => item.id === overlay.key,
 			);
 			return transaction
@@ -330,7 +323,8 @@ export function resolveOverlayRoute(
 					kind: "editor",
 					target: { kind: "evaluation", item: null },
 				});
-			const evaluation = plan.evaluations.find(
+			if (!rows.evaluations) return { state: "pending" };
+			const evaluation = rows.evaluations.find(
 				(item) => item.id === overlay.key,
 			);
 			return evaluation
@@ -353,7 +347,8 @@ export function resolveOverlayRoute(
 					tab: overlay.tab,
 					edit: { kind: "transaction", item: null },
 				});
-			const transaction = plan.transactions.find(
+			if (!rows.transactions) return { state: "pending" };
+			const transaction = rows.transactions.find(
 				(item) => item.id === overlay.editTransaction,
 			);
 			return transaction
@@ -385,7 +380,7 @@ function accountSlug(account: Account): string | null {
 export function evidenceHash(
 	page: Page,
 	target: EvidenceTarget,
-	plan: AccountLike | null,
+	rows: Pick<OverlayRows, "accounts"> | null,
 ): string {
 	switch (target.kind) {
 		case "position":
@@ -395,7 +390,7 @@ export function evidenceHash(
 		case "safe-spending":
 			return `#${page}/safe-spending`;
 		case "account": {
-			const account = plan ? findAccount(plan, target.id) : undefined;
+			const account = rows ? findAccount(rows, target.id) : undefined;
 			const slug = account ? accountSlug(account) : null;
 			if ((page === "accounts" || page === "transactions") && slug)
 				return `#${page}/${encode(slug)}`;
@@ -442,8 +437,4 @@ export function safeSpendingDetailHash(
 ): string {
 	const base = `#${page}/safe-spending-detail/${tab}`;
 	return editKey ? `${base}/edit-transaction/${encode(editKey)}` : base;
-}
-
-export function discardHash(page: Page): string {
-	return `#${page}/discard`;
 }

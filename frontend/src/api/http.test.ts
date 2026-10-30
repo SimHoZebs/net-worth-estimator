@@ -5,10 +5,11 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { ApiHttpError, parseErrorResponse } from "./http.ts";
+import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "../mocks/resource.ts";
 
 function response(body: string, init: ResponseInit): Response {
 	const headers = new Headers(init.headers);
-	headers.set("Waypoint-Resource", "users/sample");
+	headers.set("Waypoint-Resource", GUEST_USER_ID);
 	return new Response(body, { ...init, headers });
 }
 
@@ -17,11 +18,10 @@ function scope(baseUrl = "") {
 		{
 			apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 			resource: {
-				id: "users/sample",
-				kind: "sample",
+				id: GUEST_USER_ID,
 				permissions: ["user:read", "user:project"],
 			},
-			subject: null,
+			subject: GUEST_USER_SUBJECT,
 		},
 		suspendUserScope(),
 	);

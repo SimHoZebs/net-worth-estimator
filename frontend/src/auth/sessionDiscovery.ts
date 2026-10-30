@@ -16,7 +16,7 @@ export function sessionScopeInput(
 	return {
 		apiBaseUrl: canonicalApiBaseUrl(baseUrl),
 		resource: session.resource,
-		subject: session.authenticated ? (session.user?.subject ?? null) : null,
+		subject: session.user.subject,
 	};
 }
 
@@ -73,27 +73,27 @@ async function readSession(
 	)
 		throw new Error("Invalid authentication status.");
 	const resource: unknown = next.resource;
-	// Only canonical user ids (`users/*`). Sample is
-	// `users/sample`. Legacy plan ids are rejected: no legacy wire support.
+	// Every identity is an ordinary provisioned user id (`users/<64hex>`),
+	// guests included. No guest/sample ids, no kind inference, no legacy
+	// wire support.
 	const resourceId =
 		isRecord(resource) && typeof resource.id === "string" ? resource.id : null;
-	const authenticatedId =
+	const canonicalId =
 		typeof resourceId === "string" && /^users\/[a-f0-9]{64}$/.test(resourceId);
-	const sampleId = resourceId === "users/sample";
+	const subject =
+		isRecord(next.user) && typeof next.user.subject === "string"
+			? next.user.subject
+			: null;
 	if (
 		!isRecord(resource) ||
-		typeof resource.id !== "string" ||
-		(next.authenticated ? !authenticatedId : !sampleId) ||
-		resource.kind !== (next.authenticated ? "private" : "sample") ||
+		!canonicalId ||
 		!Array.isArray(resource.permissions) ||
 		!resource.permissions.every(
 			(permission) => typeof permission === "string" && permission.length > 0,
 		) ||
-		response.headers.get("Waypoint-Resource") !== resource.id ||
-		(next.authenticated &&
-			(!isRecord(next.user) ||
-				typeof next.user.subject !== "string" ||
-				!next.user.subject.trim()))
+		response.headers.get("Waypoint-Resource") !== resourceId ||
+		!subject ||
+		!subject.trim()
 	)
 		throw new Error(
 			"The server returned an invalid user resource. Retry the session check.",

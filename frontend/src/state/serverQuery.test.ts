@@ -17,7 +17,6 @@ function owner(id: string) {
 			apiBaseUrl: "https://plan.example",
 			resource: {
 				id,
-				kind: "private",
 				permissions: ["user:read", "user:project"],
 			},
 			subject: id,

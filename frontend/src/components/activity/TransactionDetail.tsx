@@ -17,24 +17,18 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import {
-	useId,
-	useState,
-	type FormEvent,
-	type ReactNode,
-} from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { markAsSubscription } from "../../domain/subscriptions.ts";
+import { buildSubscriptionConversion } from "../../domain/subscriptions.ts";
 import {
-	validatePlan,
 	visibleAccounts,
 	type Account,
 	type Transaction,
-	type Plan,
 } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
-import { stageAndSave } from "../../state/workspaceWrites.ts";
+import { serverQueryClient } from "../../state/serverQuery.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { Badge } from "../Badge.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
@@ -46,11 +40,29 @@ import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
-import { deletePosting, deleteRule } from "@/api/generated/endpoints.ts";
+import {
+	convertTransaction,
+	createRule,
+	deletePosting,
+	deleteRule,
+	updatePosting,
+	updateRule,
+} from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { refreshTransactions } from "../../state/workspaceResources.ts";
+import {
+	getServerModel,
+	modelOptions,
+	refreshTransactions,
+} from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
-import { buildTransactionPlan } from "../editors/TransactionEditor.tsx";
+import {
+	claimPostingBody,
+	detailFormValues,
+	postingBody,
+	postingUpdateBody,
+	ruleBody,
+	ruleUpdateBody,
+} from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
@@ -120,13 +132,13 @@ function FrequencyOptions() {
 
 function MoreOptions({
 	planTransaction,
-	plan,
+	transactions,
 	draft,
 	updateDraft,
 	locked,
 }: {
 	planTransaction: Transaction;
-	plan: Plan;
+	transactions: Transaction[];
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	locked: boolean;
@@ -135,7 +147,7 @@ function MoreOptions({
 	const frequency = draft.frequency;
 	const onFrequency = (next: Transaction["frequency"]) =>
 		updateDraft({ frequency: next }, "schedule");
-	const claimRules = plan.transactions.filter(
+	const claimRules = transactions.filter(
 		(item) => item.frequency !== "once" && item.id !== planTransaction.id,
 	);
 	return (
@@ -294,7 +306,7 @@ function ScheduleCapsule({
 					</select>{" "}
 					on{" "}
 					<input
-						className={transactionControlStyles({ shape: "compact" })}
+						className={transactionControlStyles({ shape: "date" })}
 						aria-label="Replaces occurrence on"
 						type="date"
 						name="claimOccurrenceDate"
@@ -445,13 +457,14 @@ function draftFromTransaction(planTransaction: Transaction): TransactionDraft {
 		postedDate: planTransaction.postedDate ?? "",
 	};
 }
+
 function useTransactionEdit({
 	planTransaction,
-	plan,
+	readOnly: readOnlyProp,
 	onClose,
 }: {
 	planTransaction: Transaction;
-	plan: Plan;
+	readOnly?: boolean;
 	onClose: () => void;
 }) {
 	// Only the clicked value is editable; null renders the pure read view.
@@ -459,14 +472,16 @@ function useTransactionEdit({
 	const [touched, setTouched] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [saving, setSaving] = useState(false);
 	const edit = useEditDraft(
 		planTransaction.id,
 		draftFromTransaction(planTransaction),
 	);
 	const draft = edit.value;
 	const formId = useId();
-	const readOnlyReason = readOnlyReasonFor(planTransaction);
-	useBeforeUnload(activeField !== null && touched);
+	const rowReason = readOnlyReasonFor(planTransaction);
+	const readOnlyReason = readOnlyProp ? sourceReadOnlyReason : rowReason;
+	useBeforeUnload(activeField !== null && touched && !saving);
 	const updateDraft = (patch: Partial<TransactionDraft>, field: EditField) => {
 		if (readOnlyReason) return;
 		edit.update(patch);
@@ -495,46 +510,89 @@ function useTransactionEdit({
 		exitEdit();
 		onClose();
 	};
-	// The visible form holds only the active control, so the draft (kept in
-	// the exact shape a full form would submit) is synthesized into FormData
-	// for the shared planTransaction builder.
-	const submit = (event: FormEvent<HTMLFormElement>) => {
+	const submit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
-		if (readOnlyReason) return;
-		const data = new FormData();
+		if (readOnlyReason || saving) return;
 		if (edit.conflict) {
 			setError(
 				"This transaction changed during your edit. Discard your edits and try again.",
 			);
 			return;
 		}
-		data.append("name", draft.name);
-		data.append("amount", draft.amount);
-		data.append("fromId", draft.fromId);
-		data.append("toId", draft.toId);
-		data.append("frequency", draft.frequency);
-		data.append("startDate", draft.startDate);
-		if (draft.noEndDate) data.append("noEndDate", "on");
-		else data.append("endDate", draft.endDate);
-		data.append("annualIncrease", draft.annualIncrease);
-		if (draft.enabled) data.append("enabled", "on");
-		data.append("claimRuleId", draft.claimRuleId);
-		data.append("claimOccurrenceDate", draft.claimOccurrenceDate);
-		data.append("postedDate", draft.postedDate);
-		const validated = validatePlan(
-			buildTransactionPlan({
-				plan,
-				item: planTransaction,
-				data,
-			}),
-		);
-		if (validated instanceof Error) {
-			setError(validated.message);
+		const once = draft.frequency === "once";
+		const values = detailFormValues({
+			draft,
+			item: planTransaction,
+			isOnce: once,
+		});
+		if (values instanceof Error) {
+			setError(values.message);
 			return;
 		}
-		// Like the overlay editor, a successful save returns to the
-		// underlying view.
-		if (stageAndSave(validated)) onClose();
+		setSaving(true);
+		setError(null);
+		// Direct row write. Conversions state an explicit new body; updates
+		// carry unedited fields over from the canonical raw row because the
+		// backend replaces the full authored row.
+		const wasOnce = planTransaction.frequency === "once";
+		const nowOnce = values.frequency === "once";
+		if (wasOnce !== nowOnce) {
+			const ok = await performSave({
+				call: () =>
+					convertTransaction(planTransaction.id, {
+						kind: nowOnce ? "posting" : "rule",
+						...(nowOnce
+							? { posting: postingBody(values) }
+							: { rule: ruleBody(values) }),
+					}),
+				refresh: refreshTransactions,
+				failureMessage: "The transaction could not be saved.",
+			});
+			setSaving(false);
+			// Keep failed form values; return to the underlying view only
+			// after confirmed save.
+			if (ok) onClose();
+			else
+				setError(
+					"The transaction could not be saved. Review the workspace notice and try again.",
+				);
+			return;
+		}
+		const document = getServerModel()?.document;
+		// The backend replaces the full authored row, so updates need the
+		// canonical raw row; conversions state explicit new bodies instead.
+		const raw = nowOnce
+			? document?.postings.find((row) => row.id === planTransaction.id)
+			: document?.recurrenceRules.find((row) => row.id === planTransaction.id);
+		if (!raw) {
+			setSaving(false);
+			setError(
+				"The saved transaction could not be loaded. Close and try again.",
+			);
+			return;
+		}
+		const ok = await performSave({
+			call: () =>
+				"postedTime" in raw
+					? updatePosting(
+							planTransaction.id,
+							postingUpdateBody({ baseline: planTransaction, raw, values }),
+						)
+					: updateRule(
+							planTransaction.id,
+							ruleUpdateBody({ baseline: planTransaction, raw, values }),
+						),
+			refresh: refreshTransactions,
+			failureMessage: "The transaction could not be saved.",
+		});
+		setSaving(false);
+		// Keep failed form values; return to the underlying view only after
+		// confirmed save.
+		if (ok) onClose();
+		else
+			setError(
+				"The transaction could not be saved. Review the workspace notice and try again.",
+			);
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
@@ -551,7 +609,7 @@ function useTransactionEdit({
 					label="Save changes"
 					type="submit"
 					form={formId}
-					disabled={Boolean(readOnlyReason)}
+					disabled={Boolean(readOnlyReason) || saving}
 				/>
 			</>
 		);
@@ -569,41 +627,160 @@ function useTransactionEdit({
 		exitEdit,
 		readOnlyReason,
 		discardAndClose,
+		saving,
 	};
+}
+
+/**
+ * Authoritative rule-existence check for subscription retries. The cache may
+ * be stale after a saved-but-refresh-failed attempt, so a cache miss falls
+ * back to one server read before any create. Never generates a rule.
+ */
+async function ruleExistsAuthoritative(ruleId: string): Promise<boolean> {
+	if (
+		getServerModel()?.document?.recurrenceRules.some(
+			(rule) => rule.id === ruleId,
+		)
+	)
+		return true;
+	try {
+		const fresh = await serverQueryClient().fetchQuery(
+			modelOptions(getUserScope()),
+		);
+		return (
+			fresh.document?.recurrenceRules.some((rule) => rule.id === ruleId) ??
+			false
+		);
+	} catch {
+		return false;
+	}
 }
 
 function MarkAsSubscriptionAction({
 	planTransaction,
-	plan,
 	locked,
 	onDone,
 }: {
 	planTransaction: Transaction;
-	plan: Plan;
 	locked: boolean;
 	onDone: () => void;
 }) {
 	const [error, setError] = useState<string | null>(null);
+	const [saving, setSaving] = useState(false);
+	// Pinned retry identity: if the rule create succeeded but the claim (or
+	// its refresh) failed, retry reuses the same rule instead of silently
+	// generating a replacement. No global draft or persistent state.
+	const attemptRef = useRef<{ ruleId: string } | null>(null);
 	if (
 		planTransaction.frequency !== "once" ||
 		planTransaction.claimRuleId ||
 		locked
 	)
 		return null;
-	const mark = () => {
-		const next = markAsSubscription(plan, planTransaction.id);
-		if (next instanceof Error) {
-			setError(next.message);
+	const mark = async () => {
+		if (saving) return;
+		const ruleId = attemptRef.current?.ruleId ?? crypto.randomUUID();
+		attemptRef.current = { ruleId };
+		const conversion = buildSubscriptionConversion(planTransaction, {
+			ruleId,
+		});
+		if (conversion instanceof Error) {
+			setError(conversion.message);
 			return;
 		}
-		if (stageAndSave(next)) onDone();
-		else setError("That change could not be applied.");
+		// Pin the original user scope across both writes: a scope change
+		// between the rule create and the claim must not start the old claim
+		// under the new user.
+		const scope = getUserScope();
+		setSaving(true);
+		setError(null);
+		// Preserve the source posting: create the rule first, then claim the
+		// posting as its occurrence. Refresh even after partial failure so a
+		// created rule is visible while the claim error stays on screen.
+		const ruleValues = {
+			name: conversion.rule.name,
+			amount: conversion.rule.amount,
+			annualIncrease: conversion.rule.annualIncrease,
+			fromId: conversion.rule.fromId,
+			toId: conversion.rule.toId,
+			frequency: conversion.rule.frequency,
+			startDate: conversion.rule.startDate,
+			endDate: conversion.rule.endDate,
+			postedDate: null,
+			enabled: conversion.rule.enabled,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+		} as const;
+		let ruleOk = await ruleExistsAuthoritative(ruleId);
+		if (!ruleOk) {
+			ruleOk = await performSave({
+				call: () =>
+					createRule({ ...ruleBody(ruleValues), id: conversion.rule.id }),
+				refresh: refreshTransactions,
+				failureMessage: "The subscription rule could not be created.",
+			});
+			if (getUserScope() !== scope) {
+				setSaving(false);
+				setError(
+					"The signed-in user changed. Close and review before retrying.",
+				);
+				return;
+			}
+			if (!ruleOk) {
+				setSaving(false);
+				setError(
+					"The subscription rule could not be created. Review the workspace notice and try again.",
+				);
+				return;
+			}
+		}
+		// Claim from the raw posting with only the claim changed: timestamps,
+		// amount descriptor, destinations, and purchase policy stay
+		// byte-identical instead of being rebuilt from display values.
+		const raw = getServerModel()?.document?.postings.find(
+			(row) => row.id === planTransaction.id,
+		);
+		if (!raw) {
+			setSaving(false);
+			setError(
+				"The saved transaction could not be loaded. Close and try again.",
+			);
+			return;
+		}
+		const claimOk = await performSave({
+			call: () =>
+				updatePosting(
+					raw.id,
+					claimPostingBody(
+						raw,
+						ruleId,
+						conversion.claimed.claimOccurrenceDate ??
+							conversion.claimed.startDate,
+					),
+				),
+			refresh: refreshTransactions,
+			failureMessage: "The source transaction could not be claimed.",
+		});
+		setSaving(false);
+		if (claimOk) {
+			attemptRef.current = null;
+			onDone();
+		} else
+			setError(
+				"The rule was created, but the source transaction could not be claimed. Review the workspace notice and try again.",
+			);
 	};
 	return (
 		<div className="mt-4">
-			<Button type="button" variant="secondary" size="sm" onClick={mark}>
+			<Button
+				type="button"
+				variant="secondary"
+				size="sm"
+				onClick={() => void mark()}
+				disabled={saving}
+			>
 				<Repeat size={16} aria-hidden="true" />
-				Mark as subscription
+				{saving ? "Marking…" : "Mark as subscription"}
 			</Button>
 			{error && <ErrorNotice message={error} />}
 		</div>
@@ -634,10 +811,8 @@ function DiscardConfirm({
 	);
 }
 
-function fromAccountOptions(plan: Plan): Account[] {
-	return visibleAccounts(plan.accounts).filter(
-		(account) => account.kind !== "debt",
-	);
+function fromAccountOptions(accounts: Account[]): Account[] {
+	return visibleAccounts(accounts).filter((account) => account.kind !== "debt");
 }
 
 /**
@@ -649,7 +824,8 @@ export function TransactionDetail({
 	transaction,
 	planTransaction,
 	accounts,
-	plan,
+	transactions,
+	readOnly,
 	claimRuleName,
 	shortfallLabel,
 	onClose,
@@ -657,7 +833,9 @@ export function TransactionDetail({
 	transaction: AccountTransaction;
 	planTransaction: Transaction;
 	accounts: AccountRef[];
-	plan: Plan;
+	/** All saved transaction rows (claim options). */
+	transactions?: Transaction[];
+	readOnly?: boolean;
 	claimRuleName?: string | null;
 	shortfallLabel?: string;
 	onClose: () => void;
@@ -666,7 +844,11 @@ export function TransactionDetail({
 		transaction.category === "transfer"
 			? ("transfer" as const)
 			: transaction.direction;
-	const edit = useTransactionEdit({ planTransaction, plan, onClose });
+	const edit = useTransactionEdit({
+		planTransaction,
+		readOnly,
+		onClose,
+	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -709,6 +891,7 @@ export function TransactionDetail({
 		if (ok) onClose();
 		else setDeleteError("The transaction could not be removed.");
 	};
+	const fullAccounts = accounts as Account[];
 	const editHeading = (
 		<span className="flex items-center gap-3">
 			<span className="sr-only">{edit.draft.name}</span>
@@ -762,7 +945,7 @@ export function TransactionDetail({
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
-				<form id={edit.formId} onSubmit={edit.submit}>
+				<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
 					<div className="flex items-center gap-4 pt-1 pb-2">
 						<div className="flex min-w-0 flex-1 flex-col gap-2">
 							{showAmount && (
@@ -803,41 +986,45 @@ export function TransactionDetail({
 								</span>
 							)}
 							<div className="flex flex-wrap items-center gap-2">
-							{transaction.void ? (
-								<Badge tone="neutral">
-									Did not post
-									<span className="sr-only">bank hold that did not post</span>
-								</Badge>
-							) : transaction.pending ? (
-								<Badge tone="warning">
-									<Clock3 size={10} aria-hidden="true" />
-									Pending
-								</Badge>
-							) : transaction.source === "historical" ? (
-								<Badge tone="success">
-									<Check size={10} aria-hidden="true" />
-									Posted
-								</Badge>
-							) : null}
-							{showExcluded && <Badge tone="warning">Excluded from account</Badge>}
-							{showShortfall && (
-								<Badge tone="warning">
-									<TriangleAlert size={10} aria-hidden="true" />
-									{shortfallLabel ?? "Shortfall"}
-								</Badge>
-							)}
-							{!planTransaction.enabled &&
-								!transaction.pending &&
-								!showExcluded && <Badge tone="warning">Excluded</Badge>}
-							{planTransaction.amountKnown === false && (
-								<Badge tone="neutral">Calculated</Badge>
-							)}
-							{hasStatusPill && (
-								<span className="text-muted" aria-hidden="true">
-									·
+								{transaction.void ? (
+									<Badge tone="neutral">
+										Did not post
+										<span className="sr-only">bank hold that did not post</span>
+									</Badge>
+								) : transaction.pending ? (
+									<Badge tone="warning">
+										<Clock3 size={10} aria-hidden="true" />
+										Pending
+									</Badge>
+								) : transaction.source === "historical" ? (
+									<Badge tone="success">
+										<Check size={10} aria-hidden="true" />
+										Posted
+									</Badge>
+								) : null}
+								{showExcluded && (
+									<Badge tone="warning">Excluded from account</Badge>
+								)}
+								{showShortfall && (
+									<Badge tone="warning">
+										<TriangleAlert size={10} aria-hidden="true" />
+										{shortfallLabel ?? "Shortfall"}
+									</Badge>
+								)}
+								{!planTransaction.enabled &&
+									!transaction.pending &&
+									!showExcluded && <Badge tone="warning">Excluded</Badge>}
+								{planTransaction.amountKnown === false && (
+									<Badge tone="neutral">Calculated</Badge>
+								)}
+								{hasStatusPill && (
+									<span className="text-muted" aria-hidden="true">
+										·
+									</span>
+								)}
+								<span className="text-sm text-muted">
+									{categoryLabel(kind)}
 								</span>
-							)}
-							<span className="text-sm text-muted">{categoryLabel(kind)}</span>
 							</div>
 						</div>
 						{(once || transaction.pending || postedDiffers) && (
@@ -925,7 +1112,9 @@ export function TransactionDetail({
 											})}
 										>
 											<option value="">External income</option>
-											<AccountOptions accounts={fromAccountOptions(plan)} />
+											<AccountOptions
+												accounts={fromAccountOptions(fullAccounts)}
+											/>
 										</select>
 									</div>
 								</div>
@@ -969,7 +1158,7 @@ export function TransactionDetail({
 										>
 											<option value="">External spending</option>
 											<AccountOptions
-												accounts={visibleAccounts(plan.accounts)}
+												accounts={visibleAccounts(fullAccounts)}
 											/>
 										</select>
 									</div>
@@ -987,13 +1176,12 @@ export function TransactionDetail({
 					/>
 					<MarkAsSubscriptionAction
 						planTransaction={planTransaction}
-						plan={plan}
 						locked={!canEdit}
 						onDone={onClose}
 					/>
 					<MoreOptions
 						planTransaction={planTransaction}
-						plan={plan}
+						transactions={transactions ?? [planTransaction]}
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}
@@ -1015,6 +1203,11 @@ export function TransactionDetail({
 						</div>
 					)}
 					{edit.error && <ErrorNotice message={edit.error} />}
+					{edit.saving && (
+						<p className="mt-2 text-xs text-muted" role="status">
+							Saving…
+						</p>
+					)}
 					{edit.confirmCancel && (
 						<DiscardConfirm
 							onContinue={() => edit.setConfirmCancel(false)}
@@ -1026,7 +1219,7 @@ export function TransactionDetail({
 				{once && (
 					<ReceiptPanel
 						postingId={planTransaction.id}
-						readOnly={plan.readOnly}
+						readOnly={Boolean(readOnly ?? planTransaction.readOnly)}
 					/>
 				)}
 			</Modal>

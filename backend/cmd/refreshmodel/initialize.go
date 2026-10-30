@@ -55,8 +55,8 @@ func initialize(target, source, sourceUser, issuer, subject string) error {
 	if err != nil {
 		return err
 	}
-	resource := authorization.ResourceFor(issuer, subject)
-	_, err = db.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject)
+	actor := authorization.ActorKey(issuer, subject)
+	_, err = db.EnsureUser(actor, issuer, subject)
 	closeErr := db.Close()
 	if err != nil {
 		return err
@@ -64,7 +64,8 @@ func initialize(target, source, sourceUser, issuer, subject string) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	if err := refresh(temporary, source, selected, resource.ID, false); err != nil {
+	resourceID := "users/" + actor[len("user:"):]
+	if err := refresh(temporary, source, selected, resourceID, false); err != nil {
 		return err
 	}
 	// Same-filesystem hard link publishes atomically without overwriting a
@@ -84,6 +85,17 @@ func selectSourceUser(path, selected string) (string, error) {
 	}
 	defer db.Close()
 	if selected != "" {
+		if selected == "sample" {
+			// Explicit offline recovery from a legacy historical row.
+			var present int
+			if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id=?", selected).Scan(&present); err != nil {
+				return "", fmt.Errorf("selected source user: %w", err)
+			}
+			if present != 1 {
+				return "", errors.New("setup source must be an existing user")
+			}
+			return selected, nil
+		}
 		var present int
 		if err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id=? AND id NOT IN ('sample','fixture')", selected).Scan(&present); err != nil {
 			return "", fmt.Errorf("selected source user: %w", err)

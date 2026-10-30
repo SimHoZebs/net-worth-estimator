@@ -224,4 +224,85 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	}
 }
 
+func TestListTransactionsExcludesPurchaseMarkers(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	account := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"id":"cash","name":"Cash","kind":"cash","minBalance":0,"enabled":true}`)
+	if account.Code != http.StatusOK {
+		t.Fatalf("create account status = %d, body %s", account.Code, account.Body.String())
+	}
+	normal := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
+		`{"id":"01900000-0000-7000-8000-000000000031","name":"Groceries","sourceAccountId":"cash","destinations":[],"amount":{"resolver":"expression","config":{"expression":"42.5"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
+	if normal.Code != http.StatusOK {
+		t.Fatalf("create posting status = %d, body %s", normal.Code, normal.Body.String())
+	}
+	marker := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
+		`{"id":"01900000-0000-7000-8000-000000000032","name":"Laptop","sourceAccountId":"cash","amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"postedTime":1769904000,"transactionTime":1769904000,"enabled":true,"purchase":{"priority":0}}`)
+	if marker.Code != http.StatusOK {
+		t.Fatalf("create purchase posting status = %d, body %s", marker.Code, marker.Body.String())
+	}
+
+	for _, path := range []string{"/v1/transactions", "/v1/transactions?recurring=once"} {
+		response := doRowRequest(t, handler, http.MethodGet, path, "")
+		if response.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, body %s", path, response.Code, response.Body.String())
+		}
+		var payload struct {
+			Transactions []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"transactions"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode %s: %v", path, err)
+		}
+		if len(payload.Transactions) != 1 || payload.Transactions[0].ID != "01900000-0000-7000-8000-000000000031" {
+			t.Fatalf("GET %s rows = %+v, want only the non-purchase posting", path, payload.Transactions)
+		}
+	}
+
+	// The purchase row stays in the document: planned purchases remain
+	// distinct from transactions instead of vanishing.
+	model := doRowRequest(t, handler, http.MethodGet, "/v1/financial-model", "")
+	if model.Code != http.StatusOK {
+		t.Fatalf("model status = %d, body %s", model.Code, model.Body.String())
+	}
+	var read struct {
+		Document types.FinancialModelDocument `json:"document"`
+	}
+	if err := json.Unmarshal(model.Body.Bytes(), &read); err != nil {
+		t.Fatalf("decode model: %v", err)
+	}
+	if len(read.Document.Postings) != 2 {
+		t.Fatalf("postings = %d, want 2", len(read.Document.Postings))
+	}
+	kept := false
+	for _, posting := range read.Document.Postings {
+		if posting.Purchase != nil && posting.ID == "01900000-0000-7000-8000-000000000032" {
+			kept = true
+		}
+	}
+	if !kept {
+		t.Fatal("purchase marker missing from saved model")
+	}
+
+	// Reads keep working under read-only grants; only writes are blocked.
+	readOnly := New(database, Config{ReadOnly: true})
+	blocked := doRowRequest(t, readOnly, http.MethodGet, "/v1/transactions", "")
+	if blocked.Code != http.StatusOK {
+		t.Fatalf("read-only list status = %d, body %s", blocked.Code, blocked.Body.String())
+	}
+	var listed struct {
+		Transactions []struct {
+			ID string `json:"id"`
+		} `json:"transactions"`
+	}
+	if err := json.Unmarshal(blocked.Body.Bytes(), &listed); err != nil {
+		t.Fatalf("decode read-only list: %v", err)
+	}
+	if len(listed.Transactions) != 1 {
+		t.Fatalf("read-only rows = %+v, want only the non-purchase posting", listed.Transactions)
+	}
+}
+
 func ptr(s string) *string { return &s }

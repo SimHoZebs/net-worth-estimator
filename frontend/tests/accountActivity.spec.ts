@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import type { FinancialModelDocument } from "../src/api/contracts.ts";
-import { FIXTURE_API, readSavedServerPlan, resetFixture } from "./fixture.ts";
+import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
 	await resetFixture();
@@ -68,7 +68,7 @@ test("clicking an account opens its recorded history and projected transactions"
 	).toBeFocused();
 });
 
-test("account names in the plan open incoming transfers with the correct other account", async ({
+test("account names in the model open incoming transfers with the correct other account", async ({
 	page,
 }) => {
 	await page.goto("/#accounts");
@@ -183,7 +183,7 @@ test("transaction values edit in place with save and discard", async ({
 	await expect(dialog.getByText("+$450.00", { exact: true })).toBeVisible();
 });
 
-test("a shortfall can be inspected and edited while preserving account context and the saved plan", async ({
+test("a shortfall can be inspected and edited while preserving account context and the saved model", async ({
 	page,
 }) => {
 	let dialog = await openChecking(page);
@@ -219,11 +219,11 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await expect(dialog.getByText("−$3,000.00", { exact: true })).toBeVisible();
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
 	// The editor saves immediately: the dialog shows the edited −$3,000.00
-	// with no Shortfall (asserted above) and the saved plan carries it too.
+	// with no Shortfall (asserted above) and the saved model carries it too.
 	// Posting CSV ids are replaced with server UUIDs on import, so the
 	// renovation is located by name on the saved side.
 	await expect(dialog).toContainText("Account activity · Saved");
-	const saved = await readSavedServerPlan();
+	const saved = await readSavedServerModel();
 	const savedExpression = saved.postings.find(
 		(posting) => posting.name === "Home renovation",
 	)?.amount.config.expression;
@@ -327,7 +327,7 @@ test("growth-only accounts have an honest empty state and retain account details
 	// The save runs async after staging; the eyebrow flipping back to
 	// Saved means it reached the server.
 	await expect(dialog).toContainText("Account activity · Saved");
-	// The inline edit reached the server: the saved plan carries the new
+	// The inline edit reached the server: the saved model carries the new
 	// floor while the dialog shows the same 5000.
 	const savedModel = await page.request
 		.get(`${FIXTURE_API}/v1/financial-model`)

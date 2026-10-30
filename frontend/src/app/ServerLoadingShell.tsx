@@ -29,7 +29,6 @@ export function ServerLoadingShell({
 					onOpenNavigation={open}
 				/>
 			)}
-			draftBar={null}
 			overlays={null}
 		>
 			<WorkspaceHeading
@@ -46,7 +45,7 @@ export function ServerLoadingShell({
 				<Skeleton className="h-3 w-5/6" />
 				<Skeleton className="h-56 w-full" />
 				<p className="sr-only" role="status">
-					Loading the saved model, status, and income snapshot.
+					Loading your saved data.
 				</p>
 			</section>
 		</WorkspaceLayout>

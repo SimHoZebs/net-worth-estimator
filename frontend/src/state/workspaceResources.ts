@@ -17,11 +17,9 @@ import type { ListCheckpointsParams } from "@/api/generated/model/listCheckpoint
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import {
-	backendToDisplayPlan,
 	type AmountPreset,
 	type EvaluationTables,
 	type FinancialModelResponse,
-	type PlanConversion,
 	type ServerStatus,
 } from "@/api/index.ts";
 import {
@@ -34,7 +32,6 @@ import { serverDocumentFingerprint } from "@/state/remoteStorage.ts";
 import { notifyError } from "@/state/notifications.ts";
 
 export interface ServerModel extends FinancialModelResponse {
-	conversion: PlanConversion | null;
 	fingerprint: string | null;
 }
 
@@ -70,23 +67,8 @@ export function statusOptions(scope = getUserScope()) {
 		...defaults,
 		queryKey: userResourceKey("status", scope),
 		queryFn: async ({ signal }) => {
-			const previousStatus = getServerStatus(scope);
 			const result: ServerStatus = (await fetchServerStatus({ signal })).data;
 			current(scope, signal);
-			if (previousStatus?.readOnly !== result.readOnly)
-				serverQueryClient().setQueryData<ServerModel>(
-					userResourceKey("model", scope),
-					(model) =>
-						model?.document
-							? {
-									...model,
-									conversion: backendToDisplayPlan({
-										document: model.document,
-										status: result,
-									}),
-								}
-							: model,
-				);
 			return result;
 		},
 	});
@@ -98,7 +80,7 @@ export function modelOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("model", scope),
 		queryFn: async ({ signal }): Promise<ServerModel> => {
 			try {
-				const [result, status] = await Promise.all([
+				const [result] = await Promise.all([
 					(
 						await getFinancialModel({
 							signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
@@ -109,9 +91,6 @@ export function modelOptions(scope = getUserScope()) {
 				current(scope, signal);
 				return {
 					...result,
-					conversion: result.document
-						? backendToDisplayPlan({ document: result.document, status })
-						: null,
 					fingerprint: result.document
 						? serverDocumentFingerprint(result.document)
 						: null,
@@ -407,7 +386,7 @@ export function getAccountBalances(scope = getUserScope()) {
 
 /**
  * Refresh the accounts view after a save: balances and checkpoints
- * refetch, and so does the model, which feeds the plan conversion and
+ * refetch, and so does the model, which feeds the saved-row hooks and
  * every projection. Marking the model stale is not enough: nothing
  * refetches it until the next remount.
  */
@@ -427,8 +406,14 @@ export async function refreshAccounts(): Promise<void> {
 	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// Refetch the list so the new row is visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
-	await cache.fetchQuery(balancesOptions(scope)).catch(() => {});
-	await cache.fetchQuery(modelOptions(scope)).catch(() => {});
+	// Both refetches run so one failure cannot hide the other; the first
+	// failure throws so a save refresh reports it instead of swallowing it.
+	const settled = await Promise.allSettled([
+		cache.fetchQuery(balancesOptions(scope)),
+		cache.fetchQuery(modelOptions(scope)),
+	]);
+	for (const result of settled)
+		if (result.status === "rejected") throw result.reason;
 }
 
 export function useTransactions(
@@ -462,7 +447,7 @@ export function useTransactionCatalog() {
 
 /**
  * Refresh the transactions view after a save: transactions and the catalog
- * refetch, and so does the model, which feeds the plan conversion and
+ * refetch, and so does the model, which feeds the saved-row hooks and
  * every projection. Marking the model stale is not enough: nothing
  * refetches it until the next remount.
  */
@@ -482,8 +467,14 @@ export async function refreshTransactions(): Promise<void> {
 	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// Refetch the list so the new row is visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
-	await cache.fetchQuery(transactionsOptions(scope)).catch(() => {});
-	await cache.fetchQuery(modelOptions(scope)).catch(() => {});
+	// Both refetches run so one failure cannot hide the other; the first
+	// failure throws so a save refresh reports it instead of swallowing it.
+	const settled = await Promise.allSettled([
+		cache.fetchQuery(transactionsOptions(scope)),
+		cache.fetchQuery(modelOptions(scope)),
+	]);
+	for (const result of settled)
+		if (result.status === "rejected") throw result.reason;
 }
 
 export function checkpointsOptions(
@@ -604,7 +595,7 @@ export function getEvaluationSummary(scope = getUserScope()) {
 
 /**
  * Refresh the evaluations view after a save: the summary refetches for the
- * grids, and so does the model, which feeds the plan conversion and every
+ * grids, and so does the model, which feeds the saved-row hooks and every
  * projection. Marking the model stale is not enough: nothing refetches it
  * until the next remount.
  */
@@ -621,6 +612,12 @@ export async function refreshEvaluations(): Promise<void> {
 	if (scope !== getUserScope() || scope.status !== "ready") return;
 	// Refetch the summary so the new row is visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
-	await cache.fetchQuery(evalSummaryOptions(scope)).catch(() => {});
-	await cache.fetchQuery(modelOptions(scope)).catch(() => {});
+	// Both refetches run so one failure cannot hide the other; the first
+	// failure throws so a save refresh reports it instead of swallowing it.
+	const settled = await Promise.allSettled([
+		cache.fetchQuery(evalSummaryOptions(scope)),
+		cache.fetchQuery(modelOptions(scope)),
+	]);
+	for (const result of settled)
+		if (result.status === "rejected") throw result.reason;
 }

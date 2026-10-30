@@ -88,7 +88,6 @@ it("re-arms the poll after a user switch", async () => {
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: nextId,
-				kind: "private",
 				permissions: ["user:read", "user:write", "user:project"],
 			},
 			subject: nextId,

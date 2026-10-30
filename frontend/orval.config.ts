@@ -1,6 +1,6 @@
 import { defineConfig } from "orval";
 
-// Transport contract per operation: plan requests verify resource identity
+// Transport contract per operation: user requests verify resource identity
 // and cancel on scope change; identity requests precede verification;
 // streams return the live resource-guarded Response; logout returns a
 // Response so local state clears first. New identity operations or streams

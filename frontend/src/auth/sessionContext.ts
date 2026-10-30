@@ -8,7 +8,11 @@ export interface Session {
 	allowed: boolean;
 	accountURL?: string;
 	resource: SessionUser;
-	user?: { subject: string; name: string };
+	// The server always provisions an ordinary user identity, including for
+	// guests: subject names the provisioned user regardless of sign-in state.
+	// `authenticated` stays the actual sign-in status for login/account UX,
+	// never a permission or identity signal.
+	user: { subject: string; name: string };
 }
 
 interface SessionContextValue {

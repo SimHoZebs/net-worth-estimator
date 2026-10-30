@@ -1,14 +1,13 @@
 import { Suspense, lazy } from "react";
-import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { WorkspaceEditor } from "../components/WorkspaceEditor.tsx";
 import { Skeleton } from "../components/Skeleton.tsx";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import {
-	selectDraftChangeCount,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
-import { useUserPlan } from "../state/useUserScope.ts";
-import { stageAndSave } from "../state/workspaceWrites.ts";
+	useSavedAccounts,
+	useSavedTransactions,
+	useSavedStartDate,
+} from "../state/savedRows.ts";
+import { useUserReadOnly } from "../state/useUserScope.ts";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
 const EvidenceDialog = lazy(() =>
@@ -16,7 +15,6 @@ const EvidenceDialog = lazy(() =>
 		default: module.EvidenceDialog,
 	})),
 );
-
 const CurrentPositionDialog = lazy(() =>
 	import("../components/evidence/CurrentPositionDialog.tsx").then((module) => ({
 		default: module.CurrentPositionDialog,
@@ -28,13 +26,15 @@ export function WorkspaceEvidence({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useUserPlan();
-	// Evidence subscribes to the base case only while its dialog is open.
+	const accounts = useSavedAccounts();
 	if (!overlays.evidence) return null;
 	if (overlays.evidence.kind === "position")
-		return plan ? (
+		return accounts ? (
 			<Suspense fallback={<Skeleton className="h-32 w-full" />}>
-				<CurrentPositionDialog plan={plan} onClose={overlays.closeEvidence} />
+				<CurrentPositionDialog
+					accounts={accounts}
+					onClose={overlays.closeEvidence}
+				/>
 			</Suspense>
 		) : null;
 	return <WorkspaceEvidenceLoaded overlays={overlays} />;
@@ -45,17 +45,18 @@ function WorkspaceEvidenceLoaded({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useUserPlan();
-	const hasDraft = useWorkspaceStore((state) => state.draft != null);
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
+	const readOnly = useUserReadOnly();
 	const projection = useRemoteProjection({ ranges: false });
-	const base =
-		projection.base instanceof Error || projection.base === null
-			? null
-			: projection.base;
+	const base = projection.base instanceof Error ? null : projection.base;
 	if (
 		!overlays.evidence ||
 		overlays.evidence.kind === "position" ||
-		!plan ||
+		!accounts ||
+		!transactions ||
+		!startDate ||
 		!base
 	)
 		return null;
@@ -63,12 +64,13 @@ function WorkspaceEvidenceLoaded({
 		<Suspense fallback={<Skeleton className="h-32 w-full" />}>
 			<EvidenceDialog
 				target={overlays.evidence}
-				plan={plan}
+				accounts={accounts}
+				transactions={transactions}
+				startDate={startDate}
+				readOnly={readOnly}
 				projection={base}
-				temporary={hasDraft}
 				onClose={overlays.closeEvidence}
 				onEdit={overlays.editFromEvidence}
-				onApply={stageAndSave}
 			/>
 		</Suspense>
 	);
@@ -79,39 +81,7 @@ export function WorkspaceDialogs({
 }: {
 	overlays: WorkspaceOverlays;
 }) {
-	const plan = useUserPlan();
-	const applyError = useWorkspaceStore((state) => state.error);
-	const changeCount = useWorkspaceStore(selectDraftChangeCount);
-	if (!plan) return null;
-	return (
-		<>
-			{overlays.editor && (
-				<WorkspaceEditor
-					target={overlays.editor}
-					plan={plan}
-					onApply={stageAndSave}
-					applyError={applyError}
-					onClose={overlays.closeEditor}
-				/>
-			)}
-			{overlays.discardOpen && (
-				<ConfirmDialog
-					title="Return to your last save?"
-					eyebrow="Discard unsaved changes"
-					onCancel={overlays.closeDiscard}
-					onConfirm={() => void overlays.confirmDiscard()}
-					cancelLabel="Keep exploring"
-					confirmLabel="Discard changes"
-					busyLabel="Discarding…"
-					busy={overlays.discarding}
-				>
-					<p>
-						Your {changeCount} unsaved{" "}
-						{changeCount === 1 ? "change will" : "changes will"} be removed.
-						Your last save stays intact.
-					</p>
-				</ConfirmDialog>
-			)}
-		</>
-	);
+	return overlays.editor ? (
+		<WorkspaceEditor target={overlays.editor} onClose={overlays.closeEditor} />
+	) : null;
 }

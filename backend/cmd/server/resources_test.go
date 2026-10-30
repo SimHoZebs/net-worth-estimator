@@ -43,7 +43,7 @@ func model(t *testing.T, handler http.Handler) *types.FinancialModelDocument {
 
 func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
 	c, err := resourceConfigFromEnv(func(string) string { return "" })
-	if err != nil || c.OwnerSubject != "" || c.ModelID != "" {
+	if err != nil || c.OwnerSubject != "" || c.ModelID != "" || c.Organization != authorization.DefaultOrganization {
 		t.Fatalf("unexpected defaults: %+v %v", c, err)
 	}
 	for key, value := range map[string]string{
@@ -60,6 +60,14 @@ func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
 		if err == nil {
 			t.Errorf("accepted invalid or retired %s", key)
 		}
+	}
+	if _, err := resourceConfigFromEnv(func(name string) string {
+		if name == "NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION" {
+			return "owner/org"
+		}
+		return ""
+	}); err == nil {
+		t.Error("accepted organization with an owner prefix")
 	}
 }
 
@@ -93,6 +101,7 @@ func TestUserProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 	}
 	defer database.Close()
 	const issuer = "https://identity.test"
+	const guestSubject = "11111111-1111-1111-1111-111111111111"
 	for _, test := range []struct {
 		name, subject       string
 		permissions         []string
@@ -104,7 +113,10 @@ func TestUserProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 		{name: "provider unavailable", subject: "unavailable", fail: true},
 		{name: "wrong scope", subject: "wrong", permissions: []string{authorization.Read}, wrongResource: true},
 		{name: "authorized", subject: "new-user", permissions: []string{authorization.Read, authorization.Project, authorization.Write}, wantUser: true},
-		{name: "guest", permissions: []string{authorization.Read, authorization.Project}},
+		{name: "viewer", subject: "viewer-user", permissions: []string{authorization.Read, authorization.Project}, wantUser: true},
+		{name: "guest viewer", subject: guestSubject, permissions: []string{authorization.Read, authorization.Project}, wantUser: true},
+		{name: "guest editor", subject: guestSubject + "-editor", permissions: []string{authorization.Read, authorization.Project, authorization.Write}, wantUser: true},
+		{name: "empty subject fails closed", subject: ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			resolve := userAccessResolver(database, issuer, func(_ context.Context, subject string) (authorization.Scope, error) {
@@ -118,15 +130,17 @@ func TestUserProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 				return authorization.Scope{Resource: resource, Permissions: test.permissions}, nil
 			})
 			scope, err := resolve(context.Background(), test.subject)
-			if (err != nil) != (test.fail || test.wrongResource) {
-				t.Fatalf("resolve error=%v", err)
+			_ = scope
+			wantErr := test.fail || test.wrongResource || test.subject == ""
+			if (err != nil) != wantErr {
+				t.Fatalf("resolve error=%v wantErr=%v", err, wantErr)
+			}
+			if test.subject == "" {
+				return
 			}
 			exists, err := database.HasUser(authorization.ActorKey(issuer, test.subject))
 			if err != nil || exists != test.wantUser {
 				t.Fatalf("user exists=%v want=%v err=%v", exists, test.wantUser, err)
-			}
-			if test.subject == "" && len(scope.Permissions) != 0 {
-				t.Fatalf("unpublished sample received permissions: %+v", scope)
 			}
 			if test.wantUser {
 				scoped, err := database.User(authorization.ActorKey(issuer, test.subject))
@@ -145,16 +159,6 @@ func TestUserProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 	}
 	if exists, err := database.HasUser(authorization.ActorKey(issuer, "other-user")); err != nil || exists {
 		t.Fatalf("unexpected authorized resource created a user: exists=%v err=%v", exists, err)
-	}
-	if _, err := database.EnsureSampleUser(); err != nil {
-		t.Fatal(err)
-	}
-	resolve := userAccessResolver(database, issuer, func(_ context.Context, subject string) (authorization.Scope, error) {
-		return authorization.Scope{Resource: authorization.ResourceFor(issuer, subject), Permissions: []string{authorization.Read, authorization.Project}}, nil
-	})
-	scope, err := resolve(context.Background(), "")
-	if err != nil || !scope.Allows(authorization.Read) || scope.Allows(authorization.Write) {
-		t.Fatalf("published sample permissions=%+v err=%v", scope, err)
 	}
 }
 
@@ -185,13 +189,14 @@ func TestOwnerSyncStoreSkipsMissingUser(t *testing.T) {
 	}
 }
 
-func TestUserRouterIsolatesUsersFromSampleAndEachOther(t *testing.T) {
+func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close()
 	const issuer = "https://identity.test"
+	const guestSubject = "11111111-1111-1111-1111-111111111111"
 	ownerID := authorization.ResourceFor(issuer, "a").ID
 	owner, err := database.EnsureUser(authorization.ActorKey(issuer, "a"), issuer, "a")
 	if err != nil {
@@ -203,7 +208,11 @@ func TestUserRouterIsolatesUsersFromSampleAndEachOther(t *testing.T) {
 	if _, err := owner.CreateAccount(types.Account{ID: "primary", Name: "Private owner checking", Kind: "cash", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.EnsureSampleUser(); err != nil {
+	guestStore, err := database.EnsureUser(authorization.ActorKey(issuer, guestSubject), issuer, guestSubject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := guestStore.InitializeDocument(); err != nil {
 		t.Fatal(err)
 	}
 	router, err := newUserRouter(database, userRouterConfig{PrimaryResourceID: ownerID})
@@ -222,7 +231,7 @@ func TestUserRouterIsolatesUsersFromSampleAndEachOther(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	guest, err := router.handlerFor(authorization.ResourceFor(issuer, ""))
+	guest, err := router.handlerFor(authorization.ResourceFor(issuer, guestSubject))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,17 +239,20 @@ func TestUserRouterIsolatesUsersFromSampleAndEachOther(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if model(t, ownerHandler).Accounts[0].ID != "primary" || len(model(t, other).Accounts) != 0 {
+	if model(t, ownerHandler).Accounts[0].ID != "primary" || len(model(t, other).Accounts) != 0 || len(model(t, guest).Accounts) != 0 {
 		t.Fatal("a user exposed another user's financial rows")
 	}
 	write := `{"id":"other","name":"Other account checking","kind":"cash","enabled":true}`
 	if w := post(t, other, "POST", "/v1/accounts", write); w.Code != 200 {
 		t.Fatalf("other user write=%d %s", w.Code, w.Body.String())
 	}
-	if w := post(t, guest, "POST", "/v1/accounts", write); w.Code != 403 {
-		t.Fatalf("sample canonical write=%d", w.Code)
+	// Routing does not force the guest read-only; permission enforcement
+	// lives in identity.Wrap. Direct routing therefore isolates but does not
+	// deny.
+	if w := post(t, guest, "POST", "/v1/accounts", write); w.Code != 200 {
+		t.Fatalf("guest canonical write=%d", w.Code)
 	}
-	if len(model(t, other).Accounts) != 1 || len(model(t, ownerHandler).Accounts) != 1 {
+	if len(model(t, other).Accounts) != 1 || len(model(t, ownerHandler).Accounts) != 1 || len(model(t, guest).Accounts) != 1 {
 		t.Fatal("canonical writes crossed the user boundary")
 	}
 	// Closing the router must not close its shared database.
@@ -250,8 +262,8 @@ func TestUserRouterIsolatesUsersFromSampleAndEachOther(t *testing.T) {
 	if err := database.PingContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	// Requests without a verified scope fail closed; unknown resources and the
-	// sample-as-primary never provision.
+	// Requests without a verified scope fail closed; unknown resources and a
+	// non-private primary never provision.
 	if w := post(t, router, "GET", "/v1/financial-model", ""); w.Code != 403 {
 		t.Fatalf("unverified user routing=%d", w.Code)
 	}
@@ -269,6 +281,7 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
 	}
 	defer database.Close()
 	const issuer = "https://identity.test"
+	const guestSubject = "11111111-1111-1111-1111-111111111111"
 	ownerID := authorization.ResourceFor(issuer, "a").ID
 	ownerStore, err := database.EnsureUser(authorization.ActorKey(issuer, "a"), issuer, "a")
 	if err != nil {
@@ -277,7 +290,7 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
 	if _, err := database.EnsureUser(authorization.ActorKey(issuer, "b"), issuer, "b"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.EnsureSampleUser(); err != nil {
+	if _, err := database.EnsureUser(authorization.ActorKey(issuer, guestSubject), issuer, guestSubject); err != nil {
 		t.Fatal(err)
 	}
 	router, err := newUserRouter(database, userRouterConfig{
@@ -288,7 +301,7 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer router.Close()
-	for _, subject := range []string{"a", "b", ""} {
+	for _, subject := range []string{"a", "b", guestSubject} {
 		handler, err := router.handlerFor(authorization.ResourceFor(issuer, subject))
 		if err != nil {
 			t.Fatal(err)
@@ -301,7 +314,7 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
 			t.Fatal(err)
 		}
-		if w.Code != 200 || status.SyncConfigured != (subject == "a") || status.ReadOnly != (subject == "") {
+		if w.Code != 200 || status.SyncConfigured != (subject == "a") || status.ReadOnly {
 			t.Fatalf("subject %q status=%d %+v", subject, w.Code, status)
 		}
 	}

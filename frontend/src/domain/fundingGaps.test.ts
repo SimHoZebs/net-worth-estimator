@@ -13,20 +13,26 @@ describe("derive funding gaps", () => {
 		});
 		expect(
 			deriveFundingGaps({
-				plan: financialModelFixture,
+				accounts: financialModelFixture.accounts,
+				transactions: financialModelFixture.transactions,
+				startDate: financialModelFixture.startDate,
 				projection,
 				postingIds: [],
 			}),
 		).toEqual([]);
 		const gaps = deriveFundingGaps({
-			plan: financialModelFixture,
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
 			projection,
 			postingIds: ["other"],
 		});
 		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06"]);
 		expect(
 			deriveFundingGaps({
-				plan: financialModelFixture,
+				accounts: financialModelFixture.accounts,
+				transactions: financialModelFixture.transactions,
+				startDate: financialModelFixture.startDate,
 				projection,
 				postingIds: null,
 			}),
@@ -34,7 +40,7 @@ describe("derive funding gaps", () => {
 	});
 
 	it("opens the window before the failure month without double-counting", () => {
-		const plan = {
+		const data = {
 			...financialModelFixture,
 			startDate: "2026-01-31",
 			accounts: financialModelFixture.accounts.map((account) =>
@@ -87,7 +93,12 @@ describe("derive funding gaps", () => {
 				}),
 			],
 		});
-		const gaps = deriveFundingGaps({ plan, projection });
+		const gaps = deriveFundingGaps({
+			accounts: data.accounts,
+			transactions: data.transactions,
+			startDate: data.startDate,
+			projection,
+		});
 		expect(gaps).toHaveLength(1);
 		expect(gaps[0]?.openingBalance).toBe(4550);
 		// The card filters on the recomputed summary: it must agree with the
@@ -102,7 +113,9 @@ describe("derive funding gaps", () => {
 			transactions: [transactionFixture()],
 		});
 		const [gap] = deriveFundingGaps({
-			plan: financialModelFixture,
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
 			projection,
 		});
 		expect(gap).toBeDefined();
@@ -130,7 +143,12 @@ describe("derive funding gaps", () => {
 			transactions: [transactionFixture({ fulfillment })],
 		});
 		expect(
-			deriveFundingGaps({ plan: financialModelFixture, projection }),
+			deriveFundingGaps({
+				accounts: financialModelFixture.accounts,
+				transactions: financialModelFixture.transactions,
+				startDate: financialModelFixture.startDate,
+				projection,
+			}),
 		).toEqual([]);
 	});
 
@@ -145,7 +163,12 @@ describe("derive funding gaps", () => {
 				}),
 			],
 		});
-		const gaps = deriveFundingGaps({ plan: financialModelFixture, projection });
+		const gaps = deriveFundingGaps({
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
+			projection,
+		});
 		expect(gaps).toHaveLength(1);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(1);
 	});
@@ -161,7 +184,12 @@ describe("derive funding gaps", () => {
 				}),
 			],
 		});
-		const gaps = deriveFundingGaps({ plan: financialModelFixture, projection });
+		const gaps = deriveFundingGaps({
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
+			projection,
+		});
 		expect(gaps).toHaveLength(1);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(500);
 	});
@@ -192,7 +220,9 @@ describe("derive funding gaps", () => {
 			],
 		});
 		const gaps = deriveFundingGaps({
-			plan: { ...financialModelFixture, startDate: "2026-01-31" },
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: "2026-01-31",
 			projection,
 		});
 		expect(gaps).toHaveLength(1);

@@ -5,8 +5,15 @@ export const permissionModelId = "waypoint/user-access";
 export const permissionAdapter = "user-policy-store";
 export const userActions = Object.freeze(["user:read", "user:project", "user:write"]);
 
+// Five-field bridge: r.sub is the provider owner/name resolved per request
+// through GET /api/get-user?owner=waypoint&userId=<verified immutable subject>.
+// r.actor and r.owner are the same stable app hash of issuer+subject, both
+// server-derived, never browser input. Group memberships assigned at creation
+// (application defaultGroup, seeded users) resolve through g(r.sub, p.sub).
+// No contextual owner/guest grant arms: cross-user requests fail on
+// r.actor == r.owner, and actions follow the member/viewer roles only.
 export const userModelText = `[request_definition]
-r = sub, obj, act, owner
+r = sub, obj, act, owner, actor
 
 [policy_definition]
 p = sub, obj, act, eft, unused, permissionId
@@ -18,20 +25,24 @@ g = _, _
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 
 [matchers]
-m = ((p.sub == "waypoint/user-owner" && r.sub == r.owner && r.sub != "guest") || (p.sub == "waypoint/guest" && r.sub == "guest" && r.obj == "users/sample") || g(r.sub, p.sub)) && keyMatch(r.obj, p.obj) && r.act == p.act
+m = g(r.sub, p.sub) && r.actor == r.owner && keyMatch(r.obj, p.obj) && r.act == p.act
 `;
 
 // User scope: action strings are user:* under waypoint/user-access.
-// Permission resources are users/* only, including the guest sample
-// users/sample (global read-only).
+// Permission resources are users/* for every scope. The r.actor == r.owner
+// matcher arm confines each request to the caller's own user resource, so one
+// generic resource pattern serves members and viewers. Creation-time group
+// memberships (application defaultGroup, seeded users) attach the roles:
+// waypoint/members grants all user actions, waypoint/viewers grants read and
+// project. Signup needs no role choice and no per-request grant reapplication.
 export function buildPermissionSeed() {
-  const role = (name, displayName, description) => ({
+  const role = (name, displayName, description, groups) => ({
     owner: "waypoint",
     name,
     displayName,
     description,
     users: [],
-    groups: [],
+    groups,
     roles: [],
     domains: [],
     isEnabled: true,
@@ -56,6 +67,18 @@ export function buildPermissionSeed() {
     expireTime: "",
     state: "Approved",
   });
+  // Groups back the creation-time role memberships. Users join them at
+  // creation (application defaultGroup, seeded users); roles point at them.
+  // The permission apply flow manages these groups add-only on sealed state,
+  // under the same preview/approve/drift discipline as models, roles,
+  // adapters, and permissions.
+  const group = (name, displayName) => ({
+    owner: "waypoint",
+    name,
+    displayName,
+    isTopGroup: true,
+    isEnabled: true,
+  });
   return {
     models: [
       {
@@ -67,16 +90,19 @@ export function buildPermissionSeed() {
     ],
     roles: [
       role(
-        "user-owner",
-        "Private user owner",
-        "Contextual role: the verified actor owns this private user. No signup-time role writes.",
+        "member",
+        "Private user member",
+        "Creation-time role: members of waypoint/members own their private user. Assigned through provider groups, never per-request writes.",
+        ["waypoint/members"],
       ),
       role(
-        "guest",
-        "Sample user guest",
-        "Contextual role: an anonymous actor can read and project only the separate sample user.",
+        "viewer",
+        "Provisioned guest viewer",
+        "Creation-time role: members of waypoint/viewers read and project their own scope. The anonymous guest resolves to one such provisioned account.",
+        ["waypoint/viewers"],
       ),
     ],
+    groups: [group("members", "Members"), group("viewers", "Viewers")],
     adapters: [
       {
         owner: "waypoint",
@@ -87,17 +113,17 @@ export function buildPermissionSeed() {
     ],
     permissions: [
       permission(
-        "own-private-user",
-        "Own private user: read, project, write",
-        "user-owner",
+        "member-private-user",
+        "Member private user: read, project, write",
+        "member",
         ["users/*"],
         [...userActions],
       ),
       permission(
-        "guest-sample-user",
-        "Sample user: guest read and project",
-        "guest",
-        ["users/sample"],
+        "viewer-guest-user",
+        "Viewer guest scope: read and project",
+        "viewer",
+        ["users/*"],
         ["user:read", "user:project"],
       ),
     ],

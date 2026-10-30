@@ -143,6 +143,11 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
   ) {
     throw new Error("Dev identity metadata does not match its saved configuration");
   }
+  if (!bootstrap.guest_subject || typeof bootstrap.guest_subject !== "string") {
+    throw new Error(
+      "Dev identity predates the provisioned guest account. Back up data, remove the dev state, and run setup again so provision.mjs can discover the guest subject.",
+    );
+  }
   if (config.ownerSubject === null) {
     config.ownerSubject = bootstrap.subject;
     await saveConfig(stateDir, config);
@@ -151,14 +156,22 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     throw new Error(
       `Set the verified Bridge ownerSubject in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. User ownership comes from the application database.`,
     );
+  if (config.guestSubject === null || config.guestSubject === undefined) {
+    config.guestSubject = bootstrap.guest_subject;
+    await saveConfig(stateDir, config);
+  }
+  if (!config.guestSubject || config.guestSubject === config.ownerSubject)
+    throw new Error(
+      `Set a verified provisioned guestSubject distinct from the owner in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. Anonymous traffic resolves to it.`,
+    );
   if (fresh) {
     const incoming = await snapshot(config, stateDir);
     if (validateSnapshot(incoming) !== "application")
       throw new Error(
         `Legacy snapshot saved at ${incoming} has no migration path. Use a current application database instead.`,
       );
-    const helper = resolve(stateDir, "refreshplan");
-    runCommand("go", ["-C", "backend", "build", "-o", helper, "./cmd/refreshplan"]);
+    const helper = resolve(stateDir, "refreshmodel");
+    runCommand("go", ["-C", "backend", "build", "-o", helper, "./cmd/refreshmodel"]);
     runCommand(helper, [
       "--db",
       destination,
@@ -170,6 +183,21 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
       bootstrap.subject,
       ...(sourceUser ? ["--source-user", sourceUser] : []),
     ]);
+    // Provision the guest destination row after owner initialization. The
+    // guest must already exist in Casdoor (seed + provision.mjs discovery);
+    // setupdb only records the ordinary user row and its blank document.
+    // Anonymous traffic resolves to bootstrap.guest_subject; publish-sample
+    // copies reviewed content into that existing row with --financial-only.
+    const setupHelper = resolve(stateDir, "setupdb");
+    runCommand("go", ["-C", "backend", "build", "-o", setupHelper, "./cmd/setupdb"]);
+    runCommand(setupHelper, [
+      "--db",
+      destination,
+      "--issuer",
+      bootstrap.issuer,
+      "--subject",
+      bootstrap.guest_subject,
+    ]);
   }
   await writeComposeEnv(config, envFile, stateDir);
   await writeOwner(stateDir, {
@@ -179,6 +207,7 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     casdoorUrl: config.identity.CASDOOR_PUBLIC_URL,
     ports: portsFor(config),
     ownerSubject: config.ownerSubject ?? null,
+    guestSubject: config.guestSubject ?? null,
     pid: process.pid,
     createdAt: new Date().toISOString(),
   });

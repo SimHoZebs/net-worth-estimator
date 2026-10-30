@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { financialModelFixture as examplePlan } from "../mocks/financialModel.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { activityProjection } from "../mocks/projection.ts";
 import {
 	accountTransactions,
@@ -8,12 +8,15 @@ import {
 } from "./accountActivity.ts";
 
 const projection = activityProjection();
+const { accounts, transactions, startDate } = financialModelFixture;
 
 describe("account-scoped transactions", () => {
 	it("includes recorded history and the dated projected occurrences belonging to an account", () => {
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection,
 		});
 		expect(rows.filter((row) => row.source === "historical")).toHaveLength(3);
@@ -24,7 +27,7 @@ describe("account-scoped transactions", () => {
 		expect(new Set(rows.map((row) => row.id)).size).toBe(rows.length);
 	});
 
-	it("does not duplicate recorded evidence from server events on or before the plan start", () => {
+	it("does not duplicate recorded evidence from server events on or before the projection start", () => {
 		const source = projection.transactions.find(
 			(transaction) =>
 				transaction.fromId === "checking" || transaction.toId === "checking",
@@ -33,11 +36,13 @@ describe("account-scoped transactions", () => {
 		const historical = {
 			...source,
 			transactionId: "historical-server-event",
-			date: examplePlan.startDate,
+			date: startDate,
 		};
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection: {
 				...projection,
 				transactions: [historical, ...projection.transactions],
@@ -51,12 +56,16 @@ describe("account-scoped transactions", () => {
 	it("shows the same transfer as money out of the source and money into the destination", () => {
 		const checking = accountTransactions({
 			accountId: "checking",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection,
 		});
 		const brokerage = accountTransactions({
 			accountId: "brokerage",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection,
 		});
 		const outgoing = checking.find((row) => row.transactionId === "invest");
@@ -91,7 +100,9 @@ describe("account-scoped transactions", () => {
 		};
 		const rows = accountTransactions({
 			accountId: "savings",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection: { ...projection, transactions: [multi] },
 		});
 		expect(rows).toContainEqual(
@@ -107,7 +118,9 @@ describe("account-scoped transactions", () => {
 	it("preserves requested and funded amounts and the reason for a shortfall", () => {
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection,
 		});
 		const failure = rows.find((row) => row.transactionId === "renovation");
@@ -118,15 +131,17 @@ describe("account-scoped transactions", () => {
 	});
 
 	it("keeps excluded recorded facts visible and excludes disabled planned rules", () => {
-		const plan = structuredClone(examplePlan);
-		for (const transaction of plan.transactions) {
+		const data = structuredClone(financialModelFixture);
+		for (const transaction of data.transactions) {
 			if (transaction.id === "pay-record-0" || transaction.id === "invest")
 				transaction.enabled = false;
 		}
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan,
-			projection: activityProjection(plan),
+			accounts: data.accounts,
+			transactions: data.transactions,
+			startDate: data.startDate,
+			projection: activityProjection(data),
 		});
 		expect(
 			rows.find((row) => row.transactionId === "pay-record-0")?.excluded,
@@ -135,8 +150,8 @@ describe("account-scoped transactions", () => {
 	});
 
 	it("flags sync pending charges instead of reporting them as user-excluded", () => {
-		const plan = structuredClone(examplePlan);
-		plan.transactions.push({
+		const data = structuredClone(financialModelFixture);
+		data.transactions.push({
 			id: "01900000-0000-7000-8000-000000000001",
 			name: "Mock Corner Store",
 			pending: true,
@@ -145,7 +160,7 @@ describe("account-scoped transactions", () => {
 			fromId: "checking",
 			toId: null,
 			frequency: "once",
-			startDate: plan.startDate,
+			startDate: data.startDate,
 			endDate: null,
 			annualIncrease: 0,
 			enabled: false,
@@ -157,8 +172,10 @@ describe("account-scoped transactions", () => {
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan,
-			projection: activityProjection(plan),
+			accounts: data.accounts,
+			transactions: data.transactions,
+			startDate: data.startDate,
+			projection: activityProjection(data),
 		});
 		expect(
 			rows.find(
@@ -171,8 +188,8 @@ describe("account-scoped transactions", () => {
 	});
 
 	it("marks holds that did not post without pending status", () => {
-		const plan = structuredClone(examplePlan);
-		plan.transactions.push({
+		const data = structuredClone(financialModelFixture);
+		data.transactions.push({
 			id: "01900000-0000-7000-8000-000000000002",
 			name: "Hold that did not post",
 			pending: false,
@@ -182,7 +199,7 @@ describe("account-scoped transactions", () => {
 			fromId: "checking",
 			toId: null,
 			frequency: "once",
-			startDate: plan.startDate,
+			startDate: data.startDate,
 			endDate: null,
 			annualIncrease: 0,
 			enabled: false,
@@ -193,8 +210,10 @@ describe("account-scoped transactions", () => {
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan,
-			projection: activityProjection(plan),
+			accounts: data.accounts,
+			transactions: data.transactions,
+			startDate: data.startDate,
+			projection: activityProjection(data),
 		});
 		expect(
 			rows.find(
@@ -208,8 +227,8 @@ describe("account-scoped transactions", () => {
 	});
 
 	it("does not infer pending status from a legacy ID prefix", () => {
-		const plan = structuredClone(examplePlan);
-		plan.transactions.push({
+		const data = structuredClone(financialModelFixture);
+		data.transactions.push({
 			id: "sfin-pending-checking-mock-pend1",
 			name: "Mock Corner Store",
 			amount: 42.1,
@@ -217,7 +236,7 @@ describe("account-scoped transactions", () => {
 			fromId: "checking",
 			toId: null,
 			frequency: "once",
-			startDate: plan.startDate,
+			startDate: data.startDate,
 			endDate: null,
 			annualIncrease: 0,
 			enabled: false,
@@ -229,8 +248,10 @@ describe("account-scoped transactions", () => {
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
-			plan,
-			projection: activityProjection(plan),
+			accounts: data.accounts,
+			transactions: data.transactions,
+			startDate: data.startDate,
+			projection: activityProjection(data),
 		});
 		expect(
 			rows.find(
@@ -248,9 +269,9 @@ describe("account-scoped transactions", () => {
 	])(
 		"keeps pending UUID %s after the balance checkpoint visible without projecting it",
 		(id) => {
-			const plan = structuredClone(examplePlan);
-			plan.transactions.push({
-				...plan.transactions[0]!,
+			const data = structuredClone(financialModelFixture);
+			data.transactions.push({
+				...data.transactions[0]!,
 				id,
 				amount: 42.1,
 				fromId: "checking",
@@ -261,11 +282,13 @@ describe("account-scoped transactions", () => {
 				readOnly: true,
 				pending: true,
 			});
-			const projection = activityProjection(plan);
+			const fixtureProjection = activityProjection(data);
 			const rows = accountTransactions({
 				accountId: "checking",
-				plan,
-				projection,
+				accounts: data.accounts,
+				transactions: data.transactions,
+				startDate: data.startDate,
+				projection: fixtureProjection,
 			});
 			expect(rows.filter((row) => row.transactionId === id)).toEqual([
 				expect.objectContaining({
@@ -277,22 +300,30 @@ describe("account-scoped transactions", () => {
 				}),
 			]);
 			expect(
-				projection.transactions.some((row) => row.transactionId === id),
+				fixtureProjection.transactions.some((row) => row.transactionId === id),
 			).toBe(false);
 			expect(
-				plan.transactions.find((transaction) => transaction.id === id)?.enabled,
+				data.transactions.find((transaction) => transaction.id === id)?.enabled,
 			).toBe(false);
 		},
 	);
 
 	it("has no manufactured transactions for growth-only or unknown accounts", () => {
 		expect(
-			accountTransactions({ accountId: "home", plan: examplePlan, projection }),
+			accountTransactions({
+				accountId: "home",
+				accounts,
+				transactions,
+				startDate,
+				projection,
+			}),
 		).toEqual([]);
 		expect(
 			accountTransactions({
 				accountId: "missing",
-				plan: examplePlan,
+				accounts,
+				transactions,
+				startDate,
 				projection,
 			}),
 		).toEqual([]);
@@ -301,7 +332,9 @@ describe("account-scoped transactions", () => {
 	it("omits zero-value scheduled payments after a debt has been paid off", () => {
 		const rows = accountTransactions({
 			accountId: "mortgage",
-			plan: examplePlan,
+			accounts,
+			transactions,
+			startDate,
 			projection,
 		});
 		expect(rows.length).toBeGreaterThan(0);
@@ -311,21 +344,23 @@ describe("account-scoped transactions", () => {
 });
 
 describe("transaction filtering", () => {
-	const transactions = accountTransactions({
+	const rows = accountTransactions({
 		accountId: "checking",
-		plan: examplePlan,
+		accounts,
+		transactions,
+		startDate,
 		projection,
 	});
 	const apply = (filters: Partial<typeof defaultActivityFilters>) =>
 		filterTransactions({
-			transactions,
-			startDate: examplePlan.startDate,
+			transactions: rows,
+			startDate: startDate,
 			filters: { ...defaultActivityFilters, ...filters },
 		});
 
 	it("searches both transaction names and the other account", () => {
 		expect(apply({ query: "RENOVATION" })).toHaveLength(1);
-		const investCounterparty = transactions.find(
+		const investCounterparty = rows.find(
 			(row) => row.transactionId === "invest",
 		)?.counterparty;
 		if (!investCounterparty) throw new Error("Expected an invest counterparty");
@@ -350,7 +385,7 @@ describe("transaction filtering", () => {
 		expect(apply({ source: "historical", direction: "out" })).toHaveLength(0);
 	});
 
-	it("filters the next 30 days from the plan date rather than the wall clock", () => {
+	it("filters the next 30 days from the saved start date rather than the wall clock", () => {
 		const rows = apply({ period: "30-days" });
 		expect(rows).toHaveLength(5);
 		expect(

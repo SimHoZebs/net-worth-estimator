@@ -6,23 +6,26 @@ import {
 	updatePosting,
 	updateRule,
 } from "@/api/generated/endpoints.ts";
-import type { PostingAmountResolution } from "@/api/generated/model/postingAmountResolution.ts";
-import type { PostingBody } from "@/api/generated/model/postingBody.ts";
-import type { RuleBody } from "@/api/generated/model/ruleBody.ts";
-import {
-	type Transaction,
-	type Plan,
-	visibleAccounts,
-} from "../../domain/model.ts";
+import { type Transaction, visibleAccounts } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
-import { upsertItem } from "../../domain/accountEdits.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { refreshTransactions } from "../../state/workspaceResources.ts";
-import { useUserPlan } from "../../state/useUserScope.ts";
-import { useTransactionCatalog } from "../../state/workspaceResources.ts";
-import { parseDisplayNumber, textValue, numberValue } from "./formValues.ts";
+import {
+	getServerModel,
+	refreshTransactions,
+	useTransactionCatalog,
+} from "../../state/workspaceResources.ts";
+import { useSavedAccounts, useSavedStartDate } from "../../state/savedRows.ts";
+import { parseDisplayNumber } from "./formValues.ts";
+import {
+	postingBody,
+	postingUpdateBody,
+	ruleBody,
+	ruleUpdateBody,
+	validateTransactionValues,
+	type TransactionFormValues,
+} from "./transactionBodies.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Notice } from "../Notice.tsx";
 import { Button } from "../Button.tsx";
@@ -30,130 +33,6 @@ import { dialogActionsStyles } from "../dialogStyles.ts";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 import { sourceReadOnlyReason } from "./EditorForm.tsx";
-
-export interface TransactionFormValues {
-	name: string;
-	amount: number;
-	annualIncrease: number;
-	fromId: string | null;
-	toId: string | null;
-	frequency: Transaction["frequency"];
-	startDate: string;
-	endDate: string | null;
-	postedDate: string | null;
-	enabled: boolean;
-	claimRuleId: string | null;
-	claimOccurrenceDate: string | null;
-}
-
-function midnightOfDay(day: string): number {
-	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
-}
-
-/**
- * Literal amount descriptor. A non-zero annual increase rides as a
- * growth-factor provider input, the same shape the adapter reads and writes,
- * so rules round-trip without dedicated backend columns.
- */
-function transactionAmountDescriptor(
-	amount: number,
-	annualIncrease: number,
-): PostingAmountResolution {
-	const expression = String(amount);
-	if (!annualIncrease)
-		return { resolver: "expression", config: { expression }, inputs: {} };
-	return {
-		resolver: "expression",
-		config: { expression: `(${expression}) * growth` },
-		inputs: {
-			growth: {
-				source: "provider",
-				provider: "growth-factor",
-				arguments: { annualGrowthRate: annualIncrease / 100 },
-			},
-		},
-	};
-}
-
-function postingBody(values: TransactionFormValues): PostingBody {
-	return {
-		name: values.name,
-		amount: transactionAmountDescriptor(values.amount, 0),
-		enabled: values.enabled,
-		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
-		destinations: values.toId ? [values.toId] : null,
-		postedTime: midnightOfDay(values.postedDate ?? values.startDate),
-		transactionTime: midnightOfDay(values.startDate),
-		// Pending is server-owned bank metadata and is never authored here.
-		...(values.claimRuleId && values.claimOccurrenceDate
-			? {
-					claim: {
-						ruleId: values.claimRuleId,
-						occurrenceDate: values.claimOccurrenceDate,
-					},
-				}
-			: {}),
-	};
-}
-
-function ruleBody(values: TransactionFormValues): RuleBody {
-	return {
-		name: values.name,
-		amount: transactionAmountDescriptor(values.amount, values.annualIncrease),
-		enabled: values.enabled,
-		frequency: values.frequency === "yearly" ? "annual" : "monthly",
-		startDate: values.startDate,
-		...(values.endDate ? { endDate: values.endDate } : {}),
-		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
-		destinations: values.toId ? [values.toId] : null,
-	};
-}
-
-/** Pure plan builder shared by the inline detail edits. */
-export function buildTransactionPlan({
-	plan,
-	item,
-	data,
-}: {
-	plan: Plan;
-	item: Transaction | null;
-	data: FormData;
-}): Plan {
-	const claimRuleId = textValue(data, "claimRuleId") || null;
-	const claimOccurrenceDate = textValue(data, "claimOccurrenceDate") || null;
-	const amountKind = textValue(data, "amountKind") || "fixed";
-	const advanced = amountKind !== "fixed" && amountKind !== "growth";
-	const transaction: Transaction = {
-		id: item?.id ?? crypto.randomUUID(),
-		name: textValue(data, "name"),
-		amount: advanced ? 0 : numberValue(data, "amount"),
-		amountKnown: !advanced,
-		fromId: textValue(data, "fromId") || null,
-		toId: textValue(data, "toId") || null,
-		frequency:
-			parseUnion(textValue(data, "frequency"), [
-				"monthly",
-				"yearly",
-				"once",
-			] as const) ?? "monthly",
-		startDate: textValue(data, "startDate"),
-		endDate:
-			textValue(data, "noEndDate") === "on"
-				? null
-				: textValue(data, "endDate") || null,
-		annualIncrease: advanced ? 0 : numberValue(data, "annualIncrease"),
-		enabled: textValue(data, "enabled") === "on",
-		readOnly: false,
-		claimRuleId,
-		claimOccurrenceDate,
-		postedDate: (textValue(data, "postedDate") || item?.postedDate) ?? null,
-		void: item?.void ?? false,
-	};
-	return {
-		...plan,
-		transactions: upsertItem({ items: plan.transactions, item: transaction }),
-	};
-}
 
 /** Transaction editor. Saves straight to the server; no draft involved. */
 export function TransactionEditor({
@@ -165,9 +44,16 @@ export function TransactionEditor({
 	onSaved: () => void;
 	onClose: () => void;
 }) {
-	const plan = useUserPlan();
+	// Saved rows only, never the review draft (useSavedAccounts /
+	// useSavedStartDate return null until their queries load).
+	const savedAccountsQuery = useSavedAccounts();
+	const savedStartDate = useSavedStartDate();
+	const savedAccounts = useMemo(
+		() => visibleAccounts(savedAccountsQuery ?? []),
+		[savedAccountsQuery],
+	);
+	const fallbackStart = savedStartDate ?? todayIso();
 	const catalog = useTransactionCatalog();
-	const accounts = useMemo(() => visibleAccounts(plan?.accounts ?? []), [plan]);
 	const claimRules = useMemo(
 		() =>
 			(catalog.data?.items ?? []).filter(
@@ -190,9 +76,7 @@ export function TransactionEditor({
 	);
 	const [fromId, setFromId] = useState(item?.fromId ?? "");
 	const [toId, setToId] = useState(item?.toId ?? "");
-	const [startDate, setStartDate] = useState(
-		item?.startDate ?? plan?.startDate ?? todayIso(),
-	);
+	const [startDate, setStartDate] = useState(item?.startDate ?? fallbackStart);
 	const [noEndDate, setNoEndDate] = useState(item?.endDate == null);
 	const [endDate, setEndDate] = useState(item?.endDate ?? "");
 	const [enabled, setEnabled] = useState(item?.enabled ?? true);
@@ -219,7 +103,7 @@ export function TransactionEditor({
 		frequency !== (item?.frequency ?? "monthly") ||
 		fromId !== (item?.fromId ?? "") ||
 		toId !== (item?.toId ?? "") ||
-		startDate !== (item?.startDate ?? plan?.startDate ?? todayIso()) ||
+		startDate !== (item?.startDate ?? fallbackStart) ||
 		noEndDate !== (item?.endDate == null) ||
 		endDate !== (item?.endDate ?? "") ||
 		enabled !== (item?.enabled ?? true) ||
@@ -231,37 +115,15 @@ export function TransactionEditor({
 		event.preventDefault();
 		if (blocked || saving) return;
 		const trimmedName = name.trim();
-		if (!trimmedName) {
-			setError("Give the transaction a name.");
-			return;
-		}
 		const parsedAmount = parseDisplayNumber(amount);
-		if (parsedAmount === null || parsedAmount < 0 || parsedAmount > 1e10) {
+		if (parsedAmount === null) {
 			setError("Enter an amount of zero or more.");
-			return;
-		}
-		if (!fromId && !toId) {
-			setError("Choose a source or destination account.");
-			return;
-		}
-		if (!startDate) {
-			setError("Choose a date.");
 			return;
 		}
 		const growth =
 			!isOnce && amountKind === "growth"
 				? (parseDisplayNumber(annualIncrease) ?? Number.NaN)
 				: 0;
-		if (!Number.isFinite(growth) || growth < -50 || growth > 50) {
-			setError("Enter a yearly increase between -50 and 50 percent.");
-			return;
-		}
-		if (!isOnce && !noEndDate && endDate && endDate < startDate) {
-			setError("The last occurrence cannot come before the first one.");
-			return;
-		}
-		setSaving(true);
-		setError(null);
 		const values: TransactionFormValues = {
 			name: trimmedName,
 			amount: parsedAmount,
@@ -279,21 +141,59 @@ export function TransactionEditor({
 					? claimOccurrenceDate
 					: null,
 		};
+		const invalid = validateTransactionValues(values);
+		if (invalid) {
+			setError(invalid);
+			return;
+		}
+		if (!isOnce && amountKind === "growth" && !Number.isFinite(growth)) {
+			setError("Enter a yearly increase between -50 and 50 percent.");
+			return;
+		}
+		setSaving(true);
+		setError(null);
+		const wasOnce = item?.frequency === "once";
+		const nowOnce = values.frequency === "once";
+		// Kind changes state explicit new bodies; same-kind updates carry
+		// unedited fields over from the canonical raw row.
+		const raw =
+			item && wasOnce === nowOnce
+				? nowOnce
+					? getServerModel()?.document?.postings.find(
+							(row) => row.id === item.id,
+						)
+					: getServerModel()?.document?.recurrenceRules.find(
+							(row) => row.id === item.id,
+						)
+				: undefined;
+		if (item && wasOnce === nowOnce && !raw) {
+			setSaving(false);
+			setError(
+				"The saved transaction could not be loaded. Close and try again.",
+			);
+			return;
+		}
 		const ok = item
 			? await performSave({
 					call: () => {
-						const wasOnce = item.frequency === "once";
-						const isOnce = values.frequency === "once";
-						if (wasOnce !== isOnce)
+						if (wasOnce !== nowOnce)
 							return convertTransaction(item.id, {
-								kind: isOnce ? "posting" : "rule",
-								...(isOnce
+								kind: nowOnce ? "posting" : "rule",
+								...(nowOnce
 									? { posting: postingBody(values) }
 									: { rule: ruleBody(values) }),
 							});
-						return isOnce
-							? updatePosting(item.id, postingBody(values))
-							: updateRule(item.id, ruleBody(values));
+						if (!raw)
+							throw new Error("The saved transaction could not be loaded.");
+						return "postedTime" in raw
+							? updatePosting(
+									item.id,
+									postingUpdateBody({ baseline: item, raw, values }),
+								)
+							: updateRule(
+									item.id,
+									ruleUpdateBody({ baseline: item, raw, values }),
+								);
 					},
 					refresh: refreshTransactions,
 					failureMessage: "The transaction could not be saved.",
@@ -310,6 +210,7 @@ export function TransactionEditor({
 					failureMessage: "The transaction could not be saved.",
 				});
 		setSaving(false);
+		// Keep failed form values; close only after confirmed save.
 		if (ok) onSaved();
 		else
 			setError(
@@ -405,7 +306,7 @@ export function TransactionEditor({
 						onChange={(event) => setFromId(event.target.value)}
 					>
 						<option value="">External income</option>
-						{accounts
+						{savedAccounts
 							.filter((account) => account.kind !== "debt")
 							.map((account) => (
 								<option key={account.id} value={account.id}>
@@ -419,7 +320,7 @@ export function TransactionEditor({
 						onChange={(event) => setToId(event.target.value)}
 					>
 						<option value="">External expense</option>
-						{accounts.map((account) => (
+						{savedAccounts.map((account) => (
 							<option key={account.id} value={account.id}>
 								{account.name}
 							</option>

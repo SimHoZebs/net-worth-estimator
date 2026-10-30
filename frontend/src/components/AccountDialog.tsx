@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { accountTransactions } from "../domain/accountActivity.ts";
 import { dateLabel, money } from "../domain/format.ts";
-import type { Account, Plan } from "../domain/model.ts";
+import type { Account, Transaction } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/accountEdits.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
@@ -13,40 +13,49 @@ import { Tabs } from "./Tabs.tsx";
 
 export function AccountDialog({
 	account,
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
+	readOnly,
 	temporary,
 	onClose,
 	onEdit,
-	onApply,
 }: {
 	account: Account;
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	projection: Projection;
+	readOnly: boolean;
 	temporary: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
-	onApply: (plan: Plan) => boolean;
 }) {
-	const [view, setView] = useState<"transactions" | "details" | "recurring">(
-		"transactions",
-	);
-	const transactions = useMemo(
-		() => accountTransactions({ accountId: account.id, plan, projection }),
-		[account.id, plan, projection],
+	const [view, setView] = useTransactionView();
+	const occurrences = useMemo(
+		() =>
+			accountTransactions({
+				accountId: account.id,
+				accounts,
+				transactions,
+				startDate,
+				projection,
+			}),
+		[account.id, accounts, transactions, startDate, projection],
 	);
 	const recurring = useMemo(
 		() =>
-			plan.transactions.filter(
+			transactions.filter(
 				(transaction) =>
 					transaction.frequency !== "once" &&
 					(transaction.fromId === account.id ||
 						transaction.toId === account.id),
 			),
-		[plan.transactions, account.id],
+		[transactions, account.id],
 	);
 	const starting =
-		projection.points.find((point) => point.date === plan.startDate) ??
+		projection.points.find((point) => point.date === startDate) ??
 		projection.points[0];
 	const last = projection.points.at(-1);
 	return (
@@ -84,7 +93,7 @@ export function AccountDialog({
 					{
 						id: "transactions",
 						label: "Transactions",
-						count: transactions.length,
+						count: occurrences.length,
 					},
 					{ id: "recurring", label: "Recurring", count: recurring.length },
 					{ id: "details", label: "Account details" },
@@ -97,23 +106,35 @@ export function AccountDialog({
 			>
 				{view === "transactions" ? (
 					<Transactions
-						transactions={transactions}
-						plan={plan}
-						horizon={last?.date ?? plan.startDate}
+						occurrences={occurrences}
+						rows={transactions}
+						accounts={accounts}
+						startDate={startDate}
+						readOnly={readOnly}
 						onEdit={onEdit}
 					/>
 				) : view === "recurring" ? (
-					<RecurringRules account={account} plan={plan} onEdit={onEdit} />
+					<RecurringRules
+						account={account}
+						accounts={accounts}
+						transactions={transactions}
+						startDate={startDate}
+						readOnly={readOnly}
+						onEdit={onEdit}
+					/>
 				) : (
 					<AccountDetails
 						key={account.id}
 						account={account}
-						plan={plan}
 						endingBalance={last?.balances[account.id] ?? 0}
-						onApply={onApply}
+						readOnly={readOnly}
 					/>
 				)}
 			</Tabs>
 		</Drawer>
 	);
+}
+
+function useTransactionView() {
+	return useState<"transactions" | "details" | "recurring">("transactions");
 }

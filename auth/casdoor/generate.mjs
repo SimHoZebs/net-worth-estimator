@@ -1,11 +1,16 @@
 import { mkdir, writeFile, chmod, stat, readdir } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { randomBytes } from "node:crypto";
 import { buildBranding } from "./branding.mjs";
 import { buildPermissionSeed } from "./permissions.mjs";
 import { allowPrivateHTTP, origin } from "./private-lan.mjs";
 
 export const defaultStateDir = resolve(dirname(fileURLToPath(import.meta.url)), "data");
+
+// Provider-reserved names that a guest account must never take. The bootstrap
+// username collision is validated separately in settingsFromEnv.
+export const reservedGuestNames = Object.freeze(["admin", "built-in"]);
 
 export { origin };
 
@@ -30,6 +35,12 @@ export function settingsFromEnv(env) {
     adminPassword: secret("CASDOOR_ADMIN_PASSWORD"),
     username: required("CASDOOR_USER_NAME"),
     password: secret("CASDOOR_USER_PASSWORD"),
+    guestName: env.CASDOOR_GUEST_NAME || "guest",
+    // The guest password is machine-generated and unknown to the operator.
+    // Anonymous traffic never signs in as the guest; it only resolves to the
+    // guest subject. Stored in the 0600 seed file. Rotate it with the provider
+    // password reset if guest sign-in is ever required for diagnosis.
+    guestPassword: randomBytes(24).toString("hex"),
     email: env.CASDOOR_USER_EMAIL || "",
     displayName: env.CASDOOR_USER_DISPLAY_NAME || required("CASDOOR_USER_NAME"),
   };
@@ -68,6 +79,17 @@ export function settingsFromEnv(env) {
   }
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(settings.username)) {
     throw new Error("CASDOOR_USER_NAME must contain 1–64 URL-safe characters");
+  }
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(settings.guestName)) {
+    throw new Error("CASDOOR_GUEST_NAME must contain 1–64 URL-safe characters");
+  }
+  if (settings.guestName === settings.username) {
+    throw new Error("CASDOOR_GUEST_NAME must not collide with CASDOOR_USER_NAME");
+  }
+  if (reservedGuestNames.includes(settings.guestName)) {
+    throw new Error(
+      `CASDOOR_GUEST_NAME must not collide with a reserved provider name (${reservedGuestNames.join(", ")})`,
+    );
   }
   if (settings.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.email)) {
     throw new Error("CASDOOR_USER_EMAIL must be an email address");
@@ -125,6 +147,10 @@ export function buildSeed(settings) {
         displayName: "Waypoint",
         ...buildBranding(),
         organization: "waypoint",
+        // Creation-time membership: password and OAuth signups join
+        // waypoint/members unless an invitation or provider signup group
+        // overrides it. Seeded users below carry explicit memberships.
+        defaultGroup: "waypoint/members",
         cert: "cert-waypoint",
         homepageUrl: `${settings.appUrl}/`,
         enablePassword: true,
@@ -185,12 +211,32 @@ export function buildSeed(settings) {
         displayName: settings.displayName,
         email: settings.email,
         password: settings.password,
+        groups: ["waypoint/members"],
+        signupApplication: "waypoint",
+        isAdmin: false,
+        isForbidden: false,
+        isDeleted: false,
+      },
+      {
+        // The provisioned guest is a normal account in the same user-scoped
+        // tables. Anonymous traffic resolves to its provider-generated
+        // subject; nothing signs in with its unknown password. Its UUID comes
+        // from Casdoor at import (init_data overwrites seed IDs), so
+        // provision.mjs discovers it via get-user and persists it to
+        // bootstrap.json as guest_subject. Do not hand-edit an ID here.
+        owner: "waypoint",
+        name: settings.guestName,
+        type: "normal-user",
+        displayName: "Guest",
+        password: settings.guestPassword,
+        groups: ["waypoint/viewers"],
         signupApplication: "waypoint",
         isAdmin: false,
         isForbidden: false,
         isDeleted: false,
       },
     ],
+    // Creation-time groups arrive through the permission seed spread above.
     // AddCert creates a fresh key pair and x509 certificate. Merge mode preserves it.
     certs: [
       {

@@ -3,7 +3,7 @@ import { Repeat2, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { accountTransactions } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
-import type { Plan } from "../../domain/model.ts";
+import type { Account, Transaction } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
 import { DetailList, DetailRow } from "../DetailRow.tsx";
@@ -44,45 +44,52 @@ const postingFilter = cva(
  */
 export function AccountDetailsModal({
 	card,
-	plan,
+	accounts,
+	transactions,
+	startDate,
+	readOnly,
 	projection,
 	onClose,
 }: {
 	card: AccountCardModel;
-	plan: Plan;
+	accounts: Account[];
+	/** Saved rules, for the detail view's lookups and the activity ledger. */
+	transactions: Transaction[];
+	startDate: string;
+	readOnly: boolean;
 	projection: Projection | null;
 	onClose: () => void;
 }) {
 	const [query, setQuery] = useState("");
 	const [filter, setFilter] = useState<StatusFilter>("all");
 	const [page, setPage] = useState(0);
-	const [selectedId, setSelectedId] = useSelectedId(plan);
 	const listId = useId();
 	const [pageAccountId, setPageAccountId] = useState(card.id);
 	if (pageAccountId !== card.id) {
 		setPageAccountId(card.id);
 		setPage(0);
 	}
-	const transactions = useMemo(
+	const ledger = useMemo(
 		() =>
 			projection
-				? accountTransactions({ accountId: card.id, plan, projection })
+				? accountTransactions({
+						accountId: card.id,
+						accounts,
+						transactions,
+						startDate,
+						projection,
+					})
 				: [],
-		[card.id, plan, projection],
+		[card.id, accounts, transactions, startDate, projection],
 	);
-	const planTransactions = useMemo(
-		() =>
-			new Map(
-				plan.transactions.map((planTransaction) => [
-					planTransaction.id,
-					planTransaction,
-				]),
-			),
-		[plan.transactions],
+	const [selectedId, setSelectedId] = useSelectedId(ledger);
+	const savedById = useMemo(
+		() => new Map(transactions.map((saved) => [saved.id, saved])),
+		[transactions],
 	);
 	const shown = useMemo(() => {
 		const needle = query.trim().toLowerCase();
-		return transactions.filter((transaction) => {
+		return ledger.filter((transaction) => {
 			if (filter === "pending" && !transaction.pending) return false;
 			if (
 				filter === "posted" &&
@@ -97,7 +104,7 @@ export function AccountDetailsModal({
 				.toLowerCase()
 				.includes(needle);
 		});
-	}, [transactions, query, filter]);
+	}, [ledger, query, filter]);
 	const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
 	const currentPage = Math.min(page, pageCount - 1);
 	const rows = shown.slice(
@@ -111,11 +118,10 @@ export function AccountDetailsModal({
 			?.scrollIntoView({ block: "nearest" });
 	};
 	const selected = selectedId
-		? (transactions.find((transaction) => transaction.id === selectedId) ??
-			null)
+		? (ledger.find((transaction) => transaction.id === selectedId) ?? null)
 		: null;
 	const selectedPlanTransaction = selected
-		? (planTransactions.get(selected.transactionId) ?? null)
+		? (savedById.get(selected.transactionId) ?? null)
 		: null;
 	return (
 		<Modal
@@ -170,7 +176,7 @@ export function AccountDetailsModal({
 			<div className="mt-2 flex items-center justify-between gap-4">
 				<h2 className="text-sm">Transactions</h2>
 				<span className="text-sm leading-relaxed text-muted">
-					{transactions.length} loaded
+					{ledger.length} loaded
 				</span>
 			</div>
 			<div className="mb-3 flex flex-wrap items-center gap-3">
@@ -216,7 +222,7 @@ export function AccountDetailsModal({
 								key={transaction.id}
 								transaction={transaction}
 								planTransaction={
-									planTransactions.get(transaction.transactionId) ?? null
+									savedById.get(transaction.transactionId) ?? null
 								}
 								onEdit={() => setSelectedId(transaction.id)}
 							/>
@@ -240,11 +246,11 @@ export function AccountDetailsModal({
 				/>
 			)}
 			<p className="py-2 text-sm leading-relaxed text-muted">
-				{transactions.length > 0 && selected == null ? (
+				{ledger.length > 0 && selected == null ? (
 					<span>
 						<Repeat2 size={12} aria-hidden="true" className="align-middle" />{" "}
 						Recurring transactions show in the account with their schedule.
-						Dates shown {dateLabel(plan.startDate, true)} onward.
+						Dates shown {dateLabel(startDate, true)} onward.
 					</span>
 				) : (
 					<span>
@@ -257,8 +263,9 @@ export function AccountDetailsModal({
 				<TransactionDetail
 					transaction={selected}
 					planTransaction={selectedPlanTransaction}
-					accounts={plan.accounts}
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					readOnly={readOnly}
 					onClose={() => setSelectedId(null)}
 				/>
 			)}

@@ -38,18 +38,15 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 	if got := query(t, target, "SELECT CAST(b.data AS TEXT) FROM receipts r JOIN blob_data b ON b.key=r.blob_key WHERE r.user_id='owner' AND r.id=?", r.ID); got != "private image" {
 		t.Fatal("refresh dropped receipt image")
 	}
-	if err := refresh(target, source, "other", "", true); err != nil {
+	if err := refresh(target, source, "other", "owner", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='sample'"); got != "0" {
-		t.Fatal("published private receipt", got)
-	}
-	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner'"); got != "1" {
-		t.Fatal("sample publication changed private receipts", got)
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner'"); got != "0" {
+		t.Fatal("financial-only published private receipt", got)
 	}
 }
 
-func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForSample(t *testing.T) {
+func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForFinancialOnly(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
@@ -78,13 +75,24 @@ func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForSample(t *tes
 	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
 		t.Fatalf("private posting field = %s", got)
 	}
-	if err := refresh(target, source, "other", "", true); err != nil {
+	// A second ordinary destination proves the private copy above stays
+	// intact while a financial-only copy strips receipt references.
+	db, err = sqlite.OpenDatabase(target)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='sample' AND id=?", p.ID); got != `[]` {
-		t.Fatalf("sample posting field = %s", got)
+	if _, err := db.EnsureUser("second", "https://issuer.invalid", "second"); err != nil {
+		db.Close()
+		t.Fatal(err)
+	}
+	db.Close()
+	if err := refresh(target, source, "other", "second", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='second' AND id=?", p.ID); got != `[]` {
+		t.Fatalf("financial-only posting field = %s", got)
 	}
 	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
-		t.Fatalf("sample publication changed private posting field = %s", got)
+		t.Fatalf("financial-only publication changed private posting field = %s", got)
 	}
 }

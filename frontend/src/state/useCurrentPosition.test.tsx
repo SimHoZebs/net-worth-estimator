@@ -10,11 +10,9 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { useCurrentPosition } from "./useCurrentPosition.ts";
-import { resetWorkspaceStore } from "./workspaceStore.ts";
 
 afterEach(() => {
 	cleanup();
-	resetWorkspaceStore();
 	suspendUserScope();
 	vi.unstubAllGlobals();
 });
@@ -47,7 +45,6 @@ function setup() {
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: `users/${"a".repeat(64)}`,
-				kind: "private",
 				permissions: ["user:read"],
 			},
 			subject: `users/${"a".repeat(64)}`,
@@ -204,7 +201,6 @@ it("separates identical models by resource identity", async () => {
 				subject: null,
 				resource: {
 					id,
-					kind: "sample",
 					permissions: ["user:read", "user:project"],
 				},
 			},
@@ -222,7 +218,7 @@ it("separates identical models by resource identity", async () => {
 	expect(seen).toEqual(["users/one", "users/two"]);
 });
 
-it("ignores workspace drafts and requests the saved model", async () => {
+it("requests the saved model without local edits", async () => {
 	setup();
 	const bodies: unknown[] = [];
 	vi.stubGlobal(
@@ -235,37 +231,6 @@ it("ignores workspace drafts and requests the saved model", async () => {
 			return new Response(JSON.stringify({ result }), { headers });
 		}),
 	);
-	const { useWorkspaceStore } = await import("./workspaceStore.ts");
-	useWorkspaceStore.setState({
-		draft: {
-			schemaVersion: 1,
-			name: "Draft marker",
-			origin: "personal",
-			startDate: "2026-01-01",
-			updatedAt: new Date().toISOString(),
-			revision: 1,
-			readOnly: false,
-			accounts: [
-				{
-					id: "draft-acc",
-					name: "Draft",
-					kind: "cash",
-					balance: 200,
-					minBalance: 0,
-					maxBalance: null,
-					color: null,
-					observedOn: "2026-01-01",
-					balanceCheck: false,
-					source: "Manual entry",
-					readOnly: false,
-				},
-			],
-			transactions: [],
-			plannedPurchases: [],
-			evaluations: [],
-			assumptions: { inflation: 2, volatility: 0 },
-		} as never,
-	});
 	const saved = model(100);
 	const hook = renderHook(() => useCurrentPosition({ document: saved }), {
 		wrapper,

@@ -9,17 +9,11 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resetUiStore, useUiStore } from "../state/uiStore.ts";
 import { notifySuccess, resetNotifications } from "../state/notifications.ts";
-import {
-	resetWorkspaceStore,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
 import type { FinancialModelResponse } from "../api/index.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { financialModelFixture } from "../mocks/financialModel.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
-import { useUserPlan } from "../state/useUserScope.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerApp } from "./ServerApp.tsx";
 import { stubTestServer } from "../mocks/waypointServer.ts";
@@ -46,32 +40,26 @@ vi.mock("../WorkspaceShell.tsx", () => ({
 		<>
 			<p>Workspace screen</p>
 			<NotificationCenter />
-			<Readout />
 		</>
 	),
 }));
-function Readout() {
-	return <p>{useUserPlan()?.name}</p>;
-}
 
 beforeEach(() => {
 	vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn() });
 	acceptTestResource();
 	stubWorkspaceFetch();
 	resetServerQueryCache();
-	resetWorkspaceStore();
 	vi.clearAllMocks();
 });
 afterEach(() => {
 	cleanup();
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	resetUiStore();
 	resetNotifications();
 	vi.unstubAllGlobals();
 });
 
-it("keeps notification and draft-storage state out of the root's server loading gate", async () => {
+it("keeps notification state out of the root's server loading gate", async () => {
 	render(<ServerApp />);
 	await screen.findByText("Recovery screen");
 	act(() => {
@@ -84,15 +72,7 @@ it("keeps notification and draft-storage state out of the root's server loading 
 		"Changes saved on the server.",
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
-	act(() => useWorkspaceStore.setState({ error: "transient" }));
 	expect(useWorkspaceNavigation).toHaveBeenCalledTimes(rootRenders);
-	act(() => useWorkspaceStore.setState({ error: null }));
-	act(() =>
-		useWorkspaceStore.setState({
-			draft: { ...financialModelFixture, name: "Edited browser draft" },
-		}),
-	);
-	expect(screen.getByText("Edited browser draft")).toBeTruthy();
 });
 
 it("uses Query availability and import state to select the screen", async () => {

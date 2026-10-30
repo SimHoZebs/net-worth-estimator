@@ -2800,10 +2800,6 @@
 					"id": {
 						"type": "string"
 					},
-					"kind": {
-						"enum": ["private", "sample"],
-						"type": "string"
-					},
 					"permissions": {
 						"items": {
 							"type": "string"
@@ -2811,7 +2807,7 @@
 						"type": "array"
 					}
 				},
-				"required": ["id", "kind", "permissions"],
+				"required": ["id", "permissions"],
 				"type": "object"
 			},
 			"SessionResponse": {

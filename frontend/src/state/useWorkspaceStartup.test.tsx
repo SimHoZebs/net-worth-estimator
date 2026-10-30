@@ -6,7 +6,6 @@ import { acceptOwnerResource } from "../mocks/resource.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 import { SessionContext } from "../auth/sessionContext.ts";
 import { resetServerQueryCache } from "./serverQuery.ts";
-import { resetWorkspaceStore } from "./workspaceStore.ts";
 import { useWorkspaceStartup } from "./useWorkspaceStartup.ts";
 
 function owner(id: string) {
@@ -15,13 +14,11 @@ function owner(id: string) {
 
 beforeEach(() => {
 	owner("users/a");
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
 });
 afterEach(() => {
 	cleanup();
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	suspendUserScope();
 	vi.unstubAllGlobals();
@@ -56,7 +53,8 @@ it("waits for the session boundary before fetching another owner's workspace", a
 					enabled: true,
 					authenticated: true,
 					allowed: true,
-					resource: { id, kind: "private", permissions: ["user:read"] },
+					resource: { id, permissions: ["user:read"] },
+					user: { subject: id, name: "User" },
 				},
 				logout: async () => {},
 				logoutPending: false,

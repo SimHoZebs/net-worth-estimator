@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Guest sample on the normal Casdoor stack. Owner checks live under auth/.
+# Provisioned guest on the normal Casdoor stack. Owner checks live under auth/.
 
 frontend_url=${FRONTEND_URL:-http://localhost:8080}
 backend_url=${BACKEND_URL:-$frontend_url}
@@ -10,7 +10,10 @@ resource=$(printf '%s' "$session" | node --input-type=module -e '
   let data = "";
   for await (const chunk of process.stdin) data += chunk;
   const session = JSON.parse(data);
-  if (!session.enabled || !session.allowed || session.resource?.kind !== "sample") process.exit(1);
+  if (!session.enabled || !session.allowed || session.authenticated !== false) process.exit(1);
+  if (typeof session.resource?.id !== "string" || !/^users\/[0-9a-f]{64}$/.test(session.resource.id)) process.exit(1);
+  if ("kind" in session.resource) process.exit(1);
+  if (!session.resource.permissions?.includes("user:read")) process.exit(1);
   process.stdout.write(session.resource.id);
 ')
 

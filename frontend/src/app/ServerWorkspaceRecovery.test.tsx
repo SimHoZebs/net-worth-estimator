@@ -7,7 +7,6 @@ import {
 	setServerStatusFixture,
 } from "../mocks/workspace.ts";
 import { SessionContext } from "../auth/sessionContext.ts";
-import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
@@ -31,12 +30,11 @@ vi.mock("../workspace/WorkspaceLayout.tsx", () => ({
 
 afterEach(() => {
 	cleanup();
-	resetWorkspaceStore();
 });
 
-it("keeps navigation usable without account controls when the private plan is empty", () => {
+it("keeps navigation usable without account controls when saved data is empty", () => {
 	setServerStatusFixture({ readOnly: false });
-	setServerModelFixture(undefined, { document: null, conversion: null });
+	setServerModelFixture(undefined, { document: null });
 	const logout = vi.fn(async () => {});
 	render(
 		<SessionContext
@@ -47,7 +45,6 @@ it("keeps navigation usable without account controls when the private plan is em
 					allowed: true,
 					resource: {
 						id: `users/${"a".repeat(64)}`,
-						kind: "private",
 						permissions: ["user:read", "user:write"],
 					},
 					user: {

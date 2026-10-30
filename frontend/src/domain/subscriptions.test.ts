@@ -2,24 +2,22 @@ import { describe, expect, it } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import {
 	addMonthsClamped,
-	markAsInstallment,
-	markAsSubscription,
+	buildInstallment,
+	buildSubscription,
+	buildSubscriptionConversion,
+	subscriptionSourceError,
 } from "./subscriptions.ts";
 
-describe("mark as subscription", () => {
+const renovation = financialModelFixture.transactions.find(
+	(item) => item.id === "renovation",
+)!;
+
+describe("subscription conversion", () => {
 	it("creates an ongoing monthly rule and claims the original", () => {
-		const next = markAsSubscription(financialModelFixture, "renovation", {
-			ruleId: "renovation-sub",
-		});
+		const next = buildSubscription(renovation, { ruleId: "renovation-sub" });
 		if (next instanceof Error) throw next;
-		expect(next.transactions).toHaveLength(
-			financialModelFixture.transactions.length + 1,
-		);
-		const original = next.transactions.find((item) => item.id === "renovation");
-		const rule = next.transactions.find((item) => item.id === "renovation-sub");
-		expect(original?.claimRuleId).toBe("renovation-sub");
-		expect(original?.claimOccurrenceDate).toBe(original?.startDate);
-		expect(rule).toMatchObject({
+		expect(next.rule).toMatchObject({
+			id: "renovation-sub",
 			name: "Home renovation",
 			amount: 48000,
 			fromId: "checking",
@@ -29,43 +27,52 @@ describe("mark as subscription", () => {
 			endDate: null,
 			enabled: true,
 		});
-		// Source plan is untouched.
-		expect(
-			financialModelFixture.transactions.find(
-				(item) => item.id === "renovation",
-			)?.claimRuleId,
-		).toBeNull();
+		expect(next.claimed).toMatchObject({
+			id: "renovation",
+			claimRuleId: "renovation-sub",
+			claimOccurrenceDate: "2028-06-15",
+		});
+		// Source row is untouched; callers persist the returned copies.
+		expect(renovation.claimRuleId).toBeNull();
 	});
 
 	it("rejects recurring sources and already-claimed transactions", () => {
-		expect(markAsSubscription(financialModelFixture, "invest")).toBeInstanceOf(
-			Error,
-		);
-		const claimed = markAsSubscription(financialModelFixture, "renovation", {
-			ruleId: "reno-sub",
-		});
+		const recurring = financialModelFixture.transactions.find(
+			(item) => item.id === "invest",
+		)!;
+		expect(buildSubscription(recurring)).toBeInstanceOf(Error);
+		expect(subscriptionSourceError(recurring)).toBeInstanceOf(Error);
+		const claimed = buildSubscription(renovation, { ruleId: "reno-sub" });
 		if (claimed instanceof Error) throw claimed;
-		expect(markAsSubscription(claimed, "renovation")).toBeInstanceOf(Error);
+		expect(buildSubscription(claimed.claimed)).toBeInstanceOf(Error);
 	});
 
 	it("supports installments as a rule with a deadline", () => {
-		const next = markAsInstallment(financialModelFixture, "renovation", 4, {
-			ruleId: "reno-split",
-		});
+		const next = buildInstallment(renovation, 4, { ruleId: "reno-split" });
 		if (next instanceof Error) throw next;
-		const rule = next.transactions.find((item) => item.id === "reno-split");
-		expect(rule?.frequency).toBe("monthly");
-		expect(rule?.endDate).toBe("2028-09-15");
-		expect(
-			next.transactions.find((item) => item.id === "renovation")?.claimRuleId,
-		).toBe("reno-split");
+		expect(next.rule.frequency).toBe("monthly");
+		expect(next.rule.endDate).toBe("2028-09-15");
+		expect(next.claimed.claimRuleId).toBe("reno-split");
 	});
 
 	it("rejects invalid payment counts and clamps month ends", () => {
+		expect(buildInstallment(renovation, 1)).toBeInstanceOf(Error);
 		expect(
-			markAsInstallment(financialModelFixture, "renovation", 1),
+			buildSubscriptionConversion(renovation, { endDate: "not-a-date" }),
+		).toBeInstanceOf(Error);
+		expect(
+			buildSubscriptionConversion(renovation, { endDate: "2020-01-01" }),
 		).toBeInstanceOf(Error);
 		expect(addMonthsClamped("2028-01-31", 1)).toBe("2028-02-29");
 		expect(addMonthsClamped("2028-01-31", 3)).toBe("2028-04-30");
+	});
+
+	it("rejects synced sources", () => {
+		expect(
+			subscriptionSourceError({ ...renovation, readOnly: true }),
+		).toBeInstanceOf(Error);
+		expect(
+			subscriptionSourceError({ ...renovation, pending: true }),
+		).toBeInstanceOf(Error);
 	});
 });

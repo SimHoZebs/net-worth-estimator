@@ -39,7 +39,9 @@ function renderCard(item: OtherEvaluation) {
 	return render(
 		<OtherEvaluationCard
 			item={item}
-			plan={financialModelFixture}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			startDate={financialModelFixture.startDate}
 			projection={null}
 			pin={{ pinned: false, onPinChange: () => {} }}
 		/>,

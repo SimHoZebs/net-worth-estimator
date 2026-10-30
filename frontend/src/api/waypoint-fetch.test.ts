@@ -20,7 +20,6 @@ function owner() {
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: A,
-				kind: "private",
 				permissions: ["user:read", "user:project", "user:write"],
 			},
 			subject: A,
@@ -181,7 +180,6 @@ it("prefixes generated requests with a non-root API base", async () => {
 				apiBaseUrl: base,
 				resource: {
 					id: A,
-					kind: "private",
 					permissions: ["user:read", "user:project", "user:write"],
 				},
 				subject: A,

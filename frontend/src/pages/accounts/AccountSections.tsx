@@ -13,10 +13,9 @@ import {
 	type TransactionOrder,
 } from "../../domain/transactionSort.ts";
 import {
-	type Plan,
+	type Account,
 	visibleAccounts,
 	visibleTransactions,
-	type Account,
 } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
@@ -28,9 +27,10 @@ import {
 	useAccountBalances,
 	useTransactions,
 } from "../../state/workspaceResources.ts";
-import { transactionToPlan } from "../../domain/transactionRows.ts";
+import { transactionToDisplay } from "../../domain/transactionRows.ts";
 import { deleteAccount } from "@/api/generated/endpoints.ts";
-import { useUserPlan } from "../../state/useUserScope.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { useSavedAccounts, useSavedStartDate } from "../../state/savedRows.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
 
@@ -49,17 +49,26 @@ export function AccountSections({
 	onEdit: (target: EditorTarget) => void;
 	onAccount: (id: string) => void;
 }) {
-	// Plan data and actions subscribe here; only the viewed tab and UI
-	// callbacks arrive as props.
-	const plan = useUserPlan();
-	if (!plan) return null;
+	// Saved rows subscribe here; only the viewed tab and UI
+	// callbacks arrive as props. Rows are destructured into atomic
+	// inputs for the panels below.
+	const accounts = useSavedAccounts();
+	const startDate = useSavedStartDate();
+	const readOnly = useUserReadOnly();
+	if (!accounts || !startDate) return null;
 	if (view === "accounts") {
 		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;
 	}
 	return (
 		<BaseProjectionView>
 			{({ base }) => (
-				<TransactionsView plan={plan} projection={base} onEdit={onEdit} />
+				<TransactionsView
+					accounts={accounts}
+					startDate={startDate}
+					readOnly={readOnly}
+					projection={base}
+					onEdit={onEdit}
+				/>
 			)}
 		</BaseProjectionView>
 	);
@@ -196,11 +205,15 @@ function AccountsView({
 }
 
 function TransactionsView({
-	plan,
+	accounts,
+	startDate,
+	readOnly,
 	projection,
 	onEdit,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	startDate: string;
+	readOnly: boolean;
 	projection?: Projection | null;
 	onEdit: (target: EditorTarget) => void;
 }) {
@@ -214,13 +227,15 @@ function TransactionsView({
 	const transactionsQuery = useTransactions();
 	const resolvedAmounts = useMemo(
 		() =>
-			projection ? resolveTransactionAmounts(projection.transactions) : new Map(),
+			projection
+				? resolveTransactionAmounts(projection.transactions)
+				: new Map(),
 		[projection],
 	);
 	const rows = useMemo(
 		() =>
 			(transactionsQuery.data?.transactions ?? []).map((row) =>
-				transactionToPlan(row, resolvedAmounts.get(row.id)),
+				transactionToDisplay(row, resolvedAmounts.get(row.id)),
 			),
 		[transactionsQuery.data, resolvedAmounts],
 	);
@@ -228,9 +243,9 @@ function TransactionsView({
 		() =>
 			visibleTransactions({
 				transactions: rows,
-				accounts: plan.accounts,
+				accounts,
 			}),
-		[rows, plan.accounts],
+		[rows, accounts],
 	);
 	const recurringCount = visible.filter(
 		(transaction) => transaction.frequency !== "once",
@@ -334,8 +349,9 @@ function TransactionsView({
 				) : (
 					<TransactionsPanel
 						transactions={pagedTransactions}
-						accounts={visibleAccounts(plan.accounts)}
-						plan={plan}
+						accounts={visibleAccounts(accounts)}
+						startDate={startDate}
+						readOnly={readOnly}
 						resolvedAmounts={resolvedAmounts}
 					/>
 				)}
