@@ -1,6 +1,5 @@
 // Real-provider contract: owner, provisioned guest, and second user in one DB.
-// Anonymous traffic resolves to the configured guest subject (a normal user
-// in the viewers group), never to a special sample wire.
+// Anonymous traffic resolves to the configured guest subject in the viewers group.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -11,6 +10,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { chromium, expect } from "../frontend/node_modules/@playwright/test/index.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { snapshotFile } from "../dev/database.mjs";
+import { pickFreePorts } from "../dev/lib/slots.mjs";
 import { casdoorSession } from "./casdoor/provision.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -73,6 +73,8 @@ try {
 }
 await mkdir(resolve(root, "tmp"), { recursive: true });
 const scratch = await mkdtemp(resolve(root, "tmp/auth-resource-integration-"));
+const [apiPort] = await pickFreePorts(1, [Number(origin.port || "80")]);
+const apiOrigin = `http://127.0.0.1:${apiPort}`;
 const binary = resolve(scratch, "server");
 const primaryDB = resolve(scratch, "financial.db");
 const publisher = resolve(scratch, "refreshmodel");
@@ -105,26 +107,31 @@ assert.equal((await once(provisionGuest, "exit"))[0], 0, "Guest destination setu
 const env = {
   ...process.env,
   HOST: "127.0.0.1",
-  PORT: origin.port || "80",
+  PORT: String(apiPort),
   NET_WORTH_ESTIMATOR_DB: primaryDB,
-  NET_WORTH_ESTIMATOR_FRONTEND_PATH: resolve(root, "frontend/dist"),
   NET_WORTH_ESTIMATOR_OWNER_SUBJECT: subject,
   NET_WORTH_ESTIMATOR_GUEST_SUBJECT: guestSubject,
   NET_WORTH_ESTIMATOR_READ_ONLY: "",
   NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: origin.origin,
 };
-// Retired split-storage settings must not leak from the operator's environment.
-for (const key of [
-  "NET_WORTH_ESTIMATOR_SAMPLE_DB",
-  "NET_WORTH_ESTIMATOR_PLANS_DIR",
-  "NET_WORTH_ESTIMATOR_AUTH_SESSION_DB",
-])
-  delete env[key];
 let server;
+let frontend;
 let browser;
 let log = "";
 async function start() {
   log = "";
+  if (!frontend) {
+    frontend = spawn(process.execPath, [
+      resolve(root, "frontend/node_modules/vite/bin/vite.js"),
+      "preview", "--host", "127.0.0.1", "--port", origin.port || "80", "--strictPort",
+    ], {
+      cwd: resolve(root, "frontend"),
+      env: { ...process.env, NET_WORTH_ESTIMATOR_BACKEND: apiOrigin },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    frontend.stdout.on("data", (data) => { log += data; });
+    frontend.stderr.on("data", (data) => { log += data; });
+  }
   server = spawn(binary, [], { env, stdio: ["ignore", "pipe", "pipe"] });
   server.stdout.on("data", (data) => {
     log += data;
@@ -134,8 +141,13 @@ async function start() {
   });
   for (let attempt = 0; attempt < 150; attempt++) {
     if (server.exitCode !== null) throw new Error(`Application exited: ${log}`);
+    if (frontend.exitCode !== null) throw new Error(`Frontend exited: ${log}`);
     try {
-      if ((await fetch(new URL("/healthz", origin))).ok) return;
+      const [apiReady, frontendReady] = await Promise.all([
+        fetch(`${apiOrigin}/healthz`),
+        fetch(origin),
+      ]);
+      if (apiReady.ok && frontendReady.ok) return;
     } catch {
       /* startup */
     }
@@ -444,10 +456,6 @@ try {
       3,
       "Owner, guest, and second user must share one database",
     );
-    assert.ok(
-      users.every((row) => !/sample/i.test(row.user_id)),
-      "No legacy sample rows remain; the guest uses an ordinary user scope",
-    );
     // Application rows key users by the store row ID (user:<hash>).
     const guestRow = `user:${guestResource.slice("users/".length)}`;
     assert.deepEqual(
@@ -485,5 +493,10 @@ try {
   );
 } finally {
   await browser?.close();
+  if (frontend?.exitCode === null) {
+    const stopped = once(frontend, "exit");
+    frontend.kill("SIGTERM");
+    await stopped;
+  }
   await stop();
 }

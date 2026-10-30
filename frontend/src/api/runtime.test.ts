@@ -2,13 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getApiBaseUrl, getRuntimeConfig } from "./runtime.ts";
 
 afterEach(() => {
-	vi.unstubAllEnvs();
 	vi.unstubAllGlobals();
 });
 
 describe("frontend API base configuration", () => {
-	it("prefers runtime configuration over the build-time value", () => {
-		vi.stubEnv("VITE_API_BASE_URL", "https://build.example/");
+	it("uses runtime configuration when present", () => {
 		vi.stubGlobal("window", {
 			__WAYPOINT_CONFIG__: { apiBaseUrl: "https://runtime.example/" },
 		});
@@ -18,24 +16,23 @@ describe("frontend API base configuration", () => {
 		});
 	});
 
-	it("uses the build-time value when runtime configuration is absent", () => {
-		vi.stubEnv("VITE_API_BASE_URL", "https://build.example///");
+	it("uses the same-origin default when runtime configuration is absent", () => {
 		vi.stubGlobal("window", {});
 
-		expect(getRuntimeConfig()).toEqual({ apiBaseUrl: "https://build.example" });
+		expect(getRuntimeConfig()).toEqual({ apiBaseUrl: "" });
 	});
 
-	it("uses the same-origin default when both values are absent or blank", () => {
-		vi.stubEnv("VITE_API_BASE_URL", "  ");
-		vi.stubGlobal("window", {});
+	it("uses the same-origin default when the value is blank", () => {
+		vi.stubGlobal("window", { __WAYPOINT_CONFIG__: { apiBaseUrl: "  " } });
 
 		expect(getApiBaseUrl()).toBe("");
 	});
 
 	it("keeps explicit configuration authoritative", () => {
-		vi.stubEnv("VITE_API_BASE_URL", "https://build.example");
-
-		expect(getApiBaseUrl({ baseUrl: "https://explicit.example/" })).toBe(
+		expect(getApiBaseUrl({ apiBaseUrl: "https://explicit.example/" })).toBe(
+			"https://explicit.example",
+		);
+		expect(getApiBaseUrl("https://explicit.example/")).toBe(
 			"https://explicit.example",
 		);
 	});

@@ -59,13 +59,12 @@ test("Vercel fails closed on incomplete or unsafe deployment settings", () => {
   }
   assert.throws(() => vercelConfig({ ...settings, BACKEND_URL: settings.NET_WORTH_ESTIMATOR_PUBLIC_URL }), /must differ/);
   assert.throws(() => vercelConfig({ ...settings, NET_WORTH_ESTIMATOR_PROXY_SECRET: "short" }), /PROXY_SECRET/);
-  assert.throws(() => vercelConfig({ ...settings, VITE_API_BASE_URL: "https://api.test" }), /VITE_API_BASE_URL/);
 });
 
 test("the root config exports the evaluated deployment configuration", () => {
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", 'const { config } = await import("./vercel.mjs"); console.log(JSON.stringify(config));'], {
     cwd: fileURLToPath(new URL("../", import.meta.url)),
-    env: { ...process.env, ...settings, VITE_API_BASE_URL: "" },
+    env: { ...process.env, ...settings },
     encoding: "utf8",
   });
   assert.equal(result.status, 0, result.stderr);

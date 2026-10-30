@@ -29,11 +29,10 @@ type Config struct {
 	Actor          func(context.Context) string
 	AllowedOrigins []string
 	ReadOnly       bool
-	// SyncRunner runs the SimpleFIN sync on trigger. It may be nil (sample
-	// plans, tests) or unconfigured (no Bridge credential); triggers then
-	// return 503.
-	SyncRunner  *simplefin.Runner
-	FrontendDir string
+	// SyncRunner runs the SimpleFIN sync on trigger. It may be nil (public
+	// probes, non-owner scopes, tests) or unconfigured (no Bridge credential);
+	// triggers then return 503.
+	SyncRunner *simplefin.Runner
 }
 
 // New builds the chi router with all routes.
@@ -75,10 +74,6 @@ func New(st store.Store, serverConfig Config) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-
-	if serverConfig.FrontendDir != "" {
-		router.NotFound(frontendHandler(serverConfig.FrontendDir))
-	}
 
 	return router
 }

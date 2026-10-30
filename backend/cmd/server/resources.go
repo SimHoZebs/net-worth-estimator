@@ -159,7 +159,7 @@ func newUserRouter(database store.Database, config userRouterConfig) (*userRoute
 	if config.PrimaryResourceID != "" && !userResource.MatchString(config.PrimaryResourceID) {
 		return nil, errors.New("primary user requires an explicit private user resource ID")
 	}
-	// Health and static files do not access financial state.
+	// Health and status probes do not access financial state.
 	publicConfig := config.API
 	publicConfig.SyncRunner = nil
 	return &userRouter{database: database, config: config, public: api.New(nil, publicConfig), opened: map[string]http.Handler{}}, nil
