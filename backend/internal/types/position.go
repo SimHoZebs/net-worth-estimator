@@ -1,8 +1,8 @@
 package types
 
 // CurrentPosition is derived from history, without a future simulation.
-// The as-of cut is an instant: a "YYYY-MM-DD" date means the end of that
-// UTC day (inclusive, backward compatible); an RFC 3339 timestamp means
+// The as-of cut is an instant: a "YYYY-MM-DD" date means the day-close cut
+// at the end of that UTC day (inclusive); an RFC 3339 timestamp means
 // that exact instant. Balance is the adjusted modeled balance at the cut;
 // ObservedBalance/ObservedAt carry the latest observation at or before it.
 // All public balances agree at an identical cut because they share one

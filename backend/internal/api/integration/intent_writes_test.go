@@ -306,28 +306,6 @@ func TestConvertTransactionRespectsReadOnly(t *testing.T) {
 	}
 }
 
-func TestPostingAPIRejectsRetiredPurchaseMarker(t *testing.T) {
-	database := openAPIStore(t)
-	handler := New(database, Config{})
-	seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
-		`{"id":"cash","name":"Cash","kind":"cash","enabled":true}`)
-	if seeded.Code != http.StatusOK {
-		t.Fatalf("seed account status = %d", seeded.Code)
-	}
-	posting := `{"id":"01900000-0000-7000-8000-000000000021","name":"Laptop","sourceAccountId":"cash","postedTime":1782950400,"transactionTime":1782950400,"amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"enabled":true,"purchase":{"priority":0}}`
-	created := doRowRequest(t, handler, http.MethodPost, "/v1/postings", posting)
-	if created.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("retired marker accepted: %d %s", created.Code, created.Body.String())
-	}
-	model, err := database.LoadModel()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if model != nil && len(model.Postings) != 0 {
-		t.Fatal("retired payload became a real movement")
-	}
-}
-
 func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})

@@ -18,11 +18,11 @@ import (
 // instead of rendering a torn view.
 
 // isSyncOwned mirrors the frontend rule: row authorship is "user"
-// (owner-authored, including the legacy "model" value renamed on setup) or
+// (owner-authored) or
 // a sync-owned name set by the server. Any other non-empty author is
 // system-owned sync output, matched by exclusion rather than by name.
 func isSyncOwned(source string) bool {
-	return source != "" && source != "user" && source != "model"
+	return source != "" && source != "user"
 }
 
 // isArchivedDebt hides a paid-off debt: a debt account whose latest
@@ -197,12 +197,7 @@ type transactionRow struct {
 }
 
 // transactionDay renders a unix stamp as a UTC calendar day for display rows.
-// A missing stamp falls back to the epoch, mirroring the legacy conversion,
-// so rows always carry a renderable date.
 func transactionDay(stamp int64) types.IsoDate {
-	if stamp <= 0 {
-		stamp = 0
-	}
 	return types.IsoDate(time.Unix(stamp, 0).UTC().Format("2006-01-02"))
 }
 

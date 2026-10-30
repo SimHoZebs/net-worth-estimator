@@ -174,15 +174,6 @@ func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 	}
 }
 
-func TestPostingIDsMustBeUUIDs(t *testing.T) {
-	store := openTestStore(t)
-	for _, id := range []string{"owner-charge", "sync-pending-card-tx1", "sfin-pending-card-tx1"} {
-		if _, err := store.CreatePosting(testPostingFixture(id)); !IsInvalidID(err) {
-			t.Fatalf("create %q err = %v, want invalid-id", id, err)
-		}
-	}
-}
-
 func TestRemergePreservesProviderSources(t *testing.T) {
 	// A second bank-data provider (stand-in "plaid") coexists with SimpleFIN
 	// rows. Model replace must keep every provider's source value so

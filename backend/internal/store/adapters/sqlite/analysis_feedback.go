@@ -24,7 +24,7 @@ func (s *sqliteStore) ReviewAnalysisFinding(id string, input types.AnalysisFeedb
 	return feedback, tx.Commit()
 }
 
-// Legacy hide/restore remains a presentation action. It is logged, but never
+// Hide/restore is a presentation action. It is logged, but never
 // becomes a positive/negative training label merely because a flag was hidden.
 func (s *sqliteStore) DismissAnalysisFinding(id string, dismissed bool, actor string) error {
 	tx, err := s.db.Begin()

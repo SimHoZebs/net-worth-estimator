@@ -23,8 +23,8 @@ export function validateRefresh(values, positionals = []) {
   }
   if (!values["source-user"])
     throw new Error("--source-user is required. Select the reviewed financial scope explicitly.");
-  if (!values.user || values.user === "users/sample")
-    throw new Error("refresh-db requires --user for an existing private user");
+  if (!values.user)
+    throw new Error("refresh-db requires --user for an existing user");
 }
 
 export async function run(values, positionals) {

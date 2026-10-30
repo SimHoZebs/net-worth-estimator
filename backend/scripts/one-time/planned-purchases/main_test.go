@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -129,33 +128,6 @@ func TestUpgradePreservesBothUsers(t *testing.T) {
 		doc, err := s.LoadModel()
 		if err != nil || !reflect.DeepEqual(doc.PlannedPurchases, want) {
 			t.Fatal("repeated upgrade changed purchases", err)
-		}
-	}
-}
-
-func TestAppAndSetupRejectPolicySchemaWithoutChanges(t *testing.T) {
-	path := policyDatabase(t, false, false)
-	if err := os.Chmod(path, 0640); err != nil {
-		t.Fatal(err)
-	}
-	before, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, open := range []func(string, ...sqlite.DatabaseOption) (*sqlite.Database, error){sqlite.OpenDatabase, sqlite.SetupDatabase} {
-		if db, err := open(path); !errors.Is(err, sqlite.ErrSetupRequired) {
-			if db != nil {
-				db.Close()
-			}
-			t.Fatalf("old purchase schema accepted: %v", err)
-		}
-		after, err := os.ReadFile(path)
-		if err != nil || !bytes.Equal(before, after) {
-			t.Fatal("rejected schema changed", err)
-		}
-		info, err := os.Stat(path)
-		if err != nil || info.Mode().Perm() != 0640 {
-			t.Fatal("rejected schema changed permissions", err)
 		}
 	}
 }

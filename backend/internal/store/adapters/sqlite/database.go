@@ -13,10 +13,6 @@ import (
 
 const sharedSchemaVersion = "shared-accounts-v1"
 
-// ErrLegacyDatabase identifies a pre-user-scope database. No migration
-// path exists: start from a current application database.
-var ErrLegacyDatabase = errors.New("unsupported legacy database: start from a current application database")
-
 // ErrSetupRequired identifies a missing or incompatible current database.
 var ErrSetupRequired = errors.New("current database schema required: use setupdb for a new database or upgrade existing data separately")
 

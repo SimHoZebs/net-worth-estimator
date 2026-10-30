@@ -41,10 +41,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	defer database.Close()
 	rowID := normalizeUserID(*userID)
-	if rowID == "sample" || rowID == "fixture" {
-		fmt.Fprintln(stderr, "refusing to reset legacy historical rows")
-		return 1
-	}
 	user, err := database.User(rowID)
 	if err != nil {
 		fmt.Fprintf(stderr, "select existing user: %v\n", err)

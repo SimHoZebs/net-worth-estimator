@@ -9,11 +9,7 @@ import (
 )
 
 type postingSyncKey struct {
-	// provider/accountID/transactionID are the exact upstream identities. An
-	// older mapper sanitized transaction keys, so rows written before exact
-	// keys cannot recover their originals; they are preserved as-is until the
-	// next authoritative snapshot for their accounts replaces that legacy
-	// pending set and establishes exact keys.
+	// provider/accountID/transactionID are the exact upstream identities.
 	provider, accountID, transactionID, postingID string
 }
 

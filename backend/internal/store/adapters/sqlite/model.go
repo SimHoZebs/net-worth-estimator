@@ -59,9 +59,6 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM entity_ids WHERE user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear entity ids: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM posting_id_migrations WHERE user_id = :user_id`); err != nil {
-		return fmt.Errorf("clear posting id history: %w", err)
-	}
 	if _, err := tx.Exec(`DELETE FROM account_links WHERE user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear account links: %w", err)
 	}

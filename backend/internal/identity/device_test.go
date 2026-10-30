@@ -131,7 +131,7 @@ func TestDeviceStartUnavailableWithoutProviderSupport(t *testing.T) {
 	}
 }
 
-func TestRetiredBearerKeepsSession(t *testing.T) {
+func TestInvalidBearerKeepsSession(t *testing.T) {
 	p := newIDP(t)
 	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
 	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })))
@@ -143,7 +143,7 @@ func TestRetiredBearerKeepsSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request.Header.Set("Authorization", "Bearer retired-token")
+	request.Header.Set("Authorization", "Bearer invalid-token")
 	request.Header.Set(ResourceHeader, authorization.ResourceFor(p.server.URL, "editor").ID)
 	response, err := client.Do(request)
 	if err != nil {
@@ -151,7 +151,7 @@ func TestRetiredBearerKeepsSession(t *testing.T) {
 	}
 	response.Body.Close()
 	if response.StatusCode != http.StatusNoContent {
-		t.Fatalf("retired bearer with session=%d want session identity", response.StatusCode)
+		t.Fatalf("invalid bearer with session=%d want session identity", response.StatusCode)
 	}
 }
 

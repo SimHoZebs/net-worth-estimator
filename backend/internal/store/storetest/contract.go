@@ -67,9 +67,6 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("ApplySyncPlanRefreshesPendingSnapshot", func(t *testing.T) {
 		testApplySyncPlanRefreshesPendingSnapshot(t, newStore)
 	})
-	// PendingDeleteSparesUserRows stays SQLite-only: its fixture (a
-	// model-source row with a sync-prefix ID) is legacy data the public API
-	// refuses to create, so only raw SQL can set it up.
 	t.Run("ArtifactsRoundTripAndKeepFirstWrite", func(t *testing.T) {
 		testArtifactsRoundTripAndKeepFirstWrite(t, newStore)
 	})

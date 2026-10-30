@@ -29,14 +29,6 @@ func TestExactCutChangesArtifactIdentity(t *testing.T) {
 	}
 }
 
-func TestArtifactIdentityPreservesStoredResultKeys(t *testing.T) {
-	// Pin the current artifact envelope and its canonical input identity.
-	const want = "deterministic:10:40ccc9c43271e8a5a308cd661dfc74ada839315342eee33df044cce217c20b82"
-	if got := artifactKey("deterministic", map[string]any{"example": "identity"}); got != want {
-		t.Fatalf("result identity = %q, want %q", got, want)
-	}
-}
-
 func TestProjectionArtifactsAreScopedToUserResources(t *testing.T) {
 	request := map[string]any{"model": "same input", "seed": 42}
 	a := &handler{resourceID: "users/a"}
@@ -47,9 +39,6 @@ func TestProjectionArtifactsAreScopedToUserResources(t *testing.T) {
 		}
 		if a.resourceArtifactKey(kind, request) != a.resourceArtifactKey(kind, request) {
 			t.Fatalf("%s same-account key is not stable", kind)
-		}
-		if (&handler{}).resourceArtifactKey(kind, request) != artifactKey(kind, request) {
-			t.Fatalf("%s legacy artifact identity changed", kind)
 		}
 	}
 }

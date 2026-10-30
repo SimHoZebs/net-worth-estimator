@@ -35,9 +35,6 @@ func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	if c.OwnerSubject != strings.TrimSpace(c.OwnerSubject) || strings.ContainsAny(c.OwnerSubject, "*\x00\r\n") {
 		return c, errors.New("OWNER_SUBJECT must be one verified OIDC subject")
 	}
-	if getenv("NET_WORTH_ESTIMATOR_PLANS_DIR") != "" || getenv("NET_WORTH_ESTIMATOR_SAMPLE_DB") != "" {
-		return c, errors.New("PLANS_DIR and SAMPLE_DB are retired; migrate plans into the application database")
-	}
 	return c, nil
 }
 

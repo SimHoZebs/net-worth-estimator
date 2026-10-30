@@ -9,7 +9,7 @@ import { snapshot } from "./snapshot.mjs";
 export async function refreshData({ config, stateDir, slot, source, sourceUser, user, publishing }) {
   if (!user || !/^users\/[0-9a-f]{64}$/.test(user))
     throw new Error(
-      "refreshData requires --user users/<64hex> for an existing ordinary user. Legacy 'sample' destinations are retired.",
+      "refreshData requires --user users/<64hex> for an existing user.",
     );
   const incoming = await snapshot(
     {
@@ -20,10 +20,7 @@ export async function refreshData({ config, stateDir, slot, source, sourceUser, 
     },
     stateDir,
   );
-  if (validateSnapshot(incoming) !== "application")
-    throw new Error(
-      "Legacy source snapshots have no migration path. Refresh only imports current application databases.",
-    );
+  validateSnapshot(incoming);
   const destination = resolve(stateDir, "data", databaseName);
   const backupDir = resolve(stateDir, "backups");
   await mkdir(backupDir, { recursive: true, mode: 0o700 });

@@ -113,6 +113,28 @@ const analysisSnapshot = async (db) => rows(db, `SELECT user_id, posting_id, fac
   SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
   SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;`);
 
+test("one-time audit-table removal preserves all current data and the backup", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-audit-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);
+    INSERT INTO sessions VALUES('session',X'0102',999);`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+  await sqlite(db, `CREATE TABLE posting_id_migrations(user_id TEXT NOT NULL, old_id TEXT NOT NULL, new_id TEXT NOT NULL, PRIMARY KEY(user_id,old_id));
+    INSERT INTO posting_id_migrations VALUES ('${owner}','opening','01900000-0000-7000-8000-000000000001');`);
+
+  await migrate(db);
+
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  const saved = await backups(directory);
+  assert.equal(saved.length, 1);
+  assert.equal(await rows(join(directory, saved[0], "before.db"), "SELECT count(*) FROM posting_id_migrations;"), "1");
+  const completed = await sha256File(db);
+  await migrate(db);
+  assert.equal(await sha256File(db), completed);
+  assert.deepEqual(await backups(directory), saved);
+});
+
 test("legacy date checkpoints convert and Analysis provisions on a full base", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-convert-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

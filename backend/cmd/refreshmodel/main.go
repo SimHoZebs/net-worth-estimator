@@ -23,7 +23,7 @@ import (
 // tables fail closed so a schema extension cannot silently leave stale rows.
 var financialTables = []string{
 	"accounts", "checkpoints", "postings", "posting_sync_keys",
-	"posting_id_migrations", "planned_purchases", "recurrence_rules", "evaluations",
+	"planned_purchases", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
 	"receipts",
@@ -68,9 +68,6 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 	}
 	sourceRow := normalizeUserRow(sourceUser)
 	targetRow := normalizeUserRow(targetUser)
-	if targetRow == "sample" || targetRow == "fixture" {
-		return errors.New("destination must be an ordinary user; legacy historical rows are never reset")
-	}
 	for _, path := range []string{target, source} {
 		info, err := os.Stat(path)
 		if err != nil {
@@ -151,7 +148,7 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
-		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations" || table.name == "transaction_source_facts" || strings.HasPrefix(table.name, "analysis_")) {
+		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "transaction_source_facts" || strings.HasPrefix(table.name, "analysis_")) {
 			continue
 		}
 		columns, values := []string{"user_id"}, []string{"?"}
@@ -193,9 +190,7 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 
 // normalizeUserRow maps a user resource to the store's user row ID:
 // users/<hash> is owned by user:<hash>; raw row IDs pass through for
-// offline operators. The raw historical row "sample" passes through only
-// as an explicit source input when an old database still contains it; it
-// is never created and never valid as a destination.
+// offline operators. Only ordinary current users are supported.
 func normalizeUserRow(id string) string {
 	if rest, ok := strings.CutPrefix(id, "users/"); ok {
 		return "user:" + rest

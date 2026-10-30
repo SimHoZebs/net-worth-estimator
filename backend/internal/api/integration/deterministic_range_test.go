@@ -154,9 +154,6 @@ func TestDeterministicResponseRangesShareCompleteArtifact(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	first := rangeRequest(t, handler, rangeBody(t, &projectionRange{EndDate: string(mid)}))
-	if got := first.Header().Get("Cache-Status"); got != "" {
-		t.Fatalf("obsolete Cache-Status header = %q", got)
-	}
 	if got := first.Header().Get("Projection-Source"); got != projectionSourceComputed {
 		t.Fatalf("first Projection-Source = %q, want computed", got)
 	}

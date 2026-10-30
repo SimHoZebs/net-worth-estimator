@@ -6,12 +6,10 @@ import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   composeEnvironment,
-  defaultPorts,
   envFileFor,
   loadConfig,
   newConfig,
   originProfile,
-  portsFor,
   projectFor,
   sanitizeSlot,
   stateDirFor,
@@ -61,32 +59,6 @@ test("slot configs use free loopback ports and refuse tailnet", () => {
     () => newConfig(undefined, undefined, { slot: "x", appPort: 8100, casdoorPort: 8100 }),
     /differ/,
   );
-});
-
-test("old configs without slot fields keep canonical behavior", () => {
-  const legacy = {
-    version: 1,
-    source: { container: "net-worth-estimator" },
-    ownerSubject: null,
-    identity: {
-      CASDOOR_PUBLIC_URL: "http://localhost:8000",
-      APP_PUBLIC_URL: "http://localhost:5178",
-      AUTH_CLIENT_ID: "waypoint-dev",
-      AUTH_CLIENT_SECRET: "a".repeat(24),
-      CASDOOR_ADMIN_PASSWORD: "b".repeat(24),
-      CASDOOR_USER_NAME: "household",
-      CASDOOR_USER_PASSWORD: "c".repeat(24),
-      CASDOOR_USER_DISPLAY_NAME: "Development owner",
-      CASDOOR_BACKCHANNEL_LOGOUT_URL: "http://backend:8787/v1/auth/backchannel-logout",
-    },
-  };
-  assert.deepEqual(portsFor(legacy), defaultPorts);
-  const env = composeEnvironment(legacy);
-  assert.equal(env.DEV_PROJECT, "waypoint-dev");
-  assert.equal(env.DEV_FRONTEND_PORT, "5178");
-  assert.equal(env.DEV_CASDOOR_PORT, "8000");
-  assert.equal(env.DEV_BACKEND_DEBUG_PORT, "8788");
-  assert.equal(env.DEV_SLOT_STATE_DIR, undefined);
 });
 
 test("slot compose args isolate the project without touching the canonical default", () => {

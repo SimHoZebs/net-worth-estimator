@@ -41,15 +41,13 @@ func model(t *testing.T, handler http.Handler) *types.FinancialModel {
 	return out.Model
 }
 
-func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
+func TestResourceConfigurationRejectsUnsafeOwner(t *testing.T) {
 	c, err := resourceConfigFromEnv(func(string) string { return "" })
 	if err != nil || c.OwnerSubject != "" || c.ModelID != "" || c.Organization != authorization.DefaultOrganization {
 		t.Fatalf("unexpected defaults: %+v %v", c, err)
 	}
 	for key, value := range map[string]string{
 		"NET_WORTH_ESTIMATOR_OWNER_SUBJECT": "*",
-		"NET_WORTH_ESTIMATOR_PLANS_DIR":     "/data/plans",
-		"NET_WORTH_ESTIMATOR_SAMPLE_DB":     "/data/sample.db",
 	} {
 		_, err := resourceConfigFromEnv(func(name string) string {
 			if name == key {
@@ -58,7 +56,7 @@ func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
 			return ""
 		})
 		if err == nil {
-			t.Errorf("accepted invalid or retired %s", key)
+			t.Errorf("accepted unsafe %s", key)
 		}
 	}
 	if _, err := resourceConfigFromEnv(func(name string) string {
@@ -68,29 +66,6 @@ func TestResourceConfigurationRejectsLegacyPathsAndUnsafeOwner(t *testing.T) {
 		return ""
 	}); err == nil {
 		t.Error("accepted organization with an owner prefix")
-	}
-}
-
-func TestOwnerSubjectEnvMigration(t *testing.T) {
-	c, err := resourceConfigFromEnv(func(name string) string {
-		if name == "NET_WORTH_ESTIMATOR_OWNER_SUBJECT" {
-			return "alice"
-		}
-		return ""
-	})
-	if err != nil || c.OwnerSubject != "alice" {
-		t.Fatalf("new owner var rejected: %+v %v", c, err)
-	}
-	// The retired plan owner var is gone entirely: it must not error and
-	// must not provision an owner.
-	c, err = resourceConfigFromEnv(func(name string) string {
-		if name == "NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT" {
-			return "alice"
-		}
-		return ""
-	})
-	if err != nil || c.OwnerSubject != "" {
-		t.Fatalf("retired owner var leaked: %+v %v", c, err)
 	}
 }
 
@@ -267,10 +242,10 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	if w := post(t, router, "GET", "/v1/financial-model", ""); w.Code != 403 {
 		t.Fatalf("unverified user routing=%d", w.Code)
 	}
-	bad, err := newUserRouter(database, userRouterConfig{PrimaryResourceID: "users/sample"})
+	bad, err := newUserRouter(database, userRouterConfig{PrimaryResourceID: "users/not-a-private-user"})
 	if err == nil {
 		bad.Close()
-		t.Fatal("sample can own server Bridge credentials")
+		t.Fatal("malformed ID can own server Bridge credentials")
 	}
 }
 

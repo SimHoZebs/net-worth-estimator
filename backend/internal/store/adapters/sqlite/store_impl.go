@@ -23,7 +23,7 @@ type sqliteStore struct {
 }
 
 // Open creates or opens an ordinary isolated user scope for tests and
-// fixture tools. Runtime callers must use OpenDatabase. Legacy unscoped
+// fixture tools. Runtime callers must use OpenDatabase. Incompatible
 // databases are rejected and never converted here.
 func Open(path string) (store.Store, error) {
 	db, err := SetupDatabase(path)

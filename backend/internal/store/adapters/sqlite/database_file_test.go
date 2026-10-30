@@ -1,8 +1,6 @@
 package sqlite
 
 import (
-	"database/sql"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -75,35 +73,6 @@ func TestSetupDatabaseDoesNotRelaxTighterPermissions(t *testing.T) {
 		d.Close()
 	}
 	assertFileMode(t, path, 0400)
-}
-
-func TestLegacyRejectionPreservesSourcePermissions(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "legacy.db")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`CREATE TABLE accounts(id TEXT PRIMARY KEY); INSERT INTO accounts VALUES ('private')`); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(path, 0640); err != nil {
-		t.Fatal(err)
-	}
-	if d, err := OpenDatabase(path); !errors.Is(err, ErrLegacyDatabase) {
-		if d != nil {
-			d.Close()
-		}
-		t.Fatalf("legacy open = %v", err)
-	}
-	assertFileMode(t, path, 0640)
-	for _, suffix := range []string{"-wal", "-shm"} {
-		if _, err := os.Lstat(path + suffix); !os.IsNotExist(err) {
-			t.Fatalf("legacy open created sidecar %s: %v", suffix, err)
-		}
-	}
 }
 
 func TestSharedDatabaseRejectsSymlinkPaths(t *testing.T) {

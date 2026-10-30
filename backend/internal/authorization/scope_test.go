@@ -48,16 +48,3 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 		t.Fatal("empty subject must fail closed, not derive a literal guest")
 	}
 }
-
-func TestLegacyPlanResourceIsRejected(t *testing.T) {
-	const issuer = "https://id.example"
-	current := ResourceFor(issuer, "alice")
-	hash := strings.TrimPrefix(current.Owner, "user:")
-	legacy := Resource{ID: "plans/" + hash, Owner: current.Owner}
-	if legacy.valid() {
-		t.Fatalf("legacy plan resource accepted after cutover: %+v", legacy)
-	}
-	if ResourceFor(issuer, "alice").ID == legacy.ID {
-		t.Fatal("ResourceFor must return the user namespace, not the legacy plan form")
-	}
-}

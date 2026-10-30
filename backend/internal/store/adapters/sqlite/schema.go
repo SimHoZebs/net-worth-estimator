@@ -150,13 +150,6 @@ func schemaStatements() []string {
 			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
 			PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
 		)`,
-		`CREATE TABLE IF NOT EXISTS posting_id_migrations (
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			old_id TEXT NOT NULL,
-			new_id TEXT NOT NULL,
-			PRIMARY KEY(user_id, old_id),
-			UNIQUE(user_id, new_id)
-		)`,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,
@@ -437,7 +430,6 @@ var requiredSchemaColumns = map[string]string{
 	"checkpoints":              "user_id, id, position, model_account_id, balance, source, observed_at",
 	"postings":                 "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids",
 	"posting_sync_keys":        "user_id, provider, bridge_account_id, transaction_id, posting_id",
-	"posting_id_migrations":    "user_id, old_id, new_id",
 	"schema_migrations":        "name",
 	"planned_purchases":        "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
 	"recurrence_rules":         "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
@@ -505,7 +497,6 @@ func expectedSchemaTables() []string {
 		"checkpoints",
 		"postings",
 		"posting_sync_keys",
-		"posting_id_migrations",
 		"schema_migrations",
 		"planned_purchases",
 		"recurrence_rules",

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +14,7 @@ func TestServerRequiresDeploymentDatabaseWithoutCreatingFiles(t *testing.T) {
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build server: %v\n%s", err, output)
 	}
-	for _, state := range []string{"missing-parent", "missing-file", "empty", "legacy"} {
+	for _, state := range []string{"missing-parent", "missing-file", "empty"} {
 		t.Run(state, func(t *testing.T) {
 			root := t.TempDir()
 			path := filepath.Join(root, "application.db")
@@ -27,19 +26,8 @@ func TestServerRequiresDeploymentDatabaseWithoutCreatingFiles(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if state == "legacy" {
-				db, err := sql.Open("sqlite", path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = db.Exec(`CREATE TABLE legacy_private_data (value TEXT); INSERT INTO legacy_private_data VALUES ('keep')`)
-				db.Close()
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
 			var before []byte
-			if state == "empty" || state == "legacy" {
+			if state == "empty" {
 				var err error
 				before, err = os.ReadFile(path)
 				if err != nil {
@@ -65,7 +53,7 @@ func TestServerRequiresDeploymentDatabaseWithoutCreatingFiles(t *testing.T) {
 			if err == nil || !strings.Contains(string(output), "open store:") {
 				t.Fatalf("server did not fail at database validation: %v\n%s", err, output)
 			}
-			if state == "empty" || state == "legacy" {
+			if state == "empty" {
 				after, err := os.ReadFile(path)
 				if err != nil || string(before) != string(after) {
 					t.Fatalf("startup modified existing database: %v", err)

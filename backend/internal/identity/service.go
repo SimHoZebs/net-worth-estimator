@@ -138,8 +138,8 @@ func (s *Service) principal(r *http.Request) (Principal, error) {
 	// An explicit bearer identity wins when it verifies. An unverifiable
 	// bearer never replaces a session: validation falls back to the session
 	// path, and a provider outage falls back to a cached-valid session
-	// before reporting unavailable. Retired or foreign tokens therefore
-	// fall back to the configured guest.
+	// before reporting unavailable. Without a valid identity, the request
+	// uses the configured guest.
 	if token, ok := bearerToken(r); ok {
 		if p, err := s.bearerPrincipal(r.Context(), token); err == nil {
 			if p.Authenticated {
