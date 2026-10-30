@@ -64,6 +64,7 @@ import {
 	ruleUpdateBody,
 } from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
+import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
@@ -1216,6 +1217,12 @@ export function TransactionDetail({
 					)}
 					<ReadOnlyNotice planTransaction={planTransaction} />
 				</form>
+				{once && (
+					<TransactionAnalysisPanel
+						postingId={planTransaction.id}
+						readOnly={Boolean(readOnly ?? planTransaction.readOnly)}
+					/>
+				)}
 				{once && (
 					<ReceiptPanel
 						postingId={planTransaction.id}

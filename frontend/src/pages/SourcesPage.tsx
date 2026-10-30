@@ -6,12 +6,14 @@ import { useUserReadOnly } from "../state/useUserScope.ts";
 import { useSavedAccounts } from "../state/savedRows.ts";
 import { useTransactionCatalog } from "../state/workspaceResources.ts";
 import { SyncSettings } from "./sources/SyncSettings.tsx";
+import { AnalysisFindings } from "./sources/AnalysisFindings.tsx";
 
-type ConfigTab = "sync" | "amounts" | "account";
+type ConfigTab = "sync" | "amounts" | "analysis" | "account";
 
 const configTabs: TabItem<ConfigTab>[] = [
 	{ id: "sync", label: "Bank sync" },
 	{ id: "amounts", label: "Amounts" },
+	{ id: "analysis", label: "Analysis" },
 	{ id: "account", label: "Account" },
 ];
 
@@ -53,6 +55,9 @@ export function SourcesPage() {
 				/>
 			)}
 			{tab === "account" && <AccountPage />}
+			{tab === "analysis" && (
+				<AnalysisFindings postings={postings} readOnly={readOnly} />
+			)}
 		</Tabs>
 	);
 }
