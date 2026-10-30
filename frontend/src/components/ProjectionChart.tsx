@@ -1,5 +1,6 @@
 import { CircleHelp } from "lucide-react";
 import { useId, useMemo, useState } from "react";
+import type { BackendCheckpoint } from "../api/contracts.ts";
 import {
 	nearestPointIndex,
 	projectionChartModel,
@@ -11,14 +12,19 @@ import type { Projection } from "../domain/result.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { IconButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
+import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
 import { Skeleton } from "./Skeleton.tsx";
+
+const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 export function ProjectionChart({
 	projection,
+	checkpoints = EMPTY_CHECKPOINTS,
 	onEvidence,
 	pending = false,
 }: {
 	projection: Projection | null;
+	checkpoints?: readonly BackendCheckpoint[];
 	onEvidence: () => void;
 	pending?: boolean;
 }) {
@@ -110,6 +116,9 @@ export function ProjectionChart({
 			className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
 			aria-label={`Net worth over the trailing ${days} days`}
 		>
+			{projection && (
+				<NetWorthSummary projection={projection} checkpoints={checkpoints} />
+			)}
 			{topRow}
 			<div className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
 				<ProjectionPlot
