@@ -20,8 +20,10 @@ Usage: scripts/test [--unit|--integration|--all|--help]
 Matrix:
   unit         backend/scripts/verify.sh (CGO_ENABLED=0 gofmt+vet+test ./...)
                npm --prefix frontend test (vitest: src/** and scripts/**, jsdom)
+               npm --prefix extension test (node:test, no external APIs)
                node --test dev/*.test.mjs auth/casdoor/*.test.mjs (Compose CLI, no daemon)
   integration  npm --prefix frontend run test:browser (tests/*.spec.ts, single worker)
+               npm --prefix extension run test:browser (disposable browser profile)
                Manual, credential-gated (not in this dispatcher):
                  auth/test-integration.mjs (CASDOOR_TEST_MUTATIONS=1, disposable tmp/)
                  scripts/smoke-backend.sh / smoke-compose.sh (running stack + cookie jar)
@@ -33,12 +35,14 @@ EOF
 run_unit() {
   backend/scripts/verify.sh
   npm --prefix frontend test
+  npm --prefix extension test
   # shellcheck disable=SC2086
   node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 }
 
 run_integration() {
   npm --prefix frontend run test:browser
+  npm --prefix extension run test:browser
 }
 
 mode="${1:---help}"

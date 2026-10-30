@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Waypoint · Planned purchases</title>
+    <link rel="stylesheet" href="panel.css" />
+    <script type="module" src="src/panel.js"></script>
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="brand" href="#" id="open-app" aria-label="Open Waypoint">W<span>WAYPOINT</span></a
+      ><span class="edition">PURCHASE CAPTURE</span>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">A little room for what comes next</p>
+        <h1>Plan it.<br /><em>Do not rush it.</em></h1>
+        <p>Bring a purchase into your plan.<br />Decide when it fits, on your terms.</p>
+      </section>
+      <section class="connection" aria-label="App connection">
+        <div>
+          <span class="eyebrow">YOUR PLAN</span>
+          <p id="identity">Not connected</p>
+        </div>
+        <button type="button" id="connect">Connect</button
+        ><button type="button" id="disconnect" hidden>Disconnect</button>
+      </section>
+      <section id="approval" class="notice" hidden>
+        <h2>Approve this connection</h2>
+        <p>Use this code on the sign-in page:</p>
+        <strong id="user-code"></strong>
+        <p>
+          <a id="approval-link" target="_blank" rel="noopener noreferrer">Open approval page</a>
+        </p>
+      </section>
+      <p id="status" role="status" aria-live="polite"></p>
+      <p id="error" role="alert" tabindex="-1" hidden></p>
+      <section id="success" class="notice" hidden>
+        <h2>Added to your plan</h2>
+        <p id="saved-name"></p>
+        <a id="view-purchase" target="_blank" rel="noopener noreferrer">View planned purchases ↗</a>
+      </section>
+      <form id="purchase" method="post">
+        <fieldset id="purchase-fields">
+          <legend>THE PURCHASE</legend>
+          <div class="capture-actions">
+            <button type="button" id="capture">Read this page</button
+            ><button type="button" id="autofill" aria-describedby="ai-disclosure">
+              AI autofill ↗
+            </button>
+          </div>
+          <p id="ai-disclosure" class="hint">
+            AI sends product metadata and a short visible-text extract to your configured provider.
+            Waypoint account data is excluded. Review the page for personal details first.
+          </p>
+          <div class="field">
+            <label for="name">Purchase name <span>required</span></label>
+            <div class="pickable">
+              <input id="name" name="name" required maxlength="100" autocomplete="off" /><button
+                type="button"
+                data-pick="name"
+                aria-label="Pick purchase name from page"
+                title="Pick from page"
+              >
+                ⌖
+              </button>
+            </div>
+            <small id="name-source"></small>
+          </div>
+          <div class="field">
+            <label for="cost">Full purchase cost <span>required</span></label>
+            <div class="pickable">
+              <input
+                id="cost"
+                name="cost"
+                type="number"
+                inputmode="decimal"
+                required
+                min="0.01"
+                max="10000000000"
+                step="0.01"
+                placeholder="0.00"
+              /><button
+                type="button"
+                data-pick="cost"
+                aria-label="Pick cost from page"
+                title="Pick from page"
+              >
+                ⌖
+              </button>
+            </div>
+            <small id="cost-source"></small>
+          </div>
+          <div class="field">
+            <label for="currency">Currency <span>required</span></label
+            ><select id="currency" name="currency" required>
+              <option value="">Confirm the price currency</option>
+              <option value="USD">USD · US dollars</option>
+            </select>
+            <p class="hint">
+              Review the full cost, including any tax or delivery allowance. No automatic
+              conversion.
+            </p>
+          </div>
+          <div class="field">
+            <label for="fromId">Funding account <span>required</span></label
+            ><select id="fromId" name="fromId" required>
+              <option value="">Connect to choose an account</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="startDate">Earliest purchase date <span>required</span></label
+            ><input id="startDate" name="startDate" type="date" required />
+          </div>
+          <details class="evidence">
+            <summary>Source &amp; product details</summary>
+            <div class="field">
+              <label for="sourceUrl">Source page</label
+              ><input
+                id="sourceUrl"
+                name="sourceUrl"
+                type="url"
+                maxlength="2048"
+                spellcheck="false"
+                autocapitalize="off"
+                autocorrect="off"
+              />
+            </div>
+            <div class="field">
+              <label for="variant">Variant or SKU</label
+              ><input id="variant" name="variant" maxlength="300" />
+            </div>
+            <p id="original-price" class="hint"></p>
+          </details>
+        </fieldset>
+        <p class="hint">
+          This adds an optional purchase to your queue. Waypoint never places an order.
+        </p>
+        <button class="primary" id="save" type="submit">
+          Add planned purchase <span aria-hidden="true">↗</span>
+        </button>
+      </form>
+      <button type="button" id="new-capture" class="text-button">Start a new capture</button>
+      <details id="settings">
+        <summary>Connection &amp; AI settings</summary>
+        <form id="settings-form" method="post">
+          <div class="field">
+            <label for="app">Waypoint app URL <span>required</span></label
+            ><input
+              id="app"
+              name="app"
+              type="url"
+              required
+              placeholder="https://your-waypoint.example"
+              autocomplete="url"
+              spellcheck="false"
+              autocapitalize="off"
+              autocorrect="off"
+            />
+          </div>
+          <fieldset>
+            <legend>OPTIONAL AI PROVIDER</legend>
+            <p class="hint">
+              Use an OpenAI-compatible Chat Completions API with JSON-schema output. Confirm your
+              provider permits this use. OpenCode Go targets coding-agent traffic.
+            </p>
+            <div class="field">
+              <label for="ai-base">API base URL</label
+              ><input
+                id="ai-base"
+                name="aiBase"
+                type="url"
+                placeholder="https://api.example/v1"
+                spellcheck="false"
+                autocapitalize="off"
+                autocorrect="off"
+              />
+            </div>
+            <div class="field">
+              <label for="model">Model ID</label
+              ><input
+                id="model"
+                name="model"
+                maxlength="200"
+                spellcheck="false"
+                autocapitalize="off"
+                autocorrect="off"
+              />
+            </div>
+            <div class="field">
+              <label for="key">API key</label
+              ><input
+                id="key"
+                name="key"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                aria-describedby="key-help"
+              />
+              <p id="key-help" class="hint">
+                Session-only. Leave unchanged to keep the current key. Refresh credentials stay
+                browser-local, never synced. Local storage is not encrypted by this extension.
+              </p>
+            </div>
+            <label class="check"
+              ><input type="checkbox" id="forget-key" name="forgetKey" />Forget the current AI
+              key</label
+            >
+          </fieldset>
+          <button type="submit">Save settings</button>
+        </form>
+      </details>
+    </main>
+    <footer>YOUR FUTURE, WITH INTENTION.</footer>
+  </body>
+</html>

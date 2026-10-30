@@ -237,6 +237,9 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			s.serveBrowserProvider(w, r)
 			return
 		}
+		if s.extensionRequest(w, r, protected) {
+			return
+		}
 		if endpoint, ok := s.browserEndpoint(r); ok {
 			// A sibling app origin cannot submit this origin's cookies.
 			// Compare through the shared canonicalizer so trailing-slash,

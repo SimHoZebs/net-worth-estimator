@@ -1,6 +1,6 @@
 # Testing
 
-This checkout holds two packages: the Go backend in `backend/`, and the Waypoint frontend in `frontend/`. Both have their own gates. The backend is the calculation authority; the frontend renders its results and saves each row through its editor. Failed edits stay local to the form for retry, and multi-row imports apply per row without an atomic whole-model promise.
+This checkout holds the Go backend in `backend/`, the Waypoint frontend in `frontend/`, and the purchase-capture extension in `extension/`. Each has its own gates. The backend is the calculation authority; the frontend renders its results and saves each row through its editor. Failed edits stay local to the form for retry, and multi-row imports apply per row without an atomic whole-model promise.
 
 Use `./scripts/test` as the single entry point:
 
@@ -11,6 +11,19 @@ scripts/test --all           # unit then integration
 ```
 
 Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `npm --prefix frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+
+The purchase-capture extension adds `npm --prefix extension test` to unit and
+`npm --prefix extension run test:browser` to integration. Install its dependencies
+with `npm --prefix extension ci`. Its completion gate also includes
+`npm --prefix extension run lint` and `npm --prefix extension run build`.
+Browser tests use a disposable Chromium profile and ephemeral local HTTP fixture.
+See [extension setup and verification](extension/README.md).
+
+Standalone planned-purchase CRUD and user isolation run in the API/store suites.
+The separate one-time upgrade script has its own tests under
+`backend/scripts/one-time/planned-purchases/`, included in the backend gate.
+Upgrade failures must roll back all users. Setup and runtime must reject the old
+schema without conversion. See [purchase persistence](docs/purchase-queue.md#persistence).
 
 ## Manual Development
 
@@ -147,6 +160,12 @@ backend/scripts/verify.sh ./internal/api/...
 Test fixtures provision through `store.SetupDatabase` before runtime opens. Startup
 regressions verify that missing, empty, and incompatible databases create no files
 or schema. Identity initialization must also reject incomplete tables without repair.
+
+Setup creates schemas only for fresh databases. Store regressions verify that
+rejected old or incomplete databases retain identical bytes and permissions.
+Cases cover missing receipt/void fields, inline images, retired owner source
+values, and missing blob lifecycle objects. Repeated setup preserves receipt
+links without a backfill. Older automatic migrations are removed.
 
 ## Casdoor Authentication
 
