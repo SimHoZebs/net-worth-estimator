@@ -7,7 +7,7 @@ import test from "node:test";
 const run = promisify(execFile);
 const image = process.env.DEPLOYMENT_TEST_IMAGE;
 
-test("API image supports non-root command overrides, explicit setup, and probes on a provider port", { skip: !image }, async (t) => {
+test("API image supports non-root command overrides, explicit setup, schema-only boot, and probes on a provider port", { skip: !image }, async (t) => {
   const { stdout } = await run("docker", ["image", "inspect", image]);
   const config = JSON.parse(stdout)[0].Config;
   assert.equal(config.User, "app:app");
@@ -26,9 +26,10 @@ cat > /tmp/provider/.well-known/openid-configuration <<'JSON'
 {"issuer":"http://127.0.0.1:18000","authorization_endpoint":"http://127.0.0.1:18000/authorize","token_endpoint":"http://127.0.0.1:18000/token","jwks_uri":"http://127.0.0.1:18000/jwks","introspection_endpoint":"http://127.0.0.1:18000/introspect","backchannel_logout_supported":true}
 JSON
 busybox-extras httpd -p 18000 -h /tmp/provider
-/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
-/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
-exec /app/server
+/app/setupdb --db /tmp/explicit-setup.db
+/app/setupdb --db /tmp/explicit-setup.db
+test ! -f "$NET_WORTH_ESTIMATOR_DB"
+exec /app/render-free-boot.sh
 `;
   await run("docker", [
     "run", "--detach", "--network", "none", "--name", name,
@@ -57,6 +58,8 @@ exec /app/server
   }
   const logs = await run("docker", ["logs", name]);
   assert.ok(ready, `API did not become ready: ${logs.stdout}\n${logs.stderr}`);
+  const users = await run("docker", ["exec", name, "/bin/sh", "-c", 'sqlite3 "$NET_WORTH_ESTIMATOR_DB" "SELECT COUNT(*) FROM users;"']);
+  assert.equal(users.stdout.trim(), "0", "Boot must not provision the configured guest before authorized access");
   const denied = await run("docker", ["exec", name, "wget", "--server-response", "-O", "/dev/null", "http://127.0.0.1:10000/v1/auth/session"])
     .then(() => "unexpected success", (error) => error.stderr);
   assert.match(denied, /403 Forbidden/);

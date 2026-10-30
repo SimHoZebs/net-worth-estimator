@@ -48,8 +48,9 @@ resumes the API and this body never restores over the data file. The private
 is recognized fail-closed. Retain this body until both supported targets
 verify it. No provider edits belong to this migration.
 
-`render-free-boot.sh` provisions current schema and the ordinary guest row on
-hosts configured for that command. This is fresh/current storage provisioning,
+`render-free-boot.sh` provisions or validates current schema on hosts configured
+for that command. It does not provision users. Guest and signed-in workspaces
+use the shared authorized-access path. This is fresh/current schema setup,
 not the deployment migration hook. Keep the two separate.
 
 ## Supported execution paths

@@ -190,14 +190,19 @@ Shell/SSH session, which has the attached disk. For a fresh database, execute:
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
 ```
 
-Then provision the guest destination row with the issuer and guest subject from
-the private `bootstrap.json` (`subject` and `guest_subject`). Anonymous traffic
-resolves to this ordinary user; the provider's viewer group limits it. Repeat
-runs preserve the existing database and user rows:
+Before guest-data publication, provision the destination row with the issuer
+and guest subject from private `bootstrap.json` (`issuer` and `guest_subject`).
+Otherwise, the first authorized access creates its empty workspace through the
+same path as other users. The provider's viewer group limits guest access.
+Repeat setup preserves existing database and user rows:
 
 ```sh
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer "$ISSUER" --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
 ```
+
+Hosts configured to use `/app/render-free-boot.sh` run schema setup only before
+the server. That wrapper never provisions guest or other user workspaces.
+Casdoor's initial deployment seed still creates the guest identity.
 
 For existing data, restore a verified current-schema SQLite-safe backup or run a
 separate one-time operator upgrade. `setupdb` only validates an existing schema,
@@ -240,8 +245,9 @@ DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test
 ```
 
 The image test uses disposable state without external networking. It checks a
-non-default port, readiness, non-root command override, explicit setup, and proxy
-bypass rejection. Go integration tests use real HTTP/TLS, a mock OIDC provider,
+non-default port, readiness, non-root command override, explicit setup,
+schema-only boot without user creation, and proxy bypass rejection.
+Go integration tests use real HTTP/TLS, a mock OIDC provider,
 real API writes, CSRF rejection, incremental streaming, and restart persistence.
 
 For an actual deployment with a provisioned guest scope:
