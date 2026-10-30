@@ -139,8 +139,13 @@ Legacy historical rows named `sample` remain recoverable as an explicit
 `--source-user sample` from a stopped-stack snapshot. Provision the ordinary
 destination user first. Runtime requests never select those legacy rows.
 
-The API container includes `setupdb`, `importcsv`, `refreshmodel`, and the
-temporary `migrate-plans-to-users` under `/app`.
+The API container includes `setupdb`, `importcsv`, and `refreshmodel` under `/app`.
 Run operator tools in a separate stopped-stack maintenance container with the
 same non-root user and explicit private volume mounts. Do not use an active
 server container for migration or user replacement.
+
+One-time upgrades belong in the deployment repository's single replaceable
+migration script, not in `setupdb` or server startup. Production uses the
+[migration SOP](https://github.com/SimHoZebs/home-server/blob/main/net-worth-estimator/MIGRATIONS.md).
+The SOP requires a verified backup, an offline rehearsal, explicit postconditions,
+and a rollback plan. `setupdb` rejects legacy plan-scoped databases unchanged.

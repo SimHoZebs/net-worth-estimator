@@ -11,7 +11,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
-func TestSetupMigratesLegacyPlansDatabase(t *testing.T) {
+func TestSetupRejectsLegacyPlansDatabaseWithoutChanges(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -39,30 +39,22 @@ func TestSetupMigratesLegacyPlansDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out, errOut bytes.Buffer
-	if code := run([]string{"--db", path}, &out, &errOut); code != 0 {
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := run([]string{"--db", path}, &out, &errOut); code != 1 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out.String(), errOut.String())
 	}
-	if !strings.Contains(out.String(), "migration complete") || !strings.Contains(out.String(), "setup complete") {
-		t.Fatalf("unexpected output: %q", out.String())
+	if out.Len() != 0 || !strings.Contains(errOut.String(), "unsupported legacy database") {
+		t.Fatalf("unexpected output: stdout=%q stderr=%q", out.String(), errOut.String())
 	}
-	// Repeat run is a no-op migration with successful setup.
-	out.Reset()
-	if code := run([]string{"--db", path}, &out, &errOut); code != 0 {
-		t.Fatalf("repeat code=%d stderr=%q", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "migration complete") {
-		t.Fatalf("repeat migrated again: %q", out.String())
-	}
-	opened, err := sqlite.OpenDatabase(path)
+	after, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("open after setup: %v", err)
-	}
-	var name string
-	if err := opened.SQL().QueryRow(`SELECT name FROM accounts WHERE user_id='user:owner1'`).Scan(&name); err != nil || name != "Checking" {
-		t.Fatalf("migrated rows: %v", err)
-	}
-	if err := opened.Close(); err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("setup changed the legacy database")
 	}
 }
 
