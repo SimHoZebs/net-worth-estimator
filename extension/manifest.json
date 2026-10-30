@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Waypoint — Planned Purchases",
+  "description": "Capture a purchase, review its cost, and add it to your Waypoint plan.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "120",
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "action": { "default_title": "Capture a planned purchase" },
+  "background": { "service_worker": "src/background.js", "type": "module" },
+  "side_panel": { "default_path": "panel.html" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+  }
+}

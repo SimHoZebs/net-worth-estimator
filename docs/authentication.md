@@ -72,6 +72,22 @@ same Casdoor session boundary. Missing
 identity settings stop startup rather than expose an unauthenticated API.
 Cross-origin session login is outside this integration.
 
+### Browser extension clients
+
+The purchase-capture extension uses the existing device-code start, poll and
+refresh endpoints. It holds its own bearer credentials, separate from website
+session cookies. See [extension setup and credential policy](../extension/README.md).
+
+Chromium extension POSTs carry an extension origin even with host permission.
+The identity boundary admits these only on device sign-in and `POST /v1/planned-purchases`.
+It removes cookies and the extension origin before the usual middleware runs.
+Purchase writes require an explicit bearer credential. Fetch Metadata, resource
+checks, user permissions and website CSRF/origin rules remain unchanged.
+This transport does not create a purchase-only OAuth scope. Existing user
+permissions still control every operation.
+Chromium GET requests omit `Origin` and use the existing bearer path. Requests
+with an extension origin outside the allowed POST routes are rejected.
+
 `GET /v1/auth/session` supplies identity and resource-capability discovery.
 The API checks Casdoor's resource permissions before any user-data read or write.
 Guests read status for their own user scope. Default viewer grants make that

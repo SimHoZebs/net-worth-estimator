@@ -23,6 +23,14 @@ Planned purchases never replay in history or execute in the main projection.
 A purchase remains hypothetical until the owner removes it. The evaluation never
 places orders or writes generated transactions to the database.
 
+### Browser capture
+
+The [purchase-capture extension](../extension/README.md) signs in as an external
+device client. It saves a reviewed name, fixed USD cost, funding account and
+earliest date through `POST /v1/planned-purchases`, the same API as the app.
+Funding choices and queue priority come from the financial-model read. Source
+details remain local to the extension.
+
 ## API
 
 - `GET /v1/planned-purchases` reads the queue and document revision.

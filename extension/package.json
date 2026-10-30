@@ -1,0 +1,19 @@
+{
+  "name": "waypoint-purchase-capture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:browser": "playwright test",
+    "lint": "oxlint src tests && oxfmt --check .",
+    "format": "oxfmt .",
+    "build": "node scripts/package.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "jsdom": "^27.4.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0"
+  }
+}
