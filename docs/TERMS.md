@@ -10,8 +10,8 @@ A planned or recorded transaction of money into, out of, or between accounts.
 
 Use **transaction**, qualified as **planned** or **recorded**. The saved model's "Transactions" tab holds the rules and dated entries you edit. An account's activity view holds the rows the engine computed from those rules.
 
-- Retired from copy: posting, movement, money movement.
-- Retired from prose: one-time movement, planned movement, projected transaction.
+- Retired from copy: posting.
+- Retired from prose: projected transaction.
 - A recurring rule is **scheduled**; a dated single entry is **one-time**.
 - A record supplied by a source is a **deposit** or **withdrawal**, not a transaction.
 
