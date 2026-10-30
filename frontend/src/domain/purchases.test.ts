@@ -10,7 +10,7 @@ import {
 	type PlannedPurchase,
 } from "./model.ts";
 import { movePurchase, purchaseQueue } from "./purchases.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { projectionFixture } from "../mocks/projection.ts";
 
 function wish(id: string): PlannedPurchase {
@@ -19,7 +19,7 @@ function wish(id: string): PlannedPurchase {
 		name: id,
 		amount: 500,
 		fromId: "checking",
-		startDate: testAccount.startDate,
+		startDate: financialModelFixture.startDate,
 		enabled: true,
 		readOnly: false,
 	};
@@ -28,7 +28,7 @@ function wish(id: string): PlannedPurchase {
 describe("purchase queue", () => {
 	it("changes priorities without changing established payments or the input", () => {
 		const plan = {
-			...testAccount,
+			...financialModelFixture,
 			plannedPurchases: [wish("laptop"), wish("chair")],
 		};
 		const next = movePurchase(plan, "chair", -1);
@@ -45,7 +45,7 @@ describe("purchase queue", () => {
 
 	it("round-trips wishlist rows through saved and exported accounts", () => {
 		const plan = {
-			...testAccount,
+			...financialModelFixture,
 			plannedPurchases: [{ ...wish("laptop"), amount: 1500 }],
 		};
 		const converted = displayPlanToBackendDocument(plan, {
@@ -98,7 +98,7 @@ describe("purchase queue", () => {
 
 	it("never manufactures historical purchase activity", () => {
 		const plan = {
-			...testAccount,
+			...financialModelFixture,
 			transactions: [],
 			plannedPurchases: [wish("laptop")],
 		};
@@ -113,7 +113,7 @@ describe("purchase queue", () => {
 	it("rejects wishes without funding accounts", () => {
 		expect(
 			validatePlan({
-				...testAccount,
+				...financialModelFixture,
 				plannedPurchases: [{ ...wish("laptop"), fromId: null }],
 			}),
 		).toBeInstanceOf(Error);
@@ -123,11 +123,11 @@ describe("purchase queue", () => {
 		// Intentionally the pre-rename shape: old drafts stored wishlist
 		// items in `transactions` with a purchasePriority field.
 		const legacy = {
-			...testAccount,
+			...financialModelFixture,
 			transactions: [
-				...testAccount.transactions,
+				...financialModelFixture.transactions,
 				{
-					...testAccount.transactions[0]!,
+					...financialModelFixture.transactions[0]!,
 					id: "laptop",
 					name: "laptop",
 					amount: 500,

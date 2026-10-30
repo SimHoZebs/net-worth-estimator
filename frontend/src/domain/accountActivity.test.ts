@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testAccount as examplePlan } from "../mocks/account.ts";
+import { financialModelFixture as examplePlan } from "../mocks/financialModel.ts";
 import { activityProjection } from "../mocks/projection.ts";
 import {
 	accountTransactions,
@@ -233,7 +233,9 @@ describe("account-scoped transactions", () => {
 			projection: activityProjection(plan),
 		});
 		expect(
-			rows.find((row) => row.transactionId === "sfin-pending-checking-mock-pend1"),
+			rows.find(
+				(row) => row.transactionId === "sfin-pending-checking-mock-pend1",
+			),
 		).toMatchObject({
 			pending: false,
 			excluded: true,
@@ -274,9 +276,9 @@ describe("account-scoped transactions", () => {
 					excluded: true,
 				}),
 			]);
-			expect(projection.transactions.some((row) => row.transactionId === id)).toBe(
-				false,
-			);
+			expect(
+				projection.transactions.some((row) => row.transactionId === id),
+			).toBe(false);
 			expect(
 				plan.transactions.find((transaction) => transaction.id === id)?.enabled,
 			).toBe(false);

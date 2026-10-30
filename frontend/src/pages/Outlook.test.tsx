@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resetWorkspaceStore } from "../state/workspaceStore.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import {
 	setServerModelFixture,
@@ -18,7 +18,7 @@ vi.mock("../state/useRemoteProjection.ts", () => ({
 }));
 
 const blankPlan = {
-	...testAccount,
+	...financialModelFixture,
 	accounts: [],
 	transactions: [],
 	evaluations: [],

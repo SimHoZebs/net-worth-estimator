@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deriveFundingGaps } from "../domain/fundingGaps.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { projectionFixture } from "../mocks/projection.ts";
 import type {
 	FinancialModelDocument,
@@ -50,7 +50,10 @@ function event(overrides: Partial<TransactionEvent> = {}): TransactionEvent {
 
 describe("projection transaction evidence", () => {
 	it("retains canonical fulfillment without a configured evaluation", () => {
-		const transactions = projectionTransactions(serverProjection([event()]), null);
+		const transactions = projectionTransactions(
+			serverProjection([event()]),
+			null,
+		);
 		expect(transactions[0]).toMatchObject({
 			transactionId: "bill",
 			fromId: "checking",
@@ -59,7 +62,7 @@ describe("projection transaction evidence", () => {
 			fulfillment: { unfulfilledAmount: 100, destinationLimitedAmount: 0 },
 		});
 		const gaps = deriveFundingGaps({
-			plan: testAccount,
+			plan: financialModelFixture,
 			projection: projectionFixture({ transactions }),
 		});
 		expect(gaps).toHaveLength(1);
@@ -81,7 +84,7 @@ describe("projection transaction evidence", () => {
 		expect(transactions[0]?.constraintTypes).toEqual(["destination-ceiling"]);
 		expect(
 			deriveFundingGaps({
-				plan: testAccount,
+				plan: financialModelFixture,
 				projection: projectionFixture({ transactions }),
 			}),
 		).toEqual([]);
@@ -102,10 +105,9 @@ describe("projection transaction evidence", () => {
 			]),
 			null,
 		);
-		expect(transactions.map((transaction) => transaction.transactionId)).toEqual([
-			"z-first",
-			"a-second",
-		]);
+		expect(
+			transactions.map((transaction) => transaction.transactionId),
+		).toEqual(["z-first", "a-second"]);
 	});
 
 	it("resolves names from the document index with postings winning ties", () => {

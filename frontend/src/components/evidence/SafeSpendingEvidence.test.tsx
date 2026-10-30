@@ -1,8 +1,11 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { testAccount } from "../../mocks/account.ts";
-import { transactionFixture, projectionFixture } from "../../mocks/projection.ts";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
+import {
+	transactionFixture,
+	projectionFixture,
+} from "../../mocks/projection.ts";
 import { SafeSpendingEvidence } from "./SafeSpendingEvidence.tsx";
 
 // This test covers evidence content rather than the native modal lifecycle.
@@ -34,7 +37,7 @@ describe("SafeSpendingEvidence", () => {
 		});
 		const view = render(
 			<SafeSpendingEvidence
-				plan={testAccount}
+				plan={financialModelFixture}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -67,7 +70,7 @@ describe("SafeSpendingEvidence", () => {
 	it("retains the empty-period explanation", () => {
 		const view = render(
 			<SafeSpendingEvidence
-				plan={testAccount}
+				plan={financialModelFixture}
 				projection={projectionFixture()}
 				onClose={() => {}}
 			/>,

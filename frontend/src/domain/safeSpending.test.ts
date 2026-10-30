@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture } from "../mocks/projection.ts";
 import {
 	cashCushion,
@@ -37,7 +37,7 @@ describe("month helpers", () => {
 
 describe("checking", () => {
 	it("prefers the checking account id", () => {
-		expect(checkingAccountId(testAccount)).toBe("checking");
+		expect(checkingAccountId(financialModelFixture)).toBe("checking");
 	});
 });
 
@@ -191,7 +191,9 @@ describe("checkingShortfall", () => {
 	it("returns zero when nothing is short", () => {
 		expect(
 			checkingShortfall({
-				transactions: transactions.filter((item) => item.transactionId === "paid"),
+				transactions: transactions.filter(
+					(item) => item.transactionId === "paid",
+				),
 				checkingIds: ["checking"],
 				after: "2026-10-09",
 				through: "2026-10-31",
@@ -457,9 +459,13 @@ describe("groupMandatorySpending", () => {
 
 describe("spendingBalance", () => {
 	it("sums the selected accounts and ignores unknown ids", () => {
-		expect(spendingBalance(testAccount, ["checking", "savings"])).toBe(60250);
-		expect(spendingBalance(testAccount, ["checking", "missing"])).toBe(18250);
-		expect(spendingBalance(testAccount, [])).toBe(0);
+		expect(
+			spendingBalance(financialModelFixture, ["checking", "savings"]),
+		).toBe(60250);
+		expect(
+			spendingBalance(financialModelFixture, ["checking", "missing"]),
+		).toBe(18250);
+		expect(spendingBalance(financialModelFixture, [])).toBe(0);
 	});
 });
 

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toAccountCard } from "../../domain/accountCards.ts";
-import { testAccount } from "../../mocks/account.ts";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
 import {
 	activityProjection,
 	transactionFixture,
@@ -40,13 +40,13 @@ describe("AccountDetailsModal", () => {
 			],
 		});
 		const card = toAccountCard({
-			account: testAccount.accounts[0]!,
+			account: financialModelFixture.accounts[0]!,
 			projection,
 		});
 		const view = render(
 			<AccountDetailsModal
 				card={card}
-				plan={testAccount}
+				plan={financialModelFixture}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -79,13 +79,13 @@ describe("AccountDetailsModal", () => {
 			],
 		});
 		const card = toAccountCard({
-			account: testAccount.accounts[0]!,
+			account: financialModelFixture.accounts[0]!,
 			projection,
 		});
 		const view = render(
 			<AccountDetailsModal
 				card={card}
-				plan={testAccount}
+				plan={financialModelFixture}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -115,13 +115,13 @@ describe("AccountDetailsModal", () => {
 	it("paginates long transaction lists client-side", () => {
 		const projection = activityProjection();
 		const card = toAccountCard({
-			account: testAccount.accounts[0]!,
+			account: financialModelFixture.accounts[0]!,
 			projection,
 		});
 		const view = render(
 			<AccountDetailsModal
 				card={card}
-				plan={testAccount}
+				plan={financialModelFixture}
 				projection={projection}
 				onClose={() => {}}
 			/>,

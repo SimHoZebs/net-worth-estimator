@@ -1,14 +1,17 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { testAccount } from "../../mocks/account.ts";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { PositionEvidence } from "./PositionEvidence.tsx";
 
 it("does not report a missing account balance as zero", () => {
 	const html = renderToStaticMarkup(
 		<PositionEvidence
-			plan={{ ...testAccount, accounts: [testAccount.accounts[0]!] }}
+			plan={{
+				...financialModelFixture,
+				accounts: [financialModelFixture.accounts[0]!],
+			}}
 			position={{
-				asOfDate: testAccount.startDate,
+				asOfDate: financialModelFixture.startDate,
 				netWorth: 100,
 				accounts: [],
 			}}
@@ -22,11 +25,16 @@ it("does not report a missing account balance as zero", () => {
 it("reports a real zero balance as zero", () => {
 	const html = renderToStaticMarkup(
 		<PositionEvidence
-			plan={{ ...testAccount, accounts: [testAccount.accounts[0]!] }}
+			plan={{
+				...financialModelFixture,
+				accounts: [financialModelFixture.accounts[0]!],
+			}}
 			position={{
-				asOfDate: testAccount.startDate,
+				asOfDate: financialModelFixture.startDate,
 				netWorth: 0,
-				accounts: [{ accountId: testAccount.accounts[0]!.id, balance: 0 }],
+				accounts: [
+					{ accountId: financialModelFixture.accounts[0]!.id, balance: 0 },
+				],
 			}}
 			onClose={() => {}}
 		/>,

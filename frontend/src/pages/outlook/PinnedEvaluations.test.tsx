@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OtherEvaluation } from "@/domain/result.ts";
-import { testAccount } from "@/mocks/account.ts";
+import { financialModelFixture } from "@/mocks/financialModel.ts";
 import { evaluationFixture, projectionFixture } from "@/mocks/projection.ts";
 import { PinnedEvaluations } from "@/pages/outlook/PinnedEvaluations.tsx";
 
@@ -23,7 +23,7 @@ const funding: OtherEvaluation = {
 
 function props() {
 	return {
-		plan: testAccount,
+		plan: financialModelFixture,
 		projection: projectionFixture({ otherEvaluations: [funding] }),
 		range: null,
 		pinnedIds: [funding.id],
@@ -63,7 +63,7 @@ describe("pinned evaluation cards", () => {
 		expect(input.onPinChange).not.toHaveBeenCalled();
 	});
 
-	it.each(testAccount.evaluations)(
+	it.each(financialModelFixture.evaluations)(
 		"shows and pins the configured $kind target without an evidence action",
 		(evaluation) => {
 			const result = evaluationFixture({ evaluation });

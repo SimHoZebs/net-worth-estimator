@@ -1,32 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture, projectionFixture } from "../mocks/projection.ts";
 import { deriveFundingGaps, summarizeFundingGap } from "./fundingGaps.ts";
 
 describe("derive funding gaps", () => {
 	it("keeps evidence within the configured transaction selection", () => {
 		const projection = projectionFixture({
-			transactions: [transactionFixture(), transactionFixture({ transactionId: "other" })],
+			transactions: [
+				transactionFixture(),
+				transactionFixture({ transactionId: "other" }),
+			],
 		});
 		expect(
-			deriveFundingGaps({ plan: testAccount, projection, postingIds: [] }),
+			deriveFundingGaps({
+				plan: financialModelFixture,
+				projection,
+				postingIds: [],
+			}),
 		).toEqual([]);
 		const gaps = deriveFundingGaps({
-			plan: testAccount,
+			plan: financialModelFixture,
 			projection,
 			postingIds: ["other"],
 		});
 		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06"]);
 		expect(
-			deriveFundingGaps({ plan: testAccount, projection, postingIds: null }),
+			deriveFundingGaps({
+				plan: financialModelFixture,
+				projection,
+				postingIds: null,
+			}),
 		).toHaveLength(2);
 	});
 
 	it("opens the window before the failure month without double-counting", () => {
 		const plan = {
-			...testAccount,
+			...financialModelFixture,
 			startDate: "2026-01-31",
-			accounts: testAccount.accounts.map((account) =>
+			accounts: financialModelFixture.accounts.map((account) =>
 				account.id === "checking" ? { ...account, balance: 4200 } : account,
 			),
 		};
@@ -87,8 +98,13 @@ describe("derive funding gaps", () => {
 	});
 
 	it("uses fulfillment amounts instead of the reconstructed account balance", () => {
-		const projection = projectionFixture({ transactions: [transactionFixture()] });
-		const [gap] = deriveFundingGaps({ plan: testAccount, projection });
+		const projection = projectionFixture({
+			transactions: [transactionFixture()],
+		});
+		const [gap] = deriveFundingGaps({
+			plan: financialModelFixture,
+			projection,
+		});
 		expect(gap).toBeDefined();
 		const summary = summarizeFundingGap(gap!);
 		expect(summary.available).toBe(6350);
@@ -113,7 +129,9 @@ describe("derive funding gaps", () => {
 		const projection = projectionFixture({
 			transactions: [transactionFixture({ fulfillment })],
 		});
-		expect(deriveFundingGaps({ plan: testAccount, projection })).toEqual([]);
+		expect(
+			deriveFundingGaps({ plan: financialModelFixture, projection }),
+		).toEqual([]);
 	});
 
 	it("retains a reportable gap when requested and realized public amounts match", () => {
@@ -127,7 +145,7 @@ describe("derive funding gaps", () => {
 				}),
 			],
 		});
-		const gaps = deriveFundingGaps({ plan: testAccount, projection });
+		const gaps = deriveFundingGaps({ plan: financialModelFixture, projection });
 		expect(gaps).toHaveLength(1);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(1);
 	});
@@ -143,7 +161,7 @@ describe("derive funding gaps", () => {
 				}),
 			],
 		});
-		const gaps = deriveFundingGaps({ plan: testAccount, projection });
+		const gaps = deriveFundingGaps({ plan: financialModelFixture, projection });
 		expect(gaps).toHaveLength(1);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(500);
 	});
@@ -174,13 +192,13 @@ describe("derive funding gaps", () => {
 			],
 		});
 		const gaps = deriveFundingGaps({
-			plan: { ...testAccount, startDate: "2026-01-31" },
+			plan: { ...financialModelFixture, startDate: "2026-01-31" },
 			projection,
 		});
 		expect(gaps).toHaveLength(1);
-		expect(gaps[0]?.transactions.map((transaction) => transaction.amount)).toEqual([
-			500,
-		]);
+		expect(
+			gaps[0]?.transactions.map((transaction) => transaction.amount),
+		).toEqual([500]);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(2650);
 	});
 });

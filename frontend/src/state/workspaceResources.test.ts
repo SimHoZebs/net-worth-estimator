@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
 import {
 	checkpointsOptions,
@@ -73,8 +73,8 @@ describe("direct Query ownership", () => {
 	it("removes server data independently of the local draft", () => {
 		setServerModelFixture();
 		useWorkspaceStore.setState({
-			draft: testAccount,
-			baseline: testAccount,
+			draft: financialModelFixture,
+			baseline: financialModelFixture,
 			baseRevision: "base",
 		});
 		serverQueryClient().removeQueries({
@@ -82,7 +82,7 @@ describe("direct Query ownership", () => {
 			exact: true,
 		});
 		expect(getServerModel()).toBeUndefined();
-		expect(useWorkspaceStore.getState().draft).toBe(testAccount);
+		expect(useWorkspaceStore.getState().draft).toBe(financialModelFixture);
 		expect(useWorkspaceStore.getState().baseRevision).toBe("base");
 	});
 	it("lists checkpoints through the narrow query with account filters", async () => {
