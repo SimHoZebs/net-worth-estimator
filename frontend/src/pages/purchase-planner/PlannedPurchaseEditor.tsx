@@ -16,12 +16,13 @@ import { Modal } from "../../components/Modal.tsx";
 import { Notice } from "../../components/Notice.tsx";
 
 /**
- * Row-first wishlist editor. Saves one planned purchase straight to the
- * server; no draft involved. A wishlist row is a hypothetical placeholder
- * for a future buy: it never posts money and never becomes a scheduled
- * transaction, it only asks the forecast for the earliest safe date.
+ * Row-first planned-purchase editor. Saves one planned purchase straight to
+ * the server; no draft involved. A planned-purchase row is a hypothetical
+ * placeholder for a future buy: it never posts money and never becomes a
+ * scheduled transaction, it only asks the forecast for the earliest safe
+ * date.
  */
-export function WishListEditor({
+export function PlannedPurchaseEditor({
 	accounts,
 	startDate,
 	item,

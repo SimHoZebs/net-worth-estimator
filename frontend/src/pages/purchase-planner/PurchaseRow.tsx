@@ -6,7 +6,7 @@ import type { PurchaseViewItem } from "./purchase.types.ts";
 import { PurchaseStatus } from "./PurchaseStatus.tsx";
 
 /**
- * Priority-queue row geometry matching the established WishListPanel list:
+ * Priority-queue row geometry for the planned-purchase list:
  * static grid row (index | text | amount | actions), name opens the
  * inspector, status reads as secondary text under the name.
  */

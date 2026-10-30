@@ -10,28 +10,25 @@ import {
 } from "../../state/purchaseWrites.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
-import { WishListEditor } from "./WishListEditor.tsx";
+import { PlannedPurchaseEditor } from "./PlannedPurchaseEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";
-import type { PurchaseEnhancements } from "./purchase.types.ts";
 
 /**
- * Wishlist panel over saved account and purchase rows. Each save writes
- * targeted row operations and refreshes authoritative state; the form only
- * closes after the server persisted the change.
+ * Planned-purchase panel over saved account and purchase rows. Each save
+ * writes targeted row operations and refreshes authoritative state; the form
+ * only closes after the server persisted the change.
  */
-export function WishListPanel({
+export function PlannedPurchasePanel({
 	accounts,
 	purchases,
 	startDate,
 	schedule,
-	enhancements,
 }: {
 	accounts: Account[];
 	purchases: PlannedPurchase[];
 	startDate: string;
 	schedule: PurchaseSchedule | null;
-	enhancements?: PurchaseEnhancements;
 }) {
 	const blocked = useUserReadOnly();
 	const years = useUiStore((state) => state.years);
@@ -44,12 +41,7 @@ export function WishListPanel({
 	const [removeError, setRemoveError] = useState<string | null>(null);
 	const [moveError, setMoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
-	const items = toPurchaseViewItems({
-		purchases,
-		accounts,
-		schedule,
-		enhancements,
-	});
+	const items = toPurchaseViewItems({ purchases, accounts, schedule });
 	const end = horizonDate({ start: startDate, years });
 
 	const moveItem = (purchase: PlannedPurchase, direction: -1 | 1) => {
@@ -100,7 +92,7 @@ export function WishListPanel({
 				{announcement}
 			</p>
 			{editor && (
-				<WishListEditor
+				<PlannedPurchaseEditor
 					accounts={accounts}
 					startDate={startDate}
 					item={editor.item}
