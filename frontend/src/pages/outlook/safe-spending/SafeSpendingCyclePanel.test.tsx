@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { testAccount } from "../../../mocks/account.ts";
+import { financialModelFixture } from "../../../mocks/financialModel.ts";
 import { SafeSpendingCyclePanel } from "./SafeSpendingCyclePanel.tsx";
 import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
 
@@ -18,7 +18,7 @@ function show(cycle: SafeSpendingChargeCycle) {
 	return render(
 		<SafeSpendingCyclePanel
 			cycle={cycle}
-			plan={testAccount}
+			plan={financialModelFixture}
 			transactionOrder="newest"
 			onTransactionOrderChange={() => {}}
 		/>,

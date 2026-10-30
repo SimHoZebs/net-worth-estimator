@@ -2,7 +2,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { dateLabel } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
-import { testAccount } from "@/mocks/account.ts";
+import { financialModelFixture } from "@/mocks/financialModel.ts";
 import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
 
 afterEach(cleanup);
@@ -39,7 +39,7 @@ function renderCard(item: OtherEvaluation) {
 	return render(
 		<OtherEvaluationCard
 			item={item}
-			plan={testAccount}
+			plan={financialModelFixture}
 			projection={null}
 			pin={{ pinned: false, onPinChange: () => {} }}
 		/>,

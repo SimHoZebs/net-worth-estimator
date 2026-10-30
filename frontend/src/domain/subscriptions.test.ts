@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import {
 	addMonthsClamped,
 	markAsInstallment,
@@ -8,11 +8,13 @@ import {
 
 describe("mark as subscription", () => {
 	it("creates an ongoing monthly rule and claims the original", () => {
-		const next = markAsSubscription(testAccount, "renovation", {
+		const next = markAsSubscription(financialModelFixture, "renovation", {
 			ruleId: "renovation-sub",
 		});
 		if (next instanceof Error) throw next;
-		expect(next.transactions).toHaveLength(testAccount.transactions.length + 1);
+		expect(next.transactions).toHaveLength(
+			financialModelFixture.transactions.length + 1,
+		);
 		const original = next.transactions.find((item) => item.id === "renovation");
 		const rule = next.transactions.find((item) => item.id === "renovation-sub");
 		expect(original?.claimRuleId).toBe("renovation-sub");
@@ -29,14 +31,17 @@ describe("mark as subscription", () => {
 		});
 		// Source plan is untouched.
 		expect(
-			testAccount.transactions.find((item) => item.id === "renovation")
-				?.claimRuleId,
+			financialModelFixture.transactions.find(
+				(item) => item.id === "renovation",
+			)?.claimRuleId,
 		).toBeNull();
 	});
 
 	it("rejects recurring sources and already-claimed transactions", () => {
-		expect(markAsSubscription(testAccount, "invest")).toBeInstanceOf(Error);
-		const claimed = markAsSubscription(testAccount, "renovation", {
+		expect(markAsSubscription(financialModelFixture, "invest")).toBeInstanceOf(
+			Error,
+		);
+		const claimed = markAsSubscription(financialModelFixture, "renovation", {
 			ruleId: "reno-sub",
 		});
 		if (claimed instanceof Error) throw claimed;
@@ -44,7 +49,7 @@ describe("mark as subscription", () => {
 	});
 
 	it("supports installments as a rule with a deadline", () => {
-		const next = markAsInstallment(testAccount, "renovation", 4, {
+		const next = markAsInstallment(financialModelFixture, "renovation", 4, {
 			ruleId: "reno-split",
 		});
 		if (next instanceof Error) throw next;
@@ -57,9 +62,9 @@ describe("mark as subscription", () => {
 	});
 
 	it("rejects invalid payment counts and clamps month ends", () => {
-		expect(markAsInstallment(testAccount, "renovation", 1)).toBeInstanceOf(
-			Error,
-		);
+		expect(
+			markAsInstallment(financialModelFixture, "renovation", 1),
+		).toBeInstanceOf(Error);
 		expect(addMonthsClamped("2028-01-31", 1)).toBe("2028-02-29");
 		expect(addMonthsClamped("2028-01-31", 3)).toBe("2028-04-30");
 	});

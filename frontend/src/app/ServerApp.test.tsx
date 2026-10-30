@@ -15,7 +15,7 @@ import {
 } from "../state/workspaceStore.ts";
 import type { FinancialModelResponse } from "../api/index.ts";
 import { resetServerQueryCache } from "../state/serverQuery.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
 import { NotificationCenter } from "../components/NotificationCenter.tsx";
@@ -89,7 +89,7 @@ it("keeps notification and draft-storage state out of the root's server loading 
 	act(() => useWorkspaceStore.setState({ error: null }));
 	act(() =>
 		useWorkspaceStore.setState({
-			draft: { ...testAccount, name: "Edited browser draft" },
+			draft: { ...financialModelFixture, name: "Edited browser draft" },
 		}),
 	);
 	expect(screen.getByText("Edited browser draft")).toBeTruthy();

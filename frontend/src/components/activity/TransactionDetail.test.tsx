@@ -7,7 +7,7 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { testAccount } from "../../mocks/account.ts";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
@@ -18,7 +18,7 @@ import { TransactionDetail } from "./TransactionDetail.tsx";
 
 function calculatedTransaction() {
 	return {
-		...testAccount.transactions[0]!,
+		...financialModelFixture.transactions[0]!,
 		id: "sapphire-payoff",
 		name: "Sapphire Statement Payoff",
 		amount: 0,
@@ -63,7 +63,7 @@ afterEach(() => {
 
 it("shows the resolved figure with a single Calculated label", () => {
 	const planTransaction = calculatedTransaction();
-	const plan = { ...testAccount, transactions: [planTransaction] };
+	const plan = { ...financialModelFixture, transactions: [planTransaction] };
 	render(
 		<TransactionDetail
 			transaction={ruleTransaction({
@@ -72,7 +72,7 @@ it("shows the resolved figure with a single Calculated label", () => {
 				resolved: { amount: 2881, requested: 2881, date: "2026-10-31" },
 			})}
 			planTransaction={planTransaction}
-			accounts={testAccount.accounts}
+			accounts={financialModelFixture.accounts}
 			plan={plan}
 			claimRuleName={null}
 			onClose={() => {}}
@@ -90,12 +90,12 @@ it("shows the resolved figure with a single Calculated label", () => {
 
 it("shows only the Calculated label when no resolved amount exists", () => {
 	const planTransaction = calculatedTransaction();
-	const plan = { ...testAccount, transactions: [planTransaction] };
+	const plan = { ...financialModelFixture, transactions: [planTransaction] };
 	render(
 		<TransactionDetail
 			transaction={ruleTransaction({ transaction: planTransaction, plan })}
 			planTransaction={planTransaction}
-			accounts={testAccount.accounts}
+			accounts={financialModelFixture.accounts}
 			plan={plan}
 			claimRuleName={null}
 			onClose={() => {}}
@@ -131,8 +131,8 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 		<TransactionDetail
 			transaction={transaction}
 			planTransaction={planTransaction}
-			accounts={testAccount.accounts}
-			plan={{ ...testAccount, transactions: [planTransaction] }}
+			accounts={financialModelFixture.accounts}
+			plan={{ ...financialModelFixture, transactions: [planTransaction] }}
 			claimRuleName={null}
 			onClose={() => {}}
 		/>,
@@ -148,20 +148,20 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 it("deletes the transaction through the row endpoint", async () => {
 	const server = stubTestServer();
 	const planTransaction = {
-		...testAccount.transactions[0]!,
+		...financialModelFixture.transactions[0]!,
 		id: "renovation-once",
 		name: "Home renovation",
 		frequency: "once" as const,
 		amountKnown: true,
 		readOnly: false,
 	};
-	const plan = { ...testAccount, transactions: [planTransaction] };
+	const plan = { ...financialModelFixture, transactions: [planTransaction] };
 	const onClose = vi.fn();
 	render(
 		<TransactionDetail
 			transaction={ruleTransaction({ transaction: planTransaction, plan })}
 			planTransaction={planTransaction}
-			accounts={testAccount.accounts}
+			accounts={financialModelFixture.accounts}
 			plan={plan}
 			claimRuleName={null}
 			onClose={onClose}
@@ -188,7 +188,7 @@ it("deletes the transaction through the row endpoint", async () => {
 
 it("marks holds that did not post instead of posted", () => {
 	const planTransaction = {
-		...testAccount.transactions[0]!,
+		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000099",
 		name: "Hold that did not post",
 		amount: 42.1,
@@ -230,8 +230,8 @@ it("marks holds that did not post instead of posted", () => {
 		<TransactionDetail
 			transaction={transaction}
 			planTransaction={planTransaction}
-			accounts={testAccount.accounts}
-			plan={{ ...testAccount, transactions: [planTransaction] }}
+			accounts={financialModelFixture.accounts}
+			plan={{ ...financialModelFixture, transactions: [planTransaction] }}
 			claimRuleName={null}
 			onClose={() => {}}
 		/>,

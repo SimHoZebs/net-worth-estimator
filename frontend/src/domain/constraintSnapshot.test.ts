@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture, projectionFixture } from "../mocks/projection.ts";
 import { failureLedger } from "./constraintSnapshot.ts";
 import type { TransactionResult } from "./result.ts";
@@ -12,7 +12,7 @@ function checkingProjection(transactions: TransactionResult[]) {
 	return projectionFixture({
 		points: [
 			{
-				date: testAccount.startDate,
+				date: financialModelFixture.startDate,
 				total: 20000,
 				balances: { checking: 20000 },
 			},
@@ -39,7 +39,7 @@ describe("failure ledger", () => {
 	it("selects the failure month as real rows with the failure flagged", () => {
 		const failure = decemberFailure();
 		const ledger = failureLedger({
-			plan: testAccount,
+			plan: financialModelFixture,
 			projection: checkingProjection([
 				move({
 					date: "2026-11-05",
@@ -134,7 +134,7 @@ describe("failure ledger", () => {
 			);
 		}
 		const ledger = failureLedger({
-			plan: testAccount,
+			plan: financialModelFixture,
 			projection: checkingProjection([...busy, failure]),
 			failure,
 		});
@@ -155,7 +155,7 @@ describe("failure ledger", () => {
 		const external = move({ fromId: null, toId: null });
 		expect(
 			failureLedger({
-				plan: testAccount,
+				plan: financialModelFixture,
 				projection: checkingProjection([external]),
 				failure: external,
 			}),

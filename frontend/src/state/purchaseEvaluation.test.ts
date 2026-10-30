@@ -10,7 +10,7 @@ import type {
 	EvaluationResultTables,
 	ProjectionResult,
 } from "../api/contracts.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 import {
 	PURCHASE_EVALUATIONS,
 	PURCHASE_EVALUATION_ID,
@@ -49,7 +49,7 @@ function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
 describe("isolated purchase evaluation", () => {
 	it("never derives a baseline start date from a planned purchase", () => {
 		const document = displayPlanToBackendDocument({
-			...testAccount,
+			...financialModelFixture,
 			plannedPurchases: [
 				{
 					id: "purchase",
@@ -157,7 +157,7 @@ describe("isolated purchase evaluation", () => {
 		const wrapper = ({ children }: { children: ReactNode }) =>
 			createElement(QueryClientProvider, { client: queryClient }, children);
 		const document = displayPlanToBackendDocument({
-			...testAccount,
+			...financialModelFixture,
 			plannedPurchases: [
 				{
 					id: "laptop",

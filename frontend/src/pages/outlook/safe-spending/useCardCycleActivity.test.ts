@@ -1,14 +1,14 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Transaction, Plan } from "../../../domain/model.ts";
-import { testAccount } from "../../../mocks/account.ts";
+import { financialModelFixture } from "../../../mocks/financialModel.ts";
 import { projectionFixture } from "../../../mocks/projection.ts";
 import { useCardCycleActivity } from "./useCardCycleActivity.ts";
 
 afterEach(cleanup);
 
 const card = {
-	...testAccount.accounts[5]!,
+	...financialModelFixture.accounts[5]!,
 	id: "household_card",
 	name: "Household card",
 };
@@ -21,7 +21,7 @@ function purchase(
 	overrides: Partial<Transaction> = {},
 ): Transaction {
 	return {
-		...testAccount.transactions[0]!,
+		...financialModelFixture.transactions[0]!,
 		id,
 		name: id,
 		startDate: date,
@@ -34,9 +34,9 @@ function purchase(
 }
 
 const plan: Plan = {
-	...testAccount,
+	...financialModelFixture,
 	startDate: "2026-10-21",
-	accounts: [...testAccount.accounts, card, otherCard],
+	accounts: [...financialModelFixture.accounts, card, otherCard],
 	transactions: [
 		purchase("before-closed", "2026-09-19", 999),
 		purchase("closed-start", "2026-09-20", 100),

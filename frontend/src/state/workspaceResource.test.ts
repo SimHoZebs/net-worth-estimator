@@ -21,7 +21,7 @@ import {
 	serverQueryClient,
 } from "./serverQuery.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
-import { testAccount } from "../mocks/account.ts";
+import { financialModelFixture } from "../mocks/financialModel.ts";
 
 function owner(id: string) {
 	acceptUserScope(
@@ -53,14 +53,14 @@ afterEach(() => {
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
 	const model = setServerModelFixture();
 	const scope = getUserScope();
-	useWorkspaceStore.setState({ draft: testAccount });
+	useWorkspaceStore.setState({ draft: financialModelFixture });
 	suspendUserScope();
 	await cancelResourceQueries();
 	expect(getServerModel()).toBeUndefined();
 	expect(
 		serverQueryClient().getQueryData(userResourceKey("model", scope)),
 	).toEqual(model);
-	expect(useWorkspaceStore.getState().draft).toBe(testAccount);
+	expect(useWorkspaceStore.getState().draft).toBe(financialModelFixture);
 });
 
 it("does not publish a retired user's late model result", async () => {
@@ -106,11 +106,11 @@ it("does not publish a retired user's late model result", async () => {
 
 it("retains only unsaved in-memory data for an explicit same-owner recovery", () => {
 	useWorkspaceStore.setState({
-		draft: testAccount,
+		draft: financialModelFixture,
 		baseRevision: "a",
 	});
 	resetWorkspaceForResource({ preserveDraft: true });
-	expect(useWorkspaceStore.getState().draft).toBe(testAccount);
+	expect(useWorkspaceStore.getState().draft).toBe(financialModelFixture);
 	expect(useWorkspaceStore.getState().scope).toBeNull();
 	resetWorkspaceForResource();
 	expect(useWorkspaceStore.getState().draft).toBeNull();

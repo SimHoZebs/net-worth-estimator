@@ -11,13 +11,13 @@ import {
 	type ServerModel,
 } from "../state/workspaceResources.ts";
 import { serverDocumentFingerprint } from "../state/remoteStorage.ts";
-import { testAccount } from "./account.ts";
+import { financialModelFixture } from "./financialModel.ts";
 
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
 }
 export function setServerModelFixture(
-	plan: Plan = testAccount,
+	plan: Plan = financialModelFixture,
 	overrides: Partial<ServerModel> = {},
 ) {
 	const document = displayPlanToBackendDocument(plan).document;
@@ -43,5 +43,5 @@ export function setServerRevisionFixture(revision: string) {
 			...model,
 			revision,
 		});
-	else setServerModelFixture(testAccount, { revision });
+	else setServerModelFixture(financialModelFixture, { revision });
 }
