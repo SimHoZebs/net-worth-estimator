@@ -30,6 +30,9 @@ The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ord
 Receipt evidence has its own account-scoped storage and a provider-neutral extraction
 interface. Images and metadata never enter `FinancialModelDocument` or projection
 identity. See [receipt contracts and source adapters](docs/receipts.md).
+Background Analysis also owns separate evidence and findings. Its worker runs
+independently of bank sync and never creates recurrence rules or changes financial
+rows. See [Analysis lifecycle, persistence, and BNPL detection](docs/analyses.md).
 Image bytes also have a separate blob storage port (`backend/internal/blobstore`,
 with SQLite and filesystem adapters, private references, and durable cleanup
 in `backend/internal/store/blob_storage.go`).

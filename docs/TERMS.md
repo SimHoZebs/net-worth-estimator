@@ -61,6 +61,11 @@ Use **Funding gaps** for the default transaction-funding evaluation and its outl
 
 ## F. Income evidence
 
+**Analysis** is a versioned inference over saved evidence. It produces findings
+with reasons and uncertainty. Analysis runs independently of account sync and
+does not change the saved financial model. BNPL detection is an Analysis. Income
+evidence is the result of income-pattern Analysis, which remains planned.
+
 An inference from recorded one-time external inflows, such as an annualized estimate of net pay. It never changes planned income and does not establish bank provenance.
 
 Use **income evidence**. Its parts stay distinct: **deposit** (the record), **cadence** (the observed pattern), **estimate** (the annualized figure), **provenance** (where it came from).
@@ -85,7 +90,7 @@ A **guest** is a provisioned user with limited assigned permissions. Guest acces
 
 **Evaluation** asks a question of a projection. It is configured on the saved model and rendered on the outlook.
 
-**Income evidence** computes from recorded deposits. It is not configured and is rendered under Data and sources.
+**Income evidence** computes from recorded deposits. Its detector remains planned. It does not ask a question about a projection.
 
 Both produce a result. Neither reads or writes the other's inputs.
 

@@ -41,6 +41,12 @@ func deleteDocumentRows(tx *userTx) error {
 }
 
 func clearDocument(tx *userTx) error {
+	if _, err := tx.Exec(`DELETE FROM analysis_findings WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM analysis_runs WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM safe_spending_settings WHERE user_id = :user_id`); err != nil {
 		return err
 	}
@@ -74,6 +80,10 @@ func clearDocument(tx *userTx) error {
 // replaceDocument is the seed/import path: it wholesale replaces owner
 // rows while preserving sync-owned rows. Runtime writes use row CRUD.
 func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
+	restoreAnalysis, err := preserveAnalysisEvidence(tx)
+	if err != nil {
+		return err
+	}
 	// Invariant: bank lines survive your saves. Sync-owned rows are managed
 	// only by the sync, never by seed payloads: snapshot them, ignore
 	// incoming copies of those identities, then re-merge. Incoming
@@ -165,6 +175,9 @@ func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
 		}
 	}
 	if err := restoreReceipts(tx, bankReceipts); err != nil {
+		return err
+	}
+	if err := restoreAnalysis(); err != nil {
 		return err
 	}
 	position = 0

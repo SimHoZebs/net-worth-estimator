@@ -98,6 +98,7 @@ type SyncPosting struct {
 	types.Posting
 	ProviderAccountID string
 	TransactionID     string
+	Facts             *types.TransactionFacts
 }
 
 // BankKey is one exact upstream identity for a bank row. A row can hold
@@ -123,6 +124,7 @@ type BankDirective struct {
 	Upsert  *BankUpsert
 	Convert *BankConvert
 	Void    string
+	Observe *BankObservation
 }
 
 // BankUpsert carries full row values for insert-or-update by key.

@@ -60,6 +60,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		primaryID = primary.ID
 	}
 	apiConfig.CanWrite = identity.CanWrite
+	apiConfig.Actor = identity.Subject
 	router, err := newUserRouter(database, userRouterConfig{
 		PrimaryResourceID: primaryID, API: apiConfig,
 	})

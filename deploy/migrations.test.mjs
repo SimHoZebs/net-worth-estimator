@@ -11,11 +11,10 @@ const run = promisify(execFile);
 const script = new URL("./migrate.sh", import.meta.url);
 const readJSON = async (path) => JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
 
-test("retired shared migration is a dependency-free no-op outside server startup", async (t) => {
+test("pending shared migration rejects an absent database and stays outside server startup", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-noop-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const result = await run("/bin/sh", [script.pathname], { cwd: directory, env: { PATH: directory } });
-  assert.equal(result.stdout + result.stderr, "");
+  await assert.rejects(run("/bin/sh", [script.pathname], { cwd: directory, env: { PATH: directory } }), /NET_WORTH_ESTIMATOR_DB/);
   assert.deepEqual(await readdir(directory), []);
   await run("bash", ["-n", script.pathname]);
   const startup = await readFile(new URL("../backend/render-free-boot.sh", import.meta.url), "utf8");
@@ -107,7 +106,7 @@ test("API image contains the exact shared script and non-root SQLite maintenance
 set -eu
 test "$(id -u)" = 10001
 test -x /app/migrate.sh
-/app/migrate.sh
+if /app/migrate.sh 2>/dev/null; then exit 1; fi
 test ! -e "$NET_WORTH_ESTIMATOR_DB"
 sqlite3 /tmp/fixture.db "CREATE TABLE fixture(value TEXT); INSERT INTO fixture VALUES ('preserved');"
 sqlite3 /tmp/fixture.db ".backup '/tmp/restored.db'"

@@ -423,36 +423,41 @@ func seedAmountPresets() []types.AmountPreset {
 // requiredSchemaColumns covers every application table, including identity.
 // Validation prepares read-only queries; it never executes DDL or repairs shape.
 var requiredSchemaColumns = map[string]string{
-	"receipts":               receiptColumns,
-	"blob_objects":           "key, state, expires_at",
-	"blob_data":              "key, data",
-	"sessions":               "token, data, expiry",
-	"identity_grants":        "id, issuer, subject, sid, expiry, data",
-	"identity_logout_marks":  "issuer, kind, identifier, seen_at, expiry",
-	"identity_logout_tokens": "issuer, jti, expiry",
-	"users":                  "id, issuer, subject",
-	"user_groups":            "id, name, created_by_user_id, created_at",
-	"group_members":          "group_id, user_id, role, joined_at, display_name",
-	"group_invites":          "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
-	"accounts":               "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
-	"checkpoints":            "user_id, id, position, date, model_account_id, balance, source",
-	"postings":               "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids",
-	"posting_sync_keys":      "user_id, provider, bridge_account_id, transaction_id, posting_id",
-	"posting_id_migrations":  "user_id, old_id, new_id",
-	"schema_migrations":      "name",
-	"purchase_policies":      "user_id, posting_id, priority",
-	"recurrence_rules":       "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
-	"evaluations":            "user_id, type, instance_id, position, name, enabled, config_json",
-	"projection_artifacts":   "user_id, identity, kind, created_at, payload",
-	"model_metadata":         "user_id, id, source_path, document_present",
-	"payment_terms":          "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
-	"entity_ids":             "user_id, id, kind",
-	"account_links":          "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
-	"pinned_evaluations":     "user_id, instance_id, position",
-	"safe_spending_settings": "user_id, id, settings_json",
-	"sync_state":             "user_id, id, last_sync_at",
-	"sync_credentials":       "user_id, id, access_url, bridge_host, updated_at, cards_json",
-	"amount_presets":         "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
+	"transaction_source_facts": "user_id, posting_id, facts_json",
+	"analysis_inputs":          "user_id, revision",
+	"analysis_runs":            "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
+	"analysis_findings":        "user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
+	"analysis_feedback":        "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
+	"receipts":                 receiptColumns,
+	"blob_objects":             "key, state, expires_at",
+	"blob_data":                "key, data",
+	"sessions":                 "token, data, expiry",
+	"identity_grants":          "id, issuer, subject, sid, expiry, data",
+	"identity_logout_marks":    "issuer, kind, identifier, seen_at, expiry",
+	"identity_logout_tokens":   "issuer, jti, expiry",
+	"users":                    "id, issuer, subject",
+	"user_groups":              "id, name, created_by_user_id, created_at",
+	"group_members":            "group_id, user_id, role, joined_at, display_name",
+	"group_invites":            "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
+	"accounts":                 "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
+	"checkpoints":              "user_id, id, position, date, model_account_id, balance, source",
+	"postings":                 "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids",
+	"posting_sync_keys":        "user_id, provider, bridge_account_id, transaction_id, posting_id",
+	"posting_id_migrations":    "user_id, old_id, new_id",
+	"schema_migrations":        "name",
+	"purchase_policies":        "user_id, posting_id, priority",
+	"recurrence_rules":         "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
+	"evaluations":              "user_id, type, instance_id, position, name, enabled, config_json",
+	"projection_artifacts":     "user_id, identity, kind, created_at, payload",
+	"model_metadata":           "user_id, id, source_path, document_present",
+	"payment_terms":            "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
+	"entity_ids":               "user_id, id, kind",
+	"account_links":            "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
+	"pinned_evaluations":       "user_id, instance_id, position",
+	"safe_spending_settings":   "user_id, id, settings_json",
+	"sync_state":               "user_id, id, last_sync_at",
+	"sync_credentials":         "user_id, id, access_url, bridge_host, updated_at, cards_json",
+	"amount_presets":           "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
 }
 
 func validateSchemaObjects(db queryer) error {
@@ -476,12 +481,21 @@ func validateSchemaObjects(db queryer) error {
 	if count != 1 {
 		return fmt.Errorf("%w: missing identity_grant_subject index", ErrSetupRequired)
 	}
+	for _, name := range analysisTriggerNames {
+		if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = ?`, name).Scan(&count); err != nil {
+			return err
+		}
+		if count != 1 {
+			return fmt.Errorf("%w: missing analysis trigger %s", ErrSetupRequired, name)
+		}
+	}
 	return checkReceiptBlobSchemaObjects(db)
 }
 
 // expectedSchemaTables lists every table SetupDatabase manages.
 func expectedSchemaTables() []string {
 	return []string{
+		"transaction_source_facts", "analysis_inputs", "analysis_runs", "analysis_findings", "analysis_feedback",
 		"receipts",
 		"blob_objects",
 		"blob_data",

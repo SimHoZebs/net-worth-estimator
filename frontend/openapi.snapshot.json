@@ -529,6 +529,386 @@
 				"required": ["resolvers", "providers"],
 				"type": "object"
 			},
+			"AnalysisDetection": {
+				"additionalProperties": false,
+				"properties": {
+					"evidence": {
+						"items": {
+							"$ref": "#/components/schemas/AnalysisEvidence"
+						},
+						"type": ["array", "null"]
+					},
+					"kind": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"product": {
+						"type": "string"
+					},
+					"provider": {
+						"type": "string"
+					},
+					"role": {
+						"type": "string"
+					},
+					"strength": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"postingId",
+					"kind",
+					"provider",
+					"product",
+					"role",
+					"strength",
+					"evidence"
+				],
+				"type": "object"
+			},
+			"AnalysisDuration": {
+				"additionalProperties": false,
+				"properties": {
+					"count": {
+						"format": "int64",
+						"maximum": 5200,
+						"minimum": 1,
+						"type": "integer"
+					},
+					"unit": {
+						"enum": ["weeks", "months"],
+						"type": "string"
+					}
+				},
+				"required": ["count", "unit"],
+				"type": "object"
+			},
+			"AnalysisEvidence": {
+				"additionalProperties": false,
+				"properties": {
+					"code": {
+						"type": "string"
+					},
+					"postingIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"reason": {
+						"type": "string"
+					}
+				},
+				"required": ["code", "reason", "postingIds"],
+				"type": "object"
+			},
+			"AnalysisFeedback": {
+				"additionalProperties": false,
+				"properties": {
+					"actor": {
+						"type": "string"
+					},
+					"analysisType": {
+						"type": "string"
+					},
+					"analyzerVersion": {
+						"type": "string"
+					},
+					"createdAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"dismissed": {
+						"type": "boolean"
+					},
+					"findingId": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"inputRevision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"prediction": {
+						"$ref": "#/components/schemas/AnalysisDetection"
+					},
+					"request": {
+						"$ref": "#/components/schemas/AnalysisFeedbackInput"
+					},
+					"review": {
+						"$ref": "#/components/schemas/AnalysisReview"
+					},
+					"revision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"runId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"findingId",
+					"postingId",
+					"analysisType",
+					"runId",
+					"analyzerVersion",
+					"inputRevision",
+					"createdAt",
+					"actor",
+					"request",
+					"prediction",
+					"dismissed",
+					"revision"
+				],
+				"type": "object"
+			},
+			"AnalysisFeedbackInput": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AnalysisFeedbackInput.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"action": {
+						"enum": ["confirm", "reject", "set-duration", "hide", "restore"],
+						"type": "string"
+					},
+					"duration": {
+						"$ref": "#/components/schemas/AnalysisDuration"
+					},
+					"requestId": {
+						"maxLength": 36,
+						"minLength": 36,
+						"type": "string"
+					},
+					"revision": {
+						"format": "int64",
+						"minimum": 0,
+						"type": "integer"
+					},
+					"runId": {
+						"maxLength": 36,
+						"minLength": 36,
+						"type": "string"
+					}
+				},
+				"required": ["requestId", "runId", "revision", "action"],
+				"type": "object"
+			},
+			"AnalysisFinding": {
+				"additionalProperties": false,
+				"properties": {
+					"analysisType": {
+						"type": "string"
+					},
+					"analyzerVersion": {
+						"type": "string"
+					},
+					"dismissed": {
+						"type": "boolean"
+					},
+					"evidence": {
+						"items": {
+							"$ref": "#/components/schemas/AnalysisEvidence"
+						},
+						"type": ["array", "null"]
+					},
+					"feedbackRevision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"firstDetectedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"type": "string"
+					},
+					"inputRevision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"lastCheckedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"product": {
+						"type": "string"
+					},
+					"provider": {
+						"type": "string"
+					},
+					"review": {
+						"$ref": "#/components/schemas/AnalysisReview"
+					},
+					"role": {
+						"type": "string"
+					},
+					"runId": {
+						"type": "string"
+					},
+					"stale": {
+						"type": "boolean"
+					},
+					"status": {
+						"type": "string"
+					},
+					"strength": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"analysisType",
+					"runId",
+					"analyzerVersion",
+					"inputRevision",
+					"firstDetectedAt",
+					"lastCheckedAt",
+					"status",
+					"stale",
+					"dismissed",
+					"feedbackRevision",
+					"postingId",
+					"kind",
+					"provider",
+					"product",
+					"role",
+					"strength",
+					"evidence"
+				],
+				"type": "object"
+			},
+			"AnalysisFindingsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/AnalysisFindingsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"findings": {
+						"items": {
+							"$ref": "#/components/schemas/AnalysisFinding"
+						},
+						"type": ["array", "null"]
+					},
+					"nextCursor": {
+						"type": "string"
+					}
+				},
+				"required": ["findings", "nextCursor"],
+				"type": "object"
+			},
+			"AnalysisReview": {
+				"additionalProperties": false,
+				"properties": {
+					"answeredAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"decision": {
+						"type": "string"
+					},
+					"duration": {
+						"$ref": "#/components/schemas/AnalysisDuration"
+					},
+					"provider": {
+						"type": "string"
+					}
+				},
+				"required": ["decision", "provider", "answeredAt"],
+				"type": "object"
+			},
+			"AnalysisRun": {
+				"additionalProperties": false,
+				"properties": {
+					"completedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"type": "string"
+					},
+					"inputRevision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"problem": {
+						"type": "string"
+					},
+					"startedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"state": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					},
+					"version": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"type",
+					"version",
+					"inputRevision",
+					"state",
+					"startedAt",
+					"completedAt",
+					"problem"
+				],
+				"type": "object"
+			},
+			"AnalysisStatus": {
+				"additionalProperties": false,
+				"properties": {
+					"currentRevision": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"run": {
+						"$ref": "#/components/schemas/AnalysisRun"
+					},
+					"state": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					},
+					"version": {
+						"type": "string"
+					}
+				},
+				"required": ["type", "version", "state", "currentRevision"],
+				"type": "object"
+			},
 			"Checkpoint": {
 				"additionalProperties": false,
 				"properties": {
@@ -781,6 +1161,47 @@
 						"$ref": "#/components/schemas/ProjectionResult"
 					}
 				},
+				"type": "object"
+			},
+			"Dismiss-analysis-findingRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Dismiss-analysis-findingRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"dismissed": {
+						"type": "boolean"
+					}
+				},
+				"required": ["dismissed"],
+				"type": "object"
+			},
+			"Dismiss-analysis-findingResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Dismiss-analysis-findingResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"dismissed": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": ["id", "dismissed"],
 				"type": "object"
 			},
 			"ErrorDetail": {
@@ -1232,6 +1653,53 @@
 					}
 				},
 				"required": ["modelAccountId"],
+				"type": "object"
+			},
+			"List-analysesResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/List-analysesResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"analyses": {
+						"items": {
+							"$ref": "#/components/schemas/AnalysisStatus"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["analyses"],
+				"type": "object"
+			},
+			"List-analysis-feedbackResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/List-analysis-feedbackResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"feedback": {
+						"items": {
+							"$ref": "#/components/schemas/AnalysisFeedback"
+						},
+						"type": ["array", "null"]
+					},
+					"nextCursor": {
+						"type": "string"
+					}
+				},
+				"required": ["feedback", "nextCursor"],
 				"type": "object"
 			},
 			"List-receiptsResponse": {
@@ -2439,6 +2907,25 @@
 					}
 				},
 				"required": ["revision"],
+				"type": "object"
+			},
+			"Review-analysis-findingResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Review-analysis-findingResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"feedback": {
+						"$ref": "#/components/schemas/AnalysisFeedback"
+					}
+				},
+				"required": ["feedback"],
 				"type": "object"
 			},
 			"Review-receiptRequest": {
@@ -3747,6 +4234,280 @@
 					}
 				},
 				"summary": "List registered amount resolvers and providers"
+			}
+		},
+		"/v1/analyses": {
+			"get": {
+				"operationId": "list-analyses",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/List-analysesResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read background analysis status without starting work"
+			}
+		},
+		"/v1/analysis-feedback": {
+			"get": {
+				"operationId": "list-analysis-feedback",
+				"parameters": [
+					{
+						"explode": false,
+						"in": "query",
+						"name": "findingId",
+						"schema": {
+							"maxLength": 100,
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "cursor",
+						"schema": {
+							"maxLength": 100,
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "limit",
+						"schema": {
+							"default": 50,
+							"format": "int64",
+							"maximum": 100,
+							"minimum": 1,
+							"type": "integer"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/List-analysis-feedbackResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read private labeled feedback with prediction provenance"
+			}
+		},
+		"/v1/analysis-findings": {
+			"get": {
+				"operationId": "list-analysis-findings",
+				"parameters": [
+					{
+						"description": "Comma-separated saved transaction UUIDs, at most 200",
+						"explode": false,
+						"in": "query",
+						"name": "postingIds",
+						"schema": {
+							"description": "Comma-separated saved transaction UUIDs, at most 200",
+							"maxLength": 7500,
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "cursor",
+						"schema": {
+							"maxLength": 100,
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "limit",
+						"schema": {
+							"default": 50,
+							"format": "int64",
+							"maximum": 100,
+							"minimum": 1,
+							"type": "integer"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AnalysisFindingsOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read persisted transaction findings"
+			}
+		},
+		"/v1/analysis-findings/{id}": {
+			"patch": {
+				"operationId": "dismiss-analysis-finding",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Dismiss-analysis-findingRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Dismiss-analysis-findingResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Dismiss or restore a transaction finding"
+			}
+		},
+		"/v1/analysis-findings/{id}/feedback": {
+			"post": {
+				"operationId": "review-analysis-finding",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AnalysisFeedbackInput"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Review-analysis-findingResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Confirm or reject a finding and record plan duration"
 			}
 		},
 		"/v1/auth/change-password": {

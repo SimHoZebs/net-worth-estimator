@@ -4,6 +4,10 @@ Status: planned. Payroll is modeled as decomposed rules (gross, 401k,
 match, tax) with generic resolvers; no income pipeline remains. This tracks
 rebuilding income _detection_ on top of that.
 
+The background Analysis runtime now exists for BNPL findings. See
+`docs/analyses.md`. Income-pattern detection itself remains planned; its later
+integration can reuse that lifecycle without coupling detection to bank sync.
+
 ## Next slice: detect candidate paycheck deposits
 
 Goal: flag which bank postings look like income, without touching payroll

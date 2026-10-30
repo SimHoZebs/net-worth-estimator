@@ -182,6 +182,7 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 			posting := store.SyncPosting{
 				ProviderAccountID: account.ID,
 				TransactionID:     transaction.ID,
+				Facts:             transactionFacts(transaction, account.Currency),
 				Posting: types.Posting{
 					Name:   truncateLabel(transaction.Description),
 					Source: store.SourceSimpleFIN,
