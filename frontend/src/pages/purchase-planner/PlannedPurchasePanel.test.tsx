@@ -15,7 +15,7 @@ import {
 	removeSavedPurchase,
 	saveNewPurchase,
 } from "../../state/purchaseWrites.ts";
-import { WishListPanel } from "./WishListPanelReplacement.tsx";
+import { PlannedPurchasePanel } from "./PlannedPurchasePanel.tsx";
 
 vi.mock("../../components/Modal.tsx", async (importOriginal) => ({
 	...(await importOriginal<typeof import("../../components/Modal.tsx")>()),
@@ -73,7 +73,7 @@ const purchases = [purchase("laptop"), purchase("chair")];
 
 function renderPanel() {
 	return render(
-		<WishListPanel
+		<PlannedPurchasePanel
 			accounts={accounts}
 			purchases={purchases}
 			startDate="2026-09-24"
@@ -87,7 +87,7 @@ afterEach(() => {
 	vi.clearAllMocks();
 });
 
-describe("WishListPanel", () => {
+describe("PlannedPurchasePanel", () => {
 	it("moves a row and announces the persisted priority", async () => {
 		mockedMove.mockResolvedValue({
 			ok: true,
@@ -158,7 +158,9 @@ describe("WishListPanel", () => {
 			.closest("form")!;
 		fireEvent.change(
 			within(dialog as HTMLElement).getByLabelText("Purchase name"),
-			{ target: { value: "Desk" } },
+			{
+				target: { value: "Desk" },
+			},
 		);
 		fireEvent.change(
 			within(dialog as HTMLElement).getByLabelText("Cost (USD)"),
@@ -168,7 +170,9 @@ describe("WishListPanel", () => {
 		);
 		fireEvent.change(
 			within(dialog as HTMLElement).getByLabelText("Funding account"),
-			{ target: { value: "checking" } },
+			{
+				target: { value: "checking" },
+			},
 		);
 		fireEvent.submit(dialog);
 		await waitFor(() => expect(mockedSaveNew).toHaveBeenCalledOnce());

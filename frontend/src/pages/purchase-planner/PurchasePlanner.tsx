@@ -29,9 +29,6 @@ export function PurchasePlanner({
 		items.find((item) => item.purchase.id === selectedId) ?? null;
 	const included = items.filter((item) => item.purchase.enabled);
 	const dated = included.filter((item) => item.outcome.kind === "scheduled");
-	const conflicts = included.filter(
-		(item) => item.outcome.kind === "fixed-conflict",
-	);
 	const total = included.reduce((sum, item) => sum + item.purchase.amount, 0);
 	const inspect = (purchase: PurchaseViewItem["purchase"]) =>
 		setSelectedId(purchase.id);
@@ -89,14 +86,8 @@ export function PurchasePlanner({
 						</strong>
 						<span className="text-muted">{included.length} included</span>
 						<span className="text-success-text">{dated.length} dated</span>
-						{conflicts.length > 0 && (
-							<span className="font-semibold text-danger-text">
-								{conflicts.length} fixed-date conflict
-								{conflicts.length === 1 ? "" : "s"}
-							</span>
-						)}
 						<span className="text-muted">
-							{included.length - dated.length - conflicts.length} not yet dated
+							{included.length - dated.length} not yet dated
 						</span>
 					</div>
 					<Tabs<View>
@@ -129,7 +120,6 @@ export function PurchasePlanner({
 			{selected && (
 				<PurchaseInspector
 					item={selected}
-					forecastEnd={forecastEnd}
 					locked={locked}
 					onClose={() => setSelectedId(null)}
 					onEdit={actions.onEdit ? edit : undefined}

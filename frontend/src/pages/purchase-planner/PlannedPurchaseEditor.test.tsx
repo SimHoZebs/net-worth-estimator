@@ -15,7 +15,7 @@ import {
 	saveNewPurchase,
 	savePurchaseEdit,
 } from "../../state/purchaseWrites.ts";
-import { WishListEditor } from "./WishListEditor.tsx";
+import { PlannedPurchaseEditor } from "./PlannedPurchaseEditor.tsx";
 
 const modalProbe = vi.hoisted(() => ({
 	current: null as null | {
@@ -113,13 +113,13 @@ function submitForm() {
 	);
 }
 
-describe("WishListEditor", () => {
+describe("PlannedPurchaseEditor", () => {
 	it("saves a new hypothetical wish and closes only after persistence", async () => {
 		mockedSaveNew.mockResolvedValue(true);
 		const onSaved = vi.fn();
 		const onClose = vi.fn();
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={null}
@@ -133,7 +133,7 @@ describe("WishListEditor", () => {
 		await waitFor(() => expect(mockedSaveNew).toHaveBeenCalledOnce());
 		const [saved, priority] = mockedSaveNew.mock.calls[0]!;
 		expect(priority).toBe(0);
-		// A wishlist row is hypothetical: it validates as a planned purchase
+		// A planned-purchase row is hypothetical: it validates as one
 		// and never carries scheduled-transaction fields.
 		expect(plannedPurchaseSchema.safeParse(saved).success).toBe(true);
 		expect(saved).not.toHaveProperty("frequency");
@@ -154,7 +154,7 @@ describe("WishListEditor", () => {
 		mockedSaveNew.mockResolvedValue(false);
 		const onSaved = vi.fn();
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={null}
@@ -177,7 +177,7 @@ describe("WishListEditor", () => {
 		mockedSaveEdit.mockResolvedValue(true);
 		const onSaved = vi.fn();
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={existing}
@@ -209,7 +209,7 @@ describe("WishListEditor", () => {
 	it("validates locally without calling the server", async () => {
 		const onSaved = vi.fn();
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={null}
@@ -232,7 +232,7 @@ describe("WishListEditor", () => {
 
 	it("retains the read-only fieldset and blocked submit action", () => {
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={{ ...existing, readOnly: true }}
@@ -259,7 +259,7 @@ describe("WishListEditor", () => {
 	it("asks to discard dirty changes and keeps the form on continue", () => {
 		const onClose = vi.fn();
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={null}
@@ -290,7 +290,7 @@ describe("WishListEditor", () => {
 	it("routes dialog close requests through the dirty guard", () => {
 		const onClose = vi.fn();
 		render(
-			<WishListEditor
+			<PlannedPurchaseEditor
 				accounts={accounts}
 				startDate="2026-09-24"
 				item={null}

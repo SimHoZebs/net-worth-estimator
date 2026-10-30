@@ -123,7 +123,7 @@ function sameEndpoints(
  * unedited field is carried over verbatim from the canonical raw row:
  * exact timestamps (not midnight), the raw amount descriptor (custom
  * resolvers and extra inputs survive name-only edits), full destination
- * arrays, the purchase policy the editor never models, and the stored claim
+ * arrays, and the stored claim
  * unless the edit changes it. Only edited fields are rebuilt.
  */
 export function postingUpdateBody({

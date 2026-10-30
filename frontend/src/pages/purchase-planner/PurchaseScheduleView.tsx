@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarDays, Clock3 } from "lucide-react";
+import { CalendarDays, Clock3 } from "lucide-react";
 import { dateLabel } from "../../domain/format.ts";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import type { PurchaseViewItem } from "./purchase.types.ts";
@@ -28,10 +28,7 @@ export function PurchaseScheduleView({
 			excluded.push(item);
 			continue;
 		}
-		const date =
-			outcome.kind === "scheduled" || outcome.kind === "fixed-conflict"
-				? outcome.date
-				: null;
+		const date = outcome.kind === "scheduled" ? outcome.date : null;
 		if (!date) {
 			waiting.push(item);
 			continue;
@@ -44,13 +41,9 @@ export function PurchaseScheduleView({
 	return (
 		<section aria-label="Purchase schedule" className="space-y-4">
 			<p className="text-xs text-muted">
-				Dates shift automatically as your forecast changes. Fixed-date
-				requirements cannot shift.
+				Dates shift automatically as your forecast changes.
 			</p>
 			{groups.map((group) => {
-				const hasConflict = group.items.some(
-					(item) => item.outcome.kind === "fixed-conflict",
-				);
 				return (
 					<div
 						key={group.date}
@@ -60,21 +53,13 @@ export function PurchaseScheduleView({
 							className="flex flex-col items-center gap-2 pt-1"
 							aria-hidden="true"
 						>
-							<span
-								className={`grid size-6 place-items-center rounded-full ${hasConflict ? "bg-danger-bg text-danger-text" : "bg-success-bg text-success-text"}`}
-							>
-								{hasConflict ? (
-									<AlertTriangle size={14} />
-								) : (
-									<CalendarDays size={14} />
-								)}
+							<span className="grid size-6 place-items-center rounded-full bg-success-bg text-success-text">
+								<CalendarDays size={14} />
 							</span>
 							<span className="h-full min-h-5 w-px bg-line" />
 						</div>
 						<div className="min-w-0 pb-4">
-							<h3
-								className={`text-sm font-semibold ${hasConflict ? "text-danger-text" : "text-ink"}`}
-							>
+							<h3 className="text-sm font-semibold text-ink">
 								<time dateTime={group.date}>{dateLabel(group.date, true)}</time>
 							</h3>
 							<ol

@@ -5,7 +5,7 @@ import {
 	useSavedPurchases,
 	useSavedStartDate,
 } from "../state/savedRows.ts";
-import { WishListPanel } from "./purchase-planner/WishListPanelReplacement.tsx";
+import { PlannedPurchasePanel } from "./purchase-planner/PlannedPurchasePanel.tsx";
 
 export function PurchasesPage() {
 	const accounts = useSavedAccounts();
@@ -15,7 +15,7 @@ export function PurchasesPage() {
 	return (
 		<BaseProjectionView evaluations={PURCHASE_EVALUATIONS}>
 			{({ base, current }) => (
-				<WishListPanel
+				<PlannedPurchasePanel
 					accounts={accounts}
 					purchases={purchases}
 					startDate={startDate}

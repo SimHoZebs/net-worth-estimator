@@ -11,7 +11,7 @@ import { performSave } from "./workspaceWrites.ts";
  * Row-first purchase writes use the dedicated planned-purchase API.
  */
 
-/** Backend row for one wishlist item. Priority is the queue index. */
+/** Backend row for one planned purchase. Priority is the queue index. */
 export function purchaseRow(
 	purchase: PlannedPurchase,
 	priority: number,
@@ -128,7 +128,7 @@ export async function persistPurchaseOperations(
 	});
 }
 
-/** Append one wishlist row at the end of the queue. */
+/** Append one planned purchase at the end of the queue. */
 export async function saveNewPurchase(
 	purchase: PlannedPurchase,
 	priority: number,
@@ -150,7 +150,7 @@ export async function savePurchaseEdit(
 	);
 }
 
-/** Remove one wishlist row. Remaining priorities keep their relative order. */
+/** Remove one planned purchase. Remaining priorities keep their relative order. */
 export async function removeSavedPurchase(id: string): Promise<boolean> {
 	return persistPurchaseOperations(
 		[deletePurchaseOperation(id)],
