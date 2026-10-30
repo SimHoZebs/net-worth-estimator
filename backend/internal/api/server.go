@@ -191,9 +191,6 @@ func New(store store.Store, serverConfig Config) http.Handler {
 		Summary:     "Report server write availability and auth state",
 	}, server.getStatus)
 
-	// Raw SSE endpoint for stochastic progress streaming.
-	router.Post("/v1/projections/stochastic", server.stochasticSSE)
-
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))

@@ -58,6 +58,21 @@ func TestRawRoutesAppearInOpenAPI(t *testing.T) {
 	}
 }
 
+func TestStochasticStreamDocumentsHumaErrors(t *testing.T) {
+	response := httptest.NewRecorder()
+	New(openAPIStore(t), Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+	var document struct {
+		Paths map[string]*huma.PathItem `json:"paths"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &document); err != nil {
+		t.Fatal(err)
+	}
+	operation := document.Paths["/v1/projections/stochastic"].Post
+	if operation.OperationID != "project-stochastic" || operation.Responses["200"].Content["text/event-stream"] == nil || operation.Responses["default"].Content["application/problem+json"] == nil {
+		t.Fatalf("stream is not a documented Huma operation: %+v", operation)
+	}
+}
+
 func TestWaypointSchemaNamerKeepsRegistryGeneratorSafe(t *testing.T) {
 	router := chi.NewRouter()
 	config := huma.DefaultConfig("Test API", "1.0.0")

@@ -146,6 +146,8 @@ A `domain.SimulationPreparationError`, including model validation failure, retur
 
 `runCount` is normalized to `[1, 10000]`. A null seed requests fresh unseeded draws.
 
+The operation belongs to Huma's compute group. Huma decodes its JSON input and returns problem-JSON errors before the stream starts: an empty body returns 400, malformed JSON returns 422, and an unavailable model returns 500. Domain preparation failures remain SSE `error` events. `huma.StreamResponse` sets source headers before it commits the stream; the higher-level SSE helper commits too early for this endpoint's source selection. The operation preserves its existing unrestricted body size and domain-owned model validation.
+
 The response is `text/event-stream` with `Cache-Control: no-store`. It writes `retry: 3000` and heartbeat comments every 15 seconds.
 
 | Event      | Data                                                                        |

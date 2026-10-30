@@ -5,18 +5,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// These routes run outside Huma (identity middleware and raw SSE). Describe
+// These identity routes run outside Huma. Describe
 // their wire contracts here so the same generated client covers every request.
-type stochasticRequest struct {
-	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
-	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
-	Settings  types.ProjectionRuntimeSettings `json:"settings"`
-	Config    types.StochasticConfig          `json:"config"`
-}
-
 func documentRawRoutes(api huma.API) {
 	spec := api.OpenAPI()
 	registry := spec.Components.Schemas
@@ -34,7 +26,6 @@ func documentRawRoutes(api huma.API) {
 		{"change-account-password", "POST", "/v1/auth/change-password", authcontract.AccountPasswordChange{}, authcontract.AccountPasswordChanged{}},
 		{"list-account-sessions", "GET", "/v1/auth/sessions", nil, authcontract.AccountSessions{}},
 		{"revoke-account-session", "DELETE", "/v1/auth/sessions", nil, authcontract.AccountSessionRevoked{}},
-		{"project-stochastic", "POST", "/v1/projections/stochastic", stochasticRequest{}, nil},
 	} {
 		op := &huma.Operation{
 			OperationID: route.id, Method: route.method, Path: route.path,
@@ -45,8 +36,6 @@ func documentRawRoutes(api huma.API) {
 		}
 		if route.output != nil {
 			op.Responses["200"].Content = jsonContent(route.output)
-		} else {
-			op.Responses["200"].Content = map[string]*huma.MediaType{"text/event-stream": {Schema: &huma.Schema{Type: "string"}}}
 		}
 		if route.id == "revoke-account-session" {
 			op.Parameters = []*huma.Param{{Name: "id", In: "query", Required: true, Schema: &huma.Schema{Type: "string"}}}
