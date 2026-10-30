@@ -49,13 +49,12 @@ sync state, default presets, and artifact eviction operate within one user.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
-Casdoor retains its own external provider database. Legacy per-account files are
-unsupported.
+Casdoor retains its own external provider database.
 
 ## 2. HTTP Contracts
 
 `internal/api` is the composition root. It owns chi, Huma configuration, global
-read-only and origin policy, server status, and static files. The `model`,
+read-only and origin policy, and server status. The `model`,
 `receipts`, `projections`, and `sync` subpackages register operations through
 explicit dependencies. They do not import the composition root or each other.
 `api/internal/modelstate` owns the revision and storage-error HTTP contracts
@@ -64,9 +63,9 @@ stay within `projections`, with the shared-run registry separate from transport.
 Whole-router HTTP contracts live in `api/integration`; private helper tests
 stay with their feature package.
 
-`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, optional `simplefin.Runner`, and optional static frontend directory. The server always wraps user APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, and optional `simplefin.Runner`. The server always wraps user APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The frontend image serves the SPA and proxies `/v1` to the backend.
 
-The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image.
+The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition.
 
 Frontend and API hosts can differ while the browser uses one public origin.
 The runtime's optional `internal/ingress` boundary authenticates a proxy with
@@ -140,7 +139,7 @@ Resolution rules:
 - `overrides` are applied by `types.ApplyModelOverrides` to a new model value; stored state is unchanged.
 - What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
 - `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
-- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the legacy date-only cut at the end of the start day. It participates in artifact identity through the settings.
+- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the calendar-day end cut at the end of the start day. It participates in artifact identity through the settings.
 - `POST /v1/position` and `GET /v1/accounts/balances` accept the same cut as an `asOfDate` date or RFC 3339 instant (`asOf` query); all three agree at an identical cut because they share one chronological replay.
 
 A successful response has `result` and `Projection-Source: stored|computed`. `stored` means the backend retrieved the identified simulation result. `computed` means this request took the simulation execution path. The header does not guarantee successful completion or storage; preparation and execution errors also report `computed`.
@@ -250,7 +249,7 @@ normal WAL/SHM sidecars during operation.
 Setup creates the complete schema only in a fresh database. Existing databases
 must already have the current schema. Setup never converts data or repairs
 missing schema objects. Separate one-time operator scripts own version upgrades.
-Legacy unscoped databases are rejected. Restore a compatible backup instead of
+Restore a compatible backup instead of
 downgrading.
 
 Timestamped observations use the one-time offline body in `deploy/migrate.sh`.
@@ -258,8 +257,9 @@ The deployment adapter runs `/app/migrate.sh` from the target image with all
 API writers stopped and the actual data mount attached. The image's SQLite
 CLI converts each legacy date to 23:59:59 UTC and drops the date column.
 The body validates the source state and creates a private SQLite-safe backup.
-It converts a disposable candidate, applies the frozen Analysis SQL, and invokes
-the standalone purchase conversion tool there. `setupdb` only validates the
+It converts a disposable candidate, applies the frozen Analysis SQL, invokes
+the standalone purchase conversion tool, and removes completed posting-ID audit
+bookkeeping there. The audit remains in the verified backup. `setupdb` only validates the
 finished schema. The body verifies preserved rows,
 integrity, and foreign keys before publication. Complete target databases
 only verify on retries. Fresh databases use `SetupDatabase` before the hook.
@@ -293,16 +293,14 @@ The current schema stores:
 | `projection_artifacts`   | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 | `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
-| `posting_id_migrations`  | private old-to-new posting identity audit for the one-way UUID migration                                      |
 | `schema_migrations`      | compatibility markers and historical upgrade records |
 
 ### First boot and import
 
 Planned purchases use dedicated `/v1/planned-purchases` CRUD and reorder routes.
-Runtime and setup reject the retired posting-policy schema without conversion.
 See [purchase persistence](docs/purchase-queue.md#persistence).
 
-The authenticated user router initializes a blank private workspace on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected user's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
+The authenticated user router initializes a blank private workspace on first authorized access. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected user's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
 
 `cmd/importcsv` requires both an existing shared database and an explicit existing user resource ID. It invokes the same import path for operator-controlled replacement within that user's scope.
 
@@ -323,8 +321,7 @@ Amount presets are saved amount recipes managed through `GET /v1/amount-presets`
 ### Posting identity
 
 Persisted postings use canonical UUIDs; the store generates UUIDv7 IDs when the
-caller supplies none. Sources with non-UUID posting IDs are unsupported, with no
-upgrade path. Exact upstream `(provider, account_id, transaction_id)` identity
+caller supplies none. Sources with non-UUID posting IDs are unsupported. Exact upstream `(provider, account_id, transaction_id)` identity
 lives in `posting_sync_keys`, separate from local posting IDs (see
 `postingSyncKey` in `backend/internal/store/sync_pending.go`).
 
@@ -338,7 +335,7 @@ Stored simulation results are durable only when the SQLite file is durable. A co
 
 ## 4. Artifact Identity
 
-`api.artifactKey` hashes a versioned descriptor with SHA-256. The identity format is `<kind>:<artifactIdentityVersion>:<digest>`. The serialized envelope retains the legacy `artifactCacheVersion` field name to preserve existing identities.
+`api.artifactKey` hashes a versioned descriptor with SHA-256. The identity format is `<kind>:<artifactIdentityVersion>:<digest>`. The serialized envelope field is `artifactIdentityVersion` with a version bump; it does not promise preservation of previous hash values.
 
 Deterministic identity includes:
 
@@ -432,7 +429,7 @@ Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers`
 
 `TransitionRuntime` applies the realized amount and records ordered account deltas. Every transaction exposes requested and realized amounts, which is the causal evidence used by fulfillment and financial-independence diagnostics.
 
-Annual-cap usage is observed from realized amounts by transaction ID (posting or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own posting ID, matching how one-time postings behaved before rules existed.
+Annual-cap usage is observed from realized amounts by transaction ID (posting or rule) and calendar year. Caps live on rules only; a claimed actual accrues under its own posting ID.
 
 ## 6. Validation and Preparation
 
@@ -465,7 +462,7 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 Historical preparation uses the same `TransitionRuntime` as projection execution.
 
 The as-of cut is a single instant: a `YYYY-MM-DD` date means the end of
-that UTC day (inclusive, backward compatible); an RFC 3339 timestamp means
+that UTC day (inclusive); an RFC 3339 timestamp means
 that exact instant. Only events and observations at or before the cut
 replay; everything after it is future. Observations after the projection
 start are invalid.
@@ -645,7 +642,6 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/read_only.go`                 | operation-based read-only write kill switch              |
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement                |
 | `backend/internal/api/status.go`                    | aggregate server capabilities and sync status            |
-| `backend/internal/api/frontend.go`                  | static assets and missing-page responses                 |
 | `backend/internal/api/model/`                       | canonical model queries, row writes, and settings         |
 | `backend/internal/api/receipts/`                    | receipt HTTP operations and upload boundaries            |
 | `backend/internal/api/sync/`                        | SimpleFIN configuration, triggers, and account links      |

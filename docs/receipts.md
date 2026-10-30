@@ -20,8 +20,7 @@ stopped. A schema downgrade requires a compatible backup.
 
 Image bytes use the private blob storage port (`backend/internal/blobstore`,
 SQLite default plus filesystem adapter, lifecycle in
-`backend/internal/store/adapters/sqlite/blob_storage.go`). Setup rejects earlier
-inline-image schemas instead of copying their images. Repeat setup preserves
+`backend/internal/store/adapters/sqlite/blob_storage.go`). Repeat setup preserves
 receipt metadata, image bytes, and stored posting receipt links without a backfill.
 
 Manual attachments and review need no extraction service. The ordinary deployment

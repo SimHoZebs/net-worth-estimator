@@ -1,7 +1,7 @@
 # One-time planned-purchase upgrade
 
 This standalone script upgrades a user-scoped `shared-accounts-v1` database that
-still stores purchases as postings with `purchase_policies`. It has no imports
+stores purchases as postings with `purchase_policies`. It has no imports
 from the app or store. The server and `setupdb` never invoke it.
 
 The API image includes the independent executable at
@@ -36,5 +36,5 @@ Verify with disposable databases:
 backend/scripts/verify.sh ./scripts/one-time/planned-purchases
 ```
 
-Delete this isolated script after its required upgrades are complete. Its frozen
+Retain this isolated script until the migration SOP confirms every supported target has verified the upgrade. Do not declare conversions complete or retire this script from a single host. Its frozen
 schema is specific to this upgrade, not a reusable migration framework.

@@ -52,9 +52,8 @@ database or repairs its schema. Use the same path in `NET_WORTH_ESTIMATOR_DB`.
 does not upgrade older schemas or repair incomplete ones. Version upgrades use
 separate one-time operator scripts, with the app stopped and a verified backup.
 
-Legacy one-database-per-model layouts are unsupported. See
-[the shared database guide](docs/shared-database.md). Runtime startup never merges
-legacy files or assigns their ownership from the first login.
+See [the shared database guide](docs/shared-database.md). Runtime startup never merges
+files or assigns their ownership from the first login.
 
 ## SimpleFIN Synchronization
 
@@ -121,7 +120,7 @@ ingress, explicit database maintenance, and host cutover without application cha
 
 The frontend is available at `http://localhost:8080` and the API at `http://localhost:8787`. Stop the stack with `docker compose down`; use `docker compose down -v` only when you intend to delete the SQLite volume.
 
-The root `Dockerfile` remains a legacy combined image. The split images do not embed or build one another, and the legacy image and Compose stack must not run against the same volume or port at the same time.
+The split images do not embed or build one another.
 
 Casdoor authentication is required in dev and production. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each user owns separate financial data. The guest is an ordinary provisioned user with limited grants assigned at creation. Normal signup assigns member access without a role-choice step. Every request uses the same authorization path. Identities and financial data stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API must share one public origin. There are no shared bearer tokens or unauthenticated server modes. See [authentication](docs/authentication.md) and [user authorization](docs/authorization.md) for boundaries and migration.
 

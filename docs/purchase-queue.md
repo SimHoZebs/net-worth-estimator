@@ -42,8 +42,6 @@ details remain local to the extension.
 Create and update return `row/issues/persisted/revision`. Delete and reorder
 return the revision. All writes use the normal validation, resource guard,
 permissions and read-only protection. Duplicate IDs return `409`.
-The posting API rejects the retired `purchase` field instead of creating an
-ordinary financial transaction from an old client payload.
 
 ## Isolated evaluation
 
@@ -103,8 +101,7 @@ account foreign key uses that same user scope. Import, clear, private refresh,
 and approved guest publication include these rows. Canonical JSON exports preserve
 purchases. Model CSVs do not represent them.
 
-The app and `setupdb` reject the retired purchase schema. Neither converts old
-data. Version upgrades use a separate, one-time operator script:
+Version upgrades use a separate, one-time operator script:
 
 ```bash
 # Stop the app and back up the database first. Run from the repository root.
@@ -128,5 +125,3 @@ The script stops and rolls back if an old row has a variable/invalid cost, bank
 ownership, a claim, attached receipts, bank links, or Analysis evidence. Resolve those rows before
 retry. It never silently discards evidence. Restore the backup to undo a completed
 upgrade. See [the one-time script](../backend/scripts/one-time/planned-purchases/README.md).
-Old JSON payloads with posting purchase markers must convert to standalone rows
-before use. The API has no backward-compatibility path.

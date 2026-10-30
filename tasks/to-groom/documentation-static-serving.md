@@ -1,10 +1,5 @@
-# Static-serving documentation: describe missing-page responses
+# Static-serving documentation (retired)
 
-With `NET_WORTH_ESTIMATOR_FRONTEND_PATH` set, a missing path such as `/settings/profile` returns HTTP `404`, using `404.html` when available. The overview incorrectly promises an index fallback. The frontend uses fragment navigation such as `/#accounts`.
+Status: retired. The API no longer serves frontend assets; the split container deployment is current (see TECHNICAL_OVERVIEW.md system boundary and container boundary, and deploy/README.md runtime contract). The index-fallback claim is removed, not replaced. This file records planning history only.
 
-Replace the index-fallback claim with the implemented response. The technical overview owns backend static serving, while the frontend guide owns navigation.
-
-- Claim/navigation: `TECHNICAL_OVERVIEW.md:30`, `frontend/RUNNING.md:52`.
-- Handler/test: `backend/internal/api/server.go:84-101,124-141`, `backend/internal/api/model_handlers_test.go:853-883`.
-
-Review existing-file, missing-page, API-route, traversal, and symlink tests. Align the separate [smoke correction](deployment-smoke-contract.md). A routing rewrite is not needed to correct the documentation.
+This task concerned the former API-owned static server and its missing-page responses. The split deployment removed that server, so the documentation correction no longer applies.

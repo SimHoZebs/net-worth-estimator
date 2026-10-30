@@ -36,7 +36,7 @@ results, financial data, and application sessions persist in SQLite.
 
 ## Reverse-proxy contract
 
-Keep `VITE_API_BASE_URL` unset or empty. Build the same frontend assets on every
+Build the same frontend assets on every
 host. Route `/v1/*` to the API without changing the browser's origin. Preserve
 paths, queries, bodies, `Origin`, cookies, `Set-Cookie`, and API response headers.
 Keep API responses private and uncached.
@@ -128,10 +128,9 @@ Set these variables in Vercel's Environment Variables settings:
 | `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | The verified owner OIDC subject |
 | `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | The provisioned guest OIDC subject (anonymous traffic resolves to it) |
 | `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Optional; defaults to `waypoint` |
-| `VITE_API_BASE_URL` | Leave unset |
 
 Both URLs must be HTTPS origins without paths or credentials. Configuration
-fails on missing settings, unsafe secrets, or a cross-origin API override.
+fails on missing settings or unsafe secrets.
 The upstream URL stays in routing configuration, outside the frontend bundle.
 The secret uses a deployment environment reference, not a literal config value.
 
@@ -261,7 +260,7 @@ resolution without a session kind, and final SSE completion. Also verify real
 Casdoor login/logout, user isolation, private writes, passkeys, signed logout
 delivery, incremental streaming, and restarts with disposable users. Never use
 production financial data as a fixture. The published `source_path` value
-`sample` is a content-only legacy label; it implies no permissions.
+`sample` is a content-only label; it implies no permissions.
 
 ## Provider references
 

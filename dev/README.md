@@ -32,11 +32,10 @@ requires the existing complete schema and never creates or repairs a database.
 
 If the source contains several private users, supply `--source-user "$SOURCE_USER"`.
 If the source contains exactly one private user, setup selects it automatically.
-Legacy files are unsupported.
 
 For an existing dev stack, run the same setup command once. It preserves saved
-credentials, issuer URLs, user ownership, financial data, and sessions. Legacy dev
-databases are unsupported; delete the dev database and run setup again. Setup
+credentials, issuer URLs, user ownership, financial data, and sessions. If the dev
+database is incompatible, delete the dev database and run setup again. Setup
 exports runtime settings to the ignored `.env.dev` file without restarting services.
 
 `tmp/dev/config.json` retains setup credentials and the snapshot source. `.env.dev`
@@ -112,7 +111,7 @@ path. The guest destination row must already exist (setup provisions it via
 edits do not change the published guest scope.
 
 Use verified resource IDs for `TARGET_USER` and `SOURCE_USER`. The source must
-use the shared application schema. Legacy backups are unsupported. The commands
+use the shared application schema. The commands
 require explicit selection because one source snapshot can contain several owners.
 
 ## Access and state
@@ -135,7 +134,7 @@ and private directories use `0700`. Compose `down` retains the bind-mounted data
 Existing Casdoor instances require the reviewed permission objects described in
 [the authorization contract](../docs/authorization.md).
 
-Legacy per-user databases are unsupported. Runtime startup does not merge
+Runtime startup does not merge
 files or infer ownership. Casdoor's external state remains separate from the
 shared application database.
 
