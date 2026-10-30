@@ -32,9 +32,10 @@ export function PositionEvidence({
 				{visibleAccounts(accounts)
 					.filter((account) => account.enabled)
 					.map((account) => {
-						const balance = position.accounts.find(
+						const positionAccount = position.accounts.find(
 							(item) => item.accountId === account.id,
-						)?.balance;
+						);
+						const balance = positionAccount?.balance;
 						return (
 							<DetailRow
 								key={account.id}

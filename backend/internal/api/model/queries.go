@@ -2,9 +2,11 @@ package model
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -24,12 +26,14 @@ func isSyncOwned(source string) bool {
 }
 
 // isArchivedDebt hides a paid-off debt: a debt account whose latest
-// observation at or before the viewed date is effectively zero.
-func isArchivedDebt(account types.Account, latest *types.Checkpoint) bool {
-	if account.Kind != "debt" || latest == nil {
+// observed balance at or before the viewed date is effectively zero.
+// The observed balance comes from the replay's selected observation, so
+// same-day instant ordering agrees with the current position.
+func isArchivedDebt(account types.Account, observedBalance *float64) bool {
+	if account.Kind != "debt" || observedBalance == nil {
 		return false
 	}
-	return latest.Balance > -0.005 && latest.Balance < 0.005
+	return *observedBalance > -0.005 && *observedBalance < 0.005
 }
 
 type accountBalanceRow struct {
@@ -46,6 +50,11 @@ type accountBalanceRow struct {
 	HasCheckpoint bool              `json:"hasCheckpoint"`
 	SyncOwned     bool              `json:"syncOwned"`
 	ReadOnly      bool              `json:"readOnly"`
+	// ObservedBalance is the latest observation at or before AsOf,
+	// separate from the adjusted modeled Balance. Nil when unobserved.
+	ObservedBalance *float64 `json:"observedBalance,omitempty"`
+	// ObservedAt is the required observation instant (Unix).
+	ObservedAt *int64 `json:"observedAt,omitempty"`
 }
 
 type accountBalancesOutput struct {
@@ -57,10 +66,13 @@ type accountBalancesOutput struct {
 }
 
 // listAccountBalances answers "what does each account hold as of this date".
-// It folds the latest checkpoint per account server-side; screens that
-// showed balances from the converted plan read this instead.
+// Balances come from the same chronological replay as the current position
+// and projection baseline (one calculation authority): Balance is the
+// adjusted modeled balance at the end of AsOf, with the latest observation
+// and reconciliation state carried separately. It never folds the latest
+// checkpoint as the balance.
 func (s *handler) listAccountBalances(_ context.Context, input *struct {
-	AsOf string `query:"asOf" doc:"Balance date YYYY-MM-DD; defaults to the latest checkpoint date or today"`
+	AsOf string `query:"asOf" doc:"Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today"`
 }) (*accountBalancesOutput, error) {
 	document, err := s.store.LoadDocument()
 	if err != nil {
@@ -71,28 +83,51 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	asOf := types.IsoDate(input.AsOf)
-	if document != nil && asOf == "" {
+	rawCut := string(asOf)
+	if document != nil && rawCut == "" {
+		var latest int64
 		for _, checkpoint := range document.Checkpoints {
-			if checkpoint.Date > asOf {
-				asOf = checkpoint.Date
+			if checkpoint.ObservedAt > latest {
+				latest = checkpoint.ObservedAt
 			}
 		}
+		if latest > 0 {
+			asOf = types.IsoDate(time.Unix(latest, 0).UTC().Format("2006-01-02"))
+			rawCut = string(asOf)
+		}
 	}
-	if asOf == "" {
-		asOf = types.IsoDate(time.Now().UTC().Format("2006-01-02"))
+	if rawCut == "" {
+		rawCut = time.Now().UTC().Format("2006-01-02")
+	}
+	// Normalize calendar fields to the parsed cut day: an RFC 3339 cut
+	// must not echo as a date-only value. The exact instant stays in the
+	// timestamp fields (ObservedAt) where needed. A malformed cut is
+	// client input, not a server failure.
+	_, cutDayStr, err := domain.ParseAsOfCut(rawCut)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
+	cutDay := types.IsoDate(cutDayStr)
+	position, err := domain.ResolveCurrentPosition(document, rawCut, types.ModelOverrides{})
+	if err != nil {
+		var preparationError *domain.SimulationPreparationError
+		if errors.As(err, &preparationError) {
+			return nil, huma.Error422UnprocessableEntity(preparationError.Error())
+		}
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	byAccount := make(map[string]types.PositionAccount, len(position.Accounts))
+	for _, account := range position.Accounts {
+		byAccount[account.AccountID] = account
 	}
 	rows := []accountBalanceRow{}
 	if document != nil {
 		for _, account := range document.Accounts {
-			var latest *types.Checkpoint
-			for i := range document.Checkpoints {
-				checkpoint := &document.Checkpoints[i]
-				if checkpoint.AccountID != account.ID || checkpoint.Date > asOf {
-					continue
-				}
-				if latest == nil || checkpoint.Date > latest.Date {
-					latest = checkpoint
-				}
+			adjusted := byAccount[account.ID]
+			observedOn := cutDay
+			hasCheckpoint := adjusted.ObservedBalance != nil
+			if hasCheckpoint {
+				observedOn = latestObservationDay(adjusted, cutDay)
 			}
 			syncOwned := false
 			if document != nil {
@@ -104,32 +139,40 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				}
 			}
 			row := accountBalanceRow{
-				ID:         account.ID,
-				Name:       account.Name,
-				Kind:       account.Kind,
-				Enabled:    account.Enabled,
-				Archived:   isArchivedDebt(account, latest),
-				Color:      account.Color,
-				MinBalance: account.MinBalance,
-				MaxBalance: account.MaxBalance,
-				SyncOwned:  syncOwned,
-				ReadOnly:   s.readOnly || syncOwned,
-			}
-			if latest != nil {
-				row.Balance = latest.Balance
-				row.ObservedOn = latest.Date
-				row.HasCheckpoint = true
-			} else {
-				row.ObservedOn = asOf
+				ID:              account.ID,
+				Name:            account.Name,
+				Kind:            account.Kind,
+				Enabled:         account.Enabled,
+				Archived:        isArchivedDebt(account, adjusted.ObservedBalance),
+				Color:           account.Color,
+				MinBalance:      account.MinBalance,
+				MaxBalance:      account.MaxBalance,
+				Balance:         adjusted.Balance,
+				ObservedOn:      observedOn,
+				HasCheckpoint:   hasCheckpoint,
+				SyncOwned:       syncOwned,
+				ReadOnly:        s.readOnly || syncOwned,
+				ObservedBalance: adjusted.ObservedBalance,
+				ObservedAt:      adjusted.ObservedAt,
 			}
 			rows = append(rows, row)
 		}
 	}
 	output := &accountBalancesOutput{}
 	output.Body.Accounts = rows
-	output.Body.AsOf = asOf
+	output.Body.AsOf = cutDay
 	output.Body.Revision = revision
 	return output, nil
+}
+
+// latestObservationDay returns the UTC day of the latest observation at
+// or before asOf, derived from the replay's selected observation so the
+// account list agrees with the current position at the same cut.
+func latestObservationDay(adjusted types.PositionAccount, asOf types.IsoDate) types.IsoDate {
+	if adjusted.ObservedAt == nil {
+		return asOf
+	}
+	return types.IsoDate(time.Unix(*adjusted.ObservedAt, 0).UTC().Format("2006-01-02"))
 }
 
 type transactionRow struct {
@@ -357,8 +400,8 @@ type checkpointListOutput struct {
 // whole checkpoint table.
 func (s *handler) listCheckpoints(_ context.Context, input *struct {
 	AccountID string `query:"accountId" doc:"Only checkpoints for this account"`
-	Since     string `query:"since" doc:"First date YYYY-MM-DD inclusive"`
-	Until     string `query:"until" doc:"Last date YYYY-MM-DD inclusive"`
+	Since     string `query:"since" doc:"First date YYYY-MM-DD inclusive (derived from instant)"`
+	Until     string `query:"until" doc:"Last date YYYY-MM-DD inclusive (derived from instant)"`
 }) (*checkpointListOutput, error) {
 	document, err := s.store.LoadDocument()
 	if err != nil {
@@ -374,10 +417,11 @@ func (s *handler) listCheckpoints(_ context.Context, input *struct {
 			if input.AccountID != "" && checkpoint.AccountID != input.AccountID {
 				continue
 			}
-			if input.Since != "" && checkpoint.Date < types.IsoDate(input.Since) {
+			day := types.IsoDate(time.Unix(checkpoint.ObservedAt, 0).UTC().Format("2006-01-02"))
+			if input.Since != "" && day < types.IsoDate(input.Since) {
 				continue
 			}
-			if input.Until != "" && checkpoint.Date > types.IsoDate(input.Until) {
+			if input.Until != "" && day > types.IsoDate(input.Until) {
 				continue
 			}
 			checkpoints = append(checkpoints, checkpoint)

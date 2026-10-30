@@ -75,6 +75,14 @@
 					"name": {
 						"type": "string"
 					},
+					"observedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"observedBalance": {
+						"format": "double",
+						"type": "number"
+					},
 					"observedOn": {
 						"type": "string"
 					},
@@ -166,8 +174,9 @@
 					"name": {
 						"type": "string"
 					},
-					"observedOn": {
-						"type": "string"
+					"observedAt": {
+						"format": "int64",
+						"type": "integer"
 					},
 					"source": {
 						"type": "string"
@@ -926,14 +935,15 @@
 						"format": "double",
 						"type": "number"
 					},
-					"Date": {
-						"type": "string"
+					"observedAt": {
+						"format": "int64",
+						"type": "integer"
 					},
 					"source": {
 						"type": "string"
 					}
 				},
-				"required": ["Date", "AccountId", "Balance"],
+				"required": ["AccountId", "Balance", "observedAt"],
 				"type": "object"
 			},
 			"CheckpointCorrection": {
@@ -2031,6 +2041,14 @@
 					"balance": {
 						"format": "double",
 						"type": "number"
+					},
+					"observedAt": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"observedBalance": {
+						"format": "double",
+						"type": "number"
 					}
 				},
 				"required": ["accountId", "balance"],
@@ -2539,6 +2557,10 @@
 			"ProjectionRuntimeSettings": {
 				"additionalProperties": false,
 				"properties": {
+					"asOfInstant": {
+						"format": "int64",
+						"type": "integer"
+					},
 					"evaluations": {
 						"$ref": "#/components/schemas/EvaluationTables"
 					},
@@ -3865,12 +3887,12 @@
 				"operationId": "list-account-balances",
 				"parameters": [
 					{
-						"description": "Balance date YYYY-MM-DD; defaults to the latest checkpoint date or today",
+						"description": "Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today",
 						"explode": false,
 						"in": "query",
 						"name": "asOf",
 						"schema": {
-							"description": "Balance date YYYY-MM-DD; defaults to the latest checkpoint date or today",
+							"description": "Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today",
 							"type": "string"
 						}
 					}
@@ -4670,9 +4692,10 @@
 					{
 						"explode": false,
 						"in": "query",
-						"name": "date",
+						"name": "observedAt",
 						"schema": {
-							"type": "string"
+							"format": "int64",
+							"type": "integer"
 						}
 					}
 				],
@@ -4714,22 +4737,22 @@
 						}
 					},
 					{
-						"description": "First date YYYY-MM-DD inclusive",
+						"description": "First date YYYY-MM-DD inclusive (derived from instant)",
 						"explode": false,
 						"in": "query",
 						"name": "since",
 						"schema": {
-							"description": "First date YYYY-MM-DD inclusive",
+							"description": "First date YYYY-MM-DD inclusive (derived from instant)",
 							"type": "string"
 						}
 					},
 					{
-						"description": "Last date YYYY-MM-DD inclusive",
+						"description": "Last date YYYY-MM-DD inclusive (derived from instant)",
 						"explode": false,
 						"in": "query",
 						"name": "until",
 						"schema": {
-							"description": "Last date YYYY-MM-DD inclusive",
+							"description": "Last date YYYY-MM-DD inclusive (derived from instant)",
 							"type": "string"
 						}
 					}

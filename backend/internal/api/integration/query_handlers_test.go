@@ -47,7 +47,7 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("create rule status = %d, body %s", rule.Code, rule.Body.String())
 	}
 	checkpoint := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"Date":"2026-01-31","AccountId":"`+accountID+`","Balance":100}`)
+		`{"AccountId":"`+accountID+`","Balance":100,"observedAt":1769903999}`)
 	if checkpoint.Code != http.StatusOK {
 		t.Fatalf("save checkpoint status = %d, body %s", checkpoint.Code, checkpoint.Body.String())
 	}
@@ -88,8 +88,8 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(balanceRows[0], &balance); err != nil {
 		t.Fatalf("decode balance row: %v", err)
 	}
-	if balance.Balance != 100 || balance.ObservedOn != "2026-01-31" || !balance.HasCheckpoint || balance.Archived {
-		t.Fatalf("balance row = %+v, want 100 on 2026-01-31, checked, active", balance)
+	if balance.Balance != 110 || balance.ObservedOn != "2026-01-31" || !balance.HasCheckpoint || balance.Archived {
+		t.Fatalf("balance row = %+v, want 110 on 2026-01-31 (start-day rule in history), checked, active", balance)
 	}
 
 	transactions := get("/v1/transactions?accountId=" + accountID)
@@ -306,3 +306,333 @@ func TestListTransactionsExcludesPurchaseMarkers(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+
+	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"Checking","kind":"cash","enabled":true}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
+	}
+	var accountPayload struct {
+		Row struct {
+			ID string `json:"id"`
+		} `json:"row"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
+		t.Fatalf("decode account: %v", err)
+	}
+	accountID := accountPayload.Row.ID
+
+	// 09:00 observed 1000 by instant; an 11:00 manual actual of -100 follows.
+	observed := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
+		`{"AccountId":"`+accountID+`","Balance":1000,"observedAt":1773133200}`)
+	if observed.Code != http.StatusOK {
+		t.Fatalf("save checkpoint status = %d, body %s", observed.Code, observed.Body.String())
+	}
+	spent := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
+		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`)
+	if spent.Code != http.StatusOK {
+		t.Fatalf("create posting status = %d, body %s", spent.Code, spent.Body.String())
+	}
+
+	response := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("GET balances status = %d, body %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Accounts []struct {
+			Balance         float64  `json:"balance"`
+			ObservedBalance *float64 `json:"observedBalance"`
+			ObservedAt      *int64   `json:"observedAt"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode balances: %v", err)
+	}
+	if len(payload.Accounts) != 1 {
+		t.Fatalf("accounts = %d, want 1", len(payload.Accounts))
+	}
+	row := payload.Accounts[0]
+	if row.Balance != 900 {
+		t.Fatalf("adjusted balance = %v, want 900 (must not fold the latest checkpoint)", row.Balance)
+	}
+	if row.ObservedBalance == nil || *row.ObservedBalance != 1000 {
+		t.Fatalf("observed balance = %+v, want 1000 separately", row.ObservedBalance)
+	}
+	if row.ObservedAt == nil || *row.ObservedAt != 1773133200 {
+		t.Fatalf("observed timestamp = %+v, want the exact instant", row.ObservedAt)
+	}
+}
+
+func TestAccountBalancesBlankUserStaysEmpty(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	for _, path := range []string{"/v1/accounts/balances", "/v1/accounts/balances?asOf=2026-03-10T10:00:00Z"} {
+		response := doRowRequest(t, handler, http.MethodGet, path, "")
+		if response.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, body %s", path, response.Code, response.Body.String())
+		}
+		var payload struct {
+			Accounts []struct{} `json:"accounts"`
+			AsOf     string     `json:"asOf"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode %s: %v", path, err)
+		}
+		if payload.Accounts == nil || len(payload.Accounts) != 0 {
+			t.Fatalf("blank user accounts = %+v, want empty", payload.Accounts)
+		}
+		if payload.AsOf == "" {
+			t.Fatalf("blank user response missing asOf")
+		}
+	}
+}
+
+func TestExactCutPositionAndAccountListAgree(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"Checking","kind":"cash","enabled":true}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
+	}
+	var accountPayload struct {
+		Row struct {
+			ID string `json:"id"`
+		} `json:"row"`
+	}
+	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
+		t.Fatalf("decode account: %v", err)
+	}
+	accountID := accountPayload.Row.ID
+
+	observed := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
+		`{"AccountId":"`+accountID+`","Balance":1000,"observedAt":1773133200}`)
+	if observed.Code != http.StatusOK {
+		t.Fatalf("save checkpoint status = %d, body %s", observed.Code, observed.Body.String())
+	}
+	spent := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
+		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`)
+	if spent.Code != http.StatusOK {
+		t.Fatalf("create posting status = %d, body %s", spent.Code, spent.Body.String())
+	}
+
+	cut := "2026-03-10T10:00:00Z"
+	position := doRowRequest(t, handler, http.MethodPost, "/v1/position", `{"asOfDate":"`+cut+`"}`)
+	if position.Code != http.StatusOK {
+		t.Fatalf("position status = %d, body %s", position.Code, position.Body.String())
+	}
+	var positionPayload struct {
+		Result *types.CurrentPosition `json:"result"`
+	}
+	if err := json.Unmarshal(position.Body.Bytes(), &positionPayload); err != nil {
+		t.Fatalf("decode position: %v", err)
+	}
+	balances := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf="+cut, "")
+	if balances.Code != http.StatusOK {
+		t.Fatalf("balances status = %d, body %s", balances.Code, balances.Body.String())
+	}
+	var balancesPayload struct {
+		Accounts []struct {
+			Balance float64 `json:"balance"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal(balances.Body.Bytes(), &balancesPayload); err != nil {
+		t.Fatalf("decode balances: %v", err)
+	}
+	if len(positionPayload.Result.Accounts) != 1 || len(balancesPayload.Accounts) != 1 {
+		t.Fatalf("account counts = %d/%d, want 1/1", len(positionPayload.Result.Accounts), len(balancesPayload.Accounts))
+	}
+	if positionPayload.Result.Accounts[0].Balance != 1000 || balancesPayload.Accounts[0].Balance != 1000 {
+		t.Fatalf("exact-cut position=%v list=%v, want 1000/1000 (11:00 actual excluded)",
+			positionPayload.Result.Accounts[0].Balance, balancesPayload.Accounts[0].Balance)
+	}
+}
+
+func TestAccountWithoutObservationNormalizesExactCutDay(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"Bare","kind":"cash","enabled":true}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
+	}
+	// An RFC 3339 cut must not echo as a date-only value: calendar fields
+	// normalize to the parsed cut day while the exact instant stays out of
+	// the date fields (there is no observation to timestamp).
+	response := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10T10:00:00Z", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("balances status = %d, body %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		AsOf     string `json:"asOf"`
+		Accounts []struct {
+			Balance         float64  `json:"balance"`
+			ObservedOn      string   `json:"observedOn"`
+			HasCheckpoint   bool     `json:"hasCheckpoint"`
+			ObservedBalance *float64 `json:"observedBalance"`
+			ObservedAt      *int64   `json:"observedAt"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode balances: %v", err)
+	}
+	if payload.AsOf != "2026-03-10" {
+		t.Fatalf("asOf = %q, want normalized cut day 2026-03-10", payload.AsOf)
+	}
+	if len(payload.Accounts) != 1 {
+		t.Fatalf("accounts = %d, want 1", len(payload.Accounts))
+	}
+	row := payload.Accounts[0]
+	if row.ObservedOn != "2026-03-10" || row.HasCheckpoint || row.ObservedBalance != nil || row.ObservedAt != nil {
+		t.Fatalf("unobserved row = %+v, want day-normalized empties", row)
+	}
+}
+
+func TestAccountBalancesRejectsMalformedCut(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	// Malformed cuts are client input: 422, not 500.
+	rejected := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=not-a-cut", "")
+	if rejected.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("malformed cut status = %d, want 422, body %s", rejected.Code, rejected.Body.String())
+	}
+	// Valid date and exact cuts still pass on the empty user.
+	for _, cut := range []string{"2026-03-10", "2026-03-10T10:00:00Z"} {
+		response := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf="+cut, "")
+		if response.Code != http.StatusOK {
+			t.Fatalf("cut %s status = %d, want 200, body %s", cut, response.Code, response.Body.String())
+		}
+	}
+	// Omitted cut still uses the documented default.
+	defCut := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances", "")
+	if defCut.Code != http.StatusOK {
+		t.Fatalf("default cut status = %d, want 200, body %s", defCut.Code, defCut.Body.String())
+	}
+}
+
+func TestAccountBalancesRejectsPreparationIssuesAsClientInput(t *testing.T) {
+	database := openAPIStore(t)
+	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 1000, ObservedAt: 1773219600}); err != nil {
+		t.Fatal(err)
+	}
+	response := doRowRequest(t, New(database, Config{}), http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("future observation status = %d, want 422, body %s", response.Code, response.Body.String())
+	}
+}
+
+func TestAccountListArchivedDebtUsesExactObservation(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	kinds := []string{"cash", "debt"}
+	ids := map[string]string{}
+	for _, kind := range kinds {
+		created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"name":"`+kind+`","kind":"`+kind+`","enabled":true}`)
+		if created.Code != http.StatusOK {
+			t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
+		}
+		var payload struct {
+			Row struct {
+				ID string `json:"id"`
+			} `json:"row"`
+		}
+		if err := json.Unmarshal(created.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode account: %v", err)
+		}
+		ids[kind] = payload.Row.ID
+	}
+	morning := int64(1773100800) + 9*3600
+	evening := morning + 6*3600
+	type observationSeed struct {
+		date    string
+		balance float64
+		instant int64
+	}
+	// Same-day observations in both input orders must agree: the later
+	// instant (nonzero) decides, not the row order.
+	for _, order := range [][]observationSeed{
+		{{"2026-03-10", 0.0, morning}, {"2026-03-10", -50.0, evening}},
+		{{"2026-03-10", -50.0, evening}, {"2026-03-10", 0.0, morning}},
+	} {
+		for _, row := range order {
+			saved := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
+				`{"AccountId":"`+ids["debt"]+`","Balance":`+jsonNumber(row.balance)+`,"observedAt":`+jsonNumber(float64(row.instant))+`}`)
+			if saved.Code != http.StatusOK {
+				t.Fatalf("save checkpoint status = %d, body %s", saved.Code, saved.Body.String())
+			}
+		}
+		balances := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10", "")
+		if balances.Code != http.StatusOK {
+			t.Fatalf("balances status = %d, body %s", balances.Code, balances.Body.String())
+		}
+		var payload struct {
+			Accounts []struct {
+				Archived        bool     `json:"archived"`
+				ObservedBalance *float64 `json:"observedBalance"`
+				ObservedOn      string   `json:"observedOn"`
+			} `json:"accounts"`
+		}
+		if err := json.Unmarshal(balances.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("decode balances: %v", err)
+		}
+		var debt *struct {
+			Archived        bool     `json:"archived"`
+			ObservedBalance *float64 `json:"observedBalance"`
+			ObservedOn      string   `json:"observedOn"`
+		}
+		for i := range payload.Accounts {
+			if payload.Accounts[i].ObservedBalance != nil {
+				debt = &payload.Accounts[i]
+			}
+		}
+		if debt == nil || debt.ObservedBalance == nil || *debt.ObservedBalance != -50 {
+			t.Fatalf("later same-day observation must win regardless of input order: %+v", payload.Accounts)
+		}
+		if debt.Archived {
+			t.Fatalf("nonzero observed balance must not archive: %+v", debt)
+		}
+		if debt.ObservedOn != "2026-03-10" {
+			t.Fatalf("observedOn = %s, want the observation day", debt.ObservedOn)
+		}
+		// Before the latest stored observation the earlier zero applies.
+		early := doRowRequest(t, handler, http.MethodGet, "/v1/accounts/balances?asOf=2026-03-10T10:00:00Z", "")
+		if early.Code != http.StatusOK {
+			t.Fatalf("early balances status = %d, body %s", early.Code, early.Body.String())
+		}
+		var earlyPayload struct {
+			Accounts []struct {
+				Archived        bool     `json:"archived"`
+				ObservedBalance *float64 `json:"observedBalance"`
+			} `json:"accounts"`
+		}
+		if err := json.Unmarshal(early.Body.Bytes(), &earlyPayload); err != nil {
+			t.Fatalf("decode early balances: %v", err)
+		}
+		for _, account := range earlyPayload.Accounts {
+			if account.ObservedBalance != nil && *account.ObservedBalance == 0 && !account.Archived {
+				t.Fatalf("zero observed balance at the cut must archive: %+v", account)
+			}
+		}
+		// Reset the debt account's observations for the next input order.
+		deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/checkpoints?accountId="+ids["debt"]+"&observedAt="+jsonNumber(float64(morning)), "")
+		if deleted.Code != http.StatusOK {
+			t.Fatalf("delete checkpoints status = %d, body %s", deleted.Code, deleted.Body.String())
+		}
+		deleted = doRowRequest(t, handler, http.MethodDelete, "/v1/checkpoints?accountId="+ids["debt"]+"&observedAt="+jsonNumber(float64(evening)), "")
+		if deleted.Code != http.StatusOK {
+			t.Fatalf("delete checkpoints status = %d, body %s", deleted.Code, deleted.Body.String())
+		}
+	}
+}
+
+func jsonNumber(value float64) string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return string(encoded)
+}

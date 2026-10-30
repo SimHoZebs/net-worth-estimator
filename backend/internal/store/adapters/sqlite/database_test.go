@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -111,7 +112,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if _, err := s.CreateEvaluation(secondEval); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Date: "2026-01-01", Balance: 10}); err != nil {
+		if _, err := s.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 10, ObservedAt: 1767311999}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.SavePaymentTerms(types.PaymentTerms{AccountID: "checking", DueDay: 1}); err != nil {
@@ -181,7 +182,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { e := eval; e.Name = "A only"; _, err := a.UpdateEvaluation(e); return err },
 		func() error { return a.MoveEvaluation(eval.Type, "second-evaluation", eval.InstanceID) },
 		func() error {
-			_, err := a.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Date: "2026-01-01", Balance: 99})
+			_, err := a.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 99, ObservedAt: 1767311999})
 			return err
 		},
 		func() error {
@@ -202,7 +203,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		},
 		func() error {
 			item := syncPendingPosting("same-transaction", "checking", "2026-08-03")
-			_, err := a.ApplySyncPlan([]SyncCheckpoint{{AccountID: "checking", Date: "2026-02-01", Balance: 50}}, []BankDirective{syncPendingDirective(item)})
+			_, err := a.ApplySyncPlan([]SyncCheckpoint{{AccountID: "checking", Balance: 50, ObservedAt: 1769990399}}, []BankDirective{syncPendingDirective(item)})
 			return err
 		},
 		func() error { return a.SetLastSyncTime("after") },
@@ -210,7 +211,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { return a.DeletePosting(postingID) },
 		func() error { return a.DeleteRule("same-rule") },
 		func() error { return a.DeleteEvaluation(eval.InstanceID) },
-		func() error { return a.DeleteCheckpoint("checking", "2026-01-01") },
+		func() error { return a.DeleteCheckpointAt("checking", 1767311999) },
 		func() error { return a.DeletePaymentTerms("checking") },
 		func() error { return a.DeleteAmountPreset(preset.ID) },
 		func() error { return a.DeleteAccountLink("same-bridge") },
@@ -326,7 +327,7 @@ func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	if _, err := a.CreatePosting(testPostingFixture("01900000-0000-7000-8000-000000000099")); err == nil {
 		t.Fatal("posting referenced another plan's account")
 	}
-	if _, err := a.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Date: "2026-01-01"}); err == nil {
+	if _, err := a.SaveCheckpoint(types.Checkpoint{AccountID: "checking", ObservedAt: 1767311999}); err == nil {
 		t.Fatal("checkpoint referenced another plan's account")
 	}
 	if _, err := a.SavePaymentTerms(types.PaymentTerms{AccountID: "checking"}); err == nil {
@@ -337,5 +338,135 @@ func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	}
 	if exists, err := a.DocumentExists(); err != nil || exists {
 		t.Fatalf("failed write activated model: %v, %v", exists, err)
+	}
+}
+
+func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
+	for _, s := range []*sqliteStore{a, b} {
+		seedAccount(t, s, "checking")
+	}
+	const instant = int64(1785903600)
+	// Identical account IDs and identical instant keys in one shared file.
+	if _, err := a.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 100, ObservedAt: instant}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 200, ObservedAt: instant}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 250, ObservedAt: 1785974399}); err != nil {
+		t.Fatal(err)
+	}
+	settledDirective := func(item SyncPosting) BankDirective {
+		item.Source = SourceSimpleFIN
+		return BankDirective{Upsert: &BankUpsert{
+			Posting: item.Posting,
+			Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+		}}
+	}
+	for user, s := range map[string]*sqliteStore{"a": a, "b": b} {
+		if _, err := s.ApplySyncPlan(
+			[]SyncCheckpoint{{AccountID: "checking", Balance: 10, ObservedAt: instant + 86400}},
+			[]BankDirective{settledDirective(syncSettledPosting("tx-"+user, "checking", "Settled "+user, "2026-08-06"))},
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bankID := func(s *sqliteStore) string {
+		loaded, err := s.LoadDocument()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, posting := range loaded.Postings {
+			if posting.Source == SourceSimpleFIN && !posting.Pending {
+				return posting.ID
+			}
+		}
+		t.Fatalf("no settled bank row for user")
+		return ""
+	}
+	bankA, bankB := bankID(a), bankID(b)
+	if bankA == bankB {
+		t.Fatalf("bank row IDs collided across users: %s", bankA)
+	}
+	checking := "checking"
+	if _, err := a.CreatePosting(types.Posting{
+		ID: "01900000-0000-7000-8000-000000000091", Name: "Manual",
+		SourceAccountID: &checking,
+		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		PostedTime:      1785817200, TransactionTime: 1785817200, Enabled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	loadedA, err := a.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedB, err := b.LoadDocument()
+	if err != nil {
+		t.Fatal(err)
+	}
+	countA, countB := 0, 0
+	for _, checkpoint := range loadedA.Checkpoints {
+		if checkpoint.AccountID == "checking" && checkpoint.ObservedAt != instant+86400 {
+			countA++
+			if checkpoint.ObservedAt == instant && checkpoint.Balance != 100 {
+				t.Fatalf("user A instant row changed: %+v", checkpoint)
+			}
+		}
+	}
+	for _, checkpoint := range loadedB.Checkpoints {
+		if checkpoint.AccountID == "checking" && checkpoint.ObservedAt != instant+86400 {
+			countB++
+		}
+	}
+	if countA != 1 || countB != 2 {
+		t.Fatalf("same-day rows leaked: a=%d b=%d", countA, countB)
+	}
+	for _, posting := range loadedB.Postings {
+		if posting.ID == "01900000-0000-7000-8000-000000000091" {
+			t.Fatalf("user A manual posting visible to user B")
+		}
+		if posting.ID == bankA {
+			t.Fatalf("user A bank row visible to user B")
+		}
+	}
+	found := false
+	for _, posting := range loadedA.Postings {
+		if posting.ID == "01900000-0000-7000-8000-000000000091" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("user A manual posting missing")
+	}
+}
+
+func TestSetupFailsClosedOnPreTimestampCheckpoints(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE users(id TEXT PRIMARY KEY, issuer TEXT NOT NULL, subject TEXT NOT NULL)`,
+		`INSERT INTO users(id, issuer, subject) VALUES ('u1', 'https://issuer.test', 's1')`,
+		`CREATE TABLE schema_migrations(name TEXT PRIMARY KEY)`,
+		`INSERT INTO schema_migrations(name) VALUES ('shared-accounts-v1')`,
+		`CREATE TABLE accounts(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id TEXT NOT NULL, position INTEGER NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'cash', min_balance REAL, max_balance REAL, color TEXT, enabled INTEGER NOT NULL, PRIMARY KEY (user_id, id))`,
+		`CREATE TABLE checkpoints(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id INTEGER NOT NULL, position INTEGER NOT NULL, date TEXT NOT NULL, model_account_id TEXT NOT NULL, balance REAL NOT NULL, source TEXT NOT NULL DEFAULT 'user', PRIMARY KEY(user_id, id), UNIQUE(user_id, model_account_id, date))`,
+		`INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance, source) VALUES ('u1', 1, 0, '2026-03-10', 'checking', 100, 'user')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			db.Close()
+			t.Fatalf("old schema: %v: %s", err, stmt)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SetupDatabase(path); !errors.Is(err, ErrSetupRequired) {
+		t.Fatalf("setup on legacy checkpoints = %v, want setup-required failure", err)
 	}
 }

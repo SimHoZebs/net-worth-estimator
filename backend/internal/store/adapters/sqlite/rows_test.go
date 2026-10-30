@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -123,19 +124,19 @@ func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
 	if _, err := store.UpdateRule(rule); err != nil {
 		t.Fatalf("update rule: %v", err)
 	}
-	saved, err := store.SaveCheckpoint(types.Checkpoint{Date: "2026-08-05", AccountID: "checking", Balance: 100})
+	saved, err := store.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 100, ObservedAt: 1785974399})
 	if err != nil || saved.Source != SourceUser {
 		t.Fatalf("save checkpoint = %+v, err %v", saved, err)
 	}
-	saved, err = store.SaveCheckpoint(types.Checkpoint{Date: "2026-08-05", AccountID: "checking", Balance: 150})
+	saved, err = store.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 150, ObservedAt: 1785974399})
 	if err != nil || saved.Balance != 150 {
 		t.Fatalf("upsert checkpoint = %+v, err %v", saved, err)
 	}
-	if err := store.DeleteCheckpoint("checking", "2026-08-05"); err != nil {
+	if err := store.DeleteCheckpointAt("checking", 1785974399); err != nil {
 		t.Fatalf("delete checkpoint: %v", err)
 	}
-	if err := store.DeleteCheckpoint("checking", "2026-08-05"); !IsNotFound(err) {
-		t.Fatalf("delete missing checkpoint err = %v, want not-found", err)
+	if err := store.DeleteCheckpointAt("checking", 1785974399); !IsNotFound(err) || !strings.Contains(err.Error(), "checking/1785974399") {
+		t.Fatalf("delete missing checkpoint err = %v, want not-found with account/instant", err)
 	}
 	terms := types.PaymentTerms{AccountID: "checking", MinimumFixed: 25, DueDay: 10}
 	if _, err := store.SavePaymentTerms(terms); err != nil {

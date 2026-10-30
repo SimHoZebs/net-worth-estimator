@@ -4,10 +4,17 @@ import type {
 	ModelValidationIssue,
 } from "./contracts.ts";
 
+export interface PositionAccount {
+	accountId: string;
+	balance: number;
+	observedBalance?: number | null;
+	observedAt?: number | null;
+}
+
 export interface CurrentPosition {
 	asOfDate: string;
 	netWorth: number;
-	accounts: { accountId: string; balance: number }[];
+	accounts: PositionAccount[];
 }
 
 export interface CurrentPositionRequest {

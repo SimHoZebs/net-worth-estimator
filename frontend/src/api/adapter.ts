@@ -40,6 +40,8 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 				: ceiling,
 		color: row.color ?? null,
 		observedOn: row.observedOn,
+		observedAt: row.observedAt ?? null,
+		observedBalance: row.observedBalance ?? null,
 		balanceCheck: row.hasCheckpoint,
 		source: row.syncOwned
 			? "Synced checkpoint"

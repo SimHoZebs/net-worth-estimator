@@ -637,7 +637,7 @@ describe("remote workspace state", () => {
 					kind: "cash",
 					enabled: true,
 					balance: 2500,
-					observedOn: "2026-02-15",
+					observedAt: Date.parse("2026-02-15T23:59:59Z") / 1000,
 				}),
 			refresh: refreshAccounts,
 			failureMessage: "The account could not be saved.",
@@ -701,7 +701,7 @@ describe("remote workspace state", () => {
 					kind: "cash",
 					enabled: true,
 					balance: 2500,
-					observedOn: "2026-02-15",
+					observedAt: Date.parse("2026-02-15T23:59:59Z") / 1000,
 				}),
 			refresh: refreshAccounts,
 			failureMessage: "The account could not be saved.",
@@ -737,7 +737,7 @@ describe("remote workspace state", () => {
 					kind: "cash",
 					enabled: true,
 					balance: 2500,
-					observedOn: "2026-02-15",
+					observedAt: Date.parse("2026-02-15T23:59:59Z") / 1000,
 				}),
 			refresh: refreshAccounts,
 			failureMessage: "The account could not be saved.",
@@ -1532,7 +1532,7 @@ describe("remote projection mapping and SSE", () => {
 	it("sends a malformed start date as data instead of throwing during render", async () => {
 		const broken = modelFixture();
 		broken.checkpoints = [
-			{ Date: "not-a-date", AccountId: "cash", Balance: 100 },
+			{ AccountId: "cash", Balance: 100, observedAt: 1769903999 },
 		];
 		const seen: { url: string; init?: RequestInit }[] = [];
 		vi.stubGlobal(

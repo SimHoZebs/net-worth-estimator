@@ -4,10 +4,30 @@ import { projectionFixture } from "../mocks/projection.ts";
 import { netWorthChangeSinceFirstSync } from "./netWorthChange.ts";
 
 const checkpoints: BackendCheckpoint[] = [
-	{ Date: "2026-07-01", AccountId: "cash", Balance: 1800, source: "simplefin" },
-	{ Date: "2026-01-01", AccountId: "cash", Balance: 100, source: "user" },
-	{ Date: "2026-02-01", AccountId: "cash", Balance: 1500, source: "simplefin" },
-	{ Date: "2026-02-01", AccountId: "debt", Balance: -500, source: "simplefin" },
+	{
+		observedAt: Date.parse("2026-07-01T09:00:00Z") / 1000,
+		AccountId: "cash",
+		Balance: 1800,
+		source: "simplefin",
+	},
+	{
+		observedAt: Date.parse("2026-01-01T09:00:00Z") / 1000,
+		AccountId: "cash",
+		Balance: 100,
+		source: "user",
+	},
+	{
+		observedAt: Date.parse("2026-02-01T09:00:00Z") / 1000,
+		AccountId: "cash",
+		Balance: 1500,
+		source: "simplefin",
+	},
+	{
+		observedAt: Date.parse("2026-02-01T10:00:00Z") / 1000,
+		AccountId: "debt",
+		Balance: -500,
+		source: "simplefin",
+	},
 ];
 const points = [
 	{ date: "2026-01-01", total: 100, balances: {} },

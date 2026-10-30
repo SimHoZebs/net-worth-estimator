@@ -4,6 +4,9 @@ import type { Posting, RecurrenceRule } from "../../api/contracts.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import { accountUpdateBody } from "./accountFields.ts";
 import {
+	combineDayTime,
+	detailFormValues,
+	timeOfDay,
 	claimPostingBody,
 	postingUpdateBody,
 	ruleUpdateBody,
@@ -55,6 +58,42 @@ const rawPosting: Posting = {
 };
 
 describe("posting update bodies", () => {
+	it("preserves second precision through the detail form and honors an explicit new time", () => {
+		const item = {
+			...baselinePosting,
+			transactionTime: rawPosting.transactionTime,
+		};
+		const draft = {
+			name: "Renamed",
+			amount: "48000",
+			fromId: "checking",
+			toId: "savings",
+			frequency: "once" as const,
+			startDate: item.startDate,
+			endDate: "",
+			noEndDate: true,
+			annualIncrease: "0",
+			enabled: true,
+			claimRuleId: "",
+			claimOccurrenceDate: "",
+			postedDate: item.postedDate ?? "",
+			transactionTime: timeOfDay(item.transactionTime),
+		};
+		const values = detailFormValues({ draft, item, isOnce: true });
+		if (values instanceof Error) throw values;
+		expect(
+			postingUpdateBody({ baseline: item, raw: rawPosting, values })
+				.transactionTime,
+		).toBe(rawPosting.transactionTime);
+		const changed = {
+			...values,
+			transactionTime: combineDayTime(item.startDate, "11:00"),
+		};
+		expect(
+			postingUpdateBody({ baseline: item, raw: rawPosting, values: changed })
+				.transactionTime,
+		).toBe(changed.transactionTime);
+	});
 	it("preserves raw timestamps, amount, destinations, and purchase on a rename-only edit", () => {
 		const body = postingUpdateBody({
 			baseline: baselinePosting,

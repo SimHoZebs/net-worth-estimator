@@ -345,7 +345,7 @@ func applyBranchPostingEvents(events []branchEventGroup, baseRealizedByDateAndPo
 				observedDirectIncome += realizedAmount
 				continue
 			}
-			if _, err := transitions.ExecutePosting(occurrence, group.date); err != nil {
+			if _, err := transitions.ExecutePosting(occurrence, group.date, false); err != nil {
 				return 0, fmt.Errorf("replay posting %q on %s: %w", posting.ID, group.date, err)
 			}
 		}

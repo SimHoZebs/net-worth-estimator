@@ -112,8 +112,11 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 		t.Fatalf("pending shape = %+v", pending)
 	}
 	settled := plan.Settled[0]
-	if settled.ProviderAccountID != "bridge-prime" || settled.TransactionID != "post1" || settled.Pending || settled.Enabled {
-		t.Fatalf("settled identity/state = %+v", settled)
+	if settled.ProviderAccountID != "bridge-prime" || settled.TransactionID != "post1" || settled.Pending || !settled.Enabled {
+		t.Fatalf("settled identity/state = %+v, want enabled settled participant", settled)
+	}
+	if settled.TransactionTime != settled.PostedTime {
+		t.Fatalf("settled event time = %d, want posted instant %d", settled.TransactionTime, settled.PostedTime)
 	}
 	if settled.SourceAccountID == nil || *settled.SourceAccountID != "prime_card" {
 		t.Fatalf("settled source = %+v", settled.SourceAccountID)
@@ -158,5 +161,37 @@ func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
 		if !found {
 			t.Fatalf("upstream key was changed: plan %+v, err %v", plan, err)
 		}
+	}
+}
+
+func TestMapNormalizesSettledEventTimeToPosted(t *testing.T) {
+	// A purchase authorized at 08:00 but posted at 11:00 affects the
+	// reported balance at posting: the settled event time is the post
+	// instant. Pending seeds keep the purchase timestamp for matching.
+	set := &AccountSet{Accounts: []Account{{
+		ID: "bridge-prime", Name: "Prime", Currency: "USD",
+		Balance: "0.00", BalanceDate: 1773100800,
+		Transactions: []Transaction{
+			{ID: "set1", Posted: 1773140400, Amount: "-100.00", Description: "Groceries", TransactedAt: &[]int64{1773129600}[0]},
+			{ID: "pend1", Posted: 0, Amount: "-10.00", Description: "Hold", Pending: &[]bool{true}[0], TransactedAt: &[]int64{1773129600}[0]},
+		},
+	}}}
+	plan, err := Map(set, map[string]string{"bridge-prime": "prime_card"}, time.Unix(1773140400, 0).UTC())
+	if err != nil {
+		t.Fatalf("map: %v", err)
+	}
+	if len(plan.Settled) != 1 || len(plan.Pending) != 1 {
+		t.Fatalf("plan = %+v, want 1 settled and 1 pending", plan)
+	}
+	settled := plan.Settled[0]
+	if !settled.Enabled {
+		t.Fatalf("settled bank actual must participate: %+v", settled.Posting)
+	}
+	if settled.Posting.TransactionTime != 1773140400 || settled.Posting.PostedTime != 1773140400 {
+		t.Fatalf("settled event time = %d/%d, want posted instant 1773140400", settled.Posting.TransactionTime, settled.Posting.PostedTime)
+	}
+	pending := plan.Pending[0]
+	if pending.Enabled || pending.Posting.TransactionTime != 1773129600 {
+		t.Fatalf("pending seed must stay disabled on its purchase timestamp: %+v", pending.Posting)
 	}
 }

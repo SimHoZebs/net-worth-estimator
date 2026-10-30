@@ -77,7 +77,7 @@ func TestWorkerIsIndependentFromSyncAndRecoversSavedInputs(t *testing.T) {
 	go func() { done <- runner.RunOnce(context.Background()) }()
 	<-blocked.started
 	// Analysis holds no database transaction while it computes.
-	if _, err := scoped.ApplySyncPlan([]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-02", Balance: 200}}, nil); err != nil {
+	if _, err := scoped.ApplySyncPlan([]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: time.Date(2026, time.August, 2, 23, 59, 59, 0, time.UTC).Unix(), Balance: 200}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	close(blocked.release)

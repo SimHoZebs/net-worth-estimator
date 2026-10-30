@@ -1,33 +1,36 @@
 {
+  "config": {
+    "runCount": 20,
+    "seed": 42
+  },
   "document": {
-    "sourcePath": "/configs",
     "accounts": [
       {
-        "name": "checking",
+        "color": null,
+        "enabled": true,
+        "id": "checking",
         "kind": "cash",
-        "minBalance": -10000000000000,
         "maxBalance": 10000000000000,
-        "color": null,
-        "enabled": true,
-        "id": "checking"
+        "minBalance": -10000000000000,
+        "name": "checking"
       },
       {
-        "name": "brokerage",
+        "color": null,
+        "enabled": true,
+        "id": "brokerage",
         "kind": "investment",
-        "minBalance": -10000000000000,
         "maxBalance": 10000000000000,
-        "color": null,
-        "enabled": true,
-        "id": "brokerage"
+        "minBalance": -10000000000000,
+        "name": "brokerage"
       },
       {
-        "name": "loan",
-        "kind": "debt",
-        "minBalance": -10000000000000,
-        "maxBalance": 10000000000000,
         "color": null,
         "enabled": true,
-        "id": "loan"
+        "id": "loan",
+        "kind": "debt",
+        "maxBalance": 10000000000000,
+        "minBalance": -10000000000000,
+        "name": "loan"
       }
     ],
     "checkpoints": [],
@@ -39,114 +42,68 @@
     "postings": [],
     "recurrenceRules": [
       {
-        "name": "seed_checking",
-        "sourceAccountId": null,
-        "destinations": ["checking"],
         "amount": {
-          "resolver": "expression",
           "config": {
             "expression": "1000"
           },
-          "inputs": {}
+          "inputs": {},
+          "resolver": "expression"
         },
-        "frequency": "monthly",
-        "startDate": "2026-02-01",
-        "endDate": null,
         "annualCap": null,
-        "priority": 1,
+        "destinations": [
+          "checking"
+        ],
         "enabled": true,
-        "id": "seed_checking"
+        "endDate": null,
+        "frequency": "monthly",
+        "id": "seed_checking",
+        "name": "seed_checking",
+        "priority": 1,
+        "sourceAccountId": null,
+        "startDate": "2026-02-01"
       },
       {
-        "name": "spend",
-        "sourceAccountId": "checking",
-        "destinations": null,
         "amount": {
-          "resolver": "expression",
           "config": {
             "expression": "400"
           },
-          "inputs": {}
+          "inputs": {},
+          "resolver": "expression"
         },
-        "frequency": "monthly",
-        "startDate": "2026-02-05",
-        "endDate": null,
         "annualCap": null,
-        "priority": 1,
+        "destinations": null,
         "enabled": true,
-        "id": "spend"
+        "endDate": null,
+        "frequency": "monthly",
+        "id": "spend",
+        "name": "spend",
+        "priority": 1,
+        "sourceAccountId": "checking",
+        "startDate": "2026-02-05"
       },
       {
-        "name": "growth",
-        "sourceAccountId": "checking",
-        "destinations": ["brokerage"],
         "amount": {
-          "resolver": "expression",
           "config": {
             "expression": "50"
           },
-          "inputs": {}
+          "inputs": {},
+          "resolver": "expression"
         },
-        "frequency": "monthly",
-        "startDate": "2026-02-01",
-        "endDate": null,
         "annualCap": null,
-        "priority": 1,
+        "destinations": [
+          "brokerage"
+        ],
         "enabled": true,
-        "id": "growth"
+        "endDate": null,
+        "frequency": "monthly",
+        "id": "growth",
+        "name": "growth",
+        "priority": 1,
+        "sourceAccountId": "checking",
+        "startDate": "2026-02-01"
       }
-    ]
-  },
-  "settings": {
-    "fallbackProjectionStartDate": "2026-02-01",
-    "horizonYears": 4,
-    "evaluations": {
-      "financialIndependence": [
-        {
-          "instanceId": "fi-golden",
-          "name": "FI golden",
-          "enabled": true,
-          "config": {
-            "minimumNetWorth": 0,
-            "annualExpenseTarget": 12000,
-            "annualExpenseTargetBasis": "fi-date-dollars",
-            "annualExpenseGrowthRate": 0.02,
-            "withdrawalRate": 0.04,
-            "evaluationYears": 2,
-            "requiredConfidence": 0.9,
-            "sources": [
-              {
-                "type": "asset",
-                "accountId": "brokerage",
-                "included": true
-              }
-            ],
-            "continuingPostingIds": ["growth"],
-            "principalPolicy": "preserve-real-principal"
-          }
-        }
-      ],
-      "netWorthThreshold": [
-        {
-          "instanceId": "nw-500",
-          "name": "Net worth 500",
-          "enabled": true,
-          "config": {
-            "target": 500
-          }
-        }
-      ],
-      "postingFulfillment": [
-        {
-          "instanceId": "pf-all",
-          "name": "Posting fulfillment",
-          "enabled": true,
-          "config": {
-            "postingIds": null
-          }
-        }
-      ]
-    }
+    ],
+    "sourcePath": "/configs"
   },
   "overrides": {
     "addedAccounts": [],
@@ -154,19 +111,22 @@
     "disabledAccountIds": [],
     "disabledPostingIds": []
   },
-  "config": {
-    "runCount": 20,
-    "seed": 42
-  },
   "result": {
-    "config": {
-      "runCount": 20,
-      "seed": 42
-    },
     "bands": [
       {
         "date": "2026-02-01",
-        "isHistorical": false,
+        "isHistorical": true,
+        "netWorth": {
+          "p10": 1000,
+          "p25": 1000,
+          "p50": 1000,
+          "p75": 1000,
+          "p90": 1000
+        }
+      },
+      {
+        "date": "2026-02-01",
+        "isHistorical": true,
         "netWorth": {
           "p10": 1000,
           "p25": 1000,
@@ -1232,14 +1192,9 @@
         }
       }
     ],
-    "milestones": {
-      "finalNetWorthPercentiles": {
-        "p10": 29800,
-        "p25": 29800,
-        "p50": 29800,
-        "p75": 29800,
-        "p90": 29800
-      }
+    "config": {
+      "runCount": 20,
+      "seed": 42
     },
     "evaluations": {
       "financialIndependence": [
@@ -1248,1239 +1203,1239 @@
           "name": "FI golden",
           "status": "not-satisfied",
           "deterministic": {
+            "milestones": {
+              "firstCoverageDate": null,
+              "firstSelfSustainingDate": null
+            },
             "rows": [
               {
-                "date": "2026-02-01",
-                "netWorth": 1000,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 50,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 2
-                  }
-                ],
-                "selectedAssetBalance": 50,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 2,
-                "totalAnnualCapacity": 2,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 2,
+                    "balance": 50,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.00016666666666666666,
+                "date": "2026-02-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-03-01",
-                "netWorth": 1600,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 1000,
+                "selectedAssetBalance": 50,
+                "totalAnnualCapacity": 2
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 100,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 4
-                  }
-                ],
-                "selectedAssetBalance": 100,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 4,
-                "totalAnnualCapacity": 4,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 4,
+                    "balance": 100,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0003333333333333333,
+                "date": "2026-03-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-04-01",
-                "netWorth": 2200,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 1600,
+                "selectedAssetBalance": 100,
+                "totalAnnualCapacity": 4
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 150,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 6
-                  }
-                ],
-                "selectedAssetBalance": 150,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 6,
-                "totalAnnualCapacity": 6,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 6,
+                    "balance": 150,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0005,
+                "date": "2026-04-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-05-01",
-                "netWorth": 2800,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 2200,
+                "selectedAssetBalance": 150,
+                "totalAnnualCapacity": 6
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 200,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 8
-                  }
-                ],
-                "selectedAssetBalance": 200,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 8,
-                "totalAnnualCapacity": 8,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 8,
+                    "balance": 200,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0006666666666666666,
+                "date": "2026-05-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-06-01",
-                "netWorth": 3400,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 2800,
+                "selectedAssetBalance": 200,
+                "totalAnnualCapacity": 8
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 250,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 10
-                  }
-                ],
-                "selectedAssetBalance": 250,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 10,
-                "totalAnnualCapacity": 10,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 10,
+                    "balance": 250,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0008333333333333334,
+                "date": "2026-06-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-07-01",
-                "netWorth": 4000,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 3400,
+                "selectedAssetBalance": 250,
+                "totalAnnualCapacity": 10
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 300,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 12
-                  }
-                ],
-                "selectedAssetBalance": 300,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 12,
-                "totalAnnualCapacity": 12,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 12,
+                    "balance": 300,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.001,
+                "date": "2026-07-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-08-01",
-                "netWorth": 4600,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 4000,
+                "selectedAssetBalance": 300,
+                "totalAnnualCapacity": 12
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 350,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 14
-                  }
-                ],
-                "selectedAssetBalance": 350,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 14,
-                "totalAnnualCapacity": 14,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 14,
+                    "balance": 350,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0011666666666666668,
+                "date": "2026-08-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-09-01",
-                "netWorth": 5200,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 4600,
+                "selectedAssetBalance": 350,
+                "totalAnnualCapacity": 14
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 400,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 16
-                  }
-                ],
-                "selectedAssetBalance": 400,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 16,
-                "totalAnnualCapacity": 16,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 16,
+                    "balance": 400,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0013333333333333333,
+                "date": "2026-09-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-10-01",
-                "netWorth": 5800,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 5200,
+                "selectedAssetBalance": 400,
+                "totalAnnualCapacity": 16
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 450,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 18
-                  }
-                ],
-                "selectedAssetBalance": 450,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 18,
-                "totalAnnualCapacity": 18,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 18,
+                    "balance": 450,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0015,
+                "date": "2026-10-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-11-01",
-                "netWorth": 6400,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 5800,
+                "selectedAssetBalance": 450,
+                "totalAnnualCapacity": 18
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 500,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 20
-                  }
-                ],
-                "selectedAssetBalance": 500,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 20,
-                "totalAnnualCapacity": 20,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 20,
+                    "balance": 500,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0016666666666666668,
+                "date": "2026-11-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2026-12-01",
-                "netWorth": 7000,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 6400,
+                "selectedAssetBalance": 500,
+                "totalAnnualCapacity": 20
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 550,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 22
-                  }
-                ],
-                "selectedAssetBalance": 550,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 22,
-                "totalAnnualCapacity": 22,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 22,
+                    "balance": 550,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0018333333333333333,
+                "date": "2026-12-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-01-01",
-                "netWorth": 7600,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 7000,
+                "selectedAssetBalance": 550,
+                "totalAnnualCapacity": 22
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 600,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 24
-                  }
-                ],
-                "selectedAssetBalance": 600,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 24,
-                "totalAnnualCapacity": 24,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 24,
+                    "balance": 600,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.002,
+                "date": "2027-01-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-02-01",
-                "netWorth": 8200,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 7600,
+                "selectedAssetBalance": 600,
+                "totalAnnualCapacity": 24
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 650,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 26
-                  }
-                ],
-                "selectedAssetBalance": 650,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 26,
-                "totalAnnualCapacity": 26,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 26,
+                    "balance": 650,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0021666666666666666,
+                "date": "2027-02-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-03-01",
-                "netWorth": 8800,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 8200,
+                "selectedAssetBalance": 650,
+                "totalAnnualCapacity": 26
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 700,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 28
-                  }
-                ],
-                "selectedAssetBalance": 700,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 28,
-                "totalAnnualCapacity": 28,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 28,
+                    "balance": 700,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0023333333333333335,
+                "date": "2027-03-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-04-01",
-                "netWorth": 9400,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 8800,
+                "selectedAssetBalance": 700,
+                "totalAnnualCapacity": 28
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 750,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 30
-                  }
-                ],
-                "selectedAssetBalance": 750,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 30,
-                "totalAnnualCapacity": 30,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 30,
+                    "balance": 750,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0025,
+                "date": "2027-04-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-05-01",
-                "netWorth": 10000,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 9400,
+                "selectedAssetBalance": 750,
+                "totalAnnualCapacity": 30
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 800,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 32
-                  }
-                ],
-                "selectedAssetBalance": 800,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 32,
-                "totalAnnualCapacity": 32,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 32,
+                    "balance": 800,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0026666666666666666,
+                "date": "2027-05-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-06-01",
-                "netWorth": 10600,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 10000,
+                "selectedAssetBalance": 800,
+                "totalAnnualCapacity": 32
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 850,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 34
-                  }
-                ],
-                "selectedAssetBalance": 850,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 34,
-                "totalAnnualCapacity": 34,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 34,
+                    "balance": 850,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0028333333333333335,
+                "date": "2027-06-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-07-01",
-                "netWorth": 11200,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 10600,
+                "selectedAssetBalance": 850,
+                "totalAnnualCapacity": 34
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 900,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 36
-                  }
-                ],
-                "selectedAssetBalance": 900,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 36,
-                "totalAnnualCapacity": 36,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 36,
+                    "balance": 900,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.003,
+                "date": "2027-07-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-08-01",
-                "netWorth": 11800,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 11200,
+                "selectedAssetBalance": 900,
+                "totalAnnualCapacity": 36
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 950,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 38
-                  }
-                ],
-                "selectedAssetBalance": 950,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 38,
-                "totalAnnualCapacity": 38,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 38,
+                    "balance": 950,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0031666666666666666,
+                "date": "2027-08-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-09-01",
-                "netWorth": 12400,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 11800,
+                "selectedAssetBalance": 950,
+                "totalAnnualCapacity": 38
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 1000,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 40
-                  }
-                ],
-                "selectedAssetBalance": 1000,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 40,
-                "totalAnnualCapacity": 40,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 40,
+                    "balance": 1000,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0033333333333333335,
+                "date": "2027-09-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-10-01",
-                "netWorth": 13000,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 12400,
+                "selectedAssetBalance": 1000,
+                "totalAnnualCapacity": 40
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 1050,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 42
-                  }
-                ],
-                "selectedAssetBalance": 1050,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 42,
-                "totalAnnualCapacity": 42,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 42,
+                    "balance": 1050,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0035,
+                "date": "2027-10-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-11-01",
-                "netWorth": 13600,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 13000,
+                "selectedAssetBalance": 1050,
+                "totalAnnualCapacity": 42
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 1100,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 44
-                  }
-                ],
-                "selectedAssetBalance": 1100,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 44,
-                "totalAnnualCapacity": 44,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 44,
+                    "balance": 1100,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.0036666666666666666,
+                "date": "2027-11-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2027-12-01",
-                "netWorth": 14200,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 13600,
+                "selectedAssetBalance": 1100,
+                "totalAnnualCapacity": 44
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 1150,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 46
-                  }
-                ],
-                "selectedAssetBalance": 1150,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 46,
-                "totalAnnualCapacity": 46,
-                "annualExpenseTarget": 12000,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 46,
+                    "balance": 1150,
+                    "withdrawalRate": 0.04
+                  }
+                ],
                 "coverageRatio": 0.003833333333333333,
+                "date": "2027-12-01",
                 "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2028-01-01",
-                "netWorth": 14800,
+                "isEligible": false,
                 "minimumNetWorth": 0,
                 "minimumNetWorthMet": true,
+                "netWorth": 14200,
+                "selectedAssetBalance": 1150,
+                "totalAnnualCapacity": 46
+              },
+              {
                 "annualDirectIncome": 0,
-                "assetContributions": [
-                  {
-                    "accountId": "brokerage",
-                    "balance": 1200,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 48
-                  }
-                ],
-                "selectedAssetBalance": 1200,
+                "annualExpenseTarget": 12000,
                 "annualWithdrawalCapacity": 48,
-                "totalAnnualCapacity": 48,
-                "annualExpenseTarget": 12000,
-                "coverageRatio": 0.004,
-                "isCovered": false,
-                "isEligible": false
-              },
-              {
-                "date": "2028-02-01",
-                "netWorth": 15400,
-                "minimumNetWorth": 0,
-                "minimumNetWorthMet": true,
-                "annualDirectIncome": 0,
                 "assetContributions": [
                   {
                     "accountId": "brokerage",
-                    "balance": 1250,
-                    "withdrawalRate": 0.04,
-                    "annualWithdrawalCapacity": 50
+                    "annualWithdrawalCapacity": 48,
+                    "balance": 1200,
+                    "withdrawalRate": 0.04
                   }
                 ],
-                "selectedAssetBalance": 1250,
-                "annualWithdrawalCapacity": 50,
-                "totalAnnualCapacity": 50,
-                "annualExpenseTarget": 12000,
-                "coverageRatio": 0.004166666666666667,
+                "coverageRatio": 0.004,
+                "date": "2028-01-01",
                 "isCovered": false,
-                "isEligible": false
+                "isEligible": false,
+                "minimumNetWorth": 0,
+                "minimumNetWorthMet": true,
+                "netWorth": 14800,
+                "selectedAssetBalance": 1200,
+                "totalAnnualCapacity": 48
+              },
+              {
+                "annualDirectIncome": 0,
+                "annualExpenseTarget": 12000,
+                "annualWithdrawalCapacity": 50,
+                "assetContributions": [
+                  {
+                    "accountId": "brokerage",
+                    "annualWithdrawalCapacity": 50,
+                    "balance": 1250,
+                    "withdrawalRate": 0.04
+                  }
+                ],
+                "coverageRatio": 0.004166666666666667,
+                "date": "2028-02-01",
+                "isCovered": false,
+                "isEligible": false,
+                "minimumNetWorth": 0,
+                "minimumNetWorthMet": true,
+                "netWorth": 15400,
+                "selectedAssetBalance": 1250,
+                "totalAnnualCapacity": 50
               }
             ],
             "runOutcomes": [
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-02-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 50,
-                "endingSelectedAssetBalance": 50,
-                "startingRealSelectedAssetBalance": 50,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 50,
+                "endingSelectedAssetBalance": 50,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 50,
+                "startingSelectedAssetBalance": 50,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-03-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 100,
-                "endingSelectedAssetBalance": 100,
-                "startingRealSelectedAssetBalance": 100,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 100,
+                "endingSelectedAssetBalance": 100,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 100,
+                "startingSelectedAssetBalance": 100,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-04-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 150,
-                "endingSelectedAssetBalance": 150,
-                "startingRealSelectedAssetBalance": 150,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 150,
+                "endingSelectedAssetBalance": 150,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 150,
+                "startingSelectedAssetBalance": 150,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-05-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 200,
-                "endingSelectedAssetBalance": 200,
-                "startingRealSelectedAssetBalance": 200,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 200,
+                "endingSelectedAssetBalance": 200,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 200,
+                "startingSelectedAssetBalance": 200,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-06-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 250,
-                "endingSelectedAssetBalance": 250,
-                "startingRealSelectedAssetBalance": 250,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 250,
+                "endingSelectedAssetBalance": 250,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 250,
+                "startingSelectedAssetBalance": 250,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-07-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 300,
-                "endingSelectedAssetBalance": 300,
-                "startingRealSelectedAssetBalance": 300,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 300,
+                "endingSelectedAssetBalance": 300,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 300,
+                "startingSelectedAssetBalance": 300,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-08-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 350,
-                "endingSelectedAssetBalance": 350,
-                "startingRealSelectedAssetBalance": 350,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 350,
+                "endingSelectedAssetBalance": 350,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 350,
+                "startingSelectedAssetBalance": 350,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-09-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 400,
-                "endingSelectedAssetBalance": 400,
-                "startingRealSelectedAssetBalance": 400,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 400,
+                "endingSelectedAssetBalance": 400,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 400,
+                "startingSelectedAssetBalance": 400,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-10-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 450,
-                "endingSelectedAssetBalance": 450,
-                "startingRealSelectedAssetBalance": 450,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 450,
+                "endingSelectedAssetBalance": 450,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 450,
+                "startingSelectedAssetBalance": 450,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-11-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 500,
-                "endingSelectedAssetBalance": 500,
-                "startingRealSelectedAssetBalance": 500,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 500,
+                "endingSelectedAssetBalance": 500,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 500,
+                "startingSelectedAssetBalance": 500,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2026-12-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 550,
-                "endingSelectedAssetBalance": 550,
-                "startingRealSelectedAssetBalance": 550,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 550,
+                "endingSelectedAssetBalance": 550,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 550,
+                "startingSelectedAssetBalance": 550,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-01-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 600,
-                "endingSelectedAssetBalance": 600,
-                "startingRealSelectedAssetBalance": 600,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 600,
+                "endingSelectedAssetBalance": 600,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 600,
+                "startingSelectedAssetBalance": 600,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-02-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 650,
-                "endingSelectedAssetBalance": 650,
-                "startingRealSelectedAssetBalance": 650,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 650,
+                "endingSelectedAssetBalance": 650,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 650,
+                "startingSelectedAssetBalance": 650,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-03-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 700,
-                "endingSelectedAssetBalance": 700,
-                "startingRealSelectedAssetBalance": 700,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 700,
+                "endingSelectedAssetBalance": 700,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 700,
+                "startingSelectedAssetBalance": 700,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-04-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 750,
-                "endingSelectedAssetBalance": 750,
-                "startingRealSelectedAssetBalance": 750,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 750,
+                "endingSelectedAssetBalance": 750,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 750,
+                "startingSelectedAssetBalance": 750,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-05-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 800,
-                "endingSelectedAssetBalance": 800,
-                "startingRealSelectedAssetBalance": 800,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 800,
+                "endingSelectedAssetBalance": 800,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 800,
+                "startingSelectedAssetBalance": 800,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-06-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 850,
-                "endingSelectedAssetBalance": 850,
-                "startingRealSelectedAssetBalance": 850,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 850,
+                "endingSelectedAssetBalance": 850,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 850,
+                "startingSelectedAssetBalance": 850,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-07-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 900,
-                "endingSelectedAssetBalance": 900,
-                "startingRealSelectedAssetBalance": 900,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 900,
+                "endingSelectedAssetBalance": 900,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 900,
+                "startingSelectedAssetBalance": 900,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-08-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 950,
-                "endingSelectedAssetBalance": 950,
-                "startingRealSelectedAssetBalance": 950,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 950,
+                "endingSelectedAssetBalance": 950,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 950,
+                "startingSelectedAssetBalance": 950,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-09-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 1000,
-                "endingSelectedAssetBalance": 1000,
-                "startingRealSelectedAssetBalance": 1000,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 1000,
+                "endingSelectedAssetBalance": 1000,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 1000,
+                "startingSelectedAssetBalance": 1000,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-10-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 1050,
-                "endingSelectedAssetBalance": 1050,
-                "startingRealSelectedAssetBalance": 1050,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 1050,
+                "endingSelectedAssetBalance": 1050,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 1050,
+                "startingSelectedAssetBalance": 1050,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-11-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 1100,
-                "endingSelectedAssetBalance": 1100,
-                "startingRealSelectedAssetBalance": 1100,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 1100,
+                "endingSelectedAssetBalance": 1100,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 1100,
+                "startingSelectedAssetBalance": 1100,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2027-12-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
-                "expensesFullyCovered": false,
-                "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 1150,
-                "endingSelectedAssetBalance": 1150,
-                "startingRealSelectedAssetBalance": 1150,
+                "cycleEstablished": false,
                 "endingRealSelectedAssetBalance": 1150,
+                "endingSelectedAssetBalance": 1150,
+                "expensesFullyCovered": false,
+                "hadWithdrawalShortfall": false,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 1150,
+                "startingSelectedAssetBalance": 1150,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2028-01-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
+                "cycleEstablished": false,
+                "endingRealSelectedAssetBalance": 1200,
+                "endingSelectedAssetBalance": 1200,
                 "expensesFullyCovered": false,
                 "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 1200,
-                "endingSelectedAssetBalance": 1200,
-                "startingRealSelectedAssetBalance": 1200,
-                "endingRealSelectedAssetBalance": 1200,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 1200,
+                "startingSelectedAssetBalance": 1200,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               },
               {
+                "balanceTrajectory": [],
                 "candidateDate": "2028-02-01",
-                "status": "ineligible",
-                "minimumNetWorthMet": true,
-                "initialCoverageMet": false,
+                "cycleEstablished": false,
+                "endingRealSelectedAssetBalance": 1250,
+                "endingSelectedAssetBalance": 1250,
                 "expensesFullyCovered": false,
                 "hadWithdrawalShortfall": false,
-                "startingSelectedAssetBalance": 1250,
-                "endingSelectedAssetBalance": 1250,
-                "startingRealSelectedAssetBalance": 1250,
-                "endingRealSelectedAssetBalance": 1250,
+                "initialCoverageMet": false,
+                "minimumNetWorthMet": true,
                 "principalReplenished": false,
-                "cycleEstablished": false,
+                "startingRealSelectedAssetBalance": 1250,
+                "startingSelectedAssetBalance": 1250,
+                "status": "ineligible",
                 "withdrawals": {
-                  "requestedAmount": 0,
-                  "realizedAmount": 0,
-                  "shortfallAmount": 0,
+                  "accounts": [],
+                  "constraints": [],
+                  "firstShortfall": null,
                   "firstShortfallDate": null,
                   "lastShortfallDate": null,
-                  "shortfallOccurrenceCount": 0,
-                  "constraints": [],
+                  "realizedAmount": 0,
                   "relatedAccountIds": [],
-                  "accounts": [],
-                  "firstShortfall": null
-                },
-                "balanceTrajectory": []
+                  "requestedAmount": 0,
+                  "shortfallAmount": 0,
+                  "shortfallOccurrenceCount": 0
+                }
               }
-            ],
-            "milestones": {
-              "firstCoverageDate": null,
-              "firstSelfSustainingDate": null
-            }
+            ]
           },
           "probabilistic": {
             "fiCycleSuccessProbability": 0,
@@ -2497,38 +2452,39 @@
           "name": "Net worth 500",
           "status": "satisfied",
           "deterministic": {
-            "reached": true,
-            "firstReachedDate": "2026-02-01"
+            "firstReachedDate": "2026-02-01",
+            "reached": true
           },
           "probabilistic": {
-            "probability": 1,
-            "p10ReachedDate": "2026-02-01",
             "medianReachedDate": "2026-02-01",
-            "p90ReachedDate": "2026-02-01"
+            "p10ReachedDate": "2026-02-01",
+            "p90ReachedDate": "2026-02-01",
+            "probability": 1
           },
           "diagnostics": []
         }
       ],
+      "accountBalance": [],
       "postingFulfillment": [
         {
           "instanceId": "pf-all",
           "name": "Posting fulfillment",
           "status": "satisfied",
           "deterministic": {
-            "requestedAmount": 70650,
-            "realizedAmount": 70650,
-            "destinationLimitedAmount": 0,
-            "unfulfilledAmount": 0,
             "completionRate": 1,
-            "firstUnderfulfilledDate": null,
-            "events": [],
             "dates": [],
-            "postings": []
+            "destinationLimitedAmount": 0,
+            "events": [],
+            "firstUnderfulfilledDate": null,
+            "postings": [],
+            "realizedAmount": 69600,
+            "requestedAmount": 69600,
+            "unfulfilledAmount": 0
           },
           "probabilistic": {
-            "runCount": 20,
             "fulfilledRunCount": 20,
             "fullFulfillmentProbability": 1,
+            "runCount": 20,
             "unfulfilledAmountPercentiles": {
               "p10": 0,
               "p25": 0,
@@ -2539,7 +2495,70 @@
           },
           "diagnostics": []
         }
-      ]
+      ],
+      "cycleFulfillment": []
+    },
+    "milestones": {
+      "finalNetWorthPercentiles": {
+        "p10": 29800,
+        "p25": 29800,
+        "p50": 29800,
+        "p75": 29800,
+        "p90": 29800
+      }
     }
+  },
+  "settings": {
+    "evaluations": {
+      "financialIndependence": [
+        {
+          "config": {
+            "annualExpenseGrowthRate": 0.02,
+            "annualExpenseTarget": 12000,
+            "annualExpenseTargetBasis": "fi-date-dollars",
+            "continuingPostingIds": [
+              "growth"
+            ],
+            "evaluationYears": 2,
+            "minimumNetWorth": 0,
+            "principalPolicy": "preserve-real-principal",
+            "requiredConfidence": 0.9,
+            "sources": [
+              {
+                "accountId": "brokerage",
+                "included": true,
+                "type": "asset"
+              }
+            ],
+            "withdrawalRate": 0.04
+          },
+          "enabled": true,
+          "instanceId": "fi-golden",
+          "name": "FI golden"
+        }
+      ],
+      "netWorthThreshold": [
+        {
+          "config": {
+            "target": 500
+          },
+          "enabled": true,
+          "instanceId": "nw-500",
+          "name": "Net worth 500"
+        }
+      ],
+      "postingFulfillment": [
+        {
+          "config": {
+            "postingIds": null
+          },
+          "enabled": true,
+          "instanceId": "pf-all",
+          "name": "Posting fulfillment"
+        }
+      ]
+    },
+    "fallbackProjectionStartDate": "2026-02-01",
+    "horizonYears": 4
   }
 }

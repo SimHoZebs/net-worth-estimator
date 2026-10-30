@@ -18,10 +18,24 @@ export interface TransactionFormValues {
 	enabled: boolean;
 	claimRuleId: string | null;
 	claimOccurrenceDate: string | null;
+	transactionTime?: number | null;
 }
 
 export function midnightOfDay(day: string): number {
 	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
+}
+
+/** UTC wall time for the editor, with seconds when the stored instant has them. */
+export function timeOfDay(stamp: number | null | undefined): string {
+	if (typeof stamp !== "number" || stamp <= 0) return "";
+	const time = new Date(stamp * 1000).toISOString().slice(11, 19);
+	return time.endsWith(":00") ? time.slice(0, 5) : time;
+}
+
+export function combineDayTime(day: string, time: string): number {
+	return time
+		? Math.floor(new Date(`${day}T${time}Z`).getTime() / 1000)
+		: midnightOfDay(day);
 }
 
 /**
@@ -67,7 +81,7 @@ export function postingBody(values: TransactionFormValues): PostingBody {
 		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
 		destinations: values.toId ? [values.toId] : null,
 		postedTime: midnightOfDay(values.postedDate ?? values.startDate),
-		transactionTime: midnightOfDay(values.startDate),
+		transactionTime: values.transactionTime ?? midnightOfDay(values.startDate),
 		// Pending is server-owned bank metadata and is never authored here.
 		...(values.claimRuleId && values.claimOccurrenceDate
 			? {
@@ -124,6 +138,10 @@ export function postingUpdateBody({
 	const endpointsChanged = !sameEndpoints(values, baseline);
 	const amountChanged = values.amount !== baseline.amount;
 	const startChanged = values.startDate !== baseline.startDate;
+	const timeChanged =
+		values.transactionTime !== undefined &&
+		(values.transactionTime ?? midnightOfDay(values.startDate)) !==
+			(baseline.transactionTime ?? raw.transactionTime);
 	const postedChanged = (values.postedDate ?? null) !== baseline.postedDate;
 	const claimChanged =
 		(values.claimRuleId ?? null) !== baseline.claimRuleId ||
@@ -148,9 +166,10 @@ export function postingUpdateBody({
 		postedTime: postedChanged
 			? midnightOfDay(values.postedDate ?? values.startDate)
 			: raw.postedTime,
-		transactionTime: startChanged
-			? midnightOfDay(values.startDate)
-			: raw.transactionTime,
+		transactionTime:
+			startChanged || timeChanged
+				? (values.transactionTime ?? midnightOfDay(values.startDate))
+				: raw.transactionTime,
 		// The editor never models the wishlist link; the backend replaces the
 		// row, so an omitted purchase would wipe it.
 		...(raw.purchase ? { purchase: raw.purchase } : {}),
@@ -305,6 +324,7 @@ export function detailFormValues({
 		claimRuleId: string;
 		claimOccurrenceDate: string;
 		postedDate: string;
+		transactionTime?: string;
 	};
 	item: Transaction;
 	isOnce: boolean;
@@ -343,6 +363,13 @@ export function detailFormValues({
 		endDate:
 			!isOnce && !draft.noEndDate && draft.endDate ? draft.endDate : null,
 		postedDate: draft.postedDate || item.postedDate,
+		transactionTime:
+			isOnce && draft.transactionTime !== undefined
+				? draft.startDate === item.startDate &&
+					draft.transactionTime === timeOfDay(item.transactionTime)
+					? item.transactionTime
+					: combineDayTime(draft.startDate, draft.transactionTime)
+				: undefined,
 		enabled: draft.enabled,
 		claimRuleId: isOnce && draft.claimRuleId ? draft.claimRuleId : null,
 		claimOccurrenceDate:

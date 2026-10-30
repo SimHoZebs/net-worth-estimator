@@ -3,13 +3,15 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// syncCheckpointKey identifies an owner/sync checkpoint row for re-merge.
-func syncCheckpointKey(accountID, date string) string {
-	return accountID + "\x00" + date
+// syncCheckpointKey identifies an owner/sync checkpoint row for re-merge:
+// the account and exact observation instant.
+func syncCheckpointKey(accountID string, observedAt int64) string {
+	return accountID + "\x00" + strconv.FormatInt(observedAt, 10)
 }
 
 // nextTablePosition returns MAX(position)+1 for a position-ordered table, or
@@ -28,43 +30,44 @@ func nextTablePosition(tx *userTx, table string) (int, error) {
 
 // remergeCheckpoints writes owner checkpoints then re-merges sync-owned rows.
 // Incoming owner checkpoints win key collisions, so owners always keep an
-// override path. Returns the next free position.
+// override path. The key carries the exact instant: several observations
+// per account/day survive, and an owner row wins only at its own instant.
 func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []types.Checkpoint, startPosition int) (int, error) {
 	incomingKeys := make(map[string]struct{}, len(incoming))
 	for _, checkpoint := range incoming {
-		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)] = struct{}{}
+		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)] = struct{}{}
 	}
 	syncedByKey := make(map[string]types.Checkpoint, len(synced))
 	for _, checkpoint := range synced {
-		syncedByKey[syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)] = checkpoint
+		syncedByKey[syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)] = checkpoint
 	}
 	position := startPosition
 	untouchedSyncKeys := make(map[string]struct{})
 	for _, checkpoint := range incoming {
-		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)
+		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)
 		if synced, ok := syncedByKey[key]; ok && synced.Balance == checkpoint.Balance {
 			// Byte-identical round-trip of a sync row: leave it sync-owned.
 			untouchedSyncKeys[key] = struct{}{}
 			continue
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, model_account_id, balance, source, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceUser,
+			`INSERT INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
+			position, checkpoint.AccountID, checkpoint.Balance, SourceUser, checkpoint.ObservedAt,
 		); err != nil {
 			return 0, fmt.Errorf("insert checkpoint: %w", err)
 		}
 		position++
 	}
 	for _, checkpoint := range synced {
-		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.Date)
+		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)
 		if _, present := incomingKeys[key]; present {
 			if _, untouched := untouchedSyncKeys[key]; !untouched {
 				continue
 			}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, date, model_account_id, balance, source, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, syncedSource(checkpoint.Source),
+			`INSERT INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
+			position, checkpoint.AccountID, checkpoint.Balance, syncedSource(checkpoint.Source), checkpoint.ObservedAt,
 		); err != nil {
 			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
 		}
@@ -102,7 +105,7 @@ func loadSyncedCheckpoints(tx *userTx) ([]types.Checkpoint, error) {
 	// Any non-model source is sync-owned. Sources stay per-provider
 	// (simplefin, plaid, ...) so metrics and debugging can tell bank-data
 	// origins apart; the lifecycle treats them uniformly.
-	rows, err := tx.Query(`SELECT date, model_account_id, balance, source FROM checkpoints WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
+	rows, err := tx.Query(`SELECT model_account_id, balance, source, observed_at FROM checkpoints WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +113,7 @@ func loadSyncedCheckpoints(tx *userTx) ([]types.Checkpoint, error) {
 	var checkpoints []types.Checkpoint
 	for rows.Next() {
 		var checkpoint types.Checkpoint
-		if err := rows.Scan(&checkpoint.Date, &checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source); err != nil {
+		if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.ObservedAt); err != nil {
 			return nil, err
 		}
 		checkpoints = append(checkpoints, checkpoint)
@@ -225,7 +228,11 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 // directives in one transaction. Owner rows always win key conflicts. The
 // directives carry fully resolved lifecycle state; the store verifies
 // structural validity (keys present, non-user source, row existence) but
-// never interprets provider behavior.
+// never interprets provider behavior. Backdated observations are retained
+// as distinct instant-keyed rows: chronological replay orders them and the
+// latest instant still wins, so a late arrival never rolls current state
+// back. A same-instant sync row replaces idempotently; an owner row at the
+// same instant keeps precedence.
 func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	tx, err := s.db.Begin()
@@ -240,8 +247,8 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 	}
 	for _, checkpoint := range checkpoints {
 		result, err := tx.Exec(
-			`INSERT OR IGNORE INTO checkpoints (position, date, model_account_id, balance, source, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			nextPosition, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN,
+			`INSERT OR IGNORE INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
+			nextPosition, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN, checkpoint.ObservedAt,
 		)
 		if err != nil {
 			return summary, fmt.Errorf("sync insert checkpoint: %w", err)
@@ -258,8 +265,8 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 		var existingSource string
 		var existingBalance float64
 		if err := tx.QueryRow(
-			`SELECT source, balance FROM checkpoints WHERE model_account_id = ? AND date = ? AND user_id = :user_id`,
-			checkpoint.AccountID, checkpoint.Date,
+			`SELECT source, balance FROM checkpoints WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`,
+			checkpoint.AccountID, checkpoint.ObservedAt,
 		).Scan(&existingSource, &existingBalance); err != nil {
 			return summary, fmt.Errorf("sync read checkpoint conflict: %w", err)
 		}
@@ -268,8 +275,8 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 			continue
 		}
 		if _, err := tx.Exec(
-			`UPDATE checkpoints SET balance = ? WHERE model_account_id = ? AND date = ? AND user_id = :user_id`,
-			checkpoint.Balance, checkpoint.AccountID, checkpoint.Date,
+			`UPDATE checkpoints SET balance = ? WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`,
+			checkpoint.Balance, checkpoint.AccountID, checkpoint.ObservedAt,
 		); err != nil {
 			return summary, fmt.Errorf("sync update checkpoint: %w", err)
 		}

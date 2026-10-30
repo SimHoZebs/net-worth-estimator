@@ -205,10 +205,15 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		if err != nil || math.IsNaN(balanceValue) || math.IsInf(balanceValue, 0) {
 			return nil, fmt.Errorf("checkpoint balance %q must be a finite number", balanceRaw)
 		}
+		observedRaw := field(record, index, "ObservedAt")
+		observedAt, err := strconv.ParseInt(observedRaw, 10, 64)
+		if observedRaw == "" || err != nil || observedAt <= 0 {
+			return nil, fmt.Errorf("checkpoint observedAt %q must be the exact observation time as Unix seconds", observedRaw)
+		}
 		document.Checkpoints = append(document.Checkpoints, types.Checkpoint{
-			Date:      field(record, index, "Date"),
-			AccountID: field(record, index, "AccountId"),
-			Balance:   balanceValue,
+			AccountID:  field(record, index, "AccountId"),
+			Balance:    balanceValue,
+			ObservedAt: observedAt,
 		})
 	}
 

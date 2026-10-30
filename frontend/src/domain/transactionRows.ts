@@ -120,5 +120,10 @@ export function transactionToDisplay(
 		postedDate: once ? settledDayOf(extra.postedTime) : null,
 		pending: extra.pending === true,
 		void: extra.void === true,
+		syncOwned: row.syncOwned === true,
+		transactionTime:
+			typeof extra.transactionTime === "number" && extra.transactionTime > 0
+				? extra.transactionTime
+				: null,
 	};
 }

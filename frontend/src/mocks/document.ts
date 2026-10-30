@@ -52,7 +52,7 @@ export function fixtureDocument(
 			}),
 		),
 		checkpoints: data.accounts.map((account) => ({
-			Date: account.observedOn,
+			observedAt: account.observedAt ?? stamp(account.observedOn) + 86399,
 			AccountId: account.id,
 			Balance: account.balance,
 			source: account.readOnly ? "simplefin" : "user",

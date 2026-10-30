@@ -7,10 +7,10 @@ const cards = [
 	{ id: "b", name: "Card B" },
 ];
 const checkpoints: BackendCheckpoint[] = [
-	{ AccountId: "a", Date: "2026-10-21", Balance: -900 },
-	{ AccountId: "b", Date: "2026-10-19", Balance: -700 },
-	{ AccountId: "a", Date: "2026-10-02", Balance: -100 },
-	{ AccountId: "a", Date: "2026-10-19", Balance: -500 },
+	{ AccountId: "a", Balance: -900, observedAt: 1792627199 },
+	{ AccountId: "b", Balance: -700, observedAt: 1792454399 },
+	{ AccountId: "a", Balance: -100, observedAt: 1790985599 },
+	{ AccountId: "a", Balance: -500, observedAt: 1792454399 },
 ];
 
 describe("closedCardBalances", () => {
@@ -55,7 +55,7 @@ describe("closedCardBalances", () => {
 		const result = closedCardBalances({
 			cards,
 			checkpoints: [
-				{ AccountId: "a", Date: "2026-10-19", Balance: 25 },
+				{ AccountId: "a", Balance: 25, observedAt: 1792454399 },
 				checkpoints[1]!,
 			],
 			cycleEnd: "2026-10-19",
@@ -64,15 +64,18 @@ describe("closedCardBalances", () => {
 		expect(result.cards[0]!.amount).toBe(0);
 	});
 
-	it("keeps the existing first-row tie break for duplicate observation dates", () => {
+	it("lets the later row win duplicate observation instants", () => {
+		// Same-instant, same-authorship ties resolve to the later row,
+		// mirroring the backend replay's stable overwrite. Owner rows win
+		// over sync rows regardless of order (see checkpoints.test.ts).
 		const result = closedCardBalances({
 			cards: [cards[0]!],
 			checkpoints: [
 				...checkpoints,
-				{ AccountId: "a", Date: "2026-10-19", Balance: -999 },
+				{ AccountId: "a", Balance: -999, observedAt: 1792454399 },
 			],
 			cycleEnd: "2026-10-19",
 		});
-		expect(result.total).toBe(500);
+		expect(result.total).toBe(999);
 	});
 });

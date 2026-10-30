@@ -133,8 +133,11 @@ export function accountTransactions({
 			counterparty: direction === "in" ? from : to,
 		};
 	};
-	// Pending charges are bank evidence even after the latest checkpoint.
-	// They stay disabled for projections, so no projected event supplies them.
+	// Pending and void charges are bank evidence even after the latest
+	// checkpoint. They stay disabled for projections, so no projected event supplies them.
+	// Deliberate exclusion is owner-only, except that pending and void bank
+	// rows are lifecycle states, never exclusions: a settled bank row
+	// participates like a manual actual unless the owner disables it.
 	const recorded: AccountTransaction[] = transactions
 		.filter(
 			(transaction) =>
@@ -159,7 +162,10 @@ export function accountTransactions({
 			requested: transaction.amount,
 			shortfall: 0,
 			constraint: null,
-			excluded: !transaction.enabled,
+			excluded:
+				!transaction.enabled &&
+				(transaction.syncOwned !== true ||
+					(!isPendingTransaction(transaction) && transaction.void !== true)),
 			pending: isPendingTransaction(transaction),
 			void: transaction.void === true,
 		}));
@@ -277,7 +283,10 @@ export function ruleTransaction({
 		requested,
 		shortfall: Math.max(0, requested - amount),
 		constraint: null,
-		excluded: !transaction.enabled,
+		excluded:
+			!transaction.enabled &&
+			(transaction.syncOwned !== true ||
+				(!pending && transaction.void !== true)),
 		pending,
 		void: transaction.void === true,
 	};

@@ -299,9 +299,9 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	checkpoints := make([]store.SyncCheckpoint, 0, len(plan.Checkpoints))
 	for _, checkpoint := range plan.Checkpoints {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{
-			AccountID: checkpoint.AccountID,
-			Date:      checkpoint.Date,
-			Balance:   checkpoint.Balance,
+			AccountID:  checkpoint.AccountID,
+			Balance:    checkpoint.Balance,
+			ObservedAt: checkpoint.ObservedAt,
 		})
 	}
 	bank, err := r.store.LoadBankPostings()

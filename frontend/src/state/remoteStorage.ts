@@ -44,10 +44,10 @@ export function serverDocumentFingerprint(
 			}),
 		),
 		checkpoints: document.checkpoints.map(
-			({ Date: date, AccountId, Balance, source }) => ({
-				Date: date,
+			({ AccountId, Balance, source, observedAt }) => ({
 				AccountId,
 				Balance,
+				observedAt,
 				...(source === undefined ? {} : { source }),
 			}),
 		),

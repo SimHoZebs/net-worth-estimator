@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -119,15 +120,17 @@ func ValidateFinancialModel(document *types.FinancialModelDocument) []types.Mode
 				fmt.Sprintf("Checkpoint account '%s' does not exist.", checkpoint.AccountID),
 				pathWithField([]any{"checkpoints", index}, "AccountId")...)
 		}
-		if !IsValidIsoDate(checkpoint.Date) {
-			addIssue(&issues, types.SeverityError, "checkpoint.date.format",
-				fmt.Sprintf("Checkpoint date '%s' must be a YYYY-MM-DD calendar date.", checkpoint.Date),
-				pathWithField([]any{"checkpoints", index}, "date")...)
+		if checkpoint.ObservedAt <= 0 {
+			addIssue(&issues, types.SeverityError, "checkpoint.observedAt.required",
+				fmt.Sprintf("Checkpoint for '%s' needs its exact observation time (Unix seconds).", checkpoint.AccountID),
+				pathWithField([]any{"checkpoints", index}, "observedAt")...)
 		}
-		key := checkpoint.AccountID + "\x00" + checkpoint.Date
+		// Timestamp-only key: account plus exact instant. Multiple
+		// observations per day survive; only the same instant collides.
+		key := checkpoint.AccountID + "\x00" + strconv.FormatInt(checkpoint.ObservedAt, 10)
 		if checkpointKeys[key] {
 			addIssue(&issues, types.SeverityError, "checkpoint.account-date.duplicate",
-				fmt.Sprintf("Account '%s' has more than one checkpoint on %s.", checkpoint.AccountID, checkpoint.Date),
+				fmt.Sprintf("Account '%s' has more than one checkpoint at the same instant %d.", checkpoint.AccountID, checkpoint.ObservedAt),
 				[]any{"checkpoints", index}...)
 		}
 		checkpointKeys[key] = true

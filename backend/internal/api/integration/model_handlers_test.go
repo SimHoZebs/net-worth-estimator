@@ -291,7 +291,7 @@ func TestRowWriteRejectsInvalidRow(t *testing.T) {
 
 	// A checkpoint for an unknown account fails validation: nothing persists.
 	post := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/checkpoints", bytes.NewReader([]byte(`{"date":"2026-08-05","accountId":"ghost","balance":10}`)))
+	request := httptest.NewRequest(http.MethodPost, "/v1/checkpoints", bytes.NewReader([]byte(`{"accountId":"ghost","balance":10,"observedAt":1785974399}`)))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(post, request)
 	if post.Code != http.StatusOK {

@@ -391,3 +391,27 @@ test("account transactions and editor evidence are accessible on desktop and mob
 		await page.keyboard.press("Escape");
 	}
 });
+
+test("an intraday time saves through the detail over the real API", async ({
+	page,
+}) => {
+	const dialog = await openChecking(page);
+	await dialog
+		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
+		.click();
+	const detail = page.getByRole("dialog", { name: "Household payroll" });
+	await expect(detail).toBeVisible();
+	// Authoring an exact time keeps the date and records the instant.
+	await page.getByLabel("Occurred at time (UTC)").fill("11:00");
+	await page.getByRole("button", { name: "Save changes" }).click();
+	await expect(
+		dialog.getByRole("button", {
+			name: "View Household payroll on Jan 15, 2026",
+		}),
+	).toBeVisible();
+	// The instant survives a reload of the detail from the server.
+	await dialog
+		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
+		.click();
+	await expect(page.getByLabel("Occurred at time (UTC)")).toHaveValue("11:00");
+});

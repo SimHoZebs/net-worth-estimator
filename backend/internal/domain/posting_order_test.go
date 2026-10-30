@@ -13,7 +13,7 @@ func TestEqualTimePostingExecutionDoesNotDependOnIdentity(t *testing.T) {
 	amount := types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}
 	document := &types.FinancialModelDocument{
 		Accounts:    []types.Account{{ID: account, Name: "Checking", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
-		Checkpoints: []types.Checkpoint{{AccountID: account, Date: "2026-01-01", Balance: 0}, {AccountID: account, Date: "2026-01-02", Balance: 10}},
+		Checkpoints: []types.Checkpoint{{AccountID: account, Balance: 0, ObservedAt: 1767311999}, {AccountID: account, ObservedAt: 1767398399, Balance: 10}},
 		Postings: []types.Posting{
 			{ID: "z-inflow", Name: "Inflow", Destinations: []string{account}, Amount: amount, PostedTime: midnightUnix("2026-01-02"), TransactionTime: midnightUnix("2026-01-02"), ExecutionOrder: 2, Enabled: true},
 			{ID: "a-outflow", Name: "Outflow", SourceAccountID: &account, Amount: amount, PostedTime: midnightUnix("2026-01-02"), TransactionTime: midnightUnix("2026-01-02"), ExecutionOrder: 1, Enabled: true},
@@ -34,7 +34,10 @@ func TestEqualTimePostingExecutionDoesNotDependOnIdentity(t *testing.T) {
 		t.Fatal("identity replacement changed checkpoint corrections")
 	}
 	correction := after[len(after)-1].CheckpointCorrections[0]
-	if correction.ModeledBalance != 10 || correction.Adjustment != 0 {
+	// Historical actuals execute at their recorded amounts without
+	// hypothetical funding clamps (forecasts retain clamps): the outflow
+	// moves 10 even from an empty account, then the inflow returns it.
+	if correction.ModeledBalance != 0 || correction.Adjustment != 10 {
 		t.Fatalf("equal-time execution order changed: %+v", correction)
 	}
 	// Projection execution shares history's ordering, even if display position differs.

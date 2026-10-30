@@ -57,13 +57,21 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	}
 	sort.Slice(dates, func(i, j int) bool { return CompareIsoDates(dates[i], dates[j]) < 0 })
 
+	// The history cut splits one timestamp stream: occurrences at or
+	// before it already replayed and must not simulate again. Purchases
+	// are future-planned inputs the replay never executes, so they are
+	// exempt from the filter.
+	cut := request.HistoryCutInstant
 	for _, date := range dates {
 		occurrences := eventDates[date]
 		sorted := make([]DatedPostingOccurrence, len(occurrences))
 		copy(sorted, occurrences)
 		sortOccurrences(sorted)
 		for _, occurrence := range sorted {
-			transition, err := transitions.ExecutePosting(occurrence, date)
+			if cut > 0 && occurrence.Posting.Purchase == nil && EffectiveOccurrenceInstant(occurrence, date) <= cut {
+				continue
+			}
+			transition, err := transitions.ExecutePosting(occurrence, date, false)
 			if err != nil {
 				return types.SimulationRun{}, err
 			}

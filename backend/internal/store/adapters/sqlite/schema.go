@@ -110,12 +110,12 @@ func schemaStatements() []string {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id INTEGER NOT NULL,
 			position INTEGER NOT NULL,
-			date TEXT NOT NULL,
 			model_account_id TEXT NOT NULL,
 			balance REAL NOT NULL,
 			source TEXT NOT NULL DEFAULT 'user',
+			observed_at INTEGER NOT NULL,
 			PRIMARY KEY(user_id, id),
-			UNIQUE(user_id, model_account_id, date),
+			UNIQUE(user_id, model_account_id, observed_at),
 			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
 		`CREATE TABLE IF NOT EXISTS postings (
@@ -440,7 +440,7 @@ var requiredSchemaColumns = map[string]string{
 	"group_members":            "group_id, user_id, role, joined_at, display_name",
 	"group_invites":            "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
 	"accounts":                 "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
-	"checkpoints":              "user_id, id, position, date, model_account_id, balance, source",
+	"checkpoints":              "user_id, id, position, model_account_id, balance, source, observed_at",
 	"postings":                 "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids",
 	"posting_sync_keys":        "user_id, provider, bridge_account_id, transaction_id, posting_id",
 	"posting_id_migrations":    "user_id, old_id, new_id",

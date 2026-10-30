@@ -68,7 +68,7 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	request,
 }) => {
 	const checkpoint = await request.post(`${FIXTURE_API}/v1/checkpoints`, {
-		data: { AccountId: "loan", Date: "2026-01-19", Balance: -4321 },
+		data: { AccountId: "loan", Balance: -4321, observedAt: 1768867199 },
 	});
 	expect(checkpoint.ok()).toBe(true);
 	const errors: string[] = [];
@@ -162,7 +162,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	request,
 }) => {
 	const observations = await request.post(`${FIXTURE_API}/v1/checkpoints`, {
-		data: { AccountId: "loan", Date: "2026-01-19", Balance: -4321 },
+		data: { AccountId: "loan", Balance: -4321, observedAt: 1768867199 },
 	});
 	expect(observations.ok()).toBe(true);
 	for (const [id, name, day, amount] of [
@@ -257,7 +257,7 @@ test("Configure only selects sources and settings, and ignores legacy overrides"
 	request,
 }) => {
 	const response = await request.post(`${FIXTURE_API}/v1/checkpoints`, {
-		data: { AccountId: "loan", Date: "2026-01-19", Balance: -4321 },
+		data: { AccountId: "loan", Balance: -4321, observedAt: 1768867199 },
 	});
 	expect(response.ok()).toBe(true);
 	await seedResourceStorage(

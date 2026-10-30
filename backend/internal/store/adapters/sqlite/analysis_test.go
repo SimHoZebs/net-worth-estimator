@@ -3,6 +3,7 @@ package sqlite
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -55,7 +56,7 @@ func TestAnalysisEvidenceIsIndependentAndDeduplicated(t *testing.T) {
 	if _, _, claimed, err := s.ClaimAnalysis("bnpl", "v1"); err != nil || claimed {
 		t.Fatalf("identical observation scheduled analysis: %v %v", claimed, err)
 	}
-	if _, err := s.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Date: "2026-08-02", Balance: 100}); err != nil {
+	if _, err := s.SaveCheckpoint(types.Checkpoint{AccountID: "checking", ObservedAt: time.Date(2026, time.August, 2, 23, 59, 59, 0, time.UTC).Unix(), Balance: 100}); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, claimed, err := s.ClaimAnalysis("bnpl", "v1"); err != nil || claimed {

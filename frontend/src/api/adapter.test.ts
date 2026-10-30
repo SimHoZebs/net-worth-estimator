@@ -58,6 +58,21 @@ function purchaseRow(
 }
 
 describe("balance rows to display accounts", () => {
+	it("keeps the observation separate from the adjusted server balance", () => {
+		expect(
+			balanceRowToDisplay(
+				balanceRow({
+					balance: 900,
+					observedBalance: 1000,
+					observedAt: 1773133200,
+				}),
+			),
+		).toMatchObject({
+			balance: 900,
+			observedBalance: 1000,
+			observedAt: 1773133200,
+		});
+	});
 	it("maps checkpoint presence to balance verification and source labels", () => {
 		expect(balanceRowToDisplay(balanceRow())).toMatchObject({
 			id: "cash",

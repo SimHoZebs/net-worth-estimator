@@ -65,9 +65,9 @@ type SyncCredential struct {
 func (c SyncCredential) Configured() bool { return c.AccessURL != "" }
 
 type SyncCheckpoint struct {
-	AccountID string
-	Date      string
-	Balance   float64
+	AccountID  string
+	Balance    float64
+	ObservedAt int64
 }
 
 // SyncApplySummary counts applied sync rows.

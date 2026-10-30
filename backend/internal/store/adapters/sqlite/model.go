@@ -283,7 +283,7 @@ func savePaymentTerms(tx *userTx, terms []types.PaymentTerms) error {
 
 func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 	var checkpoint types.Checkpoint
-	if err := rows.Scan(&checkpoint.Date, &checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source); err != nil {
+	if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.ObservedAt); err != nil {
 		return types.Checkpoint{}, err
 	}
 	return checkpoint, nil
@@ -475,7 +475,7 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 		return nil, fmt.Errorf("close accounts: %w", err)
 	}
 
-	checkpointRows, err := q.Query(`SELECT date, model_account_id, balance, source FROM checkpoints WHERE user_id = :user_id ORDER BY position`)
+	checkpointRows, err := q.Query(`SELECT model_account_id, balance, source, observed_at FROM checkpoints WHERE user_id = :user_id ORDER BY position`)
 	if err != nil {
 		return nil, err
 	}

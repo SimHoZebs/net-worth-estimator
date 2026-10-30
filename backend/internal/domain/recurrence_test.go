@@ -19,7 +19,7 @@ func claimTestDocument() *types.FinancialModelDocument {
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
 		Checkpoints: []types.Checkpoint{
-			{Date: "2025-12-01", AccountID: checking, Balance: 10000},
+			{AccountID: checking, Balance: 10000, ObservedAt: 1764633599},
 		},
 		Postings: []types.Posting{
 			{
@@ -88,8 +88,10 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 		t.Fatalf("checking after actual = %v, want 8050 (one hit, not two)", got)
 	}
 	buckets := path.ProjectionStartPostingState.RealizedPostingAmountsByYear
-	if buckets["rent"]["2026"] != 1000 {
-		t.Fatalf("rent bucket = %v, want 1000 (January only)", buckets["rent"]["2026"])
+	// Timestamp-only replay includes the start-day rule through the cut, so
+	// January plus March anchor in history; February stays claimed.
+	if buckets["rent"]["2026"] != 2000 {
+		t.Fatalf("rent bucket = %v, want 2000 (January plus March)", buckets["rent"]["2026"])
 	}
 	if buckets["rent-feb-actual"]["2026"] != 950 {
 		t.Fatalf("actual bucket = %v, want 950", buckets["rent-feb-actual"]["2026"])
@@ -114,17 +116,15 @@ func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
-	found := false
+	// Timestamp-only history includes the start-day rule through the cut, so
+	// March anchors in history rather than simulating as future.
+	if got := historicalBalance(t, path, "2026-03-01", "checking"); got != 7050 {
+		t.Fatalf("March history = %v, want 7050 (Jan plus Feb actual plus March)", got)
+	}
 	for _, event := range path.TransactionEvents {
 		if event.Origin.PostingID == "rent" && event.Date == "2026-03-01" {
-			found = true
-			if event.RealizedAmount != 1000 {
-				t.Fatalf("March rent = %v, want 1000", event.RealizedAmount)
-			}
+			t.Fatalf("March rent must not simulate twice (already in history)")
 		}
-	}
-	if !found {
-		t.Fatalf("March rent occurrence missing from projection")
 	}
 }
 

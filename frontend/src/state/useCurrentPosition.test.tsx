@@ -23,7 +23,9 @@ function model(balance = 100): FinancialModelDocument {
 		accounts: [],
 		postings: [],
 		recurrenceRules: [],
-		checkpoints: [{ AccountId: "cash", Date: "2026-01-01", Balance: balance }],
+		checkpoints: [
+			{ AccountId: "cash", Balance: balance, observedAt: 1767311999 },
+		],
 		evaluations: {
 			financialIndependence: [],
 			netWorthThreshold: [],

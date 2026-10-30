@@ -131,8 +131,8 @@ func writeBankValues(tx *userTx, id string, posting types.Posting) error {
 	if err != nil {
 		return err
 	}
-	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
-		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(posting.Pending), boolToInt(posting.Void), id, SourceUser)
+	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, enabled = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
+		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(posting.Enabled), boolToInt(posting.Pending), boolToInt(posting.Void), id, SourceUser)
 	if err != nil {
 		return err
 	}
@@ -228,7 +228,8 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			}
 			posting := upsert.Posting
 			if postingID == "" {
-				posting.Enabled = false
+				// The adapter carries the resolved participation state
+				// (settled on, pending off); the store never overrides it.
 				posting.ExecutionOrder = 0
 				posting.ID, err = newRowID()
 				if err != nil {

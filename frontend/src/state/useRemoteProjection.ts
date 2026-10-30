@@ -200,9 +200,12 @@ export function projectionResultToLocal(
 			];
 	const projectionStartDate = result.milestones.projectionStartDate;
 	const startCheckpoint =
-		document?.checkpoints.some(
-			(checkpoint) => checkpoint.Date === projectionStartDate,
-		) ?? false;
+		document?.checkpoints.some((checkpoint) => {
+			const day = new Date(checkpoint.observedAt * 1000)
+				.toISOString()
+				.slice(0, 10);
+			return day === projectionStartDate;
+		}) ?? false;
 	const transactions = projectionTransactions(result, document);
 	const balances = new Map(
 		result.accountSummaries.map((summary) => [summary.accountId, summary]),
@@ -286,7 +289,8 @@ export function projectionResultToLocal(
 		currentNetWorth: result.summary.currentNetWorth,
 		transactions,
 		firstFailure:
-			transactions.find((transaction) => transaction.constraint !== null) ?? null,
+			transactions.find((transaction) => transaction.constraint !== null) ??
+			null,
 		evaluations,
 		otherEvaluations,
 		inflows: result.totals.externalInflowAmount,

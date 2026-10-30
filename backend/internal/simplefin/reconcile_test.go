@@ -18,7 +18,7 @@ func reconcilePosting(name, account, amount string, pending bool, txTime int64) 
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      txTime,
 			TransactionTime: txTime,
-			Enabled:         false,
+			Enabled:         !pending,
 			Pending:         pending,
 		},
 	}
@@ -35,7 +35,7 @@ func reconcileBankRow(id, name, account, amount string, pending, void bool, keys
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785628800,
 			TransactionTime: 1785628800,
-			Enabled:         false,
+			Enabled:         !pending && !void,
 			Pending:         pending,
 			Void:            void,
 		},

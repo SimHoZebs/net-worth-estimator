@@ -29,7 +29,7 @@ func TestCreateAccountWithBalanceWritesCheckpoint(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	response := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
-		`{"name":"Checking","kind":"cash","enabled":true,"balance":2500,"observedOn":"2026-03-01"}`)
+		`{"name":"Checking","kind":"cash","enabled":true,"balance":2500,"observedAt":1772409599}`)
 	created := decodeRowResult[types.Account](t, response.Code, response.Body.Bytes())
 	if !created.Persisted || created.Row.ID == "" {
 		t.Fatalf("create = %+v", created)
@@ -45,7 +45,7 @@ func TestCreateAccountWithBalanceWritesCheckpoint(t *testing.T) {
 		t.Fatalf("checkpoints = %+v, want the opening observation", document.Checkpoints)
 	}
 	got := document.Checkpoints[0]
-	if got.AccountID != created.Row.ID || string(got.Date) != "2026-03-01" || got.Balance != 2500 || got.Source != store.SourceUser {
+	if got.AccountID != created.Row.ID || got.ObservedAt != 1772409599 || got.Balance != 2500 || got.Source != store.SourceUser {
 		t.Fatalf("checkpoint = %+v", got)
 	}
 	assertSavedPlanIdentity(t, database, created.Revision)
@@ -62,7 +62,7 @@ func TestAccountBalanceValidation(t *testing.T) {
 	}
 	// Observed date without a balance is rejected too.
 	rejected = doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/checking",
-		`{"name":"Checking","kind":"cash","enabled":true,"observedOn":"2026-03-01"}`)
+		`{"name":"Checking","kind":"cash","enabled":true,"observedAt":1772409599}`)
 	if rejected.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422, body %s", rejected.Code, rejected.Body.String())
 	}
@@ -79,12 +79,12 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	created := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
-		`{"id":"checking","name":"Checking","kind":"cash","enabled":true,"balance":100,"observedOn":"2026-01-01"}`)
+		`{"id":"checking","name":"Checking","kind":"cash","enabled":true,"balance":100,"observedAt":1767311999}`)
 	if created.Code != http.StatusOK {
 		t.Fatalf("create status = %d, body %s", created.Code, created.Body.String())
 	}
 	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/checking",
-		`{"name":"Checking","kind":"cash","enabled":true,"balance":200,"observedOn":"2026-02-01"}`)
+		`{"name":"Checking","kind":"cash","enabled":true,"balance":200,"observedAt":1769990399}`)
 	if updated.Code != http.StatusOK {
 		t.Fatalf("update status = %d, body %s", updated.Code, updated.Body.String())
 	}
@@ -110,7 +110,7 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 	}
 	// Updating a missing account writes nothing, including no checkpoint.
 	missing := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/ghost",
-		`{"name":"Ghost","kind":"cash","enabled":true,"balance":1,"observedOn":"2026-03-01"}`)
+		`{"name":"Ghost","kind":"cash","enabled":true,"balance":1,"observedAt":1772409599}`)
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404, body %s", missing.Code, missing.Body.String())
 	}

@@ -21,7 +21,7 @@ func bankSeedPosting(name, account, amount string, pending bool) types.Posting {
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785628800,
 		TransactionTime: 1785628800,
-		Enabled:         false,
+		Enabled:         !pending,
 		Pending:         pending,
 	}
 }
@@ -107,7 +107,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 		t.Fatal("convert changed row count")
 	}
 	row := after.Postings[0]
-	if row.ID != id || row.Name != "Settled" || row.Pending || row.Source != SourceSimpleFIN {
+	if row.ID != id || row.Name != "Settled" || row.Pending || row.Source != SourceSimpleFIN || !row.Enabled {
 		t.Fatalf("converted row = %+v", row)
 	}
 	rows, err := database.LoadBankPostings()

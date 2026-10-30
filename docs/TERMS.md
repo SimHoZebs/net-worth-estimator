@@ -17,12 +17,21 @@ Use **transaction**, qualified as **planned** or **recorded**. The saved model's
 
 ## B. Balance check
 
-A recorded end-of-day account balance that corrects modeled history for that account.
+A recorded account balance that corrects modeled history for that account.
+A check carries its exact observation time. Several checks per account per
+day survive; the replay orders them by instant, executes same-time
+postings first on a tie, and lets an owner check win only at its own
+instant.
 
 Use **balance check**. Its date column is **balance**; its tab is "Balance checks".
 
 - Retired from copy: checkpoint, balance checkpoint, observed balance.
 - Retired from prose: balance checkpoints, reconciliation.
+- Only an owner-disabled row shows **Excluded from account**. A
+  pending or void bank row is recorded bank evidence, never an exclusion;
+  settled bank rows participate like manual actuals once imported.
+- A bank hold that vanished without posting shows **Did not post**; a live
+  hold shows **Pending**.
 
 ## C. Projection, base case and range
 

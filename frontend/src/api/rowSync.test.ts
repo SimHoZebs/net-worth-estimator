@@ -34,9 +34,9 @@ const checkpoint = (
 	date: string,
 	balance: number,
 ): BackendCheckpoint => ({
-	Date: date,
 	AccountId: accountId,
 	Balance: balance,
+	observedAt: Math.floor(Date.parse(`${date}T00:00:00Z`) / 1000) + 86399,
 });
 
 const plannedPurchase = (
@@ -141,7 +141,7 @@ describe("diffFinancialModelDocuments", () => {
 			kind: "checkpoint",
 			action: "delete",
 			accountId: "a",
-			date: "2026-08-02",
+			observedAt: 1785715199,
 		});
 	});
 
