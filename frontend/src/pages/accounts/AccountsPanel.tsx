@@ -65,6 +65,13 @@ export function AccountsPanel({
 					</TableHeader>
 					<TableCell className="tabular-nums max-sm:p-4">
 						{money(account.balance)}
+						{account.observedBalance !== null &&
+							account.observedBalance !== undefined &&
+							account.observedBalance !== account.balance && (
+								<small className="block text-xs text-muted">
+									Observed {money(account.observedBalance)}
+								</small>
+							)}
 					</TableCell>
 					<TableCell className="max-sm:p-4">
 						{money(account.minBalance)}

@@ -10,7 +10,7 @@ import {
 const document = {
 	sourcePath: "models/household",
 	accounts: [{ id: "cash", name: "Cash", enabled: true }],
-	checkpoints: [{ Date: "2026-01-01", AccountId: "cash", Balance: 100 }],
+	checkpoints: [{ AccountId: "cash", Balance: 100, observedAt: 1769903999 }],
 	postings: [{ id: "pay", name: "Pay", enabled: true }],
 	recurrenceRules: [{ id: "salary", name: "Salary", enabled: true }],
 	evaluations: {
@@ -45,7 +45,9 @@ describe("server model import parsing", () => {
 		{ ...document, accounts: [{ id: "cash", name: "Cash" }] },
 		{
 			...document,
-			checkpoints: [{ Date: "2026-01-01", AccountId: "cash", Balance: "100" }],
+			checkpoints: [
+				{ AccountId: "cash", Balance: "100", observedAt: 1769903999 },
+			],
 		},
 		{ ...document, postings: [{ id: "pay", name: 1, enabled: true }] },
 		{
@@ -74,7 +76,9 @@ describe("server model import parsing", () => {
 	it("leaves references and evaluation row validation to the server", () => {
 		const input = {
 			...document,
-			checkpoints: [{ Date: "2026-01-01", AccountId: "missing", Balance: 100 }],
+			checkpoints: [
+				{ AccountId: "missing", Balance: 100, observedAt: 1769903999 },
+			],
 			evaluations: {
 				...document.evaluations,
 				netWorthThreshold: [{ id: "review-on-server" }],

@@ -32,7 +32,9 @@ export function closedCardBalances({
 		return {
 			...card,
 			amount: checkpoint ? Math.max(0, -checkpoint.Balance) : null,
-			observedOn: checkpoint?.Date ?? null,
+			observedOn: checkpoint
+				? new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10)
+				: null,
 		};
 	});
 	return {

@@ -180,7 +180,7 @@ func executeTermsOccurrence(t *testing.T, model types.FinancialModel, balances m
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
-	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", date), date)
+	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", date), date, false)
 	if err != nil {
 		t.Fatalf("execute posting: %v", err)
 	}
@@ -245,14 +245,14 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 	}
 	// Checking holds 50 above a zero floor against a 100 minimum: the payment
 	// realizes 50.
-	payment, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", "2026-09-10"), "2026-09-10")
+	payment, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", "2026-09-10"), "2026-09-10", false)
 	if err != nil {
 		t.Fatalf("execute payment: %v", err)
 	}
 	if payment.Result.RealizedAmount != 50 {
 		t.Fatalf("realized = %v, want 50", payment.Result.RealizedAmount)
 	}
-	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "fee-prime", "2026-09-11"), "2026-09-11")
+	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "fee-prime", "2026-09-11"), "2026-09-11", false)
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create runtime: %v", err)
 	}
-	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "checking-fee", "2026-09-01"), "2026-09-01")
+	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "checking-fee", "2026-09-01"), "2026-09-01", false)
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
 	}

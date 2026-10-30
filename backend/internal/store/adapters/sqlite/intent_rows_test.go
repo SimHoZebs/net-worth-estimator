@@ -14,7 +14,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	balance := 2500.0
 	created, err := store.CreateAccountWithBalance(
 		types.Account{ID: "checking", Name: "Checking", Enabled: true},
-		&balance, "2026-03-01",
+		&balance, 1772409599,
 	)
 	if err != nil {
 		t.Fatalf("create with balance: %v", err)
@@ -27,14 +27,14 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 		t.Fatalf("stored accounts/checkpoints = %+v", loaded)
 	}
 	got := loaded.Checkpoints[0]
-	if got.AccountID != "checking" || string(got.Date) != "2026-03-01" || got.Balance != 2500 || got.Source != SourceUser {
+	if got.AccountID != "checking" || got.ObservedAt != 1772409599 || got.Balance != 2500 || got.Source != SourceUser {
 		t.Fatalf("checkpoint = %+v", got)
 	}
 
 	moved := 3200.0
 	if _, err := store.UpdateAccountWithBalance(
 		types.Account{ID: "checking", Name: "Renamed", Enabled: true},
-		&moved, "2026-04-01",
+		&moved, 1775001599,
 	); err != nil {
 		t.Fatalf("update with balance: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	// Nil balance leaves balance history untouched.
 	if _, err := store.UpdateAccountWithBalance(
 		types.Account{ID: "checking", Name: "Renamed again", Enabled: true},
-		nil, "",
+		nil, 0,
 	); err != nil {
 		t.Fatalf("update without balance: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	// A missing account writes nothing, including no checkpoint.
 	ghost := 1.0
 	if _, err := store.UpdateAccountWithBalance(
-		types.Account{ID: "ghost", Name: "Ghost"}, &ghost, "2026-05-01",
+		types.Account{ID: "ghost", Name: "Ghost"}, &ghost, 1775001599,
 	); !IsNotFound(err) {
 		t.Fatalf("update missing err = %v, want not-found", err)
 	}

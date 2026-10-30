@@ -28,7 +28,7 @@ func TestCurrentPositionHTTP(t *testing.T) {
 	if _, err := database.CreateAccount(account); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: account.ID, Date: fixture.Settings.FallbackProjectionStartDate, Balance: 100}); err != nil {
+	if _, err := database.SaveCheckpoint(types.Checkpoint{AccountID: account.ID, Balance: 100, ObservedAt: 1769990399}); err != nil {
 		t.Fatal(err)
 	}
 	for _, supplied := range []bool{true, false} {

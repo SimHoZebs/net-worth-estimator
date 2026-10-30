@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -14,8 +15,11 @@ type checkpointOutput struct {
 	Body rowResultBody[types.Checkpoint] `json:"body"`
 }
 
+// checkpointKey identifies one observation: the account and exact instant.
+// Several observations per day survive; an owner row wins only at its own
+// instant.
 func checkpointKey(checkpoint types.Checkpoint) string {
-	return checkpoint.AccountID + "\x00" + string(checkpoint.Date)
+	return checkpoint.AccountID + "\x00" + strconv.FormatInt(checkpoint.ObservedAt, 10)
 }
 
 func (s *handler) saveCheckpoint(_ context.Context, input *checkpointInput) (*checkpointOutput, error) {
@@ -32,20 +36,25 @@ func (s *handler) saveCheckpoint(_ context.Context, input *checkpointInput) (*ch
 }
 
 func (s *handler) deleteCheckpoint(_ context.Context, input *struct {
-	AccountID string `query:"accountId"`
-	Date      string `query:"date"`
+	AccountID  string `query:"accountId"`
+	ObservedAt int64  `query:"observedAt"`
 }) (*reorderOutput, error) {
-	accountID, date := input.AccountID, input.Date
+	accountID := input.AccountID
+	observedAt := input.ObservedAt
 	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		kept := document.Checkpoints[:0]
 		for _, checkpoint := range document.Checkpoints {
-			if checkpoint.AccountID != accountID || string(checkpoint.Date) != date {
+			if checkpoint.AccountID != accountID || checkpoint.ObservedAt != observedAt {
 				kept = append(kept, checkpoint)
 			}
 		}
-		document.Checkpoints = kept
+		if len(kept) == 0 {
+			document.Checkpoints = []types.Checkpoint{}
+		} else {
+			document.Checkpoints = kept
+		}
 	}, func() (struct{}, error) {
-		return struct{}{}, s.store.DeleteCheckpoint(accountID, date)
+		return struct{}{}, s.store.DeleteCheckpointAt(accountID, observedAt)
 	})
 	if err != nil {
 		return nil, err

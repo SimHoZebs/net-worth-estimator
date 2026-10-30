@@ -95,13 +95,17 @@ func (a *Account) MaxBalanceValue() float64 {
 }
 
 type Checkpoint struct {
-	Date      IsoDate `json:"Date"`
 	AccountID string  `json:"AccountId"`
 	Balance   float64 `json:"Balance"`
 	// Source names the row author: "user" for owner-authored rows,
 	// "simplefin" for bank-reported rows. Authorship never changes after
 	// creation.
 	Source string `json:"source,omitempty"`
+	// ObservedAt is the required exact Unix instant the balance became that
+	// amount. It is the sole temporal key: there is no canonical Date, no
+	// zero sentinel, and no precision mode. Display days group by this
+	// instant only at presentation boundaries.
+	ObservedAt int64 `json:"observedAt"`
 }
 
 type CheckpointCorrection struct {

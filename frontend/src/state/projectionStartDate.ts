@@ -2,7 +2,9 @@ import type { FinancialModelDocument } from "../api/contracts.ts";
 import { todayIso } from "../domain/format.ts";
 
 export function projectionStartDate(document: FinancialModelDocument): string {
-	const dates = document.checkpoints.map((checkpoint) => checkpoint.Date);
+	const dates = document.checkpoints.map((checkpoint) =>
+		new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
+	);
 	const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
 	const posting = document.postings.find((item) => !item.purchase);
 	return (

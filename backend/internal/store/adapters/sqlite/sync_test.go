@@ -5,6 +5,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 	execSyncSetup(t, store, []string{
 		`INSERT INTO accounts (id, position, name, enabled, user_id) VALUES ('prime_card', 1, 'Prime', 1, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('prime_card', 'account', :user_id)`,
-		`INSERT INTO checkpoints (id, position, date, model_account_id, balance, source, user_id) VALUES (10, 10, '2026-08-01', 'checking', 111, 'simplefin', :user_id)`,
+		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, observed_at, user_id) VALUES (10, 10, 'checking', 111, 'simplefin', 1785628799, :user_id)`,
 		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id)
 		 VALUES ('` + rawSyncedPostingID + `', 10, 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'simplefin', 1, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + rawSyncedPostingID + `', 'posting', :user_id)`,
@@ -85,7 +86,7 @@ func ownerDocument() *types.FinancialModelDocument {
 			ID: "checking", Name: "Checking", Enabled: true,
 		}},
 		Checkpoints: []types.Checkpoint{
-			{Date: "2026-07-01", AccountID: "checking", Balance: 500},
+			{AccountID: "checking", Balance: 500, ObservedAt: 1782950399},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings: []types.Posting{{
@@ -105,7 +106,7 @@ func seedSyncState(t *testing.T, store store.Store) {
 	}
 	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
 	summary, err := store.ApplySyncPlan(
-		[]SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
+		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, ObservedAt: 1785628799}},
 		[]BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
@@ -150,7 +151,7 @@ func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 	if len(loaded.Accounts) != 2 {
 		t.Fatal("failed deletion changed accounts")
 	}
-	if _, ok := findCheckpoint(loaded, "checking", "2026-08-01"); !ok {
+	if _, ok := findCheckpoint(loaded, "checking", 1785628799); !ok {
 		t.Fatalf("sync checkpoint was garbage-collected: %+v", loaded.Checkpoints)
 	}
 	if len(syncedPendingIDs(loaded)) != 1 {
@@ -190,7 +191,7 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	seedOwnerDocument(t, store)
 	seedSyncRows(t, store)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO checkpoints (id, position, date, model_account_id, balance, source, user_id) VALUES (11, 11, '2026-08-02', 'checking', 222, 'plaid', :user_id)`,
+		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, observed_at, user_id) VALUES (11, 11, 'checking', 222, 'plaid', 1785715199, :user_id)`,
 		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id)
 		 VALUES ('` + otherSyncedPostingID + `', 11, 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 0, 'plaid', 1, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + otherSyncedPostingID + `', 'posting', :user_id)`,
@@ -212,15 +213,15 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 	}
 	sources := map[string]string{}
 	for _, checkpoint := range loaded.Checkpoints {
-		sources["checkpoint:"+checkpoint.AccountID+":"+checkpoint.Date] = checkpoint.Source
+		sources["checkpoint:"+checkpoint.AccountID+":"+strconv.FormatInt(checkpoint.ObservedAt, 10)] = checkpoint.Source
 	}
 	for _, posting := range loaded.Postings {
 		sources["posting:"+posting.ID] = posting.Source
 	}
 	for key, want := range map[string]string{
-		"checkpoint:checking:2026-08-01":  "simplefin",
-		"checkpoint:checking:2026-08-02":  "plaid",
-		"checkpoint:checking:2026-07-01":  "user",
+		"checkpoint:checking:1785628799":  "simplefin",
+		"checkpoint:checking:1785715199":  "plaid",
+		"checkpoint:checking:1782950399":  "user",
 		"posting:" + rawSyncedPostingID:   "simplefin",
 		"posting:" + otherSyncedPostingID: "plaid",
 		"posting:" + ownerPostingID:       "user",
@@ -264,12 +265,12 @@ func countRows(t *testing.T, store *sqliteStore, table, where string) int {
 
 // findCheckpoint locates one checkpoint in a loaded document for
 // interface-level assertions (replacing raw SQL row checks).
-func findCheckpoint(document *types.FinancialModelDocument, accountID string, date types.IsoDate) (types.Checkpoint, bool) {
+func findCheckpoint(document *types.FinancialModelDocument, accountID string, observedAt int64) (types.Checkpoint, bool) {
 	if document == nil {
 		return types.Checkpoint{}, false
 	}
 	for _, checkpoint := range document.Checkpoints {
-		if checkpoint.AccountID == accountID && checkpoint.Date == date {
+		if checkpoint.AccountID == accountID && checkpoint.ObservedAt == observedAt {
 			return checkpoint, true
 		}
 	}
@@ -348,8 +349,8 @@ func TestApplySyncPlanConvertsNamedRowKeepingUUID(t *testing.T) {
 		t.Fatal("convert changed row count")
 	}
 	row := converted.Postings[0]
-	if row.ID != id || row.Source != SourceSimpleFIN || row.Pending || row.Void || row.Enabled {
-		t.Fatalf("converted row = %+v", row)
+	if row.ID != id || row.Source != SourceSimpleFIN || row.Pending || row.Void || !row.Enabled {
+		t.Fatalf("converted row = %+v, want enabled settled participant", row)
 	}
 	rows, err := store.LoadBankPostings()
 	if err != nil || len(rows) != 1 || len(rows[0].Keys) != 1 || rows[0].Keys[0].TransactionID != "posted-a" {
@@ -412,6 +413,7 @@ func syncSettledPosting(id, accountID, name, day string) SyncPosting {
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
 			TransactionTime: stamp.Unix(),
+			Enabled:         true,
 		},
 	}
 }

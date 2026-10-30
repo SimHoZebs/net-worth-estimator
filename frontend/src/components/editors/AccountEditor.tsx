@@ -1,7 +1,6 @@
 import { useId, useState, type FormEvent } from "react";
 import { createAccount, updateAccount } from "@/api/generated/endpoints.ts";
 import type { Account } from "../../domain/model.ts";
-import { todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
@@ -74,10 +73,11 @@ export function AccountEditor({
 				: {}),
 			...(item?.color ? { color: item.color } : {}),
 		};
+		const nowInstant = Math.floor(Date.now() / 1000);
 		const moved =
 			!item ||
 			parsedBalance !== item.balance ||
-			item.observedOn === undefined ||
+			item.observedAt == null ||
 			!item.balanceCheck;
 		const ok = item
 			? await performSave({
@@ -87,7 +87,7 @@ export function AccountEditor({
 							...(moved
 								? {
 										balance: parsedBalance,
-										observedOn: item.observedOn || todayIso(),
+										observedAt: nowInstant,
 									}
 								: {}),
 						}),
@@ -99,7 +99,7 @@ export function AccountEditor({
 						createAccount({
 							...body,
 							balance: parsedBalance,
-							observedOn: todayIso(),
+							observedAt: nowInstant,
 						}),
 					refresh: refreshAccounts,
 					failureMessage: "The account could not be saved.",

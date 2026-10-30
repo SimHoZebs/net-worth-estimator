@@ -90,7 +90,12 @@ export type RowOperation =
 	| { kind: "rule"; action: "delete"; id: string }
 	| { kind: "rule"; action: "move"; id: string; beforeId: string | null }
 	| { kind: "checkpoint"; action: "save"; row: BackendCheckpoint }
-	| { kind: "checkpoint"; action: "delete"; accountId: string; date: string }
+	| {
+			kind: "checkpoint";
+			action: "delete";
+			accountId: string;
+			observedAt: number;
+	  }
 	| { kind: "plannedPurchase"; action: "create"; row: BackendPlannedPurchase }
 	| {
 			kind: "plannedPurchase";
@@ -272,7 +277,7 @@ export function diffFinancialModelDocuments(
 	);
 
 	const checkpointKey = (row: BackendCheckpoint) =>
-		`${row.AccountId}\x00${row.Date}`;
+		`${row.AccountId}\x00${row.observedAt}`;
 	const baseCheckpoints = new Map(
 		from.checkpoints.map((row) => [checkpointKey(row), row]),
 	);
@@ -291,7 +296,7 @@ export function diffFinancialModelDocuments(
 				kind: "checkpoint",
 				action: "delete",
 				accountId: row.AccountId,
-				date: row.Date,
+				observedAt: row.observedAt,
 			});
 	}
 
@@ -474,7 +479,10 @@ export async function applyRowOperations(
 				else
 					outcome = await runWrite(issues, () =>
 						deleteCheckpoint(
-							{ accountId: operation.accountId, date: operation.date },
+							{
+								accountId: operation.accountId,
+								observedAt: operation.observedAt,
+							},
 							options,
 						),
 					);

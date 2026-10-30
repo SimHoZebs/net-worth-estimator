@@ -51,6 +51,18 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("ApplySyncPlanSkipsUserCheckpoint", func(t *testing.T) {
 		testApplySyncPlanSkipsUserCheckpoint(t, newStore)
 	})
+	t.Run("TimestampedCheckpointsPreserveMultipleObservationsPerDay", func(t *testing.T) {
+		testTimestampedCheckpointsPreserveMultipleObservationsPerDay(t, newStore)
+	})
+	t.Run("ApplySyncPlanRetainsBackdatedObservation", func(t *testing.T) {
+		testApplySyncPlanRetainsBackdatedObservation(t, newStore)
+	})
+	t.Run("ApplySyncPlanOwnerWinsSameInstant", func(t *testing.T) {
+		testApplySyncPlanOwnerWinsSameInstant(t, newStore)
+	})
+	t.Run("SettledBankRowRoundTrip", func(t *testing.T) {
+		testSettledBankRowRoundTrip(t, newStore)
+	})
 	t.Run("ApplySyncPlanRefreshesPendingSnapshot", func(t *testing.T) {
 		testApplySyncPlanRefreshesPendingSnapshot(t, newStore)
 	})
@@ -309,8 +321,8 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 		t.Fatalf("create account: %v", err)
 	}
 	for _, checkpoint := range []types.Checkpoint{
-		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
-		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
+		{ObservedAt: 1777593599, AccountID: "checking", Balance: 200},
+		{ObservedAt: 1775519999, AccountID: "checking", Balance: 100},
 	} {
 		if _, err := st.SaveCheckpoint(checkpoint); err != nil {
 			t.Fatalf("save checkpoint: %v", err)
@@ -324,8 +336,8 @@ func testStoreRoundTripsCanonicalDocumentMetadataAndOrder(t *testing.T, newStore
 		t.Fatal("loaded document is nil")
 	}
 	if !reflect.DeepEqual(loaded.Checkpoints, withSourceUser([]types.Checkpoint{
-		{Date: "2026-04-30", AccountID: "checking", Balance: 200},
-		{Date: "2026-04-06", AccountID: "checking", Balance: 100},
+		{ObservedAt: 1777593599, AccountID: "checking", Balance: 200},
+		{ObservedAt: 1775519999, AccountID: "checking", Balance: 100},
 	})) {
 		t.Fatalf("checkpoint order changed: got %+v", loaded.Checkpoints)
 	}
@@ -418,7 +430,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 	}
 
 	// A checkpoint save with a forged source flag still stores owner rows.
-	correction := types.Checkpoint{Date: "2026-07-01", AccountID: "checking", Balance: 500, Source: store.SourceSimpleFIN}
+	correction := types.Checkpoint{ObservedAt: 1782950399, AccountID: "checking", Balance: 500, Source: store.SourceSimpleFIN}
 	saved, err := st.SaveCheckpoint(correction)
 	if err != nil {
 		t.Fatalf("save checkpoint: %v", err)
@@ -434,7 +446,7 @@ func testRowWritesUseStoredSyncOwnership(t *testing.T, newStore func(*testing.T)
 		t.Fatalf("checkpoints = %+v, want owner + synced", loaded.Checkpoints)
 	}
 	for _, checkpoint := range loaded.Checkpoints {
-		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-07-01" && checkpoint.Source != store.SourceUser {
+		if checkpoint.AccountID == "checking" && checkpoint.ObservedAt == 1782950399 && checkpoint.Source != store.SourceUser {
 			t.Fatalf("forged checkpoint flag persisted: %+v", checkpoint)
 		}
 	}
@@ -454,7 +466,7 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 	seedSyncState(t, st)
 
 	if _, err := st.SaveCheckpoint(types.Checkpoint{
-		Date: "2026-08-01", AccountID: "checking", Balance: 222,
+		ObservedAt: 1785628799, AccountID: "checking", Balance: 222,
 	}); err != nil {
 		t.Fatalf("save correction: %v", err)
 	}
@@ -465,7 +477,7 @@ func testOwnerCheckpointWinsKeyCollision(t *testing.T, newStore func(*testing.T)
 	}
 	count := 0
 	for _, checkpoint := range loaded.Checkpoints {
-		if checkpoint.AccountID == "checking" && checkpoint.Date == "2026-08-01" {
+		if checkpoint.AccountID == "checking" && checkpoint.ObservedAt == 1785628799 {
 			count++
 			if checkpoint.Balance != 222 || checkpoint.Source != store.SourceUser {
 				t.Fatalf("collision row = %+v, want owner correction", checkpoint)
@@ -486,21 +498,21 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 	seedAccount(t, st, "prime_card")
 
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100}},
 		nil)
 	if err != nil || summary.CheckpointsInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 
 	again, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100}},
 		nil)
 	if err != nil || again.CheckpointsUpdated != 1 || again.CheckpointsInserted != 0 {
 		t.Fatalf("rerun = %+v, err %v", again, err)
 	}
 
 	changed, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 150}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 150}},
 		nil)
 	if err != nil || changed.CheckpointsUpdated != 1 {
 		t.Fatalf("update = %+v, err %v", changed, err)
@@ -510,7 +522,7 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 		t.Fatalf("load: %v", err)
 	}
 	_ = loaded
-	checkpoint, ok := findCheckpoint(loaded, "checking", "2026-08-05")
+	checkpoint, ok := findCheckpoint(loaded, "checking", 1785974399)
 	if !ok || checkpoint.Balance != 150 || checkpoint.Source != store.SourceSimpleFIN {
 		t.Fatalf("checkpoint = %+v, want balance 150 source simplefin", checkpoint)
 	}
@@ -521,14 +533,14 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	st := newStore(t)
 	seedOwnerDocument(t, st)
 	extra, err := st.SaveCheckpoint(types.Checkpoint{
-		Date: "2026-08-05", AccountID: "checking", Balance: 999,
+		ObservedAt: 1785974399, AccountID: "checking", Balance: 999,
 	})
 	if err != nil {
 		t.Fatalf("save user checkpoint: %v", err)
 	}
 	_ = extra
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-05", Balance: 100}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100}},
 		nil)
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
@@ -537,7 +549,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	checkpoint, ok := findCheckpoint(loaded, "checking", "2026-08-05")
+	checkpoint, ok := findCheckpoint(loaded, "checking", 1785974399)
 	if !ok || checkpoint.Balance != 999 {
 		t.Fatalf("user checkpoint overwritten: %+v", checkpoint)
 	}
@@ -657,7 +669,7 @@ func seedSyncState(t *testing.T, st store.Store) {
 	}
 	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Date: "2026-08-01", Balance: 111}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785628799, Balance: 111}},
 		[]store.BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
@@ -673,12 +685,12 @@ func loadPostingIDs(t *testing.T, st store.Store) (ids []string, sources map[str
 	return postingIDsFromDocument(loaded)
 }
 
-func findCheckpoint(document *types.FinancialModelDocument, accountID string, date types.IsoDate) (types.Checkpoint, bool) {
+func findCheckpoint(document *types.FinancialModelDocument, accountID string, observedAt int64) (types.Checkpoint, bool) {
 	if document == nil {
 		return types.Checkpoint{}, false
 	}
 	for _, checkpoint := range document.Checkpoints {
-		if checkpoint.AccountID == accountID && checkpoint.Date == date {
+		if checkpoint.AccountID == accountID && checkpoint.ObservedAt == observedAt {
 			return checkpoint, true
 		}
 	}
@@ -693,7 +705,7 @@ func ownerDocument() *types.FinancialModelDocument {
 			ID: "checking", Name: "Checking", Enabled: true,
 		}},
 		Checkpoints: []types.Checkpoint{
-			{Date: "2026-07-01", AccountID: "checking", Balance: 500},
+			{ObservedAt: 1782950399, AccountID: "checking", Balance: 500},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 		Postings: []types.Posting{{
@@ -728,3 +740,183 @@ func syncedPendingIDs(document *types.FinancialModelDocument) []string {
 	}
 	return ids
 }
+
+func testTimestampedCheckpointsPreserveMultipleObservationsPerDay(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	morning := types.Checkpoint{AccountID: "checking", Balance: 1000, ObservedAt: 1785882000}
+	evening := types.Checkpoint{AccountID: "checking", Balance: 900, ObservedAt: 1785903600}
+	if _, err := st.SaveCheckpoint(morning); err != nil {
+		t.Fatalf("save morning: %v", err)
+	}
+	if _, err := st.SaveCheckpoint(evening); err != nil {
+		t.Fatalf("save evening: %v", err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	var matches []types.Checkpoint
+	for _, checkpoint := range loaded.Checkpoints {
+		if checkpoint.AccountID == "checking" && (checkpoint.ObservedAt == 1785882000 || checkpoint.ObservedAt == 1785903600) {
+			matches = append(matches, checkpoint)
+		}
+	}
+	if len(matches) != 2 {
+		t.Fatalf("same-day observations = %+v, want both preserved", matches)
+	}
+	byInstant := map[int64]float64{}
+	for _, checkpoint := range matches {
+		byInstant[checkpoint.ObservedAt] = checkpoint.Balance
+	}
+	if byInstant[1785882000] != 1000 || byInstant[1785903600] != 900 {
+		t.Fatalf("instants not preserved: %+v", matches)
+	}
+	if err := st.DeleteCheckpointAt("checking", 1785882000); err != nil {
+		t.Fatalf("delete one instant: %v", err)
+	}
+	loaded, err = st.LoadDocument()
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	remaining := 0
+	for _, checkpoint := range loaded.Checkpoints {
+		if checkpoint.AccountID == "checking" && (checkpoint.ObservedAt == 1785882000 || checkpoint.ObservedAt == 1785903600) {
+			remaining++
+			if checkpoint.ObservedAt != 1785903600 {
+				t.Fatalf("wrong row survived: %+v", checkpoint)
+			}
+		}
+	}
+	if remaining != 1 {
+		t.Fatalf("remaining same-day rows = %d, want 1", remaining)
+	}
+}
+
+func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	fresh, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 1000, ObservedAt: 1785903600}},
+		nil)
+	if err != nil || fresh.CheckpointsInserted != 1 {
+		t.Fatalf("fresh apply = %+v, err %v", fresh, err)
+	}
+	// A late-arriving backdated observation is retained as its own
+	// instant-keyed row: replay orders it chronologically and the latest
+	// instant still wins, so current state never rolls back.
+	late, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 5, ObservedAt: 1785817200}},
+		nil)
+	if err != nil || late.CheckpointsInserted != 1 || late.CheckpointsSkipped != 0 {
+		t.Fatalf("backdated apply = %+v, err %v", late, err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	seen := map[int64]float64{}
+	for _, checkpoint := range loaded.Checkpoints {
+		if checkpoint.AccountID == "checking" {
+			seen[checkpoint.ObservedAt] = checkpoint.Balance
+		}
+	}
+	if seen[1785903600] != 1000 || seen[1785817200] != 5 {
+		t.Fatalf("both instants must persist: %+v", loaded.Checkpoints)
+	}
+	// Input batch order does not matter: oldest-first and newest-first
+	// batches converge on the same instant-keyed rows.
+	repeat, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{
+			{AccountID: "checking", Balance: 1000, ObservedAt: 1785903600},
+			{AccountID: "checking", Balance: 5, ObservedAt: 1785817200},
+			{AccountID: "checking", Balance: 7, ObservedAt: 1785730800},
+		},
+		nil)
+	if err != nil || repeat.CheckpointsInserted != 1 || repeat.CheckpointsUpdated != 2 {
+		t.Fatalf("out-of-order batch = %+v, err %v", repeat, err)
+	}
+}
+
+func testApplySyncPlanOwnerWinsSameInstant(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	const instant = int64(1785903600)
+	if _, err := st.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 999, ObservedAt: instant}); err != nil {
+		t.Fatalf("save owner: %v", err)
+	}
+	summary, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 100, ObservedAt: instant}},
+		nil)
+	if err != nil || summary.CheckpointsSkipped != 1 {
+		t.Fatalf("apply = %+v, err %v", summary, err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	count := 0
+	for _, checkpoint := range loaded.Checkpoints {
+		if checkpoint.AccountID == "checking" && checkpoint.ObservedAt == instant {
+			count++
+			if checkpoint.Balance != 999 || checkpoint.Source != store.SourceUser {
+				t.Fatalf("same-instant row = %+v, want owner 999", checkpoint)
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("same-instant rows = %d, want exactly the owner row", count)
+	}
+}
+
+func testSettledBankRowRoundTrip(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerDocument(t, st)
+	settled := store.SyncPosting{
+		ProviderAccountID: "bridge-checking",
+		TransactionID:     "posted-1",
+		Posting: types.Posting{
+			Name:            "Posted",
+			SourceAccountID: strptr("checking"),
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      1785817200,
+			TransactionTime: 1785817200,
+			Enabled:         true,
+		},
+	}
+	settled.Source = store.SourceSimpleFIN
+	summary, err := st.ApplySyncPlan(nil, []store.BankDirective{{
+		Upsert: &store.BankUpsert{
+			Posting: settled.Posting,
+			Keys:    []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: settled.ProviderAccountID, TransactionID: settled.TransactionID}},
+		},
+	}})
+	if err != nil || summary.SettledInserted != 1 {
+		t.Fatalf("settled apply = %+v, err %v", summary, err)
+	}
+	loaded, err := st.LoadDocument()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	banked := false
+	for _, posting := range loaded.Postings {
+		if posting.Source == store.SourceSimpleFIN {
+			banked = true
+			if posting.Pending || posting.Void {
+				t.Fatalf("settled bank row mislabeled: %+v", posting)
+			}
+			if !posting.Enabled {
+				t.Fatalf("settled bank row must stay enabled: %+v", posting)
+			}
+		}
+	}
+	if !banked {
+		t.Fatalf("no settled bank row: %+v", loaded.Postings)
+	}
+}
+
+func strptr(value string) *string { return &value }

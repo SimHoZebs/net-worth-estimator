@@ -55,9 +55,9 @@ const input = {
 	transactions: sourceTransactions,
 	startDate: sourceStartDate,
 	checkpoints: [
-		{ AccountId: card.id, Date: "2026-10-19", Balance: -500 },
-		{ AccountId: otherCard.id, Date: "2026-10-19", Balance: -700 },
-		{ AccountId: card.id, Date: "2026-10-21", Balance: -900 },
+		{ AccountId: card.id, Balance: -500, observedAt: 1792454399 },
+		{ AccountId: otherCard.id, Balance: -700, observedAt: 1792454399 },
+		{ AccountId: card.id, Balance: -900, observedAt: 1792627199 },
 	],
 	projection: projectionFixture(),
 	cards: [card, otherCard],

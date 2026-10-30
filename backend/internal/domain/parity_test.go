@@ -103,7 +103,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 				Config:   map[string]any{"expression": "100"},
 			},
 		}},
-		Checkpoints: []types.Checkpoint{{AccountID: "checking", Date: "2026-13-40", Balance: 100}},
+		Checkpoints: []types.Checkpoint{{AccountID: "checking", Balance: 100, ObservedAt: 0}},
 	}
 
 	issues := ValidateFinancialModel(document)
@@ -114,7 +114,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 			found[issue.Code] = true
 		}
 	}
-	for _, code := range []string{"rule.start-date.format", "checkpoint.date.format"} {
+	for _, code := range []string{"rule.start-date.format", "checkpoint.observedAt.required"} {
 		if !found[code] {
 			t.Errorf("expected validation issue %q for malformed dates, got issues %v", code, found)
 		}

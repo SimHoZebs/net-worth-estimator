@@ -83,7 +83,8 @@ The product must make these concepts understandable without specialist documenta
 | Concept                     | Meaning                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Recorded**                | A balance or transaction explicitly supplied by a source or recorded as a balance check. It is evidence of a point-in-time state, not a promise about the future.                                                                                                                                                                                 |
-| **Balance check**           | A recorded end-of-day account balance used to correct modeled history and establish what was known to be true at that date.                                                                                                                                                                                                                    |
+| **Balance check**           | A recorded account balance with its exact observation time. Several checks per account per day survive. Observations set balances; transactions change balances. Same-time transactions execute first, then owner observations win at that instant. Legacy dates convert once offline to UTC day-close. |
+| **Observed vs adjusted**    | The latest observation at the as-of cut (with its timestamp) is separate from the adjusted modeled balance. Anchor corrections show the observed-vs-modeled difference. |
 | **Planned transaction**        | An expected transaction into, out of, or between accounts.                                                                                                                                                                                                                                                                                        |
 | **Account rule**            | A recurring or constrained transaction associated with an account.                                                                                                                                                                                                                                                                                |
 | **Saved model**             | The saved collection of accounts, transactions, balance checks, assumptions, source information, and goal definitions. The base projection runs only off this saved state.                                                                                                                                                                         |
@@ -104,13 +105,16 @@ The product must make these concepts understandable without specialist documenta
 The product must establish:
 
 - current net worth;
-- account-level balances and identities;
-- which values are recorded, modeled, planned, or inferred;
+- account-level balances and identities, with the latest observation
+  (balance plus timestamp) reported separately from the adjusted modeled
+  balance;
+- which values are recorded, modeled, planned, deliberately excluded, or inferred;
 - the balance-check and source coverage behind the baseline;
 - source freshness; and
 - validation problems that affect trust.
 
-The product must not silently substitute old or bundled data when the intended source fails.
+The as-of cut is the end of the viewed date, or an exact timestamp when
+one is given; later events never affect the stated position. The product must not silently substitute old or bundled data when the intended source fails.
 
 ### 5.2 Base-case outcome
 
@@ -403,10 +407,13 @@ The product does not settle the following questions:
 - How much record-level evidence should be available for posting-derived inference?
 - How many what-if scenarios should persist, and should comparisons ever become durable records?
 - Should household safe spending become a reusable household concept or remain a personal extension?
-- How should recorded and modeled balances be distinguished when both describe the same account?
 - Which approximation labels are acceptable for debt payoff and other derived dates?
 - What level of scenario detail is useful without overwhelming the user?
 - What future audiences, currencies, household structures, or privacy requirements should shape the product?
 - Which interaction architecture best minimizes interpretation effort while preserving the product contracts above?
+
+The recorded-vs-modeled question above is settled: the product reports the
+latest observation (balance plus timestamp) separately from the adjusted
+modeled balance, with the anchor correction between them shown.
 
 Until these decisions are made, the product should prefer explicit labels, conservative claims, reversible actions, and freedom from structural assumptions.

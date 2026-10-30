@@ -27,8 +27,8 @@ func TestFailedFinancialOnlyCopyIsAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
-		INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance)
-		VALUES ('other', 1, 0, '2026-01-01', 'missing-account', 100)`)
+		INSERT INTO checkpoints(user_id, id, position, observed_at, model_account_id, balance)
+		VALUES ('other', 1, 0, 1767311999, 'missing-account', 100)`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)

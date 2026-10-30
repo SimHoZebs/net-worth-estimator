@@ -158,7 +158,7 @@ func TestPurchaseDatesAndDisabledItems(t *testing.T) {
 func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
 	request := purchaseRequest(1000, purchasePosting("old-wish", "2025-01-01", "500", 0))
 	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings,
-		Checkpoints: []types.Checkpoint{{AccountID: "cash", Date: request.StartDate, Balance: 1000}}}
+		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	prepared, err := PrepareSimulationRequest(&document, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +170,7 @@ func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := purchaseEvents(run); got["old-wish"] != "2026-02-02" {
+	if got := purchaseEvents(run); got["old-wish"] != "2026-02-01" {
 		t.Fatalf("past wish = %v", got)
 	}
 }
@@ -191,7 +191,7 @@ func TestPurchasesRespectAccountFloorAndDoNotPartiallyPurchase(t *testing.T) {
 func TestPurchaseAtCheckpointDoesNotChangeBaselineBands(t *testing.T) {
 	request := purchaseRequest(1000, purchasePosting("wish", "2025-01-01", "500", 0))
 	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings,
-		Checkpoints: []types.Checkpoint{{AccountID: "cash", Date: request.StartDate, Balance: 1000}}}
+		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	seed := int64(42)
 	result, err := StochasticProjection(context.Background(), &document, &settings, types.ModelOverrides{}, types.StochasticConfig{RunCount: 5, Seed: &seed}, nil)

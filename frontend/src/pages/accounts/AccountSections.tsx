@@ -109,6 +109,8 @@ function AccountsView({
 					balanceCheck: row.hasCheckpoint,
 					source: row.syncOwned ? "Synced account" : "Manual entry",
 					readOnly: row.readOnly,
+					observedBalance: row.observedBalance ?? null,
+					observedAt: row.observedAt ?? null,
 				})),
 			),
 		[balances.data],

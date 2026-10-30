@@ -20,7 +20,7 @@ func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T)
 		establishedPosting("rent", "2026-02-02", "900", false),
 		establishedPosting("pay", "2026-02-05", "1000", true))
 	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings,
-		Checkpoints: []types.Checkpoint{{AccountID: "cash", Date: request.StartDate, Balance: 1000}}}
+		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	settings.Evaluations.PlannedPurchases = purchaseEvaluation()
 	before := toAny(t, document)

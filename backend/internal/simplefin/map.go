@@ -23,15 +23,16 @@ const (
 	SkipStaleLink SkipReason = "linked-account-missing"
 )
 
-// Checkpoint is a balance observation for one model account and day.
+// Checkpoint is a balance observation for one model account.
 // BridgeID carries the source account; AccountID is empty when the bridge
 // account has no resolved model account yet (the runner provisions one,
-// then fills it in before apply).
+// then fills it in before apply). ObservedAt is the required exact Unix
+// instant; a missing bridge balance-date falls back to arrival time.
 type Checkpoint struct {
-	AccountID string
-	BridgeID  string
-	Date      string
-	Balance   float64
+	AccountID  string
+	BridgeID   string
+	Balance    float64
+	ObservedAt int64
 }
 
 // Provision asks the store to create a model account plus an auto link
@@ -77,11 +78,14 @@ func absDecimal(raw string) (string, error) {
 	return digits, nil
 }
 
-func checkpointDay(balanceDate int64, now time.Time) string {
+// checkpointInstant preserves the bridge balance-date instant: the exact
+// Unix time the balance became that amount. A missing balance-date falls
+// back to the arrival time, which is the earliest the balance is known.
+func checkpointInstant(balanceDate int64, now time.Time) int64 {
 	if balanceDate > 0 {
-		return time.Unix(balanceDate, 0).UTC().Format("2006-01-02")
+		return balanceDate
 	}
-	return now.UTC().Format("2006-01-02")
+	return now.Unix()
 }
 
 // provisionKind picks the model account kind for an auto-provisioned
@@ -133,12 +137,12 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 				Currency: account.Currency,
 				Kind:     provisionKind(account),
 			})
-			day := checkpointDay(account.BalanceDate, now)
-			key := account.ID + "\x00" + day
+			instant := checkpointInstant(account.BalanceDate, now)
+			key := account.ID + "\x00" + strconv.FormatInt(instant, 10)
 			if _, seen := seenCheckpoints[key]; !seen {
 				seenCheckpoints[key] = struct{}{}
 				balance, _ := parseBalance(account.Balance)
-				plan.Checkpoints = append(plan.Checkpoints, Checkpoint{BridgeID: account.ID, Date: day, Balance: balance})
+				plan.Checkpoints = append(plan.Checkpoints, Checkpoint{BridgeID: account.ID, Balance: balance, ObservedAt: instant})
 			}
 			continue
 		}
@@ -151,11 +155,11 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 			plan.Skipped[SkipBadAmount]++
 			continue
 		}
-		day := checkpointDay(account.BalanceDate, now)
-		key := modelAccountID + "\x00" + day
+		instant := checkpointInstant(account.BalanceDate, now)
+		key := modelAccountID + "\x00" + strconv.FormatInt(instant, 10)
 		if _, seen := seenCheckpoints[key]; !seen {
 			seenCheckpoints[key] = struct{}{}
-			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Date: day, Balance: balance})
+			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Balance: balance, ObservedAt: instant})
 		}
 
 		for _, transaction := range account.Transactions {
@@ -175,9 +179,17 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 			if postedTime <= 0 {
 				postedTime = now.Unix()
 			}
+			// Settled movements affect the reported balance when posted,
+			// not at the earlier purchase timestamp: normalize the settled
+			// event time to the post instant. Pending seeds keep the
+			// purchase timestamp for pending-to-settled matching. Manual
+			// postings are untouched: their TransactionTime-first ordering
+			// is unchanged.
 			transactionTime := postedTime
-			if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
-				transactionTime = *transaction.TransactedAt
+			if seed {
+				if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
+					transactionTime = *transaction.TransactedAt
+				}
 			}
 			posting := store.SyncPosting{
 				ProviderAccountID: account.ID,
@@ -193,7 +205,7 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 					},
 					PostedTime:      postedTime,
 					TransactionTime: transactionTime,
-					Enabled:         false,
+					Enabled:         !seed,
 					Pending:         seed,
 				},
 			}

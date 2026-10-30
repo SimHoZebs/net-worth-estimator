@@ -15,18 +15,9 @@ type scheduledPurchase struct {
 }
 
 // purchasesCandidateRequest rebuilds the purchases candidate simulation
-// request from the prepared base path. The candidate owns all state: the
-// model carries the full effective document (including PaymentTerms, so
-// terms-minimum semantics match the base simulation), and the initial state
-// deep-copies the projection-start posting ledger through the shared
-// CloneSimulationState. Start balances are the latest historical row over
-// zero-filled accounts; with no history they are the prepared zero state.
-// A start-day checkpoint is an end-of-day observation whose events already
-// replayed as history, so candidates exclude start-day events exactly when
-// the base path does (mirroring prepare.go's !hasStartDateCheckpoint).
-// Both the purchases candidate and the FI branch rebuild owned state from
-// the same prepared posting ledger through this shared cloner path, so cap,
-// terms-minimum, and latest-realized semantics cannot drift between branches.
+// request from the prepared base path. History already replayed through the
+// cut instant, so candidates always include start-day events and rely on
+// the shared HistoryCutInstant to skip already-replayed occurrences.
 func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCarloSample) types.SimulationRequest {
 	document := path.EffectiveDocument
 	var latestHistorical *types.ProjectionRow
@@ -38,12 +29,6 @@ func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCa
 		latestHistorical = row
 	}
 	includeStartDateEvents := true
-	for _, checkpoint := range document.Checkpoints {
-		if checkpoint.Date == path.ProjectionStartDate {
-			includeStartDateEvents = false
-			break
-		}
-	}
 	return types.SimulationRequest{
 		Model: types.FinancialModel{
 			Accounts:         document.Accounts,
@@ -62,6 +47,7 @@ func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCa
 		EndDate:                path.ProjectionEndDate,
 		IncludeStartDateEvents: includeStartDateEvents,
 		MonteCarloSample:       sample,
+		HistoryCutInstant:      path.HistoryCutInstant,
 	}
 }
 
@@ -124,11 +110,6 @@ func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, er
 		return simulateScheduled(request, nil, nil)
 	}
 	firstDate := request.StartDate
-	if !request.IncludeStartDateEvents {
-		// A start-day checkpoint is an end-of-day observation. Keep purchases
-		// in the future, and retain one unambiguous balance per calendar date.
-		firstDate = FormatIsoDate(MustParseIsoDate(firstDate).AddDate(0, 0, 1))
-	}
 	dateSet := map[string]bool{}
 	for _, posting := range queue {
 		if day := postingDay(posting); day >= firstDate && day <= request.EndDate {

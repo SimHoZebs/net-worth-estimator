@@ -17,13 +17,14 @@ type accountBody struct {
 	MaxBalance *float64          `json:"maxBalance,omitempty"`
 	Color      *string           `json:"color,omitempty"`
 	Enabled    bool              `json:"enabled"`
-	// Balance with ObservedOn records the opening (create) or moved (update)
+	// Balance with ObservedAt records the opening (create) or moved (update)
 	// balance observation atomically with the account write, so callers
 	// never sequence a second checkpoint request. Omitted balance leaves
 	// balance history untouched.
 	Balance *float64 `json:"balance,omitempty"`
-	// ObservedOn is the YYYY-MM-DD date of Balance. Required with Balance.
-	ObservedOn *string `json:"observedOn,omitempty"`
+	// ObservedAt is the required exact Unix instant of Balance. Required
+	// with Balance; there is no date fallback.
+	ObservedAt *int64 `json:"observedAt,omitempty"`
 	// Source is accepted and ignored: accounts carry no authorship flag.
 	// Row authorship lives in checkpoints/postings ("user" | "simplefin")
 	// plus account_links, mirroring the retired whole-document PUT contract.
@@ -55,14 +56,14 @@ type accountOutput struct {
 
 func accountID(account types.Account) string { return account.ID }
 
-func accountObservation(body accountBody) (*float64, types.IsoDate, error) {
-	if body.Balance == nil && body.ObservedOn == nil {
-		return nil, "", nil
+func accountObservation(body accountBody) (*float64, int64, error) {
+	if body.Balance == nil && body.ObservedAt == nil {
+		return nil, 0, nil
 	}
-	if body.Balance == nil || body.ObservedOn == nil || *body.ObservedOn == "" {
-		return nil, "", huma.Error422UnprocessableEntity("balance and observedOn must be sent together")
+	if body.Balance == nil || body.ObservedAt == nil || *body.ObservedAt <= 0 {
+		return nil, 0, huma.Error422UnprocessableEntity("balance and observedAt must be sent together; observedAt must carry the exact observation time as Unix seconds")
 	}
-	return body.Balance, types.IsoDate(*body.ObservedOn), nil
+	return body.Balance, *body.ObservedAt, nil
 }
 
 func (s *handler) createAccount(_ context.Context, input *accountInput) (*accountOutput, error) {
@@ -74,17 +75,18 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 		}
 		account.ID = id.String()
 	}
-	balance, observedOn, err := accountObservation(input.Body)
+	balance, observedAt, err := accountObservation(input.Body)
 	if err != nil {
 		return nil, err
 	}
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
 		if balance != nil {
-			document.Checkpoints = replaceByID(document.Checkpoints, account.ID+"\x00"+string(observedOn), checkpointKey, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: store.SourceUser})
+			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
+			document.Checkpoints = replaceByID(document.Checkpoints, checkpointKey(pending), checkpointKey, pending)
 		}
 	}, func() (types.Account, error) {
-		return s.store.CreateAccountWithBalance(account, balance, observedOn)
+		return s.store.CreateAccountWithBalance(account, balance, observedAt)
 	})
 	if err != nil {
 		return nil, err
@@ -97,17 +99,18 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	Body accountBody `json:"body"`
 }) (*accountOutput, error) {
 	account := input.Body.toAccount(input.ID)
-	balance, observedOn, err := accountObservation(input.Body)
+	balance, observedAt, err := accountObservation(input.Body)
 	if err != nil {
 		return nil, err
 	}
 	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
 		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
 		if balance != nil {
-			document.Checkpoints = replaceByID(document.Checkpoints, account.ID+"\x00"+string(observedOn), checkpointKey, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: store.SourceUser})
+			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
+			document.Checkpoints = replaceByID(document.Checkpoints, checkpointKey(pending), checkpointKey, pending)
 		}
 	}, func() (types.Account, error) {
-		return s.store.UpdateAccountWithBalance(account, balance, observedOn)
+		return s.store.UpdateAccountWithBalance(account, balance, observedAt)
 	})
 	if err != nil {
 		return nil, err

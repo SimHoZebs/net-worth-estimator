@@ -61,7 +61,7 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 	model := t.TempDir()
 	files := map[string]string{
 		"accounts.csv":                        "id,name,kind,enabled\nsame-id,Imported account,cash,true\n",
-		"checkpoints.csv":                     "Date,AccountId,Balance\n2026-01-01,same-id,456\n",
+		"checkpoints.csv":                     "AccountId,Balance,ObservedAt\nsame-id,456,1767311999\n",
 		"postings.csv":                        "id,name,postedTime,amount\n",
 		"behavior/financial-independence.csv": "id\n",
 		"behavior/net-worth-threshold.csv":    "id\n",

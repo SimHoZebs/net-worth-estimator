@@ -33,8 +33,8 @@ export function modelFixture(): FinancialModelDocument {
 			},
 		],
 		checkpoints: [
-			{ Date: "2026-01-31", AccountId: "cash", Balance: 100 },
-			{ Date: "2026-01-31", AccountId: "loan", Balance: -40 },
+			{ AccountId: "cash", Balance: 100, observedAt: 1769903999 },
+			{ AccountId: "loan", Balance: -40, observedAt: 1769903999 },
 		],
 		evaluations: {
 			financialIndependence: [],
@@ -149,18 +149,18 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	const upsertStubCheckpoint = (
 		model: FinancialModelDocument & { [key: string]: unknown },
 		balance: number | undefined,
-		observedOn: string | undefined,
+		observedAt: number | undefined,
 		accountId: string | undefined,
 	) => {
-		if (typeof balance !== "number" || !observedOn || !accountId) return;
+		if (typeof balance !== "number" || !observedAt || !accountId) return;
 		const rows = model.checkpoints as unknown as Record<string, unknown>[];
 		const at = rows.findIndex(
-			(row) => row.AccountId === accountId && row.Date === observedOn,
+			(row) => row.AccountId === accountId && row.observedAt === observedAt,
 		);
 		const checkpoint = {
-			Date: observedOn,
 			AccountId: accountId,
 			Balance: balance,
+			observedAt,
 		};
 		if (at >= 0) rows[at] = checkpoint;
 		else rows.push(checkpoint);
@@ -214,21 +214,35 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			>[];
 			let asOf = query.get("asOf") ?? "";
 			if (!asOf) {
+				let latest = 0;
 				for (const row of checkpoints) {
-					if ((row.Date as string) > asOf) asOf = row.Date as string;
+					const instant = row.observedAt as number;
+					if (instant > latest) latest = instant;
 				}
-				if (!asOf) asOf = new Date().toISOString().slice(0, 10);
+				asOf = latest
+					? new Date(latest * 1000).toISOString().slice(0, 10)
+					: new Date().toISOString().slice(0, 10);
 			}
 			const accounts = (
 				current.accounts as unknown as Record<string, unknown>[]
 			).map((account) => {
 				let latest: Record<string, unknown> | null = null;
+				let latestInstant = -1;
 				for (const row of checkpoints) {
-					if (row.AccountId !== account.id || (row.Date as string) > asOf)
-						continue;
-					if (!latest || (row.Date as string) > (latest.Date as string))
+					const day = new Date((row.observedAt as number) * 1000)
+						.toISOString()
+						.slice(0, 10);
+					if (row.AccountId !== account.id || day > asOf) continue;
+					const instant = row.observedAt as number;
+					if (latest === null || instant >= latestInstant) {
 						latest = row;
+						latestInstant = instant;
+					}
 				}
+				// The mock has no replay engine: with fixture data the
+				// adjusted balance equals the latest observation, so the
+				// row mirrors the server contract shape (adjusted balance
+				// plus separate observation).
 				const balance = latest ? (latest.Balance as number) : 0;
 				const syncOwned = checkpoints.some(
 					(row) =>
@@ -241,7 +255,11 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				return {
 					...account,
 					balance,
-					observedOn: latest ? latest.Date : asOf,
+					observedOn: latest
+						? new Date((latest.observedAt as number) * 1000)
+								.toISOString()
+								.slice(0, 10)
+						: asOf,
 					hasCheckpoint: latest !== null,
 					archived:
 						account.kind === "debt" &&
@@ -249,6 +267,8 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						Math.abs(balance) < 0.005,
 					syncOwned,
 					readOnly: syncOwned,
+					observedBalance: latest ? latest.Balance : null,
+					observedAt: latest ? latestInstant : null,
 				};
 			});
 			return ok({ accounts, asOf, revision: narrowRevision });
@@ -320,12 +340,15 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			const until = query.get("until") ?? "";
 			const checkpoints = (
 				current.checkpoints as unknown as Record<string, unknown>[]
-			).filter(
-				(row) =>
-					(!accountId || row.AccountId === accountId) &&
-					(!since || (row.Date as string) >= since) &&
-					(!until || (row.Date as string) <= until),
-			);
+			).filter((row) => {
+				if (accountId && row.AccountId !== accountId) return false;
+				const day = new Date((row.observedAt as number) * 1000)
+					.toISOString()
+					.slice(0, 10);
+				if (since && day < since) return false;
+				if (until && day > until) return false;
+				return true;
+			});
 			return ok({ checkpoints, revision: narrowRevision });
 		}
 		if (path === "/v1/amount-presets" && method === "POST")
@@ -377,8 +400,8 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				(current.accounts as unknown[]).push(structuredClone(row));
 				upsertStubCheckpoint(
 					current,
-					(body as { balance?: number; observedOn?: string }).balance,
-					(body as { balance?: number; observedOn?: string }).observedOn,
+					(body as { balance?: number; observedAt?: number }).balance,
+					(body as { balance?: number; observedAt?: number }).observedAt,
 					(row as { id: string }).id,
 				);
 			}, row);
@@ -395,8 +418,8 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					) as typeof current.accounts;
 					upsertStubCheckpoint(
 						current,
-						(body as { balance?: number; observedOn?: string }).balance,
-						(body as { balance?: number; observedOn?: string }).observedOn,
+						(body as { balance?: number; observedAt?: number }).balance,
+						(body as { balance?: number; observedAt?: number }).observedAt,
 						id,
 					);
 				}, body);
@@ -527,7 +550,9 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			const same = (item: unknown) => {
 				const row = item as Record<string, unknown>;
 				const next = checkpoint as unknown as Record<string, unknown>;
-				return row.AccountId === next.AccountId && row.Date === next.Date;
+				return (
+					row.AccountId === next.AccountId && row.observedAt === next.observedAt
+				);
 			};
 			return write(() => {
 				current.checkpoints = [
@@ -539,14 +564,15 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (path.startsWith("/v1/checkpoints?") && method === "DELETE") {
 			const query = new URL(path, "http://localhost").searchParams;
 			const accountId = query.get("accountId") ?? "";
-			const date = query.get("date") ?? "";
+			const observedAt = Number(query.get("observedAt") ?? "");
 			return write(() => {
 				current.checkpoints = (current.checkpoints as unknown[]).filter(
 					(item) =>
 						!(
 							(item as unknown as Record<string, unknown>).AccountId ===
 								accountId &&
-							(item as unknown as Record<string, unknown>).Date === date
+							(item as unknown as Record<string, unknown>).observedAt ===
+								observedAt
 						),
 				) as typeof current.checkpoints;
 			}, undefined);

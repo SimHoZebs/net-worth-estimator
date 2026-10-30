@@ -56,13 +56,13 @@ describe("projection chart inspection", () => {
 				})}
 				checkpoints={[
 					{
-						Date: "2026-02-01",
+						observedAt: Date.parse("2026-02-01T09:00:00Z") / 1000,
 						AccountId: "cash",
 						Balance: 1000,
 						source: "simplefin",
 					},
 					{
-						Date: "2026-07-01",
+						observedAt: Date.parse("2026-07-01T09:00:00Z") / 1000,
 						AccountId: "cash",
 						Balance: 1800,
 						source: "simplefin",
@@ -90,7 +90,7 @@ describe("projection chart inspection", () => {
 					projection={projectionFixture({ currentNetWorth })}
 					checkpoints={[
 						{
-							Date: "2026-01-01",
+							observedAt: Date.parse("2026-01-01T09:00:00Z") / 1000,
 							AccountId: "cash",
 							Balance: 1000,
 							source: "simplefin",

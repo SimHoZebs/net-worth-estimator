@@ -25,6 +25,16 @@ export const accountSchema = z.object({
 	balanceCheck: z.boolean(),
 	source: name,
 	readOnly: z.boolean(),
+	// Latest observation at or before the viewed date, separate from the
+	// adjusted modeled balance above. Missing means unobserved.
+	observedBalance: z
+		.number()
+		.finite()
+		.min(-1e10)
+		.max(1e10)
+		.nullable()
+		.optional(),
+	observedAt: z.number().int().nullable().optional(),
 });
 
 export const plannedPurchaseSchema = z.object({
@@ -63,6 +73,14 @@ export const transactionSchema = z.object({
 	// Void marks a bank hold that vanished without posting. The UI shows
 	// it as "Did not post". Every transaction carries it explicitly.
 	void: z.boolean(),
+	// Bank-owned row (importer output). Settled bank rows participate
+	// like manual actuals; only an owner-disabled row counts as excluded.
+	// Pending and void bank rows are recorded bank evidence, never an
+	// exclusion.
+	syncOwned: z.boolean().optional(),
+	// Exact Unix transaction time. Day display stays on startDate; the
+	// instant orders intraday execution.
+	transactionTime: z.number().int().nullable().optional(),
 });
 
 /**

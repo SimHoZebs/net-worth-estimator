@@ -92,8 +92,8 @@ func TestInitializeFailedCopyPublishesNoDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = db.SQL().Exec(`PRAGMA foreign_keys=OFF;
-		INSERT INTO checkpoints(user_id,id,position,date,model_account_id,balance)
-		VALUES ('owner',1,0,'2026-01-01','missing',1)`)
+		INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,observed_at)
+		VALUES ('owner',1,0,'missing',1,1767311999)`)
 	db.Close()
 	if err != nil {
 		t.Fatal(err)

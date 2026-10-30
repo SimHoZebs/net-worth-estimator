@@ -35,6 +35,7 @@ func BaseDocumentHash(document *types.FinancialModelDocument, overrides types.Mo
 		"overrides":   overrides,
 		"start":       settings.FallbackProjectionStartDate,
 		"horizon":     settings.HorizonYears,
+		"asOfInstant": settings.AsOfInstant,
 		"sample":      monteCarloSample,
 	}
 	encoded, err := json.Marshal(payload)

@@ -51,9 +51,9 @@ export function isFinancialModelDocument(
 	const checkpointsValid = value.checkpoints.every(
 		(item) =>
 			isRecord(item) &&
-			typeof item.Date === "string" &&
 			typeof item.AccountId === "string" &&
-			typeof item.Balance === "number",
+			typeof item.Balance === "number" &&
+			typeof item.observedAt === "number",
 	);
 	const postingsValid = value.postings.every(
 		(item) =>

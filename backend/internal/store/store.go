@@ -42,8 +42,8 @@ type Store interface {
 	// CreateAccountWithBalance stores an account and, when balance is set,
 	// its opening balance observation in one transaction. UpdateAccountWithBalance
 	// does the same for an account edit plus a moved observation.
-	CreateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error)
-	UpdateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error)
+	CreateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error)
+	UpdateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error)
 	CreatePosting(posting types.Posting) (types.Posting, error)
 	UpdatePosting(posting types.Posting) (types.Posting, error)
 	DeletePosting(id string) error
@@ -57,7 +57,7 @@ type Store interface {
 	DeleteRule(id string) error
 	MoveRule(id, beforeID string) error
 	SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error)
-	DeleteCheckpoint(accountID, date string) error
+	DeleteCheckpointAt(accountID string, observedAt int64) error
 	CreateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error)
 	UpdateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error)
 	DeleteEvaluation(instanceID string) error

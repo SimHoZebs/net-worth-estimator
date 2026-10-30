@@ -17,11 +17,14 @@ export function NetWorthSummary({
 	checkpoints: readonly BackendCheckpoint[];
 }) {
 	const change = netWorthChangeSinceFirstSync(projection, checkpoints);
-	const asOf = checkpoints.reduce<string | null>(
-		(latest, checkpoint) =>
-			latest === null || checkpoint.Date > latest ? checkpoint.Date : latest,
-		null,
-	);
+	const asOf = checkpoints
+		.map((checkpoint) =>
+			new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
+		)
+		.reduce<string | null>(
+			(latest, day) => (latest === null || day > latest ? day : latest),
+			null,
+		);
 	return (
 		<div className="px-5 pt-5">
 			<h2 className="text-sm text-muted">Net worth</h2>

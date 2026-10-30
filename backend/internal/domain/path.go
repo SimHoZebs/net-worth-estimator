@@ -221,6 +221,7 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 		EffectiveDocument:   effectiveDocument,
 		ProjectionStartDate: run.Request.StartDate,
 		ProjectionEndDate:   run.Request.EndDate,
+		HistoryCutInstant:   prepared.Request.HistoryCutInstant,
 	}
 	initialStateClone := CloneSimulationState(run.InitialState)
 	path.ProjectionStartPostingState.LatestRealizedPostingAmounts = initialStateClone.LatestRealizedPostingAmounts

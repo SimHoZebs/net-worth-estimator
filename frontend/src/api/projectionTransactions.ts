@@ -65,9 +65,12 @@ export function projectionTransactions(
 	document: FinancialModelDocument | null,
 ): TransactionResult[] {
 	const start = result.milestones.projectionStartDate;
-	const startCheckpoint = document?.checkpoints.some(
-		(checkpoint) => checkpoint.Date === start,
-	);
+	const startCheckpoint = document?.checkpoints.some((checkpoint) => {
+		const day = new Date(checkpoint.observedAt * 1000)
+			.toISOString()
+			.slice(0, 10);
+		return day === start;
+	});
 	const sources = transactionSourceIndex(document);
 	return (result.transactionEvents ?? [])
 		.filter(

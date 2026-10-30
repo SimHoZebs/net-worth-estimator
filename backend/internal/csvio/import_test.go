@@ -33,7 +33,7 @@ func TestImportModelRemapsFICashflowSources(t *testing.T) {
 			{"id", "name", "enabled"},
 			{"old-payment", "old-payment", "true"},
 		},
-		CheckpointsFile: {{"Date", "AccountId", "Balance"}},
+		CheckpointsFile: {{"AccountId", "Balance", "ObservedAt"}},
 		PostingsFile: {
 			{"id", "name", "amount", "postedTime", "enabled"},
 			{"old-payment", "old-payment", amount, "1785628800", "true"},
@@ -82,5 +82,67 @@ func TestImportModelRemapsFICashflowSources(t *testing.T) {
 	}
 	if document.Accounts[0].ID != "old-payment" || document.Postings[0].Name != "old-payment" || fi.Name != "old-payment" {
 		t.Fatal("import rewrote an account ID or presentation string")
+	}
+}
+
+func writeCSVDir(t *testing.T, files map[string][][]string) string {
+	t.Helper()
+	path := t.TempDir()
+	for name, records := range files {
+		filename := filepath.Join(path, name)
+		if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		file, err := os.Create(filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := csv.NewWriter(file).WriteAll(records); err != nil {
+			file.Close()
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return path
+}
+
+func TestImportCheckpointsRequireInstants(t *testing.T) {
+	base := map[string][][]string{
+		AccountsFile: {
+			{"id", "name", "enabled"},
+			{"checking", "Checking", "true"},
+		},
+		PostingsFile: {
+			{"id", "name", "amount", "postedTime", "enabled"},
+		},
+		RulesFile:          {{"id", "name", "amount", "frequency", "startDate", "enabled"}},
+		FIFile:             {{"instanceId"}},
+		ThresholdFile:      {{"instanceId"}},
+		AccountBalanceFile: {{"instanceId"}},
+		FulfillmentFile:    {{"instanceId"}},
+	}
+	legacy := map[string][][]string{
+		CheckpointsFile: {{"AccountId", "Balance", "ObservedAt"}, {"checking", "1000", ""}},
+	}
+	for k, v := range base {
+		legacy[k] = v
+	}
+	if _, err := ImportModel(writeCSVDir(t, legacy)); err == nil {
+		t.Fatalf("date-only checkpoint must fail without an instant")
+	}
+	stamped := map[string][][]string{
+		CheckpointsFile: {{"AccountId", "Balance", "ObservedAt"}, {"checking", "1000", "1773187199"}},
+	}
+	for k, v := range base {
+		stamped[k] = v
+	}
+	document, err := ImportModel(writeCSVDir(t, stamped))
+	if err != nil {
+		t.Fatalf("timestamped checkpoint must import: %v", err)
+	}
+	if len(document.Checkpoints) != 1 || document.Checkpoints[0].ObservedAt != 1773187199 {
+		t.Fatalf("checkpoint = %+v, want the exact instant", document.Checkpoints)
 	}
 }

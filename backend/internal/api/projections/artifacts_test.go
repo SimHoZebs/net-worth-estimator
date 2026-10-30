@@ -20,10 +20,18 @@ func TestPurchaseEvaluationSettingsHaveSeparateArtifactIdentity(t *testing.T) {
 	}
 }
 
+func TestExactCutChangesArtifactIdentity(t *testing.T) {
+	plain := projectionSettingsDescriptor(types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1})
+	instant := int64(1773133200)
+	exact := projectionSettingsDescriptor(types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1, AsOfInstant: &instant})
+	if artifactKey("deterministic", plain) == artifactKey("deterministic", exact) {
+		t.Fatal("exact cut must change the artifact identity")
+	}
+}
+
 func TestArtifactIdentityPreservesStoredResultKeys(t *testing.T) {
-	// Pin the existing envelope. The transaction rename intentionally
-	// orphans pre-rename stored results, so this pins the post-rename key.
-	const want = "deterministic:7:f13edc334395707851cf7215943794d5ad0db43737986cf2d7c0c1ebf2b23bdf"
+	// Timestamped replay changes the result contract and orphans older artifacts.
+	const want = "deterministic:8:ddae3ceab09a9f17ef8a44bf11555519b0c88087b061fc1544b917d8a072dfb1"
 	if got := artifactKey("deterministic", map[string]any{"example": "identity"}); got != want {
 		t.Fatalf("result identity = %q, want %q", got, want)
 	}

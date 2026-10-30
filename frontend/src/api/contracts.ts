@@ -52,10 +52,10 @@ export interface BackendAccount extends HumaMetadata {
 export type Account = BackendAccount;
 
 export interface BackendCheckpoint extends HumaMetadata {
-	Date: IsoDate;
 	AccountId: string;
 	Balance: number;
 	source?: string;
+	observedAt: number;
 }
 export type Checkpoint = BackendCheckpoint;
 

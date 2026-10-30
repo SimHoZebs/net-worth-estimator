@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import type { BackendCheckpoint } from "../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
@@ -9,7 +10,11 @@ test("Outlook compares the latest balance with the first synced balance", async 
 	request,
 }) => {
 	const response = await request.post(`${FIXTURE_API}/v1/checkpoints`, {
-		data: { AccountId: "checking", Date: "2026-02-01", Balance: 6200 },
+		data: {
+			AccountId: "checking",
+			observedAt: Date.parse("2026-02-01T23:59:59Z") / 1000,
+			Balance: 6200,
+		} satisfies BackendCheckpoint,
 	});
 	expect(response.ok()).toBe(true);
 	// The fixture imports user-owned observations. Replace only their source

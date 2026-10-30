@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"cmp"
 	"sort"
 	"time"
 
@@ -23,6 +24,49 @@ type DatedPostingOccurrence struct {
 	DocPath []any
 }
 
+// compareDatedPostingOccurrences is the single strict ordering shared by
+// simulation, history replay, and the financial independence branch: one
+// definition so one edit changes all three. Negative means a sorts first;
+// zero means every ordered field ties (callers break it stably).
+func compareDatedPostingOccurrences(a, b DatedPostingOccurrence) int {
+	aPurchase, bPurchase := a.Posting.Purchase, b.Posting.Purchase
+	if (aPurchase != nil) != (bPurchase != nil) {
+		if aPurchase == nil {
+			return -1
+		}
+		return 1
+	}
+	if aPurchase != nil {
+		if aPurchase.Priority != bPurchase.Priority {
+			return cmp.Compare(aPurchase.Priority, bPurchase.Priority)
+		}
+		return cmp.Compare(a.Index, b.Index)
+	}
+	aRule, bRule := a.Rule != nil, b.Rule != nil
+	if aRule != bRule {
+		if !aRule {
+			return -1
+		}
+		return 1
+	}
+	if !aRule {
+		if a.Posting.TransactionTime != b.Posting.TransactionTime {
+			return cmp.Compare(a.Posting.TransactionTime, b.Posting.TransactionTime)
+		}
+		if a.Posting.PostedTime != b.Posting.PostedTime {
+			return cmp.Compare(a.Posting.PostedTime, b.Posting.PostedTime)
+		}
+		if a.Posting.ExecutionOrder != b.Posting.ExecutionOrder {
+			return cmp.Compare(a.Posting.ExecutionOrder, b.Posting.ExecutionOrder)
+		}
+		return cmp.Compare(a.Index, b.Index)
+	}
+	if a.Rule.Priority != b.Rule.Priority {
+		return cmp.Compare(a.Rule.Priority, b.Rule.Priority)
+	}
+	return cmp.Compare(a.Index, b.Index)
+}
+
 // sortOccurrences orders same-day occurrences with one-time postings
 // first, then scheduled rule instances. Within one-time postings it orders
 // by transaction time, then posted time, then explicit execution order.
@@ -32,40 +76,7 @@ type DatedPostingOccurrence struct {
 // changes all three.
 func sortOccurrences(occurrences []DatedPostingOccurrence) {
 	sort.SliceStable(occurrences, func(i, j int) bool {
-		leftPurchase := occurrences[i].Posting.Purchase
-		rightPurchase := occurrences[j].Posting.Purchase
-		if (leftPurchase != nil) != (rightPurchase != nil) {
-			return leftPurchase == nil
-		}
-		if leftPurchase != nil {
-			if leftPurchase.Priority != rightPurchase.Priority {
-				return leftPurchase.Priority < rightPurchase.Priority
-			}
-			return occurrences[i].Index < occurrences[j].Index
-		}
-		leftRule := occurrences[i].Rule != nil
-		rightRule := occurrences[j].Rule != nil
-		if leftRule != rightRule {
-			return !leftRule && rightRule
-		}
-		if !leftRule {
-			leftPosting := occurrences[i].Posting
-			rightPosting := occurrences[j].Posting
-			if leftPosting.TransactionTime != rightPosting.TransactionTime {
-				return leftPosting.TransactionTime < rightPosting.TransactionTime
-			}
-			if leftPosting.PostedTime != rightPosting.PostedTime {
-				return leftPosting.PostedTime < rightPosting.PostedTime
-			}
-			if leftPosting.ExecutionOrder != rightPosting.ExecutionOrder {
-				return leftPosting.ExecutionOrder < rightPosting.ExecutionOrder
-			}
-			return occurrences[i].Index < occurrences[j].Index
-		}
-		if occurrences[i].Rule.Priority != occurrences[j].Rule.Priority {
-			return occurrences[i].Rule.Priority < occurrences[j].Rule.Priority
-		}
-		return occurrences[i].Index < occurrences[j].Index
+		return compareDatedPostingOccurrences(occurrences[i], occurrences[j]) < 0
 	})
 }
 
@@ -238,15 +249,15 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	sequence := 0
 	for _, spec := range specs {
 		rule := &rules[spec.ruleIndex]
-		midnight := midnightUnix(spec.date)
+		stamp := dayCloseUnix(spec.date)
 		resolved.Instances = append(resolved.Instances, types.Posting{
 			ID:              rule.ID,
 			Name:            rule.Name,
 			SourceAccountID: rule.SourceAccountID,
 			Destinations:    rule.Destinations,
 			Amount:          rule.Amount,
-			PostedTime:      midnight,
-			TransactionTime: midnight,
+			PostedTime:      stamp,
+			TransactionTime: stamp,
 			Enabled:         true,
 		})
 		instance := &resolved.Instances[len(resolved.Instances)-1]

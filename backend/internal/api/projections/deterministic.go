@@ -15,7 +15,7 @@ import (
 // deterministicResultVersion covers the deterministic payload shape.
 // See artifactIdentityVersion in artifacts.go: bump both together so
 // incompatible stored results are not retrieved.
-const deterministicResultVersion = 8
+const deterministicResultVersion = 9
 
 // resolveDocument returns the request document or the stored one.
 func (s *handler) resolveDocument(requested *types.FinancialModelDocument) (*types.FinancialModelDocument, error) {

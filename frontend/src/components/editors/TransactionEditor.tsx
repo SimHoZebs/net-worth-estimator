@@ -19,6 +19,8 @@ import {
 import { useSavedAccounts, useSavedStartDate } from "../../state/savedRows.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import {
+	combineDayTime,
+	timeOfDay,
 	postingBody,
 	postingUpdateBody,
 	ruleBody,
@@ -85,6 +87,9 @@ export function TransactionEditor({
 		item?.claimOccurrenceDate ?? "",
 	);
 	const [saving, setSaving] = useState(false);
+	const [transactionTime, setTransactionTime] = useState(
+		timeOfDay(item?.transactionTime),
+	);
 	const [error, setError] = useState<string | null>(null);
 	const enabledId = useId();
 	const noEndDateId = useId();
@@ -108,7 +113,8 @@ export function TransactionEditor({
 		endDate !== (item?.endDate ?? "") ||
 		enabled !== (item?.enabled ?? true) ||
 		claimRuleId !== (item?.claimRuleId ?? "") ||
-		claimOccurrenceDate !== (item?.claimOccurrenceDate ?? "");
+		claimOccurrenceDate !== (item?.claimOccurrenceDate ?? "") ||
+		transactionTime !== timeOfDay(item?.transactionTime);
 	useBeforeUnload(dirty && !saving);
 
 	const submit = async (event: FormEvent) => {
@@ -134,6 +140,13 @@ export function TransactionEditor({
 			startDate,
 			endDate: !isOnce && !noEndDate && endDate ? endDate : null,
 			postedDate: item?.postedDate ?? null,
+			transactionTime: isOnce
+				? item &&
+					startDate === item.startDate &&
+					transactionTime === timeOfDay(item.transactionTime)
+					? item.transactionTime
+					: combineDayTime(startDate, transactionTime)
+				: null,
 			enabled,
 			claimRuleId: isOnce && claimRuleId ? claimRuleId : null,
 			claimOccurrenceDate:
@@ -335,6 +348,14 @@ export function TransactionEditor({
 					/>
 					{isOnce ? (
 						<>
+							<InputField
+								label="Time (UTC, optional)"
+								type="time"
+								step="1"
+								hint="Blank means midnight UTC. Every stored time is an exact instant."
+								value={transactionTime}
+								onChange={(event) => setTransactionTime(event.target.value)}
+							/>
 							<SelectField
 								label="Records an occurrence of"
 								value={claimRuleId}

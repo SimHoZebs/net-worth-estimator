@@ -155,7 +155,12 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResul
 }
 
 // ExecutePosting executes one occurrence through the shared transitions.
-func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string) (PostingExecutionTransition, error) {
+// The historicalActual policy is explicit, not a second codepath: confirmed
+// historical actuals move their recorded amount without hypothetical
+// funding clamps (history describes what moved), while modeled rules and
+// all forecast requests retain funding constraints. Annual caps still
+// apply to rule instances; one-time actuals carry no cap.
+func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string, historicalActual bool) (PostingExecutionTransition, error) {
 	posting := occurrence.Posting
 	// Rate behavior (volatility sampling, annual caps) belongs to rules.
 	// Manual postings execute literally unless their amount carries a
@@ -199,13 +204,17 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 		}, nil
 	}
 	requestedAmount := maxFloat(0, rawRequested)
-	year := date[:4]
-	realizedThisYear := t.State.RealizedPostingAmountsByYear[posting.ID][year]
-	annualCapRemaining := inf()
-	if ruleAnnualCap != nil {
-		annualCapRemaining = maxFloat(0, *ruleAnnualCap-realizedThisYear)
+	realizedAmount := requestedAmount
+	if !historicalActual {
+		year := date[:4]
+		realizedThisYear := t.State.RealizedPostingAmountsByYear[posting.ID][year]
+		annualCapRemaining := inf()
+		if ruleAnnualCap != nil {
+			annualCapRemaining = maxFloat(0, *ruleAnnualCap-realizedThisYear)
+		}
+		realizedAmount = ResolvePostingTransaction(posting, requestedAmount, annualCapRemaining, t.State.Balances, t.accountByID).RealizedAmount
 	}
-	result := ResolvePostingTransaction(posting, requestedAmount, annualCapRemaining, t.State.Balances, t.accountByID)
+	result := AccountTransactionResult{RequestedAmount: requestedAmount, RealizedAmount: realizedAmount}
 	transition := t.applyAndCollectDeltas(result, func() {
 		ApplyPosting(posting, result.RealizedAmount, t.State.Balances, t.accountByID)
 	})

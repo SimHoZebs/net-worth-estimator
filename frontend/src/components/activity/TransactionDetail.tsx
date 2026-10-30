@@ -56,6 +56,7 @@ import {
 } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
+	timeOfDay,
 	claimPostingBody,
 	detailFormValues,
 	postingBody,
@@ -439,6 +440,7 @@ type TransactionDraft = {
 	claimRuleId: string;
 	claimOccurrenceDate: string;
 	postedDate: string;
+	transactionTime: string;
 };
 
 function draftFromTransaction(planTransaction: Transaction): TransactionDraft {
@@ -456,6 +458,7 @@ function draftFromTransaction(planTransaction: Transaction): TransactionDraft {
 		claimRuleId: planTransaction.claimRuleId ?? "",
 		claimOccurrenceDate: planTransaction.claimOccurrenceDate ?? "",
 		postedDate: planTransaction.postedDate ?? "",
+		transactionTime: timeOfDay(planTransaction.transactionTime),
 	};
 }
 
@@ -1029,9 +1032,9 @@ export function TransactionDetail({
 							</div>
 						</div>
 						{(once || transaction.pending || postedDiffers) && (
-							<div className="flex flex-none flex-col items-end gap-2">
+							<div className="flex min-w-0 flex-col items-end gap-2">
 								{once && (
-									<label className="inline-flex items-center gap-2 text-sm text-muted">
+									<label className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
 										Occurred
 										<input
 											className={transactionControlStyles({ shape: "date" })}
@@ -1043,6 +1046,22 @@ export function TransactionDetail({
 											onChange={(event) =>
 												edit.updateDraft(
 													{ startDate: event.target.value },
+													"schedule",
+												)
+											}
+											readOnly={!canEdit}
+										/>
+										<input
+											className={transactionControlStyles({ shape: "date" })}
+											id={`${edit.formId}-time`}
+											type="time"
+											step="1"
+											name="transactionTime"
+											aria-label="Occurred at time (UTC)"
+											value={edit.draft.transactionTime}
+											onChange={(event) =>
+												edit.updateDraft(
+													{ transactionTime: event.target.value },
 													"schedule",
 												)
 											}

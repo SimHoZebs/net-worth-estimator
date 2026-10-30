@@ -12,8 +12,8 @@ describe("server document fingerprint", () => {
 	it("changes when semantic content changes", () => {
 		const changed = modelFixture();
 		changed.checkpoints = [
-			{ Date: "2026-01-31", AccountId: "cash", Balance: 200 },
-			{ Date: "2026-01-31", AccountId: "loan", Balance: -40 },
+			{ AccountId: "cash", Balance: 200, observedAt: 1769903999 },
+			{ AccountId: "loan", Balance: -40, observedAt: 1769903999 },
 		];
 		expect(serverDocumentFingerprint(changed)).not.toBe(
 			serverDocumentFingerprint(modelFixture()),

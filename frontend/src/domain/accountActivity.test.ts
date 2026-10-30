@@ -169,6 +169,7 @@ describe("account-scoped transactions", () => {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			void: false,
+			syncOwned: true,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
@@ -183,7 +184,7 @@ describe("account-scoped transactions", () => {
 			),
 		).toMatchObject({
 			pending: true,
-			excluded: true,
+			excluded: false,
 		});
 	});
 
@@ -207,6 +208,7 @@ describe("account-scoped transactions", () => {
 			claimRuleId: null,
 			claimOccurrenceDate: null,
 			postedDate: null,
+			syncOwned: true,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
@@ -222,7 +224,7 @@ describe("account-scoped transactions", () => {
 		).toMatchObject({
 			pending: false,
 			void: true,
-			excluded: true,
+			excluded: false,
 		});
 	});
 
@@ -245,6 +247,7 @@ describe("account-scoped transactions", () => {
 			claimOccurrenceDate: null,
 			postedDate: null,
 			void: false,
+			syncOwned: true,
 		});
 		const rows = accountTransactions({
 			accountId: "checking",
@@ -402,5 +405,108 @@ describe("transaction filtering", () => {
 			"2026-06-28",
 		]);
 		expect(JSON.stringify(transactions)).toBe(before);
+	});
+});
+
+describe("bank evidence statuses", () => {
+	function recordedPlan() {
+		const plan = structuredClone(financialModelFixture);
+		plan.transactions.push({
+			id: "01900000-0000-7000-8000-000000000010",
+			name: "Bank settled charge",
+			amount: 18.5,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			frequency: "once",
+			startDate: plan.startDate,
+			endDate: null,
+			annualIncrease: 0,
+			enabled: true,
+			readOnly: true,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+			pending: false,
+			void: false,
+			syncOwned: true,
+		});
+		plan.transactions.push({
+			id: "01900000-0000-7000-8000-000000000011",
+			name: "Owner disabled",
+			amount: 5,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			frequency: "once",
+			startDate: plan.startDate,
+			endDate: null,
+			annualIncrease: 0,
+			enabled: false,
+			readOnly: false,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+			pending: false,
+			void: false,
+		});
+		return plan;
+	}
+
+	it("participates a settled bank row and excludes only owner-disabled rows", () => {
+		const plan = recordedPlan();
+		const rows = accountTransactions({
+			accountId: "checking",
+			accounts: plan.accounts,
+			transactions: plan.transactions,
+			startDate: plan.startDate,
+			projection: activityProjection(plan),
+		});
+		expect(
+			rows.find(
+				(row) => row.transactionId === "01900000-0000-7000-8000-000000000010",
+			),
+		).toMatchObject({ excluded: false, pending: false, void: false });
+		expect(
+			rows.find(
+				(row) => row.transactionId === "01900000-0000-7000-8000-000000000011",
+			)?.excluded,
+		).toBe(true);
+	});
+
+	it("excludes an owner-disabled settled bank row like any disabled actual", () => {
+		const plan = recordedPlan();
+		plan.transactions.push({
+			id: "01900000-0000-7000-8000-000000000012",
+			name: "Disabled settled bank row",
+			amount: 7.5,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			frequency: "once",
+			startDate: plan.startDate,
+			endDate: null,
+			annualIncrease: 0,
+			enabled: false,
+			readOnly: true,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+			pending: false,
+			void: false,
+			syncOwned: true,
+		});
+		const rows = accountTransactions({
+			accountId: "checking",
+			accounts: plan.accounts,
+			transactions: plan.transactions,
+			startDate: plan.startDate,
+			projection: activityProjection(plan),
+		});
+		expect(
+			rows.find(
+				(row) => row.transactionId === "01900000-0000-7000-8000-000000000012",
+			)?.excluded,
+		).toBe(true);
 	});
 });

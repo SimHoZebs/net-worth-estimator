@@ -243,20 +243,20 @@ func updateAccountTx(tx *userTx, account *types.Account) error {
 	return nil
 }
 
-// upsertCheckpointTx writes one owner checkpoint by account/date. An owner
-// write wins over a sync-owned row on the same key.
+// upsertCheckpointTx writes one owner checkpoint by account/instant.
+// An owner write wins over a sync-owned row on the same instant key.
 func upsertCheckpointTx(tx *userTx, checkpoint types.Checkpoint) error {
 	position, err := nextTablePosition(tx, "checkpoints")
 	if err != nil {
 		return err
 	}
 	result, err := tx.Exec(
-		`INSERT INTO checkpoints (position, date, model_account_id, balance, source, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))
-		 ON CONFLICT(user_id, model_account_id, date) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
-		position, checkpoint.Date, checkpoint.AccountID, checkpoint.Balance, SourceUser,
+		`INSERT INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))
+		 ON CONFLICT(user_id, model_account_id, observed_at) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
+		position, checkpoint.AccountID, checkpoint.Balance, SourceUser, checkpoint.ObservedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("save checkpoint %s %s: %w", checkpoint.AccountID, checkpoint.Date, err)
+		return fmt.Errorf("save checkpoint %s %d: %w", checkpoint.AccountID, checkpoint.ObservedAt, err)
 	}
 	_ = result
 	return nil
@@ -282,7 +282,7 @@ func (s *sqliteStore) CreateAccount(account types.Account) (types.Account, error
 // CreateAccountWithBalance creates one account and records its opening
 // balance observation in the same transaction: a caller that only wants
 // "an account with this balance" never sees a half-written pair.
-func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error) {
+func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error) {
 	if account.ID == "" {
 		id, err := newRowID()
 		if err != nil {
@@ -297,7 +297,7 @@ func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *f
 		if balance == nil {
 			return nil
 		}
-		return upsertCheckpointTx(tx, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: SourceUser})
+		return upsertCheckpointTx(tx, types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: SourceUser, ObservedAt: observedAt})
 	})
 	if err != nil {
 		return types.Account{}, err
@@ -321,7 +321,7 @@ func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error
 
 // UpdateAccountWithBalance replaces one account and, when a balance is
 // given, records the balance observation in the same transaction.
-func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *float64, observedOn types.IsoDate) (types.Account, error) {
+func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error) {
 	if account.ID == "" {
 		return types.Account{}, NotFound("")
 	}
@@ -332,7 +332,7 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 		if balance == nil {
 			return nil
 		}
-		return upsertCheckpointTx(tx, types.Checkpoint{Date: observedOn, AccountID: account.ID, Balance: *balance, Source: SourceUser})
+		return upsertCheckpointTx(tx, types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: SourceUser, ObservedAt: observedAt})
 	})
 	if err != nil {
 		return types.Account{}, err
@@ -445,8 +445,8 @@ func (s *sqliteStore) MoveRule(id, beforeID string) error {
 	})
 }
 
-// SaveCheckpoint upserts one owner checkpoint by account/date. An owner
-// write wins over a sync-owned row on the same key.
+// SaveCheckpoint upserts one owner checkpoint by account/instant. An owner
+// write wins over a sync-owned row on the same instant key.
 func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error) {
 	checkpoint.Source = SourceUser
 	err := withRowTx(s.db, func(tx *userTx) error {
@@ -458,23 +458,28 @@ func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpo
 	return checkpoint, nil
 }
 
-// DeleteCheckpoint removes the checkpoint row for one account/date,
-// regardless of owner. A deleted sync row returns on the next sync.
-func (s *sqliteStore) DeleteCheckpoint(accountID, date string) error {
+// DeleteCheckpointAt removes the single checkpoint row for one
+// account/instant, regardless of owner. A deleted sync row returns on
+// the next sync.
+func (s *sqliteStore) DeleteCheckpointAt(accountID string, observedAt int64) error {
 	return withRowTx(s.db, func(tx *userTx) error {
-		result, err := tx.Exec(`DELETE FROM checkpoints WHERE model_account_id = ? AND date = ? AND user_id = :user_id`, accountID, date)
-		if err != nil {
-			return fmt.Errorf("delete checkpoint %s %s: %w", accountID, date, err)
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected == 0 {
-			return NotFound(accountID + "/" + date)
-		}
-		return nil
+		return deleteCheckpoints(tx, accountID, observedAt)
 	})
+}
+
+func deleteCheckpoints(tx *userTx, accountID string, observedAt int64) error {
+	result, err := tx.Exec(`DELETE FROM checkpoints WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`, accountID, observedAt)
+	if err != nil {
+		return fmt.Errorf("delete checkpoint %s %d: %w", accountID, observedAt, err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return NotFound(fmt.Sprintf("%s/%d", accountID, observedAt))
+	}
+	return nil
 }
 
 func validEvaluationType(evalType string) bool {

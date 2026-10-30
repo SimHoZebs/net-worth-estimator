@@ -63,7 +63,7 @@ func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *type
 	if len(model.RecurrenceRules) == 0 {
 		t.Fatalf("loss test model has no rules")
 	}
-	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, model.RecurrenceRules[0].ID, date), date)
+	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, model.RecurrenceRules[0].ID, date), date, false)
 	if err != nil {
 		t.Fatalf("execute posting: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestNegativeSourcedOutflowStillClampsToZero(t *testing.T) {
 		},
 	}
 	runtime := lossTestRuntime(t, model, map[string]float64{"checking": 1000}, nil)
-	transition, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-02-01")
+	transition, err := runtime.ExecutePosting(DatedPostingOccurrence{Posting: &model.Postings[0], Index: 0}, "2026-02-01", false)
 	if err != nil {
 		t.Fatalf("execute posting: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 	// must see only 1000 of cap headroom. If the loss had accrued to the
 	// ledger, headroom would be 7000 and the gain would realize in full.
 	model.RecurrenceRules[0].Amount.Inputs["rate"] = types.AmountInputBinding{Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 12.0}}
-	gainTransition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "capgrowth", "2026-03-01"), "2026-03-01")
+	gainTransition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "capgrowth", "2026-03-01"), "2026-03-01", false)
 	if err != nil {
 		t.Fatalf("execute gain posting: %v", err)
 	}

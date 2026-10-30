@@ -2,7 +2,7 @@ import { LockKeyhole } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { updateAccount } from "@/api/generated/endpoints.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
-import { money, todayIso } from "../../domain/format.ts";
+import { money } from "../../domain/format.ts";
 import type { Account } from "../../domain/model.ts";
 import { parseDisplayNumber } from "../editors/formValues.ts";
 import { accountUpdateBody } from "../editors/accountFields.ts";
@@ -172,7 +172,7 @@ export function AccountDetails({
 					...(moved
 						? {
 								balance: balanceValue,
-								observedOn: account.observedOn || todayIso(),
+								observedAt: Math.floor(Date.now() / 1000),
 							}
 						: {}),
 				}),

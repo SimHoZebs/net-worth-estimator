@@ -8,9 +8,11 @@ export function netWorthChangeSinceFirstSync(
 ) {
 	const firstSyncDate = checkpoints
 		.filter((checkpoint) => checkpoint.source === "simplefin")
+		.map((checkpoint) =>
+			new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
+		)
 		.reduce<string | null>(
-			(first, checkpoint) =>
-				first === null || checkpoint.Date < first ? checkpoint.Date : first,
+			(first, day) => (first === null || day < first ? day : first),
 			null,
 		);
 	if (!firstSyncDate) return null;
