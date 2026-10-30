@@ -188,9 +188,9 @@ type PostingClaim struct {
 	OccurrenceDate IsoDate `json:"occurrenceDate"`
 }
 
-// Posting is a single movement with two times: posted time is when the
+// Posting is a single transaction with two times: posted time is when the
 // bank posts it, transaction time is when the money moves. Both are Unix
-// seconds. The UTC day of transaction time groups the movement. Postings
+// seconds. The UTC day of transaction time groups the transaction. Postings
 // never repeat; repetition is owned by RecurrenceRule, which expands into
 // occurrences at projection time. A posting with a Claim is an actual
 // recorded against one scheduled occurrence of its rule.
@@ -223,7 +223,7 @@ type Posting struct {
 	Void bool `json:"void,omitempty"`
 }
 
-// RecurrenceRule owns repetition. Its movement fields are the template
+// RecurrenceRule owns repetition. Its transaction fields are the template
 // expanded into one occurrence per scheduled date; its schedule fields say
 // when. Rules never move money themselves; expansion at projection time
 // produces occurrences that execute exactly like postings. Rate behavior
@@ -259,7 +259,7 @@ type FinancialModelDocument struct {
 // stay values only (balances, bounds, kind); terms carry the payment
 // schedule: minimums, monthly due anchor, and the revolving statement anchor
 // for cards. Terms never move money themselves; postings remain the only
-// movement mechanism. The effective minimum combines MinimumFixed with
+// transaction mechanism. The effective minimum combines MinimumFixed with
 // MinimumPercent of the balance magnitude when set; the balance basis is
 // resolved where terms are applied.
 type PaymentTerms struct {

@@ -12,8 +12,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// The served deterministic payload must not duplicate movement evidence:
-// per-event fulfillment travels once on movementEvents, so the fulfillment
+// The served deterministic payload must not duplicate transaction evidence:
+// per-event fulfillment travels once on transactionEvents, so the fulfillment
 // envelope keeps scalars only. Regression coverage for the 2.3 MB duplicate.
 func TestDeterministicFulfillmentOmitsDetailArrays(t *testing.T) {
 	fixturePath := filepath.Join(apiProjectRoot(t), "backend", "testdata", "golden", "deterministic.json")
@@ -47,8 +47,8 @@ func TestDeterministicFulfillmentOmitsDetailArrays(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode projection response: %v", err)
 	}
-	if payload.Result == nil || len(payload.Result.MovementEvents) == 0 {
-		t.Fatal("movementEvents copy is missing; the kept evidence must stay")
+	if payload.Result == nil || len(payload.Result.TransactionEvents) == 0 {
+		t.Fatal("transactionEvents copy is missing; the kept evidence must stay")
 	}
 	if len(payload.Result.Evaluations.PostingFulfillment) == 0 {
 		t.Fatal("postingFulfillment envelope is missing")

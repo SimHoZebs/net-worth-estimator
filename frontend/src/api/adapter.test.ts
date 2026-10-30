@@ -111,7 +111,7 @@ function projectionFixture(): ProjectionResult {
 			postingFulfillment: [],
 			cycleFulfillment: [],
 		},
-		movementEvents: [],
+		transactionEvents: [],
 	};
 }
 
@@ -137,7 +137,7 @@ function syncedPosting(id: string): BackendPosting {
 function projectionWithSalaryEvent(requestedAmount: number): ProjectionResult {
 	return {
 		...projectionFixture(),
-		movementEvents: [
+		transactionEvents: [
 			{
 				date: "2026-02-05",
 				sequence: 0,

@@ -209,9 +209,9 @@ func TestGoldenCheckpoints(t *testing.T) {
 	}
 	compareValues(t, "result", payload["result"], toAny(t, result))
 
-	// Path-specific checks: historical replay rows and movement events.
+	// Path-specific checks: historical replay rows and transaction events.
 	expectedPath := payload["path"].(map[string]any)
-	compareValues(t, "path.movementEvents", expectedPath["movementEvents"], toAny(t, path.MovementEvents))
+	compareValues(t, "path.transactionEvents", expectedPath["transactionEvents"], toAny(t, path.TransactionEvents))
 	compareValues(t, "path.rows", expectedPath["rows"], toAny(t, path.Rows))
 }
 

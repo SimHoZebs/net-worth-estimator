@@ -34,7 +34,7 @@ function charge(
 ): AccountTransaction {
 	return {
 		id: "charge",
-		movementId: "charge",
+		transactionId: "charge",
 		date: "2026-10-20",
 		name: "Card charge",
 		source: "historical",

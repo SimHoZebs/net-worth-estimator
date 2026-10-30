@@ -208,7 +208,7 @@ export type ChartModel = NonNullable<ReturnType<typeof projectionChartModel>>;
 /**
  * Balance-path model for one funding gap, built on lineChartModel. The
  * trailing x slot holds the refused payment: an explanatory red vector past
- * the last executed movement that is never posted.
+ * the last executed transaction that is never posted.
  */
 export function fundingGapChartModel({
 	gap,

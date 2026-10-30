@@ -296,7 +296,7 @@ function TemplateFields({
 						name="paymentId"
 						{...set("paymentId")}
 					>
-						{optionsFor(postings, "Pick a movement")}
+						{optionsFor(postings, "Pick a transaction")}
 					</SelectField>
 					<SelectField
 						label="Card account"
@@ -343,14 +343,14 @@ function TemplateFields({
 			return (
 				<>
 					<SelectField
-						label="Gross pay movement"
+						label="Gross pay transaction"
 						name="grossId"
 						{...set("grossId")}
 					>
 						{optionsFor(postings, "Pick gross pay")}
 					</SelectField>
 					<SelectField
-						label="Pre-tax slice movement"
+						label="Pre-tax slice transaction"
 						name="pretaxId"
 						{...set("pretaxId")}
 					>

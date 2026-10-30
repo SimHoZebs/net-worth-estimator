@@ -2,7 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import { dateLabel } from "../../domain/format.ts";
 import { failureLedger } from "../../domain/constraintSnapshot.ts";
 import type { Plan } from "../../domain/model.ts";
-import type { MovementResult, Projection } from "../../domain/result.ts";
+import type { TransactionResult, Projection } from "../../domain/result.ts";
 import { Modal } from "../Modal.tsx";
 import { ConstraintSnapshot } from "./ConstraintSnapshot.tsx";
 
@@ -14,7 +14,7 @@ export function FailureEvidence({
 }: {
 	plan: Plan;
 	projection: Projection;
-	failure: MovementResult | null;
+	failure: TransactionResult | null;
 	onClose: () => void;
 }) {
 	if (!failure)
@@ -24,7 +24,7 @@ export function FailureEvidence({
 			</Modal>
 		);
 	const ledger = failureLedger({ plan, projection, failure });
-	// The table names the movement, so the heading names the event instead
+	// The table names the transaction, so the heading names the event instead
 	// of repeating it.
 	return (
 		<Modal title="First underfunded transaction" onClose={onClose}>

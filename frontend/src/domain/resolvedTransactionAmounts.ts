@@ -1,6 +1,6 @@
-import type { MovementResult } from "./result.ts";
+import type { TransactionResult } from "./result.ts";
 
-export interface ResolvedMovementAmount {
+export interface ResolvedTransactionAmount {
 	amount: number;
 	requested: number;
 	date: string;
@@ -9,24 +9,24 @@ export interface ResolvedMovementAmount {
 }
 
 /**
- * Summarize projected occurrences per movement definition.
+ * Summarize projected occurrences per transaction definition.
  *
  * Formula-driven postings (interest = balance * rate, 401(k) = pay * %,
  * payoffs = abs(balance), ...) have no single static amount. The Plan list
  * shows the earliest projected occurrence as the representative figure so
  * the row never dead-ends at "Unavailable".
  */
-export function resolveMovementAmounts(
-	movements: MovementResult[],
-): Map<string, ResolvedMovementAmount> {
-	const grouped = new Map<string, MovementResult[]>();
-	for (const movement of movements) {
-		const group = grouped.get(movement.movementId);
-		if (group) group.push(movement);
-		else grouped.set(movement.movementId, [movement]);
+export function resolveTransactionAmounts(
+	transactions: TransactionResult[],
+): Map<string, ResolvedTransactionAmount> {
+	const grouped = new Map<string, TransactionResult[]>();
+	for (const transaction of transactions) {
+		const group = grouped.get(transaction.transactionId);
+		if (group) group.push(transaction);
+		else grouped.set(transaction.transactionId, [transaction]);
 	}
-	const resolved = new Map<string, ResolvedMovementAmount>();
-	for (const [movementId, group] of grouped) {
+	const resolved = new Map<string, ResolvedTransactionAmount>();
+	for (const [transactionId, group] of grouped) {
 		const ordered = [...group].sort(
 			(left, right) =>
 				left.date.localeCompare(right.date) || left.requested - right.requested,
@@ -36,7 +36,7 @@ export function resolveMovementAmounts(
 		const amount = Number.isFinite(first.realized)
 			? first.realized
 			: first.requested;
-		resolved.set(movementId, {
+		resolved.set(transactionId, {
 			amount,
 			requested: first.requested,
 			date: first.date,

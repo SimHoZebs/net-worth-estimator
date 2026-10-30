@@ -9,15 +9,15 @@ import (
 // Shared state transitions; Go is the owner and single semantic source for
 // posting execution across deterministic, branch (FI), and Monte Carlo runs.
 
-// AppliedMovementTransition carries a movement result plus per-account deltas.
-type AppliedMovementTransition struct {
-	Result        AccountMovementResult
+// AppliedTransactionTransition carries a transaction result plus per-account deltas.
+type AppliedTransactionTransition struct {
+	Result        AccountTransactionResult
 	AccountDeltas []AccountDeltaEntry
 }
 
-// PostingExecutionTransition extends AppliedMovementTransition for postings.
+// PostingExecutionTransition extends AppliedTransactionTransition for postings.
 type PostingExecutionTransition struct {
-	AppliedMovementTransition
+	AppliedTransactionTransition
 	PostingID string
 }
 
@@ -88,7 +88,7 @@ func CloneSimulationState(state SimulationState) SimulationState {
 	return cloned
 }
 
-// TransitionRuntime executes postings/generated movements against one state.
+// TransitionRuntime executes postings/generated transactions against one state.
 type TransitionRuntime struct {
 	State            SimulationState
 	model            types.FinancialModel
@@ -145,10 +145,10 @@ func (t *TransitionRuntime) observeLossPosting(postingID string, realizedAmount 
 	t.State.LatestRealizedPostingAmounts[postingID] = realizedAmount
 }
 
-func (t *TransitionRuntime) applyAndCollectDeltas(result AccountMovementResult, apply func()) AppliedMovementTransition {
+func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResult, apply func()) AppliedTransactionTransition {
 	beforeBalances := SnapshotBalances(t.State.Balances)
 	apply()
-	return AppliedMovementTransition{
+	return AppliedTransactionTransition{
 		Result:        result,
 		AccountDeltas: collectDeltasInOrder(beforeBalances, t.State.Balances, t.accountOrder),
 	}
@@ -167,8 +167,8 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	yearIndex := ProjectionYearIndex(t.projectionStart, date)
 	var sampledRate *float64
 	// Sampling is coordinator-owned: volatile amounts look up their
-	// movement's pre-sampled annual rate for this projection year.
-	// Providers never draw RNG; a missing entry for a volatile movement
+	// transaction's pre-sampled annual rate for this projection year.
+	// Providers never draw RNG; a missing entry for a volatile transaction
 	// is a preparation defect, not a fresh draw.
 	if _, volatile := VolatileRateInputOf(posting.Amount); volatile && t.monteCarloSample != nil {
 		rates, ok := t.monteCarloSample.AnnualRatesByPostingID[posting.ID]
@@ -188,14 +188,14 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	// Clamping discards the entire downside of sampled return
 	// distributions, which biases stochastic bands above the base case.
 	if rawRequested < 0 && IsExternalInflow(posting) {
-		result := ResolveNegativeInflowMovement(posting, rawRequested, t.State.Balances, t.accountByID)
+		result := ResolveNegativeInflowTransaction(posting, rawRequested, t.State.Balances, t.accountByID)
 		transition := t.applyAndCollectDeltas(result, func() {
 			ApplyNegativeInflow(posting, result.RealizedAmount, t.State.Balances, t.accountByID)
 		})
 		t.observeLossPosting(posting.ID, result.RealizedAmount)
 		return PostingExecutionTransition{
-			AppliedMovementTransition: transition,
-			PostingID:                 posting.ID,
+			AppliedTransactionTransition: transition,
+			PostingID:                    posting.ID,
 		}, nil
 	}
 	requestedAmount := maxFloat(0, rawRequested)
@@ -205,14 +205,14 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	if ruleAnnualCap != nil {
 		annualCapRemaining = maxFloat(0, *ruleAnnualCap-realizedThisYear)
 	}
-	result := ResolvePostingMovement(posting, requestedAmount, annualCapRemaining, t.State.Balances, t.accountByID)
+	result := ResolvePostingTransaction(posting, requestedAmount, annualCapRemaining, t.State.Balances, t.accountByID)
 	transition := t.applyAndCollectDeltas(result, func() {
 		ApplyPosting(posting, result.RealizedAmount, t.State.Balances, t.accountByID)
 	})
 	t.observePosting(posting.ID, result.RealizedAmount, date)
 	return PostingExecutionTransition{
-		AppliedMovementTransition: transition,
-		PostingID:                 posting.ID,
+		AppliedTransactionTransition: transition,
+		PostingID:                    posting.ID,
 	}, nil
 }
 
@@ -221,11 +221,11 @@ func (t *TransitionRuntime) ObservePosting(postingID string, realizedAmount floa
 	t.observePosting(postingID, realizedAmount, date)
 }
 
-// ExecuteGeneratedMovement applies a reactive behavior movement.
-func (t *TransitionRuntime) ExecuteGeneratedMovement(action AccountMovementAction) (AppliedMovementTransition, error) {
-	result := ResolveAccountMovement(action, t.State.Balances, t.accountByID)
+// ExecuteGeneratedTransaction applies a reactive behavior transaction.
+func (t *TransitionRuntime) ExecuteGeneratedTransaction(action AccountTransactionAction) (AppliedTransactionTransition, error) {
+	result := ResolveAccountTransaction(action, t.State.Balances, t.accountByID)
 	transition := t.applyAndCollectDeltas(result, func() {
-		ApplyAccountMovement(action, result.RealizedAmount, t.State.Balances, t.accountByID)
+		ApplyAccountTransaction(action, result.RealizedAmount, t.State.Balances, t.accountByID)
 	})
 	return transition, nil
 }

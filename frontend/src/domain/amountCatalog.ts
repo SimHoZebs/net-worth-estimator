@@ -31,9 +31,9 @@ export const FALLBACK_RESOLVERS: CopyEntry[] = [
 export const FALLBACK_PROVIDERS: CopyEntry[] = [
 	{
 		name: "model-value",
-		label: "Other movement amount",
+		label: "Other transaction amount",
 		summary:
-			"Use the last calculated amount of another paycheck or movement. Falls back to account balance when no history exists.",
+			"Use the last calculated amount of another paycheck or transaction. Falls back to account balance when no history exists.",
 	},
 	{
 		name: "account-balance",

@@ -1,6 +1,6 @@
 import type { Transaction, Plan } from "./model.ts";
 import { nextProjectedPayments } from "./nextProjectedPayment.ts";
-import type { MovementResult } from "./result.ts";
+import type { TransactionResult } from "./result.ts";
 
 export interface IncomePayment {
 	date: string;
@@ -27,13 +27,13 @@ export interface SafeSpendingIncome {
  */
 export function safeSpendingIncome({
 	plan,
-	movements,
+	transactions,
 	incomeAccountIds,
 	incomeRuleIds,
 	todayIso,
 }: {
 	plan: Plan;
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	incomeAccountIds: string[];
 	incomeRuleIds: string[];
 	todayIso: string;
@@ -59,7 +59,7 @@ export function safeSpendingIncome({
 				(availableAccounts.has(rule.fromId) && !destinations.has(rule.fromId))),
 	);
 	const nextPayments = nextProjectedPayments({
-		movements,
+		transactions,
 		rules,
 		todayIso,
 	});

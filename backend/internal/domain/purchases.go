@@ -167,7 +167,7 @@ func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, er
 				continue
 			}
 			// Avoid a full simulation when the current source cannot buy the whole item.
-			if posting.SourceAccountID == nil || GetWithdrawableAmount(snapshot.Balances, accounts, *posting.SourceAccountID)+movementEpsilon < cost {
+			if posting.SourceAccountID == nil || GetWithdrawableAmount(snapshot.Balances, accounts, *posting.SourceAccountID)+transactionEpsilon < cost {
 				continue
 			}
 			candidateSchedule := append(append([]scheduledPurchase{}, scheduled...), scheduledPurchase{posting: posting, date: date})
@@ -197,10 +197,10 @@ func accountIndex(accounts []types.Account) map[string]types.Account {
 	return out
 }
 
-func fullyFundedPurchase(run *types.SimulationRun, id string) *types.MovementEvent {
-	for index := range run.MovementAttempts {
-		event := &run.MovementAttempts[index]
-		if event.Origin.PostingID == id && event.RequestedAmount-event.RealizedAmount <= movementEpsilon {
+func fullyFundedPurchase(run *types.SimulationRun, id string) *types.TransactionEvent {
+	for index := range run.TransactionAttempts {
+		event := &run.TransactionAttempts[index]
+		if event.Origin.PostingID == id && event.RequestedAmount-event.RealizedAmount <= transactionEpsilon {
 			return event
 		}
 	}

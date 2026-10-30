@@ -8,9 +8,9 @@ import (
 )
 
 // Rule expansion and claim suppression. Rules own repetition; postings own
-// timed movements. Expansion is virtual: rule occurrences are synthesized at
+// timed transactions. Expansion is virtual: rule occurrences are synthesized at
 // projection time and never stored. A synthesized instance carries the rule's
-// ID, so all downstream ledgers (realized amounts, annual caps, movement
+// ID, so all downstream ledgers (realized amounts, annual caps, transaction
 // origins, evaluation references) key on one stable identity per rule.
 
 // DatedPostingOccurrence binds a posting to its declaration order. Rule is
@@ -278,13 +278,13 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	return resolved
 }
 
-// ResolvedMovementPostings returns every movement identity in a document
+// ResolvedTransactionPostings returns every transaction identity in a document
 // as postings: manual postings in stored order, then one synthesized entry
 // per rule carrying the rule's template (ID, name, routes, amount).
 // Evaluation lookups keyed by origin ID work over this list without caring
 // which side an ID came from. Caps are not carried: they live on rules and
 // resolve through RuleCapsByID.
-func ResolvedMovementPostings(document *types.FinancialModelDocument) []types.Posting {
+func ResolvedTransactionPostings(document *types.FinancialModelDocument) []types.Posting {
 	out := make([]types.Posting, 0, len(document.Postings)+len(document.RecurrenceRules))
 	out = append(out, document.Postings...)
 	for index := range document.RecurrenceRules {
@@ -303,7 +303,7 @@ func ResolvedMovementPostings(document *types.FinancialModelDocument) []types.Po
 }
 
 // RuleCapsByID indexes enabled-or-not rule annual caps by rule ID. Caps
-// live on rules only; manual postings are uncapped single movements.
+// live on rules only; manual postings are uncapped single transactions.
 func RuleCapsByID(document *types.FinancialModelDocument) map[string]float64 {
 	caps := make(map[string]float64, len(document.RecurrenceRules))
 	for index := range document.RecurrenceRules {
@@ -315,9 +315,9 @@ func RuleCapsByID(document *types.FinancialModelDocument) map[string]float64 {
 	return caps
 }
 
-// MovementIDExists reports whether an ID names a manual posting, a rule,
+// TransactionIDExists reports whether an ID names a manual posting, a rule,
 // or a planned purchase.
-func MovementIDExists(document *types.FinancialModelDocument, id string) bool {
+func TransactionIDExists(document *types.FinancialModelDocument, id string) bool {
 	for index := range document.Postings {
 		if document.Postings[index].ID == id {
 			return true
@@ -336,9 +336,9 @@ func MovementIDExists(document *types.FinancialModelDocument, id string) bool {
 	return false
 }
 
-// MovementIDs returns every movement identity in a document: manual posting
+// TransactionIDs returns every transaction identity in a document: manual posting
 // IDs, rule IDs, and planned-purchase IDs.
-func MovementIDs(document *types.FinancialModelDocument) map[string]bool {
+func TransactionIDs(document *types.FinancialModelDocument) map[string]bool {
 	ids := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
 	for index := range document.Postings {
 		ids[document.Postings[index].ID] = true

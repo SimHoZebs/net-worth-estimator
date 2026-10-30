@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { testAccount } from "../mocks/account.ts";
-import { movementFixture } from "../mocks/projection.ts";
+import { transactionFixture } from "../mocks/projection.ts";
 import type { Transaction, Plan } from "./model.ts";
 import { safeSpendingIncome } from "./safeSpendingIncome.ts";
 
@@ -14,13 +14,13 @@ function rule(id: string, overrides: Partial<Transaction> = {}): Transaction {
 	};
 }
 
-function payment(movementId: string, date: string, amount: number) {
-	return movementFixture({
-		movementId,
+function payment(transactionId: string, date: string, amount: number) {
+	return transactionFixture({
+		transactionId,
 		date,
 		requested: amount,
 		realized: amount / 2,
-		fromId: movementId === "partner" ? "savings" : null,
+		fromId: transactionId === "partner" ? "savings" : null,
 		toId: "checking",
 	});
 }
@@ -35,7 +35,7 @@ const plan: Plan = {
 };
 const input = {
 	plan,
-	movements: [
+	transactions: [
 		payment("partner", "2026-11-20", 2400),
 		payment("salary", "2026-10-15", 3000),
 		payment("unselected", "2026-10-09", 9000),
@@ -82,7 +82,7 @@ describe("safeSpendingIncome", () => {
 			safeSpendingIncome({
 				...input,
 				incomeRuleIds: ["salary", "salary", "partner"],
-				movements: [
+				transactions: [
 					payment("salary", "2026-10-15", 1000),
 					payment("partner", "2026-10-15", 2000),
 				],
@@ -95,7 +95,7 @@ describe("safeSpendingIncome", () => {
 			safeSpendingIncome({
 				...input,
 				incomeRuleIds: ["salary"],
-				movements: [
+				transactions: [
 					payment("salary", "2026-10-15", 1000),
 					payment("salary", "2026-11-15", 9000),
 					payment("salary", "2026-10-15", 500),
@@ -120,7 +120,7 @@ describe("safeSpendingIncome", () => {
 			...input,
 			plan: { ...plan, transactions: rules },
 			incomeRuleIds: rules.map((item) => item.id),
-			movements: rules.map((item) => payment(item.id, "2026-10-15", 100)),
+			transactions: rules.map((item) => payment(item.id, "2026-10-15", 100)),
 		});
 		expect(result.selectedRuleIds).toEqual([
 			"active",
@@ -176,7 +176,7 @@ describe("safeSpendingIncome", () => {
 	it("ignores past, same-day, and nonpositive payments without using configured amounts", () => {
 		const result = safeSpendingIncome({
 			...input,
-			movements: [
+			transactions: [
 				payment("salary", "2026-10-07", 10000),
 				payment("salary", "2026-10-08", 10000),
 				payment("salary", "2026-10-09", 0),
@@ -189,7 +189,7 @@ describe("safeSpendingIncome", () => {
 	});
 
 	it("keeps candidates but returns no income while projection data is absent", () => {
-		const result = safeSpendingIncome({ ...input, movements: [] });
+		const result = safeSpendingIncome({ ...input, transactions: [] });
 		expect(result.candidates).toHaveLength(3);
 		expect(result.paycheck).toBeNull();
 	});

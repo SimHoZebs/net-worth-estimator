@@ -6,25 +6,25 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Posting occurrence movement resolution. Scheduling lives in
-// recurrence.go; this file resolves and applies single movements.
+// Posting occurrence transaction resolution. Scheduling lives in
+// recurrence.go; this file resolves and applies single transactions.
 
-// AccountMovementAction is a generic movement request against accounts.
-type AccountMovementAction struct {
+// AccountTransactionAction is a generic transaction request against accounts.
+type AccountTransactionAction struct {
 	SourceAccountID *string
 	Destinations    []string
 	RequestedAmount float64
 	LimitRemaining  *float64
 }
 
-// AccountMovementResult reports requested vs realized amounts.
-type AccountMovementResult struct {
+// AccountTransactionResult reports requested vs realized amounts.
+type AccountTransactionResult struct {
 	RequestedAmount float64
 	RealizedAmount  float64
 }
 
 // ComputeRequestedAmount resolves the raw posting amount for one occurrence.
-// One-time and rule-generated movements resolve through the same amount
+// One-time and rule-generated transactions resolve through the same amount
 // descriptor path: rate, growth, and volatility live in the amount inputs
 // (occurrence-rate and growth-factor providers), never in side columns.
 // Rule schedule context (frequency divisor, start date, pre-sampled rate)
@@ -57,14 +57,14 @@ func ComputeRequestedAmount(occurrence DatedPostingOccurrence, currentDate strin
 	return rawAmount, nil
 }
 
-// ResolveAccountMovement clamps a requested movement to constraints.
-func ResolveAccountMovement(action AccountMovementAction, balances map[string]float64, accountByID map[string]types.Account) AccountMovementResult {
+// ResolveAccountTransaction clamps a requested transaction to constraints.
+func ResolveAccountTransaction(action AccountTransactionAction, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
 	requestedAmount := math.Max(0, action.RequestedAmount)
 	if requestedAmount == 0 {
-		return AccountMovementResult{RequestedAmount: requestedAmount, RealizedAmount: 0}
+		return AccountTransactionResult{RequestedAmount: requestedAmount, RealizedAmount: 0}
 	}
 	if action.SourceAccountID != nil && !accountExists(accountByID, *action.SourceAccountID) {
-		return AccountMovementResult{RequestedAmount: requestedAmount, RealizedAmount: 0}
+		return AccountTransactionResult{RequestedAmount: requestedAmount, RealizedAmount: 0}
 	}
 	sourceBalanceLimit := math.Inf(1)
 	if action.SourceAccountID != nil {
@@ -79,13 +79,13 @@ func ResolveAccountMovement(action AccountMovementAction, balances map[string]fl
 		actionLimit = *action.LimitRemaining
 	}
 	realizedAmount := math.Max(0, math.Min(requestedAmount, math.Min(actionLimit, math.Min(sourceBalanceLimit, destBalanceLimit))))
-	return AccountMovementResult{RequestedAmount: requestedAmount, RealizedAmount: realizedAmount}
+	return AccountTransactionResult{RequestedAmount: requestedAmount, RealizedAmount: realizedAmount}
 }
 
-// ResolvePostingMovement wraps ResolveAccountMovement for postings.
-func ResolvePostingMovement(posting *types.Posting, requestedAmount, annualCapRemaining float64, balances map[string]float64, accountByID map[string]types.Account) AccountMovementResult {
+// ResolvePostingTransaction wraps ResolveAccountTransaction for postings.
+func ResolvePostingTransaction(posting *types.Posting, requestedAmount, annualCapRemaining float64, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
 	capRemaining := annualCapRemaining
-	return ResolveAccountMovement(AccountMovementAction{
+	return ResolveAccountTransaction(AccountTransactionAction{
 		SourceAccountID: posting.SourceAccountID,
 		Destinations:    posting.Destinations,
 		RequestedAmount: requestedAmount,
@@ -93,12 +93,12 @@ func ResolvePostingMovement(posting *types.Posting, requestedAmount, annualCapRe
 	}, balances, accountByID)
 }
 
-// ResolveNegativeInflowMovement resolves a negative amount on a sourceless
+// ResolveNegativeInflowTransaction resolves a negative amount on a sourceless
 // inflow posting (an investment loss) against destination floors, in
 // destination order. Requested and realized amounts stay negative; realized
 // is bounded by the withdrawable amount above each destination floor.
 // Losses never consume annual caps: caps limit money moved in, not losses.
-func ResolveNegativeInflowMovement(posting *types.Posting, requestedLoss float64, balances map[string]float64, accountByID map[string]types.Account) AccountMovementResult {
+func ResolveNegativeInflowTransaction(posting *types.Posting, requestedLoss float64, balances map[string]float64, accountByID map[string]types.Account) AccountTransactionResult {
 	remaining := -requestedLoss
 	withdrawn := 0.0
 	for _, destID := range posting.Destinations {
@@ -113,11 +113,11 @@ func ResolveNegativeInflowMovement(posting *types.Posting, requestedLoss float64
 		withdrawn += take
 		remaining -= take
 	}
-	return AccountMovementResult{RequestedAmount: requestedLoss, RealizedAmount: -withdrawn}
+	return AccountTransactionResult{RequestedAmount: requestedLoss, RealizedAmount: -withdrawn}
 }
 
-// ApplyAccountMovement applies a realized amount to balances.
-func ApplyAccountMovement(action AccountMovementAction, realizedAmount float64, balances map[string]float64, accountByID map[string]types.Account) {
+// ApplyAccountTransaction applies a realized amount to balances.
+func ApplyAccountTransaction(action AccountTransactionAction, realizedAmount float64, balances map[string]float64, accountByID map[string]types.Account) {
 	if realizedAmount <= 0 {
 		return
 	}
@@ -142,9 +142,9 @@ func ApplyAccountMovement(action AccountMovementAction, realizedAmount float64, 
 	}
 }
 
-// ApplyPosting applies a posting's realized movement.
+// ApplyPosting applies a posting's realized transaction.
 func ApplyPosting(posting *types.Posting, realizedAmount float64, balances map[string]float64, accountByID map[string]types.Account) {
-	ApplyAccountMovement(AccountMovementAction{
+	ApplyAccountTransaction(AccountTransactionAction{
 		SourceAccountID: posting.SourceAccountID,
 		Destinations:    posting.Destinations,
 		RequestedAmount: realizedAmount,

@@ -3,7 +3,7 @@ import type { Account, Plan } from "../../domain/model.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import type { FailureLedger } from "../../domain/constraintSnapshot.ts";
 import type { Transaction } from "../../domain/model.ts";
-import type { MovementResult } from "../../domain/result.ts";
+import type { TransactionResult } from "../../domain/result.ts";
 import { AccountEntry } from "../AccountEntry.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
 import { useSelectedEntry } from "../entrySelection.ts";
@@ -21,7 +21,7 @@ export function ConstraintSnapshot({
 	showHeaders = false,
 }: {
 	ledger: FailureLedger;
-	failure: MovementResult;
+	failure: TransactionResult;
 	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
 	plan: Plan;
 	showHeaders?: boolean;

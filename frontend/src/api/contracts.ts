@@ -321,31 +321,31 @@ export interface ProjectionAccountSummary {
 	endingBalance: number;
 }
 
-export interface MovementOrigin {
+export interface TransactionOrigin {
 	type: string;
 	postingId: string;
 }
 
-export interface MovementAccountDelta {
+export interface TransactionAccountDelta {
 	accountId: string;
 	delta: number;
 }
 
-export interface MovementFulfillment {
+export interface TransactionFulfillment {
 	unfulfilledAmount: number;
 	destinationLimitedAmount: number;
 }
 
-export interface MovementEvent {
+export interface TransactionEvent {
 	date: IsoDate;
 	sequence: number;
-	origin: MovementOrigin;
+	origin: TransactionOrigin;
 	requestedAmount: number;
 	realizedAmount: number;
-	accountDeltas: MovementAccountDelta[] | null;
+	accountDeltas: TransactionAccountDelta[] | null;
 	bindingConstraints?: JsonValue[];
 	availableAmount?: number;
-	fulfillment?: MovementFulfillment;
+	fulfillment?: TransactionFulfillment;
 }
 
 export interface ProjectionTimeline {
@@ -410,7 +410,7 @@ export interface ProjectionResult extends HumaMetadata {
 	milestones: ProjectionMilestones;
 	summary: ProjectionSummary;
 	evaluations: EvaluationResultTables;
-	movementEvents?: MovementEvent[];
+	transactionEvents?: TransactionEvent[];
 }
 
 export interface DeterministicProjectionRequest extends HumaMetadata {
@@ -603,7 +603,7 @@ export interface SafeSpendingSettings {
 	/** Explicit recurrence rule sources. Empty means no automatic income. */
 	incomeRuleIds: string[];
 	/** Null includes all recurring outflows. */
-	movementIds: string[] | null;
+	transactionIds: string[] | null;
 	/** Explicitly chosen day, including the legacy first-of-month case. */
 	statementDaySet: boolean;
 }

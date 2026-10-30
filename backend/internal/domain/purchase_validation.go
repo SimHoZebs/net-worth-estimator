@@ -66,8 +66,8 @@ func validatePurchases(issues *[]types.ModelValidationIssue, document *types.Fin
 		purchases[p.ID] = true
 	}
 	// Established payments cannot depend on an optional, unscheduled purchase.
-	for _, movement := range ResolvedMovementPostings(document) {
-		for _, dependency := range dependencies[movement.ID] {
+	for _, transaction := range ResolvedTransactionPostings(document) {
+		for _, dependency := range dependencies[transaction.ID] {
 			if purchases[dependency] {
 				addIssue(issues, types.SeverityError, "purchase.reference.invalid", "Amounts cannot depend on a planned purchase.", "postings")
 			}

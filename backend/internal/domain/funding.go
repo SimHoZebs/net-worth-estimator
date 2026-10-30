@@ -9,7 +9,7 @@ import (
 
 const minReportableUnfulfilledAmount = 0.5
 
-func reportableUnfulfilled(event *types.MovementEvent) float64 {
+func reportableUnfulfilled(event *types.TransactionEvent) float64 {
 	amount := math.Max(0, event.RequestedAmount-event.RealizedAmount)
 	if amount >= minReportableUnfulfilledAmount {
 		return amount
@@ -17,9 +17,9 @@ func reportableUnfulfilled(event *types.MovementEvent) float64 {
 	return 0
 }
 
-type evaluatedMovementEvent struct {
-	event              *types.MovementEvent
-	bindingConstraints []accountMovementConstraint
+type evaluatedTransactionEvent struct {
+	event              *types.TransactionEvent
+	bindingConstraints []accountTransactionConstraint
 	destinationLimited float64
 	unfulfilled        float64
 	fundingShortfall   float64 // Exact residual; public reports retain their display threshold.
@@ -27,8 +27,8 @@ type evaluatedMovementEvent struct {
 	availableAmount    *float64
 }
 
-func (evaluated evaluatedMovementEvent) fulfillment() types.MovementFulfillment {
-	return types.MovementFulfillment{
+func (evaluated evaluatedTransactionEvent) fulfillment() types.TransactionFulfillment {
+	return types.TransactionFulfillment{
 		UnfulfilledAmount:        roundCurrency(evaluated.unfulfilled),
 		DestinationLimitedAmount: roundCurrency(evaluated.destinationLimited),
 	}
@@ -64,7 +64,7 @@ func availableAmountFromLimits(posting *types.Posting, balancesBefore map[string
 	return &rounded
 }
 
-// evaluateMovementEvents is the shared assessment behind public evidence,
+// evaluateTransactionEvents is the shared assessment behind public evidence,
 // fulfillment evaluations, and purchase scheduling. It does not read evaluation
 // configuration, so a disabled or narrowly scoped check cannot hide a gap.
 //
@@ -72,16 +72,16 @@ func availableAmountFromLimits(posting *types.Posting, balancesBefore map[string
 // cap ledger once, returning fulfillment inputs, binding constraints,
 // remaining cap, and display-ready available amount together. Display callers
 // format from this result without re-deriving balances, sort order, or caps.
-func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent {
+func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactionEvent {
 	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
 	accountsByID := map[string]types.Account{}
 	for _, account := range path.EffectiveDocument.Accounts {
 		accountsByID[account.ID] = account
 	}
 	postingsByID := map[string]*types.Posting{}
-	movements := ResolvedMovementPostings(&path.EffectiveDocument)
-	for index := range movements {
-		posting := &movements[index]
+	transactions := ResolvedTransactionPostings(&path.EffectiveDocument)
+	for index := range transactions {
+		posting := &transactions[index]
 		postingsByID[posting.ID] = posting
 	}
 	capsByID := RuleCapsByID(&path.EffectiveDocument)
@@ -92,9 +92,9 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		}
 	}
 
-	sorted := make([]*types.MovementEvent, len(path.MovementEvents))
-	for index := range path.MovementEvents {
-		sorted[index] = &path.MovementEvents[index]
+	sorted := make([]*types.TransactionEvent, len(path.TransactionEvents))
+	for index := range path.TransactionEvents {
+		sorted[index] = &path.TransactionEvents[index]
 	}
 	sort.SliceStable(sorted, func(i, j int) bool {
 		if sorted[i].Date != sorted[j].Date {
@@ -103,12 +103,12 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		return sorted[i].Sequence < sorted[j].Sequence
 	})
 
-	out := make([]evaluatedMovementEvent, 0, len(sorted))
+	out := make([]evaluatedTransactionEvent, 0, len(sorted))
 	for _, event := range sorted {
 		posting := postingsByID[event.Origin.PostingID]
 		capKey := event.Origin.PostingID + ":" + event.Date[:4]
 		realizedBefore := realizedByPostingAndYear[capKey]
-		var bindingConstraints []accountMovementConstraint
+		var bindingConstraints []accountTransactionConstraint
 		var capRemaining *float64
 		if cap, capped := capsByID[event.Origin.PostingID]; capped && posting != nil {
 			limitRemaining := math.Max(0, cap-realizedBefore)
@@ -118,7 +118,7 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 			if beforeBalances == nil {
 				beforeBalances = map[string]float64{}
 			}
-			bindingConstraints = ClassifyMovementConstraints(movementConstraintInput{
+			bindingConstraints = ClassifyTransactionConstraints(transactionConstraintInput{
 				SourceAccountID: posting.SourceAccountID,
 				Destinations:    posting.Destinations,
 				RequestedAmount: event.RequestedAmount,
@@ -132,7 +132,7 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 			if beforeBalances == nil {
 				beforeBalances = map[string]float64{}
 			}
-			bindingConstraints = ClassifyMovementConstraints(movementConstraintInput{
+			bindingConstraints = ClassifyTransactionConstraints(transactionConstraintInput{
 				SourceAccountID: posting.SourceAccountID,
 				Destinations:    posting.Destinations,
 				RequestedAmount: event.RequestedAmount,
@@ -142,7 +142,7 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 				LimitRemaining:  nil,
 			})
 		} else {
-			bindingConstraints = []accountMovementConstraint{}
+			bindingConstraints = []accountTransactionConstraint{}
 		}
 		residual := reportableUnfulfilled(event)
 		destinationLimited := false
@@ -169,7 +169,7 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 		}
 		// Losses are balance adjustments, not cap consumption.
 		realizedByPostingAndYear[capKey] = realizedBefore + maxFloat(0, event.RealizedAmount)
-		out = append(out, evaluatedMovementEvent{
+		out = append(out, evaluatedTransactionEvent{
 			event: event, bindingConstraints: bindingConstraints,
 			destinationLimited: destinationLimitedAmount, unfulfilled: unfulfilledAmount,
 			fundingShortfall: fundingShortfall,
@@ -180,7 +180,7 @@ func evaluateMovementEvents(path *types.ProjectionPath) []evaluatedMovementEvent
 }
 
 // HasFundingGapFrom applies the canonical per-event funding assessment to all
-// movements on or after date. It is independent of configured evaluations and
+// transactions on or after date. It is independent of configured evaluations and
 // retains their destination-ceiling distinction. Protection uses exact amounts,
 // including shortfalls below the public report's display threshold.
 func HasFundingGapFrom(path *types.ProjectionPath, date string) bool {
@@ -188,9 +188,9 @@ func HasFundingGapFrom(path *types.ProjectionPath, date string) bool {
 }
 
 func hasFundingGapAfter(path *types.ProjectionPath, date string, sequence int) bool {
-	for _, event := range evaluateMovementEvents(path) {
+	for _, event := range evaluateTransactionEvents(path) {
 		isLater := event.event.Date > date || (event.event.Date == date && event.event.Sequence > sequence)
-		if isLater && event.fundingShortfall > movementEpsilon {
+		if isLater && event.fundingShortfall > transactionEpsilon {
 			return true
 		}
 	}

@@ -3,8 +3,9 @@ package api
 import "testing"
 
 func TestArtifactIdentityPreservesStoredResultKeys(t *testing.T) {
-	// Pin the existing envelope so terminology changes do not orphan results.
-	const want = "deterministic:6:5902232bedcf093519ff8ee025f87328f72f73c073ed8c3607da63745199e36e"
+	// Pin the existing envelope. The transaction rename intentionally
+	// orphans pre-rename stored results, so this pins the post-rename key.
+	const want = "deterministic:7:f13edc334395707851cf7215943794d5ad0db43737986cf2d7c0c1ebf2b23bdf"
 	if got := artifactKey("deterministic", map[string]any{"example": "identity"}); got != want {
 		t.Fatalf("result identity = %q, want %q", got, want)
 	}

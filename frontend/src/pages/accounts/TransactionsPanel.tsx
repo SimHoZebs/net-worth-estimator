@@ -17,7 +17,7 @@ import {
 	type Transaction,
 	type Plan,
 } from "../../domain/model.ts";
-import type { ResolvedMovementAmount } from "../../domain/resolvedMovementAmounts.ts";
+import type { ResolvedTransactionAmount } from "../../domain/resolvedTransactionAmounts.ts";
 
 export function TransactionsPanel({
 	transactions,
@@ -29,7 +29,7 @@ export function TransactionsPanel({
 	transactions: Transaction[];
 	accounts: Account[];
 	plan: Plan;
-	resolvedAmounts?: Map<string, ResolvedMovementAmount>;
+	resolvedAmounts?: Map<string, ResolvedTransactionAmount>;
 	showHeaders?: boolean;
 }) {
 	if (!transactions.length)
@@ -164,7 +164,7 @@ function TransactionAmount({
 	resolved,
 }: {
 	transaction: Transaction;
-	resolved: ResolvedMovementAmount | undefined;
+	resolved: ResolvedTransactionAmount | undefined;
 }) {
 	if (transaction.amountKnown)
 		return (

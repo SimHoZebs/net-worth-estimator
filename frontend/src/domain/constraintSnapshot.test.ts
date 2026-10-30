@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { testAccount } from "../mocks/account.ts";
-import { movementFixture, projectionFixture } from "../mocks/projection.ts";
+import { transactionFixture, projectionFixture } from "../mocks/projection.ts";
 import { failureLedger } from "./constraintSnapshot.ts";
-import type { MovementResult } from "./result.ts";
+import type { TransactionResult } from "./result.ts";
 
-function move(overrides: Partial<MovementResult>): MovementResult {
-	return movementFixture(overrides);
+function move(overrides: Partial<TransactionResult>): TransactionResult {
+	return transactionFixture(overrides);
 }
 
-function checkingProjection(movements: MovementResult[]) {
+function checkingProjection(transactions: TransactionResult[]) {
 	return projectionFixture({
 		points: [
 			{
@@ -17,7 +17,7 @@ function checkingProjection(movements: MovementResult[]) {
 				balances: { checking: 20000 },
 			},
 		],
-		movements,
+		transactions,
 	});
 }
 
@@ -25,7 +25,7 @@ describe("failure ledger", () => {
 	function decemberFailure() {
 		return move({
 			date: "2026-12-05",
-			movementId: "renovation",
+			transactionId: "renovation",
 			name: "Home renovation",
 			requested: 9000,
 			realized: 6350,
@@ -43,7 +43,7 @@ describe("failure ledger", () => {
 			projection: checkingProjection([
 				move({
 					date: "2026-11-05",
-					movementId: "living",
+					transactionId: "living",
 					name: "Everyday living",
 					requested: 5400,
 					realized: 5400,
@@ -53,7 +53,7 @@ describe("failure ledger", () => {
 				}),
 				move({
 					date: "2026-12-01",
-					movementId: "pay",
+					transactionId: "pay",
 					name: "Take-home pay",
 					requested: 11200,
 					realized: 11200,
@@ -63,7 +63,7 @@ describe("failure ledger", () => {
 				}),
 				move({
 					date: "2026-12-20",
-					movementId: "living",
+					transactionId: "living",
 					name: "Everyday living",
 					requested: 5400,
 					realized: 5400,
@@ -109,7 +109,7 @@ describe("failure ledger", () => {
 	it("caps peers at the nearest transactions and always shows the failure", () => {
 		const failure = move({
 			date: "2026-12-15",
-			movementId: "renovation",
+			transactionId: "renovation",
 			name: "Home renovation",
 			requested: 9000,
 			realized: 6350,
@@ -118,12 +118,12 @@ describe("failure ledger", () => {
 			constraintTypes: ["source-floor"],
 			accountDeltas: [{ accountId: "checking", delta: -6350 }],
 		});
-		const busy: MovementResult[] = [];
+		const busy: TransactionResult[] = [];
 		for (let day = 1; day <= 7; day++) {
 			busy.push(
 				move({
 					date: `2026-12-${String(day).padStart(2, "0")}`,
-					movementId: `extra-${day}`,
+					transactionId: `extra-${day}`,
 					name: `Extra ${day}`,
 					requested: 100,
 					realized: 100,

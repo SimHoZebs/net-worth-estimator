@@ -10,7 +10,7 @@ it("keeps only identity and resolves refreshed records until removal", () => {
 	const planTransaction = testAccount.transactions[0]!;
 	const transaction = {
 		id: "occurrence",
-		movementId: planTransaction.id,
+		transactionId: planTransaction.id,
 		amount: 10,
 	} as AccountTransaction;
 	const view = renderHook(

@@ -79,12 +79,12 @@ describe("useCardCycleActivity", () => {
 		expect(result.current.perAccount[0]!.derived).toBe(75);
 		expect(
 			result.current.chargeCycles.cycle.transactions.map(
-				(row) => row.movementId,
+				(row) => row.transactionId,
 			),
 		).toEqual(["new-start", "today"]);
 		expect(
 			result.current.chargeCycles["last-cycle"].transactions.map(
-				(row) => row.movementId,
+				(row) => row.transactionId,
 			),
 		).toEqual(["closed-start", "closed-end"]);
 		expect(result.current.closedCycle.total).toBe(500);
@@ -101,12 +101,12 @@ describe("useCardCycleActivity", () => {
 		expect(result.current.closedCycle.total).toBe(1200);
 		expect(
 			result.current.chargeCycles.cycle.transactions.map(
-				(row) => row.movementId,
+				(row) => row.transactionId,
 			),
 		).toEqual(["today", "new-start"]);
 		expect(
 			result.current.chargeCycles["last-cycle"].transactions.map(
-				(row) => row.movementId,
+				(row) => row.transactionId,
 			),
 		).toEqual(["closed-end", "other-card", "closed-start"]);
 	});
@@ -152,7 +152,7 @@ describe("useCardCycleActivity", () => {
 			result.current.chargeCycles.cycle.transactions.filter(
 				(row) => row.pending,
 			);
-		expect(currentPending.map((row) => row.movementId)).toEqual([
+		expect(currentPending.map((row) => row.transactionId)).toEqual([
 			"pending-before",
 			"pending-checkpoint",
 			"pending-after",
@@ -160,7 +160,7 @@ describe("useCardCycleActivity", () => {
 		expect(currentPending.every((row) => row.excluded)).toBe(true);
 		expect(
 			result.current.chargeCycles["last-cycle"].transactions.map(
-				(row) => row.movementId,
+				(row) => row.transactionId,
 			),
 		).toEqual(["closed-start", "closed-end", "pending-closed"]);
 		expect(result.current.closedCycle.total).toBe(500);

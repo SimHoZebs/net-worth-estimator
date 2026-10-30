@@ -10,7 +10,7 @@ import {
 } from "../../domain/fundingGaps.ts";
 import { fundingLabels } from "../../domain/fundingTerminology.ts";
 import { BalancePathChart } from "./BalancePathChart.tsx";
-import { FundingMovementIcon } from "./FundingMovementIcon.tsx";
+import { FundingTransactionIcon } from "./FundingTransactionIcon.tsx";
 
 export function FundingGapsModal({
 	gaps,
@@ -113,7 +113,7 @@ export function FundingGapsModal({
 			<h3 className="mt-4 mb-1 text-sm">Before the payment</h3>
 			<p className="text-sm leading-relaxed text-muted">
 				Opening balance {money(gap.openingBalance)} on{" "}
-				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length} movements
+				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length} transactions
 				in execution order · Later deposits excluded
 			</p>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */}
@@ -123,7 +123,7 @@ export function FundingGapsModal({
 						key={row.id}
 						className="flex items-center gap-3 border-t border-line py-3 text-xs"
 					>
-						<FundingMovementIcon kind={row.kind} />
+						<FundingTransactionIcon kind={row.kind} />
 						<div className="min-w-0 flex-1">
 							<div>{row.name}</div>
 							<small className="text-xs text-muted">

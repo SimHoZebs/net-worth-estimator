@@ -7,17 +7,17 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Movement constraint reconstruction.
+// Transaction constraint reconstruction.
 
-const movementEpsilon = 1e-9
+const transactionEpsilon = 1e-9
 
-type accountMovementConstraint struct {
+type accountTransactionConstraint struct {
 	Type       string
 	AccountID  string   // source-unavailable | source-floor
 	AccountIDs []string // destination-ceiling
 }
 
-func (c accountMovementConstraint) toTypes() types.JsonValue {
+func (c accountTransactionConstraint) toTypes() types.JsonValue {
 	switch c.Type {
 	case "source-unavailable", "source-floor":
 		return map[string]any{"type": c.Type, "accountId": c.AccountID}
@@ -28,7 +28,7 @@ func (c accountMovementConstraint) toTypes() types.JsonValue {
 	}
 }
 
-type movementConstraintInput struct {
+type transactionConstraintInput struct {
 	SourceAccountID *string
 	Destinations    []string
 	RequestedAmount float64
@@ -39,32 +39,32 @@ type movementConstraintInput struct {
 }
 
 func isBinding(limit, realized float64) bool {
-	return !math.IsInf(limit, 0) && math.Abs(limit-realized) < movementEpsilon
+	return !math.IsInf(limit, 0) && math.Abs(limit-realized) < transactionEpsilon
 }
 
-// ClassifyMovementConstraints derives binding constraints for an underfulfilled movement.
-func ClassifyMovementConstraints(input movementConstraintInput) []accountMovementConstraint {
-	if input.RequestedAmount-input.RealizedAmount <= movementEpsilon {
+// ClassifyTransactionConstraints derives binding constraints for an underfulfilled transaction.
+func ClassifyTransactionConstraints(input transactionConstraintInput) []accountTransactionConstraint {
+	if input.RequestedAmount-input.RealizedAmount <= transactionEpsilon {
 		return nil
 	}
 	if input.SourceAccountID != nil && !accountExists(input.AccountsByID, *input.SourceAccountID) {
-		return []accountMovementConstraint{{Type: "source-unavailable", AccountID: *input.SourceAccountID}}
+		return []accountTransactionConstraint{{Type: "source-unavailable", AccountID: *input.SourceAccountID}}
 	}
-	constraints := []accountMovementConstraint{}
+	constraints := []accountTransactionConstraint{}
 	if input.SourceAccountID != nil {
 		withdrawable := GetWithdrawableAmount(input.BalancesBefore, input.AccountsByID, *input.SourceAccountID)
 		if isBinding(withdrawable, input.RealizedAmount) {
-			constraints = append(constraints, accountMovementConstraint{Type: "source-floor", AccountID: *input.SourceAccountID})
+			constraints = append(constraints, accountTransactionConstraint{Type: "source-floor", AccountID: *input.SourceAccountID})
 		}
 	}
 	if input.Destinations != nil {
 		headroom := GetTotalDestinationHeadroom(input.BalancesBefore, input.AccountsByID, input.Destinations)
 		if isBinding(headroom, input.RealizedAmount) {
-			constraints = append(constraints, accountMovementConstraint{Type: "destination-ceiling", AccountIDs: input.Destinations})
+			constraints = append(constraints, accountTransactionConstraint{Type: "destination-ceiling", AccountIDs: input.Destinations})
 		}
 	}
 	if input.LimitRemaining != nil && isBinding(*input.LimitRemaining, input.RealizedAmount) {
-		constraints = append(constraints, accountMovementConstraint{Type: "action-limit"})
+		constraints = append(constraints, accountTransactionConstraint{Type: "action-limit"})
 	}
 	return constraints
 }
@@ -78,9 +78,9 @@ func ReconstructBalancesBeforeEvents(path *types.ProjectionPath) map[int]map[str
 			projectedRowsByDate[row.Date] = row
 		}
 	}
-	eventsByDate := map[string][]*types.MovementEvent{}
-	for index := range path.MovementEvents {
-		event := &path.MovementEvents[index]
+	eventsByDate := map[string][]*types.TransactionEvent{}
+	for index := range path.TransactionEvents {
+		event := &path.TransactionEvents[index]
 		eventsByDate[event.Date] = append(eventsByDate[event.Date], event)
 	}
 	balancesBeforeBySequence := map[int]map[string]float64{}
@@ -98,7 +98,7 @@ func ReconstructBalancesBeforeEvents(path *types.ProjectionPath) map[int]map[str
 		for _, snapshot := range row.AccountSnapshots {
 			balances[snapshot.AccountID] = snapshot.Balance
 		}
-		events := make([]*types.MovementEvent, len(eventsByDate[date]))
+		events := make([]*types.TransactionEvent, len(eventsByDate[date]))
 		copy(events, eventsByDate[date])
 		sort.SliceStable(events, func(i, j int) bool { return events[i].Sequence > events[j].Sequence })
 		for _, event := range events {

@@ -4,7 +4,7 @@ import {
 } from "./accountActivity.ts";
 import { dateLabel, money, monthDay } from "./format.ts";
 import type { Account, Transaction, Plan } from "./model.ts";
-import type { MovementResult, Projection } from "./result.ts";
+import type { TransactionResult, Projection } from "./result.ts";
 
 export interface LedgerRow {
 	transaction: AccountTransaction;
@@ -52,7 +52,7 @@ export function failureLedger({
 }: {
 	plan: Plan;
 	projection: Projection;
-	failure: MovementResult;
+	failure: TransactionResult;
 }): FailureLedger | null {
 	const accountId = failure.fromId ?? failure.toId;
 	if (!accountId) return null;
@@ -73,7 +73,7 @@ export function failureLedger({
 	);
 	const failing = candidates.find(
 		(transaction) =>
-			transaction.movementId === failure.movementId &&
+			transaction.transactionId === failure.transactionId &&
 			transaction.date === failure.date,
 	);
 	const peers = candidates.filter((transaction) => transaction !== failing);
@@ -97,7 +97,7 @@ export function failureLedger({
 		isFailing: boolean,
 	): LedgerRow => ({
 		transaction,
-		planTransaction: transactions.get(transaction.movementId) ?? null,
+		planTransaction: transactions.get(transaction.transactionId) ?? null,
 		failing: isFailing,
 	});
 	const rows = [

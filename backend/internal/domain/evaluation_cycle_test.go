@@ -7,11 +7,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func cycleEvent(date, postingID, accountID string, delta float64, sequence int) types.MovementEvent {
-	return types.MovementEvent{
+func cycleEvent(date, postingID, accountID string, delta float64, sequence int) types.TransactionEvent {
+	return types.TransactionEvent{
 		Date:            types.IsoDate(date),
 		Sequence:        sequence,
-		Origin:          types.MovementOrigin{Type: "posting", PostingID: postingID},
+		Origin:          types.TransactionOrigin{Type: "posting", PostingID: postingID},
 		RequestedAmount: math.Abs(delta),
 		RealizedAmount:  math.Abs(delta),
 		AccountDeltas: []struct {
@@ -21,9 +21,9 @@ func cycleEvent(date, postingID, accountID string, delta float64, sequence int) 
 	}
 }
 
-func cyclePath(start string, postings []types.Posting, events []types.MovementEvent, buckets map[string]map[string]float64) *types.ProjectionPath {
+func cyclePath(start string, postings []types.Posting, events []types.TransactionEvent, buckets map[string]map[string]float64) *types.ProjectionPath {
 	path := &types.ProjectionPath{
-		MovementEvents:      events,
+		TransactionEvents:   events,
 		EffectiveDocument:   types.FinancialModelDocument{Postings: postings},
 		ProjectionStartDate: types.IsoDate(start),
 		ProjectionEndDate:   types.IsoDate("2027-09-20"),
@@ -153,7 +153,7 @@ func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 		PostedTime: 1789516800, TransactionTime: 1789516800, Enabled: true,
 	}}
 	buckets := map[string]map[string]float64{"charge-sep-16": {"2026": 60}}
-	events := []types.MovementEvent{
+	events := []types.TransactionEvent{
 		cycleEvent("2026-09-10", "before-window", card, -999, 1),
 		cycleEvent("2026-09-22", "charge-sep-22", card, -40, 2),
 		cycleEvent("2026-09-23", "payment", card, 200, 3),
@@ -181,7 +181,7 @@ func TestEvaluateCycleFulfillmentSumsRecordedAndScheduled(t *testing.T) {
 func TestEvaluateCycleFulfillmentCombinesAccountSet(t *testing.T) {
 	// One total budget covers both cards: spend sums across the set while
 	// payments into either card stay out.
-	events := []types.MovementEvent{
+	events := []types.TransactionEvent{
 		cycleEvent("2026-09-22", "prime-charge", "prime_card", -300, 1),
 		cycleEvent("2026-09-23", "ultimate-charge", "ultimate_card", -250, 2),
 		cycleEvent("2026-09-24", "payment", "prime_card", 1000, 3),
@@ -200,7 +200,7 @@ func TestEvaluateCycleFulfillmentCombinesAccountSet(t *testing.T) {
 	}
 }
 
-func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A start-date occurrence covered by a movement event (no checkpoint
+func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A start-date occurrence covered by a transaction event (no checkpoint
 	// suppression) must count once, through the event.
 	card := "prime_card"
 	postings := []types.Posting{{
@@ -208,7 +208,7 @@ func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A 
 		PostedTime: 1789862400, TransactionTime: 1789862400, Enabled: true,
 	}}
 	buckets := map[string]map[string]float64{"charge-start": {"2026": 25}}
-	events := []types.MovementEvent{cycleEvent("2026-09-20", "charge-start", card, -25, 1)}
+	events := []types.TransactionEvent{cycleEvent("2026-09-20", "charge-start", card, -25, 1)}
 	path := cyclePath("2026-09-20", postings, events, buckets)
 	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.Spent != 25 {
@@ -218,7 +218,7 @@ func TestEvaluateCycleFulfillmentSkipsStartDateDoubleCount(t *testing.T) { // A 
 
 func TestEvaluateCycleFulfillmentReportsShortfall(t *testing.T) {
 	card := "prime_card"
-	events := []types.MovementEvent{cycleEvent("2026-09-22", "big-charge", card, -900, 1)}
+	events := []types.TransactionEvent{cycleEvent("2026-09-22", "big-charge", card, -900, 1)}
 	path := cyclePath("2026-09-20", nil, events, map[string]map[string]float64{})
 	result := EvaluateCycleFulfillment(path, types.CycleFulfillmentConfig{AccountIDs: []string{card}, StatementDay: 15, Budget: 800})
 	if result.WithinBudget {

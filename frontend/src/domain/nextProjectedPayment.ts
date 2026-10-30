@@ -1,4 +1,4 @@
-import type { MovementResult } from "./result.ts";
+import type { TransactionResult } from "./result.ts";
 
 export interface ProjectedPayment {
 	date: string;
@@ -11,29 +11,29 @@ export interface ProjectedPayment {
  * both lists describe the same upcoming occurrence.
  */
 export function nextProjectedPayments({
-	movements,
+	transactions,
 	rules,
 	todayIso,
 }: {
-	movements: MovementResult[];
+	transactions: TransactionResult[];
 	rules: { id: string; endDate: string | null }[];
 	todayIso: string;
 }): Map<string, ProjectedPayment> {
 	const today = todayIso.slice(0, 10);
 	const known = new Map(rules.map((rule) => [rule.id, rule]));
 	const next = new Map<string, ProjectedPayment>();
-	for (const movement of movements) {
-		const rule = known.get(movement.movementId);
-		if (!rule || movement.date <= today || movement.requested <= 0) continue;
-		if (rule.endDate !== null && movement.date > rule.endDate) continue;
+	for (const transaction of transactions) {
+		const rule = known.get(transaction.transactionId);
+		if (!rule || transaction.date <= today || transaction.requested <= 0) continue;
+		if (rule.endDate !== null && transaction.date > rule.endDate) continue;
 		const previous = next.get(rule.id);
-		if (!previous || movement.date < previous.date) {
+		if (!previous || transaction.date < previous.date) {
 			next.set(rule.id, {
-				date: movement.date,
-				amount: movement.requested,
+				date: transaction.date,
+				amount: transaction.requested,
 			});
-		} else if (movement.date === previous.date) {
-			previous.amount += movement.requested;
+		} else if (transaction.date === previous.date) {
+			previous.amount += transaction.requested;
 		}
 	}
 	return next;

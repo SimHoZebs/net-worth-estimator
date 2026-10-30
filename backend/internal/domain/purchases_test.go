@@ -46,7 +46,7 @@ func establishedPosting(id, date, amount string, inflow bool) types.Posting {
 
 func purchaseEvents(run types.SimulationRun) map[string]string {
 	out := map[string]string{}
-	for _, event := range run.MovementAttempts {
+	for _, event := range run.TransactionAttempts {
 		for _, posting := range run.Request.Model.Postings {
 			if posting.ID == event.Origin.PostingID && posting.Purchase != nil {
 				out[posting.ID] = event.Date
@@ -133,8 +133,8 @@ func TestPurchasesExecuteAfterEstablishedSameDayPayments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(run.MovementAttempts) != 4 || run.MovementAttempts[3].Origin.PostingID != "want" || run.MovementAttempts[3].RealizedAmount != 500 {
-		t.Fatalf("same-day execution = %+v", run.MovementAttempts)
+	if len(run.TransactionAttempts) != 4 || run.TransactionAttempts[3].Origin.PostingID != "want" || run.TransactionAttempts[3].RealizedAmount != 500 {
+		t.Fatalf("same-day execution = %+v", run.TransactionAttempts)
 	}
 }
 

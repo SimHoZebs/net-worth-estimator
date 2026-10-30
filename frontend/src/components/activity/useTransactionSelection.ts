@@ -10,7 +10,7 @@ export function useTransactionSelection(
 	const [id, setId] = useState<string | null>(null);
 	const transaction = transactions.find((item) => item.id === id);
 	const planTransaction = transaction
-		? planTransactions.get(transaction.movementId)
+		? planTransactions.get(transaction.transactionId)
 		: undefined;
 	const exists = Boolean(transaction && planTransaction);
 	if (id !== null && !exists) setId(null);

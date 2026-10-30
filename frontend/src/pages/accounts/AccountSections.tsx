@@ -20,7 +20,7 @@ import {
 } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { resolveMovementAmounts } from "../../domain/resolvedMovementAmounts.ts";
+import { resolveTransactionAmounts } from "../../domain/resolvedTransactionAmounts.ts";
 import type { Projection } from "../../domain/result.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
@@ -214,7 +214,7 @@ function TransactionsView({
 	const transactionsQuery = useTransactions();
 	const resolvedAmounts = useMemo(
 		() =>
-			projection ? resolveMovementAmounts(projection.movements) : new Map(),
+			projection ? resolveTransactionAmounts(projection.transactions) : new Map(),
 		[projection],
 	);
 	const rows = useMemo(

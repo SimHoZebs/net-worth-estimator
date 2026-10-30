@@ -38,9 +38,9 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	if err != nil {
 		return types.SimulationRun{}, err
 	}
-	movementAttempts := []types.MovementEvent{}
+	transactionAttempts := []types.TransactionEvent{}
 	snapshots := []types.SimulationSnapshot{}
-	movementSequence := 0
+	transactionSequence := 0
 
 	resolved := ResolveOccurrences(request.Model.RecurrenceRules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	eventDates := resolved.ByDate
@@ -67,10 +67,10 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 			if err != nil {
 				return types.SimulationRun{}, err
 			}
-			event := types.MovementEvent{
+			event := types.TransactionEvent{
 				Date:            date,
-				Sequence:        movementSequence,
-				Origin:          types.MovementOrigin{Type: "posting", PostingID: transition.PostingID},
+				Sequence:        transactionSequence,
+				Origin:          types.TransactionOrigin{Type: "posting", PostingID: transition.PostingID},
 				RequestedAmount: transition.Result.RequestedAmount,
 				RealizedAmount:  transition.Result.RealizedAmount,
 			}
@@ -80,8 +80,8 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 					Delta     float64 `json:"delta"`
 				}{AccountID: delta.AccountID, Delta: delta.Delta})
 			}
-			movementAttempts = append(movementAttempts, event)
-			movementSequence++
+			transactionAttempts = append(transactionAttempts, event)
+			transactionSequence++
 		}
 		balances := SnapshotBalances(transitions.State.Balances)
 		snapshots = append(snapshots, types.SimulationSnapshot{Date: date, Balances: balances})
@@ -95,7 +95,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	run.InitialState = CloneSimulationState(request.InitialState)
 	run.FinalState = CloneSimulationState(transitions.State)
 	run.Snapshots = snapshots
-	run.MovementAttempts = movementAttempts
+	run.TransactionAttempts = transactionAttempts
 	run.MonteCarloSample = request.MonteCarloSample
 	return run, nil
 }

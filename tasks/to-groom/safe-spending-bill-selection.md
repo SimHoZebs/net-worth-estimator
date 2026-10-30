@@ -2,7 +2,7 @@
 
 If saved bill IDs contain only `deleted-bill`, the configuration shows all current bills selected while calculations exclude every transaction. Calculations use raw saved IDs, but checkboxes and toggles apply their own cleanup and fallback rules.
 
-Create one effective-selection resolver before `obligationMovements`, the selected activity list. Use its result for calculations, checkboxes, and toggles. The result must represent the existing default selection as well as explicit IDs: default `null` includes all spendable-account outflows, including one-time transactions.
+Create one effective-selection resolver before `obligationTransactions`, the selected activity list. Use its result for calculations, checkboxes, and toggles. The result must represent the existing default selection as well as explicit IDs: default `null` includes all spendable-account outflows, including one-time transactions.
 
 - Competing selections: `frontend/src/pages/outlook/safe-spending/SafeSpendingPreview.tsx:171-174,226-248,392-403`.
 - Checkbox consumer: `frontend/src/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx:281-295`.

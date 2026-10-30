@@ -333,7 +333,7 @@ describe("unified persisted prefs", () => {
 					...overrides,
 					reserve: 100,
 					incomeRuleIds: ["salary"],
-					movementIds: ["rent"],
+					transactionIds: ["rent"],
 				},
 				version: 4,
 			}),
@@ -342,7 +342,7 @@ describe("unified persisted prefs", () => {
 		const state = useSafeSpendingSettings.getState();
 		expect(state.reserve).toBe(100);
 		expect(state.incomeRuleIds).toEqual(["salary"]);
-		expect(state.movementIds).toEqual(["rent"]);
+		expect(state.transactionIds).toEqual(["rent"]);
 		for (const key of Object.keys(overrides))
 			expect(state).not.toHaveProperty(key);
 		state.updateSettings({ reserve: 200 });
@@ -388,7 +388,7 @@ describe("financial preference owner isolation", () => {
 			accountIds: ["private-a-card"],
 			spendingAccountIds: ["private-a-cash"],
 			incomeRuleIds: ["private-a-income", "private-a-partner"],
-			movementIds: ["private-a-bill"],
+			transactionIds: ["private-a-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsA);
 		await refreshSafeSpendingSettings();
@@ -403,7 +403,7 @@ describe("financial preference owner isolation", () => {
 			accountIds: ["private-b-card"],
 			spendingAccountIds: ["private-b-cash"],
 			incomeRuleIds: [],
-			movementIds: ["private-b-bill"],
+			transactionIds: ["private-b-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
 		await refreshSafeSpendingSettings();
@@ -526,7 +526,7 @@ describe("financial preference owner isolation", () => {
 		await verifyOwner(A);
 		useSafeSpendingSettings
 			.getState()
-			.updateSettings({ reserve: 111, movementIds: ["private-a-bill"] });
+			.updateSettings({ reserve: 111, transactionIds: ["private-a-bill"] });
 		await refreshSafeSpendingSettings();
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
@@ -536,7 +536,7 @@ describe("financial preference owner isolation", () => {
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 111,
-			movementIds: ["private-a-bill"],
+			transactionIds: ["private-a-bill"],
 		});
 	});
 

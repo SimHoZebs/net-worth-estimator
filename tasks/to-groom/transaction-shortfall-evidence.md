@@ -4,7 +4,7 @@
 
 Carry requested, realized, available, and constraint values into the existing `FundingGap` display model. Calculate shortfall as requested minus realized and use it for visibility. Label positive partial payments as partially funded. The account ledger supplies context, not another calculation of payment capacity.
 
-On the server, add available funds to the existing `evaluatedMovementEvent` evidence record. Make `publicMovementEvents`, the public-response adapter, consume it instead of repeating balance reconstruction, sorting, and annual-limit tracking.
+On the server, add available funds to the existing `evaluatedTransactionEvent` evidence record. Make `publicTransactionEvents`, the public-response adapter, consume it instead of repeating balance reconstruction, sorting, and annual-limit tracking.
 
 - Example and browser summary: `frontend/src/domain/fundingGaps.test.ts:47-68`, `frontend/src/domain/fundingGaps.ts:61-83,186-201`.
 - Result mapping: `frontend/src/state/useRemoteProjection.ts:451-469`.

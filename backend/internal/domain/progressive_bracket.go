@@ -17,7 +17,7 @@ import (
 // bracket table. Inputs compose through the standard input mechanism, so
 // gross and pretax are model-value bindings (or literals — bind pretax to
 // literal 0 when there is no pre-tax slice). All figures are per-occurrence,
-// like every other movement amount: scale annual tables to the rule's
+// like every other transaction amount: scale annual tables to the rule's
 // frequency when authoring. Annual caps come from the rule, not the resolver.
 func init() {
 	RegisterAmountResolver(

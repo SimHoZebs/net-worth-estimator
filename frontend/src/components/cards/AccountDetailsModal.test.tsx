@@ -5,7 +5,7 @@ import { toAccountCard } from "../../domain/accountCards.ts";
 import { testAccount } from "../../mocks/account.ts";
 import {
 	activityProjection,
-	movementFixture,
+	transactionFixture,
 	projectionFixture,
 } from "../../mocks/projection.ts";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
@@ -28,9 +28,9 @@ beforeEach(() => {
 describe("AccountDetailsModal", () => {
 	it("keeps metrics semantic and searches transactions through a labeled input", () => {
 		const projection = projectionFixture({
-			movements: [
-				movementFixture({
-					movementId: "living",
+			transactions: [
+				transactionFixture({
+					transactionId: "living",
 					name: "Everyday living",
 					date: "2026-10-01",
 					requested: 5400,
@@ -70,9 +70,9 @@ describe("AccountDetailsModal", () => {
 
 	it("preserves native pressed states and posted-only filtering", () => {
 		const projection = projectionFixture({
-			movements: [
-				movementFixture({
-					movementId: "living",
+			transactions: [
+				transactionFixture({
+					transactionId: "living",
 					name: "Everyday living",
 					date: "2026-10-01",
 				}),

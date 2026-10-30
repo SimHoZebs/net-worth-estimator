@@ -19,7 +19,7 @@ import (
 // incompatible results are not retrieved. Storage retains at most maxArtifacts
 // across result kinds (store/artifacts.go).
 
-const artifactIdentityVersion = 6
+const artifactIdentityVersion = 7
 
 // Projection-Source identifies the result's origin, not persistence success.
 // Computed and shared responses may still end with an execution error.

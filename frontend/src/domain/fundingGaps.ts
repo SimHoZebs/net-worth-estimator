@@ -1,9 +1,9 @@
 import { accountTransactions } from "./accountActivity.ts";
 import { dateLabel, money } from "./format.ts";
 import type { Plan } from "./model.ts";
-import type { MovementResult, Projection } from "./result.ts";
+import type { TransactionResult, Projection } from "./result.ts";
 
-export type FundingMovementKind =
+export type FundingTransactionKind =
 	| "income"
 	| "housing"
 	| "utilities"
@@ -20,13 +20,13 @@ export interface FundingGapAccount {
 	name: string;
 }
 
-export interface FundingGapMovement {
+export interface FundingGapTransaction {
 	id: string;
 	date: string;
 	name: string;
 	/** Positive = money enters funding account; negative = money leaves. */
 	amount: number;
-	kind: FundingMovementKind;
+	kind: FundingTransactionKind;
 	counterpartAccountName?: string;
 }
 
@@ -41,11 +41,11 @@ export interface FundingGap {
 	unfulfilledAmount: number;
 	windowStartDate: string;
 	/** Execution order, same-day order significant. Never re-sort. */
-	movements: FundingGapMovement[];
+	transactions: FundingGapTransaction[];
 	currency?: string;
 }
 
-export interface FundingGapRow extends FundingGapMovement {
+export interface FundingGapRow extends FundingGapTransaction {
 	balanceAfter: number;
 }
 
@@ -64,11 +64,11 @@ export function summarizeFundingGap(gap: FundingGap): FundingGapSummary {
 	let balance = gap.openingBalance;
 	let moneyIn = 0;
 	let moneyOut = 0;
-	const rows = gap.movements.map((movement) => {
-		balance += movement.amount;
-		if (movement.amount >= 0) moneyIn += movement.amount;
-		else moneyOut -= movement.amount;
-		return { ...movement, balanceAfter: balance };
+	const rows = gap.transactions.map((transaction) => {
+		balance += transaction.amount;
+		if (transaction.amount >= 0) moneyIn += transaction.amount;
+		else moneyOut -= transaction.amount;
+		return { ...transaction, balanceAfter: balance };
 	});
 	const shortfall = gap.unfulfilledAmount;
 	const coveredAmount = Math.max(0, gap.requiredAmount - shortfall);
@@ -89,7 +89,7 @@ export function orderedFundingGaps(gaps: FundingGap[]): FundingGap[] {
 	return [...gaps].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function kindFor(name: string, category: string): FundingMovementKind {
+function kindFor(name: string, category: string): FundingTransactionKind {
 	if (category === "transfer") return "transfer";
 	const text = name.toLowerCase();
 	if (/(payroll|salary|paycheck|interest|dividend|income)/.test(text))
@@ -124,13 +124,13 @@ export function deriveFundingGaps({
 }): FundingGap[] {
 	if (!projection) return [];
 	const selectedIds = postingIds === null ? null : new Set(postingIds);
-	// Execution order is projection.movements order (date, sequence).
-	const failures = projection.movements.filter(
-		(movement) =>
-			(movement.fulfillment?.unfulfilledAmount ?? 0) > 0 &&
-			(selectedIds === null || selectedIds.has(movement.movementId)),
+	// Execution order is projection.transactions order (date, sequence).
+	const failures = projection.transactions.filter(
+		(transaction) =>
+			(transaction.fulfillment?.unfulfilledAmount ?? 0) > 0 &&
+			(selectedIds === null || selectedIds.has(transaction.transactionId)),
 	);
-	return failures.flatMap((failure: MovementResult): FundingGap[] => {
+	return failures.flatMap((failure: TransactionResult): FundingGap[] => {
 		const accountId = failure.fromId ?? failure.toId;
 		if (!accountId) return [];
 		const account = plan.accounts.find((item) => item.id === accountId);
@@ -139,12 +139,12 @@ export function deriveFundingGaps({
 		// Opening is the balance before the window opens: the latest point
 		// strictly before the window month. Points snapshot end-of-day
 		// balances, so a same-month point already includes that month's
-		// movements and reusing it would double-count the ledger below.
+		// transactions and reusing it would double-count the ledger below.
 		const priorPoint = [...projection.points]
 			.reverse()
 			.find((point) => point.date < windowStart);
 		const opening = priorPoint?.balances[accountId] ?? account?.balance ?? 0;
-		// Only successfully executed movements affecting this account before
+		// Only successfully executed transactions affecting this account before
 		// the failed payment, in execution order. Exclude the failed payment
 		// itself and any later deposits.
 		const ledger = accountTransactions({ accountId, plan, projection })
@@ -153,7 +153,7 @@ export function deriveFundingGaps({
 					transaction.date >= windowStart &&
 					transaction.date <= failure.date &&
 					!(
-						transaction.movementId === failure.movementId &&
+						transaction.transactionId === failure.transactionId &&
 						transaction.date === failure.date
 					),
 			)
@@ -161,18 +161,18 @@ export function deriveFundingGaps({
 				a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1,
 			);
 		// Cut off at the failure's position in execution order: projection
-		// movements are already ordered, so keep ledger entries whose
-		// (date, movementId) precedes the failure.
-		const failureIndex = projection.movements.indexOf(failure);
+		// transactions are already ordered, so keep ledger entries whose
+		// (date, transactionId) precedes the failure.
+		const failureIndex = projection.transactions.indexOf(failure);
 		const orderedLedger = ledger.filter((transaction) => {
-			const index = projection.movements.findIndex(
-				(movement) =>
-					movement.movementId === transaction.movementId &&
-					movement.date === transaction.date,
+			const index = projection.transactions.findIndex(
+				(candidate) =>
+					candidate.transactionId === transaction.transactionId &&
+					candidate.date === transaction.date,
 			);
 			return index === -1 || index < failureIndex;
 		});
-		const movements: FundingGapMovement[] = orderedLedger.map(
+		const transactions: FundingGapTransaction[] = orderedLedger.map(
 			(transaction) => ({
 				id: transaction.id,
 				date: transaction.date,
@@ -192,7 +192,7 @@ export function deriveFundingGaps({
 		const required = failure.requested;
 		return [
 			{
-				id: `${failure.movementId}-${failure.date}`,
+				id: `${failure.transactionId}-${failure.date}`,
 				date: failure.date,
 				name: failure.name,
 				fundingAccount: { id: accountId, name: accountName },
@@ -201,7 +201,7 @@ export function deriveFundingGaps({
 				availableAmount: failure.available ?? failure.realized,
 				unfulfilledAmount: failure.fulfillment!.unfulfilledAmount,
 				windowStartDate: windowStart,
-				movements,
+				transactions,
 			},
 		];
 	});

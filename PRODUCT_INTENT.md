@@ -19,7 +19,7 @@ A useful answer can establish:
 - the most important uncertainty;
 - the first meaningful failure or constraint;
 - the date and cause of a goal outcome;
-- the effect of changing one planned movement;
+- the effect of changing one planned transaction;
 - the evidence behind each important conclusion; and
 - the next useful action.
 
@@ -68,12 +68,12 @@ The product must help the user complete these jobs:
 | What happens if nothing changes? | A base-case projection from the saved model through the selected horizon.                                                                |
 | How uncertain is that outcome?   | A median and an interpretable range across sampled scenarios when ranges are enabled.                                                     |
 | Can we reach our goals?          | Goal outcomes, dates, status, and uncertainty where available.                                                                            |
-| What fails first?                | The first underfulfilled movement or goal, with its date, amount, and limiting constraint.                                                |
-| Why does it fail?                | The relevant account, movement, limit, funding source, or other model constraint.                                                          |
+| What fails first?                | The first underfulfilled transaction or goal, with its date, amount, and limiting constraint.                                                |
+| Why does it fail?                | The relevant account, transaction, limit, funding source, or other model constraint.                                                          |
 | What is happening soon?          | Cash available, upcoming commitments, replenishment cadence, and a conservative near-term spending assessment when supported by saved state. |
-| What is the model made of?       | Accounts, contributions, transfers, planned income, recurring rules, one-time movements, balance checks, and goal definitions.            |
+| What is the model made of?       | Accounts, contributions, transfers, planned income, recurring rules, one-time transactions, balance checks, and goal definitions.            |
 | What happens if I change this?   | A what-if simulator outcome that can be compared descriptively with the saved state.                                                          |
-| Can I trust this?                | Clear separation of recorded facts, assumptions, planned movements, projections, ranges, goal outcomes, and inferred evidence.            |
+| Can I trust this?                | Clear separation of recorded facts, assumptions, planned transactions, projections, ranges, goal outcomes, and inferred evidence.            |
 | How do I fix or verify it?       | A precise path to the relevant record or assumption, followed by an immediate save for base rows or an explicit promote or discard for a what-if.                                    |
 
 ## 4. Core concepts
@@ -82,17 +82,17 @@ The product must make these concepts understandable without specialist documenta
 
 | Concept                     | Meaning                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Recorded**                | A balance or movement explicitly supplied by a source or recorded as a balance check. It is evidence of a point-in-time state, not a promise about the future.                                                                                                                                                                                 |
+| **Recorded**                | A balance or transaction explicitly supplied by a source or recorded as a balance check. It is evidence of a point-in-time state, not a promise about the future.                                                                                                                                                                                 |
 | **Balance check**           | A recorded end-of-day account balance used to correct modeled history and establish what was known to be true at that date.                                                                                                                                                                                                                    |
-| **Planned movement**        | An expected movement into, out of, or between accounts.                                                                                                                                                                                                                                                                                        |
-| **Account rule**            | A recurring or constrained movement associated with an account.                                                                                                                                                                                                                                                                                |
-| **Saved model**             | The saved collection of accounts, movements, balance checks, assumptions, source information, and goal definitions. The base projection runs only off this saved state.                                                                                                                                                                         |
+| **Planned transaction**        | An expected transaction into, out of, or between accounts.                                                                                                                                                                                                                                                                                        |
+| **Account rule**            | A recurring or constrained transaction associated with an account.                                                                                                                                                                                                                                                                                |
+| **Saved model**             | The saved collection of accounts, transactions, balance checks, assumptions, source information, and goal definitions. The base projection runs only off this saved state.                                                                                                                                                                         |
 | **What-if**                 | A simulator evaluation that layers hypothetical additions, disables, and modified copies on top of the saved model without changing it. A modified row is a disable plus an addition. Promote replays the set as sequential row writes. Discard deletes the evaluation instance.                                                              |
 | **Projection**              | A calculated future path from the saved model and chosen horizon.                                                                                                                                                                                                                                                                              |
 | **Base case**               | The projection using central assumptions without sampled variation. It is a calculation, not a prediction of what must happen.                                                                                                                                                                                                                  |
 | **Range**                   | A percentile band across sampled scenarios. Its meaning must remain clear without requiring specialist terminology.                                                                                                                                                                                                                            |
-| **Goal check**              | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned movements are fulfilled.                                                                                                                                                                                                      |
-| **Financial independence**  | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing movements, a principal policy, and required confidence. Continuing movements are user-selected and never inferred from labels, categories, identity, or rates. |
+| **Goal check**              | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned transactions are fulfilled.                                                                                                                                                                                                      |
+| **Financial independence**  | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing transactions, a principal policy, and required confidence. Continuing transactions are user-selected and never inferred from labels, categories, identity, or rates. |
 | **Evidence analysis**       | An independent inference from posting-derived external inflows, such as an estimate of posting-derived net pay. It does not independently verify bank provenance.                                                                                                                                                                              |
 | **Comparison**              | A descriptive snapshot of selected measures. It does not store or restore another saved model.                                                                                                                                                                                                                                                 |
 | **Household safe spending** | Optional near-term context about cash, commitments, replenishment, and conservative room to spend. It is separate from longer-term structural constraints unless an explicit product rule combines them.                                                                                                                                       |
@@ -122,7 +122,7 @@ For a selected horizon, the product must establish:
 - which accounts contribute to or reduce the path;
 - external inflows, external outflows, and internal transfers;
 - the boundary between recorded history and modeled future; and
-- important dated movements that affect the path.
+- important dated transactions that affect the path.
 
 The product should explain approximate or derived values rather than presenting them as exact records.
 
@@ -154,7 +154,7 @@ The product does not assume that one goal check is always the primary verdict. S
 
 ### 5.5 First material failure
 
-The product must identify the earliest meaningful underfulfilled movement or goal and establish:
+The product must identify the earliest meaningful underfulfilled transaction or goal and establish:
 
 - its date;
 - the requested amount;
@@ -171,7 +171,7 @@ Near-term safe spending failures and longer-term structural constraints must rem
 For every material conclusion, the user must be able to determine:
 
 - which account was involved;
-- which movement, rule, balance check, assumption, or source record was involved;
+- which transaction, rule, balance check, assumption, or source record was involved;
 - requested and realized values where applicable;
 - the relevant balance, limit, or constraint;
 - the event date;
@@ -185,7 +185,7 @@ A conclusion that cannot be explained must be marked provisional or incomplete r
 The product must support deliberate maintenance of:
 
 - accounts and account bounds;
-- recorded one-time movements;
+- recorded one-time transactions;
 - scheduled and recurring rules;
 - balance checks;
 - planned income and income assumptions;
@@ -211,7 +211,7 @@ When evidence is available, the product must establish:
 - posting-derived and comparable-record counts;
 - outliers and exclusions;
 - limitations; and
-- the supporting and excluded movements.
+- the supporting and excluded transactions.
 
 Inferred net pay must never be presented as gross salary, used to silently change saved state, or shown without its evidence quality and limitations.
 
@@ -273,15 +273,15 @@ A user should be able to identify the current position, base-case destination, m
 
 ### Preserve a path to evidence
 
-A headline value is useful only when its basis remains understandable. Important conclusions must be inspectable to the relevant account, movement, balance check, goal definition, scenario assumption, or evidence item.
+A headline value is useful only when its basis remains understandable. Important conclusions must be inspectable to the relevant account, transaction, balance check, goal definition, scenario assumption, or evidence item.
 
 ### Separate certainty from inference
 
 The product must visibly distinguish:
 
-- recorded balances and movements;
+- recorded balances and transactions;
 - source-provided or user-provided assumptions;
-- planned movements;
+- planned transactions;
 - base-case projections;
 - ranges derived from sampled scenarios;
 - goal outcomes; and
@@ -289,7 +289,7 @@ The product must visibly distinguish:
 
 ### Use plain outcomes and preserve depth
 
-Primary language should describe outcomes such as “base case,” “range,” “shortfall,” “net pay,” “planned movement,” and “goal.” Specialist detail remains available when it helps the user evaluate, modify, or understand a conclusion.
+Primary language should describe outcomes such as “base case,” “range,” “shortfall,” “net pay,” “planned transaction,” and “goal.” Specialist detail remains available when it helps the user evaluate, modify, or understand a conclusion.
 
 Explanation should be progressive:
 

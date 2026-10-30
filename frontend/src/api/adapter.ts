@@ -403,7 +403,7 @@ function postingAmountValue(
 	if (directValue !== null) return directValue;
 	const amountValue = finite(config?.amount);
 	if (amountValue !== null) return amountValue;
-	const event = projection?.movementEvents?.find(
+	const event = projection?.transactionEvents?.find(
 		(item) => item.origin.postingId === posting.id,
 	);
 	return finite(event?.requestedAmount) ?? null;
@@ -1599,14 +1599,14 @@ export function displayPlanToBackendDocument(
 		});
 	});
 
-	const removedMovementIDs = (ids: string[]) =>
+	const removedTransactionIDs = (ids: string[]) =>
 		ids.filter(
 			(id) =>
 				!plan.transactions.some((item) => item.id === id) &&
 				!plan.plannedPurchases.some((item) => item.id === id),
 		);
 
-	for (const postingId of removedMovementIDs(
+	for (const postingId of removedTransactionIDs(
 		(sourceDocument?.postings ?? []).map((posting) => posting.id),
 	)) {
 		const storedPosting = sourcePostings.get(postingId);
@@ -1626,7 +1626,7 @@ export function displayPlanToBackendDocument(
 			);
 		}
 	}
-	for (const ruleId of removedMovementIDs(
+	for (const ruleId of removedTransactionIDs(
 		(sourceDocument?.recurrenceRules ?? []).map((rule) => rule.id),
 	)) {
 		warn(

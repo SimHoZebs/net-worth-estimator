@@ -31,7 +31,7 @@ function voidTransaction(): {
 	} as Transaction;
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000099",
-		movementId: planTransaction.id,
+		transactionId: planTransaction.id,
 		date: "2026-10-20",
 		name: planTransaction.name,
 		source: "historical",

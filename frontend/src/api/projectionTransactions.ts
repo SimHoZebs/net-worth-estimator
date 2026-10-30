@@ -1,18 +1,18 @@
 import { finite, isRecord, stringValue } from "../domain/guards.ts";
-import type { MovementResult } from "../domain/result.ts";
+import type { TransactionResult } from "../domain/result.ts";
 import type { FinancialModelDocument, ProjectionResult } from "./contracts.ts";
 
-type MovementSource = {
+type TransactionSource = {
 	name: string;
 	sourceAccountId: string | null;
 	destinations: string[] | null;
 };
 
 /** Index sources once per call so per-event lookup stays O(1). */
-function movementSourceIndex(
+function transactionSourceIndex(
 	document: FinancialModelDocument | null,
-): Map<string, MovementSource> {
-	const index = new Map<string, MovementSource>();
+): Map<string, TransactionSource> {
+	const index = new Map<string, TransactionSource>();
 	if (!document) return index;
 	for (const item of document.postings) {
 		if (!index.has(item.id))
@@ -41,7 +41,7 @@ function movementSourceIndex(
 	return index;
 }
 
-function movementConstraintLabel(type: string): string {
+function transactionConstraintLabel(type: string): string {
 	switch (type) {
 		case "source-floor":
 			return "Protected account balance";
@@ -60,16 +60,16 @@ function movementConstraintLabel(type: string): string {
 }
 
 /** Adapt engine evidence without selecting a configured evaluation's scope. */
-export function projectionMovements(
+export function projectionTransactions(
 	result: ProjectionResult,
 	document: FinancialModelDocument | null,
-): MovementResult[] {
+): TransactionResult[] {
 	const start = result.milestones.projectionStartDate;
 	const startCheckpoint = document?.checkpoints.some(
 		(checkpoint) => checkpoint.Date === start,
 	);
-	const sources = movementSourceIndex(document);
-	return (result.movementEvents ?? [])
+	const sources = transactionSourceIndex(document);
+	return (result.transactionEvents ?? [])
 		.filter(
 			(event) =>
 				event.date > start || (event.date === start && !startCheckpoint),
@@ -86,7 +86,7 @@ export function projectionMovements(
 			});
 			return {
 				date: event.date,
-				movementId: event.origin.postingId,
+				transactionId: event.origin.postingId,
 				name: source?.name || event.origin.postingId,
 				requested: event.requestedAmount,
 				realized: event.realizedAmount,
@@ -101,7 +101,7 @@ export function projectionMovements(
 				accountDeltas: deltas,
 				available: finite(event.availableAmount),
 				constraint: types.length
-					? movementConstraintLabel(types[0]!)
+					? transactionConstraintLabel(types[0]!)
 					: event.realizedAmount + 0.01 < event.requestedAmount
 						? "Backend funding constraint"
 						: null,

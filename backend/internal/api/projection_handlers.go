@@ -15,7 +15,7 @@ import (
 // deterministicResultVersion covers the deterministic payload shape.
 // See artifactIdentityVersion in artifacts.go: bump both together so
 // incompatible stored results are not retrieved.
-const deterministicResultVersion = 7
+const deterministicResultVersion = 8
 
 // domainValidate avoids importing the domain package in multiple files.
 func domainValidate(document *types.FinancialModelDocument) []types.ModelValidationIssue {
@@ -41,7 +41,7 @@ type projectionRequestBody struct {
 	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
 	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
 	Settings  types.ProjectionRuntimeSettings `json:"settings"`
-	// Range selects response rows and movement events by inclusive ISO dates.
+	// Range selects response rows and transaction events by inclusive ISO dates.
 	// At least one bound is required. Other result sections remain unchanged.
 	Range *projectionRange `json:"range,omitempty" required:"true"`
 }

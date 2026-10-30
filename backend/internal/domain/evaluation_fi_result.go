@@ -10,7 +10,7 @@ import (
 // Pure FI result builders: withdrawal summaries and JSON shaping over
 // branch-simulation outcomes. Go is the owner of these builders.
 
-func constraintAccountIDs(constraint accountMovementConstraint) []string {
+func constraintAccountIDs(constraint accountTransactionConstraint) []string {
 	switch constraint.Type {
 	case "source-unavailable", "source-floor":
 		return []string{constraint.AccountID}
@@ -21,7 +21,7 @@ func constraintAccountIDs(constraint accountMovementConstraint) []string {
 	}
 }
 
-func movementUnfulfilled(requested, realized float64) float64 {
+func transactionUnfulfilled(requested, realized float64) float64 {
 	return math.Max(0, requested-realized)
 }
 
@@ -59,7 +59,7 @@ func summarizeWithdrawals(attempts []withdrawalAttempt) *FIWithdrawalSummary {
 	}
 	shortfallPeriods := map[IsoDate][]withdrawalAttempt{}
 	for _, attempt := range attempts {
-		if movementUnfulfilled(attempt.requestedAmount, attempt.realizedAmount) <= fiEpsilon {
+		if transactionUnfulfilled(attempt.requestedAmount, attempt.realizedAmount) <= fiEpsilon {
 			continue
 		}
 		shortfallPeriods[attempt.date] = append(shortfallPeriods[attempt.date], attempt)
@@ -91,7 +91,7 @@ func summarizeWithdrawals(attempts []withdrawalAttempt) *FIWithdrawalSummary {
 
 	failingAttempts := []withdrawalAttempt{}
 	for _, attempt := range attempts {
-		if movementUnfulfilled(attempt.requestedAmount, attempt.realizedAmount) > fiEpsilon {
+		if transactionUnfulfilled(attempt.requestedAmount, attempt.realizedAmount) > fiEpsilon {
 			failingAttempts = append(failingAttempts, attempt)
 		}
 	}
@@ -144,7 +144,7 @@ func summarizeWithdrawals(attempts []withdrawalAttempt) *FIWithdrawalSummary {
 		}
 		failingAccountAttempts := []withdrawalAttempt{}
 		for _, attempt := range accountAttempts {
-			if movementUnfulfilled(attempt.requestedAmount, attempt.realizedAmount) > fiEpsilon {
+			if transactionUnfulfilled(attempt.requestedAmount, attempt.realizedAmount) > fiEpsilon {
 				failingAccountAttempts = append(failingAccountAttempts, attempt)
 			}
 		}

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { dateLabel, money } from "../../domain/format.ts";
 import type { Plan } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
-import { upcomingMovements } from "../../domain/upcoming.ts";
+import { upcomingTransactions } from "../../domain/upcoming.ts";
 import {
 	DEFAULT_TRANSACTION_ORDER,
 	sortTransactionsByDate,
@@ -24,7 +24,7 @@ export function SafeSpendingEvidence({
 	projection: Projection;
 	onClose: () => void;
 }) {
-	const { end, events } = upcomingMovements({
+	const { end, events } = upcomingTransactions({
 		startDate: plan.startDate,
 		projection,
 	});
@@ -36,7 +36,7 @@ export function SafeSpendingEvidence({
 			sortTransactionsByDate({
 				items: events,
 				getDate: (event) => event.date,
-				getId: (event) => event.movementId,
+				getId: (event) => event.transactionId,
 				order,
 			}),
 		[events, order],
@@ -63,7 +63,7 @@ export function SafeSpendingEvidence({
 				showHeaders
 			>
 				{ordered.map((event, index) => (
-					<TableRow key={`${event.movementId}-${index}`}>
+					<TableRow key={`${event.transactionId}-${index}`}>
 						<TableCell>{dateLabel(event.date, true)}</TableCell>
 						<TableHeader scope="row">{event.name}</TableHeader>
 						<TableCell>{money(event.requested)}</TableCell>

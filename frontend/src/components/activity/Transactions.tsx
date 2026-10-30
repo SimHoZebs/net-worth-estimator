@@ -95,11 +95,11 @@ export function Transactions({
 								key={transaction.id}
 								transaction={transaction}
 								planTransaction={
-									planTransactions.get(transaction.movementId) ?? null
+									planTransactions.get(transaction.transactionId) ?? null
 								}
 								onEdit={() => {
 									const planTransaction = planTransactions.get(
-										transaction.movementId,
+										transaction.transactionId,
 									);
 									if (planTransaction) inspect(transaction);
 								}}

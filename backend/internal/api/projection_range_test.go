@@ -20,7 +20,7 @@ func TestClipProjectionRange(t *testing.T) {
 	source.Milestones.ProjectionStartDate = "2026-02-01"
 	for i, date := range []types.IsoDate{"2026-01-01", "2026-02-01", "2026-03-01"} {
 		source.Timeline.Rows = append(source.Timeline.Rows, types.ProjectionRow{Date: date, IsHistorical: i == 0})
-		source.MovementEvents = append(source.MovementEvents, types.MovementEvent{Date: date})
+		source.TransactionEvents = append(source.TransactionEvents, types.TransactionEvent{Date: date})
 	}
 	before, err := json.Marshal(source)
 	if err != nil {
@@ -43,7 +43,7 @@ func TestClipProjectionRange(t *testing.T) {
 			for _, row := range filtered.Timeline.Rows {
 				rows = append(rows, row.Date)
 			}
-			for _, event := range filtered.MovementEvents {
+			for _, event := range filtered.TransactionEvents {
 				events = append(events, event.Date)
 			}
 			if !reflect.DeepEqual(rows, test.dates) || !reflect.DeepEqual(events, test.dates) {
@@ -52,7 +52,7 @@ func TestClipProjectionRange(t *testing.T) {
 			// Restore only the selected slices to compare every other result field.
 			restored := *filtered
 			restored.Timeline.Rows = source.Timeline.Rows
-			restored.MovementEvents = source.MovementEvents
+			restored.TransactionEvents = source.TransactionEvents
 			if !reflect.DeepEqual(&restored, source) {
 				t.Fatal("date filtering changed other result sections")
 			}
@@ -60,11 +60,11 @@ func TestClipProjectionRange(t *testing.T) {
 			for i := range filtered.Timeline.Rows {
 				filtered.Timeline.Rows[i].Date = "2099-01-01"
 			}
-			for i := range filtered.MovementEvents {
-				filtered.MovementEvents[i].Date = "2099-01-01"
+			for i := range filtered.TransactionEvents {
+				filtered.TransactionEvents[i].Date = "2099-01-01"
 			}
 			filtered.Timeline.Rows = append(filtered.Timeline.Rows, types.ProjectionRow{})
-			filtered.MovementEvents = append(filtered.MovementEvents, types.MovementEvent{})
+			filtered.TransactionEvents = append(filtered.TransactionEvents, types.TransactionEvent{})
 			after, err := json.Marshal(source)
 			if err != nil {
 				t.Fatal(err)

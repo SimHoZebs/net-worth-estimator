@@ -407,7 +407,7 @@ function projectionFixture(): ProjectionResult {
 			accountBalance: [],
 			postingFulfillment: [],
 		},
-		movementEvents: [
+		transactionEvents: [
 			{
 				date: "2026-02-01",
 				sequence: 0,
@@ -2073,7 +2073,7 @@ describe("remote workspace state", () => {
 });
 
 describe("remote projection mapping and SSE", () => {
-	it("maps server rows, movement events, totals, and threshold dates to the local projection", () => {
+	it("maps server rows, transaction events, totals, and threshold dates to the local projection", () => {
 		const document = modelFixture();
 		const result = projectionFixture();
 		result.timeline.rows[0]!.netWorth = 90;
@@ -2085,7 +2085,7 @@ describe("remote projection mapping and SSE", () => {
 		expect(local.currentNetWorth).toBe(60);
 		expect(local.points[0]?.total).toBe(90);
 		expect(local.points[1]?.balances).toEqual({ cash: 200, loan: -40 });
-		expect(local.movements[0]).toMatchObject({
+		expect(local.transactions[0]).toMatchObject({
 			name: "Salary",
 			fromId: null,
 			toId: "cash",
@@ -2130,19 +2130,19 @@ describe("remote projection mapping and SSE", () => {
 		const document = { ...modelFixture(), checkpoints: [] };
 		const result = projectionFixture();
 		result.milestones.projectionStartDate = "2026-01-31";
-		result.movementEvents = [
-			{ ...result.movementEvents![0]!, date: "2026-01-31" },
+		result.transactionEvents = [
+			{ ...result.transactionEvents![0]!, date: "2026-01-31" },
 		];
-		expect(projectionResultToLocal(result, document).movements).toHaveLength(1);
+		expect(projectionResultToLocal(result, document).transactions).toHaveLength(1);
 	});
 
 	it("accepts transaction events without account deltas", () => {
 		const document = modelFixture();
 		const result = projectionFixture();
-		result.movementEvents![0]!.accountDeltas = null;
+		result.transactionEvents![0]!.accountDeltas = null;
 		const local = projectionResultToLocal(result, document);
-		expect(local.movements[0]).toMatchObject({
-			movementId: "salary",
+		expect(local.transactions[0]).toMatchObject({
+			transactionId: "salary",
 			requested: 100,
 			realized: 100,
 		});
@@ -2151,7 +2151,7 @@ describe("remote projection mapping and SSE", () => {
 	it("maps binding evidence and excludes transactions on or before the plan start", () => {
 		const document = modelFixture();
 		const result = projectionFixture();
-		const baseEvent = result.movementEvents![0]!;
+		const baseEvent = result.transactionEvents![0]!;
 		const historicalEvent = { ...baseEvent, date: "2026-01-31" };
 		const sourceFloorEvent = {
 			...baseEvent,
@@ -2187,31 +2187,31 @@ describe("remote projection mapping and SSE", () => {
 		Object.assign(annualEvent, {
 			bindingConstraints: [{ type: "action-limit" }],
 		});
-		result.movementEvents = [
+		result.transactionEvents = [
 			historicalEvent,
 			sourceFloorEvent,
 			destinationEvent,
 			annualEvent,
-		] as ProjectionResult["movementEvents"];
+		] as ProjectionResult["transactionEvents"];
 
 		const local = projectionResultToLocal(result, document);
-		expect(local.movements).toHaveLength(3);
-		expect(local.movements[0]).toMatchObject({
+		expect(local.transactions).toHaveLength(3);
+		expect(local.transactions[0]).toMatchObject({
 			available: 75,
 			constraintTypes: ["source-floor"],
 		});
-		expect(typeof local.movements[0]?.constraint).toBe("string");
-		expect(local.movements[1]).toMatchObject({
+		expect(typeof local.transactions[0]?.constraint).toBe("string");
+		expect(local.transactions[1]).toMatchObject({
 			available: null,
 			constraintTypes: ["destination-ceiling"],
 		});
-		expect(typeof local.movements[1]?.constraint).toBe("string");
-		expect(local.movements[2]).toMatchObject({
+		expect(typeof local.transactions[1]?.constraint).toBe("string");
+		expect(local.transactions[2]).toMatchObject({
 			available: null,
 			constraintTypes: ["action-limit"],
 		});
-		expect(typeof local.movements[2]?.constraint).toBe("string");
-		expect(local.firstFailure).toBe(local.movements[0]);
+		expect(typeof local.transactions[2]?.constraint).toBe("string");
+		expect(local.firstFailure).toBe(local.transactions[0]);
 	});
 
 	it("maps FI coverage to visual facts instead of prose", () => {

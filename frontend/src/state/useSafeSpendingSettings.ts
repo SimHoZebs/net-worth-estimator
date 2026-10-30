@@ -30,7 +30,7 @@ export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
 	spendingAccountIds: null,
 	incomeAccountIds: null,
 	incomeRuleIds: [],
-	movementIds: null,
+	transactionIds: null,
 	statementDaySet: false,
 });
 
@@ -91,7 +91,7 @@ export function sanitizeSafeSpendingSettings(
 		spendingAccountIds: stringIds(record.spendingAccountIds),
 		incomeAccountIds: stringIds(record.incomeAccountIds),
 		incomeRuleIds: [...new Set(stringIds(record.incomeRuleIds) ?? [])],
-		movementIds: stringIds(record.movementIds),
+		transactionIds: stringIds(record.transactionIds),
 	};
 }
 
@@ -157,10 +157,10 @@ export function updateSettingsForScope(scope: UserScope = getUserScope()) {
 					? next.incomeAccountIds
 					: previous.incomeAccountIds,
 			incomeRuleIds: next.incomeRuleIds ?? previous.incomeRuleIds,
-			movementIds:
-				next.movementIds !== undefined
-					? next.movementIds
-					: previous.movementIds,
+			transactionIds:
+				next.transactionIds !== undefined
+					? next.transactionIds
+					: previous.transactionIds,
 		};
 		const cache = serverQueryClient();
 		const key = safeSpendingSettingsKey(scope);

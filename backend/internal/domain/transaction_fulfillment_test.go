@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestPublicMovementFulfillmentMatchesEvaluation(t *testing.T) {
+func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 	cases := []struct {
 		name             string
 		requested        float64
@@ -34,11 +34,11 @@ func TestPublicMovementFulfillmentMatchesEvaluation(t *testing.T) {
 			source := "checking"
 			posting := types.Posting{ID: "bill", Name: "Bill", SourceAccountID: &source, Enabled: true}
 			account := types.Account{ID: source, Name: "Checking", Kind: types.AccountKindCash, MinBalance: &tc.floor, Enabled: true}
-			event := types.MovementEvent{
+			event := types.TransactionEvent{
 				Date: "2026-02-05", Sequence: 1,
-				Origin:          types.MovementOrigin{Type: "posting", PostingID: posting.ID},
+				Origin:          types.TransactionOrigin{Type: "posting", PostingID: posting.ID},
 				RequestedAmount: tc.requested, RealizedAmount: tc.realized,
-				AccountDeltas: []movementAccountDelta{{AccountID: source, Delta: -tc.realized}},
+				AccountDeltas: []transactionAccountDelta{{AccountID: source, Delta: -tc.realized}},
 			}
 			row := types.ProjectionRow{
 				Date:             event.Date,
@@ -54,7 +54,7 @@ func TestPublicMovementFulfillmentMatchesEvaluation(t *testing.T) {
 				posting.Destinations = []string{"loan"}
 				document.Accounts = append(document.Accounts, types.Account{ID: "loan", Name: "Loan", MaxBalance: &ceiling, Enabled: true})
 				row.AccountSnapshots = append(row.AccountSnapshots, types.AccountSnapshot{AccountID: "loan", Balance: ceiling})
-				event.AccountDeltas = append(event.AccountDeltas, movementAccountDelta{AccountID: "loan", Delta: tc.realized})
+				event.AccountDeltas = append(event.AccountDeltas, transactionAccountDelta{AccountID: "loan", Delta: tc.realized})
 			}
 			if tc.capped {
 				cap := tc.realized
@@ -67,9 +67,9 @@ func TestPublicMovementFulfillmentMatchesEvaluation(t *testing.T) {
 			}
 			path := &types.ProjectionPath{
 				EffectiveDocument: document, Rows: []types.ProjectionRow{row},
-				MovementEvents: []types.MovementEvent{event},
+				TransactionEvents: []types.TransactionEvent{event},
 			}
-			public := publicMovementEvents(path)[0]
+			public := publicTransactionEvents(path)[0]
 			evaluation := EvaluatePostingFulfillment(path, types.PostingFulfillmentConfig{}, true)
 			if public.Fulfillment == nil {
 				t.Fatal("public event has no fulfillment assessment")
@@ -92,14 +92,14 @@ func TestPublicMovementFulfillmentMatchesEvaluation(t *testing.T) {
 					t.Fatalf("public constraints %+v differ from evaluation %+v", public.BindingConstraints, detail.BindingConstraints)
 				}
 			}
-			if path.MovementEvents[0].Fulfillment != nil {
+			if path.TransactionEvents[0].Fulfillment != nil {
 				t.Fatal("public adaptation mutated the evaluator-facing path")
 			}
 		})
 	}
 }
 
-func TestPublicMovementFulfillmentDoesNotDependOnConfiguredEvaluations(t *testing.T) {
+func TestPublicTransactionFulfillmentDoesNotDependOnConfiguredEvaluations(t *testing.T) {
 	payload := loadGolden(t, "checkpoints.json")
 	document := decodeDocument(t, payload["document"])
 	settings := decodeSettings(t, payload["settings"])
@@ -109,7 +109,7 @@ func TestPublicMovementFulfillmentDoesNotDependOnConfiguredEvaluations(t *testin
 			document.Accounts[index].MinBalance = &floor
 		}
 	}
-	var baseline []types.MovementEvent
+	var baseline []types.TransactionEvent
 	for _, mode := range []string{"absent", "disabled", "selected subset", "all postings"} {
 		t.Run(mode, func(t *testing.T) {
 			settings.Evaluations = types.EmptyEvaluationTables()
@@ -126,11 +126,11 @@ func TestPublicMovementFulfillmentDoesNotDependOnConfiguredEvaluations(t *testin
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(result.MovementEvents) == 0 {
-				t.Fatal("projection has no movement events")
+			if len(result.TransactionEvents) == 0 {
+				t.Fatal("projection has no transaction events")
 			}
 			foundShortfall := false
-			for _, event := range result.MovementEvents {
+			for _, event := range result.TransactionEvents {
 				if event.Fulfillment == nil {
 					t.Fatalf("event has no fulfillment assessment: %+v", event)
 				}
@@ -140,8 +140,8 @@ func TestPublicMovementFulfillmentDoesNotDependOnConfiguredEvaluations(t *testin
 				t.Fatal("expected an always-on shortfall outside the salary-only evaluation")
 			}
 			if baseline == nil {
-				baseline = result.MovementEvents
-			} else if !reflect.DeepEqual(result.MovementEvents, baseline) {
+				baseline = result.TransactionEvents
+			} else if !reflect.DeepEqual(result.TransactionEvents, baseline) {
 				t.Fatal("configured evaluation changed public fulfillment evidence")
 			}
 			if mode == "selected subset" {
