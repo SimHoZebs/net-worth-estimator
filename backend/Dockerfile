@@ -24,6 +24,8 @@ RUN apk add --no-cache ca-certificates busybox-extras \
 WORKDIR /app
 
 COPY --from=build --chown=app:app /out/ /app/
+COPY --chown=app:app backend/render-free-boot.sh /app/render-free-boot.sh
+RUN chmod 0555 /app/render-free-boot.sh
 
 ENV HOST=0.0.0.0 \
     PORT=8787 \
