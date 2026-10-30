@@ -146,6 +146,6 @@ server container for migration or user replacement.
 
 One-time upgrades belong in the deployment repository's single replaceable
 migration script, not in `setupdb` or server startup. Production uses the
-[migration SOP](https://github.com/SimHoZebs/home-server/blob/main/net-worth-estimator/MIGRATIONS.md).
+[migration SOP](../deploy/MIGRATIONS.md).
 The SOP requires a verified backup, an offline rehearsal, explicit postconditions,
 and a rollback plan. `setupdb` rejects legacy plan-scoped databases unchanged.

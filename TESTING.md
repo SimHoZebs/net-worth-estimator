@@ -112,7 +112,8 @@ TEST_PRODUCTION=1 npm --prefix frontend run test:browser
 
 ## Completion Gate
 
-Agents run the completion gates locally. The repository has no hosted CI workflows.
+Agents run the completion gates locally. Hosted CI does not run the test gates.
+The Northflank GitHub workflow only requests a gated deployment for the pushed SHA.
 
 For a frontend change, the gate is:
 
@@ -204,6 +205,7 @@ backend/scripts/verify.sh ./internal/ingress
 go -C backend test ./internal/identity -run TestDeploymentProxy
 backend/scripts/verify.sh ./cmd/server
 node --test deploy/vercel.test.mjs scripts/smoke-compose.test.mjs
+node --test deploy/migrations.test.mjs
 docker build -f backend/Dockerfile -t waypoint-deployment-test .
 DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs
 ```
@@ -214,6 +216,11 @@ CSRF denial, incremental streaming, persistent sessions and artifacts, public
 probes, command overrides, and a provider-assigned API port. Run the image checks
 locally before completion. See [the operator contract](deploy/README.md) for the
 Vercel/Render settings and the separate actual-provider checklist.
+
+Migration changes also require the [shared SOP](deploy/MIGRATIONS.md) gate on
+every supported target. Check actual volume access, nonzero exit propagation,
+exact build selection, and API startup only after migration success. The
+Northflank workflow and command template live in `deploy/northflank/`.
 
 The verification surface for the backend is its HTTP/SSE contract, CSV seed path, and SQLite persistence.
 

@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 FROM alpine:3.22
 
-RUN apk add --no-cache ca-certificates busybox-extras \
+RUN apk add --no-cache ca-certificates busybox-extras sqlite \
     && addgroup -S -g 10001 app \
     && adduser -S -D -h /home/app -s /bin/sh -u 10001 -G app app \
     && mkdir -p /app /data /home/app/.ssh \
@@ -25,7 +25,8 @@ WORKDIR /app
 
 COPY --from=build --chown=app:app /out/ /app/
 COPY --chown=app:app backend/render-free-boot.sh /app/render-free-boot.sh
-RUN chmod 0555 /app/render-free-boot.sh
+COPY --chown=app:app deploy/migrate.sh /app/migrate.sh
+RUN chmod 0555 /app/render-free-boot.sh /app/migrate.sh
 
 ENV HOST=0.0.0.0 \
     PORT=8787 \

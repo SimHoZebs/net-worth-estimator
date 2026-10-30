@@ -1,0 +1,118 @@
+{
+  "name": "waypoint-release",
+  "description": "Build exact images, stop API writers, run the shared migration on the real volume, then start the API.",
+  "apiVersion": "v1.2",
+  "arguments": { "RELEASE_SHA": "" },
+  "options": { "autorun": false, "concurrencyPolicy": "queue" },
+  "triggers": [
+    {
+      "kind": "webhook",
+      "ref": "release-hook",
+      "spec": { "token": "INJECT_PRIVATE_WEBHOOK_TOKEN" }
+    }
+  ],
+  "spec": {
+    "kind": "Workflow",
+    "spec": {
+      "type": "sequential",
+      "steps": [
+        {
+          "kind": "Build",
+          "ref": "api-build",
+          "condition": "success",
+          "spec": {
+            "id": "nwe-api",
+            "type": "service",
+            "sha": "${args.RELEASE_SHA}",
+            "reuseExistingBuilds": true,
+            "buildRuleFallThroughHandling": "fail"
+          }
+        },
+        {
+          "kind": "Build",
+          "ref": "identity-build",
+          "condition": "success",
+          "spec": {
+            "id": "nwe-casdoor",
+            "type": "service",
+            "sha": "${args.RELEASE_SHA}",
+            "reuseExistingBuilds": true,
+            "buildRuleFallThroughHandling": "fail"
+          }
+        },
+        {
+          "kind": "AddonBackup",
+          "ref": "identity-backup",
+          "condition": "success",
+          "spec": { "addonId": "nwe-casdoor-db", "backupType": "dump" }
+        },
+        {
+          "kind": "RunTemplate",
+          "ref": "stop-api-writers",
+          "condition": "success",
+          "spec": {
+            "templateType": "template",
+            "templateId": "waypoint-api-command",
+            "arguments": {
+              "variables": [
+                {
+                  "key": "COMMAND",
+                  "value": "/bin/sh -c 'mkdir -p /tmp/waypoint-maintenance; printf \"maintenance\\n\" > /tmp/waypoint-maintenance/readyz; exec busybox-extras httpd -f -p \"$PORT\" -h /tmp/waypoint-maintenance'"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "kind": "Release",
+          "ref": "deploy-identity-image",
+          "condition": "running",
+          "timeoutDuration": 600,
+          "spec": {
+            "type": "build",
+            "origin": { "id": "nwe-casdoor", "branch": "main", "build": "${refs.identity-build.id}" },
+            "target": { "id": "nwe-casdoor", "type": "service" }
+          }
+        },
+        {
+          "kind": "Release",
+          "ref": "deploy-maintenance-image",
+          "condition": "running",
+          "timeoutDuration": 600,
+          "spec": {
+            "type": "build",
+            "origin": { "id": "nwe-api", "branch": "main", "build": "${refs.api-build.id}" },
+            "target": { "id": "nwe-api", "type": "service" }
+          }
+        },
+        {
+          "kind": "Action",
+          "ref": "migrate",
+          "spec": {
+            "kind": "Service",
+            "spec": {
+              "type": "execute",
+              "data": {
+                "serviceId": "nwe-api",
+                "command": "/bin/sh -c 'test -f \"$NET_WORTH_ESTIMATOR_DB\" && exec /app/migrate.sh'",
+                "options": { "dispatchOnly": false },
+                "user": "10001",
+                "group": "10001"
+              }
+            }
+          }
+        },
+        {
+          "kind": "RunTemplate",
+          "ref": "start-api",
+          "condition": "success",
+          "spec": {
+            "templateType": "template",
+            "templateId": "waypoint-api-command",
+            "arguments": { "variables": [{ "key": "COMMAND", "value": "/app/render-free-boot.sh" }] }
+          }
+        }
+      ]
+    }
+  }
+}
