@@ -1,0 +1,24 @@
+appname = Waypoint identity
+httpport = 8000
+runmode = prod
+copyrequestbody = true
+driverName = sqlite
+dataSourceName = file:/tmp/casdoor-state/db/casdoor.db?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)
+dbName = casdoor
+showSql = false
+origin = __CASDOOR_PUBLIC_URL__
+originFrontend = __CASDOOR_PUBLIC_URL__
+frontendBaseDir = /web/build
+defaultApplication = waypoint
+defaultLanguage = en
+forceLanguage = en
+isDemoMode = false
+showGithubCorner = false
+enableErrorMask = true
+enableGzip = true
+initAdminPassword = __CASDOOR_ADMIN_PASSWORD__
+initDataFile = /tmp/casdoor-state/conf/init_data.json
+initDataNewOnly = false
+initDataMerge = true
+sessionCookieLifeTime = 2592000
+logConfig = {"adapter":"console"}
