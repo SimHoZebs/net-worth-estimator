@@ -1,0 +1,21 @@
+# `vercel --prod` from the repo root uploads this directory. The remote build
+# only needs the frontend tree plus the programmatic config (vercel.mjs).
+# Root-anchored: bare names would also match same-named dirs under frontend/.
+node_modules
+/frontend/dist
+/backend
+/auth
+/dev
+/docs
+/scripts
+/tasks
+/tmp
+/uploads
+/private-data
+/public
+/deploy/*.test.mjs
+/.git
+/.husky
+/.opencode
+/.vercel
+/.env.local
