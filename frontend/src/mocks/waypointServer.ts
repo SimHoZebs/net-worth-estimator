@@ -1,5 +1,9 @@
 import { vi } from "vitest";
-import type { FinancialModel, FinancialModelResponse } from "../api/index.ts";
+import type {
+	FinancialModel,
+	FinancialModelResponse,
+	ServerStatus,
+} from "../api/index.ts";
 import { ok } from "./fetch.ts";
 
 // Single home for the workspace fetch fake. Migration left a copy of this
@@ -81,10 +85,13 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	};
 	const calls: TestCall[] = [];
 	const modelQueue: Array<Error | FinancialModelResponse> = [];
-	const statusQueue: Array<Error | { readOnly: boolean }> = [];
+	const statusQueue: Array<Error | ServerStatus> = [];
 	const presetsQueue: Array<Error | { presets: unknown[] }> = [];
-	let statusValue: { readOnly: boolean; lastSyncAt?: string } = {
+	let statusValue: ServerStatus = {
 		readOnly: false,
+		syncConfigured: true,
+		syncQuotaUsed: 0,
+		syncQuotaLimit: 24,
 	};
 	let revisionValue = '"sha256-test"';
 	let modelHold: Promise<Response> | null = null;
@@ -246,8 +253,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						row.AccountId === account.id &&
 						typeof row.source === "string" &&
 						row.source !== "" &&
-						row.source !== "user" &&
-						row.source !== "model",
+						row.source !== "user",
 				);
 				return {
 					...account,
@@ -297,8 +303,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					const syncOwned =
 						typeof posting.source === "string" &&
 						posting.source !== "" &&
-						posting.source !== "user" &&
-						posting.source !== "model";
+						posting.source !== "user";
 					transactions.push({
 						...posting,
 						kind: "posting",
@@ -679,13 +684,13 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		failModelOnce: (error: Error | FinancialModelResponse) => {
 			modelQueue.push(error);
 		},
-		failStatusOnce: (error: Error | { readOnly: boolean }) => {
+		failStatusOnce: (error: Error | ServerStatus) => {
 			statusQueue.push(error);
 		},
 		failPresetsOnce: (error: Error | { presets: unknown[] }) => {
 			presetsQueue.push(error);
 		},
-		setStatus: (status: { readOnly: boolean; lastSyncAt?: string }) => {
+		setStatus: (status: ServerStatus) => {
 			statusValue = status;
 		},
 		setRevision: (revision: string) => {

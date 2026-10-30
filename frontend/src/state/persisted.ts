@@ -1,22 +1,7 @@
-import {
-	createJSONStorage,
-	type PersistStorage,
-	type StateStorage,
-} from "zustand/middleware";
-import {
-	getUserScope,
-	userStorageKey,
-	type UserScope,
-} from "../auth/resourceScope.ts";
+import { createJSONStorage, type StateStorage } from "zustand/middleware";
 
 export const THEME_STORAGE_KEY = "waypoint-theme";
 export const UI_PREFS_STORAGE_KEY = "waypoint.ui-prefs.v1";
-export const SAFE_SPENDING_STORAGE_KEY = "nwe.safe-spending.v1";
-export const SAFE_SPENDING_LEGACY_KEYS = [
-	"nwe.card-cycle.v4",
-	"nwe.card-cycle.v3",
-	"nwe.card-cycle.v2",
-];
 
 const memory = new Map<string, string>();
 
@@ -74,103 +59,4 @@ export function clearPersistedMemory(): void {
 
 export function appJsonStorage<T>() {
 	return createJSONStorage<T>(() => appLocalStorage);
-}
-
-/**
- * One-time upgrade path for browser records written before the user
- * cutover. Current keys use `:user:` plus `users/*` ids with no kind
- * segment. On a primary miss the previous `:user:` plus `private:` ids are
- * tried first, then the `:account:` plus `accounts/*` generation, then the
- * `:resource:` plus `plans/*` generation; the first hit is copied forward
- * and deleted. Nothing writes legacy keys, and nothing reads a foreign
- * user's data: every candidate key embeds the verified scope.
- */
-function legacyKeysFor(name: string, scope: UserScope): string[] {
-	const primary = userStorageKey(name, scope);
-	if (!primary || !scope.resource) return [];
-	const encoded = encodeURIComponent(scope.resource.id);
-	const privateKind = primary.endsWith(`:${encoded}`)
-		? `${primary.slice(0, -encoded.length)}private:${encoded}`
-		: null;
-	const accountGeneration = primary
-		.replace(":user:", ":account:")
-		.replaceAll("users%2F", "accounts%2F");
-	const resourceGeneration = primary
-		.replace(":user:", ":resource:")
-		.replaceAll("users%2F", "plans%2F");
-	const keys = [privateKind, accountGeneration, resourceGeneration].filter(
-		(key): key is string => typeof key === "string" && key !== primary,
-	);
-	return keys;
-}
-
-/** Financial preferences bind to one verified user, including memory fallbacks. */
-export function accountLocalStorage(scope: UserScope): StateStorage {
-	const keyFor = (name: string) =>
-		scope === getUserScope() ? userStorageKey(name, scope) : null;
-	const readThrough = (name: string): string | null => {
-		const key = keyFor(name);
-		if (!key) return null;
-		try {
-			const raw = appLocalStorage.getItem(key);
-			if (raw instanceof Promise) return null;
-			if (raw !== null) return raw;
-			for (const legacy of legacyKeysFor(name, scope)) {
-				const migrated = appLocalStorage.getItem(legacy);
-				if (migrated === null || migrated instanceof Promise) continue;
-				appLocalStorage.setItem(key, migrated);
-				appLocalStorage.removeItem(legacy);
-				return migrated;
-			}
-			return null;
-		} catch {
-			return null;
-		}
-	};
-	return {
-		getItem: (name) => (keyFor(name) ? readThrough(name) : null),
-		setItem: (name, value) => {
-			const key = keyFor(name);
-			if (key) return appLocalStorage.setItem(key, value);
-		},
-		removeItem: (name) => {
-			const key = keyFor(name);
-			if (key) appLocalStorage.removeItem(key);
-			for (const legacy of legacyKeysFor(name, scope))
-				appLocalStorage.removeItem(legacy);
-		},
-	};
-}
-
-/**
- * Wrap a JSON persist storage with legacy-key fallback. When the primary
- * key holds nothing readable, each legacy key is tried in order. The first
- * readable value wins. Writes always target the primary key.
- */
-export function withLegacyKeys<T>(
-	storage: PersistStorage<T> | undefined,
-	legacyKeys: string[],
-): PersistStorage<T> | undefined {
-	if (!storage) return undefined;
-	return {
-		getItem: async (name) => {
-			const primary = await storage.getItem(name);
-			if (primary !== null) return primary;
-			for (const key of legacyKeys) {
-				try {
-					const raw = (await appLocalStorage.getItem(key)) as string | null;
-					if (raw === null) continue;
-					const parsed = JSON.parse(raw) as unknown;
-					if (parsed !== null && typeof parsed === "object") {
-						return { state: parsed as T, version: 0 };
-					}
-				} catch {
-					continue;
-				}
-			}
-			return null;
-		},
-		setItem: (name, value) => storage.setItem(name, value),
-		removeItem: (name) => storage.removeItem(name),
-	};
 }

@@ -15,7 +15,12 @@ import { resetServerQueryCache } from "../state/serverQuery.ts";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
 
-const baseStatus: ServerStatus = { readOnly: false };
+const baseStatus: ServerStatus = {
+	readOnly: false,
+	syncConfigured: false,
+	syncQuotaUsed: 0,
+	syncQuotaLimit: 0,
+};
 const lastSyncAt = "2026-10-18T14:30:00Z";
 const freshSyncAt = () => new Date(Date.now() - 60_000).toISOString();
 const staleSyncAt = () =>
@@ -68,7 +73,6 @@ describe("sidebar sync signals", () => {
 
 	it.each([
 		[null, "Sync status unavailable"],
-		[baseStatus, "Sync status unavailable"],
 		[{ ...baseStatus, syncConfigured: false }, "Sync not configured"],
 		[{ ...baseStatus, syncConfigured: true }, "Never synced"],
 		[

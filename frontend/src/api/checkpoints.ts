@@ -8,7 +8,7 @@ export function checkpointInstant(checkpoint: BackendCheckpoint): number {
 /** Owner-authored rows win same-instant ties, mirroring the backend replay. */
 function isOwnerCheckpoint(checkpoint: BackendCheckpoint): boolean {
 	const source = checkpoint.source ?? "";
-	return source === "" || source === "user" || source === "model";
+	return source === "" || source === "user";
 }
 
 /**

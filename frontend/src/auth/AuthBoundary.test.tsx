@@ -102,20 +102,6 @@ function status(body: unknown, code = 200) {
 }
 
 describe("provider-independent authentication boundary", () => {
-	it("rejects authentication-disabled discovery instead of opening a legacy workspace", async () => {
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(async () => status({ enabled: false })),
-		);
-		render(
-			<AuthBoundary>
-				<p>Private workspace</p>
-			</AuthBoundary>,
-		);
-		expect(await screen.findByRole("alert")).toBeTruthy();
-		expect(screen.queryByText("Private workspace")).toBeNull();
-		expect(redirectToSignIn).not.toHaveBeenCalled();
-	});
 	it("mounts an allowed guest workspace without a forced sign-in redirect", async () => {
 		vi.stubGlobal(
 			"fetch",

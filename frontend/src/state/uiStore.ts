@@ -48,7 +48,6 @@ export const useUiStore = create<UiState>()(
 			version: 1,
 			storage: appJsonStorage<UiPrefs>(),
 			partialize: (state) => ({ years: state.years, ranges: state.ranges }),
-			migrate: (persisted) => sanitizeUiPrefs(persisted),
 			merge: (persisted, current) => ({
 				...current,
 				...sanitizeUiPrefs(persisted),

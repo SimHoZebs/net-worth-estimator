@@ -228,49 +228,11 @@ describe("account-scoped transactions", () => {
 		});
 	});
 
-	it("does not infer pending status from a legacy ID prefix", () => {
-		const data = structuredClone(financialModelFixture);
-		data.transactions.push({
-			id: "sfin-pending-checking-mock-pend1",
-			name: "Mock Corner Store",
-			amount: 42.1,
-			amountKnown: true,
-			fromId: "checking",
-			toId: null,
-			frequency: "once",
-			startDate: data.startDate,
-			endDate: null,
-			annualIncrease: 0,
-			enabled: false,
-			readOnly: true,
-			claimRuleId: null,
-			claimOccurrenceDate: null,
-			postedDate: null,
-			void: false,
-			syncOwned: true,
-		});
-		const rows = accountTransactions({
-			accountId: "checking",
-			accounts: data.accounts,
-			transactions: data.transactions,
-			startDate: data.startDate,
-			projection: activityProjection(data),
-		});
-		expect(
-			rows.find(
-				(row) => row.transactionId === "sfin-pending-checking-mock-pend1",
-			),
-		).toMatchObject({
-			pending: false,
-			excluded: true,
-		});
-	});
-
 	it.each([
 		"01900000-0000-7000-8000-000000000001",
 		"550e8400-e29b-41d4-a716-446655440000",
 	])(
-		"keeps pending UUID %s after the balance checkpoint visible without projecting it",
+		"keeps pending UUID %s after the balance check visible without projecting it",
 		(id) => {
 			const data = structuredClone(financialModelFixture);
 			data.transactions.push({

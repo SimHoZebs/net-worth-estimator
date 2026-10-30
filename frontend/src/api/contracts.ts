@@ -155,12 +155,6 @@ export type RecurrenceFrequency =
 	| "quarterly"
 	| "annual";
 
-/**
- * Standalone planned-purchase row, separated from postings. Lower priority
- * executes first; model order breaks ties. EarliestDate is the earliest
- * buy day; cost is the fixed positive cost. Mirrors the backend
- * `PlannedPurchase` row and its dedicated row endpoints.
- */
 export interface BackendPlannedPurchase extends HumaMetadata {
 	id: string;
 	name: string;
@@ -504,16 +498,16 @@ export type StochasticResponse = StochasticProjectionResponse;
 
 export interface ServerStatus extends HumaMetadata {
 	readOnly: boolean;
-	/** Whether the server has a sync runner. Absent from older backends. */
-	syncConfigured?: boolean;
+	/** Whether the server has a sync runner. */
+	syncConfigured: boolean;
 	/** Bridge host for display. Omitted when unconfigured. Never the secret. */
 	syncHost?: string;
 	/** Last successful sync completion (RFC3339 UTC). Omitted before the first sync. */
 	lastSyncAt?: string;
-	/** Bridge hits in the trailing 24 hours. Absent from older backends. */
-	syncQuotaUsed?: number;
-	/** Bridge daily allowance. Absent from older backends. */
-	syncQuotaLimit?: number;
+	/** Bridge hits in the trailing 24 hours. */
+	syncQuotaUsed: number;
+	/** Bridge daily allowance. */
+	syncQuotaLimit: number;
 }
 
 export interface SyncCredentialStatus extends HumaMetadata {
@@ -601,7 +595,7 @@ export interface SafeSpendingSettings {
 	incomeRuleIds: string[];
 	/** Null includes all recurring outflows. */
 	transactionIds: string[] | null;
-	/** Explicitly chosen day, including the legacy first-of-month case. */
+	/** Explicitly chosen day. */
 	statementDaySet: boolean;
 }
 

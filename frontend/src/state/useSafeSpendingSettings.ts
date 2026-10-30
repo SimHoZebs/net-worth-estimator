@@ -15,12 +15,8 @@ import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
 
-// TODO: replace these client-stored budget settings with a server
-// safe-spending evaluation when the backend ships one. The display already
-// routes through the envelope renderer (see safeSpendingEval.ts), so the
-// server result will swap in as progressive enhancement. Until then this
-// Query-owned local state is the source of truth and never joins the
-// projection cache key, so toggles never retrigger the base simulation.
+// Query caches server-owned safe-spending settings. Settings stay outside
+// the base projection identity, so edits do not rerun the base simulation.
 export type TotalCycleSettings = SafeSpendingSettings;
 
 export const defaultSafeSpendingSettings = (): TotalCycleSettings => ({
@@ -70,17 +66,10 @@ export function sanitizeSafeSpendingSettings(
 ): TotalCycleSettings {
 	const fallback = defaultSafeSpendingSettings();
 	if (typeof value !== "object" || value === null) return fallback;
-	const parsed = (value as Record<string, unknown>).state ?? value;
-	if (typeof parsed !== "object" || parsed === null) return fallback;
-	const record = parsed as Record<string, unknown>;
-	const statementDaySet = record.statementDaySet === true;
-	const storedDay = clampStatementDay(record.statementDay);
+	const record = value as Record<string, unknown>;
 	return {
-		statementDay:
-			!statementDaySet && storedDay === 1
-				? DEFAULT_CYCLE_STATEMENT_DAY
-				: storedDay,
-		statementDaySet,
+		statementDay: clampStatementDay(record.statementDay),
+		statementDaySet: record.statementDaySet === true,
 		reserve: Math.max(
 			0,
 			Number.isFinite(Number(record.reserve))

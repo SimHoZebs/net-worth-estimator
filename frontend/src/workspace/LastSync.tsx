@@ -42,10 +42,7 @@ export function LastSync({
 		const time = new Date(status.lastSyncAt);
 		if (Number.isNaN(time.getTime())) return <span>Sync time unavailable</span>;
 		const label = <>Last synced {syncTimeFormat.format(time)}</>;
-		if (
-			status.syncConfigured !== false &&
-			isSyncStale(status.lastSyncAt, effectiveNow)
-		) {
+		if (status.syncConfigured && isSyncStale(status.lastSyncAt, effectiveNow)) {
 			return (
 				<button
 					type="button"

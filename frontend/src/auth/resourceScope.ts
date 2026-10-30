@@ -28,16 +28,6 @@ export function canonicalApiBaseUrl(baseUrl: string): string {
 	return new URL(baseUrl || "/", location.href).href.replace(/\/+$/, "");
 }
 
-/** Browser data always belongs to a verified user. */
-export function userStorageKey(
-	baseKey: string,
-	scope: UserScope = getUserScope(),
-): string | null {
-	if (scope.status === "pending" || !scope.resource) return null;
-	const owner = encodeURIComponent(scope.resource.id);
-	return `${baseKey}:user:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
-}
-
 export function userScopeKey(input: UserScopeInput): string {
 	return JSON.stringify([
 		input.apiBaseUrl,

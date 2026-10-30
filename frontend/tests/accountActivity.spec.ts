@@ -220,8 +220,7 @@ test("a shortfall can be inspected and edited while preserving account context a
 	await expect(dialog.getByText("Shortfall", { exact: true })).toHaveCount(0);
 	// The editor saves immediately: the dialog shows the edited −$3,000.00
 	// with no Shortfall (asserted above) and the saved model carries it too.
-	// Posting CSV ids are replaced with server UUIDs on import, so the
-	// renovation is located by name on the saved side.
+	// Find the saved renovation by name.
 	await expect(dialog).toContainText("Account activity · Saved");
 	const saved = await readSavedServerModel();
 	const savedExpression = saved.postings.find(

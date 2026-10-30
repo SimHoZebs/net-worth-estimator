@@ -15,6 +15,13 @@ import {
 } from "../auth/resourceScope.ts";
 import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 
+const status = {
+	readOnly: false,
+	syncConfigured: true,
+	syncQuotaUsed: 0,
+	syncQuotaLimit: 24,
+};
+
 function stubSync(lastSyncAt = "after") {
 	const fetcher = vi.fn(async (url: unknown, _init?: RequestInit) => {
 		const headers = new Headers({ "content-type": "application/json" });
@@ -22,7 +29,7 @@ function stubSync(lastSyncAt = "after") {
 		if (resource) headers.set("Waypoint-Resource", resource);
 		const path = String(url);
 		if (path.endsWith("/v1/status"))
-			return new Response(JSON.stringify({ readOnly: false, lastSyncAt }), {
+			return new Response(JSON.stringify({ ...status, lastSyncAt }), {
 				headers,
 			});
 		return new Response(
@@ -54,7 +61,7 @@ beforeEach(() => {
 		configurable: true,
 		value: "visible",
 	});
-	setServerStatusFixture({ readOnly: false, lastSyncAt: "before" });
+	setServerStatusFixture({ ...status, lastSyncAt: "before" });
 });
 afterEach(() => {
 	cleanup();
