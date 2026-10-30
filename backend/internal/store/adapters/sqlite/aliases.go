@@ -18,6 +18,7 @@ type (
 	BankDirective    = store.BankDirective
 	BankUpsert       = store.BankUpsert
 	BankConvert      = store.BankConvert
+	BankObservation  = store.BankObservation
 	Group            = store.Group
 	GroupMember      = store.GroupMember
 	GroupInvite      = store.GroupInvite

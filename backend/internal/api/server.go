@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/analyses"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/model"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/projections"
 	receipthttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/receipts"
@@ -25,6 +26,7 @@ type Config struct {
 	// ResourceID namespaces in-flight projections as well as persisted artifacts.
 	ResourceID     string
 	CanWrite       func(context.Context) bool
+	Actor          func(context.Context) string
 	AllowedOrigins []string
 	ReadOnly       bool
 	// SyncRunner runs the SimpleFIN sync on trigger. It may be nil (sample
@@ -56,6 +58,7 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	documentRawRoutes(api)
 	receiptService := receipts.NewService(st, serverConfig.ReceiptSource, serverConfig.ResourceID)
 	receipthttp.Register(api, receiptService, st)
+	analyses.Register(api, st, serverConfig.CanWrite, serverConfig.Actor)
 	model.Register(api, st, receiptService, serverConfig.ReadOnly)
 	synchttp.Register(api, st, serverConfig.SyncRunner)
 	compute := huma.NewGroup(api)

@@ -30,6 +30,7 @@ import (
 //     leak sql.ErrNoRows, missing files, or other mechanism errors.
 type Store interface {
 	ReceiptStore
+	AnalysisStore
 	LoadDocument() (*types.FinancialModelDocument, error)
 	DocumentExists() (bool, error)
 	InitializeDocument() error

@@ -22,6 +22,9 @@ import (
 // Handlers map it to 404 without leaking internals.
 var ErrNotFound = errors.New("not found")
 
+var ErrAnalysisFeedbackConflict = errors.New("the finding changed; review it again")
+var ErrAnalysisFeedbackInvalid = errors.New("invalid analysis feedback")
+
 // ErrGroupForbidden reports a group action the caller's role may not perform.
 // It distinguishes denial (403) from unknown groups or members (404,
 // ErrNotFound).

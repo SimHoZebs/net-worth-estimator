@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
@@ -85,6 +86,12 @@ func main() {
 	defer database.Close()
 	stopBlobCleanup := database.StartBlobCleanup(context.Background(), func(err error) { log.Printf("blob cleanup: %v", err) })
 	defer stopBlobCleanup()
+	analysisRunner, err := analysis.NewRunner(database, analysis.Definitions()...)
+	if err != nil {
+		log.Fatalf("configure analyses: %v", err)
+	}
+	stopAnalyses := analysisRunner.Start(context.Background(), 15*time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
+	defer stopAnalyses()
 
 	resources, err := resourceConfigFromEnv(os.Getenv)
 	if err != nil {

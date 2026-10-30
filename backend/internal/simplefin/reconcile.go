@@ -209,5 +209,14 @@ present:
 			Upsert: &store.BankUpsert{Posting: candidate.Posting, Keys: []store.BankKey{candidateKey(candidate)}},
 		})
 	}
+	// Evidence refreshes also apply to known settled keys, independently of the
+	// posting directives. This preserves metadata without overwriting owner edits.
+	for _, items := range [][]store.SyncPosting{pending, settled} {
+		for _, item := range items {
+			if item.Facts != nil {
+				directives = append(directives, store.BankDirective{Observe: &store.BankObservation{Keys: []store.BankKey{candidateKey(item)}, Facts: *item.Facts}})
+			}
+		}
+	}
 	return directives
 }

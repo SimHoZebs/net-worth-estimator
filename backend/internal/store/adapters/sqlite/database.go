@@ -114,6 +114,14 @@ func (d *Database) setupSchema() error {
 	if err := migrateSourceUser(tx); err != nil {
 		return fmt.Errorf("migrate row source names: %w", err)
 	}
+	for _, statement := range analysisSchemaStatements() {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("setup analysis: %w", err)
+		}
+	}
+	if err := setupAnalysisFeedback(tx); err != nil {
+		return fmt.Errorf("setup analysis feedback: %w", err)
+	}
 	for _, statement := range receiptBlobSchemaObjects {
 		if _, err := tx.Exec(statement); err != nil {
 			return err

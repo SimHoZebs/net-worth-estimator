@@ -12,9 +12,23 @@ registry, numbered chain, or historical-model converter to the backend.
 Use existing `setupdb`, `refreshmodel`, and `importcsv` tools where appropriate.
 The image also provides `sqlite3` for offline SQL and SQLite-safe backups.
 
-The current body is a no-op. It needs no backup and changes no data. A pending
-migration's reviewed body must implement preflight, backup, mutation, and
-postconditions. It must reject unknown state before mutation.
+The current body provisions the Analysis evidence, findings, and feedback schema.
+It accepts current `shared-accounts-v1` storage without Analysis tables, or the
+complete target schema on repeat runs. Partial application or Analysis schemas
+fail before setup. It checks integrity and foreign keys, creates a private
+`<database>.analysis-backup.XXXXXX/before.db`, then calls this image's `setupdb`.
+It compares every preexisting application table, except the schema-marker table,
+against that backup. A complete target repeat performs read-only checks only.
+
+The adapter must keep every API writer stopped for the complete operation.
+Failed setup or postconditions leave the backup and API maintenance state intact.
+The private `<database>.analysis-migration-pending` file identifies an unverified
+attempt. A complete target with that interlock cannot bypass failed row checks
+on retry. Restore or explicitly verify its backup before API startup.
+Before new writes, rollback uses the verified backup and previous image together.
+After new writes, the reconciliation rule below applies. Retain this body until
+both supported targets verify it. No provider edits or financial-row conversion
+belong to this migration.
 
 `render-free-boot.sh` provisions current schema and the ordinary guest row on
 hosts configured for that command. This is fresh/current storage provisioning,
@@ -45,6 +59,10 @@ Do not infer coverage from a successful build.
 8. Verify migration and API use the same immutable target image.
 9. Run affected tests, image checks, shell syntax, and adapter contract checks.
 10. Review the exact staged diff before the semantic commit and push.
+
+Run `node --test deploy/analysis-migration.test.mjs deploy/migrations.test.mjs`
+for the current body's preflight, backup, row-preservation, failure, retry, and
+repeat checks. These local checks need Go and SQLite CLI, not live credentials.
 
 SQL conversion and provider-policy updates use the same path. Their bodies
 differ; their deployment contract does not. Pass target-specific values through

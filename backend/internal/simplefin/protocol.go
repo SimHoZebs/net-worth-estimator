@@ -21,12 +21,15 @@ import (
 // Transaction mirrors the SimpleFIN protocol transaction object. Only the
 // fields the sync consumes are modeled.
 type Transaction struct {
-	ID           string `json:"id"`
-	Posted       int64  `json:"posted"`
-	Amount       string `json:"amount"`
-	Description  string `json:"description"`
-	TransactedAt *int64 `json:"transacted_at"`
-	Pending      *bool  `json:"pending"`
+	ID           string                     `json:"id"`
+	Posted       int64                      `json:"posted"`
+	Amount       string                     `json:"amount"`
+	Description  string                     `json:"description"`
+	TransactedAt *int64                     `json:"transacted_at"`
+	Pending      *bool                      `json:"pending"`
+	Payee        string                     `json:"payee"`
+	Memo         string                     `json:"memo"`
+	Extra        map[string]json.RawMessage `json:"extra"`
 }
 
 // Account mirrors the SimpleFIN protocol account object.

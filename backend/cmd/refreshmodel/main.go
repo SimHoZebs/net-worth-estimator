@@ -27,6 +27,7 @@ var financialTables = []string{
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
 	"receipts",
+	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback",
 }
 
 func main() {
@@ -150,7 +151,7 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
-		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations") {
+		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations" || table.name == "transaction_source_facts" || strings.HasPrefix(table.name, "analysis_")) {
 			continue
 		}
 		columns, values := []string{"user_id"}, []string{"?"}

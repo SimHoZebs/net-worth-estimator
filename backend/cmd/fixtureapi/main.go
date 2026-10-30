@@ -23,11 +23,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
@@ -105,7 +107,7 @@ func main() {
 	var mu sync.Mutex
 	live := &switcher{}
 
-	restore := func(nextReadOnly bool) error {
+	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction) error {
 		mu.Lock()
 		defer mu.Unlock()
 		if err := database.Clear(); err != nil {
@@ -118,6 +120,16 @@ func main() {
 		if _, err := database.ImportDocument(doc); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
+		if len(bankTransactions) > 0 {
+			set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "fixture-bank", Currency: "USD", Balance: "0", Transactions: bankTransactions}}}
+			plan, err := simplefin.Map(set, map[string]string{"fixture-bank": "checking"}, time.Now())
+			if err != nil {
+				return err
+			}
+			if _, err := database.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})); err != nil {
+				return err
+			}
+		}
 		readOnly = nextReadOnly
 		live.set(api.New(database, api.Config{
 			ReceiptSource:  receiptSource,
@@ -128,9 +140,15 @@ func main() {
 		return nil
 	}
 
-	if err := restore(readOnly); err != nil {
+	if err := restore(readOnly, nil); err != nil {
 		log.Fatalf("seed fixture: %v", err)
 	}
+	analysisRunner, err := analysis.NewRunner(application, analysis.Definitions()...)
+	if err != nil {
+		log.Fatalf("configure analyses: %v", err)
+	}
+	stopAnalyses := analysisRunner.Start(context.Background(), time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
+	defer stopAnalyses()
 
 	mux := http.NewServeMux()
 	mux.Handle(resetPath, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -139,7 +157,8 @@ func main() {
 			return
 		}
 		var body struct {
-			ReadOnly *bool `json:"readOnly"`
+			ReadOnly         *bool                   `json:"readOnly"`
+			BankTransactions []simplefin.Transaction `json:"bankTransactions"`
 		}
 		if request.Body != nil {
 			// An empty body is valid and keeps the current guard setting.
@@ -149,7 +168,7 @@ func main() {
 		if body.ReadOnly != nil {
 			next = *body.ReadOnly
 		}
-		if err := restore(next); err != nil {
+		if err := restore(next, body.BankTransactions); err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintln(writer, err)
 			return

@@ -180,6 +180,10 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 	}
 	for _, directive := range directives {
 		switch {
+		case directive.Observe != nil:
+			if err := observeBankTransaction(tx, directive.Observe); err != nil {
+				return err
+			}
 		case directive.Void != "":
 			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
 			if err != nil {

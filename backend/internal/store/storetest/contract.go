@@ -29,6 +29,7 @@ const receiptPostingID = "01900000-0000-7000-8000-000000000099"
 func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Helper()
 	t.Run("ReceiptEvidence", func(t *testing.T) { testReceiptConformance(t, newStore) })
+	t.Run("AnalysisEvidence", func(t *testing.T) { testAnalysisConformance(t, newStore) })
 	t.Run("InitializeDocument", func(t *testing.T) {
 		testInitializeDocument(t, newStore)
 	})
