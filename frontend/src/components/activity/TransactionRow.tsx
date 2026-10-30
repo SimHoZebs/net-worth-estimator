@@ -12,6 +12,8 @@ import type { Transaction } from "../../domain/model.ts";
 import { useReceiptLinks } from "../../state/receipts.ts";
 import { Badge } from "../Badge.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
+import { useTransactionBNPL } from "../analysis/TransactionAnalysis.tsx";
+import { findingLabel } from "../../domain/analysisFindings.ts";
 import {
 	transactionAmountStyles,
 	transactionBadgeStyles,
@@ -50,6 +52,16 @@ export function TransactionRow({
 			? null
 			: transaction.counterparty;
 	const receipts = useReceiptLinks(planTransaction?.id ?? "");
+	const finding = useTransactionBNPL(planTransaction?.id ?? "");
+	const analysisBadge =
+		finding &&
+		planTransaction?.frequency === "once" &&
+		!transaction.pending &&
+		!transaction.void ? (
+			<Badge tone="neutral" className={transactionBadgeStyles()}>
+				{findingLabel(finding)}
+			</Badge>
+		) : null;
 	const receiptBadge =
 		planTransaction && receipts.length > 0 ? (
 			<Badge tone="neutral" className={transactionBadgeStyles()}>
@@ -85,8 +97,10 @@ export function TransactionRow({
 					transaction.void ||
 					transaction.excluded ||
 					transaction.shortfall > 0.01 ||
-					receiptBadge) && (
+					receiptBadge ||
+					analysisBadge) && (
 					<>
+						{analysisBadge}
 						{receiptBadge}{" "}
 						{transaction.void ? (
 							<Badge tone="neutral" className={transactionBadgeStyles()}>
@@ -131,7 +145,7 @@ export function TransactionRow({
 					)}
 				</>
 			}
-			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}`}
+			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}${analysisBadge && finding ? `; ${findingLabel(finding)}` : ""}`}
 			onSelect={() => {
 				if (planTransaction) onEdit(planTransaction);
 			}}

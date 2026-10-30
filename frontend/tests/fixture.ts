@@ -33,12 +33,25 @@ export async function seedResourceStorage(
 }
 
 export async function resetFixture(
-	options: { readOnly?: boolean; pinnedEvaluationIds?: string[] } = {},
+	options: {
+		readOnly?: boolean;
+		pinnedEvaluationIds?: string[];
+		bankTransactions?: {
+			id: string;
+			description: string;
+			amount: string;
+			posted: number;
+			pending?: boolean;
+		}[];
+	} = {},
 ): Promise<void> {
 	const api = await request.newContext();
 	try {
 		const response = await api.post(`${FIXTURE_API}/__fixture/reset`, {
-			data: { readOnly: options.readOnly ?? false },
+			data: {
+				readOnly: options.readOnly ?? false,
+				bankTransactions: options.bankTransactions,
+			},
 		});
 		if (!response.ok())
 			throw new Error(

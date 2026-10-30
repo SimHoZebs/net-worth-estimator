@@ -15,6 +15,7 @@ import { TransactionDetail } from "./TransactionDetail.tsx";
 import { TransactionFilters } from "./TransactionFilters.tsx";
 import { TransactionRow } from "./TransactionRow.tsx";
 import { TransactionTable } from "./TransactionTable.tsx";
+import { TransactionAnalysisProvider } from "../analysis/TransactionAnalysis.tsx";
 
 const PAGE_SIZE = 10;
 export function Transactions({
@@ -92,27 +93,33 @@ export function Transactions({
 			/>
 			{filtered.length ? (
 				<>
-					<TransactionTable
-						caption="Transactions involving this account, separated into recorded facts and projected transactions."
-						showHeaders={showHeaders}
-						scrollId={`${id}-table`}
+					<TransactionAnalysisProvider
+						postingIds={pageRows.map(
+							(transaction) => transaction.transactionId,
+						)}
 					>
-						{pageRows.map((transaction) => (
-							<TransactionRow
-								key={transaction.id}
-								transaction={transaction}
-								planTransaction={
-									savedRows.get(transaction.transactionId) ?? null
-								}
-								onEdit={() => {
-									const planTransaction = savedRows.get(
-										transaction.transactionId,
-									);
-									if (planTransaction) inspect(transaction);
-								}}
-							/>
-						))}
-					</TransactionTable>
+						<TransactionTable
+							caption="Transactions involving this account, separated into recorded facts and projected transactions."
+							showHeaders={showHeaders}
+							scrollId={`${id}-table`}
+						>
+							{pageRows.map((transaction) => (
+								<TransactionRow
+									key={transaction.id}
+									transaction={transaction}
+									planTransaction={
+										savedRows.get(transaction.transactionId) ?? null
+									}
+									onEdit={() => {
+										const planTransaction = savedRows.get(
+											transaction.transactionId,
+										);
+										if (planTransaction) inspect(transaction);
+									}}
+								/>
+							))}
+						</TransactionTable>
+					</TransactionAnalysisProvider>
 					<TablePagination
 						page={currentPage}
 						pageCount={pageCount}
