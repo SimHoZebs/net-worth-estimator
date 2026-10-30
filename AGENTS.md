@@ -1,5 +1,20 @@
 # AGENTS.md - Net Worth Estimator
 
+## Subagent model
+
+- Set `model: "opencode-go/muse-spark-1.3-contributor"` explicitly on every subagent call, including exploration, implementation, and review.
+- Never rely on model inheritance or the default model.
+- Verify each child with `opencode api get /api/session/SESSION_ID` before using its work. Check `data.model.providerID` and `data.model.id`.
+- If Muse Spark 1.3 Contributor is unavailable, stop delegation and report the blocker. Never silently substitute GPT or another model.
+
+## Latest state only
+
+- This is pre-production software. Keep only the current model, schema, API, configuration, and browser-storage formats.
+- Delete application legacy aliases, migration fallbacks, retired modes, and tests dedicated to legacy acceptance, rejection, or migration.
+- Database upgrades belong in separate one-time operator scripts. Never put conversion logic in runtime, setup, or normal import paths.
+- Keep current-state validation and tests. Test one-time scripts for conversion correctness and data safety.
+- Retire one-time scripts through `deploy/MIGRATIONS.md` only after every supported target verifies the upgrade.
+
 ## Parallel work
 
 - Default is one agent per worktree plus one private branch. Git blocks two worktrees on one branch, and detached HEAD loses commits. Several agents may share one worktree and one branch only under a single orchestrator that owns the branch, assigns non-overlapping scopes, and serializes edits, commits, and verification.
