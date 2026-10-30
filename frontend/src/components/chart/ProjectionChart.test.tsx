@@ -42,6 +42,72 @@ function show() {
 }
 
 describe("projection chart inspection", () => {
+	it("keeps the first-sync delta fixed across window changes and inspection", () => {
+		render(
+			<ProjectionChart
+				projection={projectionFixture({
+					currentNetWorth: 1800,
+					points: [
+						{ date: "2026-01-01", total: 500, balances: {} },
+						{ date: "2026-02-01", total: 1000, balances: {} },
+						{ date: "2026-07-01", total: 1800, balances: {} },
+						{ date: "2027-01-01", total: 9000, balances: {} },
+					],
+				})}
+				checkpoints={[
+					{
+						Date: "2026-02-01",
+						AccountId: "cash",
+						Balance: 1000,
+						source: "simplefin",
+					},
+					{
+						Date: "2026-07-01",
+						AccountId: "cash",
+						Balance: 1800,
+						source: "simplefin",
+					},
+				]}
+				onEvidence={vi.fn()}
+			/>,
+		);
+		expect(screen.getByText("+$800 (+80%)")).toBeTruthy();
+		expect(screen.getByText("since first sync · Feb 1, 2026")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "90 days" }));
+		fireEvent.change(screen.getByRole("slider"), { target: { value: "0" } });
+		expect(screen.getByText("+$800 (+80%)")).toBeTruthy();
+		expect(screen.getByText("As of Jul 1, 2026")).toBeTruthy();
+	});
+
+	it.each([
+		[800, "-$200 (-20%)"],
+		[1000, "$0 (0%)"],
+	])(
+		"shows signed and unchanged deltas for current worth %s",
+		(currentNetWorth, label) => {
+			render(
+				<ProjectionChart
+					projection={projectionFixture({ currentNetWorth })}
+					checkpoints={[
+						{
+							Date: "2026-01-01",
+							AccountId: "cash",
+							Balance: 1000,
+							source: "simplefin",
+						},
+					]}
+					onEvidence={vi.fn()}
+				/>,
+			);
+			expect(screen.getByText(label)).toBeTruthy();
+		},
+	);
+
+	it("hides the sync comparison until a synced baseline exists", () => {
+		show();
+		expect(screen.queryByText(/since first sync/)).toBeNull();
+	});
+
 	it("keeps keyboard inspection values and resets on blur", () => {
 		show();
 		const slider = screen.getByRole("slider", {
@@ -80,9 +146,9 @@ describe("projection chart inspection", () => {
 		);
 		// No badge or crosshair before inspection.
 		expect(screen.queryByText("Jun 2, 2026")).toBeNull();
-		expect(
-			plot.querySelectorAll('line[stroke-dasharray="4 4"]').length,
-		).toBe(0);
+		expect(plot.querySelectorAll('line[stroke-dasharray="4 4"]').length).toBe(
+			0,
+		);
 		fireEvent(
 			plot,
 			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
@@ -91,9 +157,9 @@ describe("projection chart inspection", () => {
 		expect(screen.getByText("Jun 2, 2026")).toBeTruthy();
 		expect(screen.getAllByText("$1,000").length).toBeGreaterThanOrEqual(1);
 		// Dotted guides run across both axes through the dot.
-		expect(
-			plot.querySelectorAll('line[stroke-dasharray="4 4"]').length,
-		).toBe(2);
+		expect(plot.querySelectorAll('line[stroke-dasharray="4 4"]').length).toBe(
+			2,
+		);
 	});
 
 	it("persists the dot on click and toggles off on a second click", () => {
@@ -112,9 +178,9 @@ describe("projection chart inspection", () => {
 		const slider = screen.getByRole("slider");
 		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
 		expect(screen.getByText("Jun 2, 2026")).toBeTruthy();
-		expect(
-			plot.querySelectorAll('line[stroke-dasharray="4 4"]').length,
-		).toBe(2);
+		expect(plot.querySelectorAll('line[stroke-dasharray="4 4"]').length).toBe(
+			2,
+		);
 		// Clicking the pinned spot again releases it.
 		fireEvent(plot, new MouseEvent("click", { bubbles: true, clientX: 0 }));
 		fireEvent(

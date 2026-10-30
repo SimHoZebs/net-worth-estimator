@@ -131,6 +131,7 @@ function OutlookContent({
 			)}
 			<ProjectionChart
 				projection={base}
+				checkpoints={checkpoints}
 				onEvidence={onEvidence}
 				pending={pending}
 			/>
