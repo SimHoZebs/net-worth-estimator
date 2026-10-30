@@ -79,7 +79,6 @@ export async function readSavedServerModel() {
 			id: string;
 			name: string;
 			amount: { config: { expression?: string } };
-			purchase?: { priority: number };
 		};
 		type account = { id: string; minBalance: number };
 		return {

@@ -417,33 +417,3 @@ func syncSettledPosting(id, accountID, name, day string) SyncPosting {
 		},
 	}
 }
-
-func TestSetupRenamesOwnerSourceValue(t *testing.T) {
-	path := t.TempDir() + "/source-rename.db"
-	database, err := SetupDatabase(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	privateTestPlan(t, database, "other")
-	account := "checking"
-	plan, err := database.User("other")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := plan.CreateAccount(types.Account{ID: account, Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.SQL().Exec(`INSERT INTO postings (id, position, name, source_account_id, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, user_id) VALUES ('row', 0, 'Legacy', 'checking', '{}', 1, 1, 1, 'model', 0, 'other')`); err != nil {
-		t.Fatal(err)
-	}
-	database.Close()
-	database, err = SetupDatabase(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer database.Close()
-	var source string
-	if err := database.SQL().QueryRow(`SELECT source FROM postings WHERE id = 'row'`).Scan(&source); err != nil || source != "user" {
-		t.Fatalf("source = %q, %v", source, err)
-	}
-}

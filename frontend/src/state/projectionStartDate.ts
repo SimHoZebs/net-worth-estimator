@@ -6,7 +6,7 @@ export function projectionStartDate(document: FinancialModelDocument): string {
 		new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
 	);
 	const latest = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
-	const posting = document.postings.find((item) => !item.purchase);
+	const posting = document.postings[0];
 	return (
 		latest ??
 		(document.recurrenceRules ?? [])[0]?.startDate ??

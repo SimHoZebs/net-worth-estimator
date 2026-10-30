@@ -48,6 +48,10 @@ CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
 The server requires that existing, compatible database. It never creates a missing
 database or repairs its schema. Use the same path in `NET_WORTH_ESTIMATOR_DB`.
 
+`setupdb` creates a fresh database or validates an existing current schema. It
+does not upgrade older schemas or repair incomplete ones. Version upgrades use
+separate one-time operator scripts, with the app stopped and a verified backup.
+
 Legacy one-database-per-model layouts are unsupported. See
 [the shared database guide](docs/shared-database.md). Runtime startup never merges
 legacy files or assigns their ownership from the first login.

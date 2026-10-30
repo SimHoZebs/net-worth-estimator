@@ -104,9 +104,6 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 	addedPosting := map[string]bool{}
 	for date, occurrences := range history.ByDate {
 		for _, occurrence := range occurrences {
-			if occurrence.Posting.Purchase != nil {
-				continue
-			}
 			if occurrence.Posting.Pending || occurrence.Posting.Void {
 				continue
 			}
@@ -137,7 +134,7 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 		if addedPosting[posting.ID] {
 			continue
 		}
-		if posting.Purchase != nil || posting.Pending || posting.Void || !posting.Enabled {
+		if posting.Pending || posting.Void || !posting.Enabled {
 			continue
 		}
 		day := postingDay(posting)

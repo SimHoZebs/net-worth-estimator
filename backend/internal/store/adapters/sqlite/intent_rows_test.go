@@ -87,7 +87,6 @@ func TestConvertPostingToRuleKeepsIdentity(t *testing.T) {
 		t.Fatalf("seed account: %v", err)
 	}
 	posting := testPostingFixture("01900000-0000-7000-8000-000000000001")
-	posting.Purchase = &types.PurchasePolicy{Priority: 3}
 	if _, err := store.CreatePosting(posting); err != nil {
 		t.Fatalf("seed posting: %v", err)
 	}
@@ -143,32 +142,31 @@ func TestConvertRuleToPostingAppendsOwnerRow(t *testing.T) {
 	}
 }
 
-func TestUpdatePostingKeepsStoredPurchasePolicy(t *testing.T) {
+func TestPostingEditLeavesStandalonePurchasesUntouched(t *testing.T) {
 	store := openTestStore(t)
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
 	posting := testPostingFixture("01900000-0000-7000-8000-000000000002")
-	posting.Purchase = &types.PurchasePolicy{Priority: 2}
+	account := "checking"
+	if _, err := store.CreatePlannedPurchase(types.PlannedPurchase{ID: "01900000-0000-7000-8000-000000000003", Name: "Desk", FundingAccountID: &account, Cost: 100, EarliestDate: "2026-02-01", Priority: 2, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := store.CreatePosting(posting); err != nil {
 		t.Fatalf("seed posting: %v", err)
 	}
 	renamed := testPostingFixture("01900000-0000-7000-8000-000000000002")
 	renamed.Name = "Renamed"
-	renamed.Purchase = nil
-	updated, err := store.UpdatePosting(renamed)
+	_, err := store.UpdatePosting(renamed)
 	if err != nil {
 		t.Fatalf("update: %v", err)
-	}
-	if updated.Purchase == nil || updated.Purchase.Priority != 2 {
-		t.Fatalf("purchase policy = %+v, want priority 2 kept", updated.Purchase)
 	}
 	loaded, err := store.LoadDocument()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if loaded.Postings[0].Purchase == nil || loaded.Postings[0].Purchase.Priority != 2 {
-		t.Fatalf("stored policy = %+v", loaded.Postings[0].Purchase)
+	if len(loaded.PlannedPurchases) != 1 || loaded.PlannedPurchases[0].Priority != 2 {
+		t.Fatalf("planned purchases = %+v", loaded.PlannedPurchases)
 	}
 }
 

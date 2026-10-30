@@ -32,7 +32,7 @@ const baselinePosting: Transaction = {
 };
 
 // Raw row with server shapes the display never carries: non-midnight
-// seconds, a custom resolver with extra inputs, a wishlist purchase link,
+// seconds, a custom resolver with extra inputs,
 // and multiple destination legs.
 const rawPosting: Posting = {
 	id: "renovation",
@@ -53,7 +53,6 @@ const rawPosting: Posting = {
 	postedTime: 1842681845,
 	transactionTime: 1842637212,
 	claim: null,
-	purchase: { priority: 2 },
 	enabled: true,
 };
 
@@ -94,7 +93,7 @@ describe("posting update bodies", () => {
 				.transactionTime,
 		).toBe(changed.transactionTime);
 	});
-	it("preserves raw timestamps, amount, destinations, and purchase on a rename-only edit", () => {
+	it("preserves raw timestamps, amount, and destinations on a rename-only edit", () => {
 		const body = postingUpdateBody({
 			baseline: baselinePosting,
 			raw: rawPosting,
@@ -121,7 +120,6 @@ describe("posting update bodies", () => {
 			destinations: ["savings", "brokerage"],
 			postedTime: 1842681845,
 			transactionTime: 1842637212,
-			purchase: { priority: 2 },
 		});
 	});
 
@@ -157,7 +155,6 @@ describe("posting update bodies", () => {
 		);
 		expect(body.sourceAccountId).toBeUndefined();
 		expect(body.destinations).toEqual(["savings"]);
-		expect(body.purchase).toEqual({ priority: 2 });
 		expect(body.enabled).toBe(false);
 	});
 
@@ -230,7 +227,6 @@ describe("claim posting bodies", () => {
 			postedTime: 1842681845,
 			transactionTime: 1842637212,
 			claim: { ruleId: "reno-sub", occurrenceDate: "2028-06-15" },
-			purchase: { priority: 2 },
 		});
 	});
 });

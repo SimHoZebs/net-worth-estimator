@@ -79,88 +79,6 @@ func removePostingReceiptID(tx *userTx, postingID, receiptID string) error {
 	return err
 }
 
-// migratePostingReceiptIDs adds the stored receipt back-reference to databases
-// created before it and rebuilds every value from the receipts table. It runs
-// only inside explicit SetupDatabase, before schema validation.
-func migratePostingReceiptIDs(tx *sql.Tx) error {
-	rows, err := tx.Query(`PRAGMA table_info(postings)`)
-	if err != nil {
-		return err
-	}
-	hasColumn := false
-	for rows.Next() {
-		var cid, notnull, pk int
-		var name, kind string
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &kind, &notnull, &defaultValue, &pk); err != nil {
-			rows.Close()
-			return err
-		}
-		hasColumn = hasColumn || name == "receipt_ids"
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
-	if !hasColumn {
-		if _, err := tx.Exec(`ALTER TABLE postings ADD COLUMN receipt_ids TEXT NOT NULL DEFAULT '[]'`); err != nil {
-			return err
-		}
-	}
-	if _, err := tx.Exec(`UPDATE postings SET receipt_ids = '[]'`); err != nil {
-		return err
-	}
-	rows, err = tx.Query(`SELECT user_id, posting_id, id FROM receipts ORDER BY user_id, posting_id, id`)
-	if err != nil {
-		return err
-	}
-	type ref struct{ plan, posting, receipt string }
-	var refs []ref
-	for rows.Next() {
-		var r ref
-		if err := rows.Scan(&r.plan, &r.posting, &r.receipt); err != nil {
-			rows.Close()
-			return err
-		}
-		refs = append(refs, r)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
-	grouped := map[string][]string{}
-	order := []string{}
-	for _, r := range refs {
-		key := r.plan + "\x00" + r.posting
-		if _, ok := grouped[key]; !ok {
-			order = append(order, key)
-		}
-		grouped[key] = append(grouped[key], r.receipt)
-	}
-	for _, key := range order {
-		data, err := json.Marshal(grouped[key])
-		if err != nil {
-			return err
-		}
-		sep := -1
-		for i := 0; i < len(key); i++ {
-			if key[i] == 0 {
-				sep = i
-				break
-			}
-		}
-		if sep < 0 {
-			return fmt.Errorf("migrate receipt back-references: invalid key")
-		}
-		if _, err := tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE user_id = ? AND id = ?`, string(data), key[:sep], key[sep+1:]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (out types.Receipt, err error) {
 	image, err = validatedReceiptImage(image)
 	if err != nil {
@@ -407,39 +325,6 @@ func restoreReceipts(tx *userTx, receipts []preservedReceipt) error {
 			return err
 		}
 		if err := addPostingReceiptID(tx, receipt.postingID, receipt.id); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// migratePostingVoidFlag adds the explicit void lifecycle flag to databases
-// created before it. No backfill runs: no void row can predate the code that
-// writes them, so the column default is already correct everywhere. It runs
-// only inside explicit SetupDatabase, before schema validation.
-func migratePostingVoidFlag(tx *sql.Tx) error {
-	rows, err := tx.Query(`PRAGMA table_info(postings)`)
-	if err != nil {
-		return err
-	}
-	hasColumn := false
-	for rows.Next() {
-		var cid, notnull, pk int
-		var name, kind string
-		var defaultValue any
-		if err := rows.Scan(&cid, &name, &kind, &notnull, &defaultValue, &pk); err != nil {
-			rows.Close()
-			return err
-		}
-		hasColumn = hasColumn || name == "void"
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
-	if !hasColumn {
-		if _, err := tx.Exec(`ALTER TABLE postings ADD COLUMN void INTEGER NOT NULL DEFAULT 0 CHECK (void IN (0, 1))`); err != nil {
 			return err
 		}
 	}

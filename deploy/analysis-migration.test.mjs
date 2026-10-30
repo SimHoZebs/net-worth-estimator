@@ -14,6 +14,9 @@ after(async () => { for (const directory of owned) await rm(directory, { recursi
 await run("go", ["build", "-o", join(tools, "setupdb"), "./cmd/setupdb"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-planned-purchases"), "./scripts/one-time/planned-purchases"], {
+  cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
+});
 const sql = async (db, query) => (await run("sqlite3", [db, query])).stdout.trim();
 const sha256File = async (path) => (await run("sha256sum", [path])).stdout.trim().split(/\s+/)[0];
 const migrate = (db, env = {}) => run("/bin/sh", [script], {
@@ -108,7 +111,7 @@ test("failed row preservation leaves the original publishable without a pending 
   const dumpBefore = await sql(db, ".dump");
   await assert.rejects(
     migrate(db, { PATH: failures + delimiter + tools + delimiter + process.env.PATH }),
-    /changed preserved table accounts/,
+    /Candidate setup changed schema or rows/,
   );
   // Stronger than restore-and-retry: the original was never mutated, so no
   // pending file exists and a plain retry provisions the clean candidate.
@@ -118,6 +121,51 @@ test("failed row preservation leaves the original publishable without a pending 
   await migrate(db);
   assert.equal(await sql(db, "SELECT name FROM accounts;"), "Fixture checking");
   assert.equal(await sql(db, "SELECT count(*) FROM analysis_findings;"), "0");
+});
+
+async function seedRetiredPurchase(db, owner, expression = "125.50") {
+  await sql(db, `DROP TABLE planned_purchases;
+    CREATE TABLE purchase_policies (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      posting_id TEXT NOT NULL, priority INTEGER NOT NULL CHECK(priority>=0),
+      PRIMARY KEY(user_id,posting_id),
+      FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE);
+    INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source)
+      VALUES ('${owner}','01900000-0000-7000-8000-000000000099',2,'Desk','checking','null','{"resolver":"expression","config":{"expression":"${expression}"},"inputs":{}}',1769904000,1769904000,1,'user');
+    INSERT INTO entity_ids(user_id,id,kind) VALUES ('${owner}','01900000-0000-7000-8000-000000000099','posting');
+    INSERT INTO purchase_policies(user_id,posting_id,priority) VALUES ('${owner}','01900000-0000-7000-8000-000000000099',3);`);
+}
+
+test("purchase conversion preserves current observations, bank rows, and Analysis on a verified candidate", async () => {
+  const { directory, db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
+  await migrate(db);
+  await seedRetiredPurchase(db, owner);
+  const preserved = "SELECT * FROM checkpoints; SELECT * FROM postings WHERE source='simplefin'; SELECT * FROM users;";
+  const before = await sql(db, preserved);
+  const analysis = await analysisSnapshot(db);
+  await migrate(db);
+  assert.equal(await sql(db, preserved), before);
+  assert.equal(await analysisSnapshot(db), analysis);
+  assert.equal(await sql(db, "SELECT name,cost,earliest_date,priority,enabled FROM planned_purchases;"), "Desk|125.5|2026-02-01|3|1");
+  assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE name='purchase_policies';"), "0");
+  assert.equal(await sql(db, "SELECT count(*) FROM postings WHERE id='01900000-0000-7000-8000-000000000099';"), "0");
+  assert.equal(await sql(db, "SELECT kind FROM entity_ids WHERE id='01900000-0000-7000-8000-000000000099';"), "planned-purchase");
+  const hash = await sha256File(db);
+  await migrate(db);
+  assert.equal(await sha256File(db), hash);
+  assert.equal((await backups(directory)).length, 2);
+});
+
+test("unsafe purchase conversion leaves original bytes and schema unchanged", async () => {
+  const { directory, db, owner } = await sourceDatabase();
+  await seedRetiredPurchase(db, owner, "variable * 2");
+  const before = await sha256File(db);
+  await assert.rejects(migrate(db), /Candidate purchase conversion failed/);
+  assert.equal(await sha256File(db), before);
+  assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE name='planned_purchases';"), "0");
+  assert.equal(await sql(db, "SELECT count(*) FROM purchase_policies;"), "1");
+  assert.equal((await backups(directory)).length, 1);
 });
 
 test("an old pending file still rejects an unverified complete target", async () => {
@@ -144,6 +192,34 @@ test("Analysis migration rejects missing, foreign, partial, and incomplete state
   const partialBase = await sourceDatabase();
   await sql(partialBase.db, "DROP TABLE accounts;");
   await assert.rejects(migrate(partialBase.db), /Incomplete application schema/);
+});
+
+test("target image converts retired purchases before the API can start", {
+  skip: !process.env.DEPLOYMENT_TEST_IMAGE,
+}, async () => {
+  await run("docker", ["run", "--rm", "--network", "none", process.env.DEPLOYMENT_TEST_IMAGE, "/bin/sh", "-c", `
+set -eu
+test "$(id -u)" = 10001
+test -x /app/upgrade-planned-purchases
+export NET_WORTH_ESTIMATOR_DB=/tmp/purchases.db
+/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer https://fixture.invalid --subject owner >/dev/null
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" <<'SQL'
+DROP TABLE planned_purchases;
+CREATE TABLE purchase_policies(user_id TEXT NOT NULL REFERENCES users(id),posting_id TEXT NOT NULL,priority INTEGER NOT NULL,PRIMARY KEY(user_id,posting_id),FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE);
+INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'cash',0,'Cash','cash',1 FROM users;
+INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source)
+ SELECT id,'01900000-0000-7000-8000-000000000099',0,'Desk','cash','null','{"resolver":"expression","config":{"expression":"125.50"},"inputs":{}}',1769904000,1769904000,1,'user' FROM users;
+INSERT INTO entity_ids(user_id,id,kind) SELECT id,'01900000-0000-7000-8000-000000000099','posting' FROM users;
+INSERT INTO purchase_policies(user_id,posting_id,priority) SELECT id,'01900000-0000-7000-8000-000000000099',3 FROM users;
+SQL
+/app/migrate.sh >/dev/null
+test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT name,cost,priority FROM planned_purchases;')" = 'Desk|125.5|3'
+test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT count(*) FROM postings;')" = 0
+/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" >/dev/null
+/app/migrate.sh >/dev/null
+test "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
+test -z "$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA foreign_key_check;')"
+`]);
 });
 
 test("target image provisions Analysis, preserves facts, and survives setup failure", {

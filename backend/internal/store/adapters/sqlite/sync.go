@@ -292,15 +292,3 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 	}
 	return summary, nil
 }
-
-// migrateSourceUser renames the owner-authored source value from "model" to
-// "user" in databases created before the rename. It runs only inside
-// explicit SetupDatabase, before schema validation.
-func migrateSourceUser(tx *sql.Tx) error {
-	for _, table := range []string{"postings", "checkpoints"} {
-		if _, err := tx.Exec(`UPDATE "` + table + `" SET source = 'user' WHERE source = 'model'`); err != nil {
-			return err
-		}
-	}
-	return nil
-}

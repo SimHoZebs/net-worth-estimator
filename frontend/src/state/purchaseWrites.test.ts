@@ -51,31 +51,12 @@ function wish(
 	};
 }
 
-function purchasePosting(id: string, priority: number) {
-	const stamp = Math.floor(new Date("2026-09-24T00:00:00Z").getTime() / 1000);
-	return {
-		id,
-		name: id,
-		sourceAccountId: "cash",
-		destinations: null,
-		amount: {
-			resolver: "expression",
-			config: { expression: "500" },
-			inputs: {},
-		},
-		postedTime: stamp,
-		transactionTime: stamp,
-		purchase: { priority },
-		enabled: true,
-	};
-}
-
 function seedPurchases(): FinancialModelDocument {
 	const model = modelFixture();
-	(model.postings as unknown[]).push(
-		purchasePosting("laptop", 0),
-		purchasePosting("chair", 1),
-	);
+	model.plannedPurchases = [
+		purchaseRow(wish("laptop"), 0),
+		purchaseRow(wish("chair"), 1),
+	];
 	return model;
 }
 
@@ -108,11 +89,11 @@ it("adds one wishlist row at the end of the queue", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	expect(await saveNewPurchase(wish("desk"), 2)).toBe(true);
 	const created = server.calls.find(
-		(call) => call.method === "POST" && call.url === "/v1/postings",
+		(call) => call.method === "POST" && call.url === "/v1/planned-purchases",
 	);
 	expect(created?.body).toMatchObject({
 		name: "desk",
-		purchase: { priority: 2 },
+		priority: 2,
 	});
 	// The authoritative model refetches after the persisted write.
 	expect(
@@ -126,9 +107,10 @@ it("edits one wishlist row without moving it", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	expect(await savePurchaseEdit(wish("laptop", { amount: 600 }), 0)).toBe(true);
 	const updated = server.calls.find(
-		(call) => call.method === "PATCH" && call.url === "/v1/postings/laptop",
+		(call) =>
+			call.method === "PATCH" && call.url === "/v1/planned-purchases/laptop",
 	);
-	expect(updated?.body).toMatchObject({ purchase: { priority: 0 } });
+	expect(updated?.body).toMatchObject({ priority: 0 });
 	expect(String(JSON.stringify(updated?.body))).toContain("600");
 });
 
@@ -137,12 +119,14 @@ it("removes one wishlist row without touching the rest", async () => {
 	expect(await removeSavedPurchase("laptop")).toBe(true);
 	expect(
 		server.calls.some(
-			(call) => call.method === "DELETE" && call.url === "/v1/postings/laptop",
+			(call) =>
+				call.method === "DELETE" && call.url === "/v1/planned-purchases/laptop",
 		),
 	).toBe(true);
 	expect(
 		server.calls.some(
-			(call) => call.method === "PATCH" && call.url === "/v1/postings/chair",
+			(call) =>
+				call.method === "PATCH" && call.url === "/v1/planned-purchases/chair",
 		),
 	).toBe(false);
 });
@@ -172,7 +156,8 @@ it("moves one row with priority updates and a single reorder", async () => {
 	expect(result.next?.map((item) => item.id)).toEqual(["chair", "laptop"]);
 	expect(
 		server.calls.some(
-			(call) => call.method === "POST" && call.url === "/v1/postings/reorder",
+			(call) =>
+				call.method === "POST" && call.url === "/v1/planned-purchases/reorder",
 		),
 	).toBe(true);
 });
@@ -189,7 +174,7 @@ it("reports a no-op move without any server call", async () => {
 it("refreshes authoritative state after a rejected write", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	server.writeOnce(
-		(method, path) => method === "POST" && path === "/v1/postings",
+		(method, path) => method === "POST" && path === "/v1/planned-purchases",
 		{
 			row: {},
 			issues: [{ severity: "error", message: "Choose an account." }],
@@ -208,7 +193,8 @@ it("refreshes authoritative state after a rejected write", async () => {
 it("reports a transport failure instead of implying a save", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	server.writeOnce(
-		(method, path) => method === "DELETE" && path === "/v1/postings/laptop",
+		(method, path) =>
+			method === "DELETE" && path === "/v1/planned-purchases/laptop",
 		new Error("boom"),
 	);
 	expect(await removeSavedPurchase("laptop")).toBe(false);
@@ -224,13 +210,14 @@ it("refuses writes before the workspace is ready", async () => {
 it("fails a pending save on resource switch without a stale refresh", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	const release = server.holdWriteOnce(
-		(method, path) => method === "POST" && path === "/v1/postings",
+		(method, path) => method === "POST" && path === "/v1/planned-purchases",
 	);
 	const pending = saveNewPurchase(wish("desk"), 2);
 	await vi.waitFor(() => {
 		expect(
 			server.calls.some(
-				(call) => call.method === "POST" && call.url === "/v1/postings",
+				(call) =>
+					call.method === "POST" && call.url === "/v1/planned-purchases",
 			),
 		).toBe(true);
 	});
@@ -248,7 +235,7 @@ it("fails a pending save on resource switch without a stale refresh", async () =
 it("never publishes an old failure into the new resource", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	server.writeOnce(
-		(method, path) => method === "POST" && path === "/v1/postings",
+		(method, path) => method === "POST" && path === "/v1/planned-purchases",
 		new Error("boom"),
 	);
 	const pending = saveNewPurchase(wish("desk"), 2);
@@ -268,13 +255,14 @@ it("never publishes an old failure into the new resource", async () => {
 it("serializes concurrent saves: the second save returns false", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	const release = server.holdWriteOnce(
-		(method, path) => method === "POST" && path === "/v1/postings",
+		(method, path) => method === "POST" && path === "/v1/planned-purchases",
 	);
 	const first = saveNewPurchase(wish("desk"), 2);
 	await vi.waitFor(() => {
 		expect(
 			server.calls.some(
-				(call) => call.method === "POST" && call.url === "/v1/postings",
+				(call) =>
+					call.method === "POST" && call.url === "/v1/planned-purchases",
 			),
 		).toBe(true);
 	});
@@ -283,7 +271,7 @@ it("serializes concurrent saves: the second save returns false", async () => {
 	await expect(saveNewPurchase(wish("lamp"), 3)).resolves.toBe(false);
 	expect(
 		server.calls.filter(
-			(call) => call.method === "POST" && call.url === "/v1/postings",
+			(call) => call.method === "POST" && call.url === "/v1/planned-purchases",
 		).length,
 	).toBe(1);
 	release(undefined);

@@ -18,10 +18,11 @@ import (
 // non-nil for rule-generated instances; DocPath is the validation-style path
 // identifying the owning row (["postings", i] or ["recurrenceRules", i]).
 type DatedPostingOccurrence struct {
-	Posting *types.Posting
-	Index   int
-	Rule    *types.RecurrenceRule
-	DocPath []any
+	Posting  *types.Posting
+	Index    int
+	Rule     *types.RecurrenceRule
+	Purchase *types.PlannedPurchase // Set only by the isolated purchase simulation.
+	DocPath  []any
 }
 
 // compareDatedPostingOccurrences is the single strict ordering shared by
@@ -29,7 +30,7 @@ type DatedPostingOccurrence struct {
 // definition so one edit changes all three. Negative means a sorts first;
 // zero means every ordered field ties (callers break it stably).
 func compareDatedPostingOccurrences(a, b DatedPostingOccurrence) int {
-	aPurchase, bPurchase := a.Posting.Purchase, b.Posting.Purchase
+	aPurchase, bPurchase := a.Purchase, b.Purchase
 	if (aPurchase != nil) != (bPurchase != nil) {
 		if aPurchase == nil {
 			return -1
@@ -186,7 +187,7 @@ func claimsByRule(postings []types.Posting) map[string]map[string]bool {
 	claims := map[string]map[string]bool{}
 	for index := range postings {
 		posting := &postings[index]
-		if !posting.Enabled || posting.Purchase != nil || posting.Claim == nil {
+		if !posting.Enabled || posting.Claim == nil {
 			continue
 		}
 		dates, ok := claims[posting.Claim.RuleID]
@@ -271,7 +272,7 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	}
 	for postingIndex := range postings {
 		posting := &postings[postingIndex]
-		if !posting.Enabled || posting.Purchase != nil {
+		if !posting.Enabled {
 			continue
 		}
 		day := postingDay(posting)

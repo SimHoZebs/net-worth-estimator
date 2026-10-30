@@ -29,6 +29,8 @@ var analysisSchema = []string{
 		first_detected_at INTEGER NOT NULL, last_checked_at INTEGER NOT NULL,
 		status TEXT NOT NULL CHECK(status IN ('active', 'withdrawn')),
 		dismissed INTEGER NOT NULL DEFAULT 0 CHECK(dismissed IN (0, 1)),
+		review_json TEXT NOT NULL DEFAULT 'null',
+		feedback_revision INTEGER NOT NULL DEFAULT 0,
 		PRIMARY KEY(user_id, id), UNIQUE(user_id, analysis_type, posting_id, kind),
 		FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
 		FOREIGN KEY(user_id, run_id) REFERENCES analysis_runs(user_id, id)

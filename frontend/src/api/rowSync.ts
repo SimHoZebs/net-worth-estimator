@@ -13,20 +13,24 @@ import {
 	createAccount,
 	createEvaluation,
 	createPosting,
+	createPlannedPurchase,
 	createRule,
 	deleteAccount,
 	deleteCheckpoint,
 	deleteEvaluation,
 	deletePosting,
+	deletePlannedPurchase,
 	deleteRule,
 	moveAccount,
 	moveEvaluation,
 	movePosting,
+	movePlannedPurchase,
 	moveRule,
 	saveCheckpoint,
 	updateAccount,
 	updateEvaluation,
 	updatePosting,
+	updatePlannedPurchase,
 	updateRule,
 } from "@/api/generated/endpoints.ts";
 import type {
@@ -35,6 +39,7 @@ import type {
 	EvaluationUpdate,
 	ModelValidationIssue as GeneratedIssue,
 	PostingBody,
+	PlannedPurchaseBody,
 	RuleBody,
 } from "@/api/generated/model/index.ts";
 import { ApiRequestError } from "@/api/http.ts";
@@ -134,33 +139,6 @@ export type RowOperation =
 
 function stableStringify(value: unknown): string {
 	return JSON.stringify(value);
-}
-
-function midnightOfDay(day: string): number {
-	return Math.floor(new Date(`${day}T00:00:00Z`).getTime() / 1000);
-}
-
-// TODO: switch planned-purchase writes to dedicated /v1/planned-purchases
-// row endpoints once the backend ships them. Until then the standalone rows
-// persist through the legacy posting shape with a purchase marker, so saves
-// keep working against the current backend and the mock server.
-function plannedPurchasePosting(row: BackendPlannedPurchase): BackendPosting {
-	const stamp = midnightOfDay(row.earliestDate);
-	return {
-		id: row.id,
-		name: row.name,
-		sourceAccountId: row.fundingAccountId,
-		destinations: null,
-		amount: {
-			resolver: "expression",
-			config: { expression: String(row.cost) },
-			inputs: {},
-		},
-		postedTime: stamp,
-		transactionTime: stamp,
-		purchase: { priority: row.priority },
-		enabled: row.enabled,
-	};
 }
 
 function diffOrdered<T>(
@@ -490,26 +468,26 @@ export async function applyRowOperations(
 			case "plannedPurchase":
 				if (operation.action === "create")
 					outcome = await runWrite(issues, () =>
-						createPosting(
-							plannedPurchasePosting(operation.row) as unknown as PostingBody,
+						createPlannedPurchase(
+							operation.row as PlannedPurchaseBody,
 							options,
 						),
 					);
 				else if (operation.action === "update")
 					outcome = await runWrite(issues, () =>
-						updatePosting(
+						updatePlannedPurchase(
 							operation.id,
-							plannedPurchasePosting(operation.row) as unknown as PostingBody,
+							operation.row as PlannedPurchaseBody,
 							options,
 						),
 					);
 				else if (operation.action === "delete")
 					outcome = await runWrite(issues, () =>
-						deletePosting(operation.id, options),
+						deletePlannedPurchase(operation.id, options),
 					);
 				else
 					outcome = await runWrite(issues, () =>
-						movePosting(
+						movePlannedPurchase(
 							{ id: operation.id, beforeId: operation.beforeId ?? "" },
 							options,
 						),

@@ -29,7 +29,7 @@ func TestOpenDatabaseMissingNeverCreates(t *testing.T) {
 	}
 }
 
-func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
+func TestDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 	for _, tc := range []struct {
 		name, ddl string
 		want      error
@@ -41,8 +41,17 @@ func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 		{"missing-identity", `DROP TABLE sessions`, ErrSetupRequired},
 		{"missing-groups", `DROP TABLE group_members`, ErrSetupRequired},
 		{"missing-financial", `DROP TABLE account_links`, ErrSetupRequired},
+		{"missing-purchases", `DROP TABLE planned_purchases`, ErrSetupRequired},
+		{"retired-purchases", `CREATE TABLE purchase_policies(posting_id TEXT)`, ErrSetupRequired},
 		{"missing-column", `ALTER TABLE sessions DROP COLUMN data`, ErrSetupRequired},
+		{"missing-receipt-field", `ALTER TABLE postings DROP COLUMN receipt_ids`, ErrSetupRequired},
+		{"missing-void-field", `DROP TRIGGER analysis_posting_lifecycle; ALTER TABLE postings DROP COLUMN void`, ErrSetupRequired},
 		{"missing-index", `DROP INDEX identity_grant_subject`, ErrSetupRequired},
+		{"missing-blob-index", `DROP INDEX blob_cleanup`, ErrSetupRequired},
+		{"missing-receipt-index", `DROP INDEX receipt_blob_key`, ErrSetupRequired},
+		{"missing-blob-trigger", `DROP TRIGGER receipt_blob_delete`, ErrSetupRequired},
+		{"retired-posting-source", `INSERT INTO users VALUES ('owner', 'issuer', 'subject'); INSERT INTO postings (user_id, id, position, name, amount_resolution_json, posted_time, transaction_time, enabled, source) VALUES ('owner', 'posting', 0, 'Old source', '{}', 1, 1, 1, 'model')`, ErrSetupRequired},
+		{"retired-checkpoint-source", `INSERT INTO users VALUES ('owner', 'issuer', 'subject'); INSERT INTO accounts (user_id, id, position, name, enabled) VALUES ('owner', 'cash', 0, 'Cash', 1); INSERT INTO checkpoints (user_id, id, position, observed_at, model_account_id, balance, source) VALUES ('owner', 1, 0, 1767225600, 'cash', 1, 'model')`, ErrSetupRequired},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "source.db")
@@ -81,20 +90,28 @@ func TestOpenDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if d, err := OpenDatabase(path); !errors.Is(err, tc.want) {
-				if d != nil {
-					d.Close()
+			for _, open := range []struct {
+				name string
+				call func(string, ...DatabaseOption) (*Database, error)
+			}{{"runtime", OpenDatabase}, {"setup", SetupDatabase}} {
+				if tc.name == "empty" && open.name == "setup" {
+					continue
 				}
-				t.Fatalf("open = %v, want %v", err, tc.want)
-			}
-			after, err := os.ReadFile(path)
-			if err != nil || !bytes.Equal(before, after) {
-				t.Fatalf("source changed: %v", err)
-			}
-			assertFileMode(t, path, 0640)
-			for _, suffix := range []string{"-wal", "-shm"} {
-				if _, err := os.Lstat(path + suffix); !os.IsNotExist(err) {
-					t.Fatalf("rejected open created %s: %v", suffix, err)
+				if d, err := open.call(path); !errors.Is(err, tc.want) {
+					if d != nil {
+						d.Close()
+					}
+					t.Fatalf("%s = %v, want %v", open.name, err, tc.want)
+				}
+				after, err := os.ReadFile(path)
+				if err != nil || !bytes.Equal(before, after) {
+					t.Fatalf("%s changed source: %v", open.name, err)
+				}
+				assertFileMode(t, path, 0640)
+				for _, suffix := range []string{"-wal", "-shm"} {
+					if _, err := os.Lstat(path + suffix); !os.IsNotExist(err) {
+						t.Fatalf("rejected %s created %s: %v", open.name, suffix, err)
+					}
 				}
 			}
 		})
@@ -170,45 +187,30 @@ func databaseSchemaSnapshot(t *testing.T, d *Database) []string {
 	return result
 }
 
-func TestSetupDatabaseAcceptsEmptyFileAndCompletesSharedSchema(t *testing.T) {
-	for _, emptyFile := range []bool{true, false} {
-		path := filepath.Join(t.TempDir(), "app.db")
-		if emptyFile {
-			if err := os.WriteFile(path, nil, 0644); err != nil {
-				t.Fatal(err)
-			}
-		} else {
-			d, err := SetupDatabase(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := d.SQL().Exec(`DROP TABLE sessions; DROP INDEX identity_grant_subject`); err != nil {
-				t.Fatal(err)
-			}
-			if err := d.Close(); err != nil {
-				t.Fatal(err)
-			}
-		}
-		d, err := SetupDatabase(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := checkExistingSchema(d.SQL()); err != nil {
-			t.Fatal(err)
-		}
-		var count int
-		if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil || count != 0 {
-			t.Fatalf("setup provisioned users: %d, %v", count, err)
-		}
-		if err := d.Close(); err != nil {
-			t.Fatal(err)
-		}
-		d, err = OpenDatabase(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		d.Close()
+func TestSetupDatabaseAcceptsEmptyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.db")
+	if err := os.WriteFile(path, nil, 0644); err != nil {
+		t.Fatal(err)
 	}
+	d, err := SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkExistingSchema(d.SQL()); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("setup provisioned users: %d, %v", count, err)
+	}
+	if err := d.Close(); err != nil {
+		t.Fatal(err)
+	}
+	d, err = OpenDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.Close()
 }
 
 func TestSetupDatabaseRejectsLegacyWithoutChanges(t *testing.T) {

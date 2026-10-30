@@ -52,21 +52,6 @@ describe("isolated purchase evaluation", () => {
 		document.recurrenceRules = [];
 		document.postings = [
 			{
-				id: "legacy-wish",
-				name: "Old wish",
-				sourceAccountId: "checking",
-				destinations: null,
-				amount: {
-					resolver: "expression",
-					config: { expression: "50" },
-					inputs: {},
-				},
-				postedTime: 1577836800,
-				transactionTime: 1577836800,
-				purchase: { priority: 0 },
-				enabled: true,
-			},
-			{
 				id: "real",
 				name: "Real",
 				sourceAccountId: "checking",
@@ -82,7 +67,6 @@ describe("isolated purchase evaluation", () => {
 			},
 		];
 		expect(projectionStartDate(document)).toBe("2026-02-01");
-		// Standalone rows never feed the fallback either.
 		document.plannedPurchases = [
 			{
 				id: "row",
@@ -100,18 +84,18 @@ describe("isolated purchase evaluation", () => {
 		expect(
 			purchaseSchedule({
 				purchases: [
-					{ postingId: "laptop", date: "2027-02-05", amount: 500 },
-					{ postingId: "chair", date: null, amount: 150 },
+					{ purchaseId: "laptop", date: "2027-02-05", amount: 500 },
+					{ purchaseId: "chair", date: null, amount: 150 },
 				],
 			}),
 		).toEqual({
 			purchases: [
-				{ postingId: "laptop", date: "2027-02-05", amount: 500 },
-				{ postingId: "chair", date: null, amount: 150 },
+				{ purchaseId: "laptop", date: "2027-02-05", amount: 500 },
+				{ purchaseId: "chair", date: null, amount: 150 },
 			],
 		});
 		expect(
-			purchaseSchedule({ purchases: [{ postingId: "laptop", amount: 500 }] }),
+			purchaseSchedule({ purchases: [{ purchaseId: "laptop", amount: 500 }] }),
 		).toBeNull();
 	});
 
@@ -150,21 +134,17 @@ describe("isolated purchase evaluation", () => {
 		const wrapper = ({ children }: { children: ReactNode }) =>
 			createElement(QueryClientProvider, { client: queryClient }, children);
 		const document = fixtureDocument();
-		document.postings.push({
-			id: "laptop",
-			name: "Laptop",
-			sourceAccountId: "checking",
-			destinations: null,
-			amount: {
-				resolver: "expression",
-				config: { expression: "500" },
-				inputs: {},
+		document.plannedPurchases = [
+			{
+				id: "laptop",
+				name: "Laptop",
+				fundingAccountId: "checking",
+				cost: 500,
+				earliestDate: "2026-02-01",
+				priority: 0,
+				enabled: true,
 			},
-			postedTime: 1769904000,
-			transactionTime: 1769904000,
-			purchase: { priority: 0 },
-			enabled: true,
-		});
+		];
 		const before = JSON.stringify(document);
 		const deterministicCalls: unknown[] = [];
 		let purchasesCalls = 0;
@@ -195,7 +175,7 @@ describe("isolated purchase evaluation", () => {
 							deterministic: {
 								purchases: [
 									{
-										postingId: "laptop",
+										purchaseId: "laptop",
 										date: purchasesCalls === 1 ? "2026-02-01" : "2026-03-01",
 										amount: 500,
 									},
@@ -239,7 +219,7 @@ describe("isolated purchase evaluation", () => {
 		});
 		expect(JSON.stringify(document)).toBe(before);
 		const changed = structuredClone(document);
-		changed.postings.find((item) => item.id === "laptop")!.purchase!.priority =
+		changed.plannedPurchases!.find((item) => item.id === "laptop")!.priority =
 			1;
 		rendered.rerender({ active: changed });
 		await waitFor(() =>

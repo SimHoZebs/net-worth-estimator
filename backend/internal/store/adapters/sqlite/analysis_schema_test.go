@@ -1,12 +1,14 @@
 package sqlite
 
 import (
+	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestAnalysisUpgradeIsExplicitAndPreservesFinancialData(t *testing.T) {
+func TestSetupAndRuntimeRejectMissingAnalysisSchemaWithoutChanges(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "upgrade.db")
 	d, err := SetupDatabase(path)
 	if err != nil {
@@ -34,17 +36,18 @@ func TestAnalysisUpgradeIsExplicitAndPreservesFinancialData(t *testing.T) {
 		}
 		t.Fatalf("runtime accepted missing analysis schema: %v", err)
 	}
-	d, err = SetupDatabase(path)
+	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
-	scoped, err := d.User("owner")
-	if err != nil {
-		t.Fatal(err)
+	if opened, err := SetupDatabase(path); !errors.Is(err, ErrSetupRequired) {
+		if opened != nil {
+			opened.Close()
+		}
+		t.Fatalf("setup accepted missing analysis schema: %v", err)
 	}
-	doc, err := scoped.LoadDocument()
-	if err != nil || len(doc.Accounts) != 1 || doc.Accounts[0].ID != "checking" {
-		t.Fatalf("upgrade changed model: %+v %v", doc, err)
+	after, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("rejected setup changed source: %v", err)
 	}
 }

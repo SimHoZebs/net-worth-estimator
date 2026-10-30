@@ -2,73 +2,100 @@ package integration
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestPurchasePostingHTTPRoundTrip(t *testing.T) {
+func TestPlannedPurchaseHTTPRoundTrip(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
-	account := doRowRequest(t, handler, http.MethodPost, "/v1/accounts", `{"id":"cash","name":"Cash","kind":"cash","minBalance":0,"enabled":true}`)
+	account := doRowRequest(t, handler, "POST", "/v1/accounts", `{"id":"cash","name":"Cash","kind":"cash","enabled":true}`)
 	if account.Code != 200 {
 		t.Fatal(account.Body.String())
 	}
-	body := `{"id":"01900000-0000-7000-8000-000000000022","name":"Laptop","sourceAccountId":"cash","amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"postedTime":1769904000,"transactionTime":1769904000,"enabled":true,"purchase":{"priority":3}}`
-	created := doRowRequest(t, handler, http.MethodPost, "/v1/postings", body)
+	const id = "01900000-0000-7000-8000-000000000022"
+	body := `{"id":"` + id + `","name":"Laptop","fundingAccountId":"cash","cost":500,"earliestDate":"2026-02-01","enabled":true,"priority":3}`
+	created := doRowRequest(t, handler, "POST", "/v1/planned-purchases", body)
+	var result rowResultBody[types.PlannedPurchase]
 	if created.Code != 200 {
-		t.Fatalf("create = %d %s", created.Code, created.Body.String())
+		t.Fatalf("create: %d %s", created.Code, created.Body.String())
 	}
-	var payload struct {
-		Row       types.Posting `json:"row"`
-		Persisted bool          `json:"persisted"`
+	if err := json.Unmarshal(created.Body.Bytes(), &result); err != nil || !result.Persisted || result.Row.Priority != 3 {
+		t.Fatalf("create: %s %v", created.Body.String(), err)
 	}
-	if err := json.Unmarshal(created.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
+	if w := doRowRequest(t, handler, "POST", "/v1/planned-purchases", body); w.Code != 409 {
+		t.Fatalf("retry: %d %s", w.Code, w.Body.String())
 	}
-	if !payload.Persisted || payload.Row.Purchase == nil || payload.Row.Purchase.Priority != 3 {
-		t.Fatalf("create = %s", created.Body.String())
+	row := result.Row
+	row.Cost = 600
+	update, _ := json.Marshal(row)
+	if w := doRowRequest(t, handler, "PATCH", "/v1/planned-purchases/"+id, string(update)); w.Code != 200 {
+		t.Fatalf("update: %d %s", w.Code, w.Body.String())
 	}
-	model := doRowRequest(t, handler, http.MethodGet, "/v1/financial-model", "")
-	var read struct {
-		Document types.FinancialModelDocument `json:"document"`
+	list := doRowRequest(t, handler, "GET", "/v1/planned-purchases", "")
+	if list.Code != 200 || !strings.Contains(list.Body.String(), `"cost":600`) {
+		t.Fatalf("list: %d %s", list.Code, list.Body.String())
 	}
-	if err := json.Unmarshal(model.Body.Bytes(), &read); err != nil {
-		t.Fatal(err)
+	doc, err := database.LoadDocument()
+	if err != nil || len(doc.Postings) != 0 || len(doc.PlannedPurchases) != 1 {
+		t.Fatalf("purchase became a posting: %+v %v", doc, err)
 	}
-	if read.Document.Postings[0].Purchase.Priority != 3 {
-		t.Fatal("policy absent from saved model")
+	for _, change := range []string{`"cost":-1`, `"cost":0`, `"earliestDate":"2026-02-30"`, `"fundingAccountId":"missing"`, `"priority":-1`} {
+		var invalid map[string]any
+		json.Unmarshal([]byte(body), &invalid)
+		json.Unmarshal([]byte("{"+change+"}"), &invalid)
+		data, _ := json.Marshal(invalid)
+		w := doRowRequest(t, handler, "PATCH", "/v1/planned-purchases/"+id, string(data))
+		if w.Code == 200 {
+			var rejected rowResultBody[types.PlannedPurchase]
+			json.Unmarshal(w.Body.Bytes(), &rejected)
+			if rejected.Persisted {
+				t.Fatalf("invalid purchase persisted: %s", change)
+			}
+		} else if w.Code != 422 {
+			t.Fatalf("invalid purchase: %d %s", w.Code, w.Body.String())
+		}
 	}
-	posting := payload.Row
-	posting.Purchase.Priority = 1
-	updatedBody, _ := json.Marshal(posting)
-	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000022", string(updatedBody))
-	if updated.Code != 200 {
-		t.Fatal(updated.Body.String())
+	for _, method := range []string{"POST", "PATCH", "DELETE"} {
+		path := "/v1/planned-purchases"
+		if method != "POST" {
+			path += "/" + id
+		}
+		if w := doRowRequest(t, New(database, Config{ReadOnly: true}), method, path, body); w.Code != http.StatusForbidden {
+			t.Fatalf("read-only %s: %d", method, w.Code)
+		}
 	}
-	if err := json.Unmarshal(updated.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
+	if w := doRowRequest(t, handler, "DELETE", "/v1/planned-purchases/"+id, ""); w.Code != 200 {
+		t.Fatal(w.Body.String())
 	}
-	if !payload.Persisted || payload.Row.Purchase.Priority != 1 {
-		t.Fatalf("patch = %s", updated.Body.String())
+	if w := doRowRequest(t, handler, "DELETE", "/v1/planned-purchases/"+id, ""); w.Code != 404 {
+		t.Fatalf("delete missing: %d", w.Code)
 	}
-	posting.Amount.Config["expression"] = "-500"
-	invalidBody, _ := json.Marshal(posting)
-	rejected := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000022", string(invalidBody))
-	if err := json.Unmarshal(rejected.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
+}
+
+func TestPlannedPurchaseAppendAndReorder(t *testing.T) {
+	database := openAPIStore(t)
+	_, _ = database.CreateAccount(types.Account{ID: "cash", Name: "Cash", Kind: "cash", Enabled: true})
+	handler := New(database, Config{})
+	for i := 0; i < 3; i++ {
+		body := fmt.Sprintf(`{"id":"01900000-0000-7000-8000-%012d","name":"Item","fundingAccountId":"cash","cost":100,"earliestDate":"2026-02-01","enabled":true}`, i)
+		w := doRowRequest(t, handler, "POST", "/v1/planned-purchases", body)
+		var result rowResultBody[types.PlannedPurchase]
+		json.Unmarshal(w.Body.Bytes(), &result)
+		if w.Code != 200 || !result.Persisted || result.Row.Priority != i {
+			t.Fatalf("append: %d %s", w.Code, w.Body.String())
+		}
 	}
-	if payload.Persisted {
-		t.Fatal("negative purchase persisted")
+	w := doRowRequest(t, handler, "POST", "/v1/planned-purchases/reorder", `{"id":"01900000-0000-7000-8000-000000000002","beforeId":"01900000-0000-7000-8000-000000000000"}`)
+	if w.Code != 200 {
+		t.Fatal(w.Body.String())
 	}
-	loaded, err := database.LoadDocument()
-	if err != nil || loaded.Postings[0].Amount.Config["expression"] != "500" {
-		t.Fatalf("rejected write changed model: %+v %v", loaded, err)
-	}
-	readOnly := New(database, Config{ReadOnly: true})
-	blocked := doRowRequest(t, readOnly, http.MethodPatch, "/v1/postings/01900000-0000-7000-8000-000000000022", body)
-	if blocked.Code != http.StatusForbidden {
-		t.Fatalf("read-only = %d", blocked.Code)
+	doc, _ := database.LoadDocument()
+	if doc.PlannedPurchases[0].ID != "01900000-0000-7000-8000-000000000002" || doc.PlannedPurchases[0].Priority != 0 {
+		t.Fatalf("order: %+v", doc.PlannedPurchases)
 	}
 }

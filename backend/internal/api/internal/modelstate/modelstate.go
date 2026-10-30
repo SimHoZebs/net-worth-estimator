@@ -15,7 +15,7 @@ func WriteError(err error) error {
 	case store.IsIDConflict(err):
 		return huma.Error409Conflict("id already exists")
 	case store.IsInvalidID(err):
-		return huma.Error422UnprocessableEntity("posting id must be a canonical UUID")
+		return huma.Error422UnprocessableEntity("row id must be a canonical UUID")
 	case store.IsSyncOwned(err):
 		return huma.Error422UnprocessableEntity("sync-owned rows are read-only")
 	case store.IsAccountMissing(err):

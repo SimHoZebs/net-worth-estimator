@@ -268,12 +268,6 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 		}
 		if input.Recurring == "" || input.Recurring == "all" || input.Recurring == "once" {
 			for _, posting := range document.Postings {
-				// Purchase-marker postings are wishlist rows, not money
-				// movement: planned purchases stay distinct from
-				// transactions, so the activity screens never render them.
-				if posting.Purchase != nil {
-					continue
-				}
 				if !touches(posting.SourceAccountID, posting.Destinations) {
 					continue
 				}

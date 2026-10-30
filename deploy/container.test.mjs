@@ -27,6 +27,7 @@ cat > /tmp/provider/.well-known/openid-configuration <<'JSON'
 JSON
 busybox-extras httpd -p 18000 -h /tmp/provider
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
+/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
 exec /app/server
 `;
   await run("docker", [

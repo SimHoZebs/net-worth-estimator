@@ -98,7 +98,7 @@ export interface Projection {
 }
 
 export interface PurchaseSchedule {
-	purchases: { postingId: string; date: string | null; amount: number }[];
+	purchases: { purchaseId: string; date: string | null; amount: number }[];
 }
 export interface RangePoint {
 	date: string;

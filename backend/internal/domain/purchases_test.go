@@ -3,29 +3,43 @@ package domain
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func purchasePosting(id, date, cost string, priority int) types.Posting {
+func plannedPurchase(id, date, cost string, priority int) types.PlannedPurchase {
 	source := "cash"
-	return types.Posting{
-		ID: id, Name: id, SourceAccountID: &source, Enabled: true,
-		PostedTime: midnightUnix(date), TransactionTime: midnightUnix(date),
-		Amount:   types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": cost}},
-		Purchase: &types.PurchasePolicy{Priority: priority},
+	value, _ := strconv.ParseFloat(cost, 64)
+	return types.PlannedPurchase{
+		ID: id, Name: id, FundingAccountID: &source, Enabled: true,
+		EarliestDate: date, Cost: value, Priority: priority,
 	}
 }
 
-func purchaseRequest(balance float64, postings ...types.Posting) types.SimulationRequest {
+func purchaseRequest(balance float64, items ...any) types.SimulationRequest {
 	floor := 0.0
+	postings := []types.Posting{}
+	purchases := []types.PlannedPurchase{}
+	for _, item := range items {
+		switch row := item.(type) {
+		case types.Posting:
+			postings = append(postings, row)
+		case types.PlannedPurchase:
+			purchases = append(purchases, row)
+		default:
+			panic("unsupported purchase fixture")
+		}
+	}
 	return types.SimulationRequest{
 		StartDate: "2026-02-01", EndDate: "2026-03-10", IncludeStartDateEvents: true,
 		Model: types.FinancialModel{
-			Accounts: []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
-			Postings: postings,
+			Accounts:         []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
+			Postings:         postings,
+			PlannedPurchases: purchases,
 		},
 		InitialState: types.SimulationState{
 			Balances: map[string]float64{"cash": balance}, LatestRealizedPostingAmounts: map[string]float64{},
@@ -35,8 +49,10 @@ func purchaseRequest(balance float64, postings ...types.Posting) types.Simulatio
 }
 
 func establishedPosting(id, date, amount string, inflow bool) types.Posting {
-	posting := purchasePosting(id, date, amount, 0)
-	posting.Purchase = nil
+	source := "cash"
+	posting := types.Posting{ID: id, Name: id, SourceAccountID: &source, Enabled: true,
+		PostedTime: midnightUnix(date), TransactionTime: midnightUnix(date),
+		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}}}
 	if inflow {
 		posting.SourceAccountID = nil
 		posting.Destinations = []string{"cash"}
@@ -47,9 +63,9 @@ func establishedPosting(id, date, amount string, inflow bool) types.Posting {
 func purchaseEvents(run types.SimulationRun) map[string]string {
 	out := map[string]string{}
 	for _, event := range run.TransactionAttempts {
-		for _, posting := range run.Request.Model.Postings {
-			if posting.ID == event.Origin.PostingID && posting.Purchase != nil {
-				out[posting.ID] = event.Date
+		for _, purchase := range run.Request.Model.PlannedPurchases {
+			if purchase.ID == event.Origin.PostingID {
+				out[purchase.ID] = event.Date
 			}
 		}
 	}
@@ -60,8 +76,8 @@ func TestPurchasesProtectFuturePayments(t *testing.T) {
 	for _, recurring := range []bool{false, true} {
 		t.Run(map[bool]string{false: "one-time", true: "recurring"}[recurring], func(t *testing.T) {
 			request := purchaseRequest(1000,
-				purchasePosting("laptop", "2026-02-01", "500", 0),
-				purchasePosting("chair", "2026-02-01", "150", 1),
+				plannedPurchase("laptop", "2026-02-01", "500", 0),
+				plannedPurchase("chair", "2026-02-01", "150", 1),
 				establishedPosting("pay", "2026-02-05", "1000", true),
 			)
 			rent := establishedPosting("rent", "2026-02-02", "900", false)
@@ -95,8 +111,8 @@ func TestPurchasesProtectFuturePayments(t *testing.T) {
 
 func TestPurchaseQueueStrictOrderAndWholeItems(t *testing.T) {
 	request := purchaseRequest(500,
-		purchasePosting("cheap", "2026-02-01", "100", 1),
-		purchasePosting("expensive", "2026-02-01", "600", 0),
+		plannedPurchase("cheap", "2026-02-01", "100", 1),
+		plannedPurchase("expensive", "2026-02-01", "600", 0),
 	)
 	run, err := simulatePurchases(request)
 	if err != nil {
@@ -108,8 +124,8 @@ func TestPurchaseQueueStrictOrderAndWholeItems(t *testing.T) {
 	if run.FinalState.Balances["cash"] != 500 {
 		t.Fatal("partial purchase spent money")
 	}
-	request.Model.Postings[0].Purchase.Priority = 0
-	request.Model.Postings[1].Purchase.Priority = 1
+	request.Model.PlannedPurchases[0].Priority = 0
+	request.Model.PlannedPurchases[1].Priority = 1
 	run, err = simulatePurchases(request)
 	if err != nil {
 		t.Fatal(err)
@@ -120,10 +136,10 @@ func TestPurchaseQueueStrictOrderAndWholeItems(t *testing.T) {
 }
 
 func TestPurchasesExecuteAfterEstablishedSameDayPayments(t *testing.T) {
-	request := purchaseRequest(0, purchasePosting("want", "2026-02-01", "500", 0),
+	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "500", 0),
 		establishedPosting("pay", "2026-02-01", "1500", true),
 		establishedPosting("bill", "2026-02-01", "400", false))
-	request.Model.Postings[2].TransactionTime++ // Pay arrives before the one-time bill.
+	request.Model.Postings[1].TransactionTime++ // Pay arrives before the one-time bill.
 	source := "cash"
 	end := request.StartDate
 	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "rent", SourceAccountID: &source,
@@ -140,11 +156,11 @@ func TestPurchasesExecuteAfterEstablishedSameDayPayments(t *testing.T) {
 
 func TestPurchaseDatesAndDisabledItems(t *testing.T) {
 	request := purchaseRequest(1000,
-		purchasePosting("disabled", "2026-02-01", "999999", 0),
-		purchasePosting("later", "2026-02-12", "500", 1),
-		purchasePosting("too-late", "2027-01-01", "10", 2),
+		plannedPurchase("disabled", "2026-02-01", "999999", 0),
+		plannedPurchase("later", "2026-02-12", "500", 1),
+		plannedPurchase("too-late", "2027-01-01", "10", 2),
 	)
-	request.Model.Postings[0].Enabled = false
+	request.Model.PlannedPurchases[0].Enabled = false
 	request.IncludeStartDateEvents = false
 	run, err := simulatePurchases(request)
 	if err != nil {
@@ -156,8 +172,8 @@ func TestPurchaseDatesAndDisabledItems(t *testing.T) {
 }
 
 func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
-	request := purchaseRequest(1000, purchasePosting("old-wish", "2025-01-01", "500", 0))
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings,
+	request := purchaseRequest(1000, plannedPurchase("old-wish", "2025-01-01", "500", 0))
+	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	prepared, err := PrepareSimulationRequest(&document, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}, types.ModelOverrides{}, nil)
 	if err != nil {
@@ -176,7 +192,7 @@ func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
 }
 
 func TestPurchasesRespectAccountFloorAndDoNotPartiallyPurchase(t *testing.T) {
-	request := purchaseRequest(1000, purchasePosting("want", "2026-02-01", "500.01", 0))
+	request := purchaseRequest(1000, plannedPurchase("want", "2026-02-01", "500.01", 0))
 	floor := 500.0
 	request.Model.Accounts[0].MinBalance = &floor
 	run, err := simulatePurchases(request)
@@ -189,8 +205,8 @@ func TestPurchasesRespectAccountFloorAndDoNotPartiallyPurchase(t *testing.T) {
 }
 
 func TestPurchaseAtCheckpointDoesNotChangeBaselineBands(t *testing.T) {
-	request := purchaseRequest(1000, purchasePosting("wish", "2025-01-01", "500", 0))
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings,
+	request := purchaseRequest(1000, plannedPurchase("wish", "2025-01-01", "500", 0))
+	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	seed := int64(42)
@@ -208,7 +224,7 @@ func TestPurchaseAtCheckpointDoesNotChangeBaselineBands(t *testing.T) {
 
 func TestPurchasesCanResumeAfterExistingGap(t *testing.T) {
 	request := purchaseRequest(100,
-		purchasePosting("want", "2026-02-01", "50", 0),
+		plannedPurchase("want", "2026-02-01", "50", 0),
 		establishedPosting("bill", "2026-02-02", "200", false),
 		establishedPosting("pay", "2026-02-03", "1000", true))
 	run, err := simulatePurchases(request)
@@ -222,7 +238,7 @@ func TestPurchasesCanResumeAfterExistingGap(t *testing.T) {
 
 func TestPurchaseProtectsPaymentsBelowReportDisplayThreshold(t *testing.T) {
 	request := purchaseRequest(1000,
-		purchasePosting("want", "2026-02-01", "500.01", 0),
+		plannedPurchase("want", "2026-02-01", "500.01", 0),
 		establishedPosting("bill", "2026-02-02", "500", false),
 		establishedPosting("pay", "2026-02-03", "1000", true))
 	run, err := simulatePurchases(request)
@@ -236,7 +252,7 @@ func TestPurchaseProtectsPaymentsBelowReportDisplayThreshold(t *testing.T) {
 
 func TestPurchaseCanResumeAfterSameDayReplenishment(t *testing.T) {
 	request := purchaseRequest(100,
-		purchasePosting("want", "2026-02-01", "50", 0),
+		plannedPurchase("want", "2026-02-01", "50", 0),
 		establishedPosting("bill", "2026-02-02", "200", false),
 		establishedPosting("pay", "2026-02-02", "1000", true))
 	run, err := simulatePurchases(request)
@@ -252,30 +268,32 @@ func TestPurchaseCanResumeAfterSameDayReplenishment(t *testing.T) {
 }
 
 func TestPurchaseValidation(t *testing.T) {
-	for _, kind := range []string{"negative", "variable", "priority", "transfer", "empty-destinations", "claim", "dependency"} {
+	for _, kind := range []string{"negative", "zero", "nonfinite", "priority", "account", "date", "name", "dependency"} {
 		t.Run(kind, func(t *testing.T) {
-			request := purchaseRequest(1000, purchasePosting("want", "2026-02-01", "500", 0))
-			posting := &request.Model.Postings[0]
+			request := purchaseRequest(1000, plannedPurchase("want", "2026-02-01", "500", 0))
+			purchase := &request.Model.PlannedPurchases[0]
 			switch kind {
 			case "negative":
-				posting.Amount.Config["expression"] = "-1"
-			case "variable":
-				posting.Amount.Inputs = map[string]types.AmountInputBinding{"x": {Source: "literal", Value: 500.0}}
+				purchase.Cost = -1
+			case "zero":
+				purchase.Cost = 0
+			case "nonfinite":
+				purchase.Cost = math.Inf(1)
 			case "priority":
-				posting.Purchase.Priority = -1
-			case "transfer":
-				posting.Destinations = []string{"cash"}
-			case "empty-destinations":
-				posting.Destinations = []string{}
-			case "claim":
-				posting.Claim = &types.PostingClaim{RuleID: "missing", OccurrenceDate: request.StartDate}
+				purchase.Priority = -1
+			case "account":
+				purchase.FundingAccountID = nil
+			case "date":
+				purchase.EarliestDate = "2026-02-30"
+			case "name":
+				purchase.Name = ""
 			case "dependency":
 				bill := establishedPosting("bill", "2026-02-02", "1", false)
 				bill.Amount.Config["expression"] = "x"
 				bill.Amount.Inputs = map[string]types.AmountInputBinding{"x": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "want"}}}
 				request.Model.Postings = append(request.Model.Postings, bill)
 			}
-			issues := ValidateFinancialModel(&types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings})
+			issues := ValidateFinancialModel(&types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases})
 			for _, issue := range issues {
 				if issue.Severity == types.SeverityError {
 					return
@@ -288,12 +306,12 @@ func TestPurchaseValidation(t *testing.T) {
 
 func TestPurchaseProtectsDownstreamTransferAndLaterRecurringBill(t *testing.T) {
 	request := purchaseRequest(1000,
-		purchasePosting("want", "2026-02-01", "500", 0),
+		plannedPurchase("want", "2026-02-01", "500", 0),
 		establishedPosting("transfer", "2026-02-02", "900", false),
 		establishedPosting("pay", "2026-02-04", "1000", true))
 	floor := 0.0
 	request.Model.Accounts = append(request.Model.Accounts, types.Account{ID: "bills", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true})
-	request.Model.Postings[1].Destinations = []string{"bills"}
+	request.Model.Postings[0].Destinations = []string{"bills"}
 	account := "bills"
 	end := "2026-02-03"
 	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "bill", SourceAccountID: &account,
@@ -313,11 +331,11 @@ func TestPurchaseProtectsDownstreamTransferAndLaterRecurringBill(t *testing.T) {
 
 func TestPurchaseUsesCanonicalDestinationLimitDistinction(t *testing.T) {
 	request := purchaseRequest(1000,
-		purchasePosting("want", "2026-02-01", "500", 0),
+		plannedPurchase("want", "2026-02-01", "500", 0),
 		establishedPosting("transfer", "2026-02-02", "900", false))
 	ceiling := 0.0
 	request.Model.Accounts = append(request.Model.Accounts, types.Account{ID: "paid-debt", Kind: types.AccountKindDebt, MaxBalance: &ceiling, Enabled: true})
-	request.Model.Postings[1].Destinations = []string{"paid-debt"}
+	request.Model.Postings[0].Destinations = []string{"paid-debt"}
 	run, err := simulatePurchases(request)
 	if err != nil {
 		t.Fatal(err)
@@ -328,7 +346,7 @@ func TestPurchaseUsesCanonicalDestinationLimitDistinction(t *testing.T) {
 }
 
 func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
-	request := purchaseRequest(0, purchasePosting("want", "2026-02-01", "50", 0))
+	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "50", 0))
 	end := "2026-03-01"
 	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
 		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
@@ -355,7 +373,7 @@ func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 			t.Fatalf("purchase ignored sampled income %v: %v", rate, purchaseEvents(run))
 		}
 	}
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules}
+	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	seed := int64(42)
 	config := types.StochasticConfig{RunCount: 10, Seed: &seed}
@@ -373,8 +391,8 @@ func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 }
 
 func TestPurchaseBranchPreservesSameDayPriority(t *testing.T) {
-	wish := purchasePosting("wish", "2026-02-01", "500", 0)
-	schedule := []scheduledPurchase{{posting: &wish, date: "2026-02-05"}}
+	wish := plannedPurchase("wish", "2026-02-01", "500", 0)
+	schedule := []scheduledPurchase{{purchase: &wish, date: "2026-02-05"}}
 	byDate := map[string][]DatedPostingOccurrence{"2026-02-05": {{Posting: &types.Posting{ID: "bill"}, Rule: &types.RecurrenceRule{}}}}
 	appendScheduledPurchases(byDate, schedule)
 	sortOccurrences(byDate["2026-02-05"])

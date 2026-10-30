@@ -68,7 +68,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 		copy(sorted, occurrences)
 		sortOccurrences(sorted)
 		for _, occurrence := range sorted {
-			if cut > 0 && occurrence.Posting.Purchase == nil && EffectiveOccurrenceInstant(occurrence, date) <= cut {
+			if cut > 0 && occurrence.Purchase == nil && EffectiveOccurrenceInstant(occurrence, date) <= cut {
 				continue
 			}
 			transition, err := transitions.ExecutePosting(occurrence, date, false)

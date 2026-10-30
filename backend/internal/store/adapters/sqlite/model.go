@@ -16,6 +16,9 @@ type queryer interface {
 }
 
 func deleteDocumentRows(tx *userTx) error {
+	if _, err := tx.Exec(`DELETE FROM planned_purchases WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM accounts WHERE user_id = :user_id`); err != nil {
 		return err
 	}
@@ -169,6 +172,11 @@ func replaceDocument(tx *userTx, document *types.FinancialModelDocument) error {
 	if _, err := remergePostings(tx, document.Postings, syncedPostings, 0); err != nil {
 		return err
 	}
+	for position, purchase := range document.PlannedPurchases {
+		if err := insertPlannedPurchase(tx, position, purchase); err != nil {
+			return err
+		}
+	}
 	for _, key := range syncKeys {
 		if err := insertPostingSyncKey(tx, key); err != nil {
 			return err
@@ -236,7 +244,7 @@ func insertPosting(tx *userTx, position int, posting *types.Posting, source stri
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
 	}
-	return insertPurchasePolicy(tx, posting)
+	return nil
 }
 
 func insertRule(tx *userTx, position int, rule *types.RecurrenceRule) error {
@@ -514,7 +522,8 @@ func loadDocument(q queryer) (*types.FinancialModelDocument, error) {
 	if err := postingRows.Close(); err != nil {
 		return nil, fmt.Errorf("close postings: %w", err)
 	}
-	if err := loadPurchasePolicies(q, document.Postings); err != nil {
+	document.PlannedPurchases, err = loadPlannedPurchases(q)
+	if err != nil {
 		return nil, err
 	}
 

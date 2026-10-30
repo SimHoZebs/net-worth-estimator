@@ -199,8 +199,10 @@ runs preserve the existing database and user rows:
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer "$ISSUER" --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
 ```
 
-For existing data, restore a verified SQLite-safe backup or use the
-[offline migration guide](../docs/shared-database.md). Back up before schema
+For existing data, restore a verified current-schema SQLite-safe backup or run a
+separate one-time operator upgrade. `setupdb` only validates an existing schema,
+and rejects older or incomplete ones. See the
+[database maintenance contract](../docs/shared-database.md). Back up before schema
 changes. Keep the API stopped. Ephemeral shells do not share the disk.
 
 The pending [shared migration](MIGRATIONS.md) runs `/app/migrate.sh` from the

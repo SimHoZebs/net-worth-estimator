@@ -12,6 +12,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/ \
     ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel
 
+# Independent one-time operator tool. Neither server nor setupdb imports it.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/upgrade-planned-purchases ./scripts/one-time/planned-purchases
+
 FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates busybox-extras sqlite \
@@ -26,6 +30,7 @@ WORKDIR /app
 COPY --from=build --chown=app:app /out/ /app/
 COPY --chown=app:app backend/render-free-boot.sh /app/render-free-boot.sh
 COPY --chown=app:app deploy/migrate.sh /app/migrate.sh
+COPY --chown=app:app deploy/analysis-schema.sql /app/analysis-schema.sql
 RUN chmod 0555 /app/render-free-boot.sh /app/migrate.sh
 
 ENV HOST=0.0.0.0 \

@@ -166,27 +166,6 @@ describe("planned purchase rows to display purchases", () => {
 	});
 });
 
-function purchasePosting(
-	overrides: Partial<BackendPosting> = {},
-): BackendPosting {
-	return {
-		id: "laptop",
-		name: "Laptop",
-		sourceAccountId: "cash",
-		destinations: null,
-		amount: {
-			resolver: "expression",
-			config: { expression: "500" },
-			inputs: {},
-		},
-		postedTime: 1769904000,
-		transactionTime: 1769904000,
-		purchase: { priority: 0 },
-		enabled: true,
-		...overrides,
-	};
-}
-
 function purchaseDocument(
 	postings: BackendPosting[] = [],
 	plannedPurchases: BackendPlannedPurchase[] = [],
@@ -208,67 +187,13 @@ function purchaseDocument(
 	};
 }
 
-describe("saved purchases from standalone and legacy posting rows", () => {
-	it("reads legacy purchase-marker postings with literal cost and priority", () => {
+describe("saved standalone purchases", () => {
+	it("reads cost, date, and priority from standalone rows", () => {
 		expect(
 			savedPurchasesToDisplay(
-				purchaseDocument([purchasePosting({ purchase: { priority: 2 } })]),
+				purchaseDocument([], [purchaseRow({ priority: 2 })]),
 			),
 		).toEqual([
-			{
-				id: "laptop",
-				name: "Laptop",
-				amount: 500,
-				fromId: "cash",
-				startDate: "2026-02-01",
-				enabled: true,
-				readOnly: false,
-			},
-		]);
-	});
-
-	it("orders by priority and ignores postings without a purchase marker", () => {
-		const rows = savedPurchasesToDisplay(
-			purchaseDocument([
-				purchasePosting({
-					id: "second",
-					name: "Second",
-					purchase: { priority: 1 },
-				}),
-				purchasePosting({ id: "plain", name: "Plain", purchase: null }),
-				purchasePosting({
-					id: "first",
-					name: "First",
-					amount: {
-						resolver: "expression",
-						config: { expression: "25" },
-						inputs: {},
-					},
-					purchase: { priority: 0 },
-				}),
-			]),
-		);
-		expect(rows.map((row) => row.id)).toEqual(["first", "second"]);
-		expect(rows[0]).toMatchObject({ amount: 25, fromId: "cash" });
-	});
-
-	it("dedupes a row present in both forms, preferring the standalone row", () => {
-		const rows = savedPurchasesToDisplay(
-			purchaseDocument(
-				[
-					purchasePosting({
-						amount: {
-							resolver: "expression",
-							config: { expression: "999" },
-							inputs: {},
-						},
-						purchase: { priority: 5 },
-					}),
-				],
-				[purchaseRow({ priority: 0 })],
-			),
-		);
-		expect(rows).toEqual([
 			{
 				id: "laptop",
 				name: "Laptop",
@@ -281,25 +206,45 @@ describe("saved purchases from standalone and legacy posting rows", () => {
 		]);
 	});
 
-	it("derives the earliest date from the transaction stamp", () => {
-		const rows = savedPurchasesToDisplay(
-			purchaseDocument([
-				purchasePosting({ transactionTime: 1770076800, postedTime: 0 }),
-			]),
-		);
-		expect(rows[0]).toMatchObject({ startDate: "2026-02-03" });
+	it("orders by priority without changing document order", () => {
+		const purchases = [
+			purchaseRow({ id: "second", priority: 1 }),
+			purchaseRow({ id: "first", cost: 25, priority: 0 }),
+			purchaseRow({ id: "third", priority: 1 }),
+		];
+		const rows = savedPurchasesToDisplay(purchaseDocument([], purchases));
+		expect(rows.map((row) => row.id)).toEqual(["first", "second", "third"]);
+		expect(rows[0]).toMatchObject({ amount: 25, fromId: "cash" });
+		expect(purchases.map((row) => row.id)).toEqual([
+			"second",
+			"first",
+			"third",
+		]);
 	});
 
-	it("clamps non-literal costs instead of dropping the row", () => {
+	it("does not treat postings as purchases", () => {
 		const rows = savedPurchasesToDisplay(
-			purchaseDocument([
-				purchasePosting({
-					amount: { resolver: "recipe", config: {}, inputs: {} },
-				}),
-			]),
+			purchaseDocument(
+				[
+					{
+						id: "real",
+						name: "Real payment",
+						sourceAccountId: "cash",
+						destinations: null,
+						amount: {
+							resolver: "expression",
+							config: { expression: "999" },
+							inputs: {},
+						},
+						postedTime: 1769904000,
+						transactionTime: 1769904000,
+						enabled: true,
+					},
+				],
+				[purchaseRow({ priority: 0 })],
+			),
 		);
-		expect(rows).toHaveLength(1);
-		expect(rows[0]).toMatchObject({ amount: 0 });
+		expect(rows.map((row) => row.id)).toEqual(["laptop"]);
 	});
 
 	it("returns an empty queue for a missing document", () => {

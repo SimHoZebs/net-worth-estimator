@@ -17,8 +17,8 @@ const sharedSchemaVersion = "shared-accounts-v1"
 // path exists: start from a current application database.
 var ErrLegacyDatabase = errors.New("unsupported legacy database: start from a current application database")
 
-// ErrSetupRequired identifies a missing or incomplete current database.
-var ErrSetupRequired = errors.New("database setup required: run setupdb before starting the server")
+// ErrSetupRequired identifies a missing or incompatible current database.
+var ErrSetupRequired = errors.New("current database schema required: use setupdb for a new database or upgrade existing data separately")
 
 // Database owns the shared SQLite connection. Financial operations use a Store
 // returned for an explicit user.
@@ -38,8 +38,8 @@ func OpenDatabase(path string, options ...DatabaseOption) (*Database, error) {
 }
 
 // SetupDatabase provisions the current application schema for deployment or
-// tests. Existing shared databases are supported; legacy databases are
-// rejected. Setup never provisions users.
+// tests. Existing databases must already have the complete current schema.
+// Setup never upgrades schemas, rewrites existing rows, or provisions users.
 func SetupDatabase(path string, options ...DatabaseOption) (*Database, error) {
 	dsn, err := setupDatabaseFile(path)
 	if err != nil {
@@ -92,35 +92,25 @@ func (d *Database) setupSchema() error {
 		return err
 	}
 	if tableCount != 0 {
-		if err := checkSharedSchemaMarker(tx); err != nil {
+		if err := checkExistingSchema(tx); err != nil {
 			return err
 		}
+		return tx.Commit()
 	}
 	for _, statement := range schemaStatements() {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("ensure shared schema: %w", err)
 		}
 	}
-	_, defaultSQLite := d.blobs.(*blobsqlite.Store)
-	if err := migrateInlineReceiptImages(tx, defaultSQLite); err != nil {
-		return fmt.Errorf("migrate receipt blobs: %w", err)
-	}
-	if err := migratePostingReceiptIDs(tx); err != nil {
-		return fmt.Errorf("migrate posting receipt fields: %w", err)
-	}
-	if err := migratePostingVoidFlag(tx); err != nil {
-		return fmt.Errorf("migrate posting void flag: %w", err)
-	}
-	if err := migrateSourceUser(tx); err != nil {
-		return fmt.Errorf("migrate row source names: %w", err)
-	}
 	for _, statement := range analysisSchemaStatements() {
 		if _, err := tx.Exec(statement); err != nil {
 			return fmt.Errorf("setup analysis: %w", err)
 		}
 	}
-	if err := setupAnalysisFeedback(tx); err != nil {
-		return fmt.Errorf("setup analysis feedback: %w", err)
+	for _, statement := range analysisFeedbackSchemaStatements {
+		if _, err := tx.Exec(statement); err != nil {
+			return fmt.Errorf("setup analysis feedback: %w", err)
+		}
 	}
 	for _, statement := range receiptBlobSchemaObjects {
 		if _, err := tx.Exec(statement); err != nil {

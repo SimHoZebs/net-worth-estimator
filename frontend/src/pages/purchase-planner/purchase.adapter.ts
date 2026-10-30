@@ -28,7 +28,7 @@ export function toPurchaseViewItems({
 	enhancements?: PurchaseEnhancements;
 }): PurchaseViewItem[] {
 	const events = new Map(
-		schedule?.purchases.map((event) => [event.postingId, event]),
+		schedule?.purchases.map((event) => [event.purchaseId, event]),
 	);
 	return visiblePlannedPurchases({
 		plannedPurchases: purchases,

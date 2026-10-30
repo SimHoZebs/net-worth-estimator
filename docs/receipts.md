@@ -6,22 +6,23 @@ operations do not change financial revisions or projection identities.
 
 ## Setup and use
 
-Back up the application database before the schema upgrade. Stop the API, then
-run explicit setup against its database:
+For a new application database, run explicit setup before the API starts:
 
 ```bash
 CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
 ```
 
-Setup adds the user-scoped `receipts` table and `receipt-evidence-v1` migration
-record. It preserves existing financial and identity data. Runtime never repairs
-missing schema. A schema downgrade requires a compatible backup.
+The fresh schema includes user-scoped receipts and private blob storage. Existing
+databases must already have the complete current schema. Neither setup nor
+runtime repairs missing tables, fields, indexes, or triggers. Schema upgrades
+require separate one-time operator scripts and a verified backup with the API
+stopped. A schema downgrade requires a compatible backup.
 
 Image bytes use the private blob storage port (`backend/internal/blobstore`,
 SQLite default plus filesystem adapter, lifecycle in
-`backend/internal/store/blob_storage.go`). Explicit
-setup also adds blob references and lifecycle tracking. It migrates earlier
-inline images into the default SQLite adapter and records `receipt-blobs-v1`.
+`backend/internal/store/adapters/sqlite/blob_storage.go`). Setup rejects earlier
+inline-image schemas instead of copying their images. Repeat setup preserves
+receipt metadata, image bytes, and stored posting receipt links without a backfill.
 
 Manual attachments and review need no extraction service. The ordinary deployment
 default is `NET_WORTH_ESTIMATOR_RECEIPT_SOURCE=disabled`. The dev Compose stack and

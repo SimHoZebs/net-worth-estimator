@@ -16,7 +16,6 @@ type postingBody struct {
 	PostedTime      int64                         `json:"postedTime"`
 	TransactionTime int64                         `json:"transactionTime"`
 	Claim           *types.PostingClaim           `json:"claim,omitempty"`
-	Purchase        *types.PurchasePolicy         `json:"purchase,omitempty"`
 	Enabled         bool                          `json:"enabled"`
 	// Source is accepted and ignored: ownership is server-computed,
 	// mirroring the retired whole-document PUT contract.
@@ -32,7 +31,7 @@ func (b postingBody) toPosting(id string) types.Posting {
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
 		Destinations: b.Destinations, Amount: b.Amount,
 		PostedTime: b.PostedTime, TransactionTime: b.TransactionTime,
-		Claim: b.Claim, Purchase: b.Purchase, Enabled: b.Enabled,
+		Claim: b.Claim, Enabled: b.Enabled,
 	}
 	if b.ID != nil {
 		out.ID = *b.ID

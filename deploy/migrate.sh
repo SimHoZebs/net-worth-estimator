@@ -8,8 +8,9 @@
 #      observation instants (23:59:59 UTC of their own Gregorian day), and
 #      legacy default-disabled settled bank rows recover their posted-time
 #      event times, all inside a single candidate transaction.
-#   2. The existing `setupdb` provisions the Analysis evidence, findings, and
-#      feedback schema on that candidate.
+#   2. Frozen SQL provisions Analysis on that candidate when needed.
+#   3. The standalone purchase tool converts retired purchase policies.
+#      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
 # every conversion, setup, and postcondition failure leaves the original
@@ -41,6 +42,7 @@ PATH="$PATH:/app"
 export PATH
 : "${NET_WORTH_ESTIMATOR_DB:?migrate: NET_WORTH_ESTIMATOR_DB is required}"
 db=$NET_WORTH_ESTIMATOR_DB
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 pending="${db}.analysis-migration-pending"
 
 fail() { printf 'migrate: %s\n' "$1" >&2; exit 1; }
@@ -94,7 +96,6 @@ check_base_columns() {
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids FROM postings LIMIT 0;
   SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys LIMIT 0;
   SELECT user_id, old_id, new_id FROM posting_id_migrations LIMIT 0;
-  SELECT user_id, posting_id, priority FROM purchase_policies LIMIT 0;
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
   SELECT user_id, identity, kind, created_at, payload FROM projection_artifacts LIMIT 0;
@@ -165,6 +166,15 @@ marker=$(sqlite3 -readonly "$db" "SELECT count(*) FROM schema_migrations WHERE n
 test "$marker" = 1 || fail "Unsupported application schema."
 check_base_columns "$db" || fail "Incomplete application schema. Refusing automatic repair."
 
+purchases=$(sqlite3 -readonly "$db" "SELECT group_concat(name, ',') FROM (SELECT name FROM sqlite_schema WHERE type='table' AND name IN ('purchase_policies','planned_purchases') ORDER BY name);")
+case "$purchases" in
+  purchase_policies)
+    sqlite3 -readonly "$db" 'SELECT user_id, posting_id, priority FROM purchase_policies LIMIT 0;' || fail "Incomplete purchase schema." ;;
+  planned_purchases)
+    sqlite3 -readonly "$db" 'SELECT user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled FROM planned_purchases LIMIT 0;' || fail "Incomplete purchase schema." ;;
+  *) fail "Unknown or mixed purchase schema. Refusing automatic repair." ;;
+esac
+
 analysis=$(analysis_count "$db") || fail "Cannot inspect Analysis schema; refusing to guess."
 case "$analysis" in
   0|5) ;;
@@ -212,7 +222,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 5 ]; then
+if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ]; then
   info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
   exit 0
 fi
@@ -287,10 +297,12 @@ DDL
   fi
 fi
 
-# Provision the Analysis schema on the candidate with this image's setupdb.
-if ! setupdb --db "$candidate" > "$backup/setup.log" 2>&1; then
-  printf 'migrate: setupdb failed: %s\n' "$(cat "$backup/setup.log")" >&2
-  fail "Candidate setup failed. Original unchanged; verified backup retained at $backup. Keep the API stopped."
+# Frozen upgrade SQL stays outside application setup. A complete Analysis
+# schema stays untouched; partial schemas already failed the source preflight.
+if [ "$analysis" = 0 ]; then
+  if ! sqlite3 "$candidate" < "$script_dir/analysis-schema.sql" > "$backup/analysis.log" 2>&1; then
+    fail "Candidate Analysis upgrade failed. Original unchanged; backup retained at $backup."
+  fi
 fi
 
 # Verify the full candidate before publication: target schema, integrity,
@@ -308,7 +320,8 @@ test "$(cp_cols "$candidate")" = "$FINAL_COLS" &&
 
 verify_same() {
   table=$1
-  changed=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+  snapshot=${2:-$before}
+  changed=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$snapshot")' AS before;
     SELECT (SELECT count(*) FROM main.\"$table\") != (SELECT count(*) FROM before.\"$table\")
       OR EXISTS(SELECT * FROM main.\"$table\" EXCEPT SELECT * FROM before.\"$table\")
       OR EXISTS(SELECT * FROM before.\"$table\" EXCEPT SELECT * FROM main.\"$table\");") || return 1
@@ -373,6 +386,42 @@ fi
 markers_kept=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (SELECT name FROM before.schema_migrations EXCEPT SELECT name FROM main.schema_migrations);") \
   || fail "Cannot verify schema markers; refusing to publish."
 test "$markers_kept" = 0 || fail "Candidate dropped schema markers. Original unchanged; backup retained at $backup. Keep the API stopped."
+
+# Verify purchase conversion separately against the already-verified timestamp
+# candidate. The original database still has no writes at this point.
+if [ "$purchases" = purchase_policies ]; then
+  purchase_before="$backup/before-purchases.db"
+  sqlite3 "$candidate" ".backup '$(esc "$purchase_before")'"
+  if ! upgrade-planned-purchases --db "$candidate" > "$backup/purchases.log" 2>&1; then
+    printf 'migrate: purchase conversion failed: %s\n' "$(cat "$backup/purchases.log")" >&2
+    fail "Candidate purchase conversion failed. Original unchanged; backup retained at $backup."
+  fi
+  purchase_tables=$(sqlite3 -readonly "$purchase_before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('purchase_policies','postings','entity_ids') ORDER BY name;")
+  for table in $purchase_tables; do
+    case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
+    verify_same "$table" "$purchase_before" || fail "Purchase conversion changed preserved table $table. Original unchanged; backup retained at $backup."
+  done
+  purchase_delta=$(sqlite3 -readonly "$candidate" "ATTACH DATABASE '$(esc "$purchase_before")' AS original;
+    SELECT (SELECT count(*) FROM main.planned_purchases)!=(SELECT count(*) FROM original.purchase_policies)
+      OR EXISTS(SELECT * FROM main.postings EXCEPT SELECT p.* FROM original.postings p WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=p.user_id AND q.posting_id=p.id))
+      OR EXISTS(SELECT p.* FROM original.postings p WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=p.user_id AND q.posting_id=p.id) EXCEPT SELECT * FROM main.postings)
+      OR EXISTS(SELECT * FROM main.entity_ids WHERE kind!='planned-purchase' EXCEPT SELECT e.* FROM original.entity_ids e WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=e.user_id AND q.posting_id=e.id))
+      OR EXISTS(SELECT e.* FROM original.entity_ids e WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=e.user_id AND q.posting_id=e.id) EXCEPT SELECT * FROM main.entity_ids WHERE kind!='planned-purchase')
+      OR EXISTS(SELECT 1 FROM original.purchase_policies q JOIN original.postings p ON p.user_id=q.user_id AND p.id=q.posting_id LEFT JOIN main.planned_purchases n ON n.user_id=p.user_id AND n.id=p.id LEFT JOIN main.entity_ids e ON e.user_id=p.user_id AND e.id=p.id
+        WHERE n.id IS NULL OR e.kind IS NOT 'planned-purchase' OR n.name IS NOT p.name OR n.position IS NOT p.position OR n.funding_account_id IS NOT p.source_account_id OR n.cost IS NOT CAST(json_extract(p.amount_resolution_json,'$.config.expression') AS REAL) OR n.earliest_date IS NOT date(CASE WHEN p.transaction_time>0 THEN p.transaction_time ELSE p.posted_time END,'unixepoch') OR n.priority IS NOT q.priority OR n.enabled IS NOT p.enabled);")
+  test "$purchase_delta" = 0 || fail "Purchase conversion changed unexpected rows. Original unchanged; backup retained at $backup."
+fi
+
+# Setup validates the final shape only. A digest of the logical database also
+# proves that the validator did not rewrite any candidate rows or schema.
+validation_before=$(sqlite3 "$candidate" .dump | sha256sum)
+if ! setupdb --db "$candidate" > "$backup/setup.log" 2>&1; then
+  printf 'migrate: setupdb failed: %s\n' "$(cat "$backup/setup.log")" >&2
+  fail "Candidate setup failed. Original unchanged; verified backup retained at $backup. Keep the API stopped."
+fi
+validation_after=$(sqlite3 "$candidate" .dump | sha256sum)
+test "$validation_before" = "$validation_after" || fail "Candidate setup changed schema or rows. Original unchanged; backup retained at $backup."
+check_integrity "$candidate" || fail "Candidate integrity check failed after purchase conversion. Original unchanged; backup retained at $backup."
 
 # Publish the verified candidate over the original with the backup API.
 # The destination file keeps its path, permissions, and ownership.

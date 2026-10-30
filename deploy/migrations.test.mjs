@@ -247,8 +247,8 @@ test("legacy conversion publishes committed WAL data and retains its verified ba
 
 test("candidate verification rejects lost bank identities and a changed checkpoint schema", async (t) => {
   for (const [name, sabotage, pattern] of [
-    ["bank-identity", "UPDATE postings SET id='replacement' WHERE id='unlinked-bank';", /bank repair is incomplete or overreached/],
-    ["checkpoint-schema", "ALTER TABLE checkpoints RENAME COLUMN observed_at TO wrong_instant;", /checkpoint schema verification failed/],
+    ["bank-identity", "UPDATE postings SET id='replacement' WHERE id='unlinked-bank';", /Candidate setup changed schema or rows/],
+    ["checkpoint-schema", "ALTER TABLE checkpoints RENAME COLUMN observed_at TO wrong_instant;", /Candidate setup changed schema or rows/],
   ]) {
     const directory = await mkdtemp(join(tmpdir(), `waypoint-migration-candidate-${name}-`));
     t.after(() => rm(directory, { recursive: true, force: true }));

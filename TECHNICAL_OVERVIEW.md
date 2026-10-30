@@ -247,17 +247,20 @@ indexes. It validates schema compatibility and fails closed if setup is absent.
 Identity initialization also validates its tables without DDL. SQLite can create
 normal WAL/SHM sidecars during operation.
 
-Schema changes are transactional and forward-only. Completed upgrades are recorded
-in `schema_migrations`. Legacy unscoped databases are rejected. Restore a
-compatible database backup instead of downgrading.
+Setup creates the complete schema only in a fresh database. Existing databases
+must already have the current schema. Setup never converts data or repairs
+missing schema objects. Separate one-time operator scripts own version upgrades.
+Legacy unscoped databases are rejected. Restore a compatible backup instead of
+downgrading.
 
 Timestamped observations use the one-time offline body in `deploy/migrate.sh`.
 The deployment adapter runs `/app/migrate.sh` from the target image with all
 API writers stopped and the actual data mount attached. The image's SQLite
 CLI converts each legacy date to 23:59:59 UTC and drops the date column.
 The body validates the source state and creates a private SQLite-safe backup.
-It converts a disposable candidate and uses current-schema `setupdb` there
-to preserve the pending Analysis schema upgrade. It verifies preserved rows,
+It converts a disposable candidate, applies the frozen Analysis SQL, and invokes
+the standalone purchase conversion tool there. `setupdb` only validates the
+finished schema. The body verifies preserved rows,
 integrity, and foreign keys before publication. Complete target databases
 only verify on retries. Fresh databases use `SetupDatabase` before the hook.
 The server and setup never invoke the migration. See `deploy/MIGRATIONS.md`.
@@ -275,14 +278,14 @@ The current schema stores:
 | `accounts`               | ordered account definitions                                                                                   |
 | `checkpoints`            | ordered balance observations, unique by account/instant, with required exact time (`observed_at`, no date column) |
 | `postings`               | ordered UUID posting definitions with owner, execution order, and explicit bank lifecycle |
-| `purchase_policies`      | user-scoped purchase priorities attached to posting identities                                                |
+| `planned_purchases`      | user-scoped purchase intentions with fixed cost, funding account, earliest date, priority, and enabled state |
 | `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
 | `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
 | `blob_data`              | private bytes for the default SQLite blob adapter                                                              |
 | `recurrence_rules`       | ordered repetition templates with schedule, priority, and optional annual cap                                 |
 | `payment_terms`          | mechanism config for debt-account minimums, due anchors, and statement anchors                                |
 | `evaluations`            | type, user-scoped instance ID, order, label, enablement, and JSON config                                      |
-| `entity_ids`             | shared ID registry across accounts, postings, rules, and evaluations                                          |
+| `entity_ids`             | shared ID registry across accounts, postings, planned purchases, rules, and evaluations |
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
 | `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
@@ -291,9 +294,13 @@ The current schema stores:
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 | `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
 | `posting_id_migrations`  | private old-to-new posting identity audit for the one-way UUID migration                                      |
-| `schema_migrations`      | completed transactional schema upgrades                                                                       |
+| `schema_migrations`      | compatibility markers and historical upgrade records |
 
 ### First boot and import
+
+Planned purchases use dedicated `/v1/planned-purchases` CRUD and reorder routes.
+Runtime and setup reject the retired posting-policy schema without conversion.
+See [purchase persistence](docs/purchase-queue.md#persistence).
 
 The authenticated user router initializes a blank private workspace on first authorized access. It never adopts legacy data. `ImportCSV` (offline tool, fixture seeding, tests) parses the model CSV directory and replaces the selected user's model state in one transaction. At runtime the populated database is authoritative: seed-file changes never replace canonical state. Replacement happens only through explicit import.
 
