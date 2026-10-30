@@ -238,7 +238,7 @@ application users through sign-in again. Keep financial data intact.
 ```bash
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/authorization
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 go -C backend test -race ./internal/identity
 node --test auth/casdoor/*.test.mjs
 ```

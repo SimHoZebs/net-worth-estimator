@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -17,6 +19,28 @@ import (
 type evaluationInstanceOutput struct {
 	Body struct {
 		Items []types.EvaluationInstance[types.JsonValue] `json:"items"`
+	}
+}
+
+func TestServedOpenAPIMatchesSnapshot(t *testing.T) {
+	response := httptest.NewRecorder()
+	New(openAPIStore(t), Config{}).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/openapi.json", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("OpenAPI status = %d", response.Code)
+	}
+	snapshot, err := os.ReadFile(filepath.Join(apiProjectRoot(t), "frontend", "openapi.snapshot.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var served, expected any
+	if err := json.Unmarshal(response.Body.Bytes(), &served); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(snapshot, &expected); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(served, expected) {
+		t.Fatal("served OpenAPI differs from the checked-in client contract")
 	}
 }
 
