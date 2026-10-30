@@ -4,15 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/domain"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
+
+type stochasticRequest struct {
+	Document  *types.FinancialModelDocument   `json:"document,omitempty"`
+	Overrides types.ModelOverrides            `json:"overrides,omitempty"`
+	Settings  types.ProjectionRuntimeSettings `json:"settings"`
+	Config    types.StochasticConfig          `json:"config"`
+}
 
 // stochasticSSE streams StochasticProgress events plus optional partial
 // results over SSE.
@@ -158,19 +167,6 @@ func (run *sharedStochasticRun) outcome() (*types.StochasticProjectionResult, er
 	return run.result, run.runErr
 }
 
-// writeSSEPreamble emits shared SSE headers plus the reconnect hint. Both
-// seeded (shared) and unseeded (inline) streams use this so proxy behavior
-// and retry timing stay identical. Callers set Projection-Source before calling.
-func writeSSEPreamble(w http.ResponseWriter, flusher http.Flusher) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
-	if _, err := fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs); err == nil {
-		flusher.Flush()
-	}
-}
-
 // ---- Shared SSE stream helpers ----
 
 // sseEventWriter serializes SSE event writes for one stream.
@@ -179,7 +175,7 @@ type sseEventWriter func(id, name string, payload any) error
 // newSSEEventWriter builds the single mutex-guarded event writer for a
 // stream. The heartbeat goroutine and the event loop run on different
 // goroutines and their bytes must never interleave mid-event.
-func newSSEEventWriter(w http.ResponseWriter, flusher http.Flusher, writeMu *sync.Mutex) sseEventWriter {
+func newSSEEventWriter(w io.Writer, flusher http.Flusher, writeMu *sync.Mutex) sseEventWriter {
 	return func(id, name string, payload any) error {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
@@ -197,7 +193,7 @@ func newSSEEventWriter(w http.ResponseWriter, flusher http.Flusher, writeMu *syn
 
 // startSSEHeartbeat keeps idle proxies/NAT from killing long batches between
 // progress flushes. It stops when done closes or a write fails.
-func startSSEHeartbeat(w http.ResponseWriter, flusher http.Flusher, writeMu *sync.Mutex, done chan struct{}) {
+func startSSEHeartbeat(w io.Writer, flusher http.Flusher, writeMu *sync.Mutex, done chan struct{}) {
 	go func() {
 		ticker := time.NewTicker(sseHeartbeatInterval)
 		defer ticker.Stop()
@@ -218,6 +214,36 @@ func startSSEHeartbeat(w http.ResponseWriter, flusher http.Flusher, writeMu *syn
 			}
 		}
 	}()
+}
+
+// stochasticStream commits source headers only after request preparation.
+// Huma's sse.Register commits 200 before its callback, so use StreamResponse
+// here to retain pre-stream errors and computed/shared/stored source headers.
+func stochasticStream(source string, serve func(context.Context, sseEventWriter)) *huma.StreamResponse {
+	return &huma.StreamResponse{Body: func(ctx huma.Context) {
+		writer := ctx.BodyWriter()
+		flusher, ok := writer.(http.Flusher)
+		if !ok {
+			ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
+			ctx.SetStatus(http.StatusInternalServerError)
+			_, _ = io.WriteString(writer, "streaming unsupported\n")
+			return
+		}
+		ctx.SetHeader("Content-Type", "text/event-stream")
+		ctx.SetHeader("Cache-Control", "no-store")
+		ctx.SetHeader("Projection-Source", source)
+		ctx.SetStatus(http.StatusOK)
+		flusher.Flush()
+		if _, err := fmt.Fprintf(writer, "retry: %d\n\n", sseRetryMs); err == nil {
+			flusher.Flush()
+		}
+
+		var writeMu sync.Mutex
+		heartbeatDone := make(chan struct{})
+		defer close(heartbeatDone)
+		startSSEHeartbeat(writer, flusher, &writeMu, heartbeatDone)
+		serve(ctx.Context(), newSSEEventWriter(writer, flusher, &writeMu))
+	}}
 }
 
 // stochasticProgressPayload builds the cumulative progress/partial payload:
@@ -241,22 +267,11 @@ func writeStochasticProgress(writeEvent sseEventWriter, progress types.Stochasti
 	}
 }
 
-func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	var body stochasticRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
-		return
-	}
+func (s *Server) stochasticSSE(_ context.Context, input *struct{ Body stochasticRequest }) (*huma.StreamResponse, error) {
+	body := input.Body
 	document, err := s.resolveDocument(body.Document)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
 	// Unseeded results are not stored or shared: a nil seed means "fresh
@@ -275,103 +290,81 @@ func (s *Server) stochasticSSE(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 		if stored, err := lookupArtifact[types.StochasticProjectionResult](s.store, resultKey); err == nil && stored.found {
-			w.Header().Set("Content-Type", "text/event-stream")
-			w.Header().Set("Cache-Control", "no-store")
-			w.Header().Set("Projection-Source", projectionSourceStored)
-			w.WriteHeader(http.StatusOK)
-			encoded, marshalErr := json.Marshal(map[string]any{"result": stored.value})
-			if marshalErr == nil {
-				fmt.Fprintf(w, "retry: %d\n\n", sseRetryMs)
-				fmt.Fprintf(w, "id: done\nevent: result\ndata: %s\n\n", encoded)
-			}
-			if flusher, ok := w.(http.Flusher); ok {
-				flusher.Flush()
-			}
-			return
+			return stochasticStream(projectionSourceStored, func(_ context.Context, writeEvent sseEventWriter) {
+				if err := writeEvent("done", "result", map[string]any{"result": stored.value}); err != nil {
+					log.Printf("stochastic sse: stored result write failed: %v", err)
+				}
+			}), nil
 		}
 	} else {
-		s.serveStochasticInline(w, r, document, body.Settings, body.Overrides, body.Config)
-		return
+		return stochasticStream(projectionSourceComputed, func(ctx context.Context, writeEvent sseEventWriter) {
+			s.serveStochasticInline(ctx, writeEvent, document, body.Settings, body.Overrides, body.Config)
+		}), nil
 	}
 	_, prefix := parseArtifactKeyMeta(resultKey)
 	log.Printf("stochastic simulation request key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d runs=%d",
 		prefix, len(document.Accounts), len(document.Postings), len(document.Checkpoints),
 		body.Settings.HorizonYears, body.Config.RunCount)
 	run, owner := getOrStartSharedRun(resultKey)
+	source := projectionSourceShared
 	if owner {
-		w.Header().Set("Projection-Source", projectionSourceComputed)
-	} else {
-		w.Header().Set("Projection-Source", projectionSourceShared)
+		source = projectionSourceComputed
 	}
 
-	writeSSEPreamble(w, flusher)
+	return stochasticStream(source, func(ctx context.Context, writeEvent sseEventWriter) {
+		if owner {
+			log.Printf("stochastic run start key_prefix=%s runs=%d", prefix, body.Config.RunCount)
+			// The computation is detached from the request context: this
+			// stream dropping must never cancel the shared run. Successful results
+			// are submitted to storage independently of stream lifetime.
+			computeCtx := context.WithoutCancel(ctx)
+			go func() {
+				progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
+					run.publish(stochasticStreamEvent{progress: progress, partial: partial})
+				}
+				result, runErr := domain.StochasticProjection(computeCtx, document, &body.Settings, body.Overrides, body.Config, progressCallback)
+				run.finish(resultKey, func(result *types.StochasticProjectionResult) {
+					putArtifact(s.store, resultKey, "stochastic", result)
+				}, result, runErr)
+				if runErr != nil {
+					log.Printf("stochastic finish key_prefix=%s status=error error=%v", prefix, runErr)
+				} else {
+					log.Printf("stochastic finish key_prefix=%s status=ok runs=%d", prefix, body.Config.RunCount)
+				}
+			}()
+		}
 
-	// All writes to this stream share one mutex: the heartbeat goroutine
-	// and the event loop below run on different goroutines and their bytes
-	// must never interleave mid-event.
-	var writeMu sync.Mutex
-	heartbeatDone := make(chan struct{})
-	defer close(heartbeatDone)
-	startSSEHeartbeat(w, flusher, &writeMu, heartbeatDone)
-
-	writeEvent := newSSEEventWriter(w, flusher, &writeMu)
-	writeProgress := func(_ int, progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
-		writeStochasticProgress(writeEvent, progress, partial)
-	}
-
-	if owner {
-		log.Printf("stochastic run start key_prefix=%s runs=%d", prefix, body.Config.RunCount)
-		// The computation is detached from the request context: this
-		// stream dropping must never cancel the shared run. Successful results
-		// are submitted to storage independently of stream lifetime.
-		computeCtx := context.WithoutCancel(r.Context())
-		go func() {
-			progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
-				run.publish(stochasticStreamEvent{progress: progress, partial: partial})
-			}
-			result, runErr := domain.StochasticProjection(computeCtx, document, &body.Settings, body.Overrides, body.Config, progressCallback)
-			run.finish(resultKey, func(result *types.StochasticProjectionResult) {
-				putArtifact(s.store, resultKey, "stochastic", result)
-			}, result, runErr)
-			if runErr != nil {
-				log.Printf("stochastic finish key_prefix=%s status=error error=%v", prefix, runErr)
-			} else {
-				log.Printf("stochastic finish key_prefix=%s status=ok runs=%d", prefix, body.Config.RunCount)
-			}
-		}()
-	}
-
-	ch, snapshot, hasSnapshot, finished := run.subscribe()
-	if finished {
-		log.Printf("stochastic attach key_prefix=%s outcome=finished", prefix)
-		s.writeSharedRunOutcome(writeEvent, run)
-		return
-	}
-	defer run.unsubscribe(ch)
-	completedRuns := 0
-	if hasSnapshot {
-		completedRuns = snapshot.progress.CompletedRuns
-		log.Printf("stochastic attach key_prefix=%s outcome=resume completedRuns=%d", prefix, completedRuns)
-		writeProgress(snapshot.progress.CompletedRuns, snapshot.progress, snapshot.partial)
-	} else {
-		log.Printf("stochastic attach key_prefix=%s outcome=resume completedRuns=0", prefix)
-	}
-	ctx := r.Context()
-	for {
-		select {
-		case event := <-ch:
-			completedRuns = event.progress.CompletedRuns
-			writeProgress(event.progress.CompletedRuns, event.progress, event.partial)
-		case <-run.done:
+		ch, snapshot, hasSnapshot, finished := run.subscribe()
+		if finished {
+			log.Printf("stochastic attach key_prefix=%s outcome=finished", prefix)
 			s.writeSharedRunOutcome(writeEvent, run)
 			return
-		case <-ctx.Done():
-			// Detach only; the shared run continues for others. The
-			// completedRuns count shows how far this stream got.
-			log.Printf("stochastic detach key_prefix=%s completedRuns=%d", prefix, completedRuns)
-			return
 		}
-	}
+		defer run.unsubscribe(ch)
+		completedRuns := 0
+		if hasSnapshot {
+			completedRuns = snapshot.progress.CompletedRuns
+			log.Printf("stochastic attach key_prefix=%s outcome=resume completedRuns=%d", prefix, completedRuns)
+			writeStochasticProgress(writeEvent, snapshot.progress, snapshot.partial)
+		} else {
+			log.Printf("stochastic attach key_prefix=%s outcome=resume completedRuns=0", prefix)
+		}
+		for {
+			select {
+			case event := <-ch:
+				completedRuns = event.progress.CompletedRuns
+				writeStochasticProgress(writeEvent, event.progress, event.partial)
+			case <-run.done:
+				s.writeSharedRunOutcome(writeEvent, run)
+				return
+			case <-ctx.Done():
+				// Detach only; the shared run continues for others. The
+				// completedRuns count shows how far this stream got.
+				log.Printf("stochastic detach key_prefix=%s completedRuns=%d", prefix, completedRuns)
+				return
+			}
+		}
+	}), nil
 }
 
 // writeSharedRunOutcome streams the finished run's result or error event.
@@ -392,33 +385,17 @@ func (s *Server) writeSharedRunOutcome(writeEvent func(id, name string, payload 
 // fresh random draws cannot be shared or resumed, so the stream lives and
 // dies with this connection.
 func (s *Server) serveStochasticInline(
-	w http.ResponseWriter,
-	r *http.Request,
+	ctx context.Context,
+	writeEvent sseEventWriter,
 	document *types.FinancialModelDocument,
 	settings types.ProjectionRuntimeSettings,
 	overrides types.ModelOverrides,
 	config types.StochasticConfig,
 ) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Projection-Source", projectionSourceComputed)
-	writeSSEPreamble(w, flusher)
-
-	var writeMu sync.Mutex
-	heartbeatDone := make(chan struct{})
-	defer close(heartbeatDone)
-	startSSEHeartbeat(w, flusher, &writeMu, heartbeatDone)
-
-	writeEvent := newSSEEventWriter(w, flusher, &writeMu)
-
 	progressCallback := func(progress types.StochasticProgress, partial *types.StochasticProjectionResult) {
 		writeStochasticProgress(writeEvent, progress, partial)
 	}
 
-	ctx := r.Context()
 	result, runErr := domain.StochasticProjection(ctx, document, &settings, overrides, config, progressCallback)
 	if runErr != nil {
 		if err := writeEvent("error", "error", map[string]any{"error": runErr.Error()}); err != nil {

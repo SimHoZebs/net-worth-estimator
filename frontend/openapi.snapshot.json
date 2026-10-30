@@ -4701,6 +4701,16 @@
 							}
 						},
 						"description": "Success"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
 					}
 				}
 			}
