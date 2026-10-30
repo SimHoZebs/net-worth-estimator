@@ -39,6 +39,9 @@ type Service struct {
 
 // New uses standard OIDC discovery and verification for Casdoor.
 func New(ctx context.Context, c Config) (*Service, error) {
+	if c.GuestSubject == "" {
+		return nil, fmt.Errorf("guest subject is required")
+	}
 	browsers, err := browserEndpoints(c)
 	if err != nil {
 		return nil, err
@@ -114,6 +117,18 @@ func (s *Service) Close() error { return nil }
 type principalKey struct{}
 type Principal = authcontract.Principal
 
+// Authenticated reports whether the request carries a real browser or bearer
+// login. Anonymous requests carry the configured guest subject with
+// Authenticated=false.
+func Authenticated(ctx context.Context) bool {
+	p, _ := ctx.Value(principalKey{}).(Principal)
+	return p.Authenticated
+}
+
+func (s *Service) guestPrincipal() Principal {
+	return Principal{Subject: s.config.GuestSubject}
+}
+
 func CanWrite(ctx context.Context) bool {
 	scope, ok := Scope(ctx)
 	return ok && slices.Contains(scope.Permissions, "user:write")
@@ -124,13 +139,22 @@ func (s *Service) principal(r *http.Request) (Principal, error) {
 	// bearer never replaces a session: validation falls back to the session
 	// path, and a provider outage falls back to a cached-valid session
 	// before reporting unavailable. Retired or foreign tokens therefore
-	// keep exact guest behavior.
+	// fall back to the configured guest.
 	if token, ok := bearerToken(r); ok {
 		if p, err := s.bearerPrincipal(r.Context(), token); err == nil {
-			if p.Subject != "" {
+			if p.Authenticated {
 				return p, nil
 			}
-		} else if p, serr := s.sessionPrincipal(r); serr == nil && p.Subject != "" {
+			if sp, serr := s.sessionPrincipal(r); serr == nil {
+				if sp.Authenticated {
+					return sp, nil
+				}
+				return s.guestPrincipal(), nil
+			} else if serr != nil {
+				return Principal{}, serr
+			}
+			return s.guestPrincipal(), nil
+		} else if p, serr := s.sessionPrincipal(r); serr == nil && p.Authenticated {
 			return p, nil
 		} else if serr != nil {
 			return Principal{}, serr
@@ -147,9 +171,9 @@ func (s *Service) sessionPrincipal(r *http.Request) (Principal, error) {
 		return Principal{}, err
 	}
 	if g.ID == "" {
-		return Principal{}, nil
+		return s.guestPrincipal(), nil
 	}
-	return Principal{Subject: g.Subject, Name: g.Name}, nil
+	return Principal{Subject: g.Subject, Name: g.Name, Authenticated: true}, nil
 }
 
 // Wrap verifies sessions and enforces Casdoor decisions for the selected user.
@@ -161,25 +185,11 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		if r.URL.Path == "/v1" || strings.HasPrefix(r.URL.Path, "/v1/") {
-			if isGroupRoute(r.URL.Path) {
+			if isGroupRoute(r.URL.Path) && r.Method == http.MethodOptions {
+				// The groups CORS wrapper answers preflight without a session.
+				// Data calls use the common permission boundary below, then
+				// the groups handler checks membership.
 				w.Header().Set("Cache-Control", "no-store")
-				// Preflight carries no session; the groups CORS wrapper
-				// answers it. Authenticated group calls continue below.
-				if r.Method == http.MethodOptions {
-					next.ServeHTTP(w, r)
-					return
-				}
-				p, err := s.principal(r)
-				if err != nil {
-					failure(w, 503, "Identity verification is temporarily unavailable. Retry this request.")
-					return
-				}
-				if p.Subject == "" {
-					w.Header().Set("WWW-Authenticate", "Session")
-					failure(w, 401, "Sign in to manage groups.")
-					return
-				}
-				r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -196,7 +206,7 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			}
 			w.Header().Set(ResourceHeader, scope.Resource.ID)
 			if !slices.Contains(scope.Permissions, requestAction(r)) {
-				if p.Subject == "" {
+				if !p.Authenticated {
 					w.Header().Set("WWW-Authenticate", "Session")
 					failure(w, 401, "Sign in to edit your data.")
 				} else {
@@ -268,8 +278,8 @@ func (s *Service) serveAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set(ResourceHeader, scope.Resource.ID)
-		respond(w, authcontract.SessionResponse{Enabled: true, Provider: s.config.Provider, Authenticated: p.Subject != "", Allowed: slices.Contains(scope.Permissions, "user:read"), User: p, AccountURL: s.browserProviderURL(s.config.AccountURL, endpoint),
-			Resource: authcontract.SessionResource{ID: scope.Resource.ID, Kind: scope.Resource.Kind, Permissions: scope.Permissions}})
+		respond(w, authcontract.SessionResponse{Enabled: true, Provider: s.config.Provider, Authenticated: p.Authenticated, Allowed: slices.Contains(scope.Permissions, "user:read"), User: p, AccountURL: s.browserProviderURL(s.config.AccountURL, endpoint),
+			Resource: authcontract.SessionResource{ID: scope.Resource.ID, Permissions: scope.Permissions}})
 	case "GET " + prefix + "login":
 		s.login(w, r)
 	case "GET " + prefix + "callback":

@@ -37,7 +37,7 @@ describe("SafeSpendingEvidence", () => {
 		});
 		const view = render(
 			<SafeSpendingEvidence
-				plan={financialModelFixture}
+				startDate={financialModelFixture.startDate}
 				projection={projection}
 				onClose={() => {}}
 			/>,
@@ -70,7 +70,7 @@ describe("SafeSpendingEvidence", () => {
 	it("retains the empty-period explanation", () => {
 		const view = render(
 			<SafeSpendingEvidence
-				plan={financialModelFixture}
+				startDate={financialModelFixture.startDate}
 				projection={projectionFixture()}
 				onClose={() => {}}
 			/>,

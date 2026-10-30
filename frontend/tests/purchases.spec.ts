@@ -23,7 +23,7 @@ async function addPurchase(page: Page, name: string, cost: string) {
 	await dialog.getByLabel("Purchase name").fill(name);
 	await dialog.getByLabel("Cost (USD)").fill(cost);
 	await dialog.getByLabel("Funding account").selectOption("checking");
-	await dialog.getByRole("button", { name: "Save changes" }).click();
+	await dialog.getByRole("button", { name: "Add purchase" }).click();
 	await expect(dialog).not.toBeVisible();
 }
 
@@ -96,7 +96,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	const { resource } = (await (
 		await request.get(`${FIXTURE_API}/v1/auth/session`)
 	).json()) as {
-		resource: { id: string; kind: "private"; permissions: string[] };
+		resource: { id: string; permissions: string[] };
 	};
 	const baselineResponse = await request.get(
 		`${FIXTURE_API}/v1/financial-model`,
@@ -337,7 +337,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 		.click();
 	const editor = page.getByRole("dialog", { name: "Edit purchase" });
 	await editor.getByLabel("Cost (USD)").fill("200");
-	await editor.getByRole("button", { name: "Save changes" }).click();
+	await editor.getByRole("button", { name: "Save purchase" }).click();
 	await expect(queue.locator("li").first()).toContainText("$200");
 	await page.getByRole("button", { name: /Inspect Chair/ }).click();
 	await page
@@ -400,7 +400,7 @@ test.skip("unfunded purchases hold lower priorities and the page remains accessi
 	}
 });
 
-test("read-only plans do not allow purchase writes", async ({ page }) => {
+test("read-only mode does not allow purchase writes", async ({ page }) => {
 	await resetFixture({ readOnly: true });
 	await openPurchases(page);
 	await expect(

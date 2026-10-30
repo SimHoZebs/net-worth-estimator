@@ -1,6 +1,6 @@
 import { Pin } from "lucide-react";
 import { useId } from "react";
-import type { Plan } from "@/domain/model.ts";
+import type { Account, Transaction } from "@/domain/model.ts";
 import type {
 	EvaluationResult,
 	OtherEvaluation,
@@ -15,7 +15,9 @@ type PinnedItem =
 	| { kind: "other"; result: OtherEvaluation };
 
 export function PinnedEvaluations({
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
 	range,
 	pinnedIds,
@@ -23,7 +25,9 @@ export function PinnedEvaluations({
 	pinsDisabled = false,
 	onPinChange,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 	projection: Projection | null;
 	range: RangeResult | null;
 	pinnedIds: string[] | null;
@@ -84,7 +88,9 @@ export function PinnedEvaluations({
 								<OtherEvaluationCard
 									item={item.result}
 									pin={pin}
-									plan={plan}
+									accounts={accounts}
+									transactions={transactions}
+									startDate={startDate}
 									projection={projection}
 									range={range}
 								/>

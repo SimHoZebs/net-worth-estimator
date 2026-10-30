@@ -26,7 +26,9 @@ import { useSelectedId } from "@/components/entrySelection.ts";
 /** The same configured funding-gap preview and inspector on both pages. */
 export function FundingGapsCard({
 	item,
-	plan,
+	accounts,
+	transactions,
+	startDate,
 	projection,
 	pin = null,
 }: OtherEvaluationCardProps) {
@@ -34,12 +36,25 @@ export function FundingGapsCard({
 		() =>
 			orderedFundingGaps(
 				item.enabled
-					? deriveFundingGaps({ plan, projection, postingIds: item.postingIds })
+					? deriveFundingGaps({
+							accounts,
+							transactions,
+							startDate,
+							projection,
+							postingIds: item.postingIds,
+						})
 					: [],
 			),
-		[item.enabled, item.postingIds, plan, projection],
+		[
+			item.enabled,
+			item.postingIds,
+			accounts,
+			transactions,
+			startDate,
+			projection,
+		],
 	);
-	const [selectedId, setSelectedId] = useSelectedId(plan);
+	const [selectedId, setSelectedId] = useSelectedId(projection);
 	const headingId = useId();
 	const first = gaps[0];
 	const summary = first ? summarizeFundingGap(first) : null;

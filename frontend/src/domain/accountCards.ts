@@ -1,5 +1,5 @@
 import { dateLabel, money } from "./format.ts";
-import type { Account, Plan } from "./model.ts";
+import type { Account } from "./model.ts";
 import type { Projection } from "./result.ts";
 
 /** Non-exclusive reporting roles; never summed as independent totals. */
@@ -73,7 +73,7 @@ function balanceLabelFor(account: Account, kind: CardKind): string {
 }
 
 /**
- * Map real plan accounts into the card visual contract. Balances stay
+ * Map real saved accounts into the card visual contract. Balances stay
  * sign-aware in the engine; the card shows positive magnitudes with
  * owed/value semantics. No sample balances, sync times, APRs, or due
  * dates are invented.
@@ -129,13 +129,13 @@ export function toAccountCard({
 }
 
 export function toAccountCards({
-	plan,
+	accounts,
 	projection,
 }: {
-	plan: Plan;
+	accounts: Account[];
 	projection: Projection | null;
 }): AccountCardModel[] {
-	return plan.accounts
+	return accounts
 		.filter((account) => !account.archived)
 		.map((account) => toAccountCard({ account, projection }));
 }

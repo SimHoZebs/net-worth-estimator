@@ -1,4 +1,4 @@
-import type { PlannedPurchase, Plan } from "../../domain/model.ts";
+import type { Account, PlannedPurchase } from "../../domain/model.ts";
 import { visiblePlannedPurchases } from "../../domain/model.ts";
 import type { PurchaseSchedule } from "../../domain/result.ts";
 import type {
@@ -9,7 +9,7 @@ import type {
 
 /**
  * Bridges today's backend contract to the UI without changing persistence.
- * - plan.plannedPurchases order is priority.
+ * - purchases order is priority.
  * - startDate is EARLIEST eligible date, NOT fixed date.
  * - null schedule means loading/no current result, not a purchase failure.
  * - purchase.date=null means the engine found no date within the horizon.
@@ -17,11 +17,13 @@ import type {
  * - future fixed-date mode/outcomes must be supplied explicitly via enhancements.
  */
 export function toPurchaseViewItems({
-	plan,
+	purchases,
+	accounts,
 	schedule,
 	enhancements = {},
 }: {
-	plan: Plan;
+	purchases: PlannedPurchase[];
+	accounts: Account[];
 	schedule: PurchaseSchedule | null;
 	enhancements?: PurchaseEnhancements;
 }): PurchaseViewItem[] {
@@ -29,8 +31,8 @@ export function toPurchaseViewItems({
 		schedule?.purchases.map((event) => [event.postingId, event]),
 	);
 	return visiblePlannedPurchases({
-		plannedPurchases: plan.plannedPurchases,
-		accounts: plan.accounts,
+		plannedPurchases: purchases,
+		accounts,
 	}).map((purchase: PlannedPurchase, index): PurchaseViewItem => {
 		const enhancement = enhancements[purchase.id];
 		const timing = enhancement?.timing ?? {
@@ -57,7 +59,7 @@ export function toPurchaseViewItems({
 			purchase,
 			priority: index + 1,
 			accountName:
-				plan.accounts.find((account) => account.id === purchase.fromId)?.name ??
+				accounts.find((account) => account.id === purchase.fromId)?.name ??
 				"Funding account unavailable",
 			timing,
 			outcome,

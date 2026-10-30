@@ -1,6 +1,5 @@
 export interface SessionUser {
 	id: string;
-	kind: "sample" | "private";
 	permissions: string[];
 }
 
@@ -35,7 +34,7 @@ export function userStorageKey(
 	scope: UserScope = getUserScope(),
 ): string | null {
 	if (scope.status === "pending" || !scope.resource) return null;
-	const owner = `${scope.resource.kind}:${encodeURIComponent(scope.resource.id)}`;
+	const owner = encodeURIComponent(scope.resource.id);
 	return `${baseKey}:user:${encodeURIComponent(scope.apiBaseUrl)}:${owner}`;
 }
 
@@ -43,7 +42,6 @@ export function userScopeKey(input: UserScopeInput): string {
 	return JSON.stringify([
 		input.apiBaseUrl,
 		input.resource.id,
-		input.resource.kind,
 		input.subject,
 		[...input.resource.permissions].sort(),
 	]);

@@ -5,7 +5,9 @@
 // derives from the exact OIDC issuer and immutable subject, not the display
 // name, username, or browser input. Action strings are user:* under the
 // Casdoor model waypoint/user-access; permission resource values are
-// users/*, including the global read-only users/sample row.
+// users/<64hex>. Every identity, including the preprovisioned guest, uses
+// the same users/<64hex> data path; grants are assigned at creation by
+// Casdoor groups and enforced at request time.
 package authorization
 
 import (
@@ -22,7 +24,6 @@ const (
 
 type Resource struct {
 	ID    string `json:"id"`
-	Kind  string `json:"kind"`
 	Owner string `json:"-"`
 }
 
@@ -41,32 +42,34 @@ func (s Scope) Allows(action string) bool {
 }
 
 // ActorKey uses the exact verified OIDC issuer and immutable subject, not a
-// display name or a Casdoor username. An empty subject identifies the guest.
+// display name or a Casdoor username. An empty subject fails closed with an
+// empty key; callers must supply the configured guest subject for anonymous
+// requests instead of relying on a literal fallback.
 func ActorKey(issuer, subject string) string {
 	if subject == "" {
-		return "guest"
+		return ""
 	}
 	hash := sha256.Sum256([]byte(issuer + "\x00" + subject))
 	return "user:" + hex.EncodeToString(hash[:])
 }
 
 // ResourceFor derives routing metadata exclusively from a verified identity.
-// Private users use users/<opaque-id>; the guest uses the global
-// read-only sample. Callers must never decode Resource.Owner from browser
+// Every identity uses users/<opaque-id>. An empty subject fails closed with
+// an invalid resource. Callers must never decode Resource.Owner from browser
 // input.
 func ResourceFor(issuer, subject string) Resource {
 	if subject == "" {
-		return Resource{ID: "users/sample", Kind: "sample"}
+		return Resource{}
 	}
 	actor := ActorKey(issuer, subject)
-	return Resource{ID: "users/" + strings.TrimPrefix(actor, "user:"), Kind: "private", Owner: actor}
+	if actor == "" {
+		return Resource{}
+	}
+	return Resource{ID: "users/" + strings.TrimPrefix(actor, "user:"), Owner: actor}
 }
 
 func (r Resource) valid() bool {
-	if r.Kind == "sample" {
-		return r.ID == "users/sample" && r.Owner == ""
-	}
-	if r.Kind != "private" || len(r.Owner) != len("user:")+64 || !strings.HasPrefix(r.Owner, "user:") {
+	if len(r.Owner) != len("user:")+64 || !strings.HasPrefix(r.Owner, "user:") {
 		return false
 	}
 	hash := strings.TrimPrefix(r.Owner, "user:")

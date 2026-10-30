@@ -12,7 +12,6 @@ import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
-import { resetWorkspaceStore } from "../../state/workspaceStore.ts";
 import { RecurringRules } from "./RecurringRules.tsx";
 
 vi.mock("./TransactionDetail.tsx", () => ({
@@ -61,14 +60,24 @@ vi.mock("motion/react", async (importOriginal) => ({
 
 afterEach(() => {
 	cleanup();
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
 });
 
-it("keeps an existing selected rule current across plan updates and closes it on removal", () => {
+function rulesProps(transactions: typeof financialModelFixture.transactions) {
+	const account = financialModelFixture.accounts[0]!;
+	return {
+		account,
+		accounts: financialModelFixture.accounts,
+		transactions,
+		startDate: financialModelFixture.startDate,
+		readOnly: false as const,
+		onEdit: () => {},
+	};
+}
+
+it("keeps an existing selected rule current across row updates and closes it on removal", () => {
 	acceptTestResource();
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	const account = financialModelFixture.accounts[0]!;
 	const transaction = {
@@ -79,43 +88,20 @@ it("keeps an existing selected rule current across plan updates and closes it on
 		fromId: account.id,
 		toId: null,
 	};
-	const plan = { ...financialModelFixture, transactions: [transaction] };
-	const view = render(
-		<RecurringRules account={account} plan={plan} onEdit={() => {}} />,
-	);
+	const view = render(<RecurringRules {...rulesProps([transaction])} />);
 	fireEvent.click(screen.getByRole("button", { name: /^View Original rule/ }));
 	view.rerender(
 		<RecurringRules
-			account={account}
-			plan={{ ...plan, name: "Unrelated rename" }}
-			onEdit={() => {}}
-		/>,
-	);
-	expect(screen.getByTestId("selected-rule").textContent).toBe("Original rule");
-	view.rerender(
-		<RecurringRules
-			account={account}
-			plan={{
-				...plan,
-				transactions: [{ ...transaction, name: "Current rule" }],
-			}}
-			onEdit={() => {}}
+			{...rulesProps([{ ...transaction, name: "Current rule" }])}
 		/>,
 	);
 	expect(screen.getByTestId("selected-rule").textContent).toBe("Current rule");
-	view.rerender(
-		<RecurringRules
-			account={account}
-			plan={{ ...plan, transactions: [] }}
-			onEdit={() => {}}
-		/>,
-	);
+	view.rerender(<RecurringRules {...rulesProps([])} />);
 	expect(screen.queryByTestId("selected-rule")).toBeNull();
 });
 
 it("returns a rejected drag preview to the server order", async () => {
 	acceptTestResource();
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	const server = stubTestServer();
 	const account = financialModelFixture.accounts[0]!;
@@ -127,13 +113,7 @@ it("returns a rejected drag preview to the server order", async () => {
 		fromId: account.id,
 		toId: null,
 	}));
-	render(
-		<RecurringRules
-			account={account}
-			plan={{ ...financialModelFixture, transactions }}
-			onEdit={() => {}}
-		/>,
-	);
+	render(<RecurringRules {...rulesProps(transactions)} />);
 	fireEvent.click(
 		screen.getByRole("button", { name: "Reorder recurring transactions" }),
 	);

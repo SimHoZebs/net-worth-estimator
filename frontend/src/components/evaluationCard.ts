@@ -1,4 +1,4 @@
-import type { Plan } from "../domain/model.ts";
+import type { Account, Transaction } from "../domain/model.ts";
 import type {
 	OtherEvaluation,
 	Projection,
@@ -13,8 +13,10 @@ export type EvaluationPin = {
 
 export interface OtherEvaluationCardProps {
 	item: OtherEvaluation;
-	plan: Plan;
 	projection: Projection | null;
 	pin?: EvaluationPin | null;
 	range?: RangeResult | null;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
 }

@@ -62,7 +62,9 @@ describe("projection transaction evidence", () => {
 			fulfillment: { unfulfilledAmount: 100, destinationLimitedAmount: 0 },
 		});
 		const gaps = deriveFundingGaps({
-			plan: financialModelFixture,
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
 			projection: projectionFixture({ transactions }),
 		});
 		expect(gaps).toHaveLength(1);
@@ -84,7 +86,9 @@ describe("projection transaction evidence", () => {
 		expect(transactions[0]?.constraintTypes).toEqual(["destination-ceiling"]);
 		expect(
 			deriveFundingGaps({
-				plan: financialModelFixture,
+				accounts: financialModelFixture.accounts,
+				transactions: financialModelFixture.transactions,
+				startDate: financialModelFixture.startDate,
 				projection: projectionFixture({ transactions }),
 			}),
 		).toEqual([]);

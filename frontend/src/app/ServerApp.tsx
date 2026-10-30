@@ -1,6 +1,5 @@
 import { useUiStore } from "../state/uiStore.ts";
 import { useWorkspaceStartup } from "../state/useWorkspaceStartup.ts";
-import { useUserPlan } from "../state/useUserScope.ts";
 import { useServerModel } from "../state/workspaceResources.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
@@ -12,14 +11,15 @@ export function ServerApp() {
 	// No fetched data travels as props anywhere in this tree.
 	useWorkspaceStartup();
 	const navigation = useWorkspaceNavigation();
-	const hasPlan = useUserPlan() !== null;
-	const loading = useServerModel().isPending;
+	const model = useServerModel();
+	const hasModel = model.data?.document != null;
+	const loading = model.isPending;
 	const importing = useUiStore((state) => state.importing);
 
 	// Transient waits render the shell chrome with a loading panel so
 	// navigation stays usable. Only terminal load failures reach the
 	// dedicated recovery screen.
-	if (!hasPlan) {
+	if (!hasModel) {
 		if (loading || importing)
 			return <ServerLoadingShell navigation={navigation} />;
 		return <ServerWorkspaceRecovery />;

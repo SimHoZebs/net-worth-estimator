@@ -4,13 +4,12 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
-import { displayPlanToBackendDocument } from "../api/adapter.ts";
+import { fixtureDocument } from "../mocks/document.ts";
 import type {
 	DeterministicProjectionRequest,
 	EvaluationResultTables,
 	ProjectionResult,
 } from "../api/contracts.ts";
-import { financialModelFixture } from "../mocks/financialModel.ts";
 import {
 	PURCHASE_EVALUATIONS,
 	PURCHASE_EVALUATION_ID,
@@ -48,46 +47,40 @@ function resultFixture(evaluations: EvaluationResultTables): ProjectionResult {
 
 describe("isolated purchase evaluation", () => {
 	it("never derives a baseline start date from a planned purchase", () => {
-		const document = displayPlanToBackendDocument({
-			...financialModelFixture,
-			plannedPurchases: [
-				{
-					id: "purchase",
-					name: "Purchase",
-					amount: 50,
-					fromId: "checking",
-					startDate: "2020-01-01",
-					enabled: true,
-					readOnly: false,
-				},
-			],
-		}).document;
+		const document = fixtureDocument();
 		document.checkpoints = [];
 		document.recurrenceRules = [];
-		// Compat wire shape: the slice persists as a legacy purchase posting.
-		expect(
-			document.postings.find((item) => item.id === "purchase"),
-		).toMatchObject({
-			id: "purchase",
-			sourceAccountId: "checking",
-			purchase: { priority: 0 },
-		});
-		const posting = {
-			id: "real",
-			name: "Real",
-			sourceAccountId: "checking",
-			destinations: null,
-			amount: { resolver: "expression", config: { expression: "50" } },
-			enabled: true,
-			postedTime: 1769904000,
-			transactionTime: 1769904000,
-		};
-		const legacyPurchase = {
-			...document.postings.find((item) => item.id === "purchase")!,
-			postedTime: 1577836800,
-			transactionTime: 1577836800,
-		};
-		document.postings = [legacyPurchase, posting];
+		document.postings = [
+			{
+				id: "legacy-wish",
+				name: "Old wish",
+				sourceAccountId: "checking",
+				destinations: null,
+				amount: {
+					resolver: "expression",
+					config: { expression: "50" },
+					inputs: {},
+				},
+				postedTime: 1577836800,
+				transactionTime: 1577836800,
+				purchase: { priority: 0 },
+				enabled: true,
+			},
+			{
+				id: "real",
+				name: "Real",
+				sourceAccountId: "checking",
+				destinations: null,
+				amount: {
+					resolver: "expression",
+					config: { expression: "50" },
+					inputs: {},
+				},
+				enabled: true,
+				postedTime: 1769904000,
+				transactionTime: 1769904000,
+			},
+		];
 		expect(projectionStartDate(document)).toBe("2026-02-01");
 		// Standalone rows never feed the fallback either.
 		document.plannedPurchases = [
@@ -156,20 +149,22 @@ describe("isolated purchase evaluation", () => {
 		});
 		const wrapper = ({ children }: { children: ReactNode }) =>
 			createElement(QueryClientProvider, { client: queryClient }, children);
-		const document = displayPlanToBackendDocument({
-			...financialModelFixture,
-			plannedPurchases: [
-				{
-					id: "laptop",
-					name: "Laptop",
-					amount: 500,
-					fromId: "checking",
-					startDate: "2026-02-01",
-					enabled: true,
-					readOnly: false,
-				},
-			],
-		}).document;
+		const document = fixtureDocument();
+		document.postings.push({
+			id: "laptop",
+			name: "Laptop",
+			sourceAccountId: "checking",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "500" },
+				inputs: {},
+			},
+			postedTime: 1769904000,
+			transactionTime: 1769904000,
+			purchase: { priority: 0 },
+			enabled: true,
+		});
 		const before = JSON.stringify(document);
 		const deterministicCalls: unknown[] = [];
 		let purchasesCalls = 0;

@@ -6,6 +6,7 @@ import { UserScopeError } from "@/api/scopedRequest.ts";
 import { resetServerQueryCache } from "@/state/serverQuery.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { useResourceSession } from "@/auth/useResourceSession.ts";
+import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
 
 const session = {
 	enabled: true,
@@ -13,7 +14,6 @@ const session = {
 	allowed: true,
 	resource: {
 		id: `users/${"a".repeat(64)}`,
-		kind: "private",
 		permissions: ["user:read", "user:project", "user:write"],
 	},
 	user: { subject: "account-a", name: "Account A" },
@@ -132,18 +132,18 @@ it("blocks an unverified logout redirect and recovers to the guest through an ex
 			...session,
 			authenticated: false,
 			resource: {
-				id: "users/sample",
-				kind: "sample",
+				id: GUEST_USER_ID,
 				permissions: ["user:read", "user:project"],
 			},
-			user: undefined,
+			user: { subject: GUEST_USER_SUBJECT, name: "Guest" },
 		}),
-		{ headers: { "Waypoint-Resource": "users/sample" } },
+		{ headers: { "Waypoint-Resource": GUEST_USER_ID } },
 	);
 	await act(async () => result.current.refresh());
 	expect(result.current.phase).toBe("ready");
 	expect(result.current.session?.authenticated).toBe(false);
-	expect(getUserScope().resource?.id).toBe("users/sample");
+	expect(result.current.session?.user?.subject).toBe(GUEST_USER_SUBJECT);
+	expect(getUserScope().resource?.id).toBe(GUEST_USER_ID);
 });
 
 it("names an unreachable server instead of reporting a generic status failure", async () => {

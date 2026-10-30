@@ -23,6 +23,7 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   assert.equal(env.DEV_APP_PUBLIC_URL, "http://localhost:5178");
   assert.equal(env.DEV_CASDOOR_PUBLIC_URL, "http://localhost:8000");
   assert.equal(env.DEV_OWNER_SUBJECT, "");
+  assert.equal(env.DEV_GUEST_SUBJECT, "");
   assert.equal(env.DEV_AUTH_CLIENT_SECRET, config.identity.AUTH_CLIENT_SECRET);
   assert.equal(env.CASDOOR_ADMIN_PASSWORD, undefined);
   assert.equal(env.CASDOOR_USER_PASSWORD, undefined);
@@ -34,9 +35,19 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   assert.throws(() => settings({ ...config, source: {} }), /snapshot source/);
   assert.throws(() => settings({ ...config, ownerSubject: "*" }), /verified/);
   assert.throws(() => settings({ ...config, ownerSubject: " " }), /verified/);
+  assert.throws(() => settings({ ...config, guestSubject: "*" }), /provisioned guest/);
+  assert.throws(() => settings({ ...config, guestSubject: " " }), /provisioned guest/);
+  assert.throws(
+    () => settings({ ...config, ownerSubject: "same-subject", guestSubject: "same-subject" }),
+    /distinct from the owner/,
+  );
   assert.equal(
     composeEnvironment({ ...config, ownerSubject: "verified-user" }).DEV_OWNER_SUBJECT,
     "verified-user",
+  );
+  assert.equal(
+    composeEnvironment({ ...config, guestSubject: "verified-guest" }).DEV_GUEST_SUBJECT,
+    "verified-guest",
   );
 });
 
@@ -67,6 +78,7 @@ test("native Compose consumes the exported environment and isolates dev from pro
   const config = {
     ...newConfig(undefined, "test-node.example.ts.net"),
     ownerSubject: "opaque'${NOT_A_SECRET}",
+    guestSubject: "guest-opaque'${NOT_A_SECRET}",
   };
   try {
     await writeComposeEnv(config, path);
@@ -112,10 +124,17 @@ test("native Compose consumes the exported environment and isolates dev from pro
       backend.environment.NET_WORTH_ESTIMATOR_OWNER_SUBJECT,
       config.ownerSubject.replaceAll("$", () => "$$"),
     );
+    assert.equal(
+      backend.environment.NET_WORTH_ESTIMATOR_GUEST_SUBJECT,
+      config.guestSubject.replaceAll("$", () => "$$"),
+    );
     const interpolation = spawnSync("docker", [...args, "--environment"], options);
     assert.equal(interpolation.status, 0, interpolation.stderr);
     assert.ok(
       interpolation.stdout.split("\n").includes(`DEV_OWNER_SUBJECT=${config.ownerSubject}`),
+    );
+    assert.ok(
+      interpolation.stdout.split("\n").includes(`DEV_GUEST_SUBJECT=${config.guestSubject}`),
     );
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, "casdoor");
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_DB, "/data/net-worth-estimator.db");
@@ -162,6 +181,7 @@ test("access needs no role configuration and retired grants do not reach the bac
   assert.ok(!example.includes("NET_WORTH_ESTIMATOR_AUTH_EDITORS="));
   assert.ok(!example.includes("NET_WORTH_ESTIMATOR_AUTH_READERS="));
   assert.ok(example.includes("NET_WORTH_ESTIMATOR_OWNER_SUBJECT="));
+  assert.ok(example.includes("NET_WORTH_ESTIMATOR_GUEST_SUBJECT="));
   const config = newConfig();
   assert.equal(Object.hasOwn(config, "editors"), false);
   assert.equal(Object.hasOwn(config, "readers"), false);

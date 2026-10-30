@@ -1,6 +1,6 @@
 import { Info } from "lucide-react";
 import { dateLabel, money } from "../../domain/format.ts";
-import { type Plan, visibleAccounts } from "../../domain/model.ts";
+import { visibleAccounts, type Account } from "../../domain/model.ts";
 import type { CurrentPosition } from "../../api/position.ts";
 import { AccountDot } from "../AccountIcon.tsx";
 import { DetailList, DetailRow } from "../DetailRow.tsx";
@@ -8,11 +8,11 @@ import { Notice } from "../Notice.tsx";
 import { Modal } from "../Modal.tsx";
 
 export function PositionEvidence({
-	plan,
+	accounts,
 	position,
 	onClose,
 }: {
-	plan: Plan;
+	accounts: Account[];
 	position: CurrentPosition;
 	onClose: () => void;
 }) {
@@ -29,7 +29,7 @@ export function PositionEvidence({
 				Assets minus debts · as of {dateLabel(position.asOfDate, true)}
 			</p>
 			<DetailList>
-				{visibleAccounts(plan.accounts)
+				{visibleAccounts(accounts)
 					.filter((account) => account.enabled)
 					.map((account) => {
 						const balance = position.accounts.find(
@@ -57,12 +57,7 @@ export function PositionEvidence({
 			</DetailList>
 			<Notice tone="info" className="my-4">
 				<Info size={18} aria-hidden="true" />
-				<span>
-					{plan.origin === "example"
-						? "All balances are illustrative example data. "
-						: ""}
-					Older values carry forward unchanged.
-				</span>
+				<span>Older values carry forward unchanged.</span>
 			</Notice>
 		</Modal>
 	);

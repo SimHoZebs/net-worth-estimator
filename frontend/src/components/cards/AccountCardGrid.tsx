@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { toAccountCards } from "../../domain/accountCards.ts";
-import type { Plan } from "../../domain/model.ts";
+import type { Account, Transaction } from "../../domain/model.ts";
 import type { Projection } from "../../domain/result.ts";
 import { AccountCard } from "./AccountCard.tsx";
 import { AccountDetailsModal } from "./AccountDetailsModal.tsx";
@@ -8,18 +8,24 @@ import { useSelectedId } from "../entrySelection.ts";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
 
 export function AccountCardGrid({
-	plan,
+	accounts,
+	transactions,
+	startDate,
+	readOnly,
 	projection,
 	query,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
+	readOnly: boolean;
 	projection: Projection | null;
 	query: string;
 }) {
-	const [selectedId, setSelectedId] = useSelectedId(plan);
+	const [selectedId, setSelectedId] = useSelectedId(accounts);
 	const cards = useMemo(
-		() => toAccountCards({ plan, projection }),
-		[plan, projection],
+		() => toAccountCards({ accounts, projection }),
+		[accounts, projection],
 	);
 	const needle = query.trim().toLowerCase();
 	const shown = needle
@@ -47,7 +53,10 @@ export function AccountCardGrid({
 			{selected && (
 				<AccountDetailsModal
 					card={selected}
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					startDate={startDate}
+					readOnly={readOnly}
 					projection={projection}
 					onClose={() => setSelectedId(null)}
 				/>

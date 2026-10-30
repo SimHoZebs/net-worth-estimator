@@ -5,6 +5,10 @@ package contracts
 type Principal struct {
 	Subject string `json:"subject"`
 	Name    string `json:"name"`
+	// Authenticated records a real browser or bearer login. Anonymous
+	// requests carry the configured guest subject with Authenticated=false.
+	// It never leaves the process as JSON.
+	Authenticated bool `json:"-"`
 }
 
 type AccountProfile struct {
@@ -26,7 +30,6 @@ type AccountPasswordChange struct {
 
 type SessionResource struct {
 	ID          string   `json:"id"`
-	Kind        string   `json:"kind" enum:"private,sample"`
 	Permissions []string `json:"permissions" nullable:"false"`
 }
 

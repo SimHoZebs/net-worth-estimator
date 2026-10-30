@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
@@ -15,6 +16,11 @@ import (
 type Config struct {
 	Provider, Issuer, InternalURL, ClientID, ClientSecret string
 	PublicURL, AccountURL                                 string
+	// GuestSubject is the normal immutable Casdoor subject used for anonymous
+	// requests. It is an ordinary preprovisioned account with the same
+	// users/<64hex> data path; grants are assigned at creation by Casdoor
+	// groups. It must be configured; there is no literal fallback.
+	GuestSubject string
 	// Store is the application-owned identity storage. The composition root
 	// provides the adapter.
 	Store                 store.IdentityStore
@@ -41,6 +47,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		ClientSecret: getenv("NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET"),
 		PublicURL:    getenv("NET_WORTH_ESTIMATOR_PUBLIC_URL"),
 		AccountURL:   getenv("NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL"),
+		GuestSubject: getenv("NET_WORTH_ESTIMATOR_GUEST_SUBJECT"),
 		Lifetime:     7 * 24 * time.Hour, RecheckInterval: 30 * time.Second,
 		RequireResourceHeader: true,
 		AllowPrivateHTTP:      authorization.AllowPrivateHTTP(getenv),
@@ -96,6 +103,9 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	}
 	if c.ClientID == "" || c.ClientSecret == "" {
 		return c, fmt.Errorf("AUTH_CLIENT_ID and AUTH_CLIENT_SECRET are required")
+	}
+	if c.GuestSubject == "" || c.GuestSubject != strings.TrimSpace(c.GuestSubject) || strings.Contains(c.GuestSubject, "\x00") || strings.Contains(c.GuestSubject, "/") {
+		return c, fmt.Errorf("GUEST_SUBJECT must be one verified OIDC subject")
 	}
 	if c.AccountURL != "" {
 		a, err := url.Parse(c.AccountURL)

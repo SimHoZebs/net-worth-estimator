@@ -7,13 +7,11 @@ export function WorkspaceLayout({
 	navigation,
 	header,
 	children,
-	draftBar,
 	overlays,
 }: {
 	navigation: (close: () => void) => ReactNode;
 	header: (open: () => void) => ReactNode;
 	children: ReactNode;
-	draftBar: ReactNode;
 	overlays: ReactNode;
 }) {
 	const { open, mobile, close, show } = useMobileNavigation();
@@ -53,7 +51,6 @@ export function WorkspaceLayout({
 				</main>
 				<div className="pointer-events-none sticky bottom-3 z-50 mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 empty:hidden sm:bottom-5 sm:px-6 xl:px-8 print:hidden">
 					<NotificationCenter />
-					{draftBar}
 				</div>
 			</div>
 			{overlays}

@@ -20,7 +20,6 @@ export type ServerModelImportOptions = {
 	preconditions: {
 		hasWorkspace: boolean;
 		readOnly: boolean;
-		hasDraft: boolean;
 		loading: boolean;
 	};
 	recover: (document: FinancialModelDocument) => Promise<boolean>;
@@ -43,11 +42,6 @@ export async function importServerModel({
 	if (preconditions.readOnly)
 		return new ServerModelImportError({
 			detail: READ_ONLY_IMPORT_MESSAGE,
-		});
-	if (preconditions.hasDraft)
-		return new ServerModelImportError({
-			detail:
-				"Save or discard your unsaved changes before importing another model.",
 		});
 	if (preconditions.loading)
 		return new ServerModelImportError({

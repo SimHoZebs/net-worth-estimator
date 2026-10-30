@@ -72,14 +72,14 @@ export function evaluationFixture(
 }
 
 function event(
-	plan: typeof financialModelFixture,
+	model: typeof financialModelFixture,
 	transactionId: string,
 	date: string,
 	requested: number,
 	realized: number,
 	constraint: string | null,
 ): TransactionResult {
-	const transaction = plan.transactions.find(
+	const transaction = model.transactions.find(
 		(item) => item.id === transactionId,
 	);
 	const fromId = transaction?.fromId ?? null;
@@ -106,27 +106,27 @@ function event(
 }
 
 /**
- * A household projection with the shapes the activity view must handle:
+ * A model projection with the shapes the activity view must handle:
  * a shortfall against a protected balance, a two-sided transfer, and enough
  * recurring occurrences to paginate.
  */
 /**
- * A household projection shaped like the engine output: every enabled recurring
+ * A model projection shaped like the engine output: every enabled recurring
  * transaction expanded monthly on its own day of month, a one-time renovation that
  * exceeds the protected balance, and a mortgage paid off after five years so its
  * scheduled payment continues at zero.
  */
 export function activityProjection(
-	plan: typeof financialModelFixture = financialModelFixture,
+	model: typeof financialModelFixture = financialModelFixture,
 ): Projection {
 	const transactions: TransactionResult[] = [];
-	for (const transaction of plan.transactions) {
+	for (const transaction of model.transactions) {
 		if (!transaction.enabled) continue;
 		if (transaction.frequency === "once") {
 			const shortfall = transaction.id === "renovation";
 			transactions.push(
 				event(
-					plan,
+					model,
 					transaction.id,
 					transaction.startDate,
 					shortfall ? 48000 : transaction.amount,
@@ -142,13 +142,13 @@ export function activityProjection(
 			const monthIndex = ((month + 9) % 12) + 1;
 			const lastDay = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
 			const date = `${year}-${String(monthIndex).padStart(2, "0")}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
-			if (date <= plan.startDate) continue;
+			if (date <= model.startDate) continue;
 			// The mortgage is paid off after five years; the scheduled payment then
 			// continues at zero and must not appear as a transaction.
 			const paidOff = transaction.id === "mortgage-payment" && month >= 60;
 			transactions.push(
 				event(
-					plan,
+					model,
 					transaction.id,
 					date,
 					paidOff ? 0 : transaction.amount,

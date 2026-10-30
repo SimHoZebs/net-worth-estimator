@@ -16,7 +16,7 @@ import {
 } from "../../../components/SegmentedBar.tsx";
 import { exactMoney, money, monthDay } from "../../../domain/format.ts";
 import { paycheckBeforeReserve } from "../../../domain/safeSpending.ts";
-import type { Plan } from "../../../domain/model.ts";
+import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
 	TransactionSectionView,
@@ -76,7 +76,9 @@ export function SafeSpendingBillsPanel({
 	cashNow,
 	paycheck,
 	section,
-	plan,
+	accounts,
+	transactions,
+	readOnly,
 	transactionOrder,
 	onTransactionOrderChange,
 	showHeaders = false,
@@ -85,24 +87,21 @@ export function SafeSpendingBillsPanel({
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
 	section: SafeSpendingMandatorySection;
-	plan: Plan;
+	accounts: Account[];
+	/** Saved rules, for the detail view's rule lookups and edit controls. */
+	transactions: Transaction[];
+	readOnly: boolean;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
 	showHeaders?: boolean;
 }) {
-	const planTransactions = useMemo(
-		() =>
-			new Map(
-				plan.transactions.map((planTransaction) => [
-					planTransaction.id,
-					planTransaction,
-				]),
-			),
-		[plan.transactions],
+	const savedById = useMemo(
+		() => new Map(transactions.map((saved) => [saved.id, saved])),
+		[transactions],
 	);
 	const { selected, inspect, close } = useTransactionSelection(
 		section.transactions,
-		planTransactions,
+		savedById,
 	);
 	const incoming = paycheckBeforeReserve({
 		paycheck: paycheck.paycheck,
@@ -280,7 +279,7 @@ export function SafeSpendingBillsPanel({
 					transactions={section.transactions}
 					caption={section.title}
 					emptyMessage="No bills due in this period."
-					planTransactions={planTransactions}
+					planTransactions={savedById}
 					onInspect={inspect}
 					order={transactionOrder}
 					showHeaders={showHeaders}
@@ -290,11 +289,12 @@ export function SafeSpendingBillsPanel({
 				<TransactionDetail
 					transaction={selected.transaction}
 					planTransaction={selected.planTransaction}
-					accounts={plan.accounts}
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					readOnly={readOnly}
 					claimRuleName={
 						selected.planTransaction.claimRuleId
-							? (plan.transactions.find(
+							? (transactions.find(
 									(item) => item.id === selected.planTransaction.claimRuleId,
 								)?.name ?? null)
 							: null

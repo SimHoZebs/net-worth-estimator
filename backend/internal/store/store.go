@@ -114,7 +114,6 @@ type Database interface {
 	HasUser(userID string) (bool, error)
 	User(userID string) (Store, error)
 	EnsureUser(userID, issuer, subject string) (Store, error)
-	EnsureSampleUser() (Store, error)
 	EnsureGroupUser(issuer, subject string) (string, error)
 	CreateGroup(userID, name, displayName string) (Group, error)
 	ListGroupsForUser(userID string) ([]Group, error)

@@ -12,6 +12,7 @@ func TestProviderConfiguration(t *testing.T) {
 		"NET_WORTH_ESTIMATOR_PUBLIC_URL":         "http://localhost:8080",
 		"NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID":     "client",
 		"NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET": "secret",
+		"NET_WORTH_ESTIMATOR_GUEST_SUBJECT":      "11111111-1111-1111-1111-111111111111",
 	}
 	for _, test := range []struct {
 		name, key, value string
@@ -25,6 +26,9 @@ func TestProviderConfiguration(t *testing.T) {
 		{"legacy bypass", "NET_WORTH_ESTIMATOR_AUTH_TOKEN", "legacy", true},
 		{"separate identity database", "NET_WORTH_ESTIMATOR_AUTH_SESSION_DB", "/data/sessions.db", true},
 		{"empty issuer", "NET_WORTH_ESTIMATOR_AUTH_ISSUER", "", true},
+		{"missing guest subject", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "", true},
+		{"blank guest subject", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "   ", true},
+		{"guest subject with slash", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "owner/name", true},
 		{"insecure public URL", "NET_WORTH_ESTIMATOR_PUBLIC_URL", "http://my-server.local", true},
 		{"public path", "NET_WORTH_ESTIMATOR_PUBLIC_URL", "https://example.test/path", true},
 		{"missing secret", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET", "", true},
@@ -74,6 +78,7 @@ func TestPrivateLANHTTPRequiresFlag(t *testing.T) {
 		"NET_WORTH_ESTIMATOR_PUBLIC_URL":         "http://192.168.1.50:8080",
 		"NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID":     "client",
 		"NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET": "secret",
+		"NET_WORTH_ESTIMATOR_GUEST_SUBJECT":      "11111111-1111-1111-1111-111111111111",
 	}
 	fromMap := func(m map[string]string) func(string) string {
 		return func(k string) string { return m[k] }

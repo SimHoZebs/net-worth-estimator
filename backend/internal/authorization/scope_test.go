@@ -21,15 +21,19 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 		{"https://id.example", "waypoint/user-owner"},
 		{"https://id.example/a", "bc"},
 		{"https://id.example/ab", "c"},
+		{"https://id.example", "11111111-1111-1111-1111-111111111111"},
 	} {
 		actor := ActorKey(pair[0], pair[1])
+		if actor == "" {
+			t.Fatalf("empty actor for %q", pair[1])
+		}
 		hash := sha256.Sum256([]byte(pair[0] + "\x00" + pair[1]))
 		if actor != "user:"+hex.EncodeToString(hash[:]) || seen[actor] {
 			t.Fatalf("identity alias or unexpected actor: %s", actor)
 		}
 		seen[actor] = true
 		resource := ResourceFor(pair[0], pair[1])
-		if !resource.valid() || resource.Owner != actor || strings.Count(resource.ID, "/") != 1 || resource.ID == "users/sample" {
+		if !resource.valid() || resource.Owner != actor || strings.Count(resource.ID, "/") != 1 {
 			t.Fatalf("unsafe resource: %+v", resource)
 		}
 		if !strings.HasPrefix(resource.ID, "users/") {
@@ -40,8 +44,8 @@ func TestActorAndResourceCanonicalization(t *testing.T) {
 			t.Fatalf("internal owner leaked: %s, %v", data, err)
 		}
 	}
-	if ActorKey("https://id.example", "") != "guest" || !ResourceFor("https://id.example", "").valid() {
-		t.Fatal("guest canonicalization failed")
+	if ActorKey("https://id.example", "") != "" || ResourceFor("https://id.example", "").valid() {
+		t.Fatal("empty subject must fail closed, not derive a literal guest")
 	}
 }
 
@@ -49,7 +53,7 @@ func TestLegacyPlanResourceIsRejected(t *testing.T) {
 	const issuer = "https://id.example"
 	current := ResourceFor(issuer, "alice")
 	hash := strings.TrimPrefix(current.Owner, "user:")
-	legacy := Resource{ID: "plans/" + hash, Kind: "private", Owner: current.Owner}
+	legacy := Resource{ID: "plans/" + hash, Owner: current.Owner}
 	if legacy.valid() {
 		t.Fatalf("legacy plan resource accepted after cutover: %+v", legacy)
 	}

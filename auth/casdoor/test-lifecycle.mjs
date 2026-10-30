@@ -1,6 +1,6 @@
 // Destructive account checks for an explicitly disposable combined Compose stack.
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,6 +57,30 @@ const originalApp = (await admin(appPath)).data;
 const originalUser = (await admin(userPath)).data;
 assert.equal(originalUser.id, bootstrap.subject);
 assert.equal(originalUser.isAdmin, false);
+// Seeded creation-time memberships: groups exist, roles point at them, the
+// application assigns signups to members, and subjects stay stable.
+const guestPath = `/api/get-user?id=${encodeURIComponent(`waypoint/${settings.guestName}`)}`;
+const guestRecord = (await admin(guestPath)).data;
+assert.equal(guestRecord.id, bootstrap.guest_subject);
+assert.equal(guestRecord.isAdmin, false);
+assert.ok((guestRecord.groups || []).includes("waypoint/viewers"));
+assert.ok(((await admin(userPath)).data.groups || []).includes("waypoint/members"));
+assert.equal((await admin(appPath)).data.defaultGroup, "waypoint/members");
+for (const [role, group] of [
+  ["member", "waypoint/members"],
+  ["viewer", "waypoint/viewers"],
+]) {
+  const roleRecord = (await admin(`/api/get-role?id=${encodeURIComponent(`waypoint/${role}`)}`)).data;
+  assert.deepEqual(roleRecord.groups, [group]);
+}
+const permissionSet = (await admin("/api/get-permissions?owner=waypoint")).data;
+assert.ok(
+  permissionSet.every(
+    (permission) =>
+      permission.model !== "waypoint/user-access" || !permission.resources.includes("users/sample"),
+  ),
+  "No user-access permission may reference a legacy sample wire",
+);
 const browser = await chromium.launch({ headless: true });
 let context;
 let resourceID;
@@ -121,7 +145,7 @@ async function signIn(password = settings.password) {
   const session = await (await context.request.get(`${settings.appUrl}/v1/auth/session`)).json();
   assert.equal(session.user.subject, bootstrap.subject);
   assert.equal(session.allowed, true);
-  assert.equal(session.resource.kind, "private");
+  assert.ok(!("kind" in session.resource), "Session resources carry id and permissions, no kind");
   resourceID = session.resource.id;
   return page;
 }
@@ -178,6 +202,117 @@ try {
   console.log(
     "PASS sealed bootstrap preserves generated subject and operator settings across restart",
   );
+
+  // Live five-field bridge over the real provider: member writes allow,
+  // viewer writes deny, cross-user requests deny on actor/owner mismatch.
+  const actorHash = (subject) =>
+    createHash("sha256").update(`${settings.publicUrl}\x00${subject}`, "utf8").digest("hex");
+  const ownerActor = `user:${actorHash(bootstrap.subject)}`;
+  const guestActor = `user:${actorHash(bootstrap.guest_subject)}`;
+  const appCredentials = `Basic ${Buffer.from(`${settings.clientId}:${settings.clientSecret}`).toString("base64")}`;
+  async function batchEnforce(permissionId, rows) {
+    const response = await fetch(
+      `${settings.publicUrl}/api/batch-enforce?${new URLSearchParams({ permissionId })}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: appCredentials },
+        body: JSON.stringify(rows),
+      },
+    );
+    const result = await response.json();
+    assert.equal(result.status, "ok", `Batch enforce failed for ${permissionId}`);
+    return result.data;
+  }
+  const ownerScope = `users/${ownerActor.slice("user:".length)}`;
+  const guestScope = `users/${guestActor.slice("user:".length)}`;
+  const ownerSub = `waypoint/${settings.username}`;
+  const guestSub = `waypoint/${settings.guestName}`;
+  assert.deepEqual(
+    await batchEnforce("waypoint/member-private-user", [
+      [ownerSub, ownerScope, "user:read", ownerActor, ownerActor],
+      [ownerSub, ownerScope, "user:project", ownerActor, ownerActor],
+      [ownerSub, ownerScope, "user:write", ownerActor, ownerActor],
+    ]),
+    [true, true, true],
+  );
+  assert.deepEqual(
+    await batchEnforce("waypoint/viewer-guest-user", [
+      [ownerSub, ownerScope, "user:write", ownerActor, ownerActor],
+    ]),
+    [false],
+  );
+  assert.deepEqual(
+    await batchEnforce("waypoint/viewer-guest-user", [
+      [guestSub, guestScope, "user:read", guestActor, guestActor],
+      [guestSub, guestScope, "user:project", guestActor, guestActor],
+      [guestSub, guestScope, "user:write", guestActor, guestActor],
+    ]),
+    [true, true, false],
+  );
+  assert.deepEqual(
+    await batchEnforce("waypoint/member-private-user", [
+      [guestSub, guestScope, "user:write", guestActor, guestActor],
+      [ownerSub, guestScope, "user:read", guestActor, ownerActor],
+    ]),
+    [false, false],
+  );
+  console.log("PASS live member-write allow, viewer-write deny, and cross-user deny");
+
+  // Signup joins members through the application defaultGroup: the new user
+  // can write its own scope and the provider UUID lookup stays stable.
+  const signupContext = await browser.newContext();
+  try {
+    const signupPage = await signupContext.newPage();
+    const signupName = `lifecycle-${randomBytes(4).toString("hex")}`;
+    const signupSecret = randomBytes(24).toString("hex");
+    await signupPage.goto(`${settings.appUrl}/v1/auth/login`);
+    await signupPage.getByRole("link", { name: /sign up now/i }).click();
+    await signupPage.locator("#username").fill(signupName);
+    await signupPage.locator("#name").fill("Lifecycle member");
+    await signupPage.locator("#password").fill(signupSecret);
+    await signupPage.locator("#confirm").fill(signupSecret);
+    await signupPage.getByRole("button", { name: /^sign up$/i }).click();
+    await signupPage.waitForURL(
+      (url) => url.origin === settings.appUrl && url.pathname === "/",
+      { timeout: 30_000 },
+    );
+    const memberSession = await (
+      await signupContext.request.get(`${settings.appUrl}/v1/auth/session`)
+    ).json();
+    assert.equal(memberSession.allowed, true);
+    assert.ok(
+      memberSession.resource.permissions.includes("user:write"),
+      "Signup default-group access must grant member writes",
+    );
+    const memberRecord = (
+      await admin(`/api/get-user?id=${encodeURIComponent(`waypoint/${signupName}`)}`)
+    ).data;
+    assert.ok(
+      (memberRecord.groups || []).includes("waypoint/members"),
+      "Signup must join members through defaultGroup",
+    );
+    assert.equal(memberRecord.id, memberSession.user.subject, "UUID profile lookup must stay stable");
+    assert.equal(memberSession.resource.id, `users/${actorHash(memberRecord.id)}`);
+  } finally {
+    await signupContext.close();
+  }
+  console.log("PASS signup automatic default-group access and stable UUID profile lookup");
+
+  // Anonymous traffic resolves to the provisioned guest scope: id and
+  // permissions, no kind, and no sample wire anywhere in the response.
+  const anonymous = await browser.newContext();
+  try {
+    const guestSession = await (
+      await anonymous.request.get(`${settings.appUrl}/v1/auth/session`)
+    ).json();
+    assert.equal(guestSession.authenticated, false);
+    assert.equal(guestSession.resource.id, guestScope);
+    assert.ok(!("kind" in guestSession.resource));
+    assert.ok(JSON.stringify(guestSession).indexOf("sample") === -1);
+  } finally {
+    await anonymous.close();
+  }
+  console.log("PASS anonymous session resolves to the provisioned guest scope");
 
   await signIn();
   const before = currentGrant();

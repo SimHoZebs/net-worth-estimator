@@ -29,7 +29,6 @@ const session: Session = {
 	accountURL: "https://identity.example/account",
 	resource: {
 		id: `users/${"a".repeat(64)}`,
-		kind: "private",
 		permissions: ["user:read", "user:write"],
 	},
 	user: { subject: "subject-1", name: "Sam Lee" },

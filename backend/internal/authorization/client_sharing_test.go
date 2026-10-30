@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -14,6 +15,10 @@ import (
 func TestConcurrentResolveSharesOneProviderCall(t *testing.T) {
 	var calls atomic.Int64
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/get-user" {
+			_ = json.NewEncoder(w).Encode(getUserPayload("waypoint", "alice", "alice"))
+			return
+		}
 		calls.Add(1)
 		// Hold the handler so all goroutines overlap in flight.
 		time.Sleep(100 * time.Millisecond)

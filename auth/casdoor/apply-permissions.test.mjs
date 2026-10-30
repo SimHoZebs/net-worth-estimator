@@ -85,13 +85,13 @@ function service({
         ...(extraPermission ? [extraPermission] : []),
       ]);
     const url = new URL(path, target.issuer);
-    if (/^\/api\/get-(model|role|adapter|permission)$/.test(url.pathname)) {
+    if (/^\/api\/get-(model|role|group|adapter|permission)$/.test(url.pathname)) {
       const id = url.searchParams.get("id");
       reads.set(id, (reads.get(id) || 0) + 1);
       beforeRead(id, reads.get(id), objects);
       return ok(objects.get(id) || null);
     }
-    if (/^\/api\/add-(model|role|adapter|permission)$/.test(url.pathname)) {
+    if (/^\/api\/add-(model|role|group|adapter|permission)$/.test(url.pathname)) {
       assert.equal(options.method, "POST");
       const object = structuredClone(options.body);
       const id = `${object.owner}/${object.name}`;
@@ -162,6 +162,8 @@ test("adds only the exact approved objects in dependency order and creates a pri
         "/api/add-model",
         "/api/add-role",
         "/api/add-role",
+        "/api/add-group",
+        "/api/add-group",
         "/api/add-adapter",
         "/api/add-permission",
         "/api/add-permission",
@@ -169,7 +171,13 @@ test("adds only the exact approved objects in dependency order and creates a pri
     );
     assert.deepEqual(
       mutations(fake).map(({ body }) => body),
-      [...plan.seed.models, ...plan.seed.roles, ...plan.seed.adapters, ...plan.seed.permissions],
+      [
+        ...plan.seed.models,
+        ...plan.seed.roles,
+        ...plan.seed.groups,
+        ...plan.seed.adapters,
+        ...plan.seed.permissions,
+      ],
     );
     assert.equal(fake.calls.at(-1).path, "/api/logout");
     const backup = await readFile(options.backupFile, "utf8");
@@ -205,8 +213,44 @@ test("idempotent existing objects cause no writes and partial seeds add only mis
     });
     assert.deepEqual(
       mutations(fake).map(({ path }) => path),
-      ["/api/add-permission", "/api/add-permission"],
+      ["/api/add-group", "/api/add-group", "/api/add-permission", "/api/add-permission"],
     );
+  });
+});
+
+test("sealed state missing only groups adds them without touching other objects", async () => {
+  await fixture(async (options) => {
+    const fake = service({
+      existing: [
+        ...plan.seed.models,
+        ...plan.seed.roles,
+        ...plan.seed.adapters,
+        ...plan.seed.permissions,
+      ],
+    });
+    assert.deepEqual(await applyPermissions(plan, { ...options, request: fake.request }), {
+      changed: true,
+    });
+    assert.deepEqual(
+      mutations(fake).map(({ path }) => path),
+      ["/api/add-group", "/api/add-group"],
+    );
+    assert.deepEqual(
+      mutations(fake).map(({ body }) => body),
+      plan.seed.groups,
+    );
+  });
+  await fixture(async (options) => {
+    const fake = service({
+      existing: [{ ...plan.seed.groups[0], displayName: "Operator members" }],
+    });
+    await assert.rejects(
+      () => applyPermissions(plan, { ...options, request: fake.request }),
+      /differs/,
+    );
+    assert.equal(mutations(fake).length, 0);
+    assert.equal(fake.calls.at(-1).path, "/api/logout");
+    await assert.rejects(() => stat(options.backupFile), { code: "ENOENT" });
   });
 });
 

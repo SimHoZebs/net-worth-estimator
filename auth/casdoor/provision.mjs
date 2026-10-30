@@ -6,7 +6,7 @@ import { settingsFromEnv, defaultStateDir } from "./generate.mjs";
 
 export function casdoorSession(baseUrl) {
   const cookies = new Map();
-  return async (path, { method = "GET", body, redirect = "error", form } = {}) => {
+  return async (path, { method = "GET", body, redirect = "error", form, headers = {} } = {}) => {
     const response = await fetch(`${baseUrl}${path}`, {
       method,
       redirect,
@@ -20,6 +20,7 @@ export function casdoorSession(baseUrl) {
         ...(cookies.size
           ? { Cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join("; ") }
           : {}),
+        ...headers,
       },
       ...(form
         ? { body: new URLSearchParams(form) }
@@ -68,6 +69,44 @@ export async function provision(settings) {
     ) {
       throw new Error("Bootstrap identity has inconsistent subject claims");
     }
+    // The provisioned guest is a normal account whose UUID Casdoor generates
+    // at seed import (init_data overwrites seed IDs). Discover it by name and
+    // persist the actual subject; never mint a replacement identity here, so
+    // interrupted runs and retries resolve the same guest.
+    //
+    // Discovery uses the application's BasicAuth credentials on a fresh,
+    // cookie-free session — not the owner's login session. With
+    // isProfilePublic=false the provider denies cross-user profile reads to
+    // ordinary sessions; the app credential is the documented
+    // machine-to-machine path (same as batch-enforce), not an admin login.
+    if (!settings.clientId || !settings.clientSecret) {
+      throw new Error("Application credentials are required for guest discovery");
+    }
+    const appRequest = casdoorSession(settings.publicUrl);
+    const guest = (
+      await appRequest(`/api/get-user?id=${encodeURIComponent(`waypoint/${settings.guestName}`)}`, {
+        headers: {
+          Authorization: `Basic ${btoa(`${settings.clientId}:${settings.clientSecret}`)}`,
+        },
+      })
+    ).data;
+    if (
+      !guest ||
+      typeof guest.id !== "string" ||
+      !guest.id ||
+      guest.owner !== "waypoint" ||
+      guest.name !== settings.guestName
+    ) {
+      throw new Error(
+        "Provisioned guest account is missing or misnamed. Reinitialize or create it before sealing.",
+      );
+    }
+    if (guest.isAdmin || guest.isForbidden || guest.isDeleted) {
+      throw new Error("Provisioned guest account must be an ordinary active user");
+    }
+    if (guest.id === account.sub) {
+      throw new Error("Provisioned guest account must differ from the bootstrap owner");
+    }
     return {
       version: 1,
       issuer: settings.publicUrl,
@@ -75,6 +114,7 @@ export async function provision(settings) {
       redirect_uri: `${settings.appUrl}/v1/auth/callback`,
       username: settings.username,
       subject: account.sub,
+      guest_subject: guest.id,
     };
   } finally {
     await request("/api/logout", { method: "POST" });

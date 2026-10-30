@@ -1,4 +1,4 @@
-import { waypointAuthFetch } from "@/api/waypoint-fetch.ts";
+import { waypointFetch } from "@/api/waypoint-fetch.ts";
 
 export type GroupRole = "owner" | "admin" | "member";
 
@@ -48,12 +48,12 @@ interface InvitesResponse {
 }
 
 export async function listGroups(): Promise<UserGroup[]> {
-	const response = await waypointAuthFetch<GroupsResponse>("/v1/groups");
+	const response = await waypointFetch<GroupsResponse>("/v1/groups");
 	return response.data.groups ?? [];
 }
 
 export async function createGroup(name: string): Promise<UserGroup> {
-	const response = await waypointAuthFetch<CreateGroupResponse>("/v1/groups", {
+	const response = await waypointFetch<CreateGroupResponse>("/v1/groups", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ name }),
@@ -64,26 +64,26 @@ export async function createGroup(name: string): Promise<UserGroup> {
 export async function getGroup(
 	id: string,
 ): Promise<{ group: UserGroup; members: GroupMember[] }> {
-	const response = await waypointAuthFetch<GroupDetailResponse>(
+	const response = await waypointFetch<GroupDetailResponse>(
 		`/v1/groups/${encodeURIComponent(id)}`,
 	);
 	return response.data;
 }
 
 export async function deleteGroup(id: string): Promise<void> {
-	await waypointAuthFetch(`/v1/groups/${encodeURIComponent(id)}`, {
+	await waypointFetch(`/v1/groups/${encodeURIComponent(id)}`, {
 		method: "DELETE",
 	});
 }
 
 export async function leaveGroup(id: string): Promise<void> {
-	await waypointAuthFetch(`/v1/groups/${encodeURIComponent(id)}/leave`, {
+	await waypointFetch(`/v1/groups/${encodeURIComponent(id)}/leave`, {
 		method: "POST",
 	});
 }
 
 export async function listInvites(groupId: string): Promise<GroupInvite[]> {
-	const response = await waypointAuthFetch<InvitesResponse>(
+	const response = await waypointFetch<InvitesResponse>(
 		`/v1/groups/${encodeURIComponent(groupId)}/invites`,
 	);
 	return response.data.invites ?? [];
@@ -94,7 +94,7 @@ export async function createInvite(
 	maxUses = 5,
 	ttlDays = 7,
 ): Promise<{ invite: GroupInvite; code: string }> {
-	const response = await waypointAuthFetch<InviteResponse>(
+	const response = await waypointFetch<InviteResponse>(
 		`/v1/groups/${encodeURIComponent(groupId)}/invites`,
 		{
 			method: "POST",
@@ -109,14 +109,14 @@ export async function revokeInvite(
 	groupId: string,
 	inviteId: string,
 ): Promise<void> {
-	await waypointAuthFetch(
+	await waypointFetch(
 		`/v1/groups/${encodeURIComponent(groupId)}/invites/${encodeURIComponent(inviteId)}`,
 		{ method: "DELETE" },
 	);
 }
 
 export async function acceptInvite(code: string): Promise<UserGroup> {
-	const response = await waypointAuthFetch<{ data: { group: UserGroup } }>(
+	const response = await waypointFetch<{ data: { group: UserGroup } }>(
 		"/v1/invites/accept",
 		{
 			method: "POST",
@@ -132,7 +132,7 @@ export async function updateMemberRole(
 	accountId: string,
 	role: GroupRole,
 ): Promise<void> {
-	await waypointAuthFetch(
+	await waypointFetch(
 		`/v1/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(accountId)}`,
 		{
 			method: "PATCH",
@@ -146,7 +146,7 @@ export async function removeMember(
 	groupId: string,
 	accountId: string,
 ): Promise<void> {
-	await waypointAuthFetch(
+	await waypointFetch(
 		`/v1/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(accountId)}`,
 		{ method: "DELETE" },
 	);

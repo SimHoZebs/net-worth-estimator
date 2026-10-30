@@ -16,7 +16,6 @@ import {
 	type FinancialModelDocument,
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
-import type { Plan } from "@/domain/model.ts";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
@@ -28,10 +27,6 @@ import {
 	workspaceIsBusy,
 	userResourceKey,
 } from "@/state/workspaceResources.ts";
-import {
-	draftDocumentForSave,
-	useWorkspaceStore,
-} from "@/state/workspaceStore.ts";
 import {
 	dismissKey,
 	notifyError,
@@ -67,13 +62,30 @@ function saveRejection(envelope: SaveResult): string | null {
 /**
  * One immediate save behind a form action: guard the workspace, run the
  * call, surface a rejection notice, then refresh the given queries.
- * Returns true only when the server persisted the change.
+ * Returns true only when the server persisted the change and the
+ * authoritative refresh completed for the same resource.
+ *
+ * The save runs inside the single `write("model", …)` Query mutation, so
+ * `workspaceIsBusy`/`useWorkspaceSaving` observe it, overlapping saves
+ * collapse to one `call`, and transport failures (including 403s) land in
+ * the mutation error state that `useWorkspaceWriteError`/`useUserReadOnly`
+ * read. The mutation stays silent; this function owns the one notice.
+ *
+ * Multi-row writes can persist partially before failing, so a rejection or
+ * a transport error still reloads authoritative state first — but only
+ * while the original resource stays current. A resource switch at any
+ * awaited boundary reports failure silently: no refresh, no stale notice,
+ * no success. Returning false always keeps the caller's edited form
+ * intact for retry. When the write persisted but the reload failed, the
+ * notice says exactly that instead of claiming nothing was saved.
+ * Success owns the shared "Changes saved." confirmation.
  */
 export async function performSave(options: {
 	call: () => Promise<{ data: unknown }>;
 	refresh: () => Promise<void>;
 	failureMessage: string;
 }): Promise<boolean> {
+	const scope = getUserScope();
 	if (workspaceIsBusy()) {
 		notifyError(
 			"workspace",
@@ -81,31 +93,60 @@ export async function performSave(options: {
 		);
 		return false;
 	}
-	if (getUserScope().status !== "ready") {
+	if (scope.status !== "ready") {
 		notifyError("workspace", "Load the server workspace before editing it.");
 		return false;
 	}
-	try {
-		const envelope = (await options.call()).data as unknown as SaveResult;
-		const rejection = saveRejection(envelope);
-		if (rejection) {
-			notifyError("workspace", rejection);
-			return false;
-		}
-		await options.refresh();
-		return true;
-	} catch (cause) {
-		notifyError(
-			"workspace",
-			cause instanceof Error ? cause.message : options.failureMessage,
-		);
-		return false;
-	}
+	const saved = await write(
+		"model",
+		async () => {
+			let envelope: unknown;
+			try {
+				envelope = (await options.call()).data;
+			} catch (cause) {
+				if (scope === getUserScope()) {
+					await options.refresh().catch(() => {});
+					if (scope === getUserScope())
+						notifyError(
+							"workspace",
+							cause instanceof Error ? cause.message : options.failureMessage,
+						);
+				}
+				throw cause instanceof Error
+					? cause
+					: new Error(options.failureMessage);
+			}
+			if (scope !== getUserScope()) return false;
+			const rejection = saveRejection(envelope as SaveResult);
+			if (rejection) {
+				await options.refresh().catch(() => {});
+				if (scope === getUserScope()) notifyError("workspace", rejection);
+				throw new Error(rejection);
+			}
+			try {
+				await options.refresh();
+			} catch {
+				if (scope !== getUserScope()) return false;
+				const message =
+					"The change was saved, but the latest server data could not be reloaded. Retry the server request.";
+				notifyError("workspace", message);
+				throw new Error(message);
+			}
+			if (scope !== getUserScope()) return false;
+			return true;
+		},
+		{ silent: true },
+	);
+	if (saved !== true) return false;
+	if (scope !== getUserScope()) return false;
+	notifySuccess("workspace-notice", "Changes saved.");
+	return true;
 }
 
 async function write<T>(
 	kind: "model" | "presets",
 	perform: () => Promise<T>,
+	opts?: { silent?: boolean },
 ): Promise<T | false> {
 	const scope = getUserScope();
 	const cache = serverQueryClient();
@@ -127,6 +168,7 @@ async function write<T>(
 			return result;
 		},
 		onError: (error) => {
+			if (opts?.silent) return;
 			if (scope === getUserScope())
 				notifyError(
 					kind === "presets" ? "amount-presets" : "workspace",
@@ -168,70 +210,6 @@ export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
 	return errors.at(-1) ?? null;
 }
 
-export async function saveWorkspace(): Promise<boolean> {
-	const scope = getUserScope();
-	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
-		notifyError(
-			"workspace",
-			"Wait for the current server load to finish before saving.",
-		);
-		return false;
-	}
-	return (
-		(await write("model", async () => {
-			const document = draftDocumentForSave();
-			const draft = useWorkspaceStore.getState().draft!;
-			const response = await applyRowOperations(
-				diffFinancialModelDocuments(
-					getServerModel()?.document ?? null,
-					document,
-				),
-			);
-			if (scope !== getUserScope()) return false;
-			if (response instanceof Error) throw response;
-			if (!response.ok)
-				throw new Error(
-					response.issues.map((issue) => issue.message).join(" ") ||
-						"The server rejected the save. Your changes remain unsaved.",
-				);
-			const errors = response.issues.filter(
-				(issue) => issue.severity === "error",
-			);
-			if (errors.length)
-				throw new Error(errors.map((issue) => issue.message).join(" "));
-			const cache = serverQueryClient();
-			await cache.invalidateQueries({
-				queryKey: userResourceKey("model", scope),
-				refetchType: "none",
-			});
-			const authoritative = await cache.fetchQuery(modelOptions(scope));
-			if (scope !== getUserScope()) return false;
-			if (!authoritative.document)
-				throw new Error(
-					"The save completed, but the server returned no saved data. Your unsaved changes remain available locally.",
-				);
-			const saved = useWorkspaceStore.getState().acknowledgeSave(draft);
-			if (saved) {
-				dismissKey("workspace");
-				notifySuccess("workspace-notice", "Changes saved.");
-			}
-			return saved;
-		})) === true
-	);
-}
-
-/**
- * Stage an edit and persist it immediately, so one Save press means saved.
- * Returns false (and saves nothing) when the edit is rejected or changes
- * nothing. A failed save keeps the staged draft; retry it from the banner.
- */
-export function stageAndSave(next: Plan): boolean {
-	const staged = useWorkspaceStore.getState().updatePlan(next);
-	if (!staged || !useWorkspaceStore.getState().draft) return staged;
-	void saveWorkspace();
-	return true;
-}
-
 export async function importServerDocument(
 	document: FinancialModelDocument,
 ): Promise<boolean> {
@@ -270,12 +248,6 @@ export async function importServerDocument(
 			return scope === getUserScope() && Boolean(model.document);
 		})) === true
 	);
-}
-
-export async function reloadDraft() {
-	if (!useWorkspaceStore.getState().discard(true)) return false;
-	await reloadWorkspace();
-	return Boolean(getServerModel()?.document);
 }
 
 async function changePreset(action: () => Promise<{ persisted: boolean }>) {

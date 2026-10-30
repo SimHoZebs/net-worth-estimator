@@ -12,6 +12,7 @@ import { useSession } from "@/auth/sessionContext.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
 import { resetServerQueryCache } from "@/state/serverQuery.ts";
+import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
 
@@ -49,16 +50,17 @@ function SessionProbe() {
 	);
 }
 
-const sampleAccount = {
-	id: "users/sample",
-	kind: "sample",
+// The guest is an ordinary provisioned user: canonical id plus subject,
+// signed out. Only `authenticated` differs, and it drives sign-in UX.
+const guestAccount = {
+	id: GUEST_USER_ID,
 	permissions: ["user:read", "user:project"],
 };
 const privateAccount = {
 	id: `users/${"a".repeat(64)}`,
-	kind: "private",
 	permissions: ["user:read", "user:project", "user:write"],
 };
+const guestUser = { subject: GUEST_USER_SUBJECT, name: "Guest" };
 
 beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
 
@@ -122,8 +124,8 @@ describe("provider-independent authentication boundary", () => {
 					enabled: true,
 					authenticated: false,
 					allowed: true,
-					resource: sampleAccount,
-					user: { subject: "", name: "" },
+					resource: guestAccount,
+					user: guestUser,
 				}),
 			),
 		);
@@ -138,7 +140,7 @@ describe("provider-independent authentication boundary", () => {
 		).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("redirects guests to sign in when no sample is published", async () => {
+	it("redirects denied guests to sign in when access is revoked", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -146,7 +148,8 @@ describe("provider-independent authentication boundary", () => {
 					enabled: true,
 					authenticated: false,
 					allowed: false,
-					resource: { ...sampleAccount, permissions: [] },
+					resource: { ...guestAccount, permissions: [] },
+					user: guestUser,
 				}),
 			),
 		);
@@ -170,7 +173,8 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: false,
-				resource: { ...sampleAccount, permissions: [] },
+				resource: { ...guestAccount, permissions: [] },
+				user: guestUser,
 			}),
 		);
 		vi.stubGlobal("fetch", fetcher);
@@ -278,7 +282,8 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: true,
-				resource: sampleAccount,
+				resource: guestAccount,
+				user: guestUser,
 			}),
 		);
 		window.dispatchEvent(new Event("waypoint:authentication-required"));
@@ -304,7 +309,8 @@ describe("provider-independent authentication boundary", () => {
 				enabled: true,
 				authenticated: false,
 				allowed: true,
-				resource: sampleAccount,
+				resource: guestAccount,
+				user: guestUser,
 			}),
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));

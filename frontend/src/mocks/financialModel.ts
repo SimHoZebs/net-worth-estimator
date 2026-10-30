@@ -1,16 +1,26 @@
-import type { Plan } from "../domain/model.ts";
+import type {
+	Account,
+	Evaluation,
+	PlannedPurchase,
+	Transaction,
+} from "../domain/model.ts";
 
-/** Financial-model fixture for unit tests. */
+/** Convenience data for unit tests, never a runtime editing model. */
+export interface FinancialModelFixture {
+	name: string;
+	startDate: string;
+	readOnly: boolean;
+	accounts: Account[];
+	transactions: Transaction[];
+	plannedPurchases: PlannedPurchase[];
+	evaluations: Evaluation[];
+}
 
-// A small household used only by unit tests. Production code has no
-// sample account: every projection comes from the Go engine.
-export const financialModelFixture: Plan = {
-	schemaVersion: 1,
-	name: "Our household",
-	origin: "example",
+// Small financial-model test data used only by unit tests. Production code
+// has no sample data: every projection comes from the Go engine.
+export const financialModelFixture: FinancialModelFixture = {
+	name: "Test financial model",
 	startDate: "2026-09-24",
-	updatedAt: "2026-09-24T09:00:00.000Z",
-	revision: 1,
 	readOnly: false,
 	accounts: [
 		{
@@ -250,6 +260,5 @@ export const financialModelFixture: Plan = {
 			enabled: true,
 		},
 	],
-	assumptions: { inflation: 2.5, volatility: 12 },
 	plannedPurchases: [],
 };

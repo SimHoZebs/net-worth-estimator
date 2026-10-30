@@ -4,7 +4,7 @@ import { AccountSections } from "./accounts/AccountSections.tsx";
 /**
  * Accounts section of the account workspace. Thin wrapper over
  * `AccountSections view="accounts"`; row-hook migration pending — still requires
- * the `Plan` draft layer.
+ * saved row queries.
  */
 export function AccountsPage({
 	onEdit,

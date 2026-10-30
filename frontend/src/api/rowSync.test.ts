@@ -262,7 +262,6 @@ describe("applyRowOperations", () => {
 				apiBaseUrl: canonicalApiBaseUrl(""),
 				resource: {
 					id: scopeId,
-					kind: "private",
 					permissions: ["user:read", "user:project", "user:write"],
 				},
 				subject: scopeId,

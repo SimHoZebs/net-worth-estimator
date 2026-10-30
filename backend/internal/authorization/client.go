@@ -18,14 +18,15 @@ import (
 )
 
 const (
-	DefaultModelID = "waypoint/user-access"
-	DefaultAdapter = "user-policy-store"
-	maxResponse    = 32 << 10
+	DefaultModelID      = "waypoint/user-access"
+	DefaultAdapter      = "user-policy-store"
+	DefaultOrganization = "waypoint"
+	maxResponse         = 32 << 10
 )
 
 type Config struct {
 	Issuer, InternalURL, ClientID, ClientSecret string
-	ModelID, Adapter                            string
+	ModelID, Adapter, Organization              string
 	// AllowPrivateHTTP opts into plain-HTTP issuers. The operator owns the
 	// network boundary and must expose plain HTTP only on a trusted LAN.
 	AllowPrivateHTTP bool
@@ -43,6 +44,28 @@ type Client struct {
 }
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
+
+// validProviderName accepts Casdoor account names, which may be dotted,
+// email-style, or unicode. The model/adapter identifier regexp must not
+// apply here. Reject empty, overlong, invalid UTF-8, NUL/controls, '/'
+// (owner/name separator ambiguity), and leading/trailing whitespace.
+func validProviderName(name string) bool {
+	if name == "" || len(name) > 255 || !utf8.ValidString(name) {
+		return false
+	}
+	if strings.Contains(name, "/") || strings.ContainsRune(name, '\x00') {
+		return false
+	}
+	if strings.TrimSpace(name) != name {
+		return false
+	}
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
+}
 
 // New constructs a bounded, redirect-free client. It sends no network requests.
 func New(config Config) (*Client, error) {
@@ -68,6 +91,12 @@ func New(config Config) (*Client, error) {
 	}
 	if !identifier.MatchString(config.Adapter) {
 		return nil, errors.New("authorization adapter must be a name without an owner prefix")
+	}
+	if config.Organization == "" {
+		config.Organization = DefaultOrganization
+	}
+	if !identifier.MatchString(config.Organization) {
+		return nil, errors.New("authorization organization must be a name without an owner prefix")
 	}
 	endpoint := *issuer
 	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/api/batch-enforce"
@@ -98,10 +127,15 @@ func providerURL(raw string, origin bool) (*url.URL, error) {
 }
 
 // Resolve checks all user actions for the caller's single server-selected
-// user. Sequential invocations always contact Casdoor, including guest and
-// denied invocations. Overlapping invocations for one subject share one
-// provider call and receive the same fresh decision.
+// user. The subject must be nonempty: anonymous callers use the configured
+// guest subject. Sequential invocations always contact Casdoor (identity
+// lookup plus enforce), including denied invocations. Overlapping invocations
+// for one subject share one provider call and receive the same fresh
+// decision, so revocation still fails closed on the next sequential request.
 func (c *Client) Resolve(ctx context.Context, subject string) (Scope, error) {
+	if subject == "" {
+		return Scope{}, errors.New("invalid authorization request")
+	}
 	value, err, _ := c.inFlight.Do(subject, func() (any, error) {
 		return c.resolveUnshared(ctx, subject)
 	})
@@ -113,8 +147,15 @@ func (c *Client) Resolve(ctx context.Context, subject string) (Scope, error) {
 
 func (c *Client) resolveUnshared(ctx context.Context, subject string) (Scope, error) {
 	resource := ResourceFor(c.config.Issuer, subject)
+	if !resource.valid() {
+		return Scope{}, errors.New("invalid authorization request")
+	}
 	actions := []string{Read, Project, Write}
-	decisions, err := c.Check(ctx, subject, resource, actions)
+	providerName, err := c.lookupProviderName(ctx, subject)
+	if err != nil {
+		return Scope{}, err
+	}
+	decisions, err := c.enforce(ctx, providerName, subject, resource, actions)
 	if err != nil {
 		return Scope{}, err
 	}
@@ -127,18 +168,110 @@ func (c *Client) resolveUnshared(ctx context.Context, subject string) (Scope, er
 	return scope, nil
 }
 
+// lookupProviderName resolves the mutable provider owner/name for a stable
+// immutable subject via an authenticated get-user call. Casdoor returns the
+// immutable UUID in data.id, the organization in data.owner, and the mutable
+// username in data.name. Verification checks data.id==subject and
+// data.owner==organization, then constructs owner/name from data.name. The
+// mutable name is used only as the request's grouping subject; storage keys
+// and the stable owner/actor fields keep using ActorKey(issuer, subject).
+// Forbidden or deleted users fail closed.
+func (c *Client) lookupProviderName(ctx context.Context, subject string) (string, error) {
+	if !utf8.ValidString(subject) || strings.ContainsRune(subject, '\x00') || subject == "" {
+		return "", errors.New("invalid authorization request")
+	}
+	base, err := url.Parse(c.config.Issuer)
+	if err != nil || base.Hostname() == "" {
+		return "", errors.New("invalid authorization request")
+	}
+	u := *base
+	u.Path = strings.TrimRight(u.Path, "/") + "/api/get-user"
+	u.RawQuery = url.Values{"owner": {c.config.Organization}, "userId": {subject}}.Encode()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return "", errors.New("cannot construct authorization request")
+	}
+	request.SetBasicAuth(c.config.ClientID, c.config.ClientSecret)
+	request.Header.Set("Accept", "application/json")
+	response, err := c.client.Do(request)
+	if err != nil {
+		return "", errors.New("authorization provider unavailable")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", errors.New("authorization provider rejected request")
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponse+1))
+	if err != nil || len(data) > maxResponse {
+		return "", errors.New("invalid authorization response size")
+	}
+	return decodeProviderName(data, c.config.Organization, subject)
+}
+
+func decodeProviderName(data []byte, organization, subject string) (string, error) {
+	var response struct {
+		Status string         `json:"status"`
+		Data   map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(data, &response); err != nil || response.Status != "ok" || response.Data == nil {
+		return "", errors.New("invalid authorization response")
+	}
+	owner, _ := response.Data["owner"].(string)
+	name, _ := response.Data["name"].(string)
+	id, _ := response.Data["id"].(string)
+	if owner == "" || owner != organization || id == "" || id != subject {
+		return "", errors.New("authorization provider rejected request")
+	}
+	if !validProviderName(name) {
+		return "", errors.New("authorization provider rejected request")
+	}
+	for key, value := range response.Data {
+		switch strings.ToLower(key) {
+		case "isforbidden", "forbidden", "isdeleted", "deleted":
+			if forbidden, ok := value.(bool); ok && forbidden {
+				return "", errors.New("authorization provider rejected request")
+			}
+		}
+	}
+	return owner + "/" + name, nil
+}
+
 // Check submits server-owned resource metadata without changing its owner to
-// match the caller. Decisions are positional and remain entirely provider-owned.
+// match the caller. The generic RBAC request is
+// [provider owner/name, resource.ID, action, resource.Owner, ActorKey]:
+// grouping uses the mutable provider name resolved from the immutable
+// subject, while stable owner/actor remain ActorKey(issuer, subject).
+// Decisions are positional and remain entirely provider-owned.
 func (c *Client) Check(ctx context.Context, subject string, resource Resource, actions []string) ([]bool, error) {
-	if !utf8.ValidString(subject) || strings.ContainsRune(subject, '\x00') || !resource.valid() || len(actions) == 0 || len(actions) > 3 {
+	if !utf8.ValidString(subject) || strings.ContainsRune(subject, '\x00') || subject == "" || !resource.valid() || len(actions) == 0 || len(actions) > 3 {
 		return nil, errors.New("invalid authorization request")
 	}
+	for _, action := range actions {
+		if action != Read && action != Project && action != Write {
+			return nil, errors.New("unknown user action")
+		}
+	}
+	providerName, err := c.lookupProviderName(ctx, subject)
+	if err != nil {
+		return nil, err
+	}
+	return c.enforce(ctx, providerName, subject, resource, actions)
+}
+
+func (c *Client) enforce(ctx context.Context, providerName, subject string, resource Resource, actions []string) ([]bool, error) {
+	actor := ActorKey(c.config.Issuer, subject)
+	if actor == "" || resource.Owner == "" {
+		return nil, errors.New("invalid authorization request")
+	}
+	// Cross-owner resources are passed through: the generic model denies
+	// them via r.actor==r.owner, and the caller must never rewrite the
+	// resource owner to match.
 	requests := make([][]string, 0, len(actions))
 	for _, action := range actions {
 		if action != Read && action != Project && action != Write {
 			return nil, errors.New("unknown user action")
 		}
-		requests = append(requests, []string{ActorKey(c.config.Issuer, subject), resource.ID, action, resource.Owner})
+		requests = append(requests, []string{providerName, resource.ID, action, resource.Owner, actor})
 	}
 	body, err := json.Marshal(requests)
 	if err != nil {

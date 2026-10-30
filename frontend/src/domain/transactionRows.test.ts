@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	growthPercentOf,
 	literalAmountOf,
-	transactionToPlan,
+	transactionToDisplay,
 } from "./transactionRows.ts";
 
 describe("transaction rows", () => {
@@ -57,7 +57,7 @@ describe("transaction rows", () => {
 	});
 
 	it("maps narrow rows to display transactions", () => {
-		const rule = transactionToPlan(
+		const rule = transactionToDisplay(
 			{
 				id: "salary",
 				kind: "rule",
@@ -96,7 +96,7 @@ describe("transaction rows", () => {
 			pending: false,
 			void: false,
 		});
-		const posting = transactionToPlan({
+		const posting = transactionToDisplay({
 			id: "once-1",
 			kind: "posting",
 			name: "Groceries",
@@ -120,7 +120,7 @@ describe("transaction rows", () => {
 			amountKnown: true,
 			annualIncrease: 0,
 		});
-		const varied = transactionToPlan(
+		const varied = transactionToDisplay(
 			{
 				id: "varied",
 				kind: "rule",
@@ -142,7 +142,7 @@ describe("transaction rows", () => {
 			amountKnown: false,
 			frequency: "yearly",
 		});
-		const bankRow = transactionToPlan({
+		const bankRow = transactionToDisplay({
 			id: "void-1",
 			kind: "posting",
 			name: "Vanished auth",

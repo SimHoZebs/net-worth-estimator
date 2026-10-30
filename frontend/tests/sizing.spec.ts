@@ -89,7 +89,7 @@ test("account sheet controls remain usable across responsive resizes", async ({
 });
 
 for (const width of [320, 390, 768, 1440]) {
-	test(`draft actions and notifications reserve their own space at ${width}px`, async ({
+	test(`failed-save forms and notifications remain usable at ${width}px`, async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width, height: 900 });
@@ -101,15 +101,13 @@ for (const width of [320, 390, 768, 1440]) {
 		await page.getByLabel("Account name").fill("Sizing regression");
 		await page.getByLabel("Balance (USD)", { exact: true }).fill("2500");
 		// Submit through the native form interaction, not an internal event handler.
-		// Accounts save straight to the server, so the dialog closes with no draft.
+		// The dialog closes after the row save succeeds.
 		await page.getByLabel("Account name").press("Enter");
 		await expect(dialog).not.toBeVisible();
 		await expect(
 			page.getByRole("row", { name: /Sizing regression/ }),
 		).toBeVisible();
-		// Stage a transaction edit and hold its save: the retained draft
-		// keeps the banner mounted for the layout checks below. Edits save
-		// immediately now, so only a failed save leaves a banner behind.
+		// A rejected row save retains its form and shows the server error.
 		await page.route("**/v1/recurrence-rules/*", async (route) => {
 			if (route.request().method() !== "PATCH") return route.continue();
 			return route.fulfill({
@@ -124,40 +122,22 @@ for (const width of [320, 390, 768, 1440]) {
 		await page.getByLabel("Amount (USD)").click();
 		await page.getByLabel("Amount (USD)").fill("900");
 		await page.getByRole("button", { name: "Save changes" }).click();
-		await expect(
-			page.getByRole("dialog", { name: "Monthly investing" }),
-		).not.toBeVisible();
-		const bar = page.locator("[data-draft-bar]");
-		await expect(bar).toBeVisible();
-		await expectWithinViewport(bar, page);
-		const notice = page.getByRole("status").filter({ hasText: "Unsaved" });
+		const detail = page.getByRole("dialog", { name: "Monthly investing" });
+		await expect(detail).toBeVisible();
+		await expectWithinViewport(detail, page);
+		await expect(page.getByLabel("Amount (USD)")).toHaveValue("900");
+		const save = detail.getByRole("button", { name: "Save changes" });
+		await save.scrollIntoViewIfNeeded();
+		await expectWithinViewport(save, page);
+		const notice = page
+			.getByRole("alert")
+			.filter({ hasText: "Sizing check holds" });
 		await expect(notice).toBeVisible();
-		await expectWithinViewport(notice, page);
-		// Notifications sit above the bar, independent of wrapping.
-		const notificationBox = await notice.boundingBox();
-		const initialBarBox = await bar.boundingBox();
-		expect(notificationBox!.y + notificationBox!.height).toBeLessThanOrEqual(
-			initialBarBox!.y,
-		);
-		await page.goto("/#sources");
-		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-		// The assumptions live behind their Configs tab since the tabbed layout.
-		await page.getByRole("tab", { name: "Assumptions" }).click();
-		await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-		await expectWithinViewport(bar, page);
-		const lastField = page.getByLabel("Investment return variability (%)");
-		await expectWithinViewport(lastField, page);
-		const fieldBox = await lastField.boundingBox();
-		const barBox = await bar.boundingBox();
-		expect(fieldBox!.y + fieldBox!.height).toBeLessThanOrEqual(barBox!.y + 1);
-		await lastField.click();
-		await expect(lastField).toBeFocused();
-		// Release the held save and persist the retained draft from the
-		// banner; the bar unmounts once the save lands.
+		// Retry from the same form, with the original edited fields intact.
 		await page.unroute("**/v1/recurrence-rules/*");
 		await page.getByRole("button", { name: "Save changes" }).click();
 		await expect(page.getByText("Changes saved.")).toBeVisible();
-		await expect(bar).toHaveCount(0);
+		await expect(detail).not.toBeVisible();
 		await expectWithinViewport(
 			page.getByRole("status").filter({ hasText: "Changes saved." }),
 			page,

@@ -109,6 +109,7 @@ test("discovers the generated ordinary subject and logs the bootstrap session ou
   const logins = [];
   let name;
   let logouts = 0;
+  const expectedAuth = `Basic ${Buffer.from("client:test-secret").toString("base64")}`;
   await withServer(
     (request, response, body) => {
       if (request.url === "/api/login") {
@@ -116,13 +117,43 @@ test("discovers the generated ordinary subject and logs the bootstrap session ou
         logins.push(name);
         assert.equal(body.organization, "waypoint");
         assert.equal(body.application, "waypoint");
+        response.setHeader("Set-Cookie", "session=owner-session; HttpOnly");
         response.end('{"status":"ok"}');
       } else if (request.url === "/api/get-account") {
+        assert.ok(
+          (request.headers.cookie || "").includes("session=owner-session"),
+          "Owner lookup keeps its login session",
+        );
         response.end(
           JSON.stringify({
             status: "ok",
             sub: "provider-generated-subject",
             data: { id: "provider-generated-subject", name, owner: "waypoint", isAdmin: false },
+          }),
+        );
+      } else if (request.url.startsWith("/api/get-user")) {
+        assert.equal(request.url, "/api/get-user?id=waypoint%2Fguest");
+        assert.equal(
+          request.headers.authorization,
+          expectedAuth,
+          "Guest discovery uses app BasicAuth, not the owner session",
+        );
+        assert.equal(
+          request.headers.cookie,
+          undefined,
+          "Guest discovery must not carry the owner session cookie",
+        );
+        response.end(
+          JSON.stringify({
+            status: "ok",
+            data: {
+              id: "provider-generated-guest",
+              name: "guest",
+              owner: "waypoint",
+              isAdmin: false,
+              isForbidden: false,
+              isDeleted: false,
+            },
           }),
         );
       } else if (request.url === "/api/logout") {
@@ -136,11 +167,14 @@ test("discovers the generated ordinary subject and logs the bootstrap session ou
       const metadata = await provision({
         publicUrl,
         username: "household",
+        guestName: "guest",
         password: "test",
         appUrl: "https://app.example.test",
         clientId: "client",
+        clientSecret: "test-secret",
       });
       assert.equal(metadata.subject, "provider-generated-subject");
+      assert.equal(metadata.guest_subject, "provider-generated-guest");
       assert.equal(metadata.username, "household");
       assert.equal(metadata.redirect_uri, "https://app.example.test/v1/auth/callback");
       assert.equal(Object.hasOwn(metadata, "password"), false);
@@ -176,27 +210,119 @@ test("rejects inconsistent subject claims and still ends its session", async () 
   assert.equal(loggedOut, true);
 });
 
+test("rejects a missing or unusable provisioned guest and still ends its session", async () => {
+  const guests = [
+    null,
+    { id: "", name: "guest", owner: "waypoint" },
+    { id: "guest-id", name: "someone-else", owner: "waypoint" },
+    { id: "guest-id", name: "guest", owner: "built-in" },
+    { id: "guest-id", name: "guest", owner: "waypoint", isAdmin: true },
+    { id: "guest-id", name: "guest", owner: "waypoint", isForbidden: true },
+    { id: "guest-id", name: "guest", owner: "waypoint", isDeleted: true },
+    { id: "owner-id", name: "guest", owner: "waypoint" },
+  ];
+  for (const guest of guests) {
+    let loggedOut = false;
+    await withServer(
+      (request, response) => {
+        if (request.url === "/api/get-account") {
+          response.end(
+            JSON.stringify({
+              status: "ok",
+              sub: "owner-id",
+              data: { id: "owner-id", name: "household", owner: "waypoint", isAdmin: false },
+            }),
+          );
+        } else if (request.url.startsWith("/api/get-user")) {
+          response.end(JSON.stringify({ status: "ok", data: guest }));
+        } else {
+          if (request.url === "/api/logout") loggedOut = true;
+          response.end('{"status":"ok"}');
+        }
+      },
+      (publicUrl) =>
+        assert.rejects(
+          () =>
+            provision({
+              publicUrl,
+              username: "household",
+              guestName: "guest",
+              clientId: "client",
+              clientSecret: "test-secret",
+            }),
+          /guest/,
+        ),
+    );
+    assert.equal(loggedOut, true);
+  }
+});
+
+test("rejects guest discovery without application credentials and still ends its session", async () => {
+  let loggedOut = false;
+  let guestLookups = 0;
+  await withServer(
+    (request, response) => {
+      if (request.url === "/api/get-account") {
+        response.end(
+          JSON.stringify({
+            status: "ok",
+            sub: "owner-id",
+            data: { id: "owner-id", name: "household", owner: "waypoint", isAdmin: false },
+          }),
+        );
+      } else if (request.url.startsWith("/api/get-user")) {
+        guestLookups++;
+        response.end(JSON.stringify({ status: "ok", data: null }));
+      } else {
+        if (request.url === "/api/logout") loggedOut = true;
+        response.end('{"status":"ok"}');
+      }
+    },
+    (publicUrl) =>
+      assert.rejects(
+        () => provision({ publicUrl, username: "household", guestName: "guest" }),
+        /Application credentials are required/,
+      ),
+  );
+  assert.equal(guestLookups, 0);
+  assert.equal(loggedOut, true);
+});
+
 test("records private bootstrap metadata only after sealing future imports, without overwriting it", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "casdoor-bootstrap-"));
   try {
     await withServer(
       (request, response) => {
-        response.end(
-          JSON.stringify(
-            request.url === "/api/get-account"
-              ? {
-                  status: "ok",
-                  sub: "generated-id",
-                  data: {
-                    id: "generated-id",
-                    name: "household",
-                    owner: "waypoint",
-                    isAdmin: false,
-                  },
-                }
-              : { status: "ok" },
-          ),
-        );
+        if (request.url === "/api/get-account") {
+          response.end(
+            JSON.stringify({
+              status: "ok",
+              sub: "generated-id",
+              data: {
+                id: "generated-id",
+                name: "household",
+                owner: "waypoint",
+                isAdmin: false,
+              },
+            }),
+          );
+        } else if (request.url.startsWith("/api/get-user")) {
+          response.end(
+            JSON.stringify({
+              status: "ok",
+              data: {
+                id: "generated-guest-id",
+                name: "guest",
+                owner: "waypoint",
+                isAdmin: false,
+                isForbidden: false,
+                isDeleted: false,
+              },
+            }),
+          );
+        } else {
+          response.end(JSON.stringify({ status: "ok" }));
+        }
       },
       async (publicUrl) => {
         const settings = settingsFromEnv({

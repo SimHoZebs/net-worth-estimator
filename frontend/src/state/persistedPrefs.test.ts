@@ -29,6 +29,7 @@ import {
 } from "./useSafeSpendingSettings.ts";
 import { safeSpendingSettingsObserver as useSafeSpendingSettings } from "../mocks/safeSpendingSettings.ts";
 import { memoryStorage, stubStorage } from "../mocks/storage.ts";
+import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "../mocks/resource.ts";
 
 const A = `users/${"a".repeat(64)}`;
 const B = `users/${"b".repeat(64)}`;
@@ -39,10 +40,9 @@ function acceptOwner(id: string = A, apiBaseUrl = canonicalApiBaseUrl("")) {
 			apiBaseUrl,
 			resource: {
 				id,
-				kind: id === "users/sample" ? "sample" : "private",
 				permissions: ["user:read", "user:write"],
 			},
-			subject: id !== "users/sample" ? id : null,
+			subject: id === GUEST_USER_ID ? GUEST_USER_SUBJECT : id,
 		},
 		suspendUserScope(),
 	);
@@ -159,6 +159,26 @@ describe("unified persisted prefs", () => {
 			defaultSafeSpendingSettings().reserve,
 		);
 		expect(window.localStorage.getItem(financialKey())).toContain("999");
+	});
+
+	it("migrates a private-kind browser record forward once, then drops it", async () => {
+		const scope = getUserScope();
+		const primary = financialKey(scope);
+		const legacy = primary.replace(
+			`:${encodeURIComponent(scope.apiBaseUrl)}:`,
+			`:${encodeURIComponent(scope.apiBaseUrl)}:private:`,
+		);
+		expect(legacy).not.toBe(primary);
+		expect(legacy).toContain(":private:");
+		window.localStorage.setItem(legacy, JSON.stringify({ reserve: 999 }));
+		const storage = accountLocalStorage(scope);
+		expect(await storage.getItem(SAFE_SPENDING_STORAGE_KEY)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(primary)).toBe(
+			JSON.stringify({ reserve: 999 }),
+		);
+		expect(window.localStorage.getItem(legacy)).toBeNull();
 	});
 
 	it("migrates an account-generation browser record forward once, then drops it", async () => {
@@ -407,7 +427,7 @@ describe("financial preference owner isolation", () => {
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
 		await refreshSafeSpendingSettings();
-		await verifyOwner("users/sample");
+		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
@@ -419,7 +439,7 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
 		await verifyOwner(B);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsB);
-		await verifyOwner("users/sample");
+		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 42,
 			incomeRuleIds: ["sample-income"],
@@ -465,7 +485,7 @@ describe("financial preference owner isolation", () => {
 		});
 		for (const key of keys) window.localStorage.setItem(key, raw);
 		const read = vi.spyOn(window.localStorage, "getItem");
-		for (const id of [A, B, "users/sample"]) {
+		for (const id of [A, B, GUEST_USER_ID]) {
 			await verifyOwner(id);
 			expect(useSafeSpendingSettings.getState()).toMatchObject(
 				defaultSafeSpendingSettings(),
@@ -492,14 +512,14 @@ describe("financial preference owner isolation", () => {
 		expect(useSafeSpendingSettings.getState().reserve).toBe(
 			defaultSafeSpendingSettings().reserve,
 		);
-		await verifyOwner("users/sample");
+		await verifyOwner(GUEST_USER_ID);
 		useSafeSpendingSettings
 			.getState()
 			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
-		await verifyOwner("users/sample");
+		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 200,
 			incomeRuleIds: ["sample-income"],

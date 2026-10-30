@@ -1,6 +1,6 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Transaction, Plan } from "../../../domain/model.ts";
+import type { Transaction } from "../../../domain/model.ts";
 import { financialModelFixture } from "../../../mocks/financialModel.ts";
 import { projectionFixture } from "../../../mocks/projection.ts";
 import { useCardCycleActivity } from "./useCardCycleActivity.ts";
@@ -33,28 +33,27 @@ function purchase(
 	};
 }
 
-const plan: Plan = {
-	...financialModelFixture,
-	startDate: "2026-10-21",
-	accounts: [...financialModelFixture.accounts, card, otherCard],
-	transactions: [
-		purchase("before-closed", "2026-09-19", 999),
-		purchase("closed-start", "2026-09-20", 100),
-		purchase("closed-end", "2026-10-19", 200),
-		purchase("new-start", "2026-10-20", 50),
-		purchase("today", "2026-10-21", 25),
-		purchase("future", "2026-10-22", 999),
-		purchase("disabled", "2026-10-19", 999, { enabled: false }),
-		purchase("payment", "2026-10-19", 999, {
-			fromId: "checking",
-			toId: card.id,
-		}),
-		purchase("other-card", "2026-10-19", 70, { fromId: otherCard.id }),
-	],
-};
+const sourceStartDate = "2026-10-21";
+const sourceAccounts = [...financialModelFixture.accounts, card, otherCard];
+const sourceTransactions = [
+	purchase("before-closed", "2026-09-19", 999),
+	purchase("closed-start", "2026-09-20", 100),
+	purchase("closed-end", "2026-10-19", 200),
+	purchase("new-start", "2026-10-20", 50),
+	purchase("today", "2026-10-21", 25),
+	purchase("future", "2026-10-22", 999),
+	purchase("disabled", "2026-10-19", 999, { enabled: false }),
+	purchase("payment", "2026-10-19", 999, {
+		fromId: "checking",
+		toId: card.id,
+	}),
+	purchase("other-card", "2026-10-19", 70, { fromId: otherCard.id }),
+];
 
 const input = {
-	plan,
+	accounts: sourceAccounts,
+	transactions: sourceTransactions,
+	startDate: sourceStartDate,
 	checkpoints: [
 		{ AccountId: card.id, Date: "2026-10-19", Balance: -500 },
 		{ AccountId: otherCard.id, Date: "2026-10-19", Balance: -700 },
@@ -143,7 +142,7 @@ describe("useCardCycleActivity", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
 				...input,
-				plan: { ...plan, transactions: [...plan.transactions, ...pending] },
+				transactions: [...sourceTransactions, ...pending],
 				displayToday: "2026-10-22",
 			}),
 		);

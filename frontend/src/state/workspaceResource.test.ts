@@ -6,11 +6,6 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import {
-	resetWorkspaceForResource,
-	resetWorkspaceStore,
-	useWorkspaceStore,
-} from "./workspaceStore.ts";
-import {
 	getServerModel,
 	modelOptions,
 	userResourceKey,
@@ -21,7 +16,6 @@ import {
 	serverQueryClient,
 } from "./serverQuery.ts";
 import { setServerModelFixture } from "../mocks/workspace.ts";
-import { financialModelFixture } from "../mocks/financialModel.ts";
 
 function owner(id: string) {
 	acceptUserScope(
@@ -29,7 +23,6 @@ function owner(id: string) {
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id,
-				kind: "private",
 				permissions: ["user:read", "user:write"],
 			},
 			subject: id,
@@ -39,12 +32,10 @@ function owner(id: string) {
 }
 beforeEach(() => {
 	owner("users/a");
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
 });
 afterEach(() => {
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	suspendUserScope();
 	vi.unstubAllGlobals();
@@ -53,14 +44,12 @@ afterEach(() => {
 it("retains completed Query data during verification without exposing it under pending scope", async () => {
 	const model = setServerModelFixture();
 	const scope = getUserScope();
-	useWorkspaceStore.setState({ draft: financialModelFixture });
 	suspendUserScope();
 	await cancelResourceQueries();
 	expect(getServerModel()).toBeUndefined();
 	expect(
 		serverQueryClient().getQueryData(userResourceKey("model", scope)),
 	).toEqual(model);
-	expect(useWorkspaceStore.getState().draft).toBe(financialModelFixture);
 });
 
 it("does not publish a retired user's late model result", async () => {
@@ -92,7 +81,6 @@ it("does not publish a retired user's late model result", async () => {
 		.fetchQuery(modelOptions())
 		.catch(() => {});
 	owner("users/b");
-	resetWorkspaceForResource();
 	const current = setServerModelFixture(undefined, { revision: "b" });
 	finish(
 		new Response(
@@ -102,16 +90,4 @@ it("does not publish a retired user's late model result", async () => {
 	);
 	await old;
 	expect(getServerModel()).toEqual(current);
-});
-
-it("retains only unsaved in-memory data for an explicit same-owner recovery", () => {
-	useWorkspaceStore.setState({
-		draft: financialModelFixture,
-		baseRevision: "a",
-	});
-	resetWorkspaceForResource({ preserveDraft: true });
-	expect(useWorkspaceStore.getState().draft).toBe(financialModelFixture);
-	expect(useWorkspaceStore.getState().scope).toBeNull();
-	resetWorkspaceForResource();
-	expect(useWorkspaceStore.getState().draft).toBeNull();
 });

@@ -4,7 +4,7 @@ import type { FinancialModelDocument } from "../src/api/contracts.ts";
 import {
 	FIXTURE_API,
 	REMOTE_STORAGE_KEY,
-	readSavedServerPlan,
+	readSavedServerModel,
 	resetFixture,
 	seedResourceStorage,
 } from "./fixture.ts";
@@ -107,14 +107,14 @@ test("edits save immediately and survive a reload", async ({ page }) => {
 	// The save lands async after the editor closes; poll the server for it.
 	await expect
 		.poll(async () => {
-			const saved = await readSavedServerPlan();
+			const saved = await readSavedServerModel();
 			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
 				.config.expression;
 		})
 		.toBe("900");
 	await page.reload();
 	// The save reached the server, so the reload keeps it.
-	const after = await readSavedServerPlan();
+	const after = await readSavedServerModel();
 	expect(
 		after.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
@@ -137,7 +137,7 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
 	// A clean close asks nothing and leaves the server untouched.
 	await page.getByRole("button", { name: "Close dialog" }).click();
-	const saved = await readSavedServerPlan();
+	const saved = await readSavedServerModel();
 	expect(
 		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
@@ -155,7 +155,7 @@ test("a transaction converts across once and recurring in one save each way", as
 	await editor.getByLabel("Frequency").selectOption("once");
 	await editor.getByRole("button", { name: "Save transaction" }).click();
 	await expect(editor).not.toBeVisible();
-	const once = await readSavedServerPlan();
+	const once = await readSavedServerModel();
 	expect(
 		once.postings.some((posting) => posting.name === "Monthly investing"),
 	).toBe(true);
@@ -168,7 +168,7 @@ test("a transaction converts across once and recurring in one save each way", as
 	await again.getByLabel("Frequency").selectOption("monthly");
 	await again.getByRole("button", { name: "Save transaction" }).click();
 	await expect(again).not.toBeVisible();
-	const recurring = await readSavedServerPlan();
+	const recurring = await readSavedServerModel();
 	expect(recurring.recurrenceRules.some((rule) => rule.id === "invest")).toBe(
 		true,
 	);
@@ -217,13 +217,13 @@ test("account, transaction and evaluation maintenance plus search work", async (
 	).toBeVisible();
 });
 
-test("failed saves retain the intended plan", async ({ page }) => {
+test("failed saves retain the intended edit", async ({ page }) => {
 	await page.goto("/#sources");
 	await openInvestingTransactionEditor(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	// The editor saves immediately, so the failure injection must be armed
 	// before pressing Save. The server rejects the write, and the unsaved
-	// changes must survive for a banner retry.
+	// fields must stay in the form for retry.
 	await page.route("**/v1/recurrence-rules/*", async (route) => {
 		if (route.request().method() === "PATCH")
 			return route.fulfill({
@@ -237,17 +237,28 @@ test("failed saves retain the intended plan", async ({ page }) => {
 	await expect(
 		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
 	).toBeVisible();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("900");
 	await expect(
-		page.getByText("1 unsaved change · not saved yet"),
-	).toBeVisible();
-	const saved = await readSavedServerPlan();
+		page.getByRole("button", { name: "Save changes" }),
+	).toBeEnabled();
+	const saved = await readSavedServerModel();
 	expect(
 		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
 	).toBe("600");
+	await page.unroute("**/v1/recurrence-rules/*");
+	await page.getByRole("button", { name: "Save changes" }).click();
+	await expect(page.getByText("Changes saved.")).toBeVisible();
+	expect(
+		(await readSavedServerModel()).recurrenceRules.find(
+			(rule) => rule.id === "invest",
+		)?.amount.config.expression,
+	).toBe("900");
 });
 
-test("corrupt persisted data never blocks the saved plan", async ({ page }) => {
+test("corrupt persisted data never blocks the saved model", async ({
+	page,
+}) => {
 	// No draft is restored from the remote workspace key anymore, but a
 	// corrupt value there must not break loading or fall back to example
 	// content.
@@ -257,7 +268,7 @@ test("corrupt persisted data never blocks the saved plan", async ({ page }) => {
 		page.getByRole("alert").filter({ hasText: "could not be read" }),
 	).toHaveCount(0);
 	// The canonical server model is shown, not example content: the
-	// cash-flow evidence comes from the engine running on the fixture plan.
+	// cash-flow evidence comes from the engine running on the fixture model.
 	await page.getByRole("button", { name: "Inspect cash flow" }).click();
 	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
 });
@@ -448,7 +459,7 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	).not.toContainText("80%");
 });
 
-test("read-only plans can be explored but not saved", async ({ page }) => {
+test("read-only models can be explored but not saved", async ({ page }) => {
 	await resetFixture({ readOnly: true });
 	await page.goto("/#sources");
 	// The saved-model banner is gone; the sync tab's launcher carries the
@@ -457,17 +468,13 @@ test("read-only plans can be explored but not saved", async ({ page }) => {
 		page.getByRole("button", { name: "Connect SimpleFIN" }),
 	).toBeDisabled();
 	await openInvestingTransactionEditor(page);
-	await page.getByLabel("Amount (USD)").fill("900");
-	await page.getByRole("button", { name: "Save changes" }).click();
-	// The edit stages locally, but the read-only server rejects the save,
-	// so the banner Save stays disabled and the server is untouched.
-	await expect(
-		page.getByText("1 unsaved change · not saved yet"),
-	).toBeVisible();
-	await expect(
-		page.getByRole("button", { name: "Save changes" }),
-	).toBeDisabled();
-	const saved = await readSavedServerPlan();
+	// Read-only users can inspect the saved row, but no edit or save starts.
+	await expect(page.getByLabel("Amount (USD)")).toHaveAttribute("readonly", "");
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
+	await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(
+		0,
+	);
+	const saved = await readSavedServerModel();
 	expect(
 		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
@@ -487,7 +494,7 @@ test("tabs save independently with last write winning", async ({
 	// The other tab's save lands first; last write wins below.
 	await expect
 		.poll(async () => {
-			const saved = await readSavedServerPlan();
+			const saved = await readSavedServerModel();
 			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
 				.config.expression;
 		})
@@ -497,7 +504,7 @@ test("tabs save independently with last write winning", async ({
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect
 		.poll(async () => {
-			const saved = await readSavedServerPlan();
+			const saved = await readSavedServerModel();
 			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
 				.config.expression;
 		})
@@ -506,7 +513,7 @@ test("tabs save independently with last write winning", async ({
 	await expect(
 		page.getByRole("alert").filter({ hasText: "another tab" }),
 	).toHaveCount(0);
-	const final = await readSavedServerPlan();
+	const final = await readSavedServerModel();
 	expect(
 		final.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
@@ -539,16 +546,7 @@ test("tabs use arrow-key navigation and all main pages fit narrow screens", asyn
 	await page.goto("/#sources");
 	await expect(page.getByRole("tab", { name: "Bank sync" })).toBeVisible();
 	await expect(page.getByRole("tab", { name: "Amounts" })).toBeVisible();
-	await expect(page.getByRole("tab", { name: "Assumptions" })).toBeVisible();
 	await expect(page.getByRole("tab", { name: "Account" })).toBeVisible();
-	await page.getByRole("tab", { name: "Assumptions" }).click();
-	await expect(
-		page.getByRole("heading", { name: "The inputs behind the outlook" }),
-	).toBeVisible();
-	await expect(page.getByLabel("Annual inflation (%)")).toBeVisible();
-	await expect(
-		page.getByLabel("Investment return variability (%)"),
-	).toBeVisible();
 	for (const width of [320, 768, 1280]) {
 		await page.setViewportSize({ width, height: 900 });
 		for (const route of [

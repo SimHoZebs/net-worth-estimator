@@ -19,20 +19,32 @@ func TestFixtureSessionUsesScopedProductionContract(t *testing.T) {
 		Enabled, Authenticated, Allowed bool
 		User                            map[string]string
 		Resource                        struct {
-			ID, Kind    string
+			ID          string
 			Permissions []string
 		}
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &session); err != nil {
 		t.Fatal(err)
 	}
-	if w.Code != 200 || !session.Enabled || !session.Authenticated || !session.Allowed || session.Resource.ID != fixtureResource.ID || session.Resource.Kind != "private" || len(session.Resource.Permissions) != 3 || session.User["subject"] == "" {
+	var raw map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &raw); err != nil {
+		t.Fatal(err)
+	}
+	if res, ok := raw["resource"].(map[string]any); ok {
+		if _, hasKind := res["kind"]; hasKind {
+			t.Fatalf("fixture resource must not expose kind: %s", w.Body.String())
+		}
+	}
+	if w.Code != 200 || !session.Enabled || !session.Authenticated || !session.Allowed || session.Resource.ID != fixtureResourceID || len(session.Resource.Permissions) != 3 || session.User["subject"] == "" || session.User["subject"] != fixtureSubject {
 		t.Fatalf("invalid fixture session: %s", w.Body.String())
 	}
-	if w.Header().Get(identity.ResourceHeader) != fixtureResource.ID || w.Header().Get("Cache-Control") != "no-store" {
+	if len(session.Resource.ID) != len("users/")+64 {
+		t.Fatalf("fixture resource must be ordinary users/<64hex>: %q", session.Resource.ID)
+	}
+	if w.Header().Get(identity.ResourceHeader) != fixtureResourceID || w.Header().Get("Cache-Control") != "no-store" {
 		t.Fatal("fixture session is missing its resource or cache boundary")
 	}
-	for _, expected := range []string{"", fixtureResource.ID, "users/sample"} {
+	for _, expected := range []string{"", fixtureResourceID, "users/sample"} {
 		r := httptest.NewRequest("GET", "/v1/financial-model", nil)
 		r.Header.Set(identity.ResourceHeader, expected)
 		w = httptest.NewRecorder()
@@ -41,7 +53,7 @@ func TestFixtureSessionUsesScopedProductionContract(t *testing.T) {
 		if expected == "users/sample" {
 			want = http.StatusConflict
 		}
-		if w.Code != want || w.Header().Get(identity.ResourceHeader) != fixtureResource.ID {
+		if w.Code != want || w.Header().Get(identity.ResourceHeader) != fixtureResourceID {
 			t.Fatalf("assertion %q: status=%d want=%d", expected, w.Code, want)
 		}
 		if want == http.StatusConflict {

@@ -8,7 +8,7 @@ export const FIXTURE_API =
 
 export const REMOTE_STORAGE_KEY = "waypoint.remote-workspace.v1";
 
-type FixtureResource = { id: string; kind: "private" | "sample" };
+type FixtureResource = { id: string };
 
 async function fixtureResource(page: Page): Promise<FixtureResource> {
 	const response = await page.request.get("/v1/auth/session");
@@ -25,8 +25,7 @@ export async function seedResourceStorage(
 ): Promise<void> {
 	await page.addInitScript(
 		({ baseKey, raw, resource }) => {
-			const mappedId = resource.id.replace(/^accounts\//, "users/");
-			const key = `${baseKey}:user:${encodeURIComponent(window.location.origin)}:${resource.kind}:${encodeURIComponent(mappedId)}`;
+			const key = `${baseKey}:user:${encodeURIComponent(window.location.origin)}:${encodeURIComponent(resource.id)}`;
 			if (localStorage.getItem(key) === null) localStorage.setItem(key, raw);
 		},
 		{ baseKey, raw, resource: await fixtureResource(page) },
@@ -56,7 +55,7 @@ export async function resetFixture(
 	}
 }
 
-export async function readSavedServerPlan() {
+export async function readSavedServerModel() {
 	const api = await request.newContext();
 	try {
 		const response = await api.get(`${FIXTURE_API}/v1/financial-model`);

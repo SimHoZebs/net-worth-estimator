@@ -31,7 +31,6 @@ export function ServerWorkspaceRecovery() {
 		preconditions: {
 			hasWorkspace: false,
 			readOnly,
-			hasDraft: false,
 			loading: false,
 		},
 		recover: importServerDocument,
@@ -185,7 +184,6 @@ function ServerRecovery({
 					onOpenNavigation={open}
 				/>
 			)}
-			draftBar={null}
 			overlays={null}
 		>
 			<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">

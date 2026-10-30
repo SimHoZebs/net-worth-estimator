@@ -1,4 +1,4 @@
-import type { Plan } from "../../domain/model.ts";
+import type { Account } from "../../domain/model.ts";
 import { useCurrentPosition } from "../../state/useCurrentPosition.ts";
 import { TextButton } from "../Button.tsx";
 import { Modal } from "../Modal.tsx";
@@ -6,17 +6,17 @@ import { Skeleton } from "../Skeleton.tsx";
 import { PositionEvidence } from "./PositionEvidence.tsx";
 
 export function CurrentPositionDialog({
-	plan,
+	accounts,
 	onClose,
 }: {
-	plan: Plan;
+	accounts: Account[];
 	onClose: () => void;
 }) {
 	const position = useCurrentPosition();
 	if (position.data)
 		return (
 			<PositionEvidence
-				plan={plan}
+				accounts={accounts}
 				position={position.data}
 				onClose={onClose}
 			/>

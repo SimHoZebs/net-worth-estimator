@@ -17,13 +17,20 @@ import (
 )
 
 type resourceConfig struct {
-	OwnerSubject, ModelID string
+	OwnerSubject, ModelID, Organization string
 }
 
 func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	c := resourceConfig{
 		OwnerSubject: getenv("NET_WORTH_ESTIMATOR_OWNER_SUBJECT"),
 		ModelID:      getenv("NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL"),
+		Organization: getenv("NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION"),
+	}
+	if c.Organization == "" {
+		c.Organization = authorization.DefaultOrganization
+	}
+	if !orgName.MatchString(c.Organization) {
+		return c, errors.New("AUTH_ORGANIZATION must be a name without an owner prefix")
 	}
 	if c.OwnerSubject != strings.TrimSpace(c.OwnerSubject) || strings.ContainsAny(c.OwnerSubject, "*\x00\r\n") {
 		return c, errors.New("OWNER_SUBJECT must be one verified OIDC subject")
@@ -38,6 +45,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	permissions, err := authorization.New(authorization.Config{
 		Issuer: loginConfig.Issuer, InternalURL: loginConfig.InternalURL,
 		ClientID: loginConfig.ClientID, ClientSecret: loginConfig.ClientSecret, ModelID: config.ModelID,
+		Organization:     config.Organization,
 		AllowPrivateHTTP: loginConfig.AllowPrivateHTTP,
 	})
 	if err != nil {
@@ -45,7 +53,11 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	}
 	primaryID := ""
 	if config.OwnerSubject != "" {
-		primaryID = authorization.ResourceFor(loginConfig.Issuer, config.OwnerSubject).ID
+		primary := authorization.ResourceFor(loginConfig.Issuer, config.OwnerSubject)
+		if primary.ID == "" {
+			return nil, nil, errors.New("primary user requires an explicit private user resource ID")
+		}
+		primaryID = primary.ID
 	}
 	apiConfig.CanWrite = identity.CanWrite
 	router, err := newUserRouter(database, userRouterConfig{
@@ -62,9 +74,9 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		router.Close()
 		return nil, nil, err
 	}
-	// Group routes carry authentication only: membership is enforced by the
-	// groups handler, not by user authorization, so they must never reach
-	// the user router (which 403s requests without a verified user scope).
+	// Group routes carry the same own-user permission checks and resource
+	// header as every other user route (enforced in identity.Wrap) plus
+	// existing group membership in the groups handler.
 	groupHandler := groups.New(database, loginConfig.Issuer, groups.Config{
 		AllowedOrigins: apiConfig.AllowedOrigins,
 		ReadOnly:       apiConfig.ReadOnly,
@@ -86,9 +98,14 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 // Depends on user scope: the store keys financial rows by user ID, so
 // this boundary provisions through EnsureUser keyed by the canonical
 // user record via EnsureGroupUser (both derive from ActorKey, so one
-// verified identity never splits).
+// verified identity never splits). The guest follows the exact same path:
+// it is an ordinary preprovisioned account, and provisioning happens only
+// when Casdoor grants at least one user action.
 func userAccessResolver(database *sqlite.Database, issuer string, resolve func(context.Context, string) (authorization.Scope, error)) func(context.Context, string) (authorization.Scope, error) {
 	return func(ctx context.Context, subject string) (authorization.Scope, error) {
+		if subject == "" {
+			return authorization.Scope{}, errors.New("authorization returned an unexpected user")
+		}
 		scope, err := resolve(ctx, subject)
 		if err != nil {
 			return authorization.Scope{}, err
@@ -97,15 +114,7 @@ func userAccessResolver(database *sqlite.Database, issuer string, resolve func(c
 		if scope.Resource != expected {
 			return authorization.Scope{}, errors.New("authorization returned an unexpected user")
 		}
-		if subject == "" {
-			exists, err := database.HasUser(sqlite.SampleUserID)
-			if err != nil {
-				return authorization.Scope{}, err
-			}
-			if !exists {
-				scope.Permissions = []string{}
-			}
-		} else if scope.Allows(authorization.Read) || scope.Allows(authorization.Project) || scope.Allows(authorization.Write) {
+		if scope.Allows(authorization.Read) || scope.Allows(authorization.Project) || scope.Allows(authorization.Write) {
 			if _, err := database.EnsureGroupUser(issuer, subject); err != nil {
 				return authorization.Scope{}, err
 			}
@@ -121,10 +130,9 @@ func userAccessResolver(database *sqlite.Database, issuer string, resolve func(c
 	}
 }
 
-var (
-	userResource     = regexp.MustCompile(`^users/[a-f0-9]{64}$`)
-	sampleResourceID = "users/sample"
-)
+var userResource = regexp.MustCompile(`^users/[a-f0-9]{64}$`)
+
+var orgName = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
 
 type userRouterConfig struct {
 	// PrimaryResourceID assigns server Bridge credentials, not data ownership.
@@ -169,11 +177,6 @@ func (p *userRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User access has not been verified.", http.StatusForbidden)
 		return
 	}
-	guest := identity.Subject(r.Context()) == ""
-	if guest != (scope.Resource.Kind == "sample") {
-		http.Error(w, "This user is not available to this identity.", http.StatusForbidden)
-		return
-	}
 	handler, err := p.handlerFor(scope.Resource)
 	if err != nil {
 		http.Error(w, "The selected user is temporarily unavailable.", http.StatusServiceUnavailable)
@@ -184,12 +187,9 @@ func (p *userRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // storeUserID maps an authorized user resource to the store's user
-// row ID. Private resources (users/<hash>) are owned by user:<hash>;
-// the guest sample (users/sample) is the synthetic sample user.
+// row ID. Every resource (users/<hash>) is owned by user:<hash>, including
+// the preprovisioned guest.
 func storeUserID(resourceID string) string {
-	if resourceID == sampleResourceID {
-		return sqlite.SampleUserID
-	}
 	return "user:" + strings.TrimPrefix(resourceID, "users/")
 }
 
@@ -199,7 +199,7 @@ func (p *userRouter) handlerFor(resource authorization.Resource) (http.Handler, 
 	if p.closed {
 		return nil, errors.New("user router is closed")
 	}
-	if !((resource.Kind == "sample" && resource.ID == sampleResourceID) || (resource.Kind == "private" && userResource.MatchString(resource.ID))) {
+	if !userResource.MatchString(resource.ID) {
 		return nil, errors.New("invalid user resource")
 	}
 	if existing, ok := p.opened[resource.ID]; ok {
@@ -215,10 +215,8 @@ func (p *userRouter) handlerFor(resource authorization.Resource) (http.Handler, 
 	if resource.ID != p.config.PrimaryResourceID {
 		config.SyncRunner = nil
 	}
-	if resource.Kind == "sample" {
-		config.ReadOnly = true
-		config.SyncRunner = nil
-	}
+	// The global operator read-only kill switch stays in config.ReadOnly;
+	// there is no per-identity forced read-only.
 	handler := api.New(scoped, config)
 	p.opened[resource.ID] = handler
 	return handler, nil

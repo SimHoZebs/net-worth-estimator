@@ -94,7 +94,6 @@ function seedServerState() {
 			apiBaseUrl: canonicalApiBaseUrl(""),
 			resource: {
 				id: "users/a",
-				kind: "private",
 				permissions: ["user:read", "user:write"],
 			},
 			subject: "users/a",

@@ -6,10 +6,7 @@ import { PositionEvidence } from "./PositionEvidence.tsx";
 it("does not report a missing account balance as zero", () => {
 	const html = renderToStaticMarkup(
 		<PositionEvidence
-			plan={{
-				...financialModelFixture,
-				accounts: [financialModelFixture.accounts[0]!],
-			}}
+			accounts={[financialModelFixture.accounts[0]!]}
 			position={{
 				asOfDate: financialModelFixture.startDate,
 				netWorth: 100,
@@ -25,10 +22,7 @@ it("does not report a missing account balance as zero", () => {
 it("reports a real zero balance as zero", () => {
 	const html = renderToStaticMarkup(
 		<PositionEvidence
-			plan={{
-				...financialModelFixture,
-				accounts: [financialModelFixture.accounts[0]!],
-			}}
+			accounts={[financialModelFixture.accounts[0]!]}
 			position={{
 				asOfDate: financialModelFixture.startDate,
 				netWorth: 0,

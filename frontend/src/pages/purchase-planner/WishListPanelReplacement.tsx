@@ -1,45 +1,88 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
-import type { Plan, PlannedPurchase } from "../../domain/model.ts";
-import { movePurchase } from "../../domain/purchases.ts";
+import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import type { Account, PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
 import type { PurchaseSchedule } from "../../domain/result.ts";
+import {
+	moveSavedPurchase,
+	removeSavedPurchase,
+} from "../../state/purchaseWrites.ts";
 import { useUiStore } from "../../state/uiStore.ts";
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
-import { stageAndSave } from "../../state/workspaceWrites.ts";
-import { useDraftConflict, useUserReadOnly } from "../../state/useUserScope.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { WishListEditor } from "./WishListEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";
 import type { PurchaseEnhancements } from "./purchase.types.ts";
 
 /**
- * Drop-in replacement for the current WishListPanel in PurchasesPage.tsx.
- * Preserves the existing plan update, editor, removal and read-only behavior.
- * The optional enhancements prop is for a future fixed-date-aware backend.
+ * Wishlist panel over saved account and purchase rows. Each save writes
+ * targeted row operations and refreshes authoritative state; the form only
+ * closes after the server persisted the change.
  */
 export function WishListPanel({
-	plan,
+	accounts,
+	purchases,
+	startDate,
 	schedule,
 	enhancements,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	purchases: PlannedPurchase[];
+	startDate: string;
 	schedule: PurchaseSchedule | null;
 	enhancements?: PurchaseEnhancements;
 }) {
-	const onUpdate = stageAndSave;
-	const applyError = useWorkspaceStore((state) => state.error);
 	const blocked = useUserReadOnly();
-	const draftConflict = useDraftConflict();
 	const years = useUiStore((state) => state.years);
-	const locked = blocked || Boolean(draftConflict) || plan.readOnly;
+	const locked = blocked;
 	const [editor, setEditor] = useState<{ item: PlannedPurchase | null } | null>(
 		null,
 	);
 	const [remove, setRemove] = useState<PlannedPurchase | null>(null);
+	const [removing, setRemoving] = useState(false);
+	const [removeError, setRemoveError] = useState<string | null>(null);
+	const [moveError, setMoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
-	const items = toPurchaseViewItems({ plan, schedule, enhancements });
-	const end = horizonDate({ start: plan.startDate, years });
+	const items = toPurchaseViewItems({
+		purchases,
+		accounts,
+		schedule,
+		enhancements,
+	});
+	const end = horizonDate({ start: startDate, years });
+
+	const moveItem = (purchase: PlannedPurchase, direction: -1 | 1) => {
+		if (locked || purchase.readOnly) return;
+		setMoveError(null);
+		void moveSavedPurchase(purchases, purchase.id, direction).then(
+			({ ok, next }) => {
+				if (!ok) {
+					setMoveError(
+						"The purchase could not be moved. Review the workspace notice and try again.",
+					);
+					return;
+				}
+				if (!next) return;
+				const index = next.findIndex((item) => item.id === purchase.id);
+				setAnnouncement(`${purchase.name} is now priority ${index + 1}.`);
+			},
+		);
+	};
+
+	const confirmRemove = async () => {
+		if (!remove || removing) return;
+		setRemoving(true);
+		setRemoveError(null);
+		const ok = await removeSavedPurchase(remove.id);
+		setRemoving(false);
+		if (ok) setRemove(null);
+		else setRemoveError("The purchase could not be removed.");
+	};
+
+	const editorPriority = editor?.item
+		? purchases.findIndex((item) => item.id === editor.item!.id)
+		: purchases.length;
 
 	return (
 		<>
@@ -50,27 +93,19 @@ export function WishListPanel({
 				onAdd={() => setEditor({ item: null })}
 				onEdit={(purchase) => setEditor({ item: purchase })}
 				onRemove={setRemove}
-				onMove={(purchase, direction) => {
-					if (locked || purchase.readOnly) return;
-					const next = movePurchase(plan, purchase.id, direction);
-					if (onUpdate(next)) {
-						const idx = next.plannedPurchases.findIndex(
-							(item) => item.id === purchase.id,
-						);
-						setAnnouncement(`${purchase.name} is now priority ${idx + 1}.`);
-					}
-				}}
+				onMove={moveItem}
 			/>
+			{moveError && <ErrorNotice message={moveError} />}
 			<p className="sr-only" role="status">
 				{announcement}
 			</p>
 			{editor && (
 				<WishListEditor
-					plan={plan}
+					accounts={accounts}
+					startDate={startDate}
 					item={editor.item}
-					readOnly={locked || Boolean(editor.item?.readOnly)}
-					onApply={onUpdate}
-					applyError={applyError}
+					priority={Math.max(editorPriority, 0)}
+					onSaved={() => setEditor(null)}
 					onClose={() => setEditor(null)}
 				/>
 			)}
@@ -80,18 +115,14 @@ export function WishListPanel({
 					eyebrow="Planned purchases"
 					cancelLabel="Keep item"
 					confirmLabel="Remove and save"
-					onCancel={() => setRemove(null)}
-					onConfirm={() => {
-						if (
-							onUpdate({
-								...plan,
-								plannedPurchases: plan.plannedPurchases.filter(
-									(item) => item.id !== remove.id,
-								),
-							})
-						)
-							setRemove(null);
+					busyLabel="Removing…"
+					busy={removing}
+					error={removeError}
+					onCancel={() => {
+						setRemove(null);
+						setRemoveError(null);
 					}}
+					onConfirm={() => void confirmRemove()}
 				>
 					<p>This removes the item and saves immediately.</p>
 				</ConfirmDialog>

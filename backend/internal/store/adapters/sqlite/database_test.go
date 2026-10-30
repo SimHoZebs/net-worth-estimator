@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
 	"reflect"
@@ -281,12 +282,13 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 			t.Fatalf("deleted presets reseeded = %d, %v", len(got), err)
 		}
 	}
-	sample, err := d.EnsureSampleUser()
+	ordinaryID := authorization.ActorKey("https://issuer.test", "ordinarytest")
+	ordinary, err := d.EnsureUser(ordinaryID, "https://issuer.test", "ordinarytest")
 	if err != nil {
 		t.Fatal(err)
 	}
-	seedAccount(t, sample, "checking")
-	if err := sample.Close(); err != nil {
+	seedAccount(t, ordinary, "checking")
+	if err := ordinary.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.Close(); err != nil {

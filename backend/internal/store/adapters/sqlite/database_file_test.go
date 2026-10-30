@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 )
 
 func assertFileMode(t *testing.T, path string, want os.FileMode) {
@@ -26,7 +28,7 @@ func TestSetupDatabaseFilesArePrivate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	if _, err := d.EnsureSampleUser(); err != nil {
+	if _, err := d.EnsureUser(authorization.ActorKey("https://issuer.test", "ordinarytest"), "https://issuer.test", "ordinarytest"); err != nil {
 		t.Fatal(err)
 	}
 	for _, suffix := range []string{"", "-wal", "-shm"} {

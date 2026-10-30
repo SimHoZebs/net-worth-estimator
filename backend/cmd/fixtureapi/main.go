@@ -34,23 +34,33 @@ import (
 const resetPath = "/__fixture/reset"
 
 // Only this test executable supplies a synthetic, scoped identity without OIDC.
-var fixtureResource = authorization.ResourceFor("http://fixture.invalid", "browser-test")
+// The fixture user is an ordinary provisioned user: users/<64hex> owned by a
+// stable non-empty subject. No kind and no sample special-case travel here.
+const (
+	fixtureIssuer  = "http://fixture.invalid"
+	fixtureSubject = "browser-test"
+)
+
+var (
+	fixtureActor      = authorization.ActorKey(fixtureIssuer, fixtureSubject)
+	fixtureResourceID = "users/" + fixtureActor[len("user:"):]
+)
 
 func fixtureHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set(identity.ResourceHeader, fixtureResource.ID)
+		w.Header().Set(identity.ResourceHeader, fixtureResourceID)
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/auth/session" {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"enabled": true, "authenticated": true, "allowed": true,
-				"user": map[string]string{"subject": "browser-test", "name": "Browser test"},
-				"resource": map[string]any{"id": fixtureResource.ID, "kind": fixtureResource.Kind,
+				"user": map[string]string{"subject": fixtureSubject, "name": "Browser test"},
+				"resource": map[string]any{"id": fixtureResourceID,
 					"permissions": []string{authorization.Read, authorization.Project, authorization.Write}},
 			})
 			return
 		}
-		if expected := r.Header.Get(identity.ResourceHeader); expected != "" && expected != fixtureResource.ID {
+		if expected := r.Header.Get(identity.ResourceHeader); expected != "" && expected != fixtureResourceID {
 			identity.WriteResourceChanged(w)
 			return
 		}
@@ -81,7 +91,7 @@ func main() {
 	defer application.Close()
 	stopBlobCleanup := application.StartBlobCleanup(context.Background(), func(err error) { log.Printf("blob cleanup: %v", err) })
 	defer stopBlobCleanup()
-	database, err := application.EnsureUser("fixture-browser-test", "http://fixture.invalid", "browser-test")
+	database, err := application.EnsureUser(fixtureActor, fixtureIssuer, fixtureSubject)
 	if err != nil {
 		log.Fatalf("ensure fixture user: %v", err)
 	}
@@ -113,7 +123,7 @@ func main() {
 			ReceiptSource:  receiptSource,
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
-			ResourceID:     fixtureResource.ID,
+			ResourceID:     fixtureResourceID,
 		}))
 		return nil
 	}

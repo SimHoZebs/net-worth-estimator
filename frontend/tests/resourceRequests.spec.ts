@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { readSavedServerPlan, resetFixture } from "./fixture.ts";
+import { readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
 
@@ -14,7 +14,7 @@ async function editInvestingAmount(page: Page) {
 test("an ordinary save conflict preserves edits without another session check", async ({
 	page,
 }) => {
-	const saved = await readSavedServerPlan();
+	const saved = await readSavedServerModel();
 	await editInvestingAmount(page);
 	let sessionChecks = 0;
 	let writes = 0;
@@ -33,30 +33,24 @@ test("an ordinary save conflict preserves edits without another session check", 
 			json: { status: 409, detail: "That change conflicts with server data." },
 		});
 	});
-	// The detail editor saves immediately; the rejected save surfaces an
-	// alert while the staged draft stays bannered.
+	// Rejected writes retain the edited fields in the form.
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(
 		page.getByRole("alert").filter({ hasText: "That change conflicts" }),
 	).toBeVisible();
-	await expect(
-		page.getByText("1 unsaved change · not saved yet"),
-	).toBeVisible();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("900");
 	expect(sessionChecks).toBe(0);
 	expect(writes).toBe(1);
-	// The failed save keeps the staged edit as an unsaved change while the
-	// server plan is untouched. The detail reads saved rows, so the banner
-	// is the edits-preserved evidence here.
 	await expect(
-		page.getByText("1 unsaved change · not saved yet"),
-	).toBeVisible();
-	expect(await readSavedServerPlan()).toEqual(saved);
+		page.getByRole("button", { name: "Save changes" }),
+	).toBeEnabled();
+	expect(await readSavedServerModel()).toEqual(saved);
 });
 
 test("a resource-change error restores the workspace without replaying the save", async ({
 	page,
 }) => {
-	const saved = await readSavedServerPlan();
+	const saved = await readSavedServerModel();
 	await editInvestingAmount(page);
 	let sessionChecks = 0;
 	let writes = 0;
@@ -75,16 +69,21 @@ test("a resource-change error restores the workspace without replaying the save"
 	});
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect.poll(() => sessionChecks).toBe(1);
-	await expect(
-		page.getByRole("button", { name: "Save changes" }),
-	).toBeEnabled();
+	// A resource transition removes the old form. Its save cannot replay
+	// against the newly verified scope, even when discovery returns this user.
+	await expect(page.getByRole("dialog")).toHaveCount(0);
 	expect(writes).toBe(1);
-	expect(await readSavedServerPlan()).toEqual(saved);
+	expect(await readSavedServerModel()).toEqual(saved);
+	await page.getByRole("tab", { name: /Recurring/ }).click();
+	await page.getByRole("button", { name: "Monthly investing" }).click();
+	await page.getByLabel("Amount (USD)").click();
+	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
+	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(page.getByText("Changes saved.")).toBeVisible();
 	expect(writes).toBe(2);
 	expect(
-		(await readSavedServerPlan()).recurrenceRules.find(
+		(await readSavedServerModel()).recurrenceRules.find(
 			(rule) => rule.id === "invest",
 		)?.amount.config.expression,
 	).toBe("900");

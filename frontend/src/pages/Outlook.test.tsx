@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { resetWorkspaceStore } from "../state/workspaceStore.ts";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
 import {
@@ -17,7 +16,7 @@ vi.mock("../state/useRemoteProjection.ts", () => ({
 	}),
 }));
 
-const blankPlan = {
+const blankData = {
 	...financialModelFixture,
 	accounts: [],
 	transactions: [],
@@ -35,13 +34,12 @@ const props = {
 
 beforeEach(() => {
 	acceptTestResource();
-	setServerModelFixture(blankPlan);
+	setServerModelFixture(blankData);
 	setServerStatusFixture({ readOnly: false });
 });
 
 afterEach(() => {
 	cleanup();
-	resetWorkspaceStore();
 	vi.clearAllMocks();
 });
 
@@ -56,17 +54,18 @@ it("opens the first-account editor from an active blank workspace", () => {
 	expect(props.onAddAccount).toHaveBeenCalledOnce();
 });
 
-it.each(["plan", "server", "writeBlocked"])(
-	"honors %s write restrictions on a blank workspace",
-	(restriction) => {
-		setServerModelFixture({
-			...blankPlan,
-			readOnly: restriction === "plan" || restriction === "writeBlocked",
-		});
-		setServerStatusFixture({ readOnly: restriction === "server" });
-		render(<Outlook {...props} />);
-		expect(
-			screen.queryByRole("button", { name: "Add your first account" }),
-		).toBeNull();
-	},
-);
+it("honors the server write restriction on a blank workspace", () => {
+	setServerStatusFixture({ readOnly: true });
+	render(<Outlook {...props} />);
+	expect(
+		screen.queryByRole("button", { name: "Add your first account" }),
+	).toBeNull();
+});
+
+it("does not gate the blank workspace on a model-level flag alone", () => {
+	setServerModelFixture({ ...blankData, readOnly: true });
+	render(<Outlook {...props} />);
+	expect(
+		screen.getByRole("button", { name: "Add your first account" }),
+	).toBeTruthy();
+});

@@ -1,16 +1,24 @@
 import { BaseProjectionView } from "../components/BaseProjectionView.tsx";
 import { PURCHASE_EVALUATIONS } from "../state/purchaseEvaluation.ts";
-import { useUserPlan } from "../state/useUserScope.ts";
+import {
+	useSavedAccounts,
+	useSavedPurchases,
+	useSavedStartDate,
+} from "../state/savedRows.ts";
 import { WishListPanel } from "./purchase-planner/WishListPanelReplacement.tsx";
 
 export function PurchasesPage() {
-	const plan = useUserPlan();
-	if (!plan) return null;
+	const accounts = useSavedAccounts();
+	const purchases = useSavedPurchases();
+	const startDate = useSavedStartDate();
+	if (!accounts || !purchases || !startDate) return null;
 	return (
 		<BaseProjectionView evaluations={PURCHASE_EVALUATIONS}>
 			{({ base, current }) => (
 				<WishListPanel
-					plan={plan}
+					accounts={accounts}
+					purchases={purchases}
+					startDate={startDate}
 					schedule={current ? (base?.plannedPurchases ?? null) : null}
 				/>
 			)}

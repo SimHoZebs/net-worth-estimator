@@ -9,10 +9,6 @@ import {
 } from "../state/serverQuery.ts";
 import { hydrateFinancialPreferences } from "../state/useSafeSpendingSettings.ts";
 import {
-	resetWorkspaceForResource,
-	useWorkspaceStore,
-} from "../state/workspaceStore.ts";
-import {
 	acceptUserScope,
 	userScopeKey,
 	canonicalApiBaseUrl,
@@ -104,9 +100,6 @@ export function useResourceSession() {
 					) !== userScopeKey(input);
 				if (!previous) {
 					if (changed) {
-						resetWorkspaceForResource({
-							preserveDraft: !!previous && sameOwner(previous, next),
-						});
 						await clearResourceQueryCache();
 					}
 					if (signal.aborted) return;
@@ -144,7 +137,6 @@ export function useResourceSession() {
 							activeLogout.checkedSession = next;
 							return;
 						}
-						resetWorkspaceForResource({ preserveDraft: true });
 						await clearResourceQueryCache();
 						if (signal.aborted) return;
 						owner.current = next;
@@ -170,9 +162,6 @@ export function useResourceSession() {
 					activeLogout.checkedSession = next;
 					return;
 				}
-				resetWorkspaceForResource({
-					preserveDraft: sameOwner(previous, next),
-				});
 				await clearResourceQueryCache();
 				if (signal.aborted) return;
 				if (!next.session.allowed) {
@@ -229,13 +218,6 @@ export function useResourceSession() {
 
 	const logout = useCallback(async () => {
 		if (signingOut.current || !owner.current) return;
-		if (useWorkspaceStore.getState().draft) {
-			const blocked =
-				"You have unsaved changes. Discard the draft before signing out.";
-			setStatus((previous) => ({ ...previous, error: blocked }));
-			notifyError("session-logout", blocked);
-			return;
-		}
 		const attempt: LogoutAttempt = { ...owner.current };
 		signingOut.current = attempt;
 		setLogoutPending(true);
@@ -266,7 +248,6 @@ export function useResourceSession() {
 				throw new Error("Sign-out failed. Please retry.");
 			}
 			suspendUserScope();
-			resetWorkspaceForResource();
 			// Local logout can complete even when prior discovery failed.
 			if (verification.current) verification.current.error = undefined;
 			setStatus({ phase: "checking", error: "" });
@@ -332,7 +313,6 @@ export function useResourceSession() {
 			signingOut.current = null;
 			owner.current = null;
 			suspendUserScope();
-			resetWorkspaceForResource();
 			void clearResourceQueryCache();
 		};
 	}, [refresh, verify]);

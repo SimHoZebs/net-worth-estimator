@@ -1,7 +1,4 @@
-import { useBeforeUnload } from "./state/useBeforeUnload.ts";
-import { DraftBar } from "./workspace/DraftBar.tsx";
 import type { SafeSpendingDetailTab } from "./pages/outlook/safe-spending/safeSpendingDetailModel.ts";
-import { useWorkspaceStore } from "./state/workspaceStore.ts";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./workspace/useWorkspaceOverlays.ts";
 import {
@@ -20,22 +17,15 @@ import { WorkspaceSidebar } from "./workspace/WorkspaceSidebar.tsx";
 // data display subscribes to the stores; this component takes no props.
 export function WorkspaceShell() {
 	const navigation = useWorkspaceNavigation();
-	const hasDraft = useWorkspaceStore((state) => state.draft != null);
-	const discard = useWorkspaceStore((state) => state.discard);
 	const overlays = useWorkspaceOverlays({
-		discard,
 		route: navigation.route,
 		pushHash: navigation.pushHash,
 		replaceHash: navigation.replaceHash,
 	});
-	// Only warn when a draft actually exists.
-	useBeforeUnload(hasDraft);
 	const safeSpendingDetail = (tab: SafeSpendingDetailTab | null) => {
 		if (tab) overlays.openSafeSpendingDetail(tab);
 		else overlays.closeSafeSpendingDetail();
 	};
-	// DraftBar runs its own Query mutation. Only the discard overlay
-	// stays a prop.
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
@@ -47,7 +37,6 @@ export function WorkspaceShell() {
 					onOpenNavigation={open}
 				/>
 			)}
-			draftBar={<DraftBar onDiscard={overlays.openDiscard} />}
 			overlays={<WorkspaceDialogs overlays={overlays} />}
 		>
 			<WorkspaceHeading

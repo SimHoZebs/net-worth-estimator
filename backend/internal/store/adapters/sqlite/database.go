@@ -20,13 +20,6 @@ var ErrLegacyDatabase = errors.New("unsupported legacy database: start from a cu
 // ErrSetupRequired identifies a missing or incomplete current database.
 var ErrSetupRequired = errors.New("database setup required: run setupdb before starting the server")
 
-// Synthetic user IDs for the explicit sample/fixture exceptions. They use
-// placeholder issuer/subject identities so users FKs hold.
-const (
-	SampleUserID  = "sample"
-	FixtureUserID = "fixture"
-)
-
 // Database owns the shared SQLite connection. Financial operations use a Store
 // returned for an explicit user.
 type Database struct {
@@ -216,11 +209,4 @@ func (d *Database) ensureUser(userID, issuer, subject string) (store.Store, erro
 		return nil, err
 	}
 	return &sqliteStore{db: &userDB{DB: d.db, userID: userID}, application: d}, nil
-}
-
-// EnsureSampleUser provisions the synthetic sample user. The sample is
-// an explicit exception to verified-identity provisioning: it uses
-// placeholder identity values so users FKs hold.
-func (d *Database) EnsureSampleUser() (store.Store, error) {
-	return d.ensureUser(SampleUserID, SampleUserID, SampleUserID)
 }

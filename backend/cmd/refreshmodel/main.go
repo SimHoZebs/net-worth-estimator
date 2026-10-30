@@ -1,4 +1,4 @@
-// Command refreshplan replaces one user's financial rows in an application
+// Command refreshmodel replaces one user's financial rows in an application
 // database. It never replaces the database file or copies identity records.
 // Stop the application and take a SQLite backup before this offline operation.
 package main
@@ -32,12 +32,12 @@ var financialTables = []string{
 func main() {
 	var target, source, sourceUser, targetUser string
 	var initIssuer, initSubject string
-	var sample bool
+	var financialOnly bool
 	flag.StringVar(&target, "db", "", "existing application database (application must be stopped)")
 	flag.StringVar(&source, "source", "", "application database snapshot")
 	flag.StringVar(&sourceUser, "source-user", "", "explicit source user ID")
-	flag.StringVar(&targetUser, "user", "", "existing destination private user ID")
-	flag.BoolVar(&sample, "sample", false, "publish canonical financial data to users/sample")
+	flag.StringVar(&targetUser, "user", "", "existing destination user ID")
+	flag.BoolVar(&financialOnly, "financial-only", false, "publish only public financial data: exclude receipts, sync credentials/mappings, and private defaults")
 	flag.StringVar(&initIssuer, "init-issuer", "", "initialize a NEW database for this verified dev issuer")
 	flag.StringVar(&initSubject, "init-subject", "", "initialize a NEW database for this verified dev subject")
 	flag.Parse()
@@ -46,32 +46,30 @@ func main() {
 	}
 	var err error
 	if initIssuer != "" || initSubject != "" {
-		if sample || targetUser != "" {
-			log.Fatal("initialization cannot combine with --sample or --user")
+		if financialOnly || targetUser != "" {
+			log.Fatal("initialization cannot combine with --financial-only or --user")
 		}
 		err = initialize(target, source, sourceUser, initIssuer, initSubject)
 	} else {
-		err = refresh(target, source, sourceUser, targetUser, sample)
+		err = refresh(target, source, sourceUser, targetUser, financialOnly)
 	}
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func refresh(target, source, sourceUser, targetUser string, sample bool) error {
+func refresh(target, source, sourceUser, targetUser string, financialOnly bool) error {
 	if target == "" || source == "" || sourceUser == "" {
 		return errors.New("--db, --source, and --source-user are required")
 	}
-	if sample {
-		if targetUser != "" && targetUser != sampleResourceID {
-			return errors.New("--sample can only replace users/sample")
-		}
-		targetUser = sampleResourceID
-	} else if targetUser == "" || normalizeUserRow(targetUser) == sqlite.SampleUserID {
-		return errors.New("--user must name an existing private user; use --sample to publish public data")
+	if targetUser == "" {
+		return errors.New("--user must name an existing user")
 	}
 	sourceRow := normalizeUserRow(sourceUser)
 	targetRow := normalizeUserRow(targetUser)
+	if targetRow == "sample" || targetRow == "fixture" {
+		return errors.New("destination must be an ordinary user; legacy historical rows are never reset")
+	}
 	for _, path := range []string{target, source} {
 		info, err := os.Stat(path)
 		if err != nil {
@@ -112,7 +110,7 @@ func refresh(target, source, sourceUser, targetUser string, sample bool) error {
 		return errors.New("source user has no financial model")
 	}
 	var receipts *sqlite.ReceiptCopy
-	if !sample {
+	if !financialOnly {
 		sourceDB, err := sql.Open("sqlite", uri)
 		if err != nil {
 			return err
@@ -134,27 +132,12 @@ func refresh(target, source, sourceUser, targetUser string, sample bool) error {
 	if _, err := tx.Exec("PRAGMA defer_foreign_keys=ON"); err != nil {
 		return err
 	}
-	if sample {
-		// The financial copy supplies singleton rows and defaults. Create only
-		// the registry row here, within that same transaction, so a failed first
-		// publication cannot expose a blank sample.
-		if _, err := tx.Exec("INSERT INTO users(id, issuer, subject) VALUES (?, 'sample', 'sample') ON CONFLICT(id) DO NOTHING", targetRow); err != nil {
-			return err
-		}
-	}
 	var exists bool
 	if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id=?)", targetRow).Scan(&exists); err != nil {
 		return fmt.Errorf("destination user must already exist: %w", err)
 	}
 	if !exists {
 		return errors.New("destination user must already exist")
-	}
-	if sample {
-		if targetRow != sqlite.SampleUserID {
-			return errors.New("sample user ownership conflict")
-		}
-	} else if targetRow == sqlite.SampleUserID {
-		return errors.New("destination must be a private user")
 	}
 	// Child tables precede parents during deletion. Deferred checks also permit
 	// future references between canonical tables within the same transaction.
@@ -167,7 +150,7 @@ func refresh(target, source, sourceUser, targetUser string, sample bool) error {
 		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
-		if sample && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations") {
+		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "posting_id_migrations") {
 			continue
 		}
 		columns, values := []string{"user_id"}, []string{"?"}
@@ -177,18 +160,18 @@ func refresh(target, source, sourceUser, targetUser string, sample bool) error {
 			}
 			columns = append(columns, quote(column))
 			switch {
-			case sample && table.name == "model_metadata" && column == "source_path":
+			case financialOnly && table.name == "model_metadata" && column == "source_path":
 				values = append(values, "'sample'")
-			case sample && table.name == "sync_state" && column == "last_sync_at":
+			case financialOnly && table.name == "sync_state" && column == "last_sync_at":
 				values = append(values, "''")
-			case sample && table.name == "postings" && column == "receipt_ids":
-				// Sample publication excludes receipts, so copied postings
-				// must not reference private receipt IDs.
+			case financialOnly && table.name == "postings" && column == "receipt_ids":
+				// Financial-only publication excludes receipts, so copied
+				// postings must not reference private receipt IDs.
 				values = append(values, "'[]'")
 			case table.name == "sync_credentials" && (column == "access_url" || column == "bridge_host" || column == "updated_at"):
-				// The Bridge key never travels with a refresh or a sample:
-				// reconnect it where it will run. Card selection is safe
-				// configuration and copies through.
+				// The Bridge key never travels with a refresh or a
+				// financial-only publication: reconnect it where it will
+				// run. Card selection is safe configuration and copies through.
 				values = append(values, "''")
 			default:
 				values = append(values, quote(column))
@@ -207,16 +190,12 @@ func refresh(target, source, sourceUser, targetUser string, sample bool) error {
 	return tx.Commit()
 }
 
-// sampleResourceID is the guest sample user resource. normalizeUserRow
-// maps it (and any private user resource) to the store's user row ID:
+// normalizeUserRow maps a user resource to the store's user row ID:
 // users/<hash> is owned by user:<hash>; raw row IDs pass through for
-// offline operators.
-const sampleResourceID = "users/sample"
-
+// offline operators. The raw historical row "sample" passes through only
+// as an explicit source input when an old database still contains it; it
+// is never created and never valid as a destination.
 func normalizeUserRow(id string) string {
-	if id == sampleResourceID {
-		return sqlite.SampleUserID
-	}
 	if rest, ok := strings.CutPrefix(id, "users/"); ok {
 		return "user:" + rest
 	}

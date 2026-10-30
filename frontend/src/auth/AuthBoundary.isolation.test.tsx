@@ -6,12 +6,12 @@ import {
 	resetServerQueryCache,
 	serverQueryClient,
 } from "@/state/serverQuery.ts";
-import {
-	resetWorkspaceStore,
-	useWorkspaceStore,
-} from "@/state/workspaceStore.ts";
 import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
-import { useServerModel, userResourceKey } from "@/state/workspaceResources.ts";
+import {
+	getServerModel,
+	useServerModel,
+	userResourceKey,
+} from "@/state/workspaceResources.ts";
 import { setServerRevisionFixture } from "@/mocks/workspace.ts";
 import { NotificationCenter } from "@/components/NotificationCenter.tsx";
 import { resetNotifications } from "@/state/notifications.ts";
@@ -25,26 +25,26 @@ import {
 } from "@/state/useSafeSpendingSettings.ts";
 import { safeSpendingSettingsObserver } from "@/mocks/safeSpendingSettings.ts";
 import { canonicalApiBaseUrl } from "@/auth/resourceScope.ts";
+import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
 
 const A = `users/${"a".repeat(64)}`;
 const B = `users/${"b".repeat(64)}`;
 
-function session(id = A) {
+// All identities share one shape: a canonical provisioned user id plus a
+// provisioned subject, guests included. Only `authenticated` differs.
+function session(id = A, authenticated = true) {
 	return {
 		enabled: true,
-		authenticated: id !== "users/sample",
+		authenticated,
 		allowed: true,
 		resource: {
 			id,
-			kind: id === "users/sample" ? "sample" : "private",
-			permissions: [
-				"user:read",
-				"user:project",
-				...(id === "users/sample" ? [] : ["user:write"]),
-			],
+			permissions: authenticated
+				? ["user:read", "user:project", "user:write"]
+				: ["user:read", "user:project"],
 		},
 		user: {
-			subject: id === "users/sample" ? "" : id,
+			subject: id === GUEST_USER_ID ? GUEST_USER_SUBJECT : id,
 			name: "Account",
 		},
 	};
@@ -116,12 +116,10 @@ beforeEach(() => {
 	settingsByResource.clear();
 	suspendUserScope();
 	clearPersistedMemory();
-	resetWorkspaceStore();
 });
 afterEach(() => {
 	cleanup();
 	delete window.__WAYPOINT_CONFIG__;
-	resetWorkspaceStore();
 	resetServerQueryCache();
 	resetNotifications();
 	clearPersistedMemory();
@@ -272,7 +270,7 @@ describe("authentication resource isolation", () => {
 		).toBe(true);
 	});
 
-	it.each([B, "users/sample"])(
+	it.each([B, GUEST_USER_ID])(
 		"keeps the old workspace during a cross-tab check and clears it before resource %s mounts",
 		async (nextId) => {
 			const fetcher = vi.fn(
@@ -321,7 +319,9 @@ describe("authentication resource isolation", () => {
 			expect(screen.getByTestId("active-workspace").textContent).toBe(
 				`${A}:account-a-private-revision`,
 			);
-			await act(async () => finish(response(session(nextId), nextId)));
+			await act(async () =>
+				finish(response(session(nextId, nextId !== GUEST_USER_ID), nextId)),
+			);
 			expect((await screen.findByTestId("active-workspace")).textContent).toBe(
 				`${nextId}:empty`,
 			);
@@ -367,22 +367,18 @@ describe("authentication resource isolation", () => {
 		expect(getUserScope().resource?.id).toBe(B);
 	});
 
-	it("preserves user data, recovery, and completed results across a same-user check", async () => {
+	it("preserves user data and completed results across a same-user check", async () => {
 		const fetcher = vi.fn(async () => response(session()));
 		vi.stubGlobal("fetch", fetcher);
 		renderWorkspace();
 		await screen.findByTestId("active-workspace");
-		const recovery = {
-			version: 1 as const,
-			draft: { name: "Private A draft" } as never,
-			draftPresentation: null,
-			baseRevision: "a",
-		};
 		const key = deterministicQueryKey("private-a-document", 10);
 		act(() => {
-			useWorkspaceStore.setState({ draft: recovery.draft });
 			setServerRevisionFixture("private-a-revision");
 			serverQueryClient().setQueryData(key, "private-a-result");
+			serverQueryClient().setQueryData(userResourceKey("presets"), [
+				{ id: "private-a-recipe" },
+			]);
 			window.dispatchEvent(new Event("focus"));
 		});
 		// Same-user revalidation never unmounts the workspace.
@@ -396,26 +392,26 @@ describe("authentication resource isolation", () => {
 				`${A}:private-a-revision`,
 			),
 		);
-		expect(useWorkspaceStore.getState().draft).toBe(recovery.draft);
+		expect(getServerModel()?.revision).toBe("private-a-revision");
+		expect(
+			serverQueryClient().getQueryData(userResourceKey("presets")),
+		).toEqual([{ id: "private-a-recipe" }]);
 		expect(deterministicQueryKey("private-a-document", 10)).toEqual(key);
 		expect(serverQueryClient().getQueryData(key)).toBe("private-a-result");
 	});
 
 	it.each([A, B])(
-		"keeps the workspace during a failed check and restores it only to account %s",
+		"keeps the workspace during a failed check and isolates server data on move to user %s",
 		async (nextId) => {
 			const fetcher = vi.fn(async () => response(session()));
 			vi.stubGlobal("fetch", fetcher);
 			renderWorkspace();
 			await screen.findByTestId("active-workspace");
-			const recovery = {
-				version: 1 as const,
-				draft: { name: "Private A draft" } as never,
-				draftPresentation: null,
-				baseRevision: "a",
-			};
 			act(() => {
-				useWorkspaceStore.setState({ draft: recovery.draft });
+				setServerRevisionFixture("private-a-revision");
+				serverQueryClient().setQueryData(userResourceKey("presets"), [
+					{ id: "private-a-recipe" },
+				]);
 			});
 			fetcher.mockImplementationOnce(
 				async () => new Response("", { status: 503 }),
@@ -426,14 +422,20 @@ describe("authentication resource isolation", () => {
 			// retry toast instead of wiping the UI.
 			expect(screen.getByTestId("active-workspace")).toBeTruthy();
 			expect(getUserScope().status).toBe("ready");
-			expect(useWorkspaceStore.getState().draft).toBe(recovery.draft);
+			expect(getServerModel()?.revision).toBe("private-a-revision");
+			expect(
+				serverQueryClient().getQueryData(userResourceKey("presets")),
+			).toEqual([{ id: "private-a-recipe" }]);
 			fetcher.mockImplementation(async () => response(session(nextId), nextId));
 			act(() => window.dispatchEvent(new Event("focus")));
 			await screen.findByTestId("active-workspace");
 			expect(getUserScope().resource?.id).toBe(nextId);
-			expect(useWorkspaceStore.getState().draft).toBe(
-				nextId === A ? recovery.draft : null,
+			expect(getServerModel()?.revision).toBe(
+				nextId === A ? "private-a-revision" : undefined,
 			);
+			expect(
+				serverQueryClient().getQueryData(userResourceKey("presets")),
+			).toEqual(nextId === A ? [{ id: "private-a-recipe" }] : undefined);
 		},
 	);
 
@@ -461,7 +463,7 @@ describe("authentication resource isolation", () => {
 		expect(getUserScope().resource?.permissions).toEqual(["user:read"]);
 	});
 
-	it("does not reuse data or recovery when the API address changes for the same user", async () => {
+	it("does not reuse server data when the API address changes for the same user", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => response(session())),
@@ -472,11 +474,9 @@ describe("authentication resource isolation", () => {
 		serverQueryClient().setQueryData(key, "first-api-result");
 		act(() => {
 			setServerRevisionFixture("first-api-data");
-			useWorkspaceStore.setState({
-				draft: { name: "First API draft" } as never,
-				draftPresentation: null,
-				baseRevision: "first-api",
-			});
+			serverQueryClient().setQueryData(userResourceKey("presets"), [
+				{ id: "first-api-recipe" },
+			]);
 			window.__WAYPOINT_CONFIG__ = { apiBaseUrl: "/second-api" };
 			window.dispatchEvent(new Event("focus"));
 		});
@@ -486,7 +486,10 @@ describe("authentication resource isolation", () => {
 			),
 		);
 		expect(getUserScope().apiBaseUrl).toBe(canonicalApiBaseUrl("/second-api"));
-		expect(useWorkspaceStore.getState().draft).toBeNull();
+		expect(getServerModel()).toBeUndefined();
+		expect(
+			serverQueryClient().getQueryData(userResourceKey("presets")),
+		).toBeUndefined();
 		expect(serverQueryClient().getQueryData(key)).toBeUndefined();
 	});
 
@@ -530,10 +533,14 @@ describe("authentication resource isolation", () => {
 		["missing resource", { ...session(), resource: undefined }, A],
 		["missing header", session(), null],
 		["wrong header", session(), B],
-		["guest private resource", { ...session(), authenticated: false }, A],
-		["missing private subject", { ...session(), user: undefined }, A],
 		[
-			"invalid private resource ID",
+			"guest without subject",
+			{ ...session(GUEST_USER_ID, false), user: undefined },
+			GUEST_USER_ID,
+		],
+		["missing subject", { ...session(), user: undefined }, A],
+		[
+			"non-canonical resource ID",
 			{
 				...session(),
 				resource: { ...session().resource, id: "users/sample" },

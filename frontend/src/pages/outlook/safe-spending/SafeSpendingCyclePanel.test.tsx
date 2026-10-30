@@ -18,7 +18,9 @@ function show(cycle: SafeSpendingChargeCycle) {
 	return render(
 		<SafeSpendingCyclePanel
 			cycle={cycle}
-			plan={financialModelFixture}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			readOnly={financialModelFixture.readOnly}
 			transactionOrder="newest"
 			onTransactionOrderChange={() => {}}
 		/>,

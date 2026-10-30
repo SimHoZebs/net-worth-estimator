@@ -1,18 +1,24 @@
 import { TriangleAlert } from "lucide-react";
 import { dateLabel } from "../../domain/format.ts";
 import { failureLedger } from "../../domain/constraintSnapshot.ts";
-import type { Plan } from "../../domain/model.ts";
+import type { Account, Transaction } from "../../domain/model.ts";
 import type { TransactionResult, Projection } from "../../domain/result.ts";
 import { Modal } from "../Modal.tsx";
 import { ConstraintSnapshot } from "./ConstraintSnapshot.tsx";
 
 export function FailureEvidence({
-	plan,
+	accounts,
+	transactions,
+	startDate,
+	readOnly,
 	projection,
 	failure,
 	onClose,
 }: {
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
+	readOnly: boolean;
 	projection: Projection;
 	failure: TransactionResult | null;
 	onClose: () => void;
@@ -23,7 +29,13 @@ export function FailureEvidence({
 				<p>No underfunded transactions occur in this base-case horizon.</p>
 			</Modal>
 		);
-	const ledger = failureLedger({ plan, projection, failure });
+	const ledger = failureLedger({
+		accounts,
+		transactions,
+		startDate,
+		projection,
+		failure,
+	});
 	// The table names the transaction, so the heading names the event instead
 	// of repeating it.
 	return (
@@ -38,8 +50,9 @@ export function FailureEvidence({
 				<ConstraintSnapshot
 					ledger={ledger}
 					failure={failure}
-					accounts={plan.accounts}
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					readOnly={readOnly}
 				/>
 			)}
 		</Modal>

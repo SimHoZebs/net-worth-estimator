@@ -260,7 +260,7 @@ func TestBearerMalformedHeadersFallThrough(t *testing.T) {
 	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
 	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })))
 	defer server.Close()
-	guestID := authorization.ResourceFor(p.server.URL, "").ID
+	guestID := authorization.ResourceFor(p.server.URL, s.config.GuestSubject).ID
 	ownerID := authorization.ResourceFor(p.server.URL, "editor").ID
 	for _, header := range []string{"Bearer", "Basic xyz", "Bearer a b", "Bearer  "} {
 		for _, resource := range []string{guestID, ownerID} {

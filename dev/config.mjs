@@ -103,6 +103,7 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
     version: 1,
     source,
     ownerSubject: null,
+    guestSubject: null,
     slot,
     ports: {
       app: hostname ? defaultPorts.app : Number(new URL(app).port),
@@ -117,6 +118,7 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
       CASDOOR_ADMIN_PASSWORD: secret(),
       CASDOOR_USER_NAME: "household",
       CASDOOR_USER_PASSWORD: secret(),
+      CASDOOR_GUEST_NAME: "guest",
       CASDOOR_USER_DISPLAY_NAME: "Development owner",
       CASDOOR_BACKCHANNEL_LOGOUT_URL: "http://backend:8787/v1/auth/backchannel-logout",
       ...(hostname ? tailnetOrigins(hostname) : {}),
@@ -136,6 +138,17 @@ export function settings(config) {
       /[*,\r\n]/.test(config.ownerSubject))
   ) {
     throw new Error("The primary owner must be one verified OIDC subject");
+  }
+  if (
+    config.guestSubject !== undefined &&
+    config.guestSubject !== null &&
+    (typeof config.guestSubject !== "string" ||
+      !config.guestSubject ||
+      config.guestSubject !== config.guestSubject.trim() ||
+      /[*,\r\n]/.test(config.guestSubject) ||
+      config.guestSubject === config.ownerSubject)
+  ) {
+    throw new Error("The provisioned guest must be one verified OIDC subject distinct from the owner");
   }
   if (
     !config.source ||
@@ -208,6 +221,7 @@ export function composeEnvironment(config) {
     DEV_AUTH_CLIENT_ID: config.identity.AUTH_CLIENT_ID,
     DEV_AUTH_CLIENT_SECRET: config.identity.AUTH_CLIENT_SECRET,
     DEV_OWNER_SUBJECT: config.ownerSubject ?? "",
+    DEV_GUEST_SUBJECT: config.guestSubject ?? "",
   };
 }
 

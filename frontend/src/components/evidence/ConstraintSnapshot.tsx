@@ -1,8 +1,7 @@
 import { money } from "../../domain/format.ts";
-import type { Account, Plan } from "../../domain/model.ts";
+import type { Account, Transaction } from "../../domain/model.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import type { FailureLedger } from "../../domain/constraintSnapshot.ts";
-import type { Transaction } from "../../domain/model.ts";
 import type { TransactionResult } from "../../domain/result.ts";
 import { AccountEntry } from "../AccountEntry.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
@@ -17,13 +16,16 @@ export function ConstraintSnapshot({
 	ledger,
 	failure,
 	accounts,
-	plan,
+	transactions,
+	readOnly,
 	showHeaders = false,
 }: {
 	ledger: FailureLedger;
 	failure: TransactionResult;
 	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
-	plan: Plan;
+	/** Saved rules, for the detail view's rule lookups and edit controls. */
+	transactions: Transaction[];
+	readOnly: boolean;
 	showHeaders?: boolean;
 }) {
 	const gap = failure.requested - failure.realized;
@@ -31,7 +33,7 @@ export function ConstraintSnapshot({
 		transaction: AccountTransaction;
 		planTransaction: Transaction;
 		failing: boolean;
-	}>(plan);
+	}>(failure);
 	return (
 		<figure className="mt-3 mb-0.5">
 			{ledger.accountIcon ? (
@@ -68,7 +70,8 @@ export function ConstraintSnapshot({
 					transaction={selected.transaction}
 					planTransaction={selected.planTransaction}
 					accounts={accounts}
-					plan={plan}
+					transactions={transactions}
+					readOnly={readOnly}
 					shortfallLabel={
 						selected.failing ? `Shortfall ${money(gap)}` : undefined
 					}

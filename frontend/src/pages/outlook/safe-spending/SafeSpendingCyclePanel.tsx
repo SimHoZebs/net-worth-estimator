@@ -1,5 +1,5 @@
 import { TransactionDetail } from "../../../components/activity/TransactionDetail.tsx";
-import type { Plan } from "../../../domain/model.ts";
+import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import { useMemo } from "react";
 import { useTransactionSelection } from "../../../components/activity/useTransactionSelection.ts";
@@ -12,30 +12,29 @@ import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
 
 export function SafeSpendingCyclePanel({
 	cycle,
-	plan,
+	accounts,
+	transactions,
+	readOnly,
 	transactionOrder,
 	onTransactionOrderChange,
 	showHeaders = false,
 }: {
 	cycle: SafeSpendingChargeCycle;
-	plan: Plan;
+	accounts: Account[];
+	/** Saved rules, for the detail view's rule lookups and edit controls. */
+	transactions: Transaction[];
+	readOnly: boolean;
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
 	showHeaders?: boolean;
 }) {
-	const planTransactions = useMemo(
-		() =>
-			new Map(
-				plan.transactions.map((planTransaction) => [
-					planTransaction.id,
-					planTransaction,
-				]),
-			),
-		[plan.transactions],
+	const savedById = useMemo(
+		() => new Map(transactions.map((saved) => [saved.id, saved])),
+		[transactions],
 	);
 	const { selected, inspect, close } = useTransactionSelection(
 		cycle.transactions,
-		planTransactions,
+		savedById,
 	);
 	return (
 		<div className="grid content-start gap-4">
@@ -60,7 +59,7 @@ export function SafeSpendingCyclePanel({
 				transactions={cycle.transactions}
 				caption={cycle.title}
 				emptyMessage={cycle.emptyMessage}
-				planTransactions={planTransactions}
+				planTransactions={savedById}
 				onInspect={inspect}
 				order={transactionOrder}
 				showHeaders={showHeaders}
@@ -69,11 +68,12 @@ export function SafeSpendingCyclePanel({
 				<TransactionDetail
 					transaction={selected.transaction}
 					planTransaction={selected.planTransaction}
-					accounts={plan.accounts}
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					readOnly={readOnly}
 					claimRuleName={
 						selected.planTransaction.claimRuleId
-							? (plan.transactions.find(
+							? (transactions.find(
 									(item) => item.id === selected.planTransaction.claimRuleId,
 								)?.name ?? null)
 							: null

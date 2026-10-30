@@ -148,7 +148,9 @@ describe("SafeSpendingDetailShell", () => {
 					cashNow={cashNow}
 					paycheck={paycheck}
 					section={section}
-					plan={financialModelFixture}
+					accounts={financialModelFixture.accounts}
+					transactions={financialModelFixture.transactions}
+					readOnly={financialModelFixture.readOnly}
 					transactionOrder="newest"
 					onTransactionOrderChange={noop}
 				/>
@@ -180,7 +182,9 @@ describe("SafeSpendingBillsPanel incoming foot", () => {
 				cashNow={cashNow}
 				paycheck={paycheck}
 				section={section}
-				plan={financialModelFixture}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				readOnly={financialModelFixture.readOnly}
 				transactionOrder="newest"
 				onTransactionOrderChange={noop}
 			/>,

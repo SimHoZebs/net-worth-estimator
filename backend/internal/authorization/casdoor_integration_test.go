@@ -30,10 +30,11 @@ func TestCasdoorAuthorizationFixture(t *testing.T) {
 		Subjects struct {
 			Owner  string `json:"owner"`
 			Second string `json:"second"`
+			Guest  string `json:"guest"`
 		} `json:"subjects"`
 	}
-	if json.Unmarshal(data, &fixture) != nil || fixture.Disposable != "waypoint-authorization-v1" || fixture.Subjects.Owner == "" || fixture.Subjects.Second == "" || fixture.Subjects.Owner == fixture.Subjects.Second {
-		t.Fatal("expected an explicitly disposable authorization fixture with two distinct verified subjects")
+	if json.Unmarshal(data, &fixture) != nil || fixture.Disposable != "waypoint-authorization-v1" || fixture.Subjects.Owner == "" || fixture.Subjects.Second == "" || fixture.Subjects.Guest == "" || fixture.Subjects.Owner == fixture.Subjects.Second || fixture.Subjects.Owner == fixture.Subjects.Guest || fixture.Subjects.Second == fixture.Subjects.Guest {
+		t.Fatal("expected an explicitly disposable authorization fixture with three distinct verified subjects")
 	}
 	issuer, err := url.Parse(fixture.Settings.PublicURL)
 	if err != nil || (issuer.Hostname() != "localhost" && issuer.Hostname() != "127.0.0.1") || issuer.Port() == "" || issuer.Port() == "8000" {
@@ -51,17 +52,22 @@ func TestCasdoorAuthorizationFixture(t *testing.T) {
 			t.Fatalf("real provider did not grant the private owner scope: %+v, %v", scope, err)
 		}
 	}
-	guest, err := client.Resolve(ctx, "")
-	if err != nil || guest.Resource != ResourceFor(config.Issuer, "") || !reflect.DeepEqual(guest.Permissions, []string{Read, Project}) {
-		t.Fatalf("real provider did not limit guest scope: %+v, %v", guest, err)
+	// Empty subjects fail closed; there is no literal guest or sample row.
+	if scope, err := client.Resolve(ctx, ""); err == nil || scope.Resource.ID != "" {
+		t.Fatalf("empty subject did not fail closed: %+v, %v", scope, err)
+	}
+	// The preprovisioned guest is an ordinary account with limited
+	// creation-time grants: exactly viewer [read, project], not full write.
+	guest, err := client.Resolve(ctx, fixture.Subjects.Guest)
+	if err != nil || guest.Resource != ResourceFor(config.Issuer, fixture.Subjects.Guest) || !guest.Resource.valid() || !reflect.DeepEqual(guest.Permissions, []string{Read, Project}) {
+		t.Fatalf("real provider did not return limited guest viewer grants: %+v, %v", guest, err)
 	}
 	for _, check := range []struct {
 		name, subject string
 		resource      Resource
 	}{
 		{"cross owner", fixture.Subjects.Second, ResourceFor(config.Issuer, fixture.Subjects.Owner)},
-		{"authenticated sample", fixture.Subjects.Owner, ResourceFor(config.Issuer, "")},
-		{"guest private", "", ResourceFor(config.Issuer, fixture.Subjects.Owner)},
+		{"guest private", fixture.Subjects.Guest, ResourceFor(config.Issuer, fixture.Subjects.Owner)},
 	} {
 		t.Run(check.name, func(t *testing.T) {
 			decisions, err := client.Check(ctx, check.subject, check.resource, []string{Read, Project, Write})

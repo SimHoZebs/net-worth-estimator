@@ -1,6 +1,5 @@
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type Plan, validatePlan } from "../../domain/model.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
@@ -8,30 +7,27 @@ import { Notice } from "../Notice.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 
-export interface EditorProps {
-	plan: Plan;
-	onApply: (plan: Plan) => boolean;
-	onClose: () => void;
-	applyError?: string | null;
-}
+/**
+ * Direct row edit shell. The form owns its values and saves straight to
+ * the server; there is no draft layer. Failed saves keep the form open with
+ * the entered values and a server notice, and close only after confirmed save.
+ */
 export function EditorForm({
 	title,
-	onApply,
 	onClose,
-	applyError,
 	readOnlyReason,
-	buildPlan,
+	onSubmit,
 	children,
-}: Omit<EditorProps, "plan"> & {
+}: {
 	title: string;
+	onClose: () => void;
 	readOnlyReason?: string;
-	buildPlan: (data: FormData) => Plan;
+	onSubmit: (data: FormData) => void | Promise<void>;
 	children: ReactNode;
 }) {
 	const [error, setError] = useState<string | null>(null);
 	const [dirty, setDirty] = useState(false);
 	const [confirmCancel, setConfirmCancel] = useState(false);
-	const [applyFailed, setApplyFailed] = useState(false);
 	useBeforeUnload(dirty);
 	const requestClose = () => {
 		if (!dirty) return true;
@@ -41,12 +37,6 @@ export function EditorForm({
 	const close = () => {
 		if (requestClose()) onClose();
 	};
-	const displayedError =
-		error ||
-		(applyFailed
-			? applyError ||
-				"Your change could not be applied. Review the form and try again."
-			: null);
 	return (
 		<Modal title={title} onClose={onClose} onCloseRequest={requestClose}>
 			{readOnlyReason && (
@@ -60,16 +50,23 @@ export function EditorForm({
 					event.preventDefault();
 					if (readOnlyReason) return;
 					setError(null);
-					setApplyFailed(false);
-					const validated = validatePlan(
-						buildPlan(new FormData(event.currentTarget)),
-					);
-					if (validated instanceof Error) {
-						setError(validated.message);
-						return;
+					try {
+						const result = onSubmit(new FormData(event.currentTarget));
+						if (result instanceof Promise)
+							result.catch((cause: unknown) =>
+								setError(
+									cause instanceof Error
+										? cause.message
+										: "Your change could not be applied. Review the form and try again.",
+								),
+							);
+					} catch (cause) {
+						setError(
+							cause instanceof Error
+								? cause.message
+								: "Your change could not be applied. Review the form and try again.",
+						);
 					}
-					if (onApply(validated)) onClose();
-					else setApplyFailed(true);
 				}}
 				onChange={() => setDirty(true)}
 			>
@@ -79,7 +76,7 @@ export function EditorForm({
 				>
 					{children}
 				</fieldset>
-				{displayedError && <ErrorNotice message={displayedError} />}
+				{error && <ErrorNotice message={error} />}
 				{confirmCancel ? (
 					<div
 						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"

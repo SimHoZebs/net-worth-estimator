@@ -12,9 +12,9 @@ import (
 const ResourceHeader = "Waypoint-Resource"
 
 // The header name stays Waypoint-Resource: browsers and the nwe CLI already
-// assert it, and the value is now a user resource (users/<opaque-id>,
-// guest users/sample). Only the copy changes from plan to user; the 409
-// RESOURCE_CHANGED contract is unchanged.
+// assert it, and the value is now a user resource (users/<64hex> for every
+// identity, including the preprovisioned guest). Only the copy changes from
+// plan to user; the 409 RESOURCE_CHANGED contract is unchanged.
 
 // WriteResourceChanged distinguishes a stale user assertion from an operation conflict.
 func WriteResourceChanged(w http.ResponseWriter) {
@@ -64,10 +64,11 @@ func requestAction(r *http.Request) string {
 	return "user:write"
 }
 
-// IsGroupRoute reports social group routes, which need authentication
-// only. Membership is enforced by the groups handler, not user
-// permissions. It matches exactly the routes the groups handler serves so
-// no future user route can hide inside the bypass.
+// IsGroupRoute reports social group routes. Group calls require the standard
+// own-user permission checks and resource header; group
+// membership is additionally enforced by the groups handler. It matches
+// exactly the routes the groups handler serves so no future user route can
+// hide inside the group path.
 func IsGroupRoute(path string) bool {
 	return path == "/v1/groups" || strings.HasPrefix(path, "/v1/groups/") ||
 		path == "/v1/invites/accept"

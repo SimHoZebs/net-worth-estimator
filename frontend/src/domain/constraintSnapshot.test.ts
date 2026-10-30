@@ -39,7 +39,9 @@ describe("failure ledger", () => {
 	it("selects the failure month as real rows with the failure flagged", () => {
 		const failure = decemberFailure();
 		const ledger = failureLedger({
-			plan: financialModelFixture,
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
 			projection: checkingProjection([
 				move({
 					date: "2026-11-05",
@@ -134,7 +136,9 @@ describe("failure ledger", () => {
 			);
 		}
 		const ledger = failureLedger({
-			plan: financialModelFixture,
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
 			projection: checkingProjection([...busy, failure]),
 			failure,
 		});
@@ -155,7 +159,9 @@ describe("failure ledger", () => {
 		const external = move({ fromId: null, toId: null });
 		expect(
 			failureLedger({
-				plan: financialModelFixture,
+				accounts: financialModelFixture.accounts,
+				transactions: financialModelFixture.transactions,
+				startDate: financialModelFixture.startDate,
 				projection: checkingProjection([external]),
 				failure: external,
 			}),

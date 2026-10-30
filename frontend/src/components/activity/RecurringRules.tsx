@@ -10,16 +10,15 @@ import {
 import { Reorder, useDragControls } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
-import type { Account, Transaction, Plan } from "../../domain/model.ts";
+import type { Account, Transaction } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { useWorkspaceStore } from "../../state/workspaceStore.ts";
 import { moveRule } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
-import { refreshTransactions } from "../../state/workspaceResources.ts";
 import {
-	useServerModel,
+	refreshTransactions,
 	useServerStatus,
 } from "../../state/workspaceResources.ts";
+import { ruleTransaction } from "../../domain/accountActivity.ts";
 import { Badge } from "../Badge.tsx";
 import { EmptyState } from "../EmptyState.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
@@ -28,7 +27,6 @@ import {
 	transactionBadgeStyles,
 } from "./activityStyles.ts";
 import { TransactionDetail } from "./TransactionDetail.tsx";
-import { ruleTransaction } from "../../domain/accountActivity.ts";
 
 type Direction = "in" | "out" | "transfer";
 
@@ -112,56 +110,35 @@ function SortableRow({
 
 export function RecurringRules({
 	account,
-	plan,
+	accounts,
+	transactions,
+	startDate,
+	readOnly,
 	onEdit,
 }: {
 	account: Account;
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
+	readOnly: boolean;
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const status = useServerStatus().data;
-	const model = useServerModel().data;
-	const serverDocument = model?.document;
-	const draftPresentation = useWorkspaceStore(
-		(state) => state.draftPresentation,
-	);
-	const savedPresentation = model?.conversion?.presentation;
 	const [editing, setEditing] = useState(false);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
-	const presentation = draftPresentation ?? savedPresentation;
-	const serverRules = useMemo(
-		() =>
-			new Map(
-				(serverDocument?.recurrenceRules ?? []).map((rule) => [rule.id, rule]),
-			),
-		[serverDocument],
-	);
-	const globalRecurring = useMemo(
-		() =>
-			plan.transactions.filter(
-				(transaction) => transaction.frequency !== "once",
-			),
-		[plan.transactions],
-	);
 	const rules = useMemo(
 		() =>
-			globalRecurring.filter(
+			transactions.filter(
 				(transaction) =>
-					transaction.fromId === account.id || transaction.toId === account.id,
+					transaction.frequency !== "once" &&
+					(transaction.fromId === account.id ||
+						transaction.toId === account.id),
 			),
-		[globalRecurring, account.id],
+		[transactions, account.id],
 	);
 	if (selectedId !== null && !rules.some((rule) => rule.id === selectedId))
 		setSelectedId(null);
-
-	const detailFor = (transaction: Transaction) => {
-		const stored = presentation?.transactions[transaction.id];
-		const server = serverRules.get(transaction.id);
-		const backendFrequency =
-			stored?.frequency ?? server?.frequency ?? transaction.frequency;
-		return { backendFrequency };
-	};
 
 	const persistOrder = async (orderedIds: string[]): Promise<boolean> => {
 		// Rebuild the account order with row moves, anchoring from the end
@@ -248,7 +225,7 @@ export function RecurringRules({
 		});
 	};
 
-	const canEdit = !plan.readOnly && !status?.readOnly;
+	const canEdit = !readOnly && !status?.readOnly;
 
 	if (!rules.length)
 		return (
@@ -266,7 +243,6 @@ export function RecurringRules({
 		compact: boolean,
 	) => {
 		const direction = directionFor(transaction, account.id);
-		const { backendFrequency } = detailFor(transaction);
 		const DirectionIcon =
 			direction === "transfer"
 				? ArrowRightLeft
@@ -298,7 +274,8 @@ export function RecurringRules({
 						{transaction.name}
 					</strong>
 					<span className="m-0 text-xs text-muted">
-						{directionLabel(direction)} · {frequencyLabel(backendFrequency)} ·{" "}
+						{directionLabel(direction)} ·{" "}
+						{frequencyLabel(transaction.frequency)} ·{" "}
 						{transaction.amountKnown ? money(transaction.amount) : "Varies"}
 					</span>
 					{!transaction.enabled && (
@@ -398,7 +375,7 @@ export function RecurringRules({
 							<button
 								type="button"
 								className="flex min-w-0 flex-1 items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left"
-								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${frequencyLabel(detailFor(transaction).backendFrequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
+								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${frequencyLabel(transaction.frequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
 								onClick={() => setSelectedId(transaction.id)}
 							>
 								{rowContent(transaction, index + 1, false)}
@@ -413,10 +390,15 @@ export function RecurringRules({
 					if (!transaction) return null;
 					return (
 						<TransactionDetail
-							transaction={ruleTransaction({ transaction, plan })}
+							transaction={ruleTransaction({
+								transaction,
+								accounts,
+								startDate,
+							})}
 							planTransaction={transaction}
-							accounts={plan.accounts}
-							plan={plan}
+							accounts={accounts}
+							transactions={transactions}
+							readOnly={readOnly}
 							onClose={() => setSelectedId(null)}
 						/>
 					);

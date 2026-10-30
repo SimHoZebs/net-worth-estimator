@@ -1,4 +1,4 @@
-import type { Plan } from "../domain/model.ts";
+import type { Account, Transaction } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/accountEdits.ts";
 import type { Projection } from "../domain/result.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
@@ -13,20 +13,24 @@ export type EvidenceTarget =
 
 export function EvidenceDialog({
 	target,
-	plan,
+	accounts,
+	transactions,
+	startDate,
+	readOnly,
 	projection,
 	temporary = false,
 	onClose,
 	onEdit,
-	onApply,
 }: {
 	target: Exclude<EvidenceTarget, { kind: "position" }>;
-	plan: Plan;
+	accounts: Account[];
+	transactions: Transaction[];
+	startDate: string;
+	readOnly: boolean;
 	projection: Projection;
 	temporary?: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
-	onApply: (plan: Plan) => boolean;
 }) {
 	// The editor replaces the evidence in the URL overlay slot, so the
 	// evidence unmounts on navigation: no separate close is needed, and the
@@ -38,7 +42,10 @@ export function EvidenceDialog({
 		case "failure":
 			return (
 				<FailureEvidence
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					startDate={startDate}
+					readOnly={readOnly}
 					projection={projection}
 					failure={projection.firstFailure}
 					onClose={onClose}
@@ -47,25 +54,27 @@ export function EvidenceDialog({
 		case "safe-spending":
 			return (
 				<SafeSpendingEvidence
-					plan={plan}
+					startDate={startDate}
 					projection={projection}
 					onClose={onClose}
 				/>
 			);
 		case "account": {
-			const account = plan.accounts.find(
+			const account = accounts.find(
 				(item) => item.id === target.id && !item.archived,
 			);
 			return account ? (
 				<AccountDialog
 					key={account.id}
 					account={account}
-					plan={plan}
+					accounts={accounts}
+					transactions={transactions}
+					startDate={startDate}
 					projection={projection}
+					readOnly={readOnly}
 					temporary={temporary}
 					onClose={onClose}
 					onEdit={edit}
-					onApply={onApply}
 				/>
 			) : null;
 		}
