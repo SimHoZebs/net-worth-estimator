@@ -103,7 +103,7 @@ func TestSetupCreatesParentAndSupportsRepeatProvisioning(t *testing.T) {
 	}
 }
 
-func TestSetupProvisionsOrdinaryUserWithDocument(t *testing.T) {
+func TestSetupProvisionsOrdinaryUserWithModel(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "app.db")
 	var out, errOut bytes.Buffer
 	if code := run([]string{"--db", path, "--issuer", "https://issuer.test", "--subject", "guest-user"}, &out, &errOut); code != 0 {
@@ -139,9 +139,9 @@ func TestSetupProvisionsOrdinaryUserWithDocument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	exists, err := user.DocumentExists()
+	exists, err := user.ModelExists()
 	if err != nil || !exists {
-		t.Fatalf("provisioned document missing: %v %v", exists, err)
+		t.Fatalf("provisioned model missing: %v %v", exists, err)
 	}
 	// Partial issuer/subject pair must fail.
 	for _, args := range [][]string{

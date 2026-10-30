@@ -36,7 +36,7 @@ func purchaseRequest(balance float64, items ...any) types.SimulationRequest {
 	}
 	return types.SimulationRequest{
 		StartDate: "2026-02-01", EndDate: "2026-03-10", IncludeStartDateEvents: true,
-		Model: types.FinancialModel{
+		Model: types.SimulationInputs{
 			Accounts:         []types.Account{{ID: "cash", Name: "Cash", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
 			Postings:         postings,
 			PlannedPurchases: purchases,
@@ -173,9 +173,9 @@ func TestPurchaseDatesAndDisabledItems(t *testing.T) {
 
 func TestPurchaseNeverReplaysAsHistory(t *testing.T) {
 	request := purchaseRequest(1000, plannedPurchase("old-wish", "2025-01-01", "500", 0))
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
-	prepared, err := PrepareSimulationRequest(&document, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}, types.ModelOverrides{}, nil)
+	prepared, err := PrepareSimulationRequest(&model, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,11 +206,11 @@ func TestPurchasesRespectAccountFloorAndDoNotPartiallyPurchase(t *testing.T) {
 
 func TestPurchaseAtCheckpointDoesNotChangeBaselineBands(t *testing.T) {
 	request := purchaseRequest(1000, plannedPurchase("wish", "2025-01-01", "500", 0))
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	seed := int64(42)
-	result, err := StochasticProjection(context.Background(), &document, &settings, types.ModelOverrides{}, types.StochasticConfig{RunCount: 5, Seed: &seed}, nil)
+	result, err := StochasticProjection(context.Background(), &model, &settings, types.ModelOverrides{}, types.StochasticConfig{RunCount: 5, Seed: &seed}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func TestPurchaseValidation(t *testing.T) {
 				bill.Amount.Inputs = map[string]types.AmountInputBinding{"x": {Source: "provider", Provider: "model-value", Arguments: map[string]any{"id": "want"}}}
 				request.Model.Postings = append(request.Model.Postings, bill)
 			}
-			issues := ValidateFinancialModel(&types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases})
+			issues := ValidateFinancialModel(&types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases})
 			for _, issue := range issues {
 				if issue.Severity == types.SeverityError {
 					return
@@ -373,15 +373,15 @@ func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 			t.Fatalf("purchase ignored sampled income %v: %v", rate, purchaseEvents(run))
 		}
 	}
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	seed := int64(42)
 	config := types.StochasticConfig{RunCount: 10, Seed: &seed}
-	first, err := StochasticProjection(context.Background(), &document, &settings, types.ModelOverrides{}, config, nil)
+	first, err := StochasticProjection(context.Background(), &model, &settings, types.ModelOverrides{}, config, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := StochasticProjection(context.Background(), &document, &settings, types.ModelOverrides{}, config, nil)
+	second, err := StochasticProjection(context.Background(), &model, &settings, types.ModelOverrides{}, config, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

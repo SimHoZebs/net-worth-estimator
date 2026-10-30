@@ -104,14 +104,14 @@ func whatIfOverridesFromParsed(config any) types.ModelOverrides {
 }
 
 func evaluateWhatIf(ctx *EvaluationContext, config any) (PathResult, error) {
-	base := ctx.Path.EffectiveDocument
+	base := ctx.Path.EffectiveModel
 	overrides := whatIfOverridesFromParsed(config)
 	effective := types.ApplyModelOverrides(base, overrides)
-	// Reuse the shared candidate builder against the overlaid document.
+	// Reuse the shared candidate builder against the overlaid model.
 	// History rows and the projection window come from the base path; only
-	// the effective document is swapped.
+	// the effective model is swapped.
 	branched := *ctx.Path
-	branched.EffectiveDocument = effective
+	branched.EffectiveModel = effective
 	request := purchasesCandidateRequest(&branched, ctx.MonteCarloSample)
 	run, err := Simulate(request)
 	if err != nil {

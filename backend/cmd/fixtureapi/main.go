@@ -117,7 +117,7 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
-		if _, err := database.ImportDocument(doc); err != nil {
+		if _, err := database.ImportModel(doc); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
 		if len(bankTransactions) > 0 {

@@ -1,5 +1,5 @@
 import { purchaseRequest } from "./draft.js";
-import { loadPlan, matchesPurchase } from "./plan.js";
+import { loadModel, matchesPurchase } from "./model.js";
 
 // Own the uncertain-save state and single-flight write. UI and extraction never
 // construct row writes or choose retry identities independently.
@@ -16,8 +16,8 @@ export function createPurchaseSaver(connection, captures, storage) {
   async function perform() {
     const identity = await connection.identity();
     const resource = identity.resource.id;
-    const plan = await loadPlan(connection, resource);
-    if (plan.readOnly || !identity.resource.permissions.includes("user:write"))
+    const model = await loadModel(connection, resource);
+    if (model.readOnly || !identity.resource.permissions.includes("user:write"))
       throw new Error("This account is read-only. Your draft remains available.");
     const { connection: connected } = await storage.local.get("connection");
     if (!connected) throw new Error("Reconnect before saving this purchase.");
@@ -36,7 +36,7 @@ export function createPurchaseSaver(connection, captures, storage) {
         "The connected account changed. Reopen the panel and choose its funding account before saving.",
       );
     const payload =
-      state.pendingSave?.payload ?? purchaseRequest(state.draft, plan.accounts, plan.purchases);
+      state.pendingSave?.payload ?? purchaseRequest(state.draft, model.accounts, model.purchases);
     await captures.change((current) => {
       if (current.draft.id !== state.draft.id)
         throw new Error("The draft changed. Review it before saving.");
@@ -51,8 +51,8 @@ export function createPurchaseSaver(connection, captures, storage) {
       result = await connection.api("/v1/planned-purchases", payload, resource);
     } catch (error) {
       if (error.status === 409) {
-        const model = await connection.api("/v1/financial-model", undefined, resource);
-        const stored = model.document?.plannedPurchases?.find(
+        const response = await connection.api("/v1/financial-model", undefined, resource);
+        const stored = response.model?.plannedPurchases?.find(
           (purchase) => purchase.id === payload.id,
         );
         if (!matchesPurchase(stored, payload))

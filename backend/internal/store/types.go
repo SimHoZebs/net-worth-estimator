@@ -169,12 +169,12 @@ type GroupInvite struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
-// DocumentETag returns a content identity for the canonical model document.
-func DocumentETag(document *types.FinancialModelDocument) (string, error) {
-	if document == nil {
+// ModelETag returns a content identity for the canonical model.
+func ModelETag(model *types.FinancialModel) (string, error) {
+	if model == nil {
 		return `""`, nil
 	}
-	payload, err := json.Marshal(document)
+	payload, err := json.Marshal(model)
 	if err != nil {
 		return "", fmt.Errorf("encode model ETag: %w", err)
 	}

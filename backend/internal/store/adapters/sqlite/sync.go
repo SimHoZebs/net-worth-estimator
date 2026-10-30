@@ -16,7 +16,7 @@ func syncCheckpointKey(accountID string, observedAt int64) string {
 
 // nextTablePosition returns MAX(position)+1 for a position-ordered table, or
 // 0 when empty. One position-management helper shared by the sync apply and
-// document re-merge paths.
+// model re-merge paths.
 func nextTablePosition(tx *userTx, table string) (int, error) {
 	var maxPosition sql.NullInt64
 	if err := tx.QueryRow(`SELECT MAX(position) FROM ` + table + ` WHERE user_id = :user_id`).Scan(&maxPosition); err != nil {

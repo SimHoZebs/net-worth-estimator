@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import type { FinancialModelDocument } from "../src/api/contracts.ts";
+import type { FinancialModel } from "../src/api/contracts.ts";
 import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
@@ -333,8 +333,7 @@ test("growth-only accounts have an honest empty state and retain account details
 		.get(`${FIXTURE_API}/v1/financial-model`)
 		.then(async (response) => {
 			expect(response.ok()).toBe(true);
-			return ((await response.json()) as { document: FinancialModelDocument })
-				.document;
+			return ((await response.json()) as { model: FinancialModel }).model;
 		});
 	const home = savedModel.accounts.find((account) => account.id === "home");
 	expect(home?.minBalance).toBe(5000);

@@ -44,29 +44,29 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 				Date:             event.Date,
 				AccountSnapshots: []types.AccountSnapshot{{AccountID: source, Balance: tc.endingBalance}},
 			}
-			document := types.FinancialModelDocument{Accounts: []types.Account{account}}
+			model := types.FinancialModel{Accounts: []types.Account{account}}
 			if tc.missingSource {
-				document.Accounts = nil
+				model.Accounts = nil
 				row.AccountSnapshots = nil
 			}
 			if tc.destinationLimit {
 				ceiling := tc.realized
 				posting.Destinations = []string{"loan"}
-				document.Accounts = append(document.Accounts, types.Account{ID: "loan", Name: "Loan", MaxBalance: &ceiling, Enabled: true})
+				model.Accounts = append(model.Accounts, types.Account{ID: "loan", Name: "Loan", MaxBalance: &ceiling, Enabled: true})
 				row.AccountSnapshots = append(row.AccountSnapshots, types.AccountSnapshot{AccountID: "loan", Balance: ceiling})
 				event.AccountDeltas = append(event.AccountDeltas, transactionAccountDelta{AccountID: "loan", Delta: tc.realized})
 			}
 			if tc.capped {
 				cap := tc.realized
-				document.RecurrenceRules = []types.RecurrenceRule{{
+				model.RecurrenceRules = []types.RecurrenceRule{{
 					ID: posting.ID, Name: posting.Name, SourceAccountID: posting.SourceAccountID,
 					AnnualCap: &cap, Enabled: true,
 				}}
 			} else {
-				document.Postings = []types.Posting{posting}
+				model.Postings = []types.Posting{posting}
 			}
 			path := &types.ProjectionPath{
-				EffectiveDocument: document, Rows: []types.ProjectionRow{row},
+				EffectiveModel: model, Rows: []types.ProjectionRow{row},
 				TransactionEvents: []types.TransactionEvent{event},
 			}
 			public := publicTransactionEvents(path)[0]
@@ -101,12 +101,12 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 
 func TestPublicTransactionFulfillmentDoesNotDependOnConfiguredEvaluations(t *testing.T) {
 	payload := loadGolden(t, "checkpoints.json")
-	document := decodeDocument(t, payload["document"])
+	model := decodeModel(t, payload["model"])
 	settings := decodeSettings(t, payload["settings"])
 	floor := 2400.0
-	for index := range document.Accounts {
-		if document.Accounts[index].ID == "checking" {
-			document.Accounts[index].MinBalance = &floor
+	for index := range model.Accounts {
+		if model.Accounts[index].ID == "checking" {
+			model.Accounts[index].MinBalance = &floor
 		}
 	}
 	var baseline []types.TransactionEvent
@@ -122,7 +122,7 @@ func TestPublicTransactionFulfillmentDoesNotDependOnConfiguredEvaluations(t *tes
 					InstanceID: "fulfillment", Name: "Fulfillment", Enabled: mode != "disabled", Config: config,
 				}}
 			}
-			result, err := ProjectFinancialModelDocument(document, settings, types.ModelOverrides{}, nil)
+			result, err := ProjectFinancialModel(model, settings, types.ModelOverrides{}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

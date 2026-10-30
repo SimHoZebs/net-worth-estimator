@@ -303,7 +303,7 @@ test("financial independence configuration updates minimum, duration, and fundin
 	const model = (await (
 		await request.get(`${FIXTURE_API}/v1/financial-model`)
 	).json()) as FinancialModelResponse;
-	const saved = model.document?.evaluations.financialIndependence.find(
+	const saved = model.model?.evaluations.financialIndependence.find(
 		(item) => item.instanceId === id,
 	);
 	const config = saved?.config as Record<string, JsonValue>;
@@ -444,7 +444,7 @@ for (const theme of ["light", "dark"]) {
 			const model = (await (
 				await request.get(`${FIXTURE_API}/v1/financial-model`)
 			).json()) as FinancialModelResponse;
-			expect(model.document?.evaluations.financialIndependence[0]?.name).toBe(
+			expect(model.model?.evaluations.financialIndependence[0]?.name).toBe(
 				"Financial independence",
 			);
 		});

@@ -11,7 +11,7 @@ func TestEqualTimePostingExecutionDoesNotDependOnIdentity(t *testing.T) {
 	account := "checking"
 	floor := 0.0
 	amount := types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts:    []types.Account{{ID: account, Name: "Checking", Kind: types.AccountKindCash, MinBalance: &floor, Enabled: true}},
 		Checkpoints: []types.Checkpoint{{AccountID: account, Balance: 0, ObservedAt: 1767311999}, {AccountID: account, ObservedAt: 1767398399, Balance: 10}},
 		Postings: []types.Posting{
@@ -20,13 +20,13 @@ func TestEqualTimePostingExecutionDoesNotDependOnIdentity(t *testing.T) {
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	_, before, _, err := replayHistoricalState(document, "2026-01-03")
+	_, before, _, err := replayHistoricalState(model, "2026-01-03")
 	if err != nil {
 		t.Fatal(err)
 	}
-	document.Postings[0].ID = "01900000-0000-7000-8000-000000000001"
-	document.Postings[1].ID = "01900000-0000-7000-8000-000000000002"
-	_, after, _, err := replayHistoricalState(document, "2026-01-03")
+	model.Postings[0].ID = "01900000-0000-7000-8000-000000000001"
+	model.Postings[1].ID = "01900000-0000-7000-8000-000000000002"
+	_, after, _, err := replayHistoricalState(model, "2026-01-03")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestEqualTimePostingExecutionDoesNotDependOnIdentity(t *testing.T) {
 		t.Fatalf("equal-time execution order changed: %+v", correction)
 	}
 	// Projection execution shares history's ordering, even if display position differs.
-	resolved := ResolveOccurrences(nil, document.Postings, "2026-01-02", "2026-01-02", true)
+	resolved := ResolveOccurrences(nil, model.Postings, "2026-01-02", "2026-01-02", true)
 	occurrences := resolved.ByDate["2026-01-02"]
 	sortOccurrences(occurrences)
 	if occurrences[0].Posting.ExecutionOrder != 1 {

@@ -7,14 +7,14 @@ import {
 import { ok } from "../mocks/fetch.ts";
 import { ApiHttpError, ApiNetworkError } from "./http.ts";
 import { UserScopeError } from "./scopedRequest.ts";
-import type { BackendAccount, FinancialModelDocument } from "./contracts.ts";
+import type { BackendAccount, FinancialModel } from "./contracts.ts";
 import {
 	importServerModel,
 	ServerModelImportError,
 	type ServerModelImportOptions,
 } from "./serverModelImport.ts";
 
-const emptyDocument: FinancialModelDocument = {
+const emptyModel: FinancialModel = {
 	sourcePath: "models/current",
 	accounts: [],
 	checkpoints: [],
@@ -38,8 +38,8 @@ const account: BackendAccount = {
 	enabled: true,
 };
 
-const document: FinancialModelDocument = {
-	...emptyDocument,
+const model: FinancialModel = {
+	...emptyModel,
 	sourcePath: "models/reviewed-model",
 	accounts: [account],
 };
@@ -66,7 +66,7 @@ function setup(
 		const path = String(url);
 		const method = init?.method ?? "GET";
 		if (path.endsWith("/v1/financial-model"))
-			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
+			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		if (method === "DELETE" || path.endsWith("/reorder"))
 			return ok({ revision: "r1" });
 		return ok(rowResponse(JSON.parse(String(init?.body ?? "{}"))));
@@ -88,7 +88,7 @@ function setup(
 		fetcher,
 		recover,
 		reload,
-		run: () => importServerModel({ ...options, document }),
+		run: () => importServerModel({ ...options, model }),
 	};
 }
 
@@ -103,7 +103,7 @@ describe("server model replacement", () => {
 		const { run, fetcher, reload } = setup();
 		fetcher.mockImplementationOnce(async () => {
 			suspendUserScope();
-			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
+			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		});
 		expect(await run()).toBeInstanceOf(UserScopeError);
 		expect(
@@ -122,7 +122,7 @@ describe("server model replacement", () => {
 				suspendUserScope();
 				return ok(rowResponse(account));
 			}
-			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
+			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		});
 		expect(await run()).toBeInstanceOf(UserScopeError);
 		expect(reload).not.toHaveBeenCalled();
@@ -228,7 +228,7 @@ describe("server model replacement", () => {
 					persisted: false,
 					revision: "r1",
 				});
-			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
+			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		});
 		const result = await run();
 		expect(result).toBeInstanceOf(ServerModelImportError);
@@ -256,7 +256,7 @@ describe("server model replacement", () => {
 					persisted: true,
 					revision: "r1",
 				});
-			return ok({ document: emptyDocument, issues: [], revision: "r-model" });
+			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		});
 		expect(await run()).toBe(true);
 		expect(reload).toHaveBeenCalledOnce();
@@ -281,7 +281,7 @@ describe("initial server model recovery", () => {
 			});
 			recover.mockResolvedValue(activated);
 			expect(await run()).toBe(activated);
-			expect(recover).toHaveBeenCalledExactlyOnceWith(document);
+			expect(recover).toHaveBeenCalledExactlyOnceWith(model);
 			expect(fetcher).not.toHaveBeenCalled();
 			expect(reload).not.toHaveBeenCalled();
 		},

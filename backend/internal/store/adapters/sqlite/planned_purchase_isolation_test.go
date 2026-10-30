@@ -20,7 +20,7 @@ func TestStandalonePurchaseWritesStayUserScoped(t *testing.T) {
 		}
 	}
 	before := planSnapshot(t, b)
-	doc, _ := a.LoadDocument()
+	doc, _ := a.LoadModel()
 	p := doc.PlannedPurchases[0]
 	p.Name = "Only Alice"
 	if _, err := a.UpdatePlannedPurchase(p); err != nil {

@@ -171,7 +171,7 @@ export class Connection {
       await this.commit(async () => {
         if (epoch === this.epoch) await this.storage.session.remove(["access", "identity"]);
       });
-      throw new Error("Reconnect to Waypoint to access your plan.");
+      throw new Error("Reconnect to Waypoint to access your financial model.");
     }
     await this.commit(async () => {
       if (epoch !== this.epoch) throw new Error("The connection changed. Retry.");

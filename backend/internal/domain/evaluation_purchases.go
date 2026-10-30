@@ -7,7 +7,7 @@ import (
 )
 
 // PlannedPurchasesConfig deliberately has no independent queue state. The
-// evaluator reads the purchase inputs from the effective document.
+// evaluator reads the purchase inputs from the effective model.
 func validatePlannedPurchasesConfig(config any) error {
 	object, ok := config.(map[string]any)
 	if !ok || len(object) != 0 {
@@ -50,12 +50,12 @@ func (r *PlannedPurchasesPathResult) NumericValue() float64 {
 
 func evaluatePlannedPurchases(ctx *EvaluationContext, _ any) (PathResult, error) {
 	// Reuse the shared path: rebuild the candidate simulation request from
-	// the already-prepared effective document and the caller's Monte Carlo
+	// the already-prepared effective model and the caller's Monte Carlo
 	// sample through the shared purchases builder. Candidate simulations own
-	// all state and never write to the source path, document, or FI branch.
+	// all state and never write to the source path, model, or FI branch.
 	// No PrepareSimulationRequest here: the base path already carries the
 	// validated start state.
-	document := ctx.Path.EffectiveDocument
+	model := ctx.Path.EffectiveModel
 	request := purchasesCandidateRequest(ctx.Path, ctx.MonteCarloSample)
 	run, err := simulatePurchases(request)
 	if err != nil {
@@ -63,7 +63,7 @@ func evaluatePlannedPurchases(ctx *EvaluationContext, _ any) (PathResult, error)
 	}
 	result := &PlannedPurchasesPathResult{Purchases: []PurchaseOutcome{}, AllFunded: true}
 	completed := ctx.Path.ProjectionStartDate
-	for _, planned := range document.PlannedPurchases {
+	for _, planned := range model.PlannedPurchases {
 		if !planned.Enabled {
 			continue
 		}

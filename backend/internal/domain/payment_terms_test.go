@@ -6,8 +6,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func termsDocument() *types.FinancialModelDocument {
-	return &types.FinancialModelDocument{
+func termsModel() *types.FinancialModel {
+	return &types.FinancialModel{
 		SourcePath: "test",
 		Accounts: []types.Account{
 			{ID: "prime_card", Name: "Prime Card", Kind: types.AccountKindDebt, Enabled: true},
@@ -30,14 +30,14 @@ func termsCodes(issues []types.ModelValidationIssue) map[string]bool {
 func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 	statementDay := 15
 	percent := 0.02
-	document := termsDocument()
-	document.PaymentTerms = []types.PaymentTerms{{
+	model := termsModel()
+	model.PaymentTerms = []types.PaymentTerms{{
 		AccountID: "prime_card", MinimumFixed: 25, MinimumPercent: &percent,
 		DueDay: 10, StatementDay: &statementDay,
 	}}
 	checking := "checking"
-	document.Postings = []types.Posting{}
-	document.RecurrenceRules = []types.RecurrenceRule{{
+	model.Postings = []types.Posting{}
+	model.RecurrenceRules = []types.RecurrenceRule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
@@ -46,7 +46,7 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 			Config:   map[string]any{"expression": "25"},
 		},
 	}}
-	for _, issue := range ValidateFinancialModel(document) {
+	for _, issue := range ValidateFinancialModel(model) {
 		if len(issue.Code) >= 6 && issue.Code[:6] == "terms." && issue.Severity == types.SeverityError {
 			t.Fatalf("unexpected terms error: %+v", issue)
 		}
@@ -75,21 +75,21 @@ func TestValidatePaymentTermsRejectsBadRows(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			document := termsDocument()
-			document.PaymentTerms = testCase.terms
-			if !termsCodes(ValidateFinancialModel(document))[testCase.code] {
-				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(document))
+			model := termsModel()
+			model.PaymentTerms = testCase.terms
+			if !termsCodes(ValidateFinancialModel(model))[testCase.code] {
+				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(model))
 			}
 		})
 	}
 }
 
 func TestPaymentTermsByAccountDerivesReverseLookup(t *testing.T) {
-	document := termsDocument()
-	document.PaymentTerms = []types.PaymentTerms{
+	model := termsModel()
+	model.PaymentTerms = []types.PaymentTerms{
 		{AccountID: "prime_card", MinimumFixed: 25, DueDay: 10},
 	}
-	byAccount := PaymentTermsByAccount(document)
+	byAccount := PaymentTermsByAccount(model)
 	terms, ok := byAccount["prime_card"]
 	if !ok || terms.DueDay != 10 {
 		t.Fatalf("lookup = %+v, %v", terms, ok)
@@ -100,12 +100,12 @@ func TestPaymentTermsByAccountDerivesReverseLookup(t *testing.T) {
 }
 
 func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
-	document := termsDocument()
-	document.PaymentTerms = []types.PaymentTerms{
+	model := termsModel()
+	model.PaymentTerms = []types.PaymentTerms{
 		{AccountID: "prime_card", MinimumFixed: 25, DueDay: 10},
 	}
 	found := false
-	for _, issue := range ValidateFinancialModel(document) {
+	for _, issue := range ValidateFinancialModel(model) {
 		if issue.Code == "terms.payment.missing" {
 			found = true
 			if issue.Severity != types.SeverityWarning {
@@ -117,8 +117,8 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 		t.Fatalf("expected a terms.payment.missing warning")
 	}
 	checking := "checking"
-	document.Postings = []types.Posting{}
-	document.RecurrenceRules = []types.RecurrenceRule{{
+	model.Postings = []types.Posting{}
+	model.RecurrenceRules = []types.RecurrenceRule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
@@ -127,7 +127,7 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 			Config:   map[string]any{"expression": "25"},
 		},
 	}}
-	for _, issue := range ValidateFinancialModel(document) {
+	for _, issue := range ValidateFinancialModel(model) {
 		if issue.Code == "terms.payment.missing" {
 			t.Fatalf("payment shell should satisfy coverage: %+v", issue)
 		}

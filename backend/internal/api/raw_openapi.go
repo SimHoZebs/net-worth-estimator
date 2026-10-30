@@ -9,7 +9,7 @@ import (
 
 // These identity routes run outside Huma. Describe
 // their wire contracts here so the same generated client covers every request.
-func documentRawRoutes(api huma.API) {
+func modelRawRoutes(api huma.API) {
 	spec := api.OpenAPI()
 	registry := spec.Components.Schemas
 	jsonContent := func(value any) map[string]*huma.MediaType {

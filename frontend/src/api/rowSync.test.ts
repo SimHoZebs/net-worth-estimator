@@ -4,7 +4,7 @@ import type {
 	BackendCheckpoint,
 	BackendPlannedPurchase,
 	BackendPosting,
-	FinancialModelDocument,
+	FinancialModel,
 } from "@/api/contracts.ts";
 import {
 	acceptUserScope,
@@ -13,7 +13,7 @@ import {
 } from "@/auth/resourceScope.ts";
 import {
 	applyRowOperations,
-	diffFinancialModelDocuments,
+	diffFinancialModels,
 	type RowOperation,
 } from "@/api/rowSync.ts";
 import { ok } from "@/mocks/fetch.ts";
@@ -63,7 +63,7 @@ const posting = (id: string, name = id): BackendPosting => ({
 	enabled: true,
 });
 
-const emptyDocument = (): FinancialModelDocument => ({
+const emptyModel = (): FinancialModel => ({
 	sourcePath: "",
 	accounts: [],
 	checkpoints: [],
@@ -79,30 +79,28 @@ const emptyDocument = (): FinancialModelDocument => ({
 	plannedPurchases: [],
 });
 
-describe("diffFinancialModelDocuments", () => {
-	it("returns no operations for identical documents", () => {
-		const document: FinancialModelDocument = {
-			...emptyDocument(),
+describe("diffFinancialModels", () => {
+	it("returns no operations for identical models", () => {
+		const model: FinancialModel = {
+			...emptyModel(),
 			accounts: [account("a")],
 			postings: [posting("p")],
 		};
-		expect(
-			diffFinancialModelDocuments(structuredClone(document), document),
-		).toEqual([]);
+		expect(diffFinancialModels(structuredClone(model), model)).toEqual([]);
 	});
 
 	it("emits creates, updates, deletes, and moves per collection", () => {
-		const base: FinancialModelDocument = {
-			...emptyDocument(),
+		const base: FinancialModel = {
+			...emptyModel(),
 			accounts: [account("keep"), account("rename"), account("drop")],
 			postings: [posting("p1"), posting("p2")],
 		};
-		const next: FinancialModelDocument = {
-			...emptyDocument(),
+		const next: FinancialModel = {
+			...emptyModel(),
 			accounts: [account("rename", "Renamed"), account("keep"), account("new")],
 			postings: [posting("p2"), posting("p1")],
 		};
-		const operations = diffFinancialModelDocuments(base, next);
+		const operations = diffFinancialModels(base, next);
 		const kinds = operations.map(
 			(operation) => `${operation.kind}:${operation.action}`,
 		);
@@ -120,18 +118,18 @@ describe("diffFinancialModelDocuments", () => {
 	});
 
 	it("upserts changed checkpoints and deletes removed ones", () => {
-		const base: FinancialModelDocument = {
-			...emptyDocument(),
+		const base: FinancialModel = {
+			...emptyModel(),
 			checkpoints: [
 				checkpoint("a", "2026-08-01", 100),
 				checkpoint("a", "2026-08-02", 50),
 			],
 		};
-		const next: FinancialModelDocument = {
-			...emptyDocument(),
+		const next: FinancialModel = {
+			...emptyModel(),
 			checkpoints: [checkpoint("a", "2026-08-01", 150)],
 		};
-		const operations = diffFinancialModelDocuments(base, next);
+		const operations = diffFinancialModels(base, next);
 		expect(operations).toContainEqual({
 			kind: "checkpoint",
 			action: "save",
@@ -146,10 +144,10 @@ describe("diffFinancialModelDocuments", () => {
 	});
 
 	it("diffs evaluation tables by instance id", () => {
-		const base: FinancialModelDocument = {
-			...emptyDocument(),
+		const base: FinancialModel = {
+			...emptyModel(),
 			evaluations: {
-				...emptyDocument().evaluations,
+				...emptyModel().evaluations,
 				netWorthThreshold: [
 					{
 						instanceId: "t1",
@@ -160,10 +158,10 @@ describe("diffFinancialModelDocuments", () => {
 				],
 			},
 		};
-		const next: FinancialModelDocument = {
-			...emptyDocument(),
+		const next: FinancialModel = {
+			...emptyModel(),
 			evaluations: {
-				...emptyDocument().evaluations,
+				...emptyModel().evaluations,
 				netWorthThreshold: [
 					{
 						instanceId: "t1",
@@ -180,7 +178,7 @@ describe("diffFinancialModelDocuments", () => {
 				],
 			},
 		};
-		const operations = diffFinancialModelDocuments(base, next);
+		const operations = diffFinancialModels(base, next);
 		expect(operations).toContainEqual({
 			kind: "evaluation",
 			action: "update",
@@ -209,21 +207,21 @@ describe("diffFinancialModelDocuments", () => {
 
 describe("applyRowOperations", () => {
 	it("diffs planned purchases and uses their dedicated endpoints", async () => {
-		const base: FinancialModelDocument = {
-			...emptyDocument(),
+		const base: FinancialModel = {
+			...emptyModel(),
 			plannedPurchases: [
 				plannedPurchase("keep", 0),
 				plannedPurchase("drop", 1),
 			],
 		};
-		const next: FinancialModelDocument = {
-			...emptyDocument(),
+		const next: FinancialModel = {
+			...emptyModel(),
 			plannedPurchases: [
 				{ ...plannedPurchase("keep", 1), cost: 75 },
 				plannedPurchase("new", 0),
 			],
 		};
-		const operations = diffFinancialModelDocuments(base, next);
+		const operations = diffFinancialModels(base, next);
 		const kinds = operations.map(
 			(operation) => `${operation.kind}:${operation.action}`,
 		);

@@ -156,9 +156,9 @@ func ParseNumberValue(value any) float64 {
 	return number
 }
 
-// ImportModel reads the model CSV tables from a directory into a document.
-func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
-	document := &types.FinancialModelDocument{
+// ImportModel reads the model CSV tables from a directory into a model.
+func ImportModel(csvPath string) (*types.FinancialModel, error) {
+	model := &types.FinancialModel{
 		SourcePath:  filepath.ToSlash(filepath.Base(filepath.Clean(csvPath))),
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -180,7 +180,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		if maxErr != nil {
 			return nil, fmt.Errorf("account %s: %w", field(record, index, "id"), maxErr)
 		}
-		document.Accounts = append(document.Accounts, types.Account{
+		model.Accounts = append(model.Accounts, types.Account{
 			ID:         field(record, index, "id"),
 			Name:       field(record, index, "name"),
 			Kind:       types.AccountKind(field(record, index, "kind")),
@@ -210,7 +210,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 		if observedRaw == "" || err != nil || observedAt <= 0 {
 			return nil, fmt.Errorf("checkpoint observedAt %q must be the exact observation time as Unix seconds", observedRaw)
 		}
-		document.Checkpoints = append(document.Checkpoints, types.Checkpoint{
+		model.Checkpoints = append(model.Checkpoints, types.Checkpoint{
 			AccountID:  field(record, index, "AccountId"),
 			Balance:    balanceValue,
 			ObservedAt: observedAt,
@@ -271,7 +271,7 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 			occurrenceDate := field(record, index, "occurrenceDate")
 			posting.Claim = &types.PostingClaim{RuleID: ruleID, OccurrenceDate: occurrenceDate}
 		}
-		document.Postings = append(document.Postings, posting)
+		model.Postings = append(model.Postings, posting)
 	}
 
 	records, err = readCSV(filepath.Join(csvPath, RulesFile))
@@ -306,27 +306,27 @@ func ImportModel(csvPath string) (*types.FinancialModelDocument, error) {
 			}
 			rule.Amount = amount
 			rule.AnnualCap = parseOptionalFloat(field(record, index, "annualCap"))
-			document.RecurrenceRules = append(document.RecurrenceRules, rule)
+			model.RecurrenceRules = append(model.RecurrenceRules, rule)
 		}
 	}
 
-	if err := importFIEvaluations(csvPath, document); err != nil {
+	if err := importFIEvaluations(csvPath, model); err != nil {
 		return nil, err
 	}
-	if err := importThresholdEvaluations(csvPath, document); err != nil {
+	if err := importThresholdEvaluations(csvPath, model); err != nil {
 		return nil, err
 	}
-	if err := importAccountBalanceEvaluations(csvPath, document); err != nil {
+	if err := importAccountBalanceEvaluations(csvPath, model); err != nil {
 		return nil, err
 	}
-	if err := importFulfillmentEvaluations(csvPath, document); err != nil {
+	if err := importFulfillmentEvaluations(csvPath, model); err != nil {
 		return nil, err
 	}
-	types.RemapPostingReferences(document, idMap)
-	return document, nil
+	types.RemapPostingReferences(model, idMap)
+	return model, nil
 }
 
-func importFIEvaluations(csvPath string, document *types.FinancialModelDocument) error {
+func importFIEvaluations(csvPath string, model *types.FinancialModel) error {
 	records, err := readCSV(filepath.Join(csvPath, FIFile))
 	if err != nil {
 		return fmt.Errorf("read FI behavior: %w", err)
@@ -361,7 +361,7 @@ func importFIEvaluations(csvPath string, document *types.FinancialModelDocument)
 			return fmt.Errorf("FI continuingPostingIds: %w", err)
 		}
 		config["continuingPostingIds"] = continuing
-		document.Evaluations.FinancialIndependence = append(document.Evaluations.FinancialIndependence, types.FIEvaluation{
+		model.Evaluations.FinancialIndependence = append(model.Evaluations.FinancialIndependence, types.FIEvaluation{
 			InstanceID: field(record, index, "instanceId"),
 			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
@@ -371,7 +371,7 @@ func importFIEvaluations(csvPath string, document *types.FinancialModelDocument)
 	return nil
 }
 
-func importThresholdEvaluations(csvPath string, document *types.FinancialModelDocument) error {
+func importThresholdEvaluations(csvPath string, model *types.FinancialModel) error {
 	records, err := readCSV(filepath.Join(csvPath, ThresholdFile))
 	if err != nil {
 		return fmt.Errorf("read threshold behavior: %w", err)
@@ -381,7 +381,7 @@ func importThresholdEvaluations(csvPath string, document *types.FinancialModelDo
 		if len(strings.Join(record, "")) == 0 {
 			continue
 		}
-		document.Evaluations.NetWorthThreshold = append(document.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
+		model.Evaluations.NetWorthThreshold = append(model.Evaluations.NetWorthThreshold, types.ThresholdEvaluation{
 			InstanceID: field(record, index, "instanceId"),
 			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
@@ -393,7 +393,7 @@ func importThresholdEvaluations(csvPath string, document *types.FinancialModelDo
 	return nil
 }
 
-func importAccountBalanceEvaluations(csvPath string, document *types.FinancialModelDocument) error {
+func importAccountBalanceEvaluations(csvPath string, model *types.FinancialModel) error {
 	records, err := readCSV(filepath.Join(csvPath, AccountBalanceFile))
 	if err != nil {
 		return fmt.Errorf("read account balance behavior: %w", err)
@@ -403,7 +403,7 @@ func importAccountBalanceEvaluations(csvPath string, document *types.FinancialMo
 		if len(strings.Join(record, "")) == 0 {
 			continue
 		}
-		document.Evaluations.AccountBalance = append(document.Evaluations.AccountBalance, types.BalanceEvaluation{
+		model.Evaluations.AccountBalance = append(model.Evaluations.AccountBalance, types.BalanceEvaluation{
 			InstanceID: field(record, index, "instanceId"),
 			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),
@@ -416,7 +416,7 @@ func importAccountBalanceEvaluations(csvPath string, document *types.FinancialMo
 	return nil
 }
 
-func importFulfillmentEvaluations(csvPath string, document *types.FinancialModelDocument) error {
+func importFulfillmentEvaluations(csvPath string, model *types.FinancialModel) error {
 	records, err := readCSV(filepath.Join(csvPath, FulfillmentFile))
 	if err != nil {
 		return fmt.Errorf("read fulfillment behavior: %w", err)
@@ -433,7 +433,7 @@ func importFulfillmentEvaluations(csvPath string, document *types.FinancialModel
 		} else if err := strictUnmarshal([]byte(raw), &postingIDs); err != nil {
 			return fmt.Errorf("fulfillment postingIds: %w", err)
 		}
-		document.Evaluations.PostingFulfillment = append(document.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
+		model.Evaluations.PostingFulfillment = append(model.Evaluations.PostingFulfillment, types.FulfillmentEvaluation{
 			InstanceID: field(record, index, "instanceId"),
 			Name:       field(record, index, "name"),
 			Enabled:    parseBool(field(record, index, "enabled")),

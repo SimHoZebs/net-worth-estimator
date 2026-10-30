@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import type { FinancialModelDocument } from "../api/contracts.ts";
+import type { FinancialModel } from "../api/contracts.ts";
 import { responseScopeError } from "../api/scopedRequest.ts";
 import { getUserScope, subscribeUserScope } from "../auth/resourceScope.ts";
 import {
@@ -25,10 +25,10 @@ export function useServerModelImport(options: ServerModelImportOptions) {
 			mutationKey: ["server-model-import", scope.key],
 			retry: false,
 			gcTime: 0,
-			mutationFn: async (document: FinancialModelDocument) => {
+			mutationFn: async (model: FinancialModel) => {
 				const stale = responseScopeError(scope);
 				if (stale) throw stale;
-				const result = await importServerModel({ ...options, document });
+				const result = await importServerModel({ ...options, model });
 				if (result instanceof Error) throw result;
 				return result;
 			},
@@ -37,23 +37,21 @@ export function useServerModelImport(options: ServerModelImportOptions) {
 	);
 	// Single source of truth: the shared uiStore flag. The hook no longer
 	// keeps a local copy that can drift or clear the global on unmount while
-	// another importer runs. The flag clears in `importDocument`'s finally,
+	// another importer runs. The flag clears in `importModel`'s finally,
 	// not on unmount.
 	const importing = useUiStore((state) => state.importing);
 	const setSharedImporting = useUiStore((state) => state.setImporting);
-	const importDocument = async (
-		document: FinancialModelDocument,
-	): Promise<boolean> => {
+	const importModel = async (model: FinancialModel): Promise<boolean> => {
 		const stale = responseScopeError(scope);
 		if (stale) throw stale;
 		setSharedImporting(true);
 		try {
-			return await mutation.mutateAsync(document);
+			return await mutation.mutateAsync(model);
 		} finally {
 			if (!responseScopeError(scope)) {
 				setSharedImporting(false);
 			}
 		}
 	};
-	return { importing, importDocument };
+	return { importing, importModel };
 }

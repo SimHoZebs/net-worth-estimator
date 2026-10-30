@@ -26,5 +26,5 @@ Replace the first-pass single transaction-type heuristic with an extensible clas
 ## Non-goals
 
 - No machine-learning provider or external enrichment service in the first implementation.
-- No changes to projection simulation semantics or `FinancialModelDocument`.
+- No changes to projection simulation semantics or `FinancialModel`.
 - No gross-salary inference from net-pay claims alone.

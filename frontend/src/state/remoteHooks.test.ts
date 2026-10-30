@@ -18,14 +18,14 @@ import { createAccount } from "../api/generated/endpoints.ts";
 import {
 	ApiHttpError,
 	type ApiRequestOptions,
-	type FinancialModelDocument,
+	type FinancialModel,
 	type FinancialModelResponse,
 	type ProjectionResult,
 	type StochasticProjectionResult,
 	type StochasticProjectionRequest,
 } from "../api/index.ts";
-import { serverDocumentFingerprint } from "./remoteStorage.ts";
-import { fixtureDocument } from "../mocks/document.ts";
+import { serverModelFingerprint } from "./remoteStorage.ts";
+import { fixtureModel } from "../mocks/model.ts";
 import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "../mocks/resource.ts";
 import {
 	clearResourceQueryCache,
@@ -54,7 +54,7 @@ import {
 	userResourceKey,
 } from "./workspaceResources.ts";
 import {
-	importServerDocument,
+	importServerModel,
 	performSave,
 	useWorkspaceWriteError,
 	useWorkspaceSaving,
@@ -62,31 +62,30 @@ import {
 import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
 
 // Test observations read the canonical saved state. Query owns every
-// request lifecycle and the server document is the only model: there is
-// no replacement aggregate to maintain here.
+// request lifecycle.
 function useRemoteWorkspace() {
 	useWorkspaceStartup();
-	const model = useServerModel();
+	const query = useServerModel();
 	const status = useServerStatus();
 	const presets = useAmountPresets();
 	const mutationError = useWorkspaceWriteError();
 	const saving = useWorkspaceSaving();
 	const savedAccounts = useSavedAccounts();
-	const document = model.data?.document ?? null;
+	const model = query.data?.model ?? null;
 	const error =
 		(mutationError instanceof Error ? mutationError.message : null) ??
-		model.error?.message ??
-		(model.data && !model.data.document
+		query.error?.message ??
+		(query.data && !query.data.model
 			? "The server has no financial model to display."
 			: null);
 	return {
-		serverDocument: document,
+		serverModel: model,
 		savedAccounts,
 		serverPresets: presets.data ?? null,
 		presetError: presets.error?.message ?? null,
 		status: status.data ?? null,
 		error,
-		loading: model.isFetching,
+		loading: query.isFetching,
 		saving,
 		readOnly: Boolean(
 			status.data?.readOnly ||
@@ -95,8 +94,7 @@ function useRemoteWorkspace() {
 		authRequired:
 			mutationError instanceof ApiHttpError && mutationError.status === 401,
 		retry: () => reloadWorkspace(),
-		importServerDocument: (next: FinancialModelDocument) =>
-			importServerDocument(next),
+		importServerModel: (next: FinancialModel) => importServerModel(next),
 		refreshPresets: async () => {
 			await serverQueryClient().invalidateQueries({
 				queryKey: userResourceKey("presets"),
@@ -444,18 +442,18 @@ describe("remote workspace state", () => {
 		const server = stubTestServer();
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
-		const previous = view.result().serverDocument;
+		const previous = view.result().serverModel;
 		expect(previous).not.toBeNull();
 		server.failModelOnce(new Error("offline"));
 		await act(async () => reloadWorkspace());
 		await view.settle();
-		expect(view.result().serverDocument).toBe(previous);
+		expect(view.result().serverModel).toBe(previous);
 		expect(view.result().error).not.toBeNull();
-		// A later reload recovers without losing the saved document.
+		// A later reload recovers without losing the saved model.
 		await act(async () => reloadWorkspace());
 		await view.settle();
 		expect(view.result().error).toBeNull();
-		expect(view.result().serverDocument).toEqual(previous);
+		expect(view.result().serverModel).toEqual(previous);
 		view.unmount();
 	});
 
@@ -465,7 +463,7 @@ describe("remote workspace state", () => {
 	// completed and the app stayed on "Connecting to your Waypoint server".
 	it("completes hydration across a strict-mode remount", async () => {
 		const server = stubTestServer(() => ({
-			document: modelFixture(),
+			model: modelFixture(),
 			issues: [],
 		}));
 		let resolveModel!: (value: Response) => void;
@@ -490,7 +488,7 @@ describe("remote workspace state", () => {
 		);
 		resolveModel(
 			server.ok({
-				document: modelFixture(),
+				model: modelFixture(),
 				issues: [],
 				revision: '"sha256-test"',
 			}),
@@ -498,7 +496,7 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 
 		expect(rendered.result().loading).toBe(false);
-		expect(rendered.result().serverDocument).not.toBeNull();
+		expect(rendered.result().serverModel).not.toBeNull();
 		expect(rendered.result().error).toBeNull();
 		rendered.unmount();
 	});
@@ -523,7 +521,7 @@ describe("remote workspace state", () => {
 		await act(async () => {
 			resolveModel(
 				server.ok({
-					document: modelFixture(),
+					model: modelFixture(),
 					issues: [],
 					revision: '"sha256-test"',
 				}),
@@ -562,15 +560,12 @@ describe("remote workspace state", () => {
 	it("uses a replacement client on an explicit Query refresh", async () => {
 		const server = stubTestServer();
 		const rendered = renderHookRTL(() => useWorkspaceStartup());
-		await waitFor(() => expect(getServerModel()?.document).toBeDefined());
+		await waitFor(() => expect(getServerModel()?.model).toBeDefined());
 		expect(server.modelFetches()).toHaveLength(1);
-		(server.model as FinancialModelDocument).accounts[0]!.name =
-			"Replacement cash";
+		(server.model as FinancialModel).accounts[0]!.name = "Replacement cash";
 		await act(async () => reloadWorkspace());
 		expect(server.modelFetches()).toHaveLength(2);
-		expect(getServerModel()?.document?.accounts[0]?.name).toBe(
-			"Replacement cash",
-		);
+		expect(getServerModel()?.model?.accounts[0]?.name).toBe("Replacement cash");
 		rendered.unmount();
 	});
 
@@ -598,14 +593,14 @@ describe("remote workspace state", () => {
 		await act(async () => {
 			resolveModel(
 				server.ok({
-					document: modelFixture(),
+					model: modelFixture(),
 					issues: [],
 					revision: '"sha256-test"',
 				}),
 			);
 			await pending;
 		});
-		expect(getServerModel()?.document).not.toBeNull();
+		expect(getServerModel()?.model).not.toBeNull();
 		await act(async () => reloadWorkspace());
 		expect(server.modelFetches().length).toBeGreaterThanOrEqual(2);
 		rendered.unmount();
@@ -616,7 +611,7 @@ describe("remote workspace state", () => {
 		server.failPresetsOnce(new Error("Recipes unavailable"));
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
-		expect(rendered.result().serverDocument).not.toBeNull();
+		expect(rendered.result().serverModel).not.toBeNull();
 		expect(rendered.result().error).toBeNull();
 		expect(rendered.result().presetError).not.toBeNull();
 		await rendered.result().refreshPresets();
@@ -626,7 +621,7 @@ describe("remote workspace state", () => {
 		rendered.unmount();
 	});
 
-	it("saves an account row and projects the refreshed saved document", async () => {
+	it("saves an account row and projects the refreshed saved model", async () => {
 		stubTestServer();
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
@@ -644,8 +639,8 @@ describe("remote workspace state", () => {
 		});
 		expect(ok).toBe(true);
 		await view.settle();
-		const document = view.result().serverDocument!;
-		expect(document.accounts.map((account) => account.name)).toContain(
+		const model = view.result().serverModel!;
+		expect(model.accounts.map((account) => account.name)).toContain(
 			"Travel savings",
 		);
 		await waitFor(() =>
@@ -656,7 +651,7 @@ describe("remote workspace state", () => {
 		expect(view.result().error).toBeNull();
 		view.unmount();
 
-		// Projections consume the saved document as-is; no draft overlay exists.
+		// Projections consume the saved model as-is; no draft overlay exists.
 		// The stub echoes the resource scope like the other projection fakes
 		// so the client does not retire the scope on a mismatched response.
 		vi.stubGlobal(
@@ -672,7 +667,7 @@ describe("remote workspace state", () => {
 			}),
 		);
 		const projected = renderHook(() =>
-			useRemoteProjection({ document, years: 2, ranges: false }),
+			useRemoteProjection({ model, years: 2, ranges: false }),
 		);
 		await projected.settle();
 		expect(projected.result().base).toMatchObject({ inflows: 100 });
@@ -681,7 +676,7 @@ describe("remote workspace state", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("row save rejection keeps the saved document and never reports success", async () => {
+	it("row save rejection keeps the saved model and never reports success", async () => {
 		const server = stubTestServer();
 		const view = renderHook(() => useRemoteWorkspace());
 		await waitFor(() => expect(view.result().loading).toBe(false));
@@ -711,7 +706,7 @@ describe("remote workspace state", () => {
 		// The rejection refreshes authoritative state first, and the saved
 		// rows are untouched.
 		expect(server.modelFetches().length).toBeGreaterThanOrEqual(2);
-		expect(view.result().serverDocument?.accounts).toHaveLength(2);
+		expect(view.result().serverModel?.accounts).toHaveLength(2);
 		const items = useNotifications.getState().items;
 		expect(
 			items.some(
@@ -762,22 +757,22 @@ describe("remote workspace state", () => {
 	it("creates rows when importing into an empty server", async () => {
 		const server = stubTestServer();
 		server.failModelOnce({
-			document: null,
+			model: null,
 			issues: [],
 		} as unknown as FinancialModelResponse);
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
-		expect(rendered.result().serverDocument).toBeNull();
-		expect(
-			await rendered.result().importServerDocument(fixtureDocument()),
-		).toBe(true);
+		expect(rendered.result().serverModel).toBeNull();
+		expect(await rendered.result().importServerModel(fixtureModel())).toBe(
+			true,
+		);
 		await rendered.settle();
 		expect(
 			server.calls.filter(
 				(call) => call.method === "POST" && call.url === "/v1/accounts",
 			),
 		).not.toHaveLength(0);
-		expect(rendered.result().serverDocument).not.toBeNull();
+		expect(rendered.result().serverModel).not.toBeNull();
 		rendered.unmount();
 	});
 
@@ -786,19 +781,19 @@ describe("remote workspace state", () => {
 			throw new ApiHttpError({ message: "already exists", status: 409 });
 		});
 		server.failModelOnce({
-			document: null,
+			model: null,
 			issues: [],
 		} as unknown as FinancialModelResponse);
 		server.failModelOnce(new Error("authoritative load failed"));
 		const rendered = renderHook(() => useRemoteWorkspace());
 		await rendered.settle();
-		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
+		expect(await rendered.result().importServerModel(modelFixture())).toBe(
 			false,
 		);
 		await rendered.settle();
-		expect(rendered.result().serverDocument).toBeNull();
+		expect(rendered.result().serverModel).toBeNull();
 		expect(rendered.result().error).not.toBeNull();
-		expect(await rendered.result().importServerDocument(modelFixture())).toBe(
+		expect(await rendered.result().importServerModel(modelFixture())).toBe(
 			false,
 		);
 		expect(
@@ -818,7 +813,7 @@ describe("remote workspace state", () => {
 			}),
 		);
 		const rendered = renderHook(() => useRemoteWorkspace());
-		expect(await importServerDocument(modelFixture())).toBe(false);
+		expect(await importServerModel(modelFixture())).toBe(false);
 		expect(
 			server.calls.filter(
 				(call) => call.method === "POST" && call.url === "/v1/accounts",
@@ -830,9 +825,7 @@ describe("remote workspace state", () => {
 				.items.some((item) => item.message.includes("before importing")),
 		).toBe(true);
 		await act(async () =>
-			finish(
-				server.ok({ document: null, issues: [], revision: '"sha256-test"' }),
-			),
+			finish(server.ok({ model: null, issues: [], revision: '"sha256-test"' })),
 		);
 		await rendered.settle();
 		rendered.unmount();
@@ -841,10 +834,10 @@ describe("remote workspace state", () => {
 
 describe("remote projection mapping and SSE", () => {
 	it("maps server rows, transaction events, totals, and threshold dates to the local projection", () => {
-		const document = modelFixture();
+		const model = modelFixture();
 		const result = projectionFixture();
 		result.timeline.rows[0]!.netWorth = 90;
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(local.points.map((point) => point.date)).toEqual([
 			"2026-01-31",
 			"2026-02-01",
@@ -863,12 +856,12 @@ describe("remote projection mapping and SSE", () => {
 		expect(local.firstFailure).toBeNull();
 		expect(local.evaluations[0]?.firstDate).toBe("2026-02-01");
 		expect(local).toMatchObject({ inflows: 100, outflows: 0, transfers: 0 });
-		const documentWithoutResult = {
-			...document,
+		const modelWithoutResult = {
+			...model,
 			evaluations: {
-				...document.evaluations,
+				...model.evaluations,
 				netWorthThreshold: [
-					...document.evaluations.netWorthThreshold,
+					...model.evaluations.netWorthThreshold,
 					{
 						instanceId: "missing",
 						name: "Missing result",
@@ -887,29 +880,27 @@ describe("remote projection mapping and SSE", () => {
 		};
 		const indeterminate = projectionResultToLocal(
 			withoutResult,
-			documentWithoutResult,
+			modelWithoutResult,
 		).evaluations.find((evaluation) => evaluation.evaluation.id === "missing");
 		expect(indeterminate?.firstDate).toBeNull();
 		expect(indeterminate?.evaluation.id).toBe("missing");
 	});
 
 	it("keeps start-date events when the start has no checkpoint", () => {
-		const document = { ...modelFixture(), checkpoints: [] };
+		const model = { ...modelFixture(), checkpoints: [] };
 		const result = projectionFixture();
 		result.milestones.projectionStartDate = "2026-01-31";
 		result.transactionEvents = [
 			{ ...result.transactionEvents![0]!, date: "2026-01-31" },
 		];
-		expect(projectionResultToLocal(result, document).transactions).toHaveLength(
-			1,
-		);
+		expect(projectionResultToLocal(result, model).transactions).toHaveLength(1);
 	});
 
 	it("accepts transaction events without account deltas", () => {
-		const document = modelFixture();
+		const model = modelFixture();
 		const result = projectionFixture();
 		result.transactionEvents![0]!.accountDeltas = null;
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(local.transactions[0]).toMatchObject({
 			transactionId: "salary",
 			requested: 100,
@@ -917,8 +908,8 @@ describe("remote projection mapping and SSE", () => {
 		});
 	});
 
-	it("maps binding evidence and excludes transactions on or before the plan start", () => {
-		const document = modelFixture();
+	it("maps binding evidence and excludes transactions on or before the model start", () => {
+		const model = modelFixture();
 		const result = projectionFixture();
 		const baseEvent = result.transactionEvents![0]!;
 		const historicalEvent = { ...baseEvent, date: "2026-01-31" };
@@ -963,7 +954,7 @@ describe("remote projection mapping and SSE", () => {
 			annualEvent,
 		] as ProjectionResult["transactionEvents"];
 
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(local.transactions).toHaveLength(3);
 		expect(local.transactions[0]).toMatchObject({
 			available: 75,
@@ -984,7 +975,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("maps FI coverage to visual facts instead of prose", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1061,7 +1052,7 @@ describe("remote projection mapping and SSE", () => {
 				],
 			},
 		};
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		const item = local.otherEvaluations.find(
 			(entry) => entry.id === "financial-independence",
 		);
@@ -1071,7 +1062,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("maps FI coverage to a bar without prose", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1123,7 +1114,7 @@ describe("remote projection mapping and SSE", () => {
 				],
 			},
 		};
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(
 			local.otherEvaluations.find(
 				(entry) => entry.id === "financial-independence",
@@ -1136,7 +1127,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("prefers the self-sustaining date over first coverage for FI", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1173,7 +1164,7 @@ describe("remote projection mapping and SSE", () => {
 				],
 			},
 		};
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(
 			local.otherEvaluations.find(
 				(entry) => entry.id === "financial-independence",
@@ -1186,7 +1177,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("explains coverage without a sustained cycle for FI", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1229,7 +1220,7 @@ describe("remote projection mapping and SSE", () => {
 				],
 			},
 		};
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(
 			local.otherEvaluations.find(
 				(entry) => entry.id === "financial-independence",
@@ -1246,7 +1237,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("maps a posting shortfall to a date and fulfillment bar", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1279,11 +1270,11 @@ describe("remote projection mapping and SSE", () => {
 				],
 			},
 		};
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(
 			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
 		).toMatchObject({
-			name: document.evaluations.postingFulfillment[0]!.name,
+			name: model.evaluations.postingFulfillment[0]!.name,
 			outcomeDate: "2026-05-01",
 			qualifier: null,
 			progress: { fraction: 0.87 },
@@ -1291,7 +1282,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("maps full posting fulfillment to words without a bar", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1321,7 +1312,7 @@ describe("remote projection mapping and SSE", () => {
 				],
 			},
 		};
-		const local = projectionResultToLocal(result, document);
+		const local = projectionResultToLocal(result, model);
 		expect(
 			local.otherEvaluations.find((entry) => entry.id === "fulfillment"),
 		).toMatchObject({
@@ -1333,7 +1324,7 @@ describe("remote projection mapping and SSE", () => {
 	});
 
 	it("maps cycle spend to a spent-versus-budget bar", () => {
-		const document = {
+		const model = {
 			...modelFixture(),
 			evaluations: {
 				...modelFixture().evaluations,
@@ -1380,14 +1371,14 @@ describe("remote projection mapping and SSE", () => {
 			},
 		};
 		expect(
-			projectionResultToLocal(over, document).otherEvaluations.find(
+			projectionResultToLocal(over, model).otherEvaluations.find(
 				(entry) => entry.id === "cycle",
 			),
 		).toMatchObject({
 			progress: { fraction: 1.12 },
 		});
 		expect(
-			projectionResultToLocal(within, document).otherEvaluations.find(
+			projectionResultToLocal(within, model).otherEvaluations.find(
 				(entry) => entry.id === "cycle",
 			),
 		).toMatchObject({
@@ -1440,7 +1431,7 @@ describe("remote projection mapping and SSE", () => {
 		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				document: modelFixture(),
+				model: modelFixture(),
 				years: 2,
 				ranges: true,
 			}),
@@ -1503,7 +1494,7 @@ describe("remote projection mapping and SSE", () => {
 		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				document: modelFixture(),
+				model: modelFixture(),
 				years: 2,
 				ranges: true,
 			}),
@@ -1553,7 +1544,7 @@ describe("remote projection mapping and SSE", () => {
 		try {
 			rendered = renderHook(() =>
 				useRemoteProjection({
-					document: broken,
+					model: broken,
 					years: 2,
 					ranges: false,
 				}),
@@ -1592,7 +1583,7 @@ describe("remote projection mapping and SSE", () => {
 		const narrowed = { startDate: "2026-01-31", endDate: "2026-06-30" };
 		const one = renderHook(() =>
 			useRemoteProjection({
-				document: modelFixture(),
+				model: modelFixture(),
 				years: 2,
 				ranges: false,
 				dateRange: narrowed,
@@ -1600,7 +1591,7 @@ describe("remote projection mapping and SSE", () => {
 		);
 		const two = renderHook(() =>
 			useRemoteProjection({
-				document: modelFixture(),
+				model: modelFixture(),
 				years: 2,
 				ranges: false,
 			}),
@@ -1625,7 +1616,7 @@ describe("remote projection mapping and SSE", () => {
 			const { client, stream } = scenarioStreamClient();
 			const consume = () =>
 				useRemoteProjection({
-					document: modelFixture(),
+					model: modelFixture(),
 					years: 2,
 					ranges: true,
 				});
@@ -1675,7 +1666,7 @@ describe("remote projection mapping and SSE", () => {
 	it("cancels the last subscriber and never reuses an unfinished snapshot", async () => {
 		const { client, stream } = scenarioStreamClient();
 		const consume = () =>
-			useRemoteProjection({ document: modelFixture(), ranges: true });
+			useRemoteProjection({ model: modelFixture(), ranges: true });
 		const first = renderHook(consume);
 		await first.settle();
 		await act(async () => {
@@ -1699,7 +1690,7 @@ describe("remote projection mapping and SSE", () => {
 	it("cancels explicitly without exposing a framework error or retry notice", async () => {
 		const { client, stream } = scenarioStreamClient();
 		const rendered = renderHook(() =>
-			useRemoteProjection({ document: modelFixture(), ranges: true }),
+			useRemoteProjection({ model: modelFixture(), ranges: true }),
 		);
 		await rendered.settle();
 		await act(async () => {
@@ -1720,7 +1711,7 @@ describe("remote projection mapping and SSE", () => {
 	it("lets Query restart a canceled stream under Strict Mode", async () => {
 		const { stream } = scenarioStreamClient();
 		const rendered = renderHookWith(
-			() => useRemoteProjection({ document: modelFixture(), ranges: true }),
+			() => useRemoteProjection({ model: modelFixture(), ranges: true }),
 			{ strictMode: true },
 		);
 		await rendered.settle();
@@ -1741,10 +1732,10 @@ describe("remote projection mapping and SSE", () => {
 		const { stream } = scenarioStreamClient();
 		let ranges = true;
 		const first = renderHook(() =>
-			useRemoteProjection({ document: modelFixture(), ranges }),
+			useRemoteProjection({ model: modelFixture(), ranges }),
 		);
 		const second = renderHook(() =>
-			useRemoteProjection({ document: modelFixture(), ranges }),
+			useRemoteProjection({ model: modelFixture(), ranges }),
 		);
 		await first.settle();
 		ranges = false;
@@ -1763,7 +1754,7 @@ describe("remote projection mapping and SSE", () => {
 		async (retryFrom) => {
 			const { client, stream } = scenarioStreamClient();
 			const consume = () =>
-				useRemoteProjection({ document: modelFixture(), ranges: true });
+				useRemoteProjection({ model: modelFixture(), ranges: true });
 			const first = renderHook(consume);
 			const second = renderHook(consume);
 			await first.settle();
@@ -1814,7 +1805,7 @@ describe("remote projection mapping and SSE", () => {
 		// Deliberately ignore abort in the transport to test the publication guard.
 		const { client, stream } = scenarioStreamClient(false);
 		const consume = () =>
-			useRemoteProjection({ document: modelFixture(), ranges: true });
+			useRemoteProjection({ model: modelFixture(), ranges: true });
 		const first = renderHook(consume);
 		const second = renderHook(consume);
 		await first.settle();
@@ -1884,7 +1875,7 @@ describe("remote projection mapping and SSE", () => {
 		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				document: modelFixture(),
+				model: modelFixture(),
 				years: 1,
 				ranges: true,
 			}),
@@ -1916,7 +1907,7 @@ describe("remote projection mapping and SSE", () => {
 		);
 		const rendered = renderHook(() =>
 			useRemoteProjection({
-				document: modelFixture(),
+				model: modelFixture(),
 				years: 1,
 				ranges: false,
 			}),
@@ -1947,7 +1938,7 @@ describe("remote projection mapping and SSE", () => {
 		vi.unstubAllGlobals();
 	});
 
-	it("reports a clear error instead of using example data without a document", async () => {
+	it("reports a clear error instead of using example data without a model", async () => {
 		const rendered = renderHook(() =>
 			useRemoteProjection({ years: 2, ranges: false }),
 		);
@@ -1980,12 +1971,12 @@ describe("saved-state resource scope", () => {
 			return { rendered, scope: getUserScope() };
 		};
 		const first = await mount("users/a", "A cash");
-		expect(first.rendered.result().serverDocument?.accounts[0]?.name).toBe(
+		expect(first.rendered.result().serverModel?.accounts[0]?.name).toBe(
 			"A cash",
 		);
 		first.rendered.unmount();
 		const second = await mount("users/b", "B cash");
-		expect(second.rendered.result().serverDocument?.accounts[0]?.name).toBe(
+		expect(second.rendered.result().serverModel?.accounts[0]?.name).toBe(
 			"B cash",
 		);
 		expect(
@@ -1993,21 +1984,21 @@ describe("saved-state resource scope", () => {
 		).toBeUndefined();
 		second.rendered.unmount();
 		const sample = await mount(GUEST_USER_ID, "Cash");
-		expect(sample.rendered.result().serverDocument?.accounts[0]?.name).toBe(
+		expect(sample.rendered.result().serverModel?.accounts[0]?.name).toBe(
 			"Cash",
 		);
 		sample.rendered.unmount();
 	});
 
 	it("uses a stable semantic server fingerprint", () => {
-		const document = modelFixture();
+		const model = modelFixture();
 		const reordered = {
-			postings: document.postings,
-			recurrenceRules: document.recurrenceRules,
-			evaluations: document.evaluations,
-			checkpoints: document.checkpoints,
-			accounts: document.accounts,
-			sourcePath: document.sourcePath,
+			postings: model.postings,
+			recurrenceRules: model.recurrenceRules,
+			evaluations: model.evaluations,
+			checkpoints: model.checkpoints,
+			accounts: model.accounts,
+			sourcePath: model.sourcePath,
 		};
 		const changed = modelFixture();
 		changed.recurrenceRules[0] = {
@@ -2018,11 +2009,11 @@ describe("saved-state resource scope", () => {
 				inputs: {},
 			},
 		};
-		expect(serverDocumentFingerprint(reordered)).toBe(
-			serverDocumentFingerprint(document),
+		expect(serverModelFingerprint(reordered)).toBe(
+			serverModelFingerprint(model),
 		);
-		expect(serverDocumentFingerprint(changed)).not.toBe(
-			serverDocumentFingerprint(document),
+		expect(serverModelFingerprint(changed)).not.toBe(
+			serverModelFingerprint(model),
 		);
 	});
 });

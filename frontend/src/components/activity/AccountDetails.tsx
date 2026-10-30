@@ -149,7 +149,7 @@ export function AccountDetails({
 		// display row clamps missing floors to 0 and missing ceilings (or the
 		// no-ceiling sentinel) to null. Without a cached raw row, fall back
 		// to the display baseline.
-		const raw = getServerModel()?.document?.accounts.find(
+		const raw = getServerModel()?.model?.accounts.find(
 			(row) => row.id === account.id,
 		);
 		const moved = balanceValue !== account.balance;

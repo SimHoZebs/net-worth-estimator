@@ -7,36 +7,38 @@ import { useTransactionSelection } from "./useTransactionSelection.ts";
 afterEach(cleanup);
 
 it("keeps only identity and resolves refreshed records until removal", () => {
-	const planTransaction = financialModelFixture.transactions[0]!;
+	const savedTransaction = financialModelFixture.transactions[0]!;
 	const transaction = {
 		id: "occurrence",
-		transactionId: planTransaction.id,
+		transactionId: savedTransaction.id,
 		amount: 10,
 	} as AccountTransaction;
 	const view = renderHook(
-		({ transaction, planTransaction }) =>
+		({ transaction, savedTransaction }) =>
 			useTransactionSelection(
 				transaction ? [transaction] : [],
-				new Map(planTransaction ? [[planTransaction.id, planTransaction]] : []),
+				new Map(
+					savedTransaction ? [[savedTransaction.id, savedTransaction]] : [],
+				),
 			),
 		{
 			initialProps: {
 				transaction: transaction as AccountTransaction | null,
-				planTransaction: planTransaction as typeof planTransaction | null,
+				savedTransaction: savedTransaction as typeof savedTransaction | null,
 			},
 		},
 	);
 	act(() => view.result.current.inspect(transaction));
 	view.rerender({
 		transaction: { ...transaction, amount: 20 },
-		planTransaction: { ...planTransaction, name: "Current name" },
+		savedTransaction: { ...savedTransaction, name: "Current name" },
 	});
 	expect(view.result.current.selected?.transaction.amount).toBe(20);
-	expect(view.result.current.selected?.planTransaction.name).toBe(
+	expect(view.result.current.selected?.savedTransaction.name).toBe(
 		"Current name",
 	);
-	view.rerender({ transaction: null, planTransaction });
+	view.rerender({ transaction: null, savedTransaction });
 	expect(view.result.current.selected).toBeNull();
-	view.rerender({ transaction, planTransaction });
+	view.rerender({ transaction, savedTransaction });
 	expect(view.result.current.selected).toBeNull();
 });

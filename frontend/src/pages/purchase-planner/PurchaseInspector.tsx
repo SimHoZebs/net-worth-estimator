@@ -89,7 +89,7 @@ export function PurchaseInspector({
 						)}
 						<p className="mt-2 text-danger-text">
 							The date cannot move automatically. Update the date, change
-							priority, or change the funding plan.
+							priority, or change the financial model.
 						</p>
 					</div>
 				)}

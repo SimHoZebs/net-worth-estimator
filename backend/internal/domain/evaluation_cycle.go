@@ -123,8 +123,8 @@ func EvaluateCycleFulfillment(path *types.ProjectionPath, config types.CycleFulf
 		}
 	}
 	recorded := 0.0
-	for index := range path.EffectiveDocument.Postings {
-		posting := &path.EffectiveDocument.Postings[index]
+	for index := range path.EffectiveModel.Postings {
+		posting := &path.EffectiveModel.Postings[index]
 		if !posting.Enabled {
 			continue
 		}
@@ -190,7 +190,7 @@ func maxInt(a, b int) int {
 func diagnoseCycleConfig(path *types.ProjectionPath, config types.CycleFulfillmentConfig) []types.EvaluationDiagnostic {
 	diagnostics := []types.EvaluationDiagnostic{}
 	byID := map[string]types.Account{}
-	for _, account := range path.EffectiveDocument.Accounts {
+	for _, account := range path.EffectiveModel.Accounts {
 		byID[account.ID] = account
 	}
 	for _, accountID := range config.AccountIDs {

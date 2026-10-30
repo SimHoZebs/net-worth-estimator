@@ -112,7 +112,7 @@ describe("direct Query ownership", () => {
 		await serverQueryClient().cancelQueries({ queryKey: options.queryKey });
 		expect(await old).toBeInstanceOf(Error);
 		await serverQueryClient().fetchQuery(options);
-		finish(server.ok({ document: null, issues: [], revision: "retired" }));
+		finish(server.ok({ model: null, issues: [], revision: "retired" }));
 		await Promise.resolve();
 		expect(getServerModel()?.revision).toBe("current");
 	});

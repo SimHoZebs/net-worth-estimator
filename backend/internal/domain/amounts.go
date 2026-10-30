@@ -166,7 +166,7 @@ type AmountProviderInfo struct {
 // rule reads them to move money. Terms declare what is owed; an enabled
 // transaction behind them moves it.
 //
-// Live plan uses: model-value, account-balance, occurrence-rate and
+// Live model uses: model-value, account-balance, occurrence-rate and
 // growth-factor with the expression resolver. Payroll modeling (tested,
 // seeded): chained expression rules with the progressive-bracket resolver
 // for tax. Debt feature (tested, unused in seed CSVs): terms-minimum,

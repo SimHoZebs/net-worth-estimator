@@ -3,17 +3,17 @@ package types
 // RemapPostingReferences updates only fields that refer to posting identities.
 // Expression variable names and presentation strings are not row references.
 // Import and persisted-data migration share this contract.
-func RemapPostingReferences(document *FinancialModelDocument, ids map[string]string) {
-	for i := range document.Postings {
-		if next, ok := ids[document.Postings[i].ID]; ok {
-			document.Postings[i].ID = next
+func RemapPostingReferences(model *FinancialModel, ids map[string]string) {
+	for i := range model.Postings {
+		if next, ok := ids[model.Postings[i].ID]; ok {
+			model.Postings[i].ID = next
 		}
-		RemapPostingAmountReferences(&document.Postings[i].Amount, ids)
+		RemapPostingAmountReferences(&model.Postings[i].Amount, ids)
 	}
-	for i := range document.RecurrenceRules {
-		RemapPostingAmountReferences(&document.RecurrenceRules[i].Amount, ids)
+	for i := range model.RecurrenceRules {
+		RemapPostingAmountReferences(&model.RecurrenceRules[i].Amount, ids)
 	}
-	for _, table := range document.Evaluations.Tables() {
+	for _, table := range model.Evaluations.Tables() {
 		for i := range *table.Rows {
 			config, ok := (*table.Rows)[i].Config.(map[string]any)
 			if !ok {

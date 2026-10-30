@@ -86,7 +86,7 @@ func TestIsValidIsoDate(t *testing.T) {
 }
 
 func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
 		Postings: []types.Posting{},
 		RecurrenceRules: []types.RecurrenceRule{{
@@ -106,7 +106,7 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 		Checkpoints: []types.Checkpoint{{AccountID: "checking", Balance: 100, ObservedAt: 0}},
 	}
 
-	issues := ValidateFinancialModel(document)
+	issues := ValidateFinancialModel(model)
 
 	found := map[string]bool{}
 	for _, issue := range issues {
@@ -122,14 +122,14 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 }
 
 func TestPrepareSimulationRejectsMalformedProjectionStart(t *testing.T) {
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
 	}
 	settings := &types.ProjectionRuntimeSettings{
 		FallbackProjectionStartDate: "01/02/2026",
 		HorizonYears:                1,
 	}
-	_, err := PrepareSimulationRequest(document, settings, types.EmptyModelOverrides(), nil)
+	_, err := PrepareSimulationRequest(model, settings, types.EmptyModelOverrides(), nil)
 	preparationError, ok := err.(*SimulationPreparationError)
 	if !ok {
 		t.Fatalf("expected SimulationPreparationError, got %v", err)

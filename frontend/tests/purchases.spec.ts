@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 import type {
-	FinancialModelDocument,
+	FinancialModel,
 	FinancialModelResponse,
 } from "../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
@@ -102,7 +102,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		`${FIXTURE_API}/v1/financial-model`,
 	);
 	expect(baselineResponse.ok()).toBe(true);
-	let { document: baseline } =
+	let { model: baseline } =
 		(await baselineResponse.json()) as FinancialModelResponse;
 	const pending = baseline?.postings.find(
 		(posting) => posting.sourceAccountId === "checking",
@@ -121,7 +121,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		(await (
 			await request.get(`${FIXTURE_API}/v1/financial-model`)
 		).json()) as FinancialModelResponse
-	).document;
+	).model;
 	const status = await request.get(`${FIXTURE_API}/v1/status`);
 	expect(status.ok()).toBe(true);
 	expect(await status.json()).toMatchObject({ readOnly: false });
@@ -132,19 +132,19 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		const response = await route.fetch();
 		expect(response.headers()["waypoint-resource"]).toBe(resource.id);
 		const body = (await response.json()) as FinancialModelResponse;
-		if (!body.document) throw new Error("The fixture model is missing.");
+		if (!body.model) throw new Error("The fixture model is missing.");
 		await route.fulfill({
 			response,
 			json: {
 				...body,
-				document: {
-					...body.document,
-					checkpoints: body.document.checkpoints.map((checkpoint) =>
+				model: {
+					...body.model,
+					checkpoints: body.model.checkpoints.map((checkpoint) =>
 						checkpoint.AccountId === "checking"
 							? { ...checkpoint, source: "simplefin" }
 							: checkpoint,
 					),
-					postings: body.document.postings.map((posting) =>
+					postings: body.model.postings.map((posting) =>
 						posting.id === pending.id
 							? { ...posting, source: "simplefin", pending: true }
 							: posting,
@@ -187,7 +187,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 				if (!response.ok()) return null;
 				const body = (await response.json()) as FinancialModelResponse;
 				return (
-					body.document?.plannedPurchases?.find(
+					body.model?.plannedPurchases?.find(
 						(posting) => posting.name === "Synced-account laptop",
 					) ?? null
 				);
@@ -197,7 +197,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		.not.toBeNull();
 	const savedResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	expect(savedResponse.ok()).toBe(true);
-	const { document: saved } =
+	const { model: saved } =
 		(await savedResponse.json()) as FinancialModelResponse;
 	expect(saved?.accounts).toEqual(baseline?.accounts);
 	expect(saved?.checkpoints).toEqual(baseline?.checkpoints);
@@ -246,11 +246,11 @@ test("standalone purchase CRUD and priority survive reload without posting write
 			await request.get(`${FIXTURE_API}/v1/financial-model`)
 		).json()) as FinancialModelResponse;
 	await expect
-		.poll(async () => (await read()).document?.plannedPurchases?.length)
+		.poll(async () => (await read()).model?.plannedPurchases?.length)
 		.toBe(2);
 	await page.getByRole("button", { name: "Move API chair up" }).click();
 	await expect
-		.poll(async () => (await read()).document?.plannedPurchases?.[0]?.name)
+		.poll(async () => (await read()).model?.plannedPurchases?.[0]?.name)
 		.toBe("API chair");
 	await page.getByRole("button", { name: /Inspect API chair/ }).click();
 	await page
@@ -265,7 +265,7 @@ test("standalone purchase CRUD and priority survive reload without posting write
 	await editor.getByLabel("Include in purchase queue").uncheck();
 	await editor.getByRole("button", { name: "Save purchase" }).click();
 	await expect
-		.poll(async () => (await read()).document?.plannedPurchases?.[0])
+		.poll(async () => (await read()).model?.plannedPurchases?.[0])
 		.toMatchObject({
 			name: "API chair",
 			cost: 200,
@@ -286,11 +286,9 @@ test("standalone purchase CRUD and priority survive reload without posting write
 		.click();
 	await page.getByRole("button", { name: "Remove and save" }).click();
 	await expect
-		.poll(async () => (await read()).document?.plannedPurchases?.length)
+		.poll(async () => (await read()).model?.plannedPurchases?.length)
 		.toBe(1);
-	expect((await read()).document?.postings).toEqual(
-		baseline.document?.postings,
-	);
+	expect((await read()).model?.postings).toEqual(baseline.model?.postings);
 	expect(purchaseWrites).toEqual(
 		expect.arrayContaining(["POST", "PATCH", "DELETE"]),
 	);
@@ -332,23 +330,21 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	await page.reload();
 	await expect(queue.locator("li").first()).toContainText("Chair");
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
-	const { document } = (await response.json()) as {
-		document: FinancialModelDocument;
+	const { model } = (await response.json()) as {
+		model: FinancialModel;
 	};
-	const chair = document.plannedPurchases!.find(
-		(item) => item.name === "Chair",
-	)!;
+	const chair = model.plannedPurchases!.find((item) => item.name === "Chair")!;
 	expect(chair.priority).toBe(0);
 	const projection = await request.post(
 		`${FIXTURE_API}/v1/projections/deterministic`,
 		{
 			data: {
-				document,
+				model,
 				settings: {
 					fallbackProjectionStartDate: "2026-01-31",
 					horizonYears: 20,
 					evaluations: {
-						...document.evaluations,
+						...model.evaluations,
 						plannedPurchases: [
 							{
 								instanceId: "purchases",
@@ -367,7 +363,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	const { result } = await projection.json();
 	const purchasesInBaseline = result.transactionEvents.filter(
 		(event: { origin: { postingId: string } }) =>
-			document.plannedPurchases!.some(
+			model.plannedPurchases!.some(
 				(purchase) => purchase.id === event.origin.postingId,
 			),
 	);
@@ -382,14 +378,14 @@ test.skip("purchase priorities persist and purchases protect all established pay
 		`${FIXTURE_API}/v1/projections/deterministic`,
 		{
 			data: {
-				document: {
-					...document,
+				model: {
+					...model,
 					plannedPurchases: [],
 				},
 				settings: {
 					fallbackProjectionStartDate: "2026-01-31",
 					horizonYears: 20,
-					evaluations: document.evaluations,
+					evaluations: model.evaluations,
 				},
 				range: { startDate: "2000-01-01", endDate: "2100-01-01" },
 			},

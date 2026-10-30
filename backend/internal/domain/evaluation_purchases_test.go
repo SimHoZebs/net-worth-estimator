@@ -19,12 +19,12 @@ func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T)
 		plannedPurchase("chair", "2026-02-01", "150", 1),
 		establishedPosting("rent", "2026-02-02", "900", false),
 		establishedPosting("pay", "2026-02-05", "1000", true))
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, PlannedPurchases: request.Model.PlannedPurchases,
 		Checkpoints: []types.Checkpoint{{AccountID: "cash", Balance: 1000, ObservedAt: dayCloseUnix(string(request.StartDate))}}}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	settings.Evaluations.PlannedPurchases = purchaseEvaluation()
-	before := toAny(t, document)
-	result, err := ProjectFinancialModelDocument(&document, &settings, types.ModelOverrides{}, nil)
+	before := toAny(t, model)
+	result, err := ProjectFinancialModel(&model, &settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,38 +50,38 @@ func TestPlannedPurchasesEvaluationProtectsPaymentsInPrivateBranch(t *testing.T)
 	if result.Summary.FinalNetWorth != 1100 || result.Totals.ExternalOutflowAmount != 900 || len(result.TransactionEvents) != 2 {
 		t.Fatalf("branch affected baseline: %+v", result)
 	}
-	if !reflect.DeepEqual(before, toAny(t, document)) {
+	if !reflect.DeepEqual(before, toAny(t, model)) {
 		t.Fatal("evaluation mutated canonical input")
 	}
 }
 
 func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 	fixture := loadGolden(t, "stochastic.json")
-	document := decodeDocument(t, fixture["document"])
+	model := decodeModel(t, fixture["model"])
 	settings := decodeSettings(t, fixture["settings"])
 	// Exercise actual sampled income as well as the existing FI branch.
-	document.RecurrenceRules[0].Amount = types.PostingAmountResolution{Resolver: "expression",
+	model.RecurrenceRules[0].Amount = types.PostingAmountResolution{Resolver: "expression",
 		Config: map[string]any{"expression": "rate * 12"},
 		Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate",
 			Arguments: map[string]any{"annualRate": 100.0, "volatility": 10.0}}}}
-	baseline, err := ProjectFinancialModelDocument(document, settings, types.ModelOverrides{}, nil)
+	baseline, err := ProjectFinancialModel(model, settings, types.ModelOverrides{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	seed := int64(42)
 	config := types.StochasticConfig{RunCount: 3, Seed: &seed}
-	bands, err := StochasticProjection(context.Background(), document, settings, types.ModelOverrides{}, config, nil)
+	bands, err := StochasticProjection(context.Background(), model, settings, types.ModelOverrides{}, config, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, priority := range []int{0, 2} {
 		purchase := plannedPurchase("laptop", "2026-02-01", "500", priority)
-		purchase.FundingAccountID = &document.Accounts[0].ID
+		purchase.FundingAccountID = &model.Accounts[0].ID
 		other := plannedPurchase("chair", "2026-02-03", "150", 1)
 		other.FundingAccountID = purchase.FundingAccountID
-		document.PlannedPurchases = []types.PlannedPurchase{purchase, other}
+		model.PlannedPurchases = []types.PlannedPurchase{purchase, other}
 		settings.Evaluations.PlannedPurchases = purchaseEvaluation()
-		result, err := ProjectFinancialModelDocument(document, settings, types.ModelOverrides{}, nil)
+		result, err := ProjectFinancialModel(model, settings, types.ModelOverrides{}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,7 @@ func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 			compareValues(t, "projection", toAny(t, baseline), toAny(t, result))
 			t.Fatal("purchase inputs, evaluation, or priority changed baseline/FI result")
 		}
-		sampled, err := StochasticProjection(context.Background(), document, settings, types.ModelOverrides{}, config, nil)
+		sampled, err := StochasticProjection(context.Background(), model, settings, types.ModelOverrides{}, config, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,11 +115,11 @@ func TestPlannedPurchasesSampleUsesTheBaselineSample(t *testing.T) {
 		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
 	}}
-	document := types.FinancialModelDocument{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	for _, rate := range []float64{0, 100} {
 		sample := &types.MonteCarloSample{AnnualRatesByPostingID: map[string][]float64{"pay": {rate}}}
-		path, _, err := ProjectRawFinancialModelDocument(&document, &settings, types.ModelOverrides{}, sample)
+		path, _, err := ProjectRawFinancialModel(&model, &settings, types.ModelOverrides{}, sample)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -22,11 +22,9 @@ import {
 /**
  * Saved rows for display, one hook per resource. Each hook returns null
  * while its query has no data (not loaded) and a possibly empty array once
- * loaded. The hooks never assemble a whole model: accounts come from the
- * balance rows, transactions from the transaction query, evaluations from
- * the eval summary, purchases from the standalone rows plus the legacy
- * purchase-marker postings in the canonical document, and the start date
- * from the canonical document.
+ * loaded. Accounts come from balance rows, transactions from the transaction
+ * query, evaluations from the evaluation summary, and purchases and the
+ * start date from the saved financial model.
  *
  * Outputs are referentially stable for unchanged query data: selection and
  * form memos plus effects can depend on them without re-running every
@@ -61,20 +59,17 @@ export function useSavedEvaluations(): Evaluation[] | null {
 	);
 }
 
-/** Saved purchases as display rows, standalone or legacy posting form. */
+/** Saved purchases as display rows. */
 export function useSavedPurchases(): PlannedPurchase[] | null {
-	const document = useServerModel({ enabled: true }).data?.document;
+	const model = useServerModel({ enabled: true }).data?.model;
 	return useMemo(() => {
-		if (document === undefined) return null;
-		return savedPurchasesToDisplay(document);
-	}, [document]);
+		if (model === undefined) return null;
+		return savedPurchasesToDisplay(model);
+	}, [model]);
 }
 
-/** Saved projection start date from the canonical document. */
+/** Saved projection start date from the financial model. */
 export function useSavedStartDate(): string | null {
-	const document = useServerModel({ enabled: true }).data?.document;
-	return useMemo(
-		() => (document ? projectionStartDate(document) : null),
-		[document],
-	);
+	const model = useServerModel({ enabled: true }).data?.model;
+	return useMemo(() => (model ? projectionStartDate(model) : null), [model]);
 }

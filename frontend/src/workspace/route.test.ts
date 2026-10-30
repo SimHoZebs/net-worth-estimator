@@ -291,7 +291,7 @@ describe("resolveOverlayRoute", () => {
 		).toMatchObject({ state: "ready", overlay: { kind: "editor" } });
 	});
 
-	test("no overlay resolves to none, even without a plan", () => {
+	test("no overlay resolves to none, even without a model", () => {
 		expect(
 			resolveOverlayRoute({ page: "accounts", overlay: null }, null),
 		).toEqual({
@@ -299,7 +299,7 @@ describe("resolveOverlayRoute", () => {
 		});
 	});
 
-	test("overlays wait for the plan instead of failing", () => {
+	test("overlays wait for the model instead of failing", () => {
 		expect(
 			resolveOverlayRoute(
 				{
@@ -311,7 +311,7 @@ describe("resolveOverlayRoute", () => {
 		).toEqual({ state: "pending" });
 	});
 
-	test("invalid shapes resolve to unknown even without a plan", () => {
+	test("invalid shapes resolve to unknown even without a model", () => {
 		expect(
 			resolveOverlayRoute(
 				{ page: "outlook", overlay: { type: "invalid" } },

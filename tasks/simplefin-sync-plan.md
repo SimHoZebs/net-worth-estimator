@@ -62,7 +62,7 @@ Row writes replace the retired whole-document save. Incoming `source` values are
 
 ### Seed and import coexistence
 
-`replaceDocument` (seed/import path) snapshots stored sync rows, drops forged `sfin-` IDs from the incoming document, replaces owner rows, and re-merges stored sync rows in one transaction.
+`replaceModel` (seed/import path) snapshots stored sync rows, drops forged `sfin-` IDs from the incoming document, replaces owner rows, and re-merges stored sync rows in one transaction.
 
 Checkpoint behavior:
 

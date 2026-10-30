@@ -49,7 +49,7 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 	default:
 		return nil, huma.Error422UnprocessableEntity(`convert kind must be "posting" or "rule"`)
 	}
-	current, err := s.store.LoadDocument()
+	current, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
@@ -81,16 +81,16 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 			}
 		}
 	}
-	_, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Postings = removeByID(document.Postings, id, postingID)
-		document.RecurrenceRules = removeByID(document.RecurrenceRules, id, ruleID)
+	_, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Postings = removeByID(model.Postings, id, postingID)
+		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
 		if kind == "rule" {
 			priority := 0
 			if input.Body.Rule.Priority != nil {
 				priority = *input.Body.Rule.Priority
 			} else {
 				max := -1
-				for _, existing := range document.RecurrenceRules {
+				for _, existing := range model.RecurrenceRules {
 					if existing.Priority > max {
 						max = existing.Priority
 					}
@@ -98,10 +98,10 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 				priority = max + 1
 			}
 			rule = input.Body.Rule.toRule(id, priority)
-			document.RecurrenceRules = replaceByID(document.RecurrenceRules, rule.ID, ruleID, rule)
+			model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 		} else {
 			posting = input.Body.Posting.toPosting(id)
-			document.Postings = replaceByID(document.Postings, posting.ID, postingID, posting)
+			model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 		}
 	}, func() (struct{}, error) {
 		if kind == "rule" {

@@ -17,7 +17,7 @@ import (
 // the amount descriptor) before anything is written. The amount descriptor
 // validates shape-only: presets may reference placeholder IDs that resolve
 // at authoring time, so references are never checked against stored data.
-// Presets never touch the canonical document, its validation, or its
+// Presets never touch the canonical model, its validation, or its
 // revision: simulation reads copied descriptors, never presets.
 
 type presetListOutput struct {

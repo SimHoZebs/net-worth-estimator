@@ -28,7 +28,7 @@ import {
 	type UserScope,
 } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
-import { serverDocumentFingerprint } from "@/state/remoteStorage.ts";
+import { serverModelFingerprint } from "@/state/remoteStorage.ts";
 import { notifyError } from "@/state/notifications.ts";
 
 export interface ServerModel extends FinancialModelResponse {
@@ -91,8 +91,8 @@ export function modelOptions(scope = getUserScope()) {
 				current(scope, signal);
 				return {
 					...result,
-					fingerprint: result.document
-						? serverDocumentFingerprint(result.document)
+					fingerprint: result.model
+						? serverModelFingerprint(result.model)
 						: null,
 				};
 			} catch (error) {

@@ -42,7 +42,7 @@ func TestScopedImportPreservesOtherUserAndIdentity(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := user.InitializeDocument(); err != nil {
+		if err := user.InitializeModel(); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := user.CreateAccount(types.Account{ID: "same-id", Name: subject, Kind: types.AccountKind("cash"), Enabled: true}); err != nil {
@@ -92,7 +92,7 @@ INSERT INTO identity_logout_tokens VALUES('issuer','jti',999);`)
 }
 
 // Snapshot every user-scoped table plus ownership and identity tables. This
-// also catches side effects outside the canonical model document.
+// also catches side effects outside the canonical model.
 func protectedRows(t *testing.T, db *sql.DB, user string) map[string][]string {
 	t.Helper()
 	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`)

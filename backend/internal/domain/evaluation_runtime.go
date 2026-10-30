@@ -54,14 +54,14 @@ const (
 // EvaluationContext is passed to every evaluation hook.
 type EvaluationContext struct {
 	Path             *types.ProjectionPath
-	Document         *types.FinancialModelDocument
+	Model            *types.FinancialModel
 	MonteCarloSample *types.MonteCarloSample
 	DetailLevel      string // "detailed" | "summary"
 }
 
 // EvaluationFinalizeContext is passed to stochastic finalization.
 type EvaluationFinalizeContext struct {
-	Document          *types.FinancialModelDocument
+	Model             *types.FinancialModel
 	DeterministicPath *types.ProjectionPath
 	RunCount          int
 }
@@ -232,9 +232,9 @@ func withOrchestratorSim(fn func()) {
 // orchestratedPrepare runs PrepareSimulationRequest as an orchestrator: the
 // base path builder and the stochastic sampler simulate concurrently with
 // evaluation by design, so their runs never count as reader violations.
-func orchestratedPrepare(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (prepared *types.PreparedProjection, err error) {
+func orchestratedPrepare(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (prepared *types.PreparedProjection, err error) {
 	withOrchestratorSim(func() {
-		prepared, err = PrepareSimulationRequest(document, settings, overrides, monteCarloSample)
+		prepared, err = PrepareSimulationRequest(model, settings, overrides, monteCarloSample)
 	})
 	return prepared, err
 }

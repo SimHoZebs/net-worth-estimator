@@ -125,7 +125,7 @@ func TestRowWriteReadOnlyMatrix(t *testing.T) {
 			before := httptest.NewRecorder()
 			handler.ServeHTTP(before, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 			var beforePayload struct {
-				Document json.RawMessage `json:"document"`
+				Model json.RawMessage `json:"model"`
 			}
 			if err := json.Unmarshal(before.Body.Bytes(), &beforePayload); err != nil {
 				t.Fatalf("decode GET response: %v", err)
@@ -139,13 +139,13 @@ func TestRowWriteReadOnlyMatrix(t *testing.T) {
 			after := httptest.NewRecorder()
 			handler.ServeHTTP(after, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 			var afterPayload struct {
-				Document json.RawMessage `json:"document"`
+				Model json.RawMessage `json:"model"`
 			}
 			if err := json.Unmarshal(after.Body.Bytes(), &afterPayload); err != nil {
 				t.Fatalf("decode verify response: %v", err)
 			}
-			if test.want != http.StatusOK && string(afterPayload.Document) != string(beforePayload.Document) {
-				t.Fatalf("rejected write changed stored document")
+			if test.want != http.StatusOK && string(afterPayload.Model) != string(beforePayload.Model) {
+				t.Fatalf("rejected write changed stored model")
 			}
 		})
 	}

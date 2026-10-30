@@ -287,7 +287,7 @@ func corsHeadersAllowed(value string) bool {
 }
 
 // CORSMiddleware exposes the shared CORS enforcement for routers outside
-// the plan API (for example social groups) so direct cross-origin callers
+// the financial model API (for example social groups) so direct cross-origin callers
 // see identical origin, preflight, and header behavior.
 func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 	return corsMiddleware(allowedOrigins)

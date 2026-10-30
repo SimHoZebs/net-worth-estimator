@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 
-// Discovery must survive cancellation and eviction of the previous plan's data.
+// Discovery must survive cancellation and eviction of the previous user's data.
 // Never retain session bodies or retry identity writes automatically.
 export const sessionQueryClient = new QueryClient({
 	defaultOptions: {

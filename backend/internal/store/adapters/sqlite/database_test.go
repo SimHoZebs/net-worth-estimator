@@ -33,7 +33,7 @@ func privateTestPlan(t *testing.T, d *Database, name string) *sqliteStore {
 	return s.(*sqliteStore)
 }
 
-// Capture every financial table, not only the model document. This catches
+// Capture every financial table, not only the model. This catches
 // changes to preferences, identity registries, private sync keys, and caches.
 func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 	t.Helper()
@@ -230,7 +230,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 	if payload, ok, err := b.GetArtifact("same-artifact"); err != nil || !ok || payload != "b" {
 		t.Fatalf("artifact = %q, %v, %v", payload, ok, err)
 	}
-	if exists, err := a.DocumentExists(); err != nil || exists {
+	if exists, err := a.ModelExists(); err != nil || exists {
 		t.Fatalf("cleared presence = %v, %v", exists, err)
 	}
 	if _, ok, err := a.GetArtifact("same-artifact"); err != nil || ok {
@@ -336,7 +336,7 @@ func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	if _, err := a.SetPinnedEvaluations([]string{"missing"}); !IsNotFound(err) {
 		t.Fatalf("unknown pin = %v", err)
 	}
-	if exists, err := a.DocumentExists(); err != nil || exists {
+	if exists, err := a.ModelExists(); err != nil || exists {
 		t.Fatalf("failed write activated model: %v, %v", exists, err)
 	}
 }
@@ -374,7 +374,7 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 		}
 	}
 	bankID := func(s *sqliteStore) string {
-		loaded, err := s.LoadDocument()
+		loaded, err := s.LoadModel()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -399,11 +399,11 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	loadedA, err := a.LoadDocument()
+	loadedA, err := a.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	loadedB, err := b.LoadDocument()
+	loadedB, err := b.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}

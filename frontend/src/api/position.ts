@@ -1,5 +1,5 @@
 import type {
-	FinancialModelDocument,
+	FinancialModel,
 	HumaMetadata,
 	ModelValidationIssue,
 } from "./contracts.ts";
@@ -18,7 +18,7 @@ export interface CurrentPosition {
 }
 
 export interface CurrentPositionRequest {
-	document?: FinancialModelDocument;
+	model?: FinancialModel;
 	asOfDate: string;
 }
 

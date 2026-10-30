@@ -2,7 +2,7 @@
 
 The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds account-scoped financial data and application identity state.
 
-`PRODUCT_INTENT.md` defines the product experience. This document defines only the current Go contracts and domain behavior.
+`PRODUCT_INTENT.md` defines the product experience. This document defines the current Go contracts and domain behavior.
 
 ## 1. System Boundary
 
@@ -23,12 +23,12 @@ Store interface backed by SQLite
 - `internal/store` owns transactions, ordering, schema migration, row ownership, and artifact eviction.
 - `internal/types` defines the JSON and domain values shared across those layers.
 
-The model aggregate is `types.FinancialModelDocument`. Payroll is modeled as ordinary recurrence rules chained by priority and model-value references: gross pay, pre-tax contributions, employer match, and progressive-bracket tax are separate rules, not a separate income pipeline.
+The model aggregate is `types.FinancialModel`. Payroll is modeled as ordinary recurrence rules chained by priority and model-value references: gross pay, pre-tax contributions, employer match, and progressive-bracket tax are separate rules, not a separate income pipeline.
 
 ### Shared persistence and ownership
 
 Receipt evidence has its own account-scoped storage and a provider-neutral extraction
-interface. Images and metadata never enter `FinancialModelDocument` or projection
+interface. Images and metadata never enter `FinancialModel` or projection
 identity. See [receipt contracts and source adapters](docs/receipts.md).
 Background Analysis also owns separate evidence and findings. Its worker runs
 independently of bank sync and never creates recurrence rules or changes financial
@@ -44,7 +44,7 @@ access. `users` identifies users by immutable issuer and subject. Financial
 
 Every financial table includes `user_id`. Entity IDs and unique names can repeat
 between users. Relational references use composite user/entity keys. JSON model
-references validate against the scoped document. Imports, deletes, ordering,
+references validate against the scoped model. Imports, deletes, ordering,
 sync state, default presets, and artifact eviction operate within one user.
 
 Application sessions, provider grants, and logout records use global identity
@@ -82,15 +82,15 @@ connection with a two-second deadline. See [the deployment contract](deploy/READ
 
 ```json
 {
-  "document": "FinancialModelDocument or null",
+  "model": "FinancialModel or null",
   "issues": [],
   "revision": "\"sha256-...\""
 }
 ```
 
-Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `document` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
+Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `model` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
 
-Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting document and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
 
 - Any error-severity issue prevents persistence.
 - Warning-only writes are persisted.
@@ -111,7 +111,7 @@ The frontend displays these provider-neutral sync signals. Provider setup, accou
 
 ```json
 {
-  "document": "optional FinancialModelDocument",
+  "model": "optional FinancialModel",
   "overrides": {
     "addedAccounts": [],
     "addedPostings": [],
@@ -135,9 +135,9 @@ The frontend displays these provider-neutral sync signals. Provider setup, accou
 
 Resolution rules:
 
-- Production omits `document` and `overrides`; the stored model supplies the base.
-- A supplied document affects only that request and exists for tests, fixtures, and offline tooling.
-- `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
+- Production omits `model` and `overrides`; the stored model supplies the base.
+- A supplied model affects only that request and exists for tests, fixtures, and offline tooling.
+- `overrides` are applied by `types.ApplyModelOverrides` to a new model value; stored state is unchanged.
 - What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
 - `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
 - `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the legacy date-only cut at the end of the start day. It participates in artifact identity through the settings.
@@ -218,7 +218,7 @@ The kill switch rejects writes with 403 without a separate endpoint list. The pr
 
 `store.Store` is the persistence boundary. Its methods cover:
 
-- canonical document load (writes go through row create/update/delete/move);
+- canonical model load (writes go through row create/update/delete/move);
 - row writes with server-generated UUIDv7 IDs and a shared cross-table ID registry;
 - bridge-to-model account links;
 - CSV replacement import;
@@ -274,7 +274,7 @@ The current schema stores:
 | `identity_logout_marks`  | global revocation markers that block delayed callbacks and stale grants                                       |
 | `identity_logout_tokens` | global signed logout token replay records                                                                     |
 | `users`                  | data owners, including the provisioned guest, unique by issuer and subject                                     |
-| `model_metadata`         | source path and document-present flag                                                                         |
+| `model_metadata`         | source path and model-present flag                                                                         |
 | `accounts`               | ordered account definitions                                                                                   |
 | `checkpoints`            | ordered balance observations, unique by account/instant, with required exact time (`observed_at`, no date column) |
 | `postings`               | ordered UUID posting definitions with owner, execution order, and explicit bank lifecycle |
@@ -308,7 +308,7 @@ The authenticated user router initializes a blank private workspace on first aut
 
 ### Row writes and ownership
 
-Each row write runs one transaction: validate the resulting document, then insert, replace, delete, or reorder one row. There is no whole-document replace at runtime; `replaceDocument` survives only as the private seed/import path.
+Each row write runs one transaction: validate the resulting model, then insert, replace, delete, or reorder one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path.
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
@@ -318,7 +318,7 @@ Each row write runs one transaction: validate the resulting document, then inser
 
 ### Amount presets
 
-Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical document: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
+Amount presets are saved amount recipes managed through `GET /v1/amount-presets`, `POST`/`PATCH`/`DELETE /v1/amount-presets`, and `POST /v1/amount-presets/reorder`. Each write runs one transaction without touching the canonical model: creates generate UUIDv7 IDs when omitted; names are unique (duplicates return 409) and immutable; deletes and moves return the affected ID. Validation is shape-only (non-empty name and label, `ValidateAmountDescriptor` with no references so placeholder IDs pass); failures return issues with `persisted: false`. The table seeds 8 factory presets at migration time and survives `Clear` and CSV import: presets are user configuration, not model data.
 
 ### Posting identity
 
@@ -342,18 +342,18 @@ Stored simulation results are durable only when the SQLite file is durable. A co
 
 Deterministic identity includes:
 
-- the resolved model document;
+- the resolved model;
 - request overrides;
 - fallback projection start date and horizon;
-- every enabled settings evaluation instance ID and config, excluding settings evaluation labels. The complete model document also contributes its evaluation tables.
+- every enabled settings evaluation instance ID and config, excluding settings evaluation labels. The complete model also contributes its evaluation tables.
 
 Seeded stochastic identity adds the requested run count and the exact seed.
 
 Consequences:
 
 - omitting the model body still tracks saved model changes because the handler hashes the resolved stored snapshot;
-- disabled settings evaluation configs do not affect result identity, but model-document changes still do;
-- settings evaluation label-only changes do not change result identity, but model-document renames do;
+- disabled settings evaluation configs do not affect result identity, but model-model changes still do;
+- settings evaluation label-only changes do not change result identity, but model-model renames do;
 - a seed is part of stochastic identity;
 - unseeded stochastic runs are not content-addressed;
 - result identities are backend-owned and have no cross-runtime compatibility requirement.
@@ -453,7 +453,7 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 
 `PrepareSimulationRequest`:
 
-1. applies request overrides without mutating the input document;
+1. applies request overrides without mutating the input model;
 2. validates the effective model;
 3. validates `fallbackProjectionStartDate`;
 4. replays historical state;
@@ -516,7 +516,7 @@ The kernel:
 - accumulating external inflow, external outflow, and internal transfer totals;
 - rounding public monetary values with `roundCurrency`.
 
-`ProjectFinancialModelDocument` adds the configured evaluation tables.
+`ProjectFinancialModel` adds the configured evaluation tables.
 
 ## 9. Evaluation Runtime
 

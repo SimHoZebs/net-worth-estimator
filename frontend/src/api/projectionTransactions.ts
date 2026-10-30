@@ -1,6 +1,6 @@
 import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import type { TransactionResult } from "../domain/result.ts";
-import type { FinancialModelDocument, ProjectionResult } from "./contracts.ts";
+import type { FinancialModel, ProjectionResult } from "./contracts.ts";
 
 type TransactionSource = {
 	name: string;
@@ -10,11 +10,11 @@ type TransactionSource = {
 
 /** Index sources once per call so per-event lookup stays O(1). */
 function transactionSourceIndex(
-	document: FinancialModelDocument | null,
+	model: FinancialModel | null,
 ): Map<string, TransactionSource> {
 	const index = new Map<string, TransactionSource>();
-	if (!document) return index;
-	for (const item of document.postings) {
+	if (!model) return index;
+	for (const item of model.postings) {
 		if (!index.has(item.id))
 			index.set(item.id, {
 				name: item.name,
@@ -22,7 +22,7 @@ function transactionSourceIndex(
 				destinations: item.destinations,
 			});
 	}
-	for (const item of document.recurrenceRules ?? []) {
+	for (const item of model.recurrenceRules ?? []) {
 		if (!index.has(item.id))
 			index.set(item.id, {
 				name: item.name,
@@ -30,7 +30,7 @@ function transactionSourceIndex(
 				destinations: item.destinations,
 			});
 	}
-	for (const item of document.plannedPurchases ?? []) {
+	for (const item of model.plannedPurchases ?? []) {
 		if (!index.has(item.id))
 			index.set(item.id, {
 				name: item.name,
@@ -62,16 +62,16 @@ function transactionConstraintLabel(type: string): string {
 /** Adapt engine evidence without selecting a configured evaluation's scope. */
 export function projectionTransactions(
 	result: ProjectionResult,
-	document: FinancialModelDocument | null,
+	model: FinancialModel | null,
 ): TransactionResult[] {
 	const start = result.milestones.projectionStartDate;
-	const startCheckpoint = document?.checkpoints.some((checkpoint) => {
+	const startCheckpoint = model?.checkpoints.some((checkpoint) => {
 		const day = new Date(checkpoint.observedAt * 1000)
 			.toISOString()
 			.slice(0, 10);
 		return day === start;
 	});
-	const sources = transactionSourceIndex(document);
+	const sources = transactionSourceIndex(model);
 	return (result.transactionEvents ?? [])
 		.filter(
 			(event) =>

@@ -9,9 +9,9 @@ test.beforeEach(async ({ page, request }) => {
 	await page.clock.setFixedTime(new Date("2026-01-31T12:00:00Z"));
 	// Make salary current, rather than a future-start rule, without changing
 	// any projected amounts after the January balance checkpoint.
-	const model = await request.get(`${FIXTURE_API}/v1/financial-model`);
-	const { document } = await model.json();
-	const salary = document.recurrenceRules.find(
+	const modelResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
+	const { model } = await modelResponse.json();
+	const salary = model.recurrenceRules.find(
 		(rule: { id: string }) => rule.id === "salary",
 	);
 	const response = await request.patch(

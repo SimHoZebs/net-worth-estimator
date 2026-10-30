@@ -130,9 +130,9 @@ func TestExtensionUsesPlannedPurchaseAPI(t *testing.T) {
 			t.Fatalf("read %s: %d %s", path, w.Code, w.Body.String())
 		}
 	}
-	document, err := plan.LoadDocument()
-	if err != nil || len(document.Postings) != 0 || len(document.PlannedPurchases) != 1 {
-		t.Fatalf("purchase persistence: %+v %v", document, err)
+	model, err := plan.LoadModel()
+	if err != nil || len(model.Postings) != 0 || len(model.PlannedPurchases) != 1 {
+		t.Fatalf("purchase persistence: %+v %v", model, err)
 	}
 	readOnly := s.Wrap(api.New(plan, api.Config{ReadOnly: true}))
 	r := httptest.NewRequest("POST", s.config.PublicURL+"/v1/planned-purchases", bytes.NewBufferString(payload))

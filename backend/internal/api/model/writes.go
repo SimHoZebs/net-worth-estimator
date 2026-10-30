@@ -8,8 +8,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Row writes replace the retired whole-document PUT. Each handler loads
-// the stored document, applies one change in memory, runs the
+// Row writes replace the retired whole-model PUT. Each handler loads
+// the stored model, applies one change in memory, runs the
 // authoritative validator, and persists only when no error-severity issue
 // exists. Last write wins: concurrent row edits overwrite each other,
 // which is correct for a single writer and revisable later.
@@ -29,20 +29,20 @@ func hasErrorIssues(issues []types.ModelValidationIssue) bool {
 	return false
 }
 
-// runRowWrite validates and persists one plan-entry change, then computes
+// runRowWrite validates and persists one model-entry change, then computes
 // its revision from the stored snapshot used for response warnings.
 // Handlers wrap row/issues/persisted/revision in their output shape.
-func runRowWrite[T any](s *handler, mutate func(document *types.FinancialModelDocument), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
+func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
 	var zero T
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
-	if document == nil {
-		document = &types.FinancialModelDocument{Evaluations: types.EmptyEvaluationTables()}
+	if model == nil {
+		model = &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
 	}
-	mutate(document)
-	issues := domain.ValidateFinancialModel(document)
+	mutate(model)
+	issues := domain.ValidateFinancialModel(model)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}
@@ -58,17 +58,17 @@ func runRowWrite[T any](s *handler, mutate func(document *types.FinancialModelDo
 	if err != nil {
 		return zero, nil, false, "", modelstate.WriteError(err)
 	}
-	// Re-read warnings against the persisted document so the response
+	// Re-read warnings against the persisted model so the response
 	// reflects stored state, not the request echo.
-	document, err = s.store.LoadDocument()
+	model, err = s.store.LoadModel()
 	if err != nil {
 		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
-	issues = domain.ValidateFinancialModel(document)
+	issues = domain.ValidateFinancialModel(model)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}

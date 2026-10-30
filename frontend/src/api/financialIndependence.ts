@@ -1,6 +1,6 @@
 import type {
 	EvaluationResultEnvelope,
-	FinancialModelDocument,
+	FinancialModel,
 	FinancialIndependenceEvaluation,
 } from "./contracts.ts";
 import type {
@@ -140,7 +140,7 @@ function mapCandidate(
 function mapAnalysis(
 	evaluation: FinancialIndependenceEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
-	document: FinancialModelDocument | null,
+	model: FinancialModel | null,
 	startDate: string,
 	endDate: string | null,
 ): FinancialIndependenceAnalysis | null {
@@ -167,9 +167,9 @@ function mapAnalysis(
 	);
 	const transactions = new Map(
 		[
-			...(document?.postings ?? []),
-			...(document?.recurrenceRules ?? []),
-			...(document?.plannedPurchases ?? []),
+			...(model?.postings ?? []),
+			...(model?.recurrenceRules ?? []),
+			...(model?.plannedPurchases ?? []),
 		].map((item) => [item.id, item.name]),
 	);
 	const years = finite(config.evaluationYears);
@@ -200,7 +200,7 @@ function mapAnalysis(
 			null,
 		diagnostics: envelope.diagnostics ?? [],
 		accountNames: Object.fromEntries(
-			(document?.accounts ?? []).map((account) => [account.id, account.name]),
+			(model?.accounts ?? []).map((account) => [account.id, account.name]),
 		),
 		incomeNames: records(config.sources)
 			.filter(
@@ -221,7 +221,7 @@ function mapAnalysis(
 export function financialIndependenceEvaluation(
 	evaluation: FinancialIndependenceEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
-	document: FinancialModelDocument | null,
+	model: FinancialModel | null,
 	startDate: string,
 	endDate: string | null,
 ): OtherEvaluation {
@@ -285,7 +285,7 @@ export function financialIndependenceEvaluation(
 		financialIndependence: mapAnalysis(
 			evaluation,
 			envelope,
-			document,
+			model,
 			startDate,
 			endDate,
 		),

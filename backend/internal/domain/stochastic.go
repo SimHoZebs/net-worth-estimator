@@ -18,13 +18,13 @@ import (
 // touched by the coordinator, preserving deterministic accumulation.
 func StochasticProjection(
 	ctx context.Context,
-	document *types.FinancialModelDocument,
+	model *types.FinancialModel,
 	settings *types.ProjectionRuntimeSettings,
 	overrides types.ModelOverrides,
 	config types.StochasticConfig,
 	onProgress StochasticProgressCallback,
 ) (*types.StochasticProjectionResult, error) {
-	session, err := newStochasticSession(document, settings, overrides, config, onProgress)
+	session, err := newStochasticSession(model, settings, overrides, config, onProgress)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func consumeOrdered(
 	session.valuesMutex.Lock()
 	session.runtimes.Consume(&EvaluationContext{
 		Path:             path,
-		Document:         &path.EffectiveDocument,
+		Model:            &path.EffectiveModel,
 		MonteCarloSample: sample,
 		DetailLevel:      "summary",
 	})

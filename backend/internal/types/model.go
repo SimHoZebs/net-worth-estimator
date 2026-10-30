@@ -247,7 +247,8 @@ type RecurrenceRule struct {
 	Enabled         bool                    `json:"enabled"`
 }
 
-type FinancialModelDocument struct {
+// FinancialModel is the complete collection of financial rows.
+type FinancialModel struct {
 	SourcePath       string            `json:"sourcePath"`
 	Accounts         []Account         `json:"accounts"`
 	Checkpoints      []Checkpoint      `json:"checkpoints"`
@@ -293,9 +294,9 @@ func EmptyModelOverrides() ModelOverrides {
 	}
 }
 
-// ApplyModelOverrides builds the effective document without mutating the
+// ApplyModelOverrides builds the effective model without mutating the
 // canonical input.
-func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrides) FinancialModelDocument {
+func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) FinancialModel {
 	disabledAccounts := make(map[string]bool, len(overrides.DisabledAccountIDs))
 	for _, id := range overrides.DisabledAccountIDs {
 		disabledAccounts[id] = true
@@ -308,8 +309,8 @@ func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrid
 	for _, id := range overrides.DisabledRuleIDs {
 		disabledRules[id] = true
 	}
-	accounts := make([]Account, 0, len(document.Accounts)+len(overrides.AddedAccounts))
-	for _, account := range document.Accounts {
+	accounts := make([]Account, 0, len(model.Accounts)+len(overrides.AddedAccounts))
+	for _, account := range model.Accounts {
 		if !disabledAccounts[account.ID] {
 			accounts = append(accounts, account)
 		}
@@ -319,35 +320,35 @@ func ApplyModelOverrides(document FinancialModelDocument, overrides ModelOverrid
 	for _, account := range accounts {
 		accountIDSet[account.ID] = true
 	}
-	checkpoints := make([]Checkpoint, 0, len(document.Checkpoints))
-	for _, checkpoint := range document.Checkpoints {
+	checkpoints := make([]Checkpoint, 0, len(model.Checkpoints))
+	for _, checkpoint := range model.Checkpoints {
 		if accountIDSet[checkpoint.AccountID] {
 			checkpoints = append(checkpoints, checkpoint)
 		}
 	}
-	postings := make([]Posting, 0, len(document.Postings)+len(overrides.AddedPostings))
-	for _, posting := range document.Postings {
+	postings := make([]Posting, 0, len(model.Postings)+len(overrides.AddedPostings))
+	for _, posting := range model.Postings {
 		if !disabledPostings[posting.ID] {
 			postings = append(postings, posting)
 		}
 	}
 	postings = append(postings, overrides.AddedPostings...)
-	rules := make([]RecurrenceRule, 0, len(document.RecurrenceRules)+len(overrides.AddedRules))
-	for _, rule := range document.RecurrenceRules {
+	rules := make([]RecurrenceRule, 0, len(model.RecurrenceRules)+len(overrides.AddedRules))
+	for _, rule := range model.RecurrenceRules {
 		if !disabledRules[rule.ID] {
 			rules = append(rules, rule)
 		}
 	}
 	rules = append(rules, overrides.AddedRules...)
-	return FinancialModelDocument{
-		SourcePath:       document.SourcePath,
+	return FinancialModel{
+		SourcePath:       model.SourcePath,
 		Accounts:         accounts,
 		Checkpoints:      checkpoints,
-		Evaluations:      document.Evaluations,
+		Evaluations:      model.Evaluations,
 		Postings:         postings,
 		RecurrenceRules:  rules,
-		PaymentTerms:     document.PaymentTerms,
-		PlannedPurchases: document.PlannedPurchases,
+		PaymentTerms:     model.PaymentTerms,
+		PlannedPurchases: model.PlannedPurchases,
 	}
 }
 

@@ -14,12 +14,12 @@ func TestPurchaseEvaluationPersistsThroughRowAndModelWrites(t *testing.T) {
 	if _, err := database.CreateEvaluation(item); err != nil {
 		t.Fatal(err)
 	}
-	document, err := database.LoadDocument()
-	if err != nil || len(document.Evaluations.PlannedPurchases) != 1 {
-		t.Fatalf("document: %+v %v", document, err)
+	model, err := database.LoadModel()
+	if err != nil || len(model.Evaluations.PlannedPurchases) != 1 {
+		t.Fatalf("model: %+v %v", model, err)
 	}
-	before := document.Evaluations
-	loaded, err := database.ImportDocument(document)
+	before := model.Evaluations
+	loaded, err := database.ImportModel(model)
 	if err != nil || !reflect.DeepEqual(before, loaded.Evaluations) {
 		t.Fatalf("model replacement lost evaluation: %+v %v", loaded, err)
 	}
@@ -45,7 +45,7 @@ func TestStandalonePurchasePersistsAcrossRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	loaded, err := database.LoadDocument()
+	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 0 || len(loaded.PlannedPurchases) != 1 || !reflect.DeepEqual(loaded.PlannedPurchases[0], purchase) {
 		t.Fatalf("loaded = %+v %v", loaded, err)
 	}
@@ -53,7 +53,7 @@ func TestStandalonePurchasePersistsAcrossRestart(t *testing.T) {
 	if _, err := database.UpdatePlannedPurchase(purchase); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err = database.LoadDocument()
+	loaded, err = database.LoadModel()
 	if err != nil || loaded.PlannedPurchases[0].Priority != 1 {
 		t.Fatalf("updated = %+v %v", loaded, err)
 	}
@@ -63,7 +63,7 @@ func TestStandalonePurchasePersistsAcrossRestart(t *testing.T) {
 	if _, err := database.CreatePosting(testPostingFixture(purchase.ID)); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err = database.LoadDocument()
+	loaded, err = database.LoadModel()
 	if err != nil || len(loaded.PlannedPurchases) != 0 || len(loaded.Postings) != 1 {
 		t.Fatalf("stale purchase survived: %+v %v", loaded, err)
 	}

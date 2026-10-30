@@ -106,7 +106,7 @@ function useReceiptWrite<T>(
 					queryKey: receiptCollectionKey(postingId, scope),
 				});
 				// Reverse lookup lives on the financial-model envelope, outside
-				// the document. Refresh it so posting badges follow mutations.
+				// the model. Refresh it so posting badges follow mutations.
 				await cache.invalidateQueries({
 					queryKey: userResourceKey("model", scope),
 				});

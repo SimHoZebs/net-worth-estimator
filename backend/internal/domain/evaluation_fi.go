@@ -273,7 +273,7 @@ const (
 
 func classifyPostingDispositions(path *types.ProjectionPath, cashflowIDs, continuingIDs map[string]bool) map[string]postingDisposition {
 	dispositions := map[string]postingDisposition{}
-	for id := range TransactionIDs(&path.EffectiveDocument) {
+	for id := range TransactionIDs(&path.EffectiveModel) {
 		switch {
 		case cashflowIDs[id]:
 			dispositions[id] = dispositionObserveBasePath
@@ -379,8 +379,8 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 	assetRates := selectedAssetRates(plan)
 	assetRateOrder := selectedAssetRateOrder(plan, assetRates)
 	cashflowIDs := selectedCashflowIDs(plan)
-	accountsByID := make(map[string]types.Account, len(path.EffectiveDocument.Accounts))
-	for _, account := range path.EffectiveDocument.Accounts {
+	accountsByID := make(map[string]types.Account, len(path.EffectiveModel.Accounts))
+	for _, account := range path.EffectiveModel.Accounts {
 		accountsByID[account.ID] = account
 	}
 	continuingIDs := map[string]bool{}
@@ -391,15 +391,15 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 	}
 	dispositions := classifyPostingDispositions(path, cashflowIDs, continuingIDs)
 	branchPostings := []types.Posting{}
-	for index := range path.EffectiveDocument.Postings {
-		posting := &path.EffectiveDocument.Postings[index]
+	for index := range path.EffectiveModel.Postings {
+		posting := &path.EffectiveModel.Postings[index]
 		if posting.Enabled && dispositions[posting.ID] != dispositionDisabled {
 			branchPostings = append(branchPostings, *posting)
 		}
 	}
 	branchRules := []types.RecurrenceRule{}
-	for index := range path.EffectiveDocument.RecurrenceRules {
-		rule := &path.EffectiveDocument.RecurrenceRules[index]
+	for index := range path.EffectiveModel.RecurrenceRules {
+		rule := &path.EffectiveModel.RecurrenceRules[index]
 		if rule.Enabled && dispositions[rule.ID] != dispositionDisabled {
 			branchRules = append(branchRules, *rule)
 		}
@@ -454,7 +454,7 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	expenseBaseline := expenseBaselineDate(plan, path.ProjectionStartDate, candidate.Date)
 	cashflowIDs := shared.cashflowIDs
 	accountsByID := shared.accountsByID
-	candidateBalances := balancesAt(candidateRow, path.EffectiveDocument.Accounts)
+	candidateBalances := balancesAt(candidateRow, path.EffectiveModel.Accounts)
 
 	if summaryOnly {
 		monthCount := plan.EvaluationYears * 12
@@ -486,11 +486,11 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	branchRules := shared.branchRules
 	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
 	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
-	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts:        path.EffectiveDocument.Accounts,
+	transitions, err := CreateTransitionRuntime(types.SimulationInputs{
+		Accounts:        path.EffectiveModel.Accounts,
 		Postings:        branchPostings,
 		RecurrenceRules: branchRules,
-		PaymentTerms:    path.EffectiveDocument.PaymentTerms,
+		PaymentTerms:    path.EffectiveModel.PaymentTerms,
 	}, initializeBranchSimulationState(candidateBalances, path.TransactionEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
 	if err != nil {
 		return nil, err
@@ -780,7 +780,7 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 		// One balance map per candidate (O(A)) instead of one snapshot scan
 		// per selected asset (O(S*A)). balancesAt zero-fills missing
 		// accounts, matching balanceAt's missing-as-zero semantics here.
-		rowBalances := balancesAt(row, path.EffectiveDocument.Accounts)
+		rowBalances := balancesAt(row, path.EffectiveModel.Accounts)
 		for _, accountID := range assetRateOrder {
 			rate := assetRates[accountID]
 			balance := math.Max(0, rowBalances[accountID])
@@ -861,10 +861,10 @@ func EvaluateFinancialIndependence(path *types.ProjectionPath, plan *types.FIPla
 // AvailableFIPlan filters sources to existing accounts/postings.
 func AvailableFIPlan(path *types.ProjectionPath, config *types.FIPlan) *types.FIPlan {
 	accountIDs := map[string]bool{}
-	for _, account := range path.EffectiveDocument.Accounts {
+	for _, account := range path.EffectiveModel.Accounts {
 		accountIDs[account.ID] = true
 	}
-	postingIDs := TransactionIDs(&path.EffectiveDocument)
+	postingIDs := TransactionIDs(&path.EffectiveModel)
 	filtered := *config
 	filtered.Sources = []types.FISource{}
 	for _, source := range config.Sources {
@@ -941,10 +941,10 @@ var financialIndependenceDefinition = &EvaluationDefinition{
 	DiagnoseConfig: func(ctx *EvaluationContext, config any) []types.EvaluationDiagnostic {
 		typed := config.(types.FIPlan)
 		accountIDs := map[string]bool{}
-		for _, account := range ctx.Path.EffectiveDocument.Accounts {
+		for _, account := range ctx.Path.EffectiveModel.Accounts {
 			accountIDs[account.ID] = true
 		}
-		postingIDs := TransactionIDs(&ctx.Path.EffectiveDocument)
+		postingIDs := TransactionIDs(&ctx.Path.EffectiveModel)
 		diagnostics := []types.EvaluationDiagnostic{}
 		for _, source := range typed.Sources {
 			if !source.Included {

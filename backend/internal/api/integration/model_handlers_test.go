@@ -25,13 +25,13 @@ func TestGetModelReturnsNullWhenStoreIsUninitialized(t *testing.T) {
 		t.Fatalf("GET status = %d, body %s", response.Code, response.Body.String())
 	}
 	var payload struct {
-		Document *types.FinancialModelDocument `json:"document"`
-		Issues   []types.ModelValidationIssue  `json:"issues"`
+		Model  *types.FinancialModel        `json:"model"`
+		Issues []types.ModelValidationIssue `json:"issues"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode GET response: %v", err)
 	}
-	if payload.Document != nil || payload.Issues == nil {
+	if payload.Model != nil || payload.Issues == nil {
 		t.Fatalf("unexpected uninitialized response: %+v", payload)
 	}
 }
@@ -178,14 +178,14 @@ func TestReadOnlyRejectsWritesButServesReads(t *testing.T) {
 		t.Fatalf("GET status = %d, want 200, body %s", get.Code, get.Body.String())
 	}
 	var after struct {
-		Document *types.FinancialModelDocument `json:"document"`
-		Issues   []types.ModelValidationIssue  `json:"issues"`
+		Model  *types.FinancialModel        `json:"model"`
+		Issues []types.ModelValidationIssue `json:"issues"`
 	}
 	if err := json.Unmarshal(get.Body.Bytes(), &after); err != nil {
 		t.Fatalf("decode GET response: %v", err)
 	}
-	if after.Document != nil {
-		t.Fatalf("stored document changed: %+v", after.Document)
+	if after.Model != nil {
+		t.Fatalf("stored model changed: %+v", after.Model)
 	}
 }
 
@@ -202,7 +202,7 @@ func TestReadOnlyRejectsRowWrites(t *testing.T) {
 	get := httptest.NewRecorder()
 	handler.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 	var payload struct {
-		Document json.RawMessage `json:"document"`
+		Model json.RawMessage `json:"model"`
 	}
 	if err := json.Unmarshal(get.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode GET response: %v", err)
@@ -219,13 +219,13 @@ func TestReadOnlyRejectsRowWrites(t *testing.T) {
 	verify := httptest.NewRecorder()
 	handler.ServeHTTP(verify, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 	var after struct {
-		Document json.RawMessage `json:"document"`
+		Model json.RawMessage `json:"model"`
 	}
 	if err := json.Unmarshal(verify.Body.Bytes(), &after); err != nil {
 		t.Fatalf("decode verify response: %v", err)
 	}
-	if string(after.Document) != string(payload.Document) {
-		t.Fatalf("rejected write changed stored document")
+	if string(after.Model) != string(payload.Model) {
+		t.Fatalf("rejected write changed stored model")
 	}
 }
 
@@ -283,7 +283,7 @@ func TestRowWriteRejectsInvalidRow(t *testing.T) {
 	before := httptest.NewRecorder()
 	handler.ServeHTTP(before, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 	var beforePayload struct {
-		Document json.RawMessage `json:"document"`
+		Model json.RawMessage `json:"model"`
 	}
 	if err := json.Unmarshal(before.Body.Bytes(), &beforePayload); err != nil {
 		t.Fatalf("decode GET response: %v", err)
@@ -311,13 +311,13 @@ func TestRowWriteRejectsInvalidRow(t *testing.T) {
 	after := httptest.NewRecorder()
 	handler.ServeHTTP(after, httptest.NewRequest(http.MethodGet, "/v1/financial-model", nil))
 	var afterPayload struct {
-		Document json.RawMessage `json:"document"`
+		Model json.RawMessage `json:"model"`
 	}
 	if err := json.Unmarshal(after.Body.Bytes(), &afterPayload); err != nil {
 		t.Fatalf("decode verify response: %v", err)
 	}
-	if string(afterPayload.Document) != string(beforePayload.Document) {
-		t.Fatalf("rejected write changed stored document")
+	if string(afterPayload.Model) != string(beforePayload.Model) {
+		t.Fatalf("rejected write changed stored model")
 	}
 }
 
@@ -413,7 +413,7 @@ func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
 	if payload.Persisted || len(payload.Issues) == 0 {
 		t.Fatalf("dangling delete response = %+v", payload)
 	}
-	loaded, err := database.LoadDocument()
+	loaded, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -435,18 +435,18 @@ func TestDeterministicResponseIncludesTransactionEvents(t *testing.T) {
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	if fixture.Document == nil {
-		t.Fatal("projection fixture has no document")
+	if fixture.Model == nil {
+		t.Fatal("projection fixture has no model")
 	}
 
 	body, err := json.Marshal(projectionRequestBody{
-		Document: fixture.Document,
+		Model:    fixture.Model,
 		Settings: fixture.Settings,
 		Range:    fullSpanRange(),
 	})
@@ -511,27 +511,27 @@ func TestDeterministicTransactionEvidenceIncludesBindingConstraints(t *testing.T
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	if fixture.Document == nil {
-		t.Fatal("projection fixture has no document")
+	if fixture.Model == nil {
+		t.Fatal("projection fixture has no model")
 	}
 	floor := 2400.0
-	for index := range fixture.Document.Accounts {
-		if fixture.Document.Accounts[index].ID == "checking" {
-			fixture.Document.Accounts[index].MinBalance = &floor
+	for index := range fixture.Model.Accounts {
+		if fixture.Model.Accounts[index].ID == "checking" {
+			fixture.Model.Accounts[index].MinBalance = &floor
 		}
 	}
-	for index := range fixture.Document.Postings {
-		if fixture.Document.Postings[index].ID == "spend" {
-			fixture.Document.Postings[index].Amount.Config = map[string]any{"expression": "200.49"}
+	for index := range fixture.Model.Postings {
+		if fixture.Model.Postings[index].ID == "spend" {
+			fixture.Model.Postings[index].Amount.Config = map[string]any{"expression": "200.49"}
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -604,19 +604,19 @@ func TestDeterministicTransactionEvidenceReportsAnnualCapAvailability(t *testing
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
 	cap := 500.0
-	for index := range fixture.Document.RecurrenceRules {
-		if fixture.Document.RecurrenceRules[index].ID == "invest" {
-			fixture.Document.RecurrenceRules[index].AnnualCap = &cap
+	for index := range fixture.Model.RecurrenceRules {
+		if fixture.Model.RecurrenceRules[index].ID == "invest" {
+			fixture.Model.RecurrenceRules[index].AnnualCap = &cap
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -654,7 +654,7 @@ func TestDeterministicTransactionEvidenceCarriesHistoricalAnnualCapUsage(t *test
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
@@ -662,14 +662,14 @@ func TestDeterministicTransactionEvidenceCarriesHistoricalAnnualCapUsage(t *test
 	}
 	cap := 500.0
 	endDate := types.IsoDate("2026-03-31")
-	for index := range fixture.Document.RecurrenceRules {
-		if fixture.Document.RecurrenceRules[index].ID == "invest" {
-			fixture.Document.RecurrenceRules[index].StartDate = "2026-01-31"
-			fixture.Document.RecurrenceRules[index].EndDate = &endDate
-			fixture.Document.RecurrenceRules[index].AnnualCap = &cap
+	for index := range fixture.Model.RecurrenceRules {
+		if fixture.Model.RecurrenceRules[index].ID == "invest" {
+			fixture.Model.RecurrenceRules[index].StartDate = "2026-01-31"
+			fixture.Model.RecurrenceRules[index].EndDate = &endDate
+			fixture.Model.RecurrenceRules[index].AnnualCap = &cap
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -707,28 +707,28 @@ func TestDeterministicTransactionEvidenceReportsDestinationHeadroom(t *testing.T
 		t.Fatalf("read projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode projection fixture: %v", err)
 	}
-	if fixture.Document == nil {
-		t.Fatal("projection fixture has no document")
+	if fixture.Model == nil {
+		t.Fatal("projection fixture has no model")
 	}
 	ceiling := 0.0
-	for index := range fixture.Document.Accounts {
-		if fixture.Document.Accounts[index].ID == "loan" {
-			fixture.Document.Accounts[index].MaxBalance = &ceiling
+	for index := range fixture.Model.Accounts {
+		if fixture.Model.Accounts[index].ID == "loan" {
+			fixture.Model.Accounts[index].MaxBalance = &ceiling
 		}
 	}
-	for index := range fixture.Document.RecurrenceRules {
-		if fixture.Document.RecurrenceRules[index].ID == "paydown" {
-			fixture.Document.RecurrenceRules[index].Amount.Config = map[string]any{"expression": "711"}
-			fixture.Document.RecurrenceRules[index].Amount.Inputs = map[string]types.AmountInputBinding{}
+	for index := range fixture.Model.RecurrenceRules {
+		if fixture.Model.RecurrenceRules[index].ID == "paydown" {
+			fixture.Model.RecurrenceRules[index].Amount.Config = map[string]any{"expression": "711"}
+			fixture.Model.RecurrenceRules[index].Amount.Inputs = map[string]types.AmountInputBinding{}
 		}
 	}
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode projection request: %v", err)
 	}
@@ -784,17 +784,17 @@ func TestDeterministicTransactionEvidenceRoundsPayrollFields(t *testing.T) {
 		t.Fatalf("read payroll projection fixture: %v", err)
 	}
 	var fixture struct {
-		Document *types.FinancialModelDocument   `json:"document"`
+		Model    *types.FinancialModel           `json:"model"`
 		Settings types.ProjectionRuntimeSettings `json:"settings"`
 	}
 	if err := json.Unmarshal(fixtureBytes, &fixture); err != nil {
 		t.Fatalf("decode payroll projection fixture: %v", err)
 	}
-	if fixture.Document == nil {
+	if fixture.Model == nil {
 		t.Fatal("payroll projection fixture is incomplete")
 	}
 	fixture.Settings.HorizonYears = 1
-	body, err := json.Marshal(projectionRequestBody{Document: fixture.Document, Settings: fixture.Settings, Range: fullSpanRange()})
+	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
 	if err != nil {
 		t.Fatalf("encode payroll projection request: %v", err)
 	}

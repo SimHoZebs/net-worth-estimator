@@ -9,35 +9,35 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-type parseResultBody struct {
-	Document     *types.FinancialModelDocument `json:"document"`
-	Issues       []types.ModelValidationIssue  `json:"issues"`
-	Revision     string                        `json:"revision,omitempty"`
-	ReceiptLinks map[string][]string           `json:"receiptLinks,omitempty"`
+type financialModelResponse struct {
+	Model        *types.FinancialModel        `json:"model"`
+	Issues       []types.ModelValidationIssue `json:"issues"`
+	Revision     string                       `json:"revision,omitempty"`
+	ReceiptLinks map[string][]string          `json:"receiptLinks,omitempty"`
 }
 
 type getModelOutput struct {
-	Body parseResultBody
+	Body financialModelResponse
 }
 
-func (s *handler) loadStoredDocument() (*types.FinancialModelDocument, []types.ModelValidationIssue, error) {
-	document, err := s.store.LoadDocument()
+func (s *handler) loadStoredModel() (*types.FinancialModel, []types.ModelValidationIssue, error) {
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, nil, err
 	}
-	if document == nil {
+	if model == nil {
 		return nil, []types.ModelValidationIssue{}, nil
 	}
-	issues := domain.ValidateFinancialModel(document)
-	return document, issues, nil
+	issues := domain.ValidateFinancialModel(model)
+	return model, issues, nil
 }
 
 func (s *handler) getModel(_ context.Context, _ *struct{}) (*getModelOutput, error) {
-	document, issues, err := s.loadStoredDocument()
+	model, issues, err := s.loadStoredModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
@@ -45,5 +45,5 @@ func (s *handler) getModel(_ context.Context, _ *struct{}) (*getModelOutput, err
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	return &getModelOutput{Body: parseResultBody{Document: document, Issues: issues, Revision: revision, ReceiptLinks: links}}, nil
+	return &getModelOutput{Body: financialModelResponse{Model: model, Issues: issues, Revision: revision, ReceiptLinks: links}}, nil
 }

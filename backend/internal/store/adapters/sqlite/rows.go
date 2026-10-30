@@ -58,10 +58,10 @@ func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-func markDocumentPresent(tx *userTx) error {
+func markModelPresent(tx *userTx) error {
 	if _, err := tx.Exec(`INSERT INTO model_metadata (id, source_path, document_present, user_id) VALUES (1, '', 1, :user_id)
 		ON CONFLICT(user_id, id) DO UPDATE SET document_present = 1`); err != nil {
-		return fmt.Errorf("mark document present: %w", err)
+		return fmt.Errorf("mark model present: %w", err)
 	}
 	return nil
 }
@@ -193,7 +193,7 @@ func withRowTx(db *userDB, fn func(tx *userTx) error) error {
 	if err := fn(tx); err != nil {
 		return err
 	}
-	if err := markDocumentPresent(tx); err != nil {
+	if err := markModelPresent(tx); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {

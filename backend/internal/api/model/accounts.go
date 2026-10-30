@@ -27,7 +27,7 @@ type accountBody struct {
 	ObservedAt *int64 `json:"observedAt,omitempty"`
 	// Source is accepted and ignored: accounts carry no authorship flag.
 	// Row authorship lives in checkpoints/postings ("user" | "simplefin")
-	// plus account_links, mirroring the retired whole-document PUT contract.
+	// plus account_links, mirroring the retired whole-model PUT contract.
 	Source *string `json:"source,omitempty"`
 }
 
@@ -79,11 +79,11 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 	if err != nil {
 		return nil, err
 	}
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
-			document.Checkpoints = replaceByID(document.Checkpoints, checkpointKey(pending), checkpointKey, pending)
+			model.Checkpoints = replaceByID(model.Checkpoints, checkpointKey(pending), checkpointKey, pending)
 		}
 	}, func() (types.Account, error) {
 		return s.store.CreateAccountWithBalance(account, balance, observedAt)
@@ -103,11 +103,11 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Accounts = replaceByID(document.Accounts, account.ID, accountID, account)
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
-			document.Checkpoints = replaceByID(document.Checkpoints, checkpointKey(pending), checkpointKey, pending)
+			model.Checkpoints = replaceByID(model.Checkpoints, checkpointKey(pending), checkpointKey, pending)
 		}
 	}, func() (types.Account, error) {
 		return s.store.UpdateAccountWithBalance(account, balance, observedAt)
@@ -129,8 +129,8 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 	} `json:"body"`
 }, error) {
 	id := input.ID
-	_, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Accounts = removeByID(document.Accounts, id, accountID)
+	_, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Accounts = removeByID(model.Accounts, id, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteAccount(id)
 	})
@@ -154,8 +154,8 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 
 func (s *handler) moveAccount(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.Accounts = moveBeforeID(document.Accounts, id, beforeID, accountID)
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.Accounts = moveBeforeID(model.Accounts, id, beforeID, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MoveAccount(id, beforeID)
 	})

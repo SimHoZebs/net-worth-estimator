@@ -34,7 +34,7 @@ afterEach(() => {
 
 it("keeps navigation usable without account controls when saved data is empty", () => {
 	setServerStatusFixture({ readOnly: false });
-	setServerModelFixture(undefined, { document: null });
+	setServerModelFixture(undefined, { model: null });
 	const logout = vi.fn(async () => {});
 	render(
 		<SessionContext

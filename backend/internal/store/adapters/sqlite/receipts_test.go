@@ -33,8 +33,8 @@ func TestReceiptsStayPlanScopedAndPreserveModel(t *testing.T) {
 	for _, s := range []store.Store{a, b} {
 		seedReceiptPosting(t, s)
 	}
-	before, _ := a.LoadDocument()
-	revision, _ := DocumentETag(before)
+	before, _ := a.LoadModel()
+	revision, _ := ModelETag(before)
 	image := types.ReceiptImage{Bytes: []byte("normalized pixels"), MediaType: "image/png"}
 	r, err := a.CreateReceipt(context.Background(), receiptPostingID, "receipt.png", image)
 	if err != nil {
@@ -95,8 +95,8 @@ func TestReceiptsStayPlanScopedAndPreserveModel(t *testing.T) {
 	if pixels, err := b.GetReceiptImage(context.Background(), r.ID); err != nil || !bytes.Equal(pixels.Bytes, image.Bytes) {
 		t.Fatalf("cleanup changed another plan's pixels: %+v %v", pixels, err)
 	}
-	after, _ := a.LoadDocument()
-	got, _ := DocumentETag(after)
+	after, _ := a.LoadModel()
+	got, _ := ModelETag(after)
 	if got != revision {
 		t.Fatalf("receipt changed model revision: %s != %s", got, revision)
 	}
@@ -221,7 +221,7 @@ func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 	if _, err := s.UpdatePosting(p); err != nil {
 		t.Fatal(err)
 	}
-	doc, err := s.LoadDocument()
+	doc, err := s.LoadModel()
 	if err != nil || doc.Postings[0].Pending {
 		t.Fatal("owner update did not recompute pending metadata", err)
 	}
@@ -274,7 +274,7 @@ func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
 	if err != nil || len(links[p.ID]) != 2 {
 		t.Fatalf("links = %+v, %v", links, err)
 	}
-	// Ordinary posting edits preserve the field and keep it out of the document.
+	// Ordinary posting edits preserve the field and keep it out of the model.
 	p.Name = "Updated"
 	if _, err := s.UpdatePosting(p); err != nil {
 		t.Fatal(err)
@@ -283,10 +283,10 @@ func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
 	if err != nil || len(links[p.ID]) != 2 {
 		t.Fatalf("links after edit = %+v, %v", links, err)
 	}
-	doc, _ := s.LoadDocument()
+	doc, _ := s.LoadModel()
 	raw, _ := json.Marshal(doc)
 	if strings.Contains(string(raw), r.ID) || strings.Contains(string(raw), "receipt") {
-		t.Fatal("receipt field leaked into the financial document")
+		t.Fatal("receipt field leaked into the financial model")
 	}
 	if err := s.DeleteReceipt(context.Background(), r.ID); err != nil {
 		t.Fatal(err)

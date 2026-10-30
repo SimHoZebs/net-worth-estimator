@@ -38,7 +38,7 @@ export function useUserPending(): boolean {
  */
 export function useUserModelAvailable(): boolean {
 	const model = useModel();
-	return model.data?.document != null;
+	return model.data?.model != null;
 }
 
 /** Read-only state from server policy and the latest write denial. */

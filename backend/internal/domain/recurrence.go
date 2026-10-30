@@ -290,17 +290,17 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 	return resolved
 }
 
-// ResolvedTransactionPostings returns every transaction identity in a document
+// ResolvedTransactionPostings returns every transaction identity in a model
 // as postings: manual postings in stored order, then one synthesized entry
 // per rule carrying the rule's template (ID, name, routes, amount).
 // Evaluation lookups keyed by origin ID work over this list without caring
 // which side an ID came from. Caps are not carried: they live on rules and
 // resolve through RuleCapsByID.
-func ResolvedTransactionPostings(document *types.FinancialModelDocument) []types.Posting {
-	out := make([]types.Posting, 0, len(document.Postings)+len(document.RecurrenceRules))
-	out = append(out, document.Postings...)
-	for index := range document.RecurrenceRules {
-		rule := &document.RecurrenceRules[index]
+func ResolvedTransactionPostings(model *types.FinancialModel) []types.Posting {
+	out := make([]types.Posting, 0, len(model.Postings)+len(model.RecurrenceRules))
+	out = append(out, model.Postings...)
+	for index := range model.RecurrenceRules {
+		rule := &model.RecurrenceRules[index]
 		out = append(out, types.Posting{
 			ID:              rule.ID,
 			Name:            rule.Name,
@@ -316,10 +316,10 @@ func ResolvedTransactionPostings(document *types.FinancialModelDocument) []types
 
 // RuleCapsByID indexes enabled-or-not rule annual caps by rule ID. Caps
 // live on rules only; manual postings are uncapped single transactions.
-func RuleCapsByID(document *types.FinancialModelDocument) map[string]float64 {
-	caps := make(map[string]float64, len(document.RecurrenceRules))
-	for index := range document.RecurrenceRules {
-		rule := &document.RecurrenceRules[index]
+func RuleCapsByID(model *types.FinancialModel) map[string]float64 {
+	caps := make(map[string]float64, len(model.RecurrenceRules))
+	for index := range model.RecurrenceRules {
+		rule := &model.RecurrenceRules[index]
 		if rule.AnnualCap != nil {
 			caps[rule.ID] = *rule.AnnualCap
 		}
@@ -329,37 +329,37 @@ func RuleCapsByID(document *types.FinancialModelDocument) map[string]float64 {
 
 // TransactionIDExists reports whether an ID names a manual posting, a rule,
 // or a planned purchase.
-func TransactionIDExists(document *types.FinancialModelDocument, id string) bool {
-	for index := range document.Postings {
-		if document.Postings[index].ID == id {
+func TransactionIDExists(model *types.FinancialModel, id string) bool {
+	for index := range model.Postings {
+		if model.Postings[index].ID == id {
 			return true
 		}
 	}
-	for index := range document.RecurrenceRules {
-		if document.RecurrenceRules[index].ID == id {
+	for index := range model.RecurrenceRules {
+		if model.RecurrenceRules[index].ID == id {
 			return true
 		}
 	}
-	for index := range document.PlannedPurchases {
-		if document.PlannedPurchases[index].ID == id {
+	for index := range model.PlannedPurchases {
+		if model.PlannedPurchases[index].ID == id {
 			return true
 		}
 	}
 	return false
 }
 
-// TransactionIDs returns every transaction identity in a document: manual posting
+// TransactionIDs returns every transaction identity in a model: manual posting
 // IDs, rule IDs, and planned-purchase IDs.
-func TransactionIDs(document *types.FinancialModelDocument) map[string]bool {
-	ids := make(map[string]bool, len(document.Postings)+len(document.RecurrenceRules)+len(document.PlannedPurchases))
-	for index := range document.Postings {
-		ids[document.Postings[index].ID] = true
+func TransactionIDs(model *types.FinancialModel) map[string]bool {
+	ids := make(map[string]bool, len(model.Postings)+len(model.RecurrenceRules)+len(model.PlannedPurchases))
+	for index := range model.Postings {
+		ids[model.Postings[index].ID] = true
 	}
-	for index := range document.RecurrenceRules {
-		ids[document.RecurrenceRules[index].ID] = true
+	for index := range model.RecurrenceRules {
+		ids[model.RecurrenceRules[index].ID] = true
 	}
-	for index := range document.PlannedPurchases {
-		ids[document.PlannedPurchases[index].ID] = true
+	for index := range model.PlannedPurchases {
+		ids[model.PlannedPurchases[index].ID] = true
 	}
 	return ids
 }

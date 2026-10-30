@@ -17,7 +17,7 @@ import (
 
 type Repository interface {
 	store.ReceiptStore
-	LoadDocument() (*types.FinancialModelDocument, error)
+	LoadModel() (*types.FinancialModel, error)
 }
 
 type Service struct {
@@ -95,12 +95,12 @@ func (s *Service) ListLinks() (map[string][]string, error) {
 }
 
 func (s *Service) posting(id string) (types.Posting, error) {
-	document, err := s.repository.LoadDocument()
+	model, err := s.repository.LoadModel()
 	if err != nil {
 		return types.Posting{}, err
 	}
-	if document != nil {
-		for _, posting := range document.Postings {
+	if model != nil {
+		for _, posting := range model.Postings {
 			if posting.ID == id {
 				return posting, nil
 			}

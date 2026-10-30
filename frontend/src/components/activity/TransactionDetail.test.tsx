@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
-import { fixtureDocument } from "../../mocks/document.ts";
+import { fixtureModel } from "../../mocks/model.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { setServerModelFixture } from "../../mocks/workspace.ts";
@@ -75,17 +75,17 @@ afterEach(() => {
 });
 
 it("shows the resolved figure with a single Calculated label", () => {
-	const planTransaction = calculatedTransaction();
+	const savedTransaction = calculatedTransaction();
 	render(
 		<TransactionDetail
-			transaction={occurrence(planTransaction, {
+			transaction={occurrence(savedTransaction, {
 				amount: 2881,
 				requested: 2881,
 				date: "2026-10-31",
 			})}
-			planTransaction={planTransaction}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[planTransaction]}
+			transactions={[savedTransaction]}
 			onClose={() => {}}
 		/>,
 	);
@@ -100,13 +100,13 @@ it("shows the resolved figure with a single Calculated label", () => {
 });
 
 it("shows only the Calculated label when no resolved amount exists", () => {
-	const planTransaction = calculatedTransaction();
+	const savedTransaction = calculatedTransaction();
 	render(
 		<TransactionDetail
-			transaction={occurrence(planTransaction)}
-			planTransaction={planTransaction}
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[planTransaction]}
+			transactions={[savedTransaction]}
 			onClose={() => {}}
 		/>,
 	);
@@ -116,12 +116,12 @@ it("shows only the Calculated label when no resolved amount exists", () => {
 });
 
 it("shows the resolved occurrence amount with a Calculated label", () => {
-	const planTransaction = calculatedTransaction();
+	const savedTransaction = calculatedTransaction();
 	const transaction: AccountTransaction = {
 		id: "projected-sapphire-payoff-2026-10-31-0",
-		transactionId: planTransaction.id,
+		transactionId: savedTransaction.id,
 		date: "2026-10-31",
-		name: planTransaction.name,
+		name: savedTransaction.name,
 		source: "projected",
 		direction: "out",
 		category: "transfer",
@@ -139,9 +139,9 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 	render(
 		<TransactionDetail
 			transaction={transaction}
-			planTransaction={planTransaction}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[planTransaction]}
+			transactions={[savedTransaction]}
 			onClose={() => {}}
 		/>,
 	);
@@ -155,7 +155,7 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 
 it("deletes the transaction through the row endpoint", async () => {
 	const server = stubTestServer();
-	const planTransaction = {
+	const savedTransaction = {
 		...financialModelFixture.transactions[0]!,
 		id: "renovation-once",
 		name: "Home renovation",
@@ -166,10 +166,10 @@ it("deletes the transaction through the row endpoint", async () => {
 	const onClose = vi.fn();
 	render(
 		<TransactionDetail
-			transaction={occurrence(planTransaction)}
-			planTransaction={planTransaction}
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[planTransaction]}
+			transactions={[savedTransaction]}
 			onClose={onClose}
 		/>,
 	);
@@ -193,7 +193,7 @@ it("deletes the transaction through the row endpoint", async () => {
 });
 
 it("marks holds that did not post instead of posted", () => {
-	const planTransaction = {
+	const savedTransaction = {
 		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000099",
 		name: "Hold that did not post",
@@ -215,9 +215,9 @@ it("marks holds that did not post instead of posted", () => {
 	};
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000099",
-		transactionId: planTransaction.id,
+		transactionId: savedTransaction.id,
 		date: "2026-10-20",
-		name: planTransaction.name,
+		name: savedTransaction.name,
 		source: "historical",
 		direction: "out",
 		category: "expense",
@@ -235,9 +235,9 @@ it("marks holds that did not post instead of posted", () => {
 	render(
 		<TransactionDetail
 			transaction={transaction}
-			planTransaction={planTransaction}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[planTransaction]}
+			transactions={[savedTransaction]}
 			onClose={() => {}}
 		/>,
 	);
@@ -250,19 +250,19 @@ it("marks holds that did not post instead of posted", () => {
 it("saves row edits through the posting endpoint and closes", async () => {
 	// Raw row carries server shapes the display never shows: non-midnight
 	// seconds that a date-unchanged save must keep verbatim.
-	const document = fixtureDocument(financialModelFixture);
+	const model = fixtureModel(financialModelFixture);
 	const day = Math.floor(Date.parse("2028-06-15T00:00:00Z") / 1000);
-	const raw = document.postings.find((row) => row.id === "renovation")!;
+	const raw = model.postings.find((row) => row.id === "renovation")!;
 	raw.postedTime = day + 45245;
 	raw.transactionTime = day + 123;
-	const server = stubTestServer(undefined, document);
+	const server = stubTestServer(undefined, model);
 	acceptTestResource();
-	setServerModelFixture(financialModelFixture, { document });
-	const planTransaction = financialModelFixture.transactions.find(
+	setServerModelFixture(financialModelFixture, { model });
+	const savedTransaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	const baselinePostedDate = ruleTransaction({
-		transaction: planTransaction,
+		transaction: savedTransaction,
 		accounts: financialModelFixture.accounts,
 		startDate: financialModelFixture.startDate,
 	}).date;
@@ -270,8 +270,8 @@ it("saves row edits through the posting endpoint and closes", async () => {
 	const onClose = vi.fn();
 	render(
 		<TransactionDetail
-			transaction={occurrence(planTransaction)}
-			planTransaction={planTransaction}
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={onClose}
@@ -306,18 +306,18 @@ it("saves row edits through the posting endpoint and closes", async () => {
 });
 
 it("converts a subscription through row endpoints and preserves the source posting", async () => {
-	const document = fixtureDocument(financialModelFixture);
-	const server = stubTestServer(undefined, document);
+	const model = fixtureModel(financialModelFixture);
+	const server = stubTestServer(undefined, model);
 	acceptTestResource();
-	setServerModelFixture(financialModelFixture, { document });
-	const planTransaction = financialModelFixture.transactions.find(
+	setServerModelFixture(financialModelFixture, { model });
+	const savedTransaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
 	const onClose = vi.fn();
 	render(
 		<TransactionDetail
-			transaction={occurrence(planTransaction)}
-			planTransaction={planTransaction}
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={onClose}
@@ -353,9 +353,9 @@ it("retries a rejected claim without creating a second rule", async () => {
 	// Raw source carries non-midnight times, a custom amount resolver with
 	// extra inputs; the claim body must keep
 	// all of them byte-identical.
-	const document = fixtureDocument(financialModelFixture);
+	const model = fixtureModel(financialModelFixture);
 	const day = Math.floor(Date.parse("2028-06-15T00:00:00Z") / 1000);
-	const raw = document.postings.find((row) => row.id === "renovation")!;
+	const raw = model.postings.find((row) => row.id === "renovation")!;
 	raw.postedTime = day + 45245;
 	raw.transactionTime = day + 123;
 	raw.amount = {
@@ -369,9 +369,9 @@ it("retries a rejected claim without creating a second rule", async () => {
 			},
 		},
 	};
-	const server = stubTestServer(undefined, document);
+	const server = stubTestServer(undefined, model);
 	acceptTestResource();
-	setServerModelFixture(financialModelFixture, { document });
+	setServerModelFixture(financialModelFixture, { model });
 	// Reject the claim write once; the rule create still succeeds.
 	server.writeOnce(
 		(method, path) => method === "PATCH" && path === "/v1/postings/renovation",
@@ -384,7 +384,7 @@ it("retries a rejected claim without creating a second rule", async () => {
 	render(
 		<TransactionDetail
 			transaction={occurrence(source)}
-			planTransaction={source}
+			savedTransaction={source}
 			accounts={financialModelFixture.accounts}
 			transactions={financialModelFixture.transactions}
 			onClose={onClose}

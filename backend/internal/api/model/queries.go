@@ -13,7 +13,7 @@ import (
 
 // Purpose-built reads for row-first clients. Each endpoint answers one
 // question a screen actually asks instead of dumping a table. Every
-// response carries the document revision (one global content identity), so
+// response carries the model revision (one global content identity), so
 // callers that combine queries can compare revisions and refetch on skew
 // instead of rendering a torn view.
 
@@ -74,19 +74,19 @@ type accountBalancesOutput struct {
 func (s *handler) listAccountBalances(_ context.Context, input *struct {
 	AsOf string `query:"asOf" doc:"Cut YYYY-MM-DD (end of day, inclusive) or RFC 3339 instant; defaults to the latest checkpoint date or today"`
 }) (*accountBalancesOutput, error) {
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	asOf := types.IsoDate(input.AsOf)
 	rawCut := string(asOf)
-	if document != nil && rawCut == "" {
+	if model != nil && rawCut == "" {
 		var latest int64
-		for _, checkpoint := range document.Checkpoints {
+		for _, checkpoint := range model.Checkpoints {
 			if checkpoint.ObservedAt > latest {
 				latest = checkpoint.ObservedAt
 			}
@@ -108,7 +108,7 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
 	cutDay := types.IsoDate(cutDayStr)
-	position, err := domain.ResolveCurrentPosition(document, rawCut, types.ModelOverrides{})
+	position, err := domain.ResolveCurrentPosition(model, rawCut, types.ModelOverrides{})
 	if err != nil {
 		var preparationError *domain.SimulationPreparationError
 		if errors.As(err, &preparationError) {
@@ -121,8 +121,8 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 		byAccount[account.AccountID] = account
 	}
 	rows := []accountBalanceRow{}
-	if document != nil {
-		for _, account := range document.Accounts {
+	if model != nil {
+		for _, account := range model.Accounts {
 			adjusted := byAccount[account.ID]
 			observedOn := cutDay
 			hasCheckpoint := adjusted.ObservedBalance != nil
@@ -130,8 +130,8 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				observedOn = latestObservationDay(adjusted, cutDay)
 			}
 			syncOwned := false
-			if document != nil {
-				for _, checkpoint := range document.Checkpoints {
+			if model != nil {
+				for _, checkpoint := range model.Checkpoints {
 					if checkpoint.AccountID == account.ID && isSyncOwned(checkpoint.Source) {
 						syncOwned = true
 						break
@@ -221,16 +221,16 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 	AccountID string `query:"accountId" doc:"Only transactions touching this account"`
 	Recurring string `query:"recurring" doc:"once, recurring, or all" default:"all"`
 }) (*transactionListOutput, error) {
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	transactions := []transactionRow{}
-	if document != nil {
+	if model != nil {
 		touches := func(source *string, destinations []string) bool {
 			if input.AccountID == "" {
 				return true
@@ -246,7 +246,7 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			return false
 		}
 		if input.Recurring == "" || input.Recurring == "all" || input.Recurring == "recurring" {
-			for _, rule := range document.RecurrenceRules {
+			for _, rule := range model.RecurrenceRules {
 				if !touches(rule.SourceAccountID, rule.Destinations) {
 					continue
 				}
@@ -267,7 +267,7 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			}
 		}
 		if input.Recurring == "" || input.Recurring == "all" || input.Recurring == "once" {
-			for _, posting := range document.Postings {
+			for _, posting := range model.Postings {
 				if !touches(posting.SourceAccountID, posting.Destinations) {
 					continue
 				}
@@ -318,11 +318,11 @@ type transactionCatalogOutput struct {
 // Amount editors, funding-source pickers, and evaluation forms need id and
 // name only; the full descriptors stay with the transactions query.
 func (s *handler) listTransactionCatalog(_ context.Context, _ *struct{}) (*transactionCatalogOutput, error) {
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
@@ -332,15 +332,15 @@ func (s *handler) listTransactionCatalog(_ context.Context, _ *struct{}) (*trans
 		Kind string `json:"kind"`
 		Name string `json:"name"`
 	}{}
-	if document != nil {
-		for _, rule := range document.RecurrenceRules {
+	if model != nil {
+		for _, rule := range model.RecurrenceRules {
 			output.Body.Items = append(output.Body.Items, struct {
 				ID   string `json:"id"`
 				Kind string `json:"kind"`
 				Name string `json:"name"`
 			}{ID: rule.ID, Kind: "rule", Name: rule.Name})
 		}
-		for _, posting := range document.Postings {
+		for _, posting := range model.Postings {
 			output.Body.Items = append(output.Body.Items, struct {
 				ID   string `json:"id"`
 				Kind string `json:"kind"`
@@ -364,17 +364,17 @@ type evaluationSummaryOutput struct {
 // identity and configs here. The tables hold a handful of rows, so the full
 // configs travel with the summary instead of a second fetch per row.
 func (s *handler) listEvaluationSummary(_ context.Context, _ *struct{}) (*evaluationSummaryOutput, error) {
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	evaluations := types.EmptyEvaluationTables()
-	if document != nil {
-		evaluations = document.Evaluations
+	if model != nil {
+		evaluations = model.Evaluations
 	}
 	output := &evaluationSummaryOutput{}
 	output.Body.Evaluations = evaluations
@@ -397,17 +397,17 @@ func (s *handler) listCheckpoints(_ context.Context, input *struct {
 	Since     string `query:"since" doc:"First date YYYY-MM-DD inclusive (derived from instant)"`
 	Until     string `query:"until" doc:"Last date YYYY-MM-DD inclusive (derived from instant)"`
 }) (*checkpointListOutput, error) {
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	revision, err := store.DocumentETag(document)
+	revision, err := store.ModelETag(model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	checkpoints := []types.Checkpoint{}
-	if document != nil {
-		for _, checkpoint := range document.Checkpoints {
+	if model != nil {
+		for _, checkpoint := range model.Checkpoints {
 			if input.AccountID != "" && checkpoint.AccountID != input.AccountID {
 				continue
 			}

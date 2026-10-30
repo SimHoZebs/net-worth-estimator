@@ -99,8 +99,8 @@ describe("failure ledger", () => {
 			shortfall: 2650,
 			counterparty: "External spending",
 		});
-		expect(failing?.planTransaction?.id).toBe("renovation");
-		expect(ledger?.rows[0]?.planTransaction?.id).toBe("pay");
+		expect(failing?.savedTransaction?.id).toBe("renovation");
+		expect(ledger?.rows[0]?.savedTransaction?.id).toBe("pay");
 		expect(ledger?.summary).toContain(
 			"during Dec 2026: Take-home pay Dec 1 +$11,200; " +
 				"Home renovation Dec 5 −$6,350, short $2,650; " +

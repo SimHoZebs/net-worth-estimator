@@ -113,13 +113,13 @@ func TestMultipleVolatileInputsRejected(t *testing.T) {
 	if CountVolatileRateInputs(amount) != 2 {
 		t.Fatalf("volatile count = %d, want 2", CountVolatileRateInputs(amount))
 	}
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		RecurrenceRules: []types.RecurrenceRule{{
 			ID: "growth", Name: "Growth", Amount: amount,
 			Frequency: types.FrequencyMonthly, StartDate: "2026-02-01", Enabled: true,
 		}},
 	}
-	issues := ValidateFinancialModel(document)
+	issues := ValidateFinancialModel(model)
 	found := false
 	for _, issue := range issues {
 		if issue.Code == "posting.amount.multiple_volatile_rates" {

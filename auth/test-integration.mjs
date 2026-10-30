@@ -97,7 +97,7 @@ assert.equal((await once(buildSetup, "exit"))[0], 0, "Database setup build faile
 const provision = spawn(setupDB, ["--db", primaryDB], { stdio: "inherit" });
 assert.equal((await once(provision, "exit"))[0], 0, "Database setup failed");
 // Provision the guest destination row before publication. The guest is an
-// ordinary user; setupdb records its row and blank document, same as init.
+// ordinary user; setupdb records its row and blank model, same as init.
 const provisionGuest = spawn(setupDB, ["--db", primaryDB, "--issuer", issuer, "--subject", guestSubject], {
   stdio: "inherit",
 });
@@ -277,7 +277,7 @@ try {
   assert.equal((await (await request(guest, published, "GET", "/v1/status")).json()).readOnly, true);
   const guestModel = await (await request(guest, published, "GET", "/v1/financial-model")).json();
   assert.deepEqual(
-    guestModel.document.accounts.map((item) => item.id),
+    guestModel.model.accounts.map((item) => item.id),
     ["owner-checking"],
   );
   assert.equal(
@@ -378,7 +378,7 @@ try {
   assert.equal(other.resource.id, actorResource(issuer, other.user.subject));
   assert.ok(!("kind" in other.resource), "Session resources carry id and permissions, no kind");
   const blank = (await (await request(second, other, "GET", "/v1/financial-model")).json())
-    .document;
+    .model;
   assert.ok(blank, "Signup activates a usable blank model without an import");
   assert.deepEqual(blank.accounts, []);
   assert.deepEqual(blank.postings, []);
@@ -416,7 +416,7 @@ try {
     secondPage.getByRole("button", { name: "Open Second checking transactions", exact: true }),
   ).toBeVisible();
   const secondModel = (await (await request(second, other, "GET", "/v1/financial-model")).json())
-    .document;
+    .model;
   assert.equal(secondModel.accounts.length, 1);
   assert.equal(secondModel.accounts[0].name, "Second checking");
   assert.equal(secondModel.checkpoints[0].Balance, 1250);
@@ -433,7 +433,7 @@ try {
   );
   const ownerModel = await (await request(owner, own, "GET", "/v1/financial-model")).json();
   assert.deepEqual(
-    ownerModel.document.accounts.map((item) => item.id),
+    ownerModel.model.accounts.map((item) => item.id),
     ["owner-checking", "private-after-publication"],
   );
   const shared = new DatabaseSync(primaryDB, { readOnly: true });

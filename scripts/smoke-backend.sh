@@ -42,7 +42,7 @@ request GET "/healthz"
 jq -r '"healthz body: \(.)"' "$tmp"
 
 request GET "/v1/financial-model"
-jq -r '"model: \(.document.accounts | length) accounts, \(.document.postings | length) postings, \(.document.checkpoints | length) checkpoints, \(.issues | length) issues"' "$tmp"
+jq -r '"model: \(.model.accounts | length) accounts, \(.model.postings | length) postings, \(.model.checkpoints | length) checkpoints, \(.issues | length) issues"' "$tmp"
 
 # SimpleFIN sync stays unconfigured until a key is connected through
 # POST /v1/sync/simplefin/credential (setup token or access URL). That is a

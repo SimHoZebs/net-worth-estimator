@@ -11,9 +11,9 @@ import (
 // so the balance takes one hit instead of two. Future occurrences are
 // unaffected.
 
-func claimTestDocument() *types.FinancialModelDocument {
+func claimTestModel() *types.FinancialModel {
 	checking := "checking"
-	return &types.FinancialModelDocument{
+	return &types.FinancialModel{
 		SourcePath: "test",
 		Accounts: []types.Account{
 			{ID: checking, Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
@@ -78,7 +78,7 @@ func historicalBalance(t *testing.T, path *types.ProjectionPath, date, accountID
 }
 
 func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
-	path, _, err := ProjectRawFinancialModelDocument(claimTestDocument(), claimTestSettings(), types.EmptyModelOverrides(), nil)
+	path, _, err := ProjectRawFinancialModel(claimTestModel(), claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -99,9 +99,9 @@ func TestClaimSuppressesGeneratedOccurrence(t *testing.T) {
 }
 
 func TestUnclaimedOccurrenceReplaysNormally(t *testing.T) {
-	document := claimTestDocument()
-	document.Postings[0].Claim = nil
-	path, _, err := ProjectRawFinancialModelDocument(document, claimTestSettings(), types.EmptyModelOverrides(), nil)
+	model := claimTestModel()
+	model.Postings[0].Claim = nil
+	path, _, err := ProjectRawFinancialModel(model, claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestUnclaimedOccurrenceReplaysNormally(t *testing.T) {
 }
 
 func TestClaimLeavesFutureOccurrencesAlone(t *testing.T) {
-	path, _, err := ProjectRawFinancialModelDocument(claimTestDocument(), claimTestSettings(), types.EmptyModelOverrides(), nil)
+	path, _, err := ProjectRawFinancialModel(claimTestModel(), claimTestSettings(), types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatalf("project: %v", err)
 	}
@@ -141,34 +141,34 @@ func TestClaimValidation(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			document := claimTestDocument()
-			document.Postings[0].Claim = testCase.claim
+			model := claimTestModel()
+			model.Postings[0].Claim = testCase.claim
 			found := false
-			for _, issue := range ValidateFinancialModel(document) {
+			for _, issue := range ValidateFinancialModel(model) {
 				if issue.Code == testCase.code {
 					found = true
 				}
 			}
 			if !found {
-				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(document))
+				t.Fatalf("expected %q, got %+v", testCase.code, ValidateFinancialModel(model))
 			}
 		})
 	}
 }
 
 func TestDuplicateClaimRejected(t *testing.T) {
-	document := claimTestDocument()
-	duplicate := document.Postings[0]
+	model := claimTestModel()
+	duplicate := model.Postings[0]
 	duplicate.ID = "rent-feb-actual-2"
-	document.Postings = append(document.Postings, duplicate)
+	model.Postings = append(model.Postings, duplicate)
 	found := false
-	for _, issue := range ValidateFinancialModel(document) {
+	for _, issue := range ValidateFinancialModel(model) {
 		if issue.Code == "posting.claim.duplicate" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected posting.claim.duplicate, got %+v", ValidateFinancialModel(document))
+		t.Fatalf("expected posting.claim.duplicate, got %+v", ValidateFinancialModel(model))
 	}
 }
 

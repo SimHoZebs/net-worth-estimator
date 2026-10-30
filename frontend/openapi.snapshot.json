@@ -1521,7 +1521,7 @@
 				"required": ["type", "name", "enabled"],
 				"type": "object"
 			},
-			"FinancialModelDocument": {
+			"FinancialModel": {
 				"additionalProperties": false,
 				"properties": {
 					"accounts": {
@@ -1576,6 +1576,43 @@
 					"recurrenceRules",
 					"paymentTerms"
 				],
+				"type": "object"
+			},
+			"FinancialModelResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/FinancialModelResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"model": {
+						"$ref": "#/components/schemas/FinancialModel"
+					},
+					"receiptLinks": {
+						"additionalProperties": {
+							"items": {
+								"type": "string"
+							},
+							"type": ["array", "null"]
+						},
+						"type": "object"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["model", "issues"],
 				"type": "object"
 			},
 			"Item": {
@@ -1915,41 +1952,6 @@
 				"required": ["type", "instanceId"],
 				"type": "object"
 			},
-			"ParseResultBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/ParseResultBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"document": {
-						"$ref": "#/components/schemas/FinancialModelDocument"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"receiptLinks": {
-						"additionalProperties": {
-							"items": {
-								"type": "string"
-							},
-							"type": ["array", "null"]
-						},
-						"type": "object"
-					},
-					"revision": {
-						"type": "string"
-					}
-				},
-				"required": ["document", "issues"],
-				"type": "object"
-			},
 			"PaymentTerms": {
 				"additionalProperties": false,
 				"properties": {
@@ -2171,8 +2173,8 @@
 					"asOfDate": {
 						"type": "string"
 					},
-					"document": {
-						"$ref": "#/components/schemas/FinancialModelDocument"
+					"model": {
+						"$ref": "#/components/schemas/FinancialModel"
 					}
 				},
 				"required": ["asOfDate"],
@@ -2454,8 +2456,8 @@
 						"readOnly": true,
 						"type": "string"
 					},
-					"document": {
-						"$ref": "#/components/schemas/FinancialModelDocument"
+					"model": {
+						"$ref": "#/components/schemas/FinancialModel"
 					},
 					"overrides": {
 						"$ref": "#/components/schemas/ModelOverrides"
@@ -3520,8 +3522,8 @@
 					"config": {
 						"$ref": "#/components/schemas/StochasticConfig"
 					},
-					"document": {
-						"$ref": "#/components/schemas/FinancialModelDocument"
+					"model": {
+						"$ref": "#/components/schemas/FinancialModel"
 					},
 					"overrides": {
 						"$ref": "#/components/schemas/ModelOverrides"
@@ -5105,7 +5107,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ParseResultBody"
+									"$ref": "#/components/schemas/FinancialModelResponse"
 								}
 							}
 						},
@@ -6559,7 +6561,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "List per-plan SimpleFIN card accounts"
+				"summary": "List user-scoped SimpleFIN card accounts"
 			},
 			"put": {
 				"operationId": "set-sync-cards",
@@ -6595,7 +6597,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Replace per-plan SimpleFIN card accounts"
+				"summary": "Replace user-scoped SimpleFIN card accounts"
 			}
 		},
 		"/v1/sync/simplefin/credential": {

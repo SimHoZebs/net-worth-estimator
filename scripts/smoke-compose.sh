@@ -32,7 +32,7 @@ projection_request=$(curl --fail --silent --show-error \
 	-H "Waypoint-Resource: $resource" "${frontend_url}/v1/financial-model" | node --input-type=module -e '
   let data = "";
   for await (const chunk of process.stdin) data += chunk;
-  const model = JSON.parse(data).document;
+  const model = JSON.parse(data).model;
   const start = model.checkpoints.map(row => new Date(row.observedAt * 1000).toISOString().slice(0, 10)).sort().at(-1) || new Date().toISOString().slice(0, 10);
   process.stdout.write(JSON.stringify({ settings: { fallbackProjectionStartDate: start, horizonYears: 1 }, config: { runCount: 1, seed: 42 } }));
 ')

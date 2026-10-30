@@ -157,11 +157,9 @@ export type RecurrenceFrequency =
 
 /**
  * Standalone planned-purchase row, separated from postings. Lower priority
- * executes first; document order breaks ties. EarliestDate is the earliest
+ * executes first; model order breaks ties. EarliestDate is the earliest
  * buy day; cost is the fixed positive cost. Mirrors the backend
- * `PlannedPurchase` row. Legacy documents carry purchases as postings with
- * a `purchase` marker instead; the adapter reads both and always writes the
- * legacy posting shape until the backend ships row endpoints (see rowSync).
+ * `PlannedPurchase` row and its dedicated row endpoints.
  */
 export interface BackendPlannedPurchase extends HumaMetadata {
 	id: string;
@@ -249,7 +247,7 @@ export interface EvaluationTables extends HumaMetadata {
 	whatIf?: EvaluationInstance[];
 }
 
-export interface FinancialModelDocument extends HumaMetadata {
+export interface FinancialModel extends HumaMetadata {
 	sourcePath: string;
 	accounts: BackendAccount[];
 	checkpoints: BackendCheckpoint[];
@@ -413,7 +411,7 @@ export interface ProjectionResult extends HumaMetadata {
 }
 
 export interface DeterministicProjectionRequest extends HumaMetadata {
-	document?: FinancialModelDocument | null;
+	model?: FinancialModel | null;
 	overrides?: ModelOverrides;
 	settings: ProjectionRuntimeSettings;
 	// Closed timeline slice to return. Either bound may be omitted for an
@@ -540,7 +538,7 @@ export interface SyncCardsRequest extends HumaMetadata {
 export type StatusResponse = ServerStatus;
 
 export interface FinancialModelResponse extends HumaMetadata {
-	document: FinancialModelDocument | null;
+	model: FinancialModel | null;
 	issues: ModelValidationIssue[];
 	revision?: string;
 	/** Stored reverse lookup: posting ID to its receipt IDs. */

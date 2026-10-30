@@ -8,9 +8,9 @@ afterEach(cleanup);
 
 function voidTransaction(): {
 	transaction: AccountTransaction;
-	planTransaction: Transaction;
+	savedTransaction: Transaction;
 } {
-	const planTransaction = {
+	const savedTransaction = {
 		id: "01900000-0000-7000-8000-000000000099",
 		name: "Hold that did not post",
 		amount: 42.1,
@@ -31,9 +31,9 @@ function voidTransaction(): {
 	} as Transaction;
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000099",
-		transactionId: planTransaction.id,
+		transactionId: savedTransaction.id,
 		date: "2026-10-20",
-		name: planTransaction.name,
+		name: savedTransaction.name,
 		source: "historical",
 		direction: "out",
 		category: "expense",
@@ -48,15 +48,15 @@ function voidTransaction(): {
 		pending: false,
 		void: true,
 	};
-	return { transaction, planTransaction };
+	return { transaction, savedTransaction };
 }
 
 it("marks holds that did not post instead of pending", () => {
-	const { transaction, planTransaction } = voidTransaction();
+	const { transaction, savedTransaction } = voidTransaction();
 	render(
 		<TransactionRow
 			transaction={transaction}
-			planTransaction={planTransaction}
+			savedTransaction={savedTransaction}
 			onEdit={() => {}}
 		/>,
 	);
@@ -67,11 +67,11 @@ it("marks holds that did not post instead of pending", () => {
 });
 
 it("does not render any badge without status", () => {
-	const { transaction, planTransaction } = voidTransaction();
+	const { transaction, savedTransaction } = voidTransaction();
 	render(
 		<TransactionRow
 			transaction={{ ...transaction, void: false }}
-			planTransaction={planTransaction}
+			savedTransaction={savedTransaction}
 			onEdit={() => {}}
 		/>,
 	);

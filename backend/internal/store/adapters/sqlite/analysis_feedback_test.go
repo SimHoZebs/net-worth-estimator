@@ -32,7 +32,7 @@ func TestAnalysisFeedbackAuditReplayAndDuration(t *testing.T) {
 	s := openSQLiteStore(t)
 	seedAnalysisEvidence(t, s)
 	finding := completeTestAnalysis(t, s, "v1")
-	before, _ := s.LoadDocument()
+	before, _ := s.LoadModel()
 	input := feedbackInput(t, finding, "confirm")
 	confirmed, err := s.ReviewAnalysisFinding(finding.ID, input)
 	if err != nil || confirmed.Revision != 1 || confirmed.Review.Decision != "confirmed" || confirmed.Actor != "verified-owner" || confirmed.AnalyzerVersion != "v1" || !reflect.DeepEqual(confirmed.Prediction, finding.AnalysisDetection) {
@@ -82,7 +82,7 @@ func TestAnalysisFeedbackAuditReplayAndDuration(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(replay, confirmed) || onlyFinding(t, s).Review.Duration.Count != 6 {
 		t.Fatalf("old replay changed state: %+v %v", replay, err)
 	}
-	after, _ := s.LoadDocument()
+	after, _ := s.LoadModel()
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("feedback changed financial model")
 	}
@@ -166,8 +166,8 @@ func TestAnalysisFeedbackSurvivesRerunsImportsAndPruning(t *testing.T) {
 	if next := onlyFinding(t, s); next.Status != "withdrawn" || next.Review.Decision != "confirmed" {
 		t.Fatal("withdrawal lost confirmation")
 	}
-	doc, _ := s.LoadDocument()
-	if _, err := s.ImportDocument(doc); err != nil {
+	doc, _ := s.LoadModel()
+	if _, err := s.ImportModel(doc); err != nil {
 		t.Fatal(err)
 	}
 	if next := onlyFinding(t, s); next.Review.Duration.Count != 3 || next.FeedbackRevision != 2 {

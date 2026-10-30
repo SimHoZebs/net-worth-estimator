@@ -143,8 +143,7 @@ export function horizonDate({
 	});
 }
 
-// The engine owns this value. The previous plan-balance fallback existed only
-// for the client-side engine and is gone.
+// The engine supplies current net worth.
 export function currentNetWorth(projection: Projection): number {
 	return projection.currentNetWorth;
 }

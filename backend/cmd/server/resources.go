@@ -123,7 +123,7 @@ func userAccessResolver(database *sqlite.Database, issuer string, resolve func(c
 			if err != nil {
 				return authorization.Scope{}, err
 			}
-			if err := scoped.InitializeDocument(); err != nil {
+			if err := scoped.InitializeModel(); err != nil {
 				return authorization.Scope{}, err
 			}
 		}

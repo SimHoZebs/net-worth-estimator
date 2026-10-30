@@ -40,7 +40,7 @@ func TestPlannedPurchaseHTTPRoundTrip(t *testing.T) {
 	if list.Code != 200 || !strings.Contains(list.Body.String(), `"cost":600`) {
 		t.Fatalf("list: %d %s", list.Code, list.Body.String())
 	}
-	doc, err := database.LoadDocument()
+	doc, err := database.LoadModel()
 	if err != nil || len(doc.Postings) != 0 || len(doc.PlannedPurchases) != 1 {
 		t.Fatalf("purchase became a posting: %+v %v", doc, err)
 	}
@@ -94,7 +94,7 @@ func TestPlannedPurchaseAppendAndReorder(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatal(w.Body.String())
 	}
-	doc, _ := database.LoadDocument()
+	doc, _ := database.LoadModel()
 	if doc.PlannedPurchases[0].ID != "01900000-0000-7000-8000-000000000002" || doc.PlannedPurchases[0].Priority != 0 {
 		t.Fatalf("order: %+v", doc.PlannedPurchases)
 	}

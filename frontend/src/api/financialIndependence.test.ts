@@ -17,8 +17,8 @@ import {
 
 describe("financial independence evidence mapping", () => {
 	it("uses the requested horizon even when the returned timeline slice is empty", () => {
-		const document = modelFixture();
-		document.evaluations.financialIndependence = [independenceConfig()];
+		const model = modelFixture();
+		model.evaluations.financialIndependence = [independenceConfig()];
 		const result: ProjectionResult = {
 			timeline: { rows: [] },
 			accountSummaries: [],
@@ -39,7 +39,7 @@ describe("financial independence evidence mapping", () => {
 				postingFulfillment: [],
 			},
 		};
-		const local = projectionResultToLocal(result, document, 20);
+		const local = projectionResultToLocal(result, model, 20);
 		expect(local.otherEvaluations[0]!.financialIndependence?.endDate).toBe(
 			"2046-02-01",
 		);

@@ -67,7 +67,7 @@ function render(next) {
   $("save").textContent = state.pendingSave
     ? "Retry the same save ↗"
     : saved
-      ? "Added to your plan"
+      ? "Added to your financial model"
       : "Add planned purchase ↗";
   $("autofill").disabled = !state.aiReady;
   $("name-source").textContent = `Source: ${state.draft.nameMethod}`;

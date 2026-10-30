@@ -155,10 +155,10 @@ func TestAccountBalanceSharesThresholdAccumulatorShape(t *testing.T) {
 	}
 }
 
-// An evaluation pointing at an account the document does not contain must be reported
+// An evaluation pointing at an account the model does not contain must be reported
 // rather than silently evaluating as never reached.
 func TestValidateFinancialModelFlagsDanglingAccountBalanceEvaluation(t *testing.T) {
-	document := &types.FinancialModelDocument{
+	model := &types.FinancialModel{
 		SourcePath: "test",
 		Accounts: []types.Account{
 			{ID: "checking", Name: "Checking", Enabled: true},
@@ -174,7 +174,7 @@ func TestValidateFinancialModelFlagsDanglingAccountBalanceEvaluation(t *testing.
 			}},
 		},
 	}
-	issues := ValidateFinancialModel(document)
+	issues := ValidateFinancialModel(model)
 	found := false
 	for _, issue := range issues {
 		if issue.Code == "evaluation.accountBalance.accountId.invalid" {

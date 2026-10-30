@@ -230,7 +230,7 @@ export const OTHER_EVAL_OUTCOME_RENDERERS = {
 	financialIndependence: (
 		evaluation: EditableEvaluation,
 		context: OtherEvalContext & {
-			document: Parameters<typeof financialIndependenceEvaluation>[2];
+			model: Parameters<typeof financialIndependenceEvaluation>[2];
 			projectionStartDate: string;
 			horizonEndDate: string | null;
 		},
@@ -239,7 +239,7 @@ export const OTHER_EVAL_OUTCOME_RENDERERS = {
 			financialIndependenceEvaluation(
 				evaluation,
 				context.envelope,
-				context.document,
+				context.model,
 				context.projectionStartDate,
 				context.horizonEndDate,
 			),

@@ -14,13 +14,13 @@ import (
 // sync-owned rows and the next sync re-inserts fresh state.
 func TestPurgeSyncScriptClearsSyncRows(t *testing.T) {
 	store := openSQLiteStore(t)
-	seedOwnerDocument(t, store)
+	seedOwnerModel(t, store)
 	seedSyncRows(t, store)
 	other, err := store.owned.EnsureUser("other", "https://issuer.test", "other")
 	if err != nil {
 		t.Fatal(err)
 	}
-	seedOwnerDocument(t, other)
+	seedOwnerModel(t, other)
 	seedSyncRows(t, other.(*sqliteStore))
 	if err := other.SetLastSyncTime("2026-10-18T14:30:00Z"); err != nil {
 		t.Fatal(err)

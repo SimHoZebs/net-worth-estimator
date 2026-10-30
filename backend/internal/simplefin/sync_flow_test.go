@@ -203,7 +203,7 @@ func seedFlowChecking(t *testing.T, database store.Store) {
 	}
 }
 
-func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now time.Time) (store.SyncApplySummary, *types.FinancialModelDocument) {
+func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now time.Time) (store.SyncApplySummary, *types.FinancialModel) {
 	t.Helper()
 	plan, err := Map(set, map[string]string{"bridge-checking": "checking"}, now)
 	if err != nil {
@@ -221,11 +221,11 @@ func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now 
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
-	document, err := database.LoadDocument()
+	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return summary, document
+	return summary, model
 }
 
 // End-to-end provider feed: a settled posted expense participates as an
@@ -249,15 +249,15 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if plan.Settled[0].Posting.TransactionTime != 1773140400 {
 		t.Fatalf("settled event time = %d, want posted instant 1773140400", plan.Settled[0].Posting.TransactionTime)
 	}
-	_, document := applyProviderFeed(t, database, &set, now)
-	position, err := domain.ResolveCurrentPosition(document, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+	_, model := applyProviderFeed(t, database, &set, now)
+	position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := position.Accounts[0].Balance; got != 900 {
 		t.Fatalf("12:00 position = %v, want 900", got)
 	}
-	_, result, err := domain.ProjectRawFinancialModelDocument(document,
+	_, result, err := domain.ProjectRawFinancialModel(model,
 		&types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1},
 		types.ModelOverrides{}, nil)
 	if err != nil {
@@ -279,7 +279,7 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if repeat.SettledInserted != 0 || repeat.SettledConverted != 0 || repeat.PendingUpdated != 0 || repeat.PendingDeleted != 0 || repeat.CheckpointsInserted != 0 {
 		t.Fatalf("repeat feed must be a no-op: %+v", repeat)
 	}
-	again, err := database.LoadDocument()
+	again, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,11 +310,11 @@ func TestPendingSeedConvertsToSettledEndToEnd(t *testing.T) {
 			Description: "Groceries", Pending: pending, TransactedAt: &[]int64{1773129600}[0],
 		}},
 	}}}
-	summary, document := applyProviderFeed(t, database, feed, now)
+	summary, model := applyProviderFeed(t, database, feed, now)
 	if summary.PendingInserted != 1 {
 		t.Fatalf("pending seed = %+v", summary)
 	}
-	position, err := domain.ResolveCurrentPosition(document, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+	position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}

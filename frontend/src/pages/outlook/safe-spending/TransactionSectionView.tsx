@@ -35,7 +35,7 @@ export function TransactionSectionView({
 	transactions,
 	caption,
 	emptyMessage,
-	planTransactions,
+	savedTransactions,
 	onInspect,
 	order,
 	showHeaders = false,
@@ -43,10 +43,10 @@ export function TransactionSectionView({
 	transactions: AccountTransaction[];
 	caption: string;
 	emptyMessage: string;
-	planTransactions: Map<string, Transaction>;
+	savedTransactions: Map<string, Transaction>;
 	onInspect: (
 		transaction: AccountTransaction,
-		planTransaction: Transaction,
+		savedTransaction: Transaction,
 	) => void;
 	order: TransactionOrder;
 	showHeaders?: boolean;
@@ -68,8 +68,12 @@ export function TransactionSectionView({
 				<TransactionRow
 					key={transaction.id}
 					transaction={transaction}
-					planTransaction={planTransactions.get(transaction.transactionId) ?? null}
-					onEdit={(planTransaction) => onInspect(transaction, planTransaction)}
+					savedTransaction={
+						savedTransactions.get(transaction.transactionId) ?? null
+					}
+					onEdit={(savedTransaction) =>
+						onInspect(transaction, savedTransaction)
+					}
 				/>
 			))}
 		</TransactionTable>

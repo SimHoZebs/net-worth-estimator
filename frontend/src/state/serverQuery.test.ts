@@ -75,13 +75,13 @@ describe("resource-scoped projection cache", () => {
 	});
 	it("never reuses identical deterministic or stochastic inputs across users", () => {
 		owner("users/a");
-		const deterministicA = deterministicQueryKey("same-document", 10);
-		const stochasticA = stochasticQueryKey("same-document", 10, 100, 42, 0);
+		const deterministicA = deterministicQueryKey("same-model", 10);
+		const stochasticA = stochasticQueryKey("same-model", 10, 100, 42, 0);
 		serverQueryClient().setQueryData(deterministicA, "private-a-result");
 		serverQueryClient().setQueryData(stochasticA, "private-a-bands");
 		owner("users/b");
-		const deterministicB = deterministicQueryKey("same-document", 10);
-		const stochasticB = stochasticQueryKey("same-document", 10, 100, 42, 0);
+		const deterministicB = deterministicQueryKey("same-model", 10);
+		const stochasticB = stochasticQueryKey("same-model", 10, 100, 42, 0);
 		expect(deterministicB).not.toEqual(deterministicA);
 		expect(stochasticB).not.toEqual(stochasticA);
 		expect(serverQueryClient().getQueryData(deterministicB)).toBeUndefined();
@@ -90,23 +90,23 @@ describe("resource-scoped projection cache", () => {
 
 	it("reuses results after a same-user verification", () => {
 		owner("users/a");
-		const before = deterministicQueryKey("same-document", 10);
-		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
+		const before = deterministicQueryKey("same-model", 10);
+		expect(deterministicQueryKey("same-model", 10)).toEqual(before);
 		owner("users/a");
-		expect(deterministicQueryKey("same-document", 10)).toEqual(before);
+		expect(deterministicQueryKey("same-model", 10)).toEqual(before);
 	});
 
 	it("isolates deterministic cache entries by range", () => {
 		owner("users/a");
-		const full = deterministicQueryKey("same-document", 10, "..2028-01-31");
+		const full = deterministicQueryKey("same-model", 10, "..2028-01-31");
 		const narrowed = deterministicQueryKey(
-			"same-document",
+			"same-model",
 			10,
 			"2026-01-31..2026-06-30",
 		);
 		serverQueryClient().setQueryData(full, "full-result");
 		expect(serverQueryClient().getQueryData(narrowed)).toBeUndefined();
-		expect(deterministicQueryKey("same-document", 10, "..2028-01-31")).toEqual(
+		expect(deterministicQueryKey("same-model", 10, "..2028-01-31")).toEqual(
 			full,
 		);
 	});
@@ -114,7 +114,7 @@ describe("resource-scoped projection cache", () => {
 	it("aborts old fetches, removes data, and ignores late non-cooperative results", async () => {
 		owner("users/a");
 		const client = serverQueryClient();
-		const key = deterministicQueryKey("same-document", 10);
+		const key = deterministicQueryKey("same-model", 10);
 		let signal: AbortSignal | undefined;
 		let finish: (value: string) => void = () => {};
 		const pending = client
@@ -140,7 +140,7 @@ describe("resource-scoped projection cache", () => {
 	it("cancels verification-era work without losing completed same-user results", async () => {
 		owner("users/a");
 		const client = serverQueryClient();
-		const key = deterministicQueryKey("same-document", 10);
+		const key = deterministicQueryKey("same-model", 10);
 		client.setQueryData(key, "completed-result");
 		let finish: (value: string) => void = () => {};
 		let signal: AbortSignal | undefined;
@@ -161,7 +161,7 @@ describe("resource-scoped projection cache", () => {
 		finish("late-result");
 		await pending;
 		expect(signal?.aborted).toBe(true);
-		expect(deterministicQueryKey("same-document", 10)).toEqual(key);
+		expect(deterministicQueryKey("same-model", 10)).toEqual(key);
 		expect(client.getQueryData(key)).toBe("completed-result");
 	});
 });

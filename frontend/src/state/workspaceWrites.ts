@@ -6,14 +6,11 @@ import {
 	moveAmountPreset,
 	updateAmountPreset,
 } from "@/api/generated/endpoints.ts";
-import {
-	applyRowOperations,
-	diffFinancialModelDocuments,
-} from "@/api/rowSync.ts";
+import { applyRowOperations, diffFinancialModels } from "@/api/rowSync.ts";
 import {
 	ApiHttpError,
 	type AmountPreset,
-	type FinancialModelDocument,
+	type FinancialModel,
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
@@ -210,8 +207,8 @@ export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
 	return errors.at(-1) ?? null;
 }
 
-export async function importServerDocument(
-	document: FinancialModelDocument,
+export async function importServerModel(
+	model: FinancialModel,
 ): Promise<boolean> {
 	const scope = getUserScope();
 	if (serverQueryClient().isFetching({ queryKey: userResourceKey("model") })) {
@@ -223,7 +220,7 @@ export async function importServerDocument(
 	}
 	return (
 		(await write("model", async () => {
-			if (getServerModel()?.document)
+			if (getServerModel()?.model)
 				throw new Error(
 					"A server model is already loaded. Use the reviewed import action in Configs.",
 				);
@@ -232,9 +229,7 @@ export async function importServerDocument(
 					status: 403,
 					message: READ_ONLY_IMPORT_MESSAGE,
 				});
-			const result = await applyRowOperations(
-				diffFinancialModelDocuments(null, document),
-			);
+			const result = await applyRowOperations(diffFinancialModels(null, model));
 			if (scope !== getUserScope()) return false;
 			if (result instanceof Error) throw result;
 			if (!result.ok)
@@ -244,8 +239,8 @@ export async function importServerDocument(
 				queryKey: userResourceKey("model", scope),
 				refetchType: "none",
 			});
-			const model = await cache.fetchQuery(modelOptions(scope));
-			return scope === getUserScope() && Boolean(model.document);
+			const response = await cache.fetchQuery(modelOptions(scope));
+			return scope === getUserScope() && Boolean(response.model);
 		})) === true
 	);
 }

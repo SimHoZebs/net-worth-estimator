@@ -19,7 +19,7 @@ import (
 // incompatible results are not retrieved. Storage retains at most maxArtifacts
 // across result kinds (store/artifacts.go).
 
-const artifactIdentityVersion = 9
+const artifactIdentityVersion = 10
 
 // Projection-Source identifies the result's origin, not persistence success.
 // Computed and shared responses may still end with an execution error.
@@ -115,7 +115,7 @@ func putArtifact[T any](st store.Store, key, kind string, value T) {
 }
 
 // projectionSettingsDescriptor omits names from settings evaluation tables.
-// The complete model document contributes separately to result identity.
+// The complete model contributes separately to result identity.
 func projectionSettingsDescriptor(settings types.ProjectionRuntimeSettings) map[string]any {
 	return map[string]any{
 		"fallbackProjectionStartDate": settings.FallbackProjectionStartDate,

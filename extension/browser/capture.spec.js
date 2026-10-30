@@ -97,7 +97,7 @@ test("installed extension connects, captures, picks, persists drafts, and retrie
         expect(request.headers.origin).toBeUndefined();
         expect(request.headers["sec-fetch-site"]).toBe("none");
         json({
-          document: {
+          model: {
             accounts: [
               { id: "cash", name: "Everyday cash", kind: "cash", enabled: true },
               { id: "card", name: "Credit card", kind: "debt", enabled: true },
@@ -210,7 +210,9 @@ test("installed extension connects, captures, picks, persists drafts, and retrie
     await expect(panel.getByRole("button", { name: "Retry the same save" })).toBeEnabled();
     await panel.reload();
     await panel.getByRole("button", { name: "Retry the same save" }).click();
-    await expect(panel.getByRole("heading", { name: "Added to your plan" })).toBeVisible();
+    await expect(
+      panel.getByRole("heading", { name: "Added to your financial model" }),
+    ).toBeVisible();
     expect(saves).toBe(1);
     expect(saved.name).toBe("My desk");
     expect(saved.fundingAccountId).toBe("cash");

@@ -10,7 +10,7 @@ import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 
 // The failure month as the shared transaction table: real TransactionRow
-// entries with the failing planTransaction riding inline, its Shortfall badge
+// entries with the failing savedTransaction riding inline, its Shortfall badge
 // carrying the gap amount. Only the badge text is dialog-specific.
 export function ConstraintSnapshot({
 	ledger,
@@ -31,7 +31,7 @@ export function ConstraintSnapshot({
 	const gap = failure.requested - failure.realized;
 	const [selected, setSelected] = useSelectedEntry<{
 		transaction: AccountTransaction;
-		planTransaction: Transaction;
+		savedTransaction: Transaction;
 		failing: boolean;
 	}>(failure);
 	return (
@@ -50,13 +50,13 @@ export function ConstraintSnapshot({
 				</h3>
 			)}
 			<TransactionTable caption={ledger.summary} showHeaders={showHeaders}>
-				{ledger.rows.map(({ transaction, planTransaction, failing }) => (
+				{ledger.rows.map(({ transaction, savedTransaction, failing }) => (
 					<TransactionRow
 						key={transaction.id}
 						transaction={transaction}
-						planTransaction={planTransaction}
+						savedTransaction={savedTransaction}
 						onEdit={(item) =>
-							setSelected({ transaction, planTransaction: item, failing })
+							setSelected({ transaction, savedTransaction: item, failing })
 						}
 						shortfallLabel={failing ? `Shortfall ${money(gap)}` : undefined}
 					/>
@@ -68,7 +68,7 @@ export function ConstraintSnapshot({
 			{selected && (
 				<TransactionDetail
 					transaction={selected.transaction}
-					planTransaction={selected.planTransaction}
+					savedTransaction={selected.savedTransaction}
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}

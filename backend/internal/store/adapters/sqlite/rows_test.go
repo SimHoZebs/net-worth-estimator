@@ -59,7 +59,7 @@ func TestRowAccountCRUD(t *testing.T) {
 	if err := store.MoveAccount(generated.ID, "checking"); err != nil {
 		t.Fatalf("move account: %v", err)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
 	if err := store.DeleteRule("rent"); err != nil {
 		t.Fatalf("delete rule: %v", err)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestRowEvaluationCRUD(t *testing.T) {
 	if err := store.MoveEvaluation("netWorthThreshold", second.InstanceID, created.InstanceID); err != nil {
 		t.Fatalf("move evaluation: %v", err)
 	}
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestProvisionSyncAccounts(t *testing.T) {
 		t.Fatalf("provisioned = %d, want 1", provisioned)
 	}
 	newID := resolved["bridge-new"]
-	loaded, err := store.LoadDocument()
+	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

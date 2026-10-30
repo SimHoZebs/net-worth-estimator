@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-	isFinancialModelDocument,
+	isFinancialModel,
 	MAX_IMPORT_BYTES,
 	ModelImportError,
-	parseModelDocument,
+	parseFinancialModel,
 	readImportFile,
 } from "./modelImport.ts";
 
-const document = {
+const model = {
 	sourcePath: "models/household",
 	accounts: [{ id: "cash", name: "Cash", enabled: true }],
 	checkpoints: [{ AccountId: "cash", Balance: 100, observedAt: 1769903999 }],
@@ -21,10 +21,10 @@ const document = {
 };
 
 describe("server model import parsing", () => {
-	it("preserves the complete server document without applying display-plan defaults", () => {
-		const input = { ...document, additionalServerField: { value: 42 } };
+	it("preserves the complete financial model and additional server fields", () => {
+		const input = { ...model, additionalServerField: { value: 42 } };
 		expect(
-			parseModelDocument({
+			parseFinancialModel({
 				text: JSON.stringify(input),
 				malformedMessage: "Invalid model JSON",
 			}),
@@ -35,28 +35,28 @@ describe("server model import parsing", () => {
 		[],
 		"model",
 		{ accounts: [] },
-		{ ...document, sourcePath: null },
-		{ ...document, evaluations: {} },
+		{ ...model, sourcePath: null },
+		{ ...model, evaluations: {} },
 		{
-			...document,
-			evaluations: { ...document.evaluations, postingFulfillment: null },
+			...model,
+			evaluations: { ...model.evaluations, postingFulfillment: null },
 		},
-		{ ...document, accounts: [null] },
-		{ ...document, accounts: [{ id: "cash", name: "Cash" }] },
+		{ ...model, accounts: [null] },
+		{ ...model, accounts: [{ id: "cash", name: "Cash" }] },
 		{
-			...document,
+			...model,
 			checkpoints: [
 				{ AccountId: "cash", Balance: "100", observedAt: 1769903999 },
 			],
 		},
-		{ ...document, postings: [{ id: "pay", name: 1, enabled: true }] },
+		{ ...model, postings: [{ id: "pay", name: 1, enabled: true }] },
 		{
-			...document,
+			...model,
 			recurrenceRules: [{ id: "salary", name: 1, enabled: true }],
 		},
 	])("rejects an unsafe preview envelope: %j", (value) => {
-		expect(isFinancialModelDocument(value)).toBe(false);
-		const result = parseModelDocument({
+		expect(isFinancialModel(value)).toBe(false);
+		const result = parseFinancialModel({
 			text: JSON.stringify(value),
 			malformedMessage: "Invalid model JSON",
 		});
@@ -64,8 +64,8 @@ describe("server model import parsing", () => {
 	});
 	it("accepts empty tables for subsequent authoritative server validation", () => {
 		expect(
-			isFinancialModelDocument({
-				...document,
+			isFinancialModel({
+				...model,
 				accounts: [],
 				checkpoints: [],
 				postings: [],
@@ -75,17 +75,17 @@ describe("server model import parsing", () => {
 	});
 	it("leaves references and evaluation row validation to the server", () => {
 		const input = {
-			...document,
+			...model,
 			checkpoints: [
 				{ AccountId: "missing", Balance: 100, observedAt: 1769903999 },
 			],
 			evaluations: {
-				...document.evaluations,
+				...model.evaluations,
 				netWorthThreshold: [{ id: "review-on-server" }],
 			},
 		};
 		expect(
-			parseModelDocument({
+			parseFinancialModel({
 				text: JSON.stringify(input),
 				malformedMessage: "Invalid model JSON",
 			}),
@@ -95,7 +95,7 @@ describe("server model import parsing", () => {
 		"The selected model file is not valid JSON.",
 		"The selected server model file is not valid JSON.",
 	])("retains caller-specific malformed JSON copy", (malformedMessage) => {
-		const result = parseModelDocument({ text: "{", malformedMessage });
+		const result = parseFinancialModel({ text: "{", malformedMessage });
 		expect(result).toBeInstanceOf(ModelImportError);
 		expect(result).toHaveProperty("message", malformedMessage);
 		expect(result).toHaveProperty("cause", expect.any(SyntaxError));

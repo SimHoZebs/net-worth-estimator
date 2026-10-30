@@ -30,7 +30,7 @@ export function EvaluationCard({
 	const pinned = pin?.pinned ?? false;
 	const onPinChange = pin?.onPinChange ?? null;
 	const pinDisabled = pin?.disabled ?? false;
-	// Outcome slots await the projection; everything else is plan data and
+	// Outcome slots await the projection; everything else is model data and
 	// stays live. Pending never fabricates zeros for not-yet-computed values.
 	const outcomePending = evaluation.enabled && (pending || !result);
 	const met = !outcomePending && result && result.current >= evaluation.target;

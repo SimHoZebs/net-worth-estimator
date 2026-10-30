@@ -49,7 +49,7 @@ func (s *handler) listPlannedPurchases(_ context.Context, _ *struct{}) (*struct 
 		Revision         string                  `json:"revision"`
 	}
 }, error) {
-	document, err := s.store.LoadDocument()
+	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
@@ -60,24 +60,24 @@ func (s *handler) listPlannedPurchases(_ context.Context, _ *struct{}) (*struct 
 		}
 	}{}
 	out.Body.PlannedPurchases = []types.PlannedPurchase{}
-	if document != nil {
-		out.Body.PlannedPurchases = document.PlannedPurchases
+	if model != nil {
+		out.Body.PlannedPurchases = model.PlannedPurchases
 	}
-	out.Body.Revision, err = store.DocumentETag(document)
+	out.Body.Revision, err = store.ModelETag(model)
 	return out, err
 }
 
 func (s *handler) createPlannedPurchase(_ context.Context, input *struct{ Body plannedPurchaseBody }) (*plannedPurchaseOutput, error) {
 	p := input.Body.purchase("")
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
-			for _, existing := range document.PlannedPurchases {
+			for _, existing := range model.PlannedPurchases {
 				if existing.Priority >= p.Priority {
 					p.Priority = existing.Priority + 1
 				}
 			}
 		}
-		document.PlannedPurchases = replaceByID(document.PlannedPurchases, p.ID, plannedPurchaseID, p)
+		model.PlannedPurchases = replaceByID(model.PlannedPurchases, p.ID, plannedPurchaseID, p)
 	}, func() (types.PlannedPurchase, error) { return s.store.CreatePlannedPurchase(p) })
 	if err != nil {
 		return nil, err
@@ -90,15 +90,15 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 	Body plannedPurchaseBody
 }) (*plannedPurchaseOutput, error) {
 	p := input.Body.purchase(input.ID)
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
-			for _, existing := range document.PlannedPurchases {
+			for _, existing := range model.PlannedPurchases {
 				if existing.ID == p.ID {
 					p.Priority = existing.Priority
 				}
 			}
 		}
-		document.PlannedPurchases = replaceByID(document.PlannedPurchases, p.ID, plannedPurchaseID, p)
+		model.PlannedPurchases = replaceByID(model.PlannedPurchases, p.ID, plannedPurchaseID, p)
 	}, func() (types.PlannedPurchase, error) { return s.store.UpdatePlannedPurchase(p) })
 	if err != nil {
 		return nil, err
@@ -109,8 +109,8 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 func (s *handler) deletePlannedPurchase(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.PlannedPurchases = removeByID(document.PlannedPurchases, input.ID, plannedPurchaseID)
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.PlannedPurchases = removeByID(model.PlannedPurchases, input.ID, plannedPurchaseID)
 	}, func() (struct{}, error) { return struct{}{}, s.store.DeletePlannedPurchase(input.ID) })
 	if err != nil {
 		return nil, err
@@ -121,10 +121,10 @@ func (s *handler) deletePlannedPurchase(_ context.Context, input *struct {
 }
 
 func (s *handler) movePlannedPurchase(_ context.Context, input *reorderInput) (*reorderOutput, error) {
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		document.PlannedPurchases = moveBeforeID(document.PlannedPurchases, input.Body.ID, input.Body.BeforeID, plannedPurchaseID)
-		for i := range document.PlannedPurchases {
-			document.PlannedPurchases[i].Priority = i
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		model.PlannedPurchases = moveBeforeID(model.PlannedPurchases, input.Body.ID, input.Body.BeforeID, plannedPurchaseID)
+		for i := range model.PlannedPurchases {
+			model.PlannedPurchases[i].Priority = i
 		}
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MovePlannedPurchase(input.Body.ID, input.Body.BeforeID)

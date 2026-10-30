@@ -59,7 +59,7 @@ func IsOwnerAuthored(source string) bool {
 // SortObservations orders observations chronologically for replay. Ties on
 // the same instant apply sync rows before owner rows, so an
 // owner-authored observation wins at the same instant. Other ties keep
-// document order (stable).
+// model order (stable).
 func SortObservations(observations []types.Checkpoint) {
 	sort.SliceStable(observations, func(i, j int) bool {
 		left, right := CheckpointInstant(observations[i]), CheckpointInstant(observations[j])

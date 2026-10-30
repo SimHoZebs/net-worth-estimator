@@ -48,8 +48,8 @@ func TestAnalysisReadsArePassiveAndReviewDoesNotChangeModel(t *testing.T) {
 	if len(runs) != 0 {
 		t.Fatal("GET ran analysis")
 	}
-	doc, _ := scoped.LoadDocument()
-	before, _ := store.DocumentETag(doc)
+	doc, _ := scoped.LoadModel()
+	before, _ := store.ModelETag(doc)
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-10-20", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables()}
 	deterministic, _ := json.Marshal(projectionRequestBody{Settings: settings, Range: fullSpanRange()})
 	seed := int64(42)
@@ -89,8 +89,8 @@ func TestAnalysisReadsArePassiveAndReviewDoesNotChangeModel(t *testing.T) {
 	if response := request(handler, "PATCH", "/v1/analysis-findings/missing", `{"dismissed":true}`); response.Code != 404 {
 		t.Fatalf("missing=%d", response.Code)
 	}
-	doc, _ = scoped.LoadDocument()
-	after, _ := store.DocumentETag(doc)
+	doc, _ = scoped.LoadModel()
+	after, _ := store.ModelETag(doc)
 	if before != after || len(doc.RecurrenceRules) != 0 {
 		t.Fatal("analysis mutated model")
 	}

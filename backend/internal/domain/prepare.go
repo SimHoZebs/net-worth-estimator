@@ -23,8 +23,8 @@ func (e *SimulationPreparationError) Error() string {
 	return message
 }
 
-func replayHistoricalState(document *types.FinancialModelDocument, projectionStartDate string) (*SimulationState, []types.HistoricalObservationSnapshot, bool, error) {
-	replay, err := replayChronologicalHistory(document, projectionStartDate)
+func replayHistoricalState(model *types.FinancialModel, projectionStartDate string) (*SimulationState, []types.HistoricalObservationSnapshot, bool, error) {
+	replay, err := replayChronologicalHistory(model, projectionStartDate)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -41,8 +41,8 @@ type historicalReplay struct {
 }
 
 // replayChronologicalHistory replays through the end of projectionStartDate.
-func replayChronologicalHistory(document *types.FinancialModelDocument, projectionStartDate string) (*historicalReplay, error) {
-	return replayChronologicalHistoryAt(document, projectionStartDate, dayCloseUnix(projectionStartDate))
+func replayChronologicalHistory(model *types.FinancialModel, projectionStartDate string) (*historicalReplay, error) {
+	return replayChronologicalHistoryAt(model, projectionStartDate, dayCloseUnix(projectionStartDate))
 }
 
 // historyEvent is the single unified replay input: either one posting/rule
@@ -73,8 +73,8 @@ type historyEvent struct {
 //   - Each account anchors independently. Observations sort by instant, so
 //     arrival order never matters and a backdated observation cannot roll
 //     the latest state back.
-func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projectionStartDate string, cutInstant int64) (*historicalReplay, error) {
-	for _, checkpoint := range document.Checkpoints {
+func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDate string, cutInstant int64) (*historicalReplay, error) {
+	for _, checkpoint := range model.Checkpoints {
 		day := FormatIsoDate(time.Unix(CheckpointInstant(checkpoint), 0).UTC())
 		if CompareIsoDates(day, projectionStartDate) > 0 {
 			return nil, &SimulationPreparationError{Issues: []types.ModelValidationIssue{{
@@ -90,14 +90,14 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 	// Lower bound for rule expansion: earliest observation day, else the
 	// start day itself so start-day movements still replay exactly once.
 	earliestDay := projectionStartDate
-	for _, checkpoint := range document.Checkpoints {
+	for _, checkpoint := range model.Checkpoints {
 		day := FormatIsoDate(time.Unix(CheckpointInstant(checkpoint), 0).UTC())
 		if CompareIsoDates(day, earliestDay) < 0 {
 			earliestDay = day
 		}
 	}
 	var history ResolvedOccurrences
-	history = ResolveOccurrences(document.RecurrenceRules, document.Postings, earliestDay, projectionStartDate, true)
+	history = ResolveOccurrences(model.RecurrenceRules, model.Postings, earliestDay, projectionStartDate, true)
 
 	events := []historyEvent{}
 	seq := 0
@@ -129,8 +129,8 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 	}
 	// Manual postings before the rule-expansion lower bound still replay:
 	// history has no lower bound for confirmed actuals, only the cut.
-	for index := range document.Postings {
-		posting := &document.Postings[index]
+	for index := range model.Postings {
+		posting := &model.Postings[index]
 		if addedPosting[posting.ID] {
 			continue
 		}
@@ -154,7 +154,7 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 		})
 		seq++
 	}
-	for _, checkpoint := range document.Checkpoints {
+	for _, checkpoint := range model.Checkpoints {
 		instant := CheckpointInstant(checkpoint)
 		if instant <= 0 || instant > cutInstant {
 			continue
@@ -189,14 +189,14 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 		return events[i].seq < events[j].seq
 	})
 
-	transitions, err := CreateTransitionRuntime(types.FinancialModel{
-		Accounts:         document.Accounts,
-		Postings:         document.Postings,
-		RecurrenceRules:  document.RecurrenceRules,
-		PaymentTerms:     document.PaymentTerms,
-		PlannedPurchases: document.PlannedPurchases,
+	transitions, err := CreateTransitionRuntime(types.SimulationInputs{
+		Accounts:         model.Accounts,
+		Postings:         model.Postings,
+		RecurrenceRules:  model.RecurrenceRules,
+		PaymentTerms:     model.PaymentTerms,
+		PlannedPurchases: model.PlannedPurchases,
 	}, SimulationState{
-		Balances:                     InitAccountBalances(document.Accounts),
+		Balances:                     InitAccountBalances(model.Accounts),
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
 	}, projectionStartDate, nil)
@@ -282,23 +282,23 @@ func replayChronologicalHistoryAt(document *types.FinancialModelDocument, projec
 }
 
 type preparedPosition struct {
-	document               types.FinancialModelDocument
+	model                  types.FinancialModel
 	state                  *SimulationState
 	snapshots              []types.HistoricalObservationSnapshot
 	includeStartDateEvents bool
 	replay                 *historicalReplay
 }
 
-func preparePosition(document *types.FinancialModelDocument, startDate string, overrides types.ModelOverrides) (*preparedPosition, error) {
-	return preparePositionAt(document, startDate, dayCloseUnix(startDate), overrides)
+func preparePosition(model *types.FinancialModel, startDate string, overrides types.ModelOverrides) (*preparedPosition, error) {
+	return preparePositionAt(model, startDate, dayCloseUnix(startDate), overrides)
 }
 
-func preparePositionAt(document *types.FinancialModelDocument, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
-	if document == nil {
-		document = &types.FinancialModelDocument{Evaluations: types.EmptyEvaluationTables()}
+func preparePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
+	if model == nil {
+		model = &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
 	}
-	effectiveDocument := types.ApplyModelOverrides(*document, overrides)
-	issues := ValidateFinancialModel(&effectiveDocument)
+	effectiveModel := types.ApplyModelOverrides(*model, overrides)
+	issues := ValidateFinancialModel(&effectiveModel)
 	validationErrors := []types.ModelValidationIssue{}
 	for _, issue := range issues {
 		if issue.Severity == types.SeverityError {
@@ -317,19 +317,19 @@ func preparePositionAt(document *types.FinancialModelDocument, startDate string,
 			Path:     []any{"fallbackProjectionStartDate"},
 		}}}
 	}
-	replay, err := replayChronologicalHistoryAt(&effectiveDocument, startDate, cutInstant)
+	replay, err := replayChronologicalHistoryAt(&effectiveModel, startDate, cutInstant)
 	if err != nil {
 		return nil, err
 	}
 
-	return &preparedPosition{effectiveDocument, replay.state, replay.snapshots, replay.includeStartDateEvents, replay}, nil
+	return &preparedPosition{effectiveModel, replay.state, replay.snapshots, replay.includeStartDateEvents, replay}, nil
 }
 
 // PrepareSimulationRequest resolves overrides, validation, history, and dates.
 // History replays through the cut instant and the simulation continues after
 // it, skipping already-replayed occurrences by the same cut so nothing
 // executes twice.
-func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
+func PrepareSimulationRequest(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, error) {
 	if err := requireResimulationAllowed("PrepareSimulationRequest"); err != nil {
 		return nil, err
 	}
@@ -354,21 +354,21 @@ func PrepareSimulationRequest(document *types.FinancialModelDocument, settings *
 			}}}
 		}
 	}
-	position, err := preparePositionAt(document, startDate, cutInstant, overrides)
+	position, err := preparePositionAt(model, startDate, cutInstant, overrides)
 	if err != nil {
 		return nil, err
 	}
-	effectiveDocument := position.document
+	effectiveModel := position.model
 	prepared := &types.PreparedProjection{
-		EffectiveDocument:   effectiveDocument,
+		EffectiveModel:      effectiveModel,
 		HistoricalSnapshots: position.snapshots,
 		Request: types.SimulationRequest{
-			Model: types.FinancialModel{
-				Accounts:         effectiveDocument.Accounts,
-				Postings:         effectiveDocument.Postings,
-				RecurrenceRules:  effectiveDocument.RecurrenceRules,
-				PaymentTerms:     effectiveDocument.PaymentTerms,
-				PlannedPurchases: effectiveDocument.PlannedPurchases,
+			Model: types.SimulationInputs{
+				Accounts:         effectiveModel.Accounts,
+				Postings:         effectiveModel.Postings,
+				RecurrenceRules:  effectiveModel.RecurrenceRules,
+				PaymentTerms:     effectiveModel.PaymentTerms,
+				PlannedPurchases: effectiveModel.PlannedPurchases,
 			},
 			InitialState:           *position.state,
 			StartDate:              settings.FallbackProjectionStartDate,

@@ -9,8 +9,8 @@ import (
 )
 
 type positionRequestBody struct {
-	Document *types.FinancialModelDocument `json:"document,omitempty"`
-	AsOfDate string                        `json:"asOfDate"`
+	Model    *types.FinancialModel `json:"model,omitempty"`
+	AsOfDate string                `json:"asOfDate"`
 }
 
 type positionOutput struct {
@@ -22,11 +22,11 @@ type positionOutput struct {
 }
 
 func (s *handler) currentPosition(ctx context.Context, input *struct{ Body positionRequestBody }) (*positionOutput, error) {
-	document, err := s.resolveDocument(input.Body.Document)
+	model, err := s.resolveModel(input.Body.Model)
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	result, err := domain.ResolveCurrentPosition(document, input.Body.AsOfDate, types.ModelOverrides{})
+	result, err := domain.ResolveCurrentPosition(model, input.Body.AsOfDate, types.ModelOverrides{})
 	output := &positionOutput{}
 	if err != nil {
 		if preparationError, ok := err.(*domain.SimulationPreparationError); ok {

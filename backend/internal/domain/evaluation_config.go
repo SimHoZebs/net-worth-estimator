@@ -9,7 +9,7 @@ import (
 )
 
 // Evaluation configuration validation and normalization. Kept beside validation
-// so document cross-validation and evaluation runtimes share one source of truth.
+// so model cross-validation and evaluation runtimes share one source of truth.
 
 func finiteNonNegative(value, fallback float64) float64 {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
@@ -295,7 +295,7 @@ func ParseThresholdConfig(config any) (types.NetWorthThresholdConfig, error) {
 }
 
 // ValidateAccountBalanceConfig validates account balance config JSON. The
-// account reference is checked against the document by the document validator;
+// account reference is checked against the model by the model validator;
 // this validates the config's own shape.
 func ValidateAccountBalanceConfig(config any) error {
 	obj, ok := asObject(config)
@@ -374,7 +374,7 @@ func ParseFulfillmentConfig(config any) (types.PostingFulfillmentConfig, error) 
 }
 
 // ValidateCycleFulfillmentConfig validates card cycle budget config JSON.
-// The account references are checked against the document by the document
+// The account references are checked against the model by the model
 // validator; this validates the config's own shape.
 func ValidateCycleFulfillmentConfig(config any) error {
 	obj, ok := asObject(config)

@@ -31,16 +31,16 @@ type paymentTermsOutput struct {
 
 func (s *handler) savePaymentTerms(_ context.Context, input *paymentTermsInput) (*paymentTermsOutput, error) {
 	terms := input.Body.toTerms()
-	row, issues, persisted, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
+	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		replaced := false
-		for i, existing := range document.PaymentTerms {
+		for i, existing := range model.PaymentTerms {
 			if existing.AccountID == terms.AccountID {
-				document.PaymentTerms[i] = terms
+				model.PaymentTerms[i] = terms
 				replaced = true
 			}
 		}
 		if !replaced {
-			document.PaymentTerms = append(document.PaymentTerms, terms)
+			model.PaymentTerms = append(model.PaymentTerms, terms)
 		}
 	}, func() (types.PaymentTerms, error) {
 		return s.store.SavePaymentTerms(terms)
@@ -55,14 +55,14 @@ func (s *handler) deletePaymentTerms(_ context.Context, input *struct {
 	AccountID string `path:"accountId"`
 }) (*reorderOutput, error) {
 	accountID := input.AccountID
-	_, _, _, revision, err := runRowWrite(s, func(document *types.FinancialModelDocument) {
-		kept := document.PaymentTerms[:0]
-		for _, terms := range document.PaymentTerms {
+	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+		kept := model.PaymentTerms[:0]
+		for _, terms := range model.PaymentTerms {
 			if terms.AccountID != accountID {
 				kept = append(kept, terms)
 			}
 		}
-		document.PaymentTerms = kept
+		model.PaymentTerms = kept
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeletePaymentTerms(accountID)
 	})

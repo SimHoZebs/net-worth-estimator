@@ -1,4 +1,4 @@
-import type { FinancialModelDocument } from "../api/index.ts";
+import type { FinancialModel } from "../api/index.ts";
 
 function canonicalJson(value: unknown): string {
 	if (value === null) return "null";
@@ -28,12 +28,10 @@ function stableHash(value: string): string {
 	return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-export function serverDocumentFingerprint(
-	document: FinancialModelDocument,
-): string {
-	const semanticDocument = {
-		sourcePath: document.sourcePath,
-		accounts: document.accounts.map(
+export function serverModelFingerprint(model: FinancialModel): string {
+	const semanticModel = {
+		sourcePath: model.sourcePath,
+		accounts: model.accounts.map(
 			({ id, name, minBalance, maxBalance, color, enabled }) => ({
 				id,
 				name,
@@ -43,7 +41,7 @@ export function serverDocumentFingerprint(
 				enabled,
 			}),
 		),
-		checkpoints: document.checkpoints.map(
+		checkpoints: model.checkpoints.map(
 			({ AccountId, Balance, source, observedAt }) => ({
 				AccountId,
 				Balance,
@@ -52,7 +50,7 @@ export function serverDocumentFingerprint(
 			}),
 		),
 		evaluations: {
-			financialIndependence: document.evaluations.financialIndependence.map(
+			financialIndependence: model.evaluations.financialIndependence.map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,
@@ -60,7 +58,7 @@ export function serverDocumentFingerprint(
 					config,
 				}),
 			),
-			netWorthThreshold: document.evaluations.netWorthThreshold.map(
+			netWorthThreshold: model.evaluations.netWorthThreshold.map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,
@@ -68,7 +66,7 @@ export function serverDocumentFingerprint(
 					config,
 				}),
 			),
-			accountBalance: document.evaluations.accountBalance.map(
+			accountBalance: model.evaluations.accountBalance.map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,
@@ -76,7 +74,7 @@ export function serverDocumentFingerprint(
 					config,
 				}),
 			),
-			postingFulfillment: document.evaluations.postingFulfillment.map(
+			postingFulfillment: model.evaluations.postingFulfillment.map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,
@@ -84,7 +82,7 @@ export function serverDocumentFingerprint(
 					config,
 				}),
 			),
-			cycleFulfillment: (document.evaluations.cycleFulfillment ?? []).map(
+			cycleFulfillment: (model.evaluations.cycleFulfillment ?? []).map(
 				({ instanceId, name, enabled, config }) => ({
 					instanceId,
 					name,
@@ -93,7 +91,7 @@ export function serverDocumentFingerprint(
 				}),
 			),
 		},
-		postings: document.postings.map(
+		postings: model.postings.map(
 			({
 				id,
 				name,
@@ -118,7 +116,7 @@ export function serverDocumentFingerprint(
 				...(source === undefined ? {} : { source }),
 			}),
 		),
-		recurrenceRules: (document.recurrenceRules ?? []).map(
+		recurrenceRules: (model.recurrenceRules ?? []).map(
 			({
 				id,
 				name,
@@ -146,5 +144,5 @@ export function serverDocumentFingerprint(
 			}),
 		),
 	};
-	return `v1:${stableHash(canonicalJson(semanticDocument))}`;
+	return `v1:${stableHash(canonicalJson(semanticModel))}`;
 }

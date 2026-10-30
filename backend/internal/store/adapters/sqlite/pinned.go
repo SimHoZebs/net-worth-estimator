@@ -7,8 +7,8 @@ import (
 
 // Pinned evaluations are a per-user display preference: the subset of
 // evaluation instances the user wants surfaced on Outlook. They live
-// outside the canonical financial model document, so they never affect
-// the document ETag, validation, or the row-sync diff. Ordering is
+// outside the canonical financial model, so they never affect
+// the model ETag, validation, or the row-sync diff. Ordering is
 // explicit (position) and owned by the writer: SetPinnedEvaluations
 // replaces the whole list.
 //
@@ -51,7 +51,7 @@ func evaluationExists(tx *userTx, instanceID string) (bool, error) {
 // SetPinnedEvaluations replaces the pin list. Duplicates collapse to the
 // first occurrence; every ID must name a stored evaluation instance.
 // Pin writes are preference writes: they run in their own transaction and
-// never mark the model document present.
+// never mark the model present.
 func (s *sqliteStore) SetPinnedEvaluations(ids []string) ([]string, error) {
 	seen := make(map[string]struct{}, len(ids))
 	ordered := make([]string, 0, len(ids))

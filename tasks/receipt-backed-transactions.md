@@ -112,7 +112,7 @@ keeps images in the existing database backup. Inject storage through
 types or paths in receipt logic. Keep byte reads out of model loads and receipt
 lists. See `backend/internal/blobstore` and `backend/internal/store/blob_storage.go`.
 
-Add receipt tables with composite plan/entity keys. Reference postings with `(plan_id, posting_id)`. Do not extend `FinancialModelDocument` or store receipts in the evictable `projection_artifacts` table.
+Add receipt tables with composite plan/entity keys. Reference postings with `(plan_id, posting_id)`. Do not extend `FinancialModel` or store receipts in the evictable `projection_artifacts` table.
 
 **Requested ownership normalization:** derive receipt ownership from its posting
 and remove the duplicate `plan_id`. The existing posting key permits identical

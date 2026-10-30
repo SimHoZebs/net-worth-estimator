@@ -75,16 +75,16 @@ func availableAmountFromLimits(posting *types.Posting, balancesBefore map[string
 func evaluateTransactionEvents(path *types.ProjectionPath) []evaluatedTransactionEvent {
 	balancesBeforeBySequence := ReconstructBalancesBeforeEvents(path)
 	accountsByID := map[string]types.Account{}
-	for _, account := range path.EffectiveDocument.Accounts {
+	for _, account := range path.EffectiveModel.Accounts {
 		accountsByID[account.ID] = account
 	}
 	postingsByID := map[string]*types.Posting{}
-	transactions := ResolvedTransactionPostings(&path.EffectiveDocument)
+	transactions := ResolvedTransactionPostings(&path.EffectiveModel)
 	for index := range transactions {
 		posting := &transactions[index]
 		postingsByID[posting.ID] = posting
 	}
-	capsByID := RuleCapsByID(&path.EffectiveDocument)
+	capsByID := RuleCapsByID(&path.EffectiveModel)
 	realizedByPostingAndYear := map[string]float64{}
 	for postingID, byYear := range path.ProjectionStartPostingState.RealizedPostingAmountsByYear {
 		for year, amount := range byYear {

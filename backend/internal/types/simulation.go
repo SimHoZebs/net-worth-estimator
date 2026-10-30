@@ -2,7 +2,8 @@ package types
 
 // Simulation and stochastic wire types.
 
-type FinancialModel struct {
+// SimulationInputs contains the executable rows for a prepared simulation.
+type SimulationInputs struct {
 	Accounts         []Account         `json:"accounts"`
 	Postings         []Posting         `json:"postings"`
 	RecurrenceRules  []RecurrenceRule  `json:"recurrenceRules"`
@@ -22,7 +23,7 @@ type MonteCarloSample struct {
 }
 
 type SimulationRequest struct {
-	Model                  FinancialModel    `json:"model"`
+	Model                  SimulationInputs  `json:"model"`
 	InitialState           SimulationState   `json:"initialState"`
 	StartDate              IsoDate           `json:"startDate"`
 	EndDate                IsoDate           `json:"endDate"`
@@ -42,10 +43,10 @@ type SimulationSnapshot struct {
 
 type SimulationRun struct {
 	Request struct {
-		Model                  FinancialModel `json:"model"`
-		StartDate              IsoDate        `json:"startDate"`
-		EndDate                IsoDate        `json:"endDate"`
-		IncludeStartDateEvents bool           `json:"includeStartDateEvents"`
+		Model                  SimulationInputs `json:"model"`
+		StartDate              IsoDate          `json:"startDate"`
+		EndDate                IsoDate          `json:"endDate"`
+		IncludeStartDateEvents bool             `json:"includeStartDateEvents"`
 	} `json:"request"`
 	InitialState        SimulationState      `json:"initialState"`
 	FinalState          SimulationState      `json:"finalState"`
@@ -61,7 +62,7 @@ type HistoricalObservationSnapshot struct {
 }
 
 type PreparedProjection struct {
-	EffectiveDocument   FinancialModelDocument          `json:"effectiveDocument"`
+	EffectiveModel      FinancialModel                  `json:"effectiveModel"`
 	HistoricalSnapshots []HistoricalObservationSnapshot `json:"historicalSnapshots"`
 	Request             SimulationRequest               `json:"request"`
 }

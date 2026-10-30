@@ -1,15 +1,12 @@
 import { vi } from "vitest";
-import type {
-	FinancialModelDocument,
-	FinancialModelResponse,
-} from "../api/index.ts";
+import type { FinancialModel, FinancialModelResponse } from "../api/index.ts";
 import { ok } from "./fetch.ts";
 
 // Single home for the workspace fetch fake. Migration left a copy of this
 // server inside remoteHooks.test.ts and smaller variants in other test
 // files; extend this module instead of adding another local stub.
 
-export function modelFixture(): FinancialModelDocument {
+export function modelFixture(): FinancialModel {
 	return {
 		sourcePath: "/configs/household.json",
 		accounts: [
@@ -69,7 +66,7 @@ export function modelFixture(): FinancialModelDocument {
 }
 
 export type PutCallback = (
-	document: FinancialModelDocument,
+	model: FinancialModel,
 ) => Error | FinancialModelResponse;
 
 export interface TestCall {
@@ -79,7 +76,7 @@ export interface TestCall {
 }
 
 export function stubTestServer(put?: PutCallback, model = modelFixture()) {
-	const current = structuredClone(model) as FinancialModelDocument & {
+	const current = structuredClone(model) as FinancialModel & {
 		[key: string]: unknown;
 	};
 	const calls: TestCall[] = [];
@@ -107,7 +104,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		| Error => {
 		if (!put)
 			return { row, issues: [], persisted: true, revision: revisionValue };
-		const response = put(structuredClone(current) as FinancialModelDocument);
+		const response = put(structuredClone(current) as FinancialModel);
 		if (response instanceof Error) return response;
 		const errors = (response.issues ?? []).filter(
 			(issue) => issue.severity === "error",
@@ -147,7 +144,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		throw error;
 	};
 	const upsertStubCheckpoint = (
-		model: FinancialModelDocument & { [key: string]: unknown },
+		model: FinancialModel & { [key: string]: unknown },
 		balance: number | undefined,
 		observedAt: number | undefined,
 		accountId: string | undefined,
@@ -183,7 +180,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				return ok(next);
 			}
 			return ok({
-				document: structuredClone(current),
+				model: structuredClone(current),
 				issues: [],
 				revision: revisionValue,
 			});
@@ -677,7 +674,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		ok,
 		calls,
 		fetcher,
-		model: current as FinancialModelDocument,
+		model: current as FinancialModel,
 		modelFetches,
 		failModelOnce: (error: Error | FinancialModelResponse) => {
 			modelQueue.push(error);
@@ -694,12 +691,12 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		setRevision: (revision: string) => {
 			revisionValue = revision;
 		},
-		setDocument: (document: FinancialModelDocument | null) => {
-			(current as { document?: unknown }).document = document;
-			if (document === null) {
-				// Serve a null document until replaced; keep tables for writes.
+		setModel: (model: FinancialModel | null) => {
+			(current as { model?: unknown }).model = model;
+			if (model === null) {
+				// Serve a null model until replaced; keep tables for writes.
 				(modelQueue as Array<Error | FinancialModelResponse>).unshift({
-					document: null,
+					model: null,
 					issues: [],
 					revision: revisionValue,
 				} as unknown as FinancialModelResponse);
