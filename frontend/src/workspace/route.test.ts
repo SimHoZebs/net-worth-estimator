@@ -168,10 +168,20 @@ describe("parseHash", () => {
 			page: "accounts",
 			overlay: { type: "transactionEdit", key: "new" },
 		});
+		// The retired `edit-movement` segment has no compat path: every old
+		// hash shape resolves to invalid so stale bookmarks normalize back
+		// to the page instead of opening an editor.
 		expect(parseHash("#outlook/edit-movement/invest")).toEqual({
 			page: "outlook",
 			overlay: { type: "invalid" },
 		});
+		expect(parseHash("#accounts/edit-movement/new")).toEqual({
+			page: "accounts",
+			overlay: { type: "invalid" },
+		});
+		expect(
+			resolveOverlayRoute(parseHash("#outlook/edit-movement/invest"), plan),
+		).toEqual({ state: "unknown" });
 		expect(parseHash("#outlook/edit-account/new")).toEqual({
 			page: "outlook",
 			overlay: { type: "accountEdit", key: "new" },
@@ -245,6 +255,12 @@ describe("parseHash", () => {
 		});
 		expect(
 			parseHash("#outlook/safe-spending-detail/cycle/edit-movement/invest"),
+		).toEqual({
+			page: "outlook",
+			overlay: { type: "invalid" },
+		});
+		expect(
+			parseHash("#outlook/safe-spending-detail/edit-movement/invest"),
 		).toEqual({
 			page: "outlook",
 			overlay: { type: "invalid" },
