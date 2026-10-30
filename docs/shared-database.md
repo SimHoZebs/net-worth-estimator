@@ -105,7 +105,7 @@ read-only switch still blocks editor writes.
 ```bash
 backend/scripts/verify.sh ./internal/store
 backend/scripts/verify.sh ./internal/identity
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 backend/scripts/verify.sh
 node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 ```

@@ -200,7 +200,7 @@ deletion does not promise secure erasure from those locations.
 ```bash
 backend/scripts/verify.sh ./internal/receipts/...
 backend/scripts/verify.sh ./internal/store
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./cmd/refreshmodel
 npm --prefix frontend test -- src/domain/receipt.test.ts src/api/waypoint-fetch.test.ts

@@ -51,6 +51,16 @@ unsupported.
 
 ## 2. HTTP Contracts
 
+`internal/api` is the composition root. It owns chi, Huma configuration, global
+read-only and origin policy, server status, and static files. The `model`,
+`receipts`, `projections`, and `sync` subpackages register operations through
+explicit dependencies. They do not import the composition root or each other.
+`api/internal/modelstate` owns the revision and storage-error HTTP contracts
+shared by model writes and account links. Projection state and SSE recovery
+stay within `projections`, with the shared-run registry separate from transport.
+Whole-router HTTP contracts live in `api/integration`; private helper tests
+stay with their feature package.
+
 `api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, optional `simplefin.Runner`, and optional static frontend directory. The server always wraps user APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The split container deployment leaves `FrontendDir` empty: the frontend image serves the SPA and proxies `/v1` to the backend.
 
 The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition; the root `Dockerfile` is retained as a legacy combined image.
@@ -578,11 +588,15 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/server.go`                    | router and operation registration                       |
 | `backend/internal/api/read_only.go`                 | operation-based read-only write kill switch              |
 | `backend/internal/api/cors.go`                      | origin parsing and preflight enforcement                |
-| `backend/internal/api/model_handlers.go`            | model and status handlers                               |
-| `backend/internal/api/rows.go`                      | row create/update/delete/move and link handlers         |
-| `backend/internal/api/projection_handlers.go`       | deterministic resolution, execution, and result storage |
-| `backend/internal/api/stochastic_sse.go`            | shared seeded runs and event serialization              |
-| `backend/internal/api/artifacts.go`                 | simulation result identity and storage helpers          |
+| `backend/internal/api/status.go`                    | aggregate server capabilities and sync status            |
+| `backend/internal/api/frontend.go`                  | static assets and missing-page responses                 |
+| `backend/internal/api/model/`                       | canonical model queries, row writes, and settings         |
+| `backend/internal/api/receipts/`                    | receipt HTTP operations and upload boundaries            |
+| `backend/internal/api/sync/`                        | SimpleFIN configuration, triggers, and account links      |
+| `backend/internal/api/projections/`                 | position, projections, result identity, and SSE           |
+| `backend/internal/api/projections/runs.go`           | shared seeded computation and subscriber state           |
+| `backend/internal/api/internal/modelstate/`          | shared model revision and storage-error HTTP contracts    |
+| `backend/internal/api/integration/`                 | whole-router HTTP contract tests                         |
 | `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle     |
 | `backend/internal/store/model.go`                   | seed/import replacement and ordered reload              |
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning              |

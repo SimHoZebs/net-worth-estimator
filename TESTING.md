@@ -46,7 +46,7 @@ scripts/dev ps-all
 Posting UUID migration and exact upstream identity checks:
 
 ```bash
-CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api
+CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/csvio ./internal/simplefin ./internal/api/...
 ```
 
 ## Frontend Gates
@@ -141,7 +141,7 @@ files alone do not prove row-level isolation.
 ```bash
 backend/scripts/verify.sh ./internal/store
 backend/scripts/verify.sh ./internal/identity
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 ```
 
 Test fixtures provision through `store.SetupDatabase` before runtime opens. Startup
@@ -155,7 +155,7 @@ Unit checks need no identity container:
 ```bash
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/authorization
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 node --test auth/casdoor/*.test.mjs
 ```
 
@@ -228,11 +228,17 @@ The verification surface for the backend is its HTTP/SSE contract, CSV seed path
 
 ## Scoped Go Tests
 
+The `internal/api` package composes the router and global HTTP policy. Feature
+handlers live in `internal/api/model`, `receipts`, `projections`, and `sync`.
+Run `./internal/api/...` to include both feature unit tests and whole-router
+contract tests in `internal/api/integration`. Shared fixtures in `apitest`
+depend only on storage and domain types, not on the API composition root.
+
 Run the narrowest relevant package first:
 
 ```bash
 backend/scripts/verify.sh ./internal/domain/...
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 backend/scripts/verify.sh ./internal/store
 backend/scripts/verify.sh ./internal/simplefin
 backend/scripts/verify.sh ./cmd/server
@@ -255,7 +261,7 @@ Direct commands are useful while diagnosing a failure:
 ```bash
 cd backend
 CGO_ENABLED=0 go test ./internal/domain/... -run 'TestGolden'
-CGO_ENABLED=0 go test ./internal/api -run 'TestRowWriteReadOnlyMatrix|TestCORSMiddleware'
+CGO_ENABLED=0 go test ./internal/api/... -run 'TestRowWriteReadOnlyMatrix|TestCORSMiddleware'
 CGO_ENABLED=0 go test ./internal/store -run 'TestStoreConformance|TestPurgeSyncScriptClearsSyncRows'
 CGO_ENABLED=0 go build ./...
 ```
@@ -482,7 +488,7 @@ A guard test belongs in Go and runs with:
 
 ```bash
 backend/scripts/verify.sh ./internal/simplefin
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 ```
 
 ## Smoke Script
@@ -503,7 +509,7 @@ For a backend change, finish with:
 
 ```bash
 backend/scripts/verify.sh ./internal/domain/...
-backend/scripts/verify.sh ./internal/api
+backend/scripts/verify.sh ./internal/api/...
 backend/scripts/verify.sh ./internal/store
 backend/scripts/verify.sh ./internal/simplefin
 backend/scripts/verify.sh ./cmd/server
