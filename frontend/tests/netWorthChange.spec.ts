@@ -54,11 +54,12 @@ test("Outlook compares the latest balance with the first synced balance", async 
 	await expect(page.getByText("+$2,000 (+0.6%)")).toBeVisible();
 	await page.setViewportSize({ width: 390, height: 844 });
 	await expect(page.getByText("+$2,000 (+0.6%)")).toBeVisible();
-	expect(
-		await page.evaluate(
-			() => document.documentElement.scrollWidth <= innerWidth,
-		),
-	).toBe(true);
+	// Media-query subscribers update React after the viewport changes.
+	await expect
+		.poll(() =>
+			page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+		)
+		.toBe(true);
 	const accessibility = await new AxeBuilder({ page })
 		.include('section[aria-label="Net worth over the trailing 90 days"]')
 		.analyze();
