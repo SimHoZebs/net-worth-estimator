@@ -202,6 +202,15 @@ runs preserve the existing database and user rows:
 For existing data, restore a verified SQLite-safe backup or use the
 [offline migration guide](../docs/shared-database.md). Back up before schema
 changes. Keep the API stopped. Ephemeral shells do not share the disk.
+
+The pending [shared migration](MIGRATIONS.md) runs `/app/migrate.sh` from the
+target image before API startup. It converts legacy checkpoint dates to UTC
+day-close instants. It also enables settled bank rows and aligns their event
+times with posting times. Manual, pending, and void rows stay unchanged.
+Legacy API-set exclusions are indistinguishable from the old import default,
+so this one-time conversion enables those settled rows too. Final-schema
+retries only verify and preserve later exclusions. Use the stopped-API
+adapter with the original mount. Do not run a separate host-side converter.
 After validation, clear the temporary Docker Command and redeploy. Normal API
 startup never provisions storage. Repeat maintenance only for explicit operations.
 

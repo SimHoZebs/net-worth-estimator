@@ -28,7 +28,10 @@ async function smoke(t, finalEvent = "result", readiness = 200) {
     if (request.url === "/v1/status") return send(200, { readOnly: true });
     if (request.url === "/v1/financial-model")
       return send(200, {
-        document: { checkpoints: [{ Date: "2026-10-21" }, { Date: "2026-10-22" }] },
+        document: { checkpoints: [
+          { observedAt: Date.parse("2026-10-21T23:59:59Z") / 1000 },
+          { observedAt: Date.parse("2026-10-22T09:00:00Z") / 1000 },
+        ] },
       });
     if (request.url === "/v1/projections/stochastic") {
       let body = "";

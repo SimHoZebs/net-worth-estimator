@@ -15,69 +15,119 @@ await run("go", ["build", "-o", join(tools, "setupdb"), "./cmd/setupdb"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
 const sql = async (db, query) => (await run("sqlite3", [db, query])).stdout.trim();
+const sha256File = async (path) => (await run("sha256sum", [path])).stdout.trim().split(/\s+/)[0];
 const migrate = (db, env = {}) => run("/bin/sh", [script], {
   env: { ...process.env, PATH: tools + delimiter + process.env.PATH, NET_WORTH_ESTIMATOR_DB: db, ...env },
 });
+const backups = async (directory) => (await readdir(directory)).filter((name) => name.includes(".analysis-backup."));
 async function sourceDatabase() {
   const directory = await mkdtemp("/tmp/opencode/bnpl-migration-db-");
   owned.add(directory);
   const db = join(directory, "application.db");
   await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "owner"]);
+  const owner = await sql(db, "SELECT id FROM users;");
   await sql(db, `DROP TRIGGER analysis_posting_lifecycle;
     DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
     DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
     DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');`);
-  await sql(db, "INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'checking',0,'Fixture checking','cash',1 FROM users;");
-  return { directory, db };
+  await sql(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
+    ('${owner}','checking',0,'Fixture checking','cash',1);`);
+  return { directory, db, owner };
 }
+async function seedFinalRows(db, owner) {
+  await sql(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES
+    ('${owner}',1,0,'checking',100,'user',1773187199);`);
+  await sql(db, `INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source,pending,void,execution_order) VALUES
+    ('${owner}','settled-a',0,'Groceries','checking','null','{}',1773140400,1773129600,0,'simplefin',0,0,1),
+    ('${owner}','manual-a',1,'Owner','checking','null','{}',1773140400,1773129600,0,'user',0,0,4);`);
+  await sql(db, `INSERT INTO posting_sync_keys(user_id,provider,bridge_account_id,transaction_id,posting_id) VALUES
+    ('${owner}','simplefin','bridge-checking','tx1','settled-a');`);
+}
+const analysisSnapshot = async (db) => sql(db, `SELECT user_id, posting_id, facts_json FROM transaction_source_facts ORDER BY 1, 2;
+  SELECT user_id, revision FROM analysis_inputs ORDER BY 1;
+  SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs ORDER BY 1, 2;
+  SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
+  SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;`);
 
-test("Analysis migration backs up current data, provisions schema, and repeats without writes", async () => {
-  const { directory, db } = await sourceDatabase();
-  const snapshot = "SELECT id, issuer, subject FROM users; SELECT * FROM model_metadata; SELECT * FROM accounts;";
+test("Analysis migration completes schema on a verified candidate and repeats without writes", async () => {
+  const { directory, db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
+  const snapshot = `SELECT id, issuer, subject FROM users; SELECT * FROM model_metadata; SELECT * FROM accounts; SELECT * FROM checkpoints; SELECT * FROM postings;`;
   const before = await sql(db, snapshot);
   await migrate(db);
   assert.equal(await sql(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await sql(db, "PRAGMA foreign_key_check;"), "");
   assert.equal(await sql(db, snapshot), before);
+  // Final checkpoints never trigger the legacy bank repair.
+  assert.equal(await sql(db, "SELECT enabled, transaction_time FROM postings WHERE id = 'settled-a';"), "0|1773129600");
   assert.equal(await sql(db, "SELECT count(*) FROM analysis_feedback; SELECT count(*) FROM analysis_findings;"), "0\n0");
-  const backups = (await readdir(directory)).filter((name) => name.includes(".analysis-backup."));
-  assert.equal(backups.length, 1);
-  const backup = join(directory, backups[0], "before.db");
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  const backup = join(directory, names[0], "before.db");
   assert.equal((await stat(backup)).mode & 0o077, 0);
   assert.equal(await sql(backup, "PRAGMA integrity_check;"), "ok");
   assert.equal(await sql(backup, snapshot), before);
+  // The candidate was provisioned, so the backup predates Analysis tables.
+  assert.equal(await sql(backup, "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='analysis_runs';"), "0");
+  const hashBefore = await sha256File(db);
   await migrate(db);
-  assert.deepEqual((await readdir(directory)).filter((name) => name.includes(".analysis-backup.")), backups);
+  assert.deepEqual(await backups(directory), names);
+  assert.equal(await sha256File(db), hashBefore);
 });
 
-test("Analysis migration retains a verified backup after setup failure and permits retry", async () => {
-  const { directory, db } = await sourceDatabase();
+test("Analysis migration leaves the original untouched on setup failure and permits retry", async () => {
+  const { directory, db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
   const failures = await mkdtemp("/tmp/opencode/bnpl-migration-failure-");
   owned.add(failures);
-  await writeFile(join(failures, "setupdb"), "#!/bin/sh\nexit 23\n", { mode: 0o700 });
-  await assert.rejects(migrate(db, { PATH: failures + delimiter + process.env.PATH }), (error) => error.code === 23);
-  const backups = (await readdir(directory)).filter((name) => name.includes(".analysis-backup."));
-  assert.equal(backups.length, 1);
-  assert.equal(await sql(join(directory, backups[0], "before.db"), "PRAGMA integrity_check;"), "ok");
+  const stubFirstPath = failures + delimiter + tools + delimiter + process.env.PATH;
+  await writeFile(join(failures, "setupdb"), `#!/bin/sh\ntouch '${join(failures, "ran")}'\nexit 23\n`, { mode: 0o700 });
+  const dumpBefore = await sql(db, ".dump");
+  await assert.rejects(migrate(db, { PATH: stubFirstPath }), /Candidate setup failed/);
+  assert.equal(await readFile(join(failures, "ran"), "utf8"), "");
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  assert.equal(await sql(join(directory, names[0], "before.db"), "PRAGMA integrity_check;"), "ok");
+  // The failed candidate never published: no Analysis tables, rows intact.
+  assert.equal(await sql(db, ".dump"), dumpBefore);
   assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE name='analysis_findings';"), "0");
+  assert.equal(await sql(db, "SELECT name FROM accounts;"), "Fixture checking");
+  assert.ok(!(await readdir(directory)).some((name) => name.endsWith(".analysis-migration-pending")));
   await migrate(db);
   assert.equal(await sql(db, "SELECT count(*) FROM accounts;"), "1");
-  assert.equal((await readdir(directory)).filter((name) => name.includes(".analysis-backup.")).length, 2);
+  assert.equal(await sql(db, "SELECT count(*) FROM schema_migrations WHERE name='analysis-feedback-v1';"), "1");
+  assert.equal((await backups(directory)).length, 2);
 });
 
-test("failed row preservation cannot become a successful repeat", async () => {
-  const { db } = await sourceDatabase();
+test("failed row preservation leaves the original publishable without a pending file", async () => {
+  const { directory, db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
   const failures = await mkdtemp("/tmp/opencode/bnpl-migration-corruption-");
   owned.add(failures);
-  await writeFile(join(failures, "setupdb"), `#!/bin/sh\n"${join(tools, "setupdb")}" "$@"\nsqlite3 "$NET_WORTH_ESTIMATOR_DB" "UPDATE accounts SET name='Unexpected edit';"\n`, { mode: 0o700 });
-  await assert.rejects(migrate(db, { PATH: failures + delimiter + process.env.PATH }), /changed existing application rows/);
-  await assert.rejects(migrate(db), /Unverified prior Analysis migration/);
-  const backup = (await readFile(db + ".analysis-migration-pending", "utf8")).trim();
-  assert.equal(await sql(backup, "SELECT name FROM accounts;"), "Fixture checking");
-  // A stopped-API operator can restore the verified pre-write backup and retry.
-  await sql(db, `.restore '${backup}'`);
+  await writeFile(join(failures, "setupdb"), `#!/bin/sh\n"${join(tools, "setupdb")}" "$@"\n# Corrupt the candidate the hook just provisioned, never the original.\ndb=""; for arg in "$@"; do if [ "$want_db" = 1 ]; then db="$arg"; fi; case "$arg" in --db) want_db=1;; *) want_db=0;; esac; done\nsqlite3 "$db" "UPDATE accounts SET name='Unexpected edit';"\n`, { mode: 0o700 });
+  const dumpBefore = await sql(db, ".dump");
+  await assert.rejects(
+    migrate(db, { PATH: failures + delimiter + tools + delimiter + process.env.PATH }),
+    /changed preserved table accounts/,
+  );
+  // Stronger than restore-and-retry: the original was never mutated, so no
+  // pending file exists and a plain retry provisions the clean candidate.
+  assert.equal(await sql(db, ".dump"), dumpBefore);
+  assert.equal(await sql(db, "SELECT count(*) FROM sqlite_schema WHERE name='analysis_findings';"), "0");
+  assert.ok(!(await readdir(directory)).some((name) => name.endsWith(".analysis-migration-pending")));
   await migrate(db);
   assert.equal(await sql(db, "SELECT name FROM accounts;"), "Fixture checking");
+  assert.equal(await sql(db, "SELECT count(*) FROM analysis_findings;"), "0");
+});
+
+test("an old pending file still rejects an unverified complete target", async () => {
+  const { db, owner } = await sourceDatabase();
+  await seedFinalRows(db, owner);
+  await migrate(db);
+  const hashBefore = await sha256File(db);
+  await writeFile(db + ".analysis-migration-pending", "/tmp/opencode/stale-backup/before.db\n");
+  await assert.rejects(migrate(db), /Unverified prior Analysis migration/);
+  assert.equal(await sha256File(db), hashBefore);
 });
 
 test("Analysis migration rejects missing, foreign, partial, and incomplete states", async () => {
@@ -96,28 +146,64 @@ test("Analysis migration rejects missing, foreign, partial, and incomplete state
   await assert.rejects(migrate(partialBase.db), /Incomplete application schema/);
 });
 
-test("target image migrates real SQLite as its non-root application user", {
+test("target image provisions Analysis, preserves facts, and survives setup failure", {
   skip: !process.env.DEPLOYMENT_TEST_IMAGE,
 }, async () => {
   await run("docker", ["run", "--rm", "--network", "none", process.env.DEPLOYMENT_TEST_IMAGE, "/bin/sh", "-c", `
 set -eu
 test "$(id -u)" = 10001
+test -x /app/migrate.sh
 export NET_WORTH_ESTIMATOR_DB='/tmp/analysis fixture.db'
-/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer https://fixture.invalid --subject owner
-sqlite3 "$NET_WORTH_ESTIMATOR_DB" "
-  DROP TRIGGER analysis_posting_lifecycle;
+if /app/migrate.sh 2>/dev/null; then exit 1; fi
+/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer https://fixture.invalid --subject owner >/dev/null
+owner="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT id FROM users;')"
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('$owner','checking',0,'Fixture checking','cash',1);
+  INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('$owner',1,0,'checking',100,'user',1773187199);
+  INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source,pending,void,execution_order) VALUES ('$owner','settled-a',0,'Groceries','checking','null','{}',1773140400,1773140400,1,'simplefin',0,0,1);"
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_posting_lifecycle;
+  DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
+  DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
+  DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');"
+/app/migrate.sh >/dev/null
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT observed_at FROM checkpoints;')" = 1773187199
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT COUNT(*) FROM analysis_feedback;')" = 0
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
+test -z "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA foreign_key_check;')"
+test 1 -eq "$(find /tmp -maxdepth 1 -name '*.analysis-backup.*' | wc -l)"
+for backup in /tmp/*.analysis-backup.*/before.db; do
+  test "$(stat -c %a "$backup")" = 600
+done
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO transaction_source_facts(user_id,posting_id,facts_json) VALUES ('$owner','settled-a','{}');
+  INSERT INTO analysis_runs(user_id,id,type,version,input_revision,state,started_at,completed_at,lease_until,problem,input_json) VALUES ('$owner','run-1','bnpl','v1',1,'complete',100,200,0,'','{}');
+  INSERT INTO analysis_findings(user_id,id,analysis_type,posting_id,kind,detection_json,run_id,first_detected_at,last_checked_at,status,dismissed,review_json,feedback_revision) VALUES ('$owner','f-1','bnpl','settled-a','bnpl','{}','run-1',100,150,'active',0,'null',0);
+  INSERT INTO analysis_feedback(user_id,id,request_id,finding_id,run_id,created_at,payload_json) VALUES ('$owner','fb-1','req-1','f-1','run-1',160,'{}');"
+revision="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" "SELECT revision FROM analysis_inputs WHERE user_id = '$owner';")"
+/app/migrate.sh >/dev/null
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT facts_json FROM transaction_source_facts WHERE posting_id = 'settled-a';")" = '{}'
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT payload_json FROM analysis_feedback WHERE id = 'fb-1';")" = '{}'
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT revision FROM analysis_inputs WHERE user_id = '$owner';")" = "$revision"
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
+test -z "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA foreign_key_check;')"
+sha_before="$(sha256sum "$NET_WORTH_ESTIMATOR_DB")"
+/app/migrate.sh >/dev/null
+test "$(sha256sum "$NET_WORTH_ESTIMATOR_DB")" = "$sha_before"
+export SECOND_DB='/tmp/analysis second.db'
+/app/setupdb --db "$SECOND_DB" --issuer https://fixture.invalid --subject owner >/dev/null
+owner2="$(sqlite3 "$SECOND_DB" 'SELECT id FROM users;')"
+sqlite3 "$SECOND_DB" "DROP TRIGGER analysis_posting_lifecycle;
   DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
   DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
   DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');
-  INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'checking',0,'Fixture checking','cash',1 FROM users;"
-/app/migrate.sh
-test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT name FROM accounts;')" = 'Fixture checking'
-test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
-test -z "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA foreign_key_check;')"
-for backup in /tmp/*.analysis-backup.*/before.db; do
-  test "$(stat -c %a "$backup")" = 600
-  test "$(sqlite3 -readonly "$backup" 'SELECT name FROM accounts;')" = 'Fixture checking'
-done
-/app/migrate.sh
+  INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('$owner2','checking',0,'Second','cash',1);
+  INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('$owner2',1,0,'checking',50,'user',1773187199);"
+mkdir -p /tmp/failbin
+printf '#!/bin/sh\\nexit 23\\n' > /tmp/failbin/setupdb
+chmod 700 /tmp/failbin/setupdb
+if PATH="/tmp/failbin:$PATH" NET_WORTH_ESTIMATOR_DB="$SECOND_DB" /app/migrate.sh >/dev/null 2>&1; then exit 1; fi
+test "$(sqlite3 -readonly "$SECOND_DB" "SELECT count(*) FROM sqlite_schema WHERE name='analysis_findings';")" = 0
+test "$(sqlite3 -readonly "$SECOND_DB" 'PRAGMA integrity_check;')" = ok
+NET_WORTH_ESTIMATOR_DB="$SECOND_DB" /app/migrate.sh >/dev/null
+test "$(sqlite3 -readonly "$SECOND_DB" "SELECT observed_at FROM checkpoints;")" = 1773187199
+test 3 -eq "$(find /tmp -maxdepth 1 -name '*.analysis-backup.*' | wc -l)"
 `]);
 });

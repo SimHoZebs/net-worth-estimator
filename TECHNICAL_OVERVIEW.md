@@ -123,7 +123,8 @@ The frontend displays these provider-neutral sync signals. Provider setup, accou
   "settings": {
     "fallbackProjectionStartDate": "YYYY-MM-DD",
     "horizonYears": 1,
-    "evaluations": {}
+    "evaluations": {},
+    "asOfInstant": null
   },
   "range": {
     "startDate": "YYYY-MM-DD",
@@ -139,6 +140,8 @@ Resolution rules:
 - `overrides` are applied by `types.ApplyModelOverrides` to a new document value; stored state is unchanged.
 - What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
 - `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
+- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the legacy date-only cut at the end of the start day. It participates in artifact identity through the settings.
+- `POST /v1/position` and `GET /v1/accounts/balances` accept the same cut as an `asOfDate` date or RFC 3339 instant (`asOf` query); all three agree at an identical cut because they share one chronological replay.
 
 A successful response has `result` and `Projection-Source: stored|computed`. `stored` means the backend retrieved the identified simulation result. `computed` means this request took the simulation execution path. The header does not guarantee successful completion or storage; preparation and execution errors also report `computed`.
 
@@ -248,6 +251,17 @@ Schema changes are transactional and forward-only. Completed upgrades are record
 in `schema_migrations`. Legacy unscoped databases are rejected. Restore a
 compatible database backup instead of downgrading.
 
+Timestamped observations use the one-time offline body in `deploy/migrate.sh`.
+The deployment adapter runs `/app/migrate.sh` from the target image with all
+API writers stopped and the actual data mount attached. The image's SQLite
+CLI converts each legacy date to 23:59:59 UTC and drops the date column.
+The body validates the source state and creates a private SQLite-safe backup.
+It converts a disposable candidate and uses current-schema `setupdb` there
+to preserve the pending Analysis schema upgrade. It verifies preserved rows,
+integrity, and foreign keys before publication. Complete target databases
+only verify on retries. Fresh databases use `SetupDatabase` before the hook.
+The server and setup never invoke the migration. See `deploy/MIGRATIONS.md`.
+
 The current schema stores:
 
 | Table                    | Purpose                                                                                                       |
@@ -259,8 +273,8 @@ The current schema stores:
 | `users`                  | data owners, including the provisioned guest, unique by issuer and subject                                     |
 | `model_metadata`         | source path and document-present flag                                                                         |
 | `accounts`               | ordered account definitions                                                                                   |
-| `checkpoints`            | ordered balance observations, unique by account/date, with owner                                              |
-| `postings`               | ordered UUID posting definitions with owner and explicit pending state                                        |
+| `checkpoints`            | ordered balance observations, unique by account/instant, with required exact time (`observed_at`, no date column) |
+| `postings`               | ordered UUID posting definitions with owner, execution order, and explicit bank lifecycle |
 | `purchase_policies`      | user-scoped purchase priorities attached to posting identities                                                |
 | `receipts`               | private posting attachments, blob references, extraction provenance, drafts, and confirmed corrections         |
 | `blob_objects`           | globally unique object keys, upload leases, and durable cleanup state                                          |
@@ -292,7 +306,7 @@ Each row write runs one transaction: validate the resulting document, then inser
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
 3. Posting IDs are canonical UUIDs. Incoming `source`, `pending`, and `void` values are ignored and recomputed. Stored lifecycle protects live pending and void bank rows from owner updates and deletes; settled bank rows accept them. ID prefixes carry no policy or lifecycle meaning.
-4. Owner checkpoints win key collisions; a later synchronization skips the owner-owned key until owner data is removed.
+4. Owner checkpoints win same-instant key collisions (several observations per account/day survive); a later synchronization skips the owner-owned instant until owner data is removed, retains backdated instants as their own rows, and replaces a same-instant sync row idempotently. Databases that predate the required instant fail schema validation; the server never migrates them.
 5. Deleting an account keeps its bridge links; the link is the memory of the mapping, so recreating the account resumes sync flow. A link whose model account is gone resolves to nothing and is counted as `linked-account-missing` until relinked.
 
 ### Amount presets
@@ -419,7 +433,10 @@ Annual-cap usage is observed from realized amounts by transaction ID (posting or
 
 - duplicate account, posting, rule, and cross-type evaluation IDs;
 - account/posting/rule ID collisions (one shared namespace);
-- checkpoint account, date, and duplicate key validity;
+- checkpoint account and required instant (every observation carries only
+  its exact Unix time; there is no Date field and no zero sentinel), and
+  the timestamp-only key (several observations per day survive; only the
+  exact same account/instant collides);
 - amount resolver config, exact required inputs, provider references, and transaction dependency cycles spanning postings and rules;
 - posting and rule source/destination references, duplicate destinations, same-account routing, rule schedules, and claim validity (named rule exists, date is a real scheduled occurrence, no double claims);
 - account bounds;
@@ -440,17 +457,33 @@ Warnings and errors share the ordered `ModelValidationIssue` shape. `SeverityErr
 
 Historical preparation uses the same `TransitionRuntime` as projection execution.
 
-- Checkpoints after the projection start are invalid.
-- Enabled postings dated before the projection start are replayed.
-- A posting dated on the projection start joins history only when a checkpoint exists that day.
-- When the earliest checkpoint exists, rule occurrences needed between that date and the projection start are replayed, except occurrences claimed by a manual posting.
-- Without a start-date checkpoint, projection includes start-date occurrences.
-- With a start-date checkpoint, projection excludes start-date occurrences.
-- Historical dates execute in ascending calendar order.
-- Same-date transactions execute one-time postings first (by transaction time, posted time, then ID), then rule occurrences by ascending priority and resolution sequence.
-- Checkpoints execute after same-date postings and overwrite only their account balance.
+The as-of cut is a single instant: a `YYYY-MM-DD` date means the end of
+that UTC day (inclusive, backward compatible); an RFC 3339 timestamp means
+that exact instant. Only events and observations at or before the cut
+replay; everything after it is future. Observations after the projection
+start are invalid.
 
-Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers.
+- History is one sorted event list, one forward pass: each transaction at its
+  effective instant (postings at their stored Unix time including 00:00;
+  rules at the day-close of their date) and each observation at its exact
+  instant. No date-wide gates, no per-day phases, no identity-suppression
+  maps. Claimed rule occurrences never replay.
+- Ties execute transactions before observations so a rule at 23:59:59 anchors
+  before an observation at the same instant; owner observations execute
+  last at the same instant. Daily snapshots sample the resulting state;
+  they are not alternative execution phases.
+- Observations SET their account balance; postings CHANGE balances; a
+  later observation SETS again and records the observed-vs-modeled
+  discrepancy as a checkpoint correction. Each anchor is per-account and
+  absolute. Observations sort by instant, so arrival order never matters
+  and a backdated observation cannot roll the latest state back.
+- Confirmed one-time actuals move their recorded amount. Generated modeled
+  rules keep hypothetical funding clamps and caps; pending/void rows never
+  move.
+- The simulation continues after the same cut instant, skipping
+  already-replayed occurrences so nothing executes twice.
+
+Each historical correction records observed balance, modeled balance, and adjustment. Historical rows carry no projected transaction totals. Replay still updates balances, latest realized posting amounts, and annual-cap state for later projection and amount providers. `GET /v1/accounts/balances` and `POST /v1/position` report the same replay: adjusted modeled balances with the latest observation (balance plus timestamp) carried separately per account, never a folded latest checkpoint.
 
 `BuildProjectionPath` prefixes these historical observations with projected snapshots. `ProjectionRow.isHistorical` marks the boundary.
 
@@ -462,7 +495,7 @@ The kernel:
 
 1. creates a `TransitionRuntime` from the prepared model, state, date, and optional sampled rates;
 2. expands enabled occurrences through the projection window;
-3. sorts dates and same-date occurrences;
+3. sorts dates and same-date occurrences, skipping occurrences named in `SuppressedIdentities` (exact-cut history already replayed them);
 4. executes each occurrence through the shared transition path;
 5. records every requested/realized transaction and ordered account deltas;
 6. snapshots balances after each event date;
@@ -575,9 +608,22 @@ Two rounding rules stay explicit: deterministic public currency, fulfillment amo
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Map` emits one balance checkpoint per resolved account/date plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Map` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySyncPlan` applies checkpoints and directives in one transaction without interpreting provider behavior. Owner checkpoints win key collisions. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySyncPlan` applies checkpoints and directives in one transaction without interpreting provider behavior. Settled bank posts are normal participants at posting time: the mapper emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual postings. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
+
+One-off legacy interpretation, stated plainly: in databases written
+before this change, a disabled settled bank row does not distinguish the
+old importer default from an explicit pre-upgrade API owner disable
+(`UpdatePosting` persists `enabled` on settled bank rows, and bank rows
+are readable in the UI but only the API could have written the flag).
+The one-time offline script therefore enables ALL legacy settled bank
+rows, including any pre-upgrade API disables; that is the documented
+cost of the repair, and operator release notes should call it out.
+Post-upgrade owner disables remain honored: the script only converts
+legacy date-shaped databases and only verifies already-converted ones,
+so a repeat run never re-enables an explicit disable. Delete-plus-
+tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 

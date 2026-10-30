@@ -209,7 +209,7 @@ backend/scripts/verify.sh ./cmd/server
 node --test deploy/vercel.test.mjs scripts/smoke-compose.test.mjs
 node --test deploy/migrations.test.mjs
 docker build -f backend/Dockerfile -t waypoint-deployment-test .
-DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs
+DEPLOYMENT_TEST_IMAGE=waypoint-deployment-test node --test deploy/container.test.mjs deploy/migrations.test.mjs deploy/analysis-migration.test.mjs
 ```
 
 These checks use disposable state, not the dev stack or production database.

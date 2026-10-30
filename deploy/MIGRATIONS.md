@@ -12,23 +12,35 @@ registry, numbered chain, or historical-model converter to the backend.
 Use existing `setupdb`, `refreshmodel`, and `importcsv` tools where appropriate.
 The image also provides `sqlite3` for offline SQL and SQLite-safe backups.
 
-The current body provisions the Analysis evidence, findings, and feedback schema.
-It accepts current `shared-accounts-v1` storage without Analysis tables, or the
-complete target schema on repeat runs. Partial application or Analysis schemas
-fail before setup. It checks integrity and foreign keys, creates a private
-`<database>.analysis-backup.XXXXXX/before.db`, then calls this image's `setupdb`.
-It compares every preexisting application table, except the schema-marker table,
-against that backup. A complete target repeat performs read-only checks only.
+The current body performs one combined offline upgrade. It converts the
+deployed user-scoped date-only checkpoints to exact UTC day-close instants
+and enables legacy settled bank rows with their posted event time, then
+provisions the Analysis evidence, findings, and feedback schema. Conversion
+and repair run inside a candidate copy of a verified backup; the existing
+`setupdb` then provisions Analysis on that candidate. Only the verified
+candidate is published over the original database, so the original file is
+never mutated before publication. It accepts current `shared-accounts-v1`
+storage with date-only or final checkpoints and with or without Analysis
+tables, or the complete target schema on repeat runs. Partial application or
+Analysis schemas fail before any backup. It checks integrity and foreign
+keys, creates a private `<database>.analysis-backup.XXXXXX/before.db` with
+the SQLite backup API, and compares every preexisting application table,
+except the schema-marker table, against that backup. Only the checkpoint
+date-to-instant conversion and the settled-bank repair may differ. A
+complete target repeat performs read-only checks only and never reactivates
+a post-upgrade owner disable.
+
+The old import default and pre-upgrade API-set exclusions share the same
+disabled flag. The conversion enables all legacy settled bank rows once,
+including those API exclusions. Later exclusions remain intact on retries.
 
 The adapter must keep every API writer stopped for the complete operation.
-Failed setup or postconditions leave the backup and API maintenance state intact.
-The private `<database>.analysis-migration-pending` file identifies an unverified
-attempt. A complete target with that interlock cannot bypass failed row checks
-on retry. Restore or explicitly verify its backup before API startup.
-Before new writes, rollback uses the verified backup and previous image together.
-After new writes, the reconciliation rule below applies. Retain this body until
-both supported targets verify it. No provider edits or financial-row conversion
-belong to this migration.
+Failed conversion, setup, or postconditions leave the original database
+byte-identical with the verified backup retained; no automatic rollback
+resumes the API and this body never restores over the data file. The private
+`<database>.analysis-migration-pending` file from an actual previous attempt
+is recognized fail-closed. Retain this body until both supported targets
+verify it. No provider edits belong to this migration.
 
 `render-free-boot.sh` provisions current schema and the ordinary guest row on
 hosts configured for that command. This is fresh/current storage provisioning,
@@ -92,6 +104,11 @@ and sessions required for paired recovery.
 6. Require exit 0 and explicit postconditions before allowing API startup.
 7. Compare preserved identities and private rows with the backup.
 8. Verify exact images, readiness, login/logout, permissions, isolation, and persistence.
+
+For an API contract change, hold Vercel production builds until Northflank
+passes the migration and API checks. Save the project's ignored-build command
+before the hold. Preview builds can continue. Restore the saved command only
+after the new API contract is live, then deploy the matching frontend SHA.
 
 Require exactly `ok` from `PRAGMA integrity_check` and no rows from
 `PRAGMA foreign_key_check`. A candidate database permits checks before
