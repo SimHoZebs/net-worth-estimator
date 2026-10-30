@@ -114,6 +114,8 @@ TEST_PRODUCTION=1 npm --prefix frontend run test:browser
 
 Agents run the completion gates locally. Hosted CI does not run the test gates.
 The Northflank GitHub workflow only requests a gated deployment for the pushed SHA.
+The image publisher does not replace the local test gates either. Validate it with
+`actionlint .github/workflows/images.yml` and `node --test deploy/images.test.mjs`.
 
 For a frontend change, the gate is:
 

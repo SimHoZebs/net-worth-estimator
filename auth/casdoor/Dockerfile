@@ -3,7 +3,10 @@
 # reuses the pinned upstream binaries and renders /conf from environment
 # variables at every boot into ephemeral storage. All state is disposable:
 # each restart re-imports the same seed with fresh signing keys and subjects.
-FROM casbin/casdoor:v4.23.0@sha256:e13c9aada231f7338a03ab0ae7054d0a9480e77283338ab9fc319d88fe2b3ce0
+# The upstream target publishes the unchanged, pinned home-stack runtime to GHCR.
+FROM casbin/casdoor:v4.23.0@sha256:e13c9aada231f7338a03ab0ae7054d0a9480e77283338ab9fc319d88fe2b3ce0 AS upstream
+
+FROM upstream AS runtime
 
 USER root
 RUN mkdir -p /casdoor-template && chown 1000:1000 /casdoor-template \
