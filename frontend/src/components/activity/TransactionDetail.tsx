@@ -951,8 +951,8 @@ export function TransactionDetail({
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
-					<div className="flex items-center gap-4 pt-1 pb-2">
-						<div className="flex min-w-0 flex-1 flex-col gap-2">
+					<div className="flex flex-col gap-3 pt-1 pb-2">
+						<div className="flex min-w-0 flex-col gap-2">
 							{showAmount && (
 								<span
 									className={`type-value inline-flex items-baseline gap-1 text-2xl leading-[1.3] font-medium tracking-tight whitespace-nowrap${transaction.direction === "in" ? " text-success-text" : ""}`}
@@ -1033,7 +1033,7 @@ export function TransactionDetail({
 							</div>
 						</div>
 						{(once || transaction.pending || postedDiffers) && (
-							<div className="flex min-w-0 flex-col items-end gap-2">
+							<div className="flex min-w-0 flex-col items-start gap-2">
 								{once && (
 									<label className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
 										Occurred
@@ -1071,7 +1071,7 @@ export function TransactionDetail({
 									</label>
 								)}
 								{(transaction.pending || postedDiffers) && (
-									<label className="inline-flex items-center gap-2 text-sm text-muted">
+									<label className="inline-flex flex-wrap items-center gap-2 text-sm text-muted">
 										Posted
 										{transaction.pending ? (
 											<span>Not yet posted</span>
