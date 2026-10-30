@@ -1,6 +1,6 @@
 # Backend Access-Control Plan
 
-Status: superseded. Current contracts live in `backend/internal/api/auth.go`, `backend/internal/api/cors.go`, `TECHNICAL_OVERVIEW.md` §2, and `docs/authorization.md`. This file records rollout history only.
+Status: superseded. Current contracts live in `backend/internal/api/read_only.go`, `backend/internal/api/cors.go`, `TECHNICAL_OVERVIEW.md` §2, and `docs/authorization.md`. This file records rollout history only.
 
 ## Objective
 
