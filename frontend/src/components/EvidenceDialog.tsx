@@ -1,6 +1,11 @@
-import type { Account, Transaction } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/accountEdits.ts";
-import type { Projection } from "../domain/result.ts";
+import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "../state/savedRows.ts";
+import { useUserReadOnly } from "../state/useUserScope.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
 import { SafeSpendingEvidence } from "./evidence/SafeSpendingEvidence.tsx";
@@ -13,32 +18,33 @@ export type EvidenceTarget =
 
 export function EvidenceDialog({
 	target,
-	accounts,
-	transactions,
-	startDate,
-	readOnly,
-	projection,
-	projectionLoading = false,
-	projectionError = null,
-	retryProjection,
 	temporary = false,
 	onClose,
 	onEdit,
 }: {
 	target: Exclude<EvidenceTarget, { kind: "position" }>;
-	accounts: Account[];
-	transactions: Transaction[];
-	startDate: string;
-	readOnly: boolean;
-	/** Required for failure/safe-spending; account renders without it. */
-	projection?: Projection | null;
-	projectionLoading?: boolean;
-	projectionError?: string | null;
-	retryProjection?: () => void;
 	temporary?: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
 }) {
+	// Each evidence view subscribes to its own queries; only the target
+	// selection and UI callbacks arrive as props.
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
+	const readOnly = useUserReadOnly();
+	const projectionQuery = useRemoteProjection({
+		ranges: false,
+		// The account view loads its forecast only on explicit request
+		// inside AccountDialog; do not prefetch it here.
+		enabled: target.kind !== "account",
+	});
+	const projection =
+		projectionQuery.base instanceof Error ? null : projectionQuery.base;
+	const projectionLoading = projectionQuery.loading;
+	const projectionError = projectionQuery.baseError;
+	const retryProjection = projectionQuery.retryProjection;
+	if (!accounts || !transactions || !startDate) return null;
 	// The editor replaces the evidence in the URL overlay slot, so the
 	// evidence unmounts on navigation: no separate close is needed, and the
 	// back button returns to this evidence.
