@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -120,12 +121,23 @@ func (s *sqliteStore) DeletePosting(id string) error {
 		// gone from the feed (vanished rows are reconciled from absence), so
 		// there is nothing for a later sync to rejoin. Only pending rows
 		// stay sync-owned here: pending seeds refresh in place on every feed.
-		// (Settled rows stay deletable at the store but hidden in the UI:
-		// deleting one cascades its sync keys, and the key stays in later
-		// feeds, so the next sync would re-import it under a new ID.)
+		// Settled rows are removable as well: their bank ids move to the
+		// do-not-import list first, so later feeds skip them.
 		voidBankRow := lifecycle.source != SourceUser && lifecycle.source != "" && !lifecycle.pending && lifecycle.void
 		if !lifecycle.ownerEditable() && !voidBankRow {
 			return SyncOwned(id)
+		}
+		// Copy the row's bank ids onto the do-not-import list before the
+		// cascade drops them: a removed charge stays removed on later feeds.
+		// Void holds suppress nothing: their keys already left the feed, and
+		// keeping the auth key usable preserves same-key settlement.
+		if !lifecycle.void {
+			if err := ensureSuppressionSchema(tx); err != nil {
+				return err
+			}
+			if err := suppressPostingKeys(tx, id, time.Now().Unix()); err != nil {
+				return fmt.Errorf("suppress posting %s: %w", id, err)
+			}
 		}
 		// Sync keys cascade with the row: posting_sync_keys references
 		// postings ON DELETE CASCADE.
@@ -154,6 +166,14 @@ func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.Recurren
 		}
 		if !lifecycle.ownerEditable() {
 			return SyncOwned(postingID)
+		}
+		// A converted bank charge must not come back: its keys move to the
+		// do-not-import list, exactly as on delete.
+		if err := ensureSuppressionSchema(tx); err != nil {
+			return err
+		}
+		if err := suppressPostingKeys(tx, postingID, time.Now().Unix()); err != nil {
+			return fmt.Errorf("suppress posting %s: %w", postingID, err)
 		}
 		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND user_id = :user_id`, postingID); err != nil {
 			return fmt.Errorf("convert posting %s: %w", postingID, err)

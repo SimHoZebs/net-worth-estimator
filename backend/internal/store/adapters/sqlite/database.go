@@ -23,6 +23,13 @@ type Database struct {
 	blobs blobstore.Store
 }
 
+// EnsureSuppressionSchema creates the do-not-import list when missing so
+// pre-existing databases gain it on first use without a migration.
+func (d *Database) EnsureSuppressionSchema() error {
+	_, err := d.db.Exec(suppressedSyncKeysDDL)
+	return err
+}
+
 // OpenDatabase opens an existing, fully provisioned database. It never creates
 // files, repairs permissions, or changes the schema.
 func OpenDatabase(path string, options ...DatabaseOption) (*Database, error) {

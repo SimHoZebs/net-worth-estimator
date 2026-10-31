@@ -147,6 +147,124 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 	}
 }
 
+func TestDeletePostingSuppressesBankKeysAcrossSyncs(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), SourceSimpleFIN, "bridge-prime", "post1")
+	if first := applyDirectives(t, database, []BankDirective{upsert}); first.SettledInserted != 1 {
+		t.Fatalf("seed = %+v", first)
+	}
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	// Removing a bank row records its bank ids: the next feed carries the
+	// same charge, and apply skips it instead of resurrecting the row.
+	if err := database.DeletePosting(loaded.Postings[0].ID); err != nil {
+		t.Fatalf("delete = %v", err)
+	}
+	if got := countRows(t, database, "suppressed_sync_keys", ""); got != 1 {
+		t.Fatalf("suppressions = %d, want the removed key", got)
+	}
+	second := applyDirectives(t, database, []BankDirective{upsert})
+	if second != (SyncApplySummary{}) {
+		t.Fatalf("resupply counted: %+v", second)
+	}
+	if got := countRows(t, database, "postings", ""); got != 0 {
+		t.Fatalf("resupply resurrected %d rows", got)
+	}
+	// Suppression is per key: an unrelated charge still imports.
+	other := bankUpsertDirective(bankSeedPosting("Bistro", "prime_card", "58.00", false), SourceSimpleFIN, "bridge-prime", "post2")
+	if third := applyDirectives(t, database, []BankDirective{other}); third.SettledInserted != 1 {
+		t.Fatalf("unrelated = %+v", third)
+	}
+}
+
+func TestDeleteOwnerPostingSuppressesNothing(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	created, err := database.CreatePosting(types.Posting{
+		Name:            "Manual",
+		SourceAccountID: &[]string{"prime_card"}[0],
+		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		PostedTime:      1785628800,
+		TransactionTime: 1785628800,
+		Enabled:         true,
+	})
+	if err != nil {
+		t.Fatalf("create = %v", err)
+	}
+	if err := database.DeletePosting(created.ID); err != nil {
+		t.Fatalf("delete = %v", err)
+	}
+	if got := countRows(t, database, "suppressed_sync_keys", ""); got != 0 {
+		t.Fatalf("owner delete suppressed %d keys", got)
+	}
+}
+
+func TestDeleteVoidSuppressesNothingAndSameKeyStillImports(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", true), SourceSimpleFIN, "bridge-prime", "pend1")
+	applyDirectives(t, database, []BankDirective{upsert})
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	id := loaded.Postings[0].ID
+	if first := applyDirectives(t, database, []BankDirective{{Void: id}}); first.PendingDeleted != 1 {
+		t.Fatalf("void = %+v", first)
+	}
+	// Removing a void hold records nothing: its keys already left the
+	// feed, and the auth key stays usable for same-key settlement.
+	if err := database.DeletePosting(id); err != nil {
+		t.Fatalf("delete = %v", err)
+	}
+	if got := countRows(t, database, "suppressed_sync_keys", ""); got != 0 {
+		t.Fatalf("void delete suppressed %d keys", got)
+	}
+	if second := applyDirectives(t, database, []BankDirective{upsert}); second.PendingInserted != 1 {
+		t.Fatalf("re-authorized hold skipped: %+v", second)
+	}
+}
+
+func TestConvertSettledBankRowSuppressesKeys(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), SourceSimpleFIN, "bridge-prime", "post1")
+	applyDirectives(t, database, []BankDirective{upsert})
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	if _, err := database.ConvertPostingToRule(loaded.Postings[0].ID, testRuleFixture("ignored")); err != nil {
+		t.Fatalf("convert = %v", err)
+	}
+	// The converted-away charge must not come back on the next feed.
+	if second := applyDirectives(t, database, []BankDirective{upsert}); second != (SyncApplySummary{}) {
+		t.Fatalf("resupply counted: %+v", second)
+	}
+	if got := countRows(t, database, "postings", ""); got != 0 {
+		t.Fatalf("resupply resurrected %d rows", got)
+	}
+}
+
+func TestBankConvertSkipsRemovedRow(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	// A conversion racing a removal lands nowhere: the removal stands,
+	// and the sync stays green.
+	summary, err := database.ApplySyncPlan(nil, []BankDirective{{
+		Convert: &BankConvert{ID: "missing", Posting: bankSeedPosting("C", "prime_card", "10", false)},
+	}})
+	if err != nil {
+		t.Fatalf("convert of removed row errored: %v", err)
+	}
+	if summary != (SyncApplySummary{}) {
+		t.Fatalf("convert of removed row counted: %+v", summary)
+	}
+}
+
 func TestBankDirectivesRejectInvalidInput(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
@@ -164,7 +282,6 @@ func TestBankDirectivesRejectInvalidInput(t *testing.T) {
 			p.SourceAccountID = nil
 			return p
 		}(), Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "pend1")}}},
-		"convert miss": {{Convert: &BankConvert{ID: "missing", Posting: bankSeedPosting("C", "prime_card", "10", false)}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := database.ApplySyncPlan(nil, directives); err == nil {
