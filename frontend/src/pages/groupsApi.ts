@@ -47,8 +47,10 @@ interface InvitesResponse {
 	data: { invites: GroupInvite[] };
 }
 
-export async function listGroups(): Promise<UserGroup[]> {
-	const response = await waypointFetch<GroupsResponse>("/v1/groups");
+export async function listGroups(signal?: AbortSignal): Promise<UserGroup[]> {
+	const response = await waypointFetch<GroupsResponse>("/v1/groups", {
+		signal,
+	});
 	return response.data.groups ?? [];
 }
 
@@ -63,9 +65,11 @@ export async function createGroup(name: string): Promise<UserGroup> {
 
 export async function getGroup(
 	id: string,
+	signal?: AbortSignal,
 ): Promise<{ group: UserGroup; members: GroupMember[] }> {
 	const response = await waypointFetch<GroupDetailResponse>(
 		`/v1/groups/${encodeURIComponent(id)}`,
+		{ signal },
 	);
 	return response.data;
 }
@@ -82,9 +86,13 @@ export async function leaveGroup(id: string): Promise<void> {
 	});
 }
 
-export async function listInvites(groupId: string): Promise<GroupInvite[]> {
+export async function listInvites(
+	groupId: string,
+	signal?: AbortSignal,
+): Promise<GroupInvite[]> {
 	const response = await waypointFetch<InvitesResponse>(
 		`/v1/groups/${encodeURIComponent(groupId)}/invites`,
+		{ signal },
 	);
 	return response.data.invites ?? [];
 }
