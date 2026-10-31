@@ -50,16 +50,9 @@ export function PurchasePlanner({
 		>
 			<div className="mb-5 flex flex-wrap items-start justify-between gap-4">
 				<div>
-					<p className="text-xs font-bold tracking-widest text-muted">
-						After your commitments
-					</p>
 					<h2 className="my-2 text-2xl tracking-tight text-ink">
 						Planned purchases
 					</h2>
-					<p className="max-w-[55ch] text-sm text-muted">
-						Flexible dates move automatically when your projected finances
-						change.
-					</p>
 				</div>
 				{actions.onAdd && (
 					<Button
