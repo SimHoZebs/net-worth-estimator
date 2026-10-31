@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useRef, useState, type Ref } from "react";
 import type { AnalysisDuration } from "@/api/generated/model/analysisDuration.ts";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
 import { findingLabel, providerLabel } from "@/domain/analysisFindings.ts";
@@ -7,6 +7,16 @@ import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { InputField, SelectField } from "../Field.tsx";
+
+// useReviewAnalysisFinding awaits its finding refetch before action completion.
+// Schedule the action's focus handoff after React commits its new controls, without
+// polling for a node or reacting to later background updates.
+function focusAfterCommit(target: () => HTMLElement | null) {
+	requestAnimationFrame(() => {
+		const node = target();
+		if (node?.isConnected && !node.matches(":disabled")) node.focus();
+	});
+}
 
 export function BNPLConfirmation({
 	finding,
@@ -19,30 +29,11 @@ export function BNPLConfirmation({
 	const [changeAnswer, setChangeAnswer] = useState(false);
 	const [editDuration, setEditDuration] = useState(false);
 	const durationInput = useRef<HTMLInputElement>(null);
-	const consumedDurationFocus = useRef(0);
-	const [durationFocusRequest, setDurationFocusRequest] = useState(0);
-	const [focusSummary, setFocusSummary] = useState(0);
-	const editButton = useRef<HTMLButtonElement>(null);
+	const changeButton = useRef<HTMLButtonElement>(null);
 	const review = finding.review;
 	const confirmed = review?.decision === "confirmed";
 	const duration = review?.duration;
 	const provider = providerLabel(review?.provider ?? finding.provider);
-	const focusDurationInput = () => {
-		setDurationFocusRequest((previous) => previous + 1);
-	};
-	useEffect(() => {
-		if (
-			durationFocusRequest > consumedDurationFocus.current &&
-			!feedback.isPending &&
-			durationInput.current
-		) {
-			durationInput.current.focus();
-			consumedDurationFocus.current = durationFocusRequest;
-		}
-	}, [durationFocusRequest, feedback.isPending, confirmed, editDuration]);
-	useEffect(() => {
-		if (focusSummary > 0) editButton.current?.focus();
-	}, [focusSummary]);
 	const answer = (action: "confirm" | "reject") => {
 		feedback.mutate(
 			{
@@ -57,7 +48,8 @@ export function BNPLConfirmation({
 			{
 				onSuccess: () => {
 					setChangeAnswer(false);
-					focusDurationInput();
+					if (action === "confirm")
+						focusAfterCommit(() => durationInput.current);
 				},
 			},
 		);
@@ -97,14 +89,14 @@ export function BNPLConfirmation({
 					</span>
 					{!readOnly && (
 						<Button
-							ref={editButton}
+							ref={changeButton}
 							size="sm"
 							variant="secondary"
 							disabled={finding.stale || feedback.isPending}
 							onClick={() => {
-								focusDurationInput();
 								setChangeAnswer(true);
 								setEditDuration(true);
+								focusAfterCommit(() => durationInput.current);
 							}}
 						>
 							Change
@@ -114,7 +106,7 @@ export function BNPLConfirmation({
 			)}
 			{confirmed && !readOnly && (!duration || editDuration) && (
 				<PlanDuration
-					key={`${finding.id}-${finding.feedbackRevision}`}
+					key={finding.id}
 					duration={duration}
 					inputRef={durationInput}
 					busy={feedback.isPending}
@@ -134,7 +126,7 @@ export function BNPLConfirmation({
 								onSuccess: () => {
 									setEditDuration(false);
 									setChangeAnswer(false);
-									setFocusSummary((previous) => previous + 1);
+									focusAfterCommit(() => changeButton.current);
 								},
 							},
 						);

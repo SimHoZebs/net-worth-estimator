@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
 import { InputField } from "@/components/Field.tsx";
@@ -152,30 +152,12 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 			);
 	}, [catalog.data]);
 
-	const initial = useMemo(
-		() => fiConfigureState(row?.config as JsonValue | undefined),
-		// Reset when a different evaluation or a saved config arrives.
-		// oxlint-disable-next-line react/exhaustive-deps
-		[instanceId, JSON.stringify(row?.config ?? null)],
-	);
-	const [minimum, setMinimum] = useState(initial.minimum);
-	const [years, setYears] = useState(initial.years);
-	const [assets, setAssets] = useState(initial.assets);
-	const [income, setIncome] = useState(initial.income);
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [saved, setSaved] = useState(false);
-
-	useEffect(() => {
-		setMinimum(initial.minimum);
-		setYears(initial.years);
-		setAssets(initial.assets);
-		setIncome(initial.income);
-		setSaved(false);
-		setError(null);
-	}, [initial]);
-
-	if (summary.isFetching || balances.isFetching || catalog.isFetching) {
+	// Await first-load data, but keep the mounted draft during background refetches.
+	if (
+		(summary.isPending && summary.isFetching) ||
+		(balances.isPending && balances.isFetching) ||
+		(catalog.isPending && catalog.isFetching)
+	) {
 		return (
 			<p className="m-0 text-xs text-muted" role="status">
 				Loading configuration…
@@ -186,6 +168,54 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 	if (!row) {
 		return <p className="m-0 text-xs text-muted">Configuration unavailable.</p>;
 	}
+
+	// The form owns its field state for its whole lifetime. It mounts once per
+	// saved config identity, so background refetches of unrelated queries keep
+	// the same key and never wipe dirty fields. A newly saved config arrives
+	// with a new key and explicitly remounts a fresh form.
+	return (
+		<IndependenceForm
+			key={`${instanceId}:${JSON.stringify(row.config ?? null)}`}
+			instanceId={instanceId}
+			evaluationName={row.name}
+			evaluationEnabled={row.enabled}
+			initial={fiConfigureState(row.config as JsonValue | undefined)}
+			accounts={accounts}
+			incomeCandidates={incomeCandidates}
+			readOnly={readOnly}
+		/>
+	);
+}
+
+function IndependenceForm({
+	instanceId,
+	evaluationName,
+	evaluationEnabled,
+	initial,
+	accounts,
+	incomeCandidates,
+	readOnly,
+}: {
+	instanceId: string;
+	evaluationName: string;
+	evaluationEnabled: boolean;
+	initial: ReturnType<typeof fiConfigureState>;
+	accounts: {
+		id: string;
+		name: string;
+		kind: "cash" | "investment" | "debt" | "property";
+		color: string | null;
+	}[];
+	incomeCandidates: { id: string; name: string; detail: string }[];
+	readOnly: boolean;
+}) {
+	const [minimum, setMinimum] = useState(initial.minimum);
+	const [years, setYears] = useState(initial.years);
+	const [assets, setAssets] = useState(initial.assets);
+	const [income, setIncome] = useState(initial.income);
+	const [saving, setSaving] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const [saved, setSaved] = useState(false);
 
 	const toggleAsset = (accountId: string) => {
 		setSaved(false);
@@ -220,8 +250,8 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 			call: () =>
 				updateEvaluation(instanceId, {
 					instanceId,
-					name: row.name,
-					enabled: row.enabled,
+					name: evaluationName,
+					enabled: evaluationEnabled,
 					type: "financialIndependence",
 					config,
 				}),
