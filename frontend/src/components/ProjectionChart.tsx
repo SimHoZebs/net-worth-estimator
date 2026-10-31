@@ -198,6 +198,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
             <ContributionStackPlot
               points={model.points}
               accounts={stackAccounts}
+              height={measuredHeight ?? undefined}
             />
           )}
         </div>
