@@ -133,16 +133,16 @@ func candidateKey(item store.SyncPosting) store.BankKey {
 }
 
 // Reconcile translates one mapped snapshot plus loaded bank rows into store
-// directives. It owns every SimpleFIN lifecycle decision: pending items
-// upsert by key, vanished pending or void rows convert on a unique
-// tip-bounded posted match or void otherwise, and unmatched posted charges
-// insert. Only this provider's rows and keys participate; other providers'
-// bank rows are invisible to it. Covered limits stale handling to resolved
-// accounts so unlinked accounts' rows are never touched. A candidate whose
-// key is already recorded is already imported and never reprocesses, so
-// repeat feeds are stable no-ops. Tip-bounded matching applies only to
-// pending lifecycle transitions; the settled-to-settled duplicate check
-// stays exact so near-amount repeats never suppress a genuine second charge.
+// directives. Pending items upsert by key; vanished pending rows void in
+// place; unmatched posted charges insert as new rows. A posted charge under
+// a new id never joins its old authorization automatically: the hold voids,
+// the charge inserts, and the owner links or removes either side by hand.
+// Only this provider's rows and keys participate; other providers' bank rows
+// are invisible to it. Covered limits stale handling to resolved accounts so
+// unlinked accounts' rows are never touched. A candidate whose key is
+// already recorded is already imported and never reprocesses, so repeat feeds
+// are stable no-ops. The settled-to-settled duplicate check stays exact so
+// near-amount repeats never suppress a genuine second charge.
 func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
@@ -183,7 +183,6 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 			stale = append(stale, staleRow{id: row.Posting.ID, pending: row.Posting.Pending})
 		}
 	}
-	used := map[int]bool{}
 	recorded := func(item store.SyncPosting) bool {
 		_, ok := byKey[candidateKey(item)]
 		return ok
@@ -192,32 +191,11 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		account, ok := rowAccount(item.Posting)
 		return ok && covered[account]
 	}
+	// Vanished holds void in place. No fuzzy join to a posted charge runs
+	// here: a charge under a new id inserts below as its own row.
 	for _, entry := range stale {
 		row := byID[entry.id]
 		if account, ok := rowAccount(row.Posting); !ok || !covered[account] {
-			continue
-		}
-		match := -1
-		for i, candidate := range settled {
-			if used[i] || recorded(candidate) || !settleMatchTolerant(row.Posting, candidate) {
-				continue
-			}
-			if match != -1 {
-				match = -2
-				break
-			}
-			match = i
-		}
-		if match >= 0 {
-			candidate := settled[match]
-			used[match] = true
-			directives = append(directives, store.BankDirective{
-				Convert: &store.BankConvert{
-					ID:      entry.id,
-					Posting: candidate.Posting,
-					AddKeys: []store.BankKey{candidateKey(candidate)},
-				},
-			})
 			continue
 		}
 		if entry.pending {
@@ -225,30 +203,8 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		}
 	}
 present:
-	for i, candidate := range settled {
-		if used[i] || recorded(candidate) || !coveredAccount(candidate) {
-			continue
-		}
-		// A candidate matching live pending values defers: the pending
-		// row converts when it vanishes instead of duplicating now.
-		// Tip-bounded amounts defer like exact ones so a tipped total
-		// waits for its authorization instead of inserting beside it.
-		deferred := false
-		for _, item := range pending {
-			if settleMatchTolerant(item.Posting, candidate) {
-				deferred = true
-				break
-			}
-		}
-		if !deferred {
-			for id := range seen {
-				if row := byID[id]; row.Posting.Pending && settleMatchTolerant(row.Posting, candidate) {
-					deferred = true
-					break
-				}
-			}
-		}
-		if deferred {
+	for _, candidate := range settled {
+		if recorded(candidate) || !coveredAccount(candidate) {
 			continue
 		}
 		// A candidate matching an existing settled bank row is already

@@ -60,7 +60,7 @@ func bankRowIDs(t *testing.T, database store.Store) map[string]types.Posting {
 	return out
 }
 
-func TestSyncFlowPendingSettlesThroughConversion(t *testing.T) {
+func TestSyncFlowPendingVoidsAndSettledInserts(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
 	first := applyFlow(t, database,
@@ -72,19 +72,16 @@ func TestSyncFlowPendingSettlesThroughConversion(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatalf("pending rows = %v", rows)
 	}
-	var pendingID string
-	for id := range rows {
-		pendingID = id
-	}
+	// The posted charge arrives under a new id: the hold voids in place
+	// and the charge inserts as its own row.
 	second := applyFlow(t, database, nil,
 		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
-	if second.SettledConverted != 1 || second.PendingDeleted != 0 {
-		t.Fatalf("convert = %+v", second)
+	if second.SettledInserted != 1 || second.SettledConverted != 0 || second.PendingDeleted != 1 {
+		t.Fatalf("settle = %+v, want one insert plus one void", second)
 	}
 	after := bankRowIDs(t, database)
-	row, ok := after[pendingID]
-	if !ok || row.Pending || row.Void || row.Source != store.SourceSimpleFIN || !row.Enabled {
-		t.Fatalf("converted row = %+v, present %v", row, ok)
+	if len(after) != 2 {
+		t.Fatalf("settle rows = %v, want voided hold plus settled charge", after)
 	}
 	// The settled charge stays in later feeds without duplicating.
 	third := applyFlow(t, database, nil,
@@ -92,16 +89,16 @@ func TestSyncFlowPendingSettlesThroughConversion(t *testing.T) {
 	if third.SettledConverted != 0 || third.SettledInserted != 0 || third.PendingDeleted != 0 {
 		t.Fatalf("repeat = %+v", third)
 	}
-	if len(bankRowIDs(t, database)) != 1 {
+	if len(bankRowIDs(t, database)) != 2 {
 		t.Fatal("repeat feed duplicated the settled row")
 	}
 }
 
-func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
+func TestSyncFlowTipAdjustedSettleVoidsAndInserts(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
-	// Dinner authorizes $50, then posts at $58 with the tip: the pending
-	// seed converts instead of voiding beside a duplicate.
+	// Dinner authorizes $50, then posts at $58 with the tip: the hold
+	// voids and the posted charge inserts as its own row.
 	first := applyFlow(t, database,
 		[]store.SyncPosting{flowPosting("auth-a", "Bistro", "prime_card", "50.00", true, "2026-08-02")}, nil)
 	if first.PendingInserted != 1 {
@@ -109,16 +106,16 @@ func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
 	}
 	second := applyFlow(t, database, nil,
 		[]store.SyncPosting{flowPosting("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
-	if second.SettledConverted != 1 || second.PendingDeleted != 0 {
-		t.Fatalf("tip settle = %+v, want one conversion", second)
+	if second.SettledInserted != 1 || second.SettledConverted != 0 || second.PendingDeleted != 1 {
+		t.Fatalf("tip settle = %+v, want one insert plus one void", second)
 	}
 	after := bankRowIDs(t, database)
-	if len(after) != 1 {
-		t.Fatalf("tip settle duplicated the row: %+v", after)
+	if len(after) != 2 {
+		t.Fatalf("tip settle rows = %+v, want voided hold plus settled charge", after)
 	}
 	for _, row := range after {
-		if row.Pending || row.Void || !row.Enabled {
-			t.Fatalf("converted row = %+v, want enabled settled", row)
+		if row.Pending {
+			t.Fatalf("live hold remains = %+v", row)
 		}
 	}
 	// A repeat of the identical feed is a stable no-op.
@@ -381,8 +378,9 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 }
 
 // End-to-end pending lifecycle: the authorization never moves balances;
-// once posted it converts in place and participates exactly once.
-func TestPendingSeedConvertsToSettledEndToEnd(t *testing.T) {
+// once posted under a new id the hold voids and the charge inserts as its
+// own row, participating exactly once.
+func TestPendingSeedVoidsAndSettledInsertsEndToEnd(t *testing.T) {
 	database := openRunnerStore(t)
 	seedFlowChecking(t, database)
 	now := time.Unix(1773133200, 0).UTC()
@@ -408,11 +406,11 @@ func TestPendingSeedConvertsToSettledEndToEnd(t *testing.T) {
 	}
 	settled := settledFeed(t, 1773140400, 1773129600)
 	second, converted := applyProviderFeed(t, database, &settled, time.Unix(1773140400, 0).UTC())
-	if second.SettledConverted != 1 {
-		t.Fatalf("settlement = %+v, want one conversion", second)
+	if second.SettledInserted != 1 || second.PendingDeleted != 1 {
+		t.Fatalf("settlement = %+v, want one void plus one insert", second)
 	}
-	if len(converted.Postings) != 1 {
-		t.Fatalf("conversion duplicated the row: %+v", converted.Postings)
+	if len(converted.Postings) != 2 {
+		t.Fatalf("settlement rows = %d, want voided hold plus settled charge", len(converted.Postings))
 	}
 	position, err = domain.ResolveCurrentPosition(converted, "2026-03-10T12:00:00Z", types.ModelOverrides{})
 	if err != nil {
