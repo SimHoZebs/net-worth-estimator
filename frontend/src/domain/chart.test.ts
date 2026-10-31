@@ -22,6 +22,16 @@ const options = {
 };
 
 describe("chart presentation data", () => {
+	it("honors explicit viewBox dimensions and clamps tiny ones", () => {
+		const sized = projectionChartModel({ ...options, width: 950, height: 340 });
+		if (!sized) throw new Error("Expected chart");
+		expect(sized.width).toBe(950);
+		expect(sized.height).toBe(340);
+		const tiny = projectionChartModel({ ...options, width: 10, height: 10 });
+		if (!tiny) throw new Error("Expected chart");
+		expect(tiny.width).toBe(280);
+		expect(tiny.height).toBe(200);
+	});
 	it("uses identical values for annual rows and CSV", () => {
 		const model = projectionChartModel(options);
 		if (!model) throw new Error("Expected chart");
