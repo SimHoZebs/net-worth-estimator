@@ -601,6 +601,15 @@ func testApplySyncPlanRefreshesPendingSnapshot(t *testing.T, newStore func(*test
 	if len(got) != 2 {
 		t.Fatalf("pending rows = %+v, want b and c", got)
 	}
+	for _, posting := range reloaded.Postings {
+		if posting.ID == ids["Pending a"] {
+			// A void transition stops participation: pending/void
+			// rows are stored disabled, never as execution gates.
+			if !posting.Void || posting.Pending || posting.Enabled {
+				t.Fatalf("voided row must stay disabled: %+v", posting)
+			}
+		}
+	}
 	for _, id := range got {
 		if _, err := uuid.Parse(id); err != nil {
 			t.Fatalf("pending identity is not a UUID: %v", got)

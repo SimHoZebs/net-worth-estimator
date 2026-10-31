@@ -25,7 +25,9 @@ Use **balance check**. Its date column is **balance**; its tab is "Balance check
 
 - Only an owner-disabled row shows **Excluded from account**. A
   pending or void bank row is recorded bank evidence. Settled bank rows
-  participate like manual actuals once imported.
+  participate like manual actuals once imported. Enabled alone decides
+  execution: sync translation stores pending and void rows disabled, so
+  they never move balances until settlement converts them enabled.
 - A bank hold that vanished without posting shows **Did not post**; a live
   hold shows **Pending**.
 

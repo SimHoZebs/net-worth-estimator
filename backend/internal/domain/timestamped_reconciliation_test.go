@@ -258,7 +258,13 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 	}
 }
 
-func TestPendingAndVoidHaveNoBalanceEffect(t *testing.T) {
+// Enabled alone decides execution: pending and void are stored provider
+// lifecycle metadata, never independent execution gates. A lifecycle row
+// with Enabled true executes like any actual; with Enabled false it stays
+// out, as does an owner-disabled settled row. Holds both before the rows
+// (exact 10:00 cut) and after them (day-close cut), in history replay and
+// in the forward simulation.
+func TestEnabledAloneDecidesExecutionRegardlessOfLifecycle(t *testing.T) {
 	account := "checking"
 	source := account
 	model := &types.FinancialModel{
@@ -267,20 +273,51 @@ func TestPendingAndVoidHaveNoBalanceEffect(t *testing.T) {
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
 		},
 		Postings: []types.Posting{
-			{ID: "pending", Name: "Pending", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin", Pending: true},
-			{ID: "voided", Name: "Voided", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin", Void: true},
-			// An owner-disabled settled bank row is a deliberate
-			// exclusion and stays out of balances like any disabled row.
-			{ID: "owner-disabled-bank", Name: "BankSettled", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin"},
+			{ID: "pending-disabled", Name: "PendingOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Pending: true},
+			{ID: "pending-enabled", Name: "PendingOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin", Pending: true},
+			{ID: "void-disabled", Name: "VoidOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Void: true},
+			{ID: "void-enabled", Name: "VoidOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin", Void: true},
+			{ID: "settled-disabled", Name: "SettledOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin"},
+			{ID: "settled-enabled", Name: "SettledOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
-	replay, err := replayChronologicalHistory(model, "2026-03-10")
+	// Before the 11:00 rows: nothing executes at the exact 10:00 cut.
+	beforeCut := unixAt(10, 10)
+	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := replay.state.Balances[account]; got != 1000 {
-		t.Fatalf("pending/void/owner-disabled-bank rows must not move balances, got %v", got)
+	if got := position.Accounts[0].Balance; got != 1000 {
+		t.Fatalf("exact cut before rows = %v, want 1000", got)
+	}
+	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1, AsOfInstant: &beforeCut}
+	_, result, err := ProjectRawFinancialModel(model, settings, types.ModelOverrides{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Summary.CurrentNetWorth != 1000 || result.Summary.FinalNetWorth != 700 {
+		t.Fatalf("exact-cut projection before rows = %v/%v, want current 1000 (history excludes future rows) and final 700 (simulation runs the three enabled future rows)",
+			result.Summary.CurrentNetWorth, result.Summary.FinalNetWorth)
+	}
+	// After the 11:00 rows: exactly the three Enabled rows execute, once
+	// each, regardless of their pending/void flags.
+	position, err = ResolveCurrentPosition(model, "2026-03-10", types.ModelOverrides{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := position.Accounts[0].Balance; got != 700 {
+		t.Fatalf("day-close balance = %v, want 700 (three enabled rows at -100 each)", got)
+	}
+	_, result, err = ProjectRawFinancialModel(model,
+		&types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1},
+		types.ModelOverrides{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Summary.CurrentNetWorth != 700 || result.Summary.FinalNetWorth != 700 {
+		t.Fatalf("day-close projection = %v/%v, want 700/700",
+			result.Summary.CurrentNetWorth, result.Summary.FinalNetWorth)
 	}
 }
 

@@ -181,7 +181,10 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 				return err
 			}
 		case directive.Void != "":
-			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
+			// A voided authorization stops participating: translation
+			// stores pending/void rows disabled, so the transition
+			// clears Enabled alongside the lifecycle flags.
+			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1, enabled = 0 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
 			if err != nil {
 				return err
 			}

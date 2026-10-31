@@ -104,9 +104,10 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 	addedPosting := map[string]bool{}
 	for date, occurrences := range history.ByDate {
 		for _, occurrence := range occurrences {
-			if occurrence.Posting.Pending || occurrence.Posting.Void {
-				continue
-			}
+			// Enabled alone decides execution. Pending and void are
+			// stored provider lifecycle metadata; translation assigns
+			// them Enabled false, and the engine never reinterprets
+			// them here.
 			if !occurrence.Posting.Enabled {
 				continue
 			}
@@ -134,7 +135,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		if addedPosting[posting.ID] {
 			continue
 		}
-		if posting.Pending || posting.Void || !posting.Enabled {
+		if !posting.Enabled {
 			continue
 		}
 		day := postingDay(posting)
