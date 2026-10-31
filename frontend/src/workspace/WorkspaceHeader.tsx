@@ -11,16 +11,19 @@ export function WorkspaceTopbar({
 	onOpenNavigation: () => void;
 }) {
 	return (
-		<header className="hidden h-16 items-center gap-3 border-0 border-b border-solid border-line bg-surface px-6 max-md:flex print:hidden">
-			<IconButton
-				icon={Menu}
-				label="Open navigation"
-				onClick={onOpenNavigation}
-			/>
-			<span className="truncate text-sm font-semibold tracking-tight">
-				{page.label}
-			</span>
-		</header>
+		<>
+			<title>{`${page.label} · Waypoint`}</title>
+			<header className="hidden h-16 items-center gap-3 border-0 border-b border-solid border-line bg-surface px-6 max-md:flex print:hidden">
+				<IconButton
+					icon={Menu}
+					label="Open navigation"
+					onClick={onOpenNavigation}
+				/>
+				<span className="truncate text-sm font-semibold tracking-tight">
+					{page.label}
+				</span>
+			</header>
+		</>
 	);
 }
 

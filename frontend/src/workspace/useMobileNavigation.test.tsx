@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Drawer } from "../components/Drawer.tsx";
 import { useMobileNavigation } from "./useMobileNavigation.ts";
@@ -56,5 +62,32 @@ describe("mobile navigation guard", () => {
 		render(<Harness />);
 		fireEvent.click(screen.getByRole("button", { name: "Open nav" }));
 		expect(screen.getByTestId("nav-open").textContent).toBe("true");
+	});
+
+	it("dismisses at the desktop breakpoint and stays closed on return to mobile", () => {
+		let mobile = true;
+		const listeners = new Set<() => void>();
+		vi.stubGlobal("matchMedia", () => ({
+			get matches() {
+				return mobile;
+			},
+			addEventListener: (_: string, listener: () => void) =>
+				listeners.add(listener),
+			removeEventListener: (_: string, listener: () => void) =>
+				listeners.delete(listener),
+		}));
+		render(<Harness />);
+		fireEvent.click(screen.getByRole("button", { name: "Open nav" }));
+		expect(screen.getByTestId("nav-open").textContent).toBe("true");
+		act(() => {
+			mobile = false;
+			for (const listener of listeners) listener();
+		});
+		expect(screen.getByTestId("nav-open").textContent).toBe("false");
+		act(() => {
+			mobile = true;
+			for (const listener of listeners) listener();
+		});
+		expect(screen.getByTestId("nav-open").textContent).toBe("false");
 	});
 });

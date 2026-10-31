@@ -5,13 +5,12 @@ import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 
 export function useMobileNavigation() {
 	const [open, setOpen] = useState(false);
-	const mobile = useMediaQuery(viewportQueries.belowMd);
-	useEffect(() => {
-		// Viewport reset: closing the drawer when leaving mobile widths is the
-		// intended sync, not a render cascade.
-		// oxlint-disable-next-line react/set-state-in-effect
+	// The browser's breakpoint event owns dismissal, rather than an effect
+	// that watches the rendered breakpoint and repairs the open state later.
+	const onViewportChange = useCallback((mobile: boolean) => {
 		if (!mobile) setOpen(false);
-	}, [mobile]);
+	}, []);
+	const mobile = useMediaQuery(viewportQueries.belowMd, onViewportChange);
 	useEffect(() => {
 		const close = () => setOpen(false);
 		window.addEventListener("hashchange", close);
@@ -27,9 +26,9 @@ export function useMobileNavigation() {
 	// nav sheet above an open modal.
 	const hasModal = useHasOpenModal();
 	const show = useCallback(() => {
-		if (open || hasModal) return;
+		if (!mobile || open || hasModal) return;
 		setOpen(true);
-	}, [open, hasModal]);
+	}, [mobile, open, hasModal]);
 	useHorizontalSwipe({
 		enabled: mobile,
 		onSwipeRight: () => {
