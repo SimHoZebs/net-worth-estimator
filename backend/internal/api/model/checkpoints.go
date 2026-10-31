@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -38,7 +39,7 @@ func (s *handler) saveCheckpoint(_ context.Context, input *checkpointInput) (*ch
 func (s *handler) deleteCheckpoint(_ context.Context, input *struct {
 	AccountID  string `query:"accountId"`
 	ObservedAt int64  `query:"observedAt"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	accountID := input.AccountID
 	observedAt := input.ObservedAt
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
@@ -59,7 +60,7 @@ func (s *handler) deleteCheckpoint(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }

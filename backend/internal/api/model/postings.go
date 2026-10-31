@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -113,7 +114,7 @@ func (s *handler) updatePosting(_ context.Context, input *struct {
 
 func (s *handler) deletePosting(_ context.Context, input *struct {
 	ID string `path:"id"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	id := input.ID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = removeByID(model.Postings, id, postingID)
@@ -123,12 +124,12 @@ func (s *handler) deletePosting(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }
 
-func (s *handler) movePosting(_ context.Context, input *reorderInput) (*reorderOutput, error) {
+func (s *handler) movePosting(_ context.Context, input *reorderInput) (*modelstate.ReorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = moveBeforeID(model.Postings, id, beforeID, postingID)
@@ -138,7 +139,7 @@ func (s *handler) movePosting(_ context.Context, input *reorderInput) (*reorderO
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }

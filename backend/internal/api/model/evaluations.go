@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -71,7 +72,7 @@ func (s *handler) updateEvaluation(_ context.Context, input *struct {
 
 func (s *handler) deleteEvaluation(_ context.Context, input *struct {
 	InstanceID string `path:"instanceId"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	instanceID := input.InstanceID
 	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		for _, evalType := range types.EvaluationTypeOrder {
@@ -85,7 +86,7 @@ func (s *handler) deleteEvaluation(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }
@@ -96,7 +97,7 @@ func (s *handler) moveEvaluation(_ context.Context, input *struct {
 		InstanceID string `json:"instanceId"`
 		BeforeID   string `json:"beforeId,omitempty"`
 	} `json:"body"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	evalType, instanceID, beforeID := input.Body.Type, input.Body.InstanceID, input.Body.BeforeID
 	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		if slice := evalSlice(model, evalType); slice != nil {
@@ -108,7 +109,7 @@ func (s *handler) moveEvaluation(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }

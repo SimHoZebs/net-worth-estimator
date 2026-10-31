@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -53,7 +54,7 @@ func (s *handler) savePaymentTerms(_ context.Context, input *paymentTermsInput) 
 
 func (s *handler) deletePaymentTerms(_ context.Context, input *struct {
 	AccountID string `path:"accountId"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	accountID := input.AccountID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		kept := model.PaymentTerms[:0]
@@ -69,7 +70,7 @@ func (s *handler) deletePaymentTerms(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }

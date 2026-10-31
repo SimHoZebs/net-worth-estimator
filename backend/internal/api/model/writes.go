@@ -154,5 +154,3 @@ type reorderInput struct {
 		BeforeID string `json:"beforeId,omitempty"`
 	} `json:"body"`
 }
-
-type reorderOutput = modelstate.ReorderOutput
