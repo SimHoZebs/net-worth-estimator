@@ -3,12 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { projectionFixture } from "../../mocks/projection.ts";
 import { ProjectionChart } from "../ProjectionChart.tsx";
-import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
+import { useOutlookProjection } from "../../pages/outlook/useOutlookProjection.ts";
 import { useSavedAccounts } from "../../state/savedRows.ts";
 import { useCheckpoints } from "../../state/workspaceResources.ts";
 
-vi.mock("../../state/useRemoteProjection.ts", () => ({
-	useRemoteProjection: vi.fn(),
+vi.mock("../../pages/outlook/useOutlookProjection.ts", () => ({
+	useOutlookProjection: vi.fn(),
 }));
 
 vi.mock("../../state/savedRows.ts", () => ({
@@ -24,7 +24,7 @@ vi.mock("../../state/workspaceResources.ts", async (importOriginal) => ({
 	useCheckpoints: vi.fn(),
 }));
 
-const mockedProjection = vi.mocked(useRemoteProjection);
+const mockedOutlookProjection = vi.mocked(useOutlookProjection);
 const mockedCheckpoints = vi.mocked(useCheckpoints);
 
 function mockChart(
@@ -36,12 +36,15 @@ function mockChart(
 		source: string;
 	}[] = [],
 ) {
-	mockedProjection.mockReturnValue({
+	mockedOutlookProjection.mockReturnValue({
 		base: projection,
-		isPlaceholderData: false,
-		status: "success",
+		range: null,
+		pending: false,
 		loading: false,
-	} as ReturnType<typeof useRemoteProjection>);
+		baseError: null,
+		retryProjection: vi.fn(),
+		status: "success",
+	} as ReturnType<typeof useOutlookProjection>);
 	mockedCheckpoints.mockReturnValue({
 		data: { checkpoints },
 	} as ReturnType<typeof useCheckpoints>);

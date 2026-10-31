@@ -4,10 +4,9 @@ import type { EvaluationResult, OtherEvaluation } from "@/domain/result.ts";
 import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
 import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
 import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
-import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
+import { useOutlookProjection } from "./useOutlookProjection.ts";
 import {
 	useSavedAccounts,
-	useSavedEvaluations,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "@/state/savedRows.ts";
@@ -24,30 +23,13 @@ export function PinnedEvaluations() {
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
 	const startDate = useSavedStartDate();
-	const evaluations = useSavedEvaluations();
 	const {
 		ids: pinnedIds,
 		toggle: togglePin,
 		loading: pinsLoading,
 	} = usePinnedEvaluations();
-	const projectionQuery = useRemoteProjection({
-		enabled: (accounts?.length ?? 0) > 0,
-		years: 20,
-		ranges:
-			evaluations?.some((evaluation) =>
-				(pinnedIds ?? []).includes(evaluation.id),
-			) ?? false,
-	});
+	const { base: projection, range, pending } = useOutlookProjection();
 	const status = useServerStatus().data;
-	const base =
-		projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
-			? null
-			: projectionQuery.base;
-	const range = projectionQuery.range;
-	const projection = base;
-	const pending =
-		projectionQuery.status === "pending" ||
-		(projectionQuery.isPlaceholderData && projectionQuery.loading);
 	const pinsDisabled = pinsLoading || (status?.readOnly ?? false);
 	const onPinChange = (id: string) => {
 		void togglePin(id);

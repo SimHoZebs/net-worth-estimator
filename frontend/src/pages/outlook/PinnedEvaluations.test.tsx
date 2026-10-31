@@ -11,7 +11,7 @@ import {
 	useSavedTransactions,
 } from "@/state/savedRows.ts";
 import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
-import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
+import { useOutlookProjection } from "./useOutlookProjection.ts";
 import { useServerStatus } from "@/state/workspaceResources.ts";
 
 vi.mock("@/state/savedRows.ts", () => ({
@@ -25,8 +25,8 @@ vi.mock("@/state/pinnedEvaluations.ts", () => ({
 	usePinnedEvaluations: vi.fn(),
 }));
 
-vi.mock("@/state/useRemoteProjection.ts", () => ({
-	useRemoteProjection: vi.fn(),
+vi.mock("./useOutlookProjection.ts", () => ({
+	useOutlookProjection: vi.fn(),
 }));
 
 vi.mock("@/state/workspaceResources.ts", async (importOriginal) => ({
@@ -39,7 +39,7 @@ const mockedTransactions = vi.mocked(useSavedTransactions);
 const mockedStartDate = vi.mocked(useSavedStartDate);
 const mockedEvaluations = vi.mocked(useSavedEvaluations);
 const mockedPins = vi.mocked(usePinnedEvaluations);
-const mockedProjection = vi.mocked(useRemoteProjection);
+const mockedOutlookProjection = vi.mocked(useOutlookProjection);
 const mockedStatus = vi.mocked(useServerStatus);
 
 afterEach(cleanup);
@@ -88,14 +88,12 @@ function mockState(input: {
 		error: null,
 		refresh: async () => {},
 	} as unknown as ReturnType<typeof usePinnedEvaluations>);
-	mockedProjection.mockReturnValue({
+	mockedOutlookProjection.mockReturnValue({
 		base:
 			input.projection ?? projectionFixture({ otherEvaluations: [funding] }),
 		range: input.range ?? null,
-		status: "success",
-		isPlaceholderData: false,
-		loading: false,
-	} as ReturnType<typeof useRemoteProjection>);
+		pending: false,
+	} as ReturnType<typeof useOutlookProjection>);
 	mockedStatus.mockReturnValue({
 		data: { readOnly: input.readOnly ?? false },
 	} as ReturnType<typeof useServerStatus>);
