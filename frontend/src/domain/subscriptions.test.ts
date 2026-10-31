@@ -67,12 +67,13 @@ describe("subscription conversion", () => {
 		expect(addMonthsClamped("2028-01-31", 3)).toBe("2028-04-30");
 	});
 
-	it("rejects synced sources", () => {
+	it("rejects synced settled sources", () => {
 		expect(
 			subscriptionSourceError({ ...renovation, readOnly: true }),
 		).toBeInstanceOf(Error);
+		// Pending bank charges may be claimed as a recurring occurrence.
 		expect(
 			subscriptionSourceError({ ...renovation, pending: true }),
-		).toBeInstanceOf(Error);
+		).toBeNull();
 	});
 });

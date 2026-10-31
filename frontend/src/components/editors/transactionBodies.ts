@@ -257,10 +257,12 @@ export function claimPostingBody(
 	return {
 		name: raw.name,
 		amount: rawAmount(raw.amount),
-		enabled: raw.enabled,
+		// A claimed pending charge now records its occurrence, so it must
+		// participate in projections; settled charges keep their stored flag.
+		enabled: raw.pending ? true : raw.enabled,
 		...(raw.sourceAccountId ? { sourceAccountId: raw.sourceAccountId } : {}),
 		destinations: raw.destinations,
-		postedTime: raw.postedTime,
+		postedTime: raw.postedTime > 0 ? raw.postedTime : raw.transactionTime,
 		transactionTime: raw.transactionTime,
 		claim: { ruleId, occurrenceDate },
 	};
