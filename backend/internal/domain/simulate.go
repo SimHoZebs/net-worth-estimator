@@ -29,15 +29,12 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	if err := requireResimulationAllowed("simulateScheduled"); err != nil {
 		return types.SimulationRun{}, err
 	}
-	transitions, err := CreateTransitionRuntime(
+	transitions := CreateTransitionRuntime(
 		request.Model,
 		request.InitialState,
 		request.StartDate,
 		request.MonteCarloSample,
 	)
-	if err != nil {
-		return types.SimulationRun{}, err
-	}
 	transactionAttempts := []types.TransactionEvent{}
 	snapshots := []types.SimulationSnapshot{}
 	transactionSequence := 0

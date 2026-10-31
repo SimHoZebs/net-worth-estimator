@@ -47,14 +47,11 @@ func lossTestModel(minBalance *float64) types.SimulationInputs {
 
 func lossTestRuntime(t *testing.T, model types.SimulationInputs, balances map[string]float64, sample *types.MonteCarloSample) *TransitionRuntime {
 	t.Helper()
-	runtime, err := CreateTransitionRuntime(model, SimulationState{
+	runtime := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
 	}, "2026-01-15", sample)
-	if err != nil {
-		t.Fatalf("create runtime: %v", err)
-	}
 	return runtime
 }
 

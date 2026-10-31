@@ -100,16 +100,12 @@ type TransitionRuntime struct {
 }
 
 // CreateTransitionRuntime clones initialState and binds model context.
-func CreateTransitionRuntime(model types.SimulationInputs, initialState SimulationState, projectionStartDate string, monteCarloSample *types.MonteCarloSample) (*TransitionRuntime, error) {
+func CreateTransitionRuntime(model types.SimulationInputs, initialState SimulationState, projectionStartDate string, monteCarloSample *types.MonteCarloSample) *TransitionRuntime {
 	accountByID := make(map[string]types.Account, len(model.Accounts))
 	accountOrder := make([]string, 0, len(model.Accounts))
-	seenAccounts := map[string]bool{}
 	for _, account := range model.Accounts {
 		accountByID[account.ID] = account
-		if !seenAccounts[account.ID] {
-			seenAccounts[account.ID] = true
-			accountOrder = append(accountOrder, account.ID)
-		}
+		accountOrder = append(accountOrder, account.ID)
 	}
 	return &TransitionRuntime{
 		State:            CloneSimulationState(initialState),
@@ -119,7 +115,7 @@ func CreateTransitionRuntime(model types.SimulationInputs, initialState Simulati
 		paymentTerms:     paymentTermsByAccount(model.PaymentTerms),
 		projectionStart:  projectionStartDate,
 		monteCarloSample: monteCarloSample,
-	}, nil
+	}
 }
 
 func (t *TransitionRuntime) observePosting(postingID string, realizedAmount float64, date string) {
