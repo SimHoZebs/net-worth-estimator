@@ -114,12 +114,29 @@ function accountFor(
 	return accounts.find((account) => account.id === id) ?? null;
 }
 
-function categoryLabel(kind: "in" | "out" | "transfer"): string {
-	return kind === "transfer"
-		? "Transfer"
-		: kind === "in"
-			? "Income"
-			: "Expense";
+function associatedAccountLabel({
+	fromAccount,
+	toAccount,
+	transaction,
+}: {
+	fromAccount: AccountRef | null;
+	toAccount: AccountRef | null;
+	transaction: AccountTransaction;
+}): string {
+	const fromFallback =
+		transaction.from && transaction.from !== "External income"
+			? transaction.from
+			: null;
+	const toFallback =
+		transaction.to && transaction.to !== "External spending"
+			? transaction.to
+			: null;
+	const names = [
+		fromAccount?.name ?? fromFallback,
+		toAccount?.name ?? toFallback,
+	].filter((name): name is string => Boolean(name));
+	const unique = [...new Set(names)];
+	return unique.join(" → ");
 }
 
 function FrequencyOptions() {
@@ -1235,7 +1252,6 @@ export function TransactionDetail({
 							onDiscard={edit.discardAndClose}
 						/>
 					)}
-					<ReadOnlyNotice savedTransaction={savedTransaction} />
 				</form>
 				{once && (
 					<TransactionAnalysisPanel
