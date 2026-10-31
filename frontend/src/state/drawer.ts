@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { useReducedMotion } from "motion/react";
 
 // Shared slide primitives for the single Drawer component: the left
@@ -86,10 +86,19 @@ export function useHorizontalSwipe({
 	onSwipeLeft?: (dx: number, origin: EventTarget | null) => void;
 	onSwipeRight?: (dx: number, origin: EventTarget | null) => void;
 }) {
-	const callbacks = useRef({ onSwipeLeft, onSwipeRight });
-	useEffect(() => {
-		callbacks.current = { onSwipeLeft, onSwipeRight };
-	});
+	// Latest callbacks through events: the gesture listeners below subscribe
+	// once per enabled lifetime and always invoke the current handlers, so a
+	// callback rerender never resets an active gesture.
+	const handleSwipeLeft = useEffectEvent(
+		(dx: number, origin: EventTarget | null) => {
+			onSwipeLeft?.(dx, origin);
+		},
+	);
+	const handleSwipeRight = useEffectEvent(
+		(dx: number, origin: EventTarget | null) => {
+			onSwipeRight?.(dx, origin);
+		},
+	);
 	useEffect(() => {
 		if (!enabled) return;
 		const MIN_DISTANCE = 64;
@@ -157,8 +166,8 @@ export function useHorizontalSwipe({
 			// direction consumes the gesture instead of the swipe handler.
 			const scroller = nearestHorizontalScroller(startTarget);
 			if (scroller && scrollerConsumes(scroller, dx)) return;
-			if (dx < 0) callbacks.current.onSwipeLeft?.(dx, startTarget);
-			else callbacks.current.onSwipeRight?.(dx, startTarget);
+			if (dx < 0) handleSwipeLeft(dx, startTarget);
+			else handleSwipeRight(dx, startTarget);
 		};
 		window.addEventListener("touchstart", onTouchStart, { passive: true });
 		window.addEventListener("touchend", onTouchEnd, { passive: true });
