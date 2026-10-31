@@ -14,14 +14,17 @@ import {
 const summaryState = vi.hoisted(() => ({
 	summary: null as unknown,
 	pending: false,
+	fetching: false,
 }));
 const balancesState = vi.hoisted(() => ({
 	accounts: [] as { id: string; name: string; kind: string; color: null }[],
 	pending: false,
+	fetching: false,
 }));
 const catalogState = vi.hoisted(() => ({
 	items: [] as { id: string; kind: string; name: string }[],
 	pending: false,
+	fetching: false,
 }));
 const statusState = vi.hoisted(() => ({ readOnly: false }));
 const writesState = vi.hoisted(() => ({
@@ -33,20 +36,22 @@ vi.mock("@/state/evaluationQueries.ts", () => ({
 	useEvaluationSummary: () => ({
 		data: summaryState.summary,
 		isPending: summaryState.pending,
-		isFetching: summaryState.pending,
+		isFetching: summaryState.pending || summaryState.fetching,
 	}),
 }));
 
 vi.mock("@/state/workspaceResources.ts", () => ({
 	useAccountBalances: () => ({
-		data: { accounts: balancesState.accounts },
+		data: balancesState.pending
+			? undefined
+			: { accounts: balancesState.accounts },
 		isPending: balancesState.pending,
-		isFetching: balancesState.pending,
+		isFetching: balancesState.pending || balancesState.fetching,
 	}),
 	useTransactionCatalog: () => ({
-		data: { items: catalogState.items },
+		data: catalogState.pending ? undefined : { items: catalogState.items },
 		isPending: catalogState.pending,
-		isFetching: catalogState.pending,
+		isFetching: catalogState.pending || catalogState.fetching,
 	}),
 	useServerStatus: () => ({ data: { readOnly: statusState.readOnly } }),
 	refreshEvaluations: vi.fn(async () => {}),
@@ -77,10 +82,13 @@ afterEach(() => {
 	cleanup();
 	summaryState.summary = null;
 	summaryState.pending = false;
+	summaryState.fetching = false;
 	balancesState.accounts = [];
 	balancesState.pending = false;
+	balancesState.fetching = false;
 	catalogState.items = [];
 	catalogState.pending = false;
+	catalogState.fetching = false;
 	statusState.readOnly = false;
 	writesState.saved.length = 0;
 	writesState.result = true;
@@ -207,6 +215,24 @@ describe("IndependenceConfigure", () => {
 		expect(view.getByText("Loading configuration…")).toBeTruthy();
 	});
 
+	it("waits for initial funding data after the summary arrives", () => {
+		seedServerState();
+		balancesState.pending = true;
+		catalogState.pending = true;
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		expect(view.getByText("Loading configuration…")).toBeTruthy();
+		expect(view.queryByText("No accounts available.")).toBeNull();
+		expect(view.queryByText("No income sources available.")).toBeNull();
+		balancesState.pending = false;
+		view.rerender(<IndependenceConfigure instanceId="fi-1" />);
+		expect(view.getByText("Loading configuration…")).toBeTruthy();
+		catalogState.pending = false;
+		view.rerender(<IndependenceConfigure instanceId="fi-1" />);
+		expect(view.queryByText("Loading configuration…")).toBeNull();
+		expect(view.getByRole("button", { name: /Brokerage/ })).toBeTruthy();
+		expect(view.getByRole("button", { name: /Salary/ })).toBeTruthy();
+	});
+
 	it("edits minimum, duration, and funding sources then saves", async () => {
 		seedServerState();
 		const view = render(<IndependenceConfigure instanceId="fi-1" />);
@@ -261,5 +287,85 @@ describe("IndependenceConfigure", () => {
 		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
 		await view.findByText("The configuration could not be saved. Try again.");
 		expect(view.queryByText("Saved. Updating projection…")).toBeNull();
+	});
+
+	it("retains dirty fields when the row write fails", async () => {
+		seedServerState();
+		writesState.result = false;
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		const minimum = view.getByLabelText(
+			"Minimum net worth ($)",
+		) as HTMLInputElement;
+		fireEvent.change(minimum, { target: { value: "5000" } });
+		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
+		await view.findByText("The configuration could not be saved. Try again.");
+		expect(minimum.value).toBe("5000");
+	});
+
+	it("keeps dirty fields during unrelated background refreshes", () => {
+		seedServerState();
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		const minimum = view.getByLabelText(
+			"Minimum net worth ($)",
+		) as HTMLInputElement;
+		fireEvent.change(minimum, { target: { value: "5000" } });
+		expect(minimum.value).toBe("5000");
+		// An unrelated query refetch must not wipe the in-progress edit.
+		balancesState.fetching = true;
+		catalogState.fetching = true;
+		view.rerender(<IndependenceConfigure instanceId="fi-1" />);
+		expect(minimum.value).toBe("5000");
+		expect(view.queryByText("Loading configuration…")).toBeNull();
+		balancesState.fetching = false;
+		catalogState.fetching = false;
+		view.rerender(<IndependenceConfigure instanceId="fi-1" />);
+		expect(minimum.value).toBe("5000");
+	});
+
+	it("resets to the newly saved config when it arrives", async () => {
+		seedServerState();
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		const minimum = view.getByLabelText(
+			"Minimum net worth ($)",
+		) as HTMLInputElement;
+		fireEvent.change(minimum, { target: { value: "5000" } });
+		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
+		await view.findByText("Saved. Updating projection…");
+		// The saved config echoes back from the server with a new identity,
+		// which explicitly remounts a fresh form.
+		const saved = writesState.saved[0]?.input as { config: unknown };
+		summaryState.summary = {
+			...(summaryState.summary as Record<string, unknown>),
+			evaluations: {
+				financialIndependence: [
+					{
+						instanceId: "fi-1",
+						name: "Financial independence",
+						enabled: true,
+						config: saved.config,
+					},
+				],
+			},
+		} as typeof summaryState.summary;
+		view.rerender(<IndependenceConfigure instanceId="fi-1" />);
+		expect(
+			(view.getByLabelText("Minimum net worth ($)") as HTMLInputElement).value,
+		).toBe("5000");
+		expect(view.queryByText("Saved. Updating projection…")).toBeNull();
+	});
+
+	it("clamps the spending test duration when saving", async () => {
+		seedServerState();
+		const view = render(<IndependenceConfigure instanceId="fi-1" />);
+		const years = view.getByLabelText(
+			"Spending test duration (years)",
+		) as HTMLInputElement;
+		fireEvent.change(years, { target: { value: "100" } });
+		fireEvent.click(view.getByRole("button", { name: "Save configuration" }));
+		await view.findByText("Saved. Updating projection…");
+		const input = writesState.saved[0]?.input as {
+			config: { evaluationYears: number };
+		};
+		expect(input.config.evaluationYears).toBe(50);
 	});
 });
