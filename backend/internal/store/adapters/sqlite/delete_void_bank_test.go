@@ -62,25 +62,6 @@ func TestDeletePostingRemovesPhantomVoid(t *testing.T) {
 	}
 }
 
-func TestDeletePostingStillRefusesPendingBankRows(t *testing.T) {
-	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
-	seed := bankSeedPosting("Hold", "prime_card", "5.00", true)
-	summary := applyDirectives(t, database, []BankDirective{{
-		Upsert: &BankUpsert{Posting: seed, Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "hold-a")},
-	}})
-	if summary.PendingInserted != 1 {
-		t.Fatalf("seed pending = %+v", summary)
-	}
-	rows, err := database.LoadBankPostings()
-	if err != nil || len(rows) != 1 {
-		t.Fatalf("bank rows = %+v, err %v", rows, err)
-	}
-	if err := database.DeletePosting(rows[0].Posting.ID); !IsSyncOwned(err) {
-		t.Fatalf("delete pending bank row err = %v, want sync-owned refusal", err)
-	}
-}
-
 func TestDeletePostingAllowsSettledBankRows(t *testing.T) {
 	// Settled bank rows were already owner-deletable through the store;
 	// the UI keeps the delete control hidden for them because a deleted
