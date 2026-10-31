@@ -1,58 +1,75 @@
-import { useEffect } from "react";
-import { getUserScope } from "@/auth/resourceScope.ts";
+import { useEffect, useSyncExternalStore } from "react";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
-	financialQueryFilter,
-	serverQueryClient,
-} from "@/state/serverQuery.ts";
+	getAppliedSyncStamp,
+	markSyncApplied,
+	refreshWorkspaceAfterSync,
+} from "@/state/syncWorkspaceRefresh.ts";
 import {
 	getServerStatus,
-	reloadWorkspace,
 	statusOptions,
 	workspaceIsBusy,
 	userResourceKey,
 } from "@/state/workspaceResources.ts";
 
 export function useWorkspaceSyncMonitor(enabled: boolean): void {
-	// Keyed on the scope epoch: the caller re-renders on scope change, so a
-	// ready-to-ready user switch re-runs the effect and recaptures scope.
-	// Keying on `enabled` alone left a stale capture whose guard bailed on
-	// every poll after a user switch.
-	const scopeKey = getUserScope().key;
+	// Subscribe directly to the user scope so a ready-to-ready user switch
+	// re-runs the effect without requiring the caller to rerender.
+	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scopeKey = scope.status === "ready" ? scope.key : "pending";
 	useEffect(() => {
 		if (!enabled) return;
-		const scope = getUserScope();
+		const active = getUserScope();
+		if (active.status !== "ready") return;
+		// The applied baseline lives outside the shared status cache: a manual
+		// sync's explicit refresh marks it, so a later poll with an
+		// already-refreshed status does not reload twice, and a status refetch
+		// can never consume a change before it is applied.
+		if (getAppliedSyncStamp(active) === undefined)
+			markSyncApplied(active, getServerStatus(active)?.lastSyncAt ?? null);
 		const cache = serverQueryClient();
+		// Effect-local lifecycle: cleanup on disable, unmount, or scope change
+		// cancels in-flight work so it can never apply to a new scope.
+		let cancelled = false;
+		let checking = false;
 		const check = async () => {
-			if (
-				scope !== getUserScope() ||
-				document.visibilityState === "hidden" ||
-				workspaceIsBusy() ||
-				cache.isFetching({ queryKey: userResourceKey("status", scope) })
-			)
+			if (cancelled || checking) return;
+			const current = getUserScope();
+			if (current.status !== "ready" || current !== active) return;
+			if (document.visibilityState === "hidden") return;
+			// While the workspace is busy a poll retains its baseline instead
+			// of consuming the change, so a later poll retries it.
+			if (workspaceIsBusy()) return;
+			if (cache.isFetching({ queryKey: userResourceKey("status", current) }))
 				return;
-			const before = getServerStatus(scope)?.lastSyncAt ?? "";
+			checking = true;
 			try {
-				const status = await cache.fetchQuery({
-					...statusOptions(scope),
-					staleTime: 0,
-				});
+				if (getAppliedSyncStamp(current) === undefined)
+					markSyncApplied(
+						current,
+						getServerStatus(current)?.lastSyncAt ?? null,
+					);
+				const status = await cache
+					.fetchQuery({
+						...statusOptions(current),
+						staleTime: 0,
+					})
+					.catch(() => null);
 				if (
-					scope !== getUserScope() ||
-					workspaceIsBusy() ||
-					before === (status.lastSyncAt ?? "")
+					cancelled ||
+					!status ||
+					current !== active ||
+					current !== getUserScope()
 				)
 					return;
-				const filter = financialQueryFilter(scope.key);
-				await cache.invalidateQueries({ ...filter, refetchType: "none" });
-				await reloadWorkspace();
-				if (scope === getUserScope())
-					await cache.refetchQueries({
-						...filter,
-						type: "active",
-						stale: true,
-					});
-			} catch {
-				/* A failed poll retains Query's last good data. */
+				// A failed poll retains Query's last good data.
+				const next = status.lastSyncAt ?? null;
+				if (next === getAppliedSyncStamp(current)) return;
+				if (workspaceIsBusy()) return;
+				await refreshWorkspaceAfterSync(current, next);
+			} finally {
+				checking = false;
 			}
 		};
 		const onResume = () => void check();
@@ -60,6 +77,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 		window.addEventListener("online", onResume);
 		document.addEventListener("visibilitychange", onResume);
 		return () => {
+			cancelled = true;
 			window.clearInterval(timer);
 			window.removeEventListener("online", onResume);
 			document.removeEventListener("visibilitychange", onResume);

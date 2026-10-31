@@ -6,6 +6,7 @@ import {
 	getCheckpoints,
 	getServerModel,
 	modelOptions,
+	reloadWorkspace,
 	resolversOptions,
 	userResourceKey,
 } from "./workspaceResources.ts";
@@ -115,5 +116,11 @@ describe("direct Query ownership", () => {
 		finish(server.ok({ model: null, issues: [], revision: "retired" }));
 		await Promise.resolve();
 		expect(getServerModel()?.revision).toBe("current");
+	});
+	it("reports whether the scoped model fetch succeeded", async () => {
+		const server = stubTestServer();
+		expect(await reloadWorkspace()).toBe(true);
+		server.failModelOnce(new Error("boom"));
+		expect(await reloadWorkspace()).toBe(false);
 	});
 });

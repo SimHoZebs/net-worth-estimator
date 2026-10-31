@@ -18,6 +18,7 @@ import {
 } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
+import { refreshWorkspaceAfterSync } from "@/state/syncWorkspaceRefresh.ts";
 import { userResourceKey } from "@/state/workspaceResources.ts";
 
 export function syncCredentialKey(scope = getUserScope()) {
@@ -108,7 +109,7 @@ async function refreshSyncData(scope: UserScope) {
 		queryKey: syncLinksKey(scope),
 		refetchType: "active",
 	});
-	void refreshStatus(scope);
+	await refreshStatus(scope);
 }
 
 export async function refreshSyncSettings(force = false): Promise<void> {
@@ -212,9 +213,11 @@ export async function disconnectSyncKey(): Promise<boolean> {
 // triggerSyncNow runs one manual Bridge sync. Server guards apply: a recent
 // trigger or post-429 blackout returns 429, a concurrent run returns 409,
 // and a missing credential returns 503. Failures surface the server message
-// through the shared error notice; success refreshes links and status so
-// the new lastSyncAt and quota propagate (the sync monitor reloads the
-// workspace once the stamp flips).
+// through the shared error notice; success explicitly refreshes links,
+// status, the workspace, and this scope's financial queries before completing.
+// The workspace refresh is explicit because the status refresh lands the new
+// lastSyncAt in the shared cache before the scheduled monitor polls, so the
+// monitor alone would miss the change permanently.
 export async function triggerSyncNow(): Promise<boolean> {
 	const scope = getUserScope();
 	const result = await runMutation<unknown>(
@@ -225,6 +228,9 @@ export async function triggerSyncNow(): Promise<boolean> {
 	if (!result) return false;
 	if (scope !== getUserScope()) return false;
 	await refreshSyncData(scope);
+	if (scope !== getUserScope()) return false;
+	await refreshWorkspaceAfterSync(scope);
+	if (scope !== getUserScope()) return false;
 	dismissKey("sync-trigger");
 	return true;
 }

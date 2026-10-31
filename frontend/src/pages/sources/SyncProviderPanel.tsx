@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Landmark, RefreshCw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { buttonStyles } from "../../components/buttonStyles.ts";
@@ -44,14 +44,41 @@ export function SyncProviderPanel({
 	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-	const headingRef = useRef<HTMLHeadingElement>(null);
-	const wasConfigured = useRef(configured);
-	useEffect(() => {
-		// The credential refetch lands after the onboarding and disconnect
-		// forms report, so move focus once the next container mounts.
-		if (configured !== wasConfigured.current) headingRef.current?.focus();
-		wasConfigured.current = configured;
-	}, [configured]);
+	// One-time focus owned by the explicit successful connect/disconnect
+	// actions. The credential cache updates before the form reports success,
+	// so the target heading may mount before or after the action arms focus:
+	// each heading reports its node, arming focuses an already-mounted target
+	// at once, and mounting focuses an armed target once. Initial and
+	// background credential loads never arm it, so they never steal focus.
+	const pendingFocus = useRef<"connected" | "connect" | null>(null);
+	const connectedNode = useRef<HTMLHeadingElement | null>(null);
+	const connectNode = useRef<HTMLHeadingElement | null>(null);
+	const focusConnectedHeading = useCallback(
+		(node: HTMLHeadingElement | null) => {
+			connectedNode.current = node;
+			if (node && pendingFocus.current === "connected") {
+				pendingFocus.current = null;
+				node.focus();
+			}
+		},
+		[],
+	);
+	const focusConnectHeading = useCallback((node: HTMLHeadingElement | null) => {
+		connectNode.current = node;
+		if (node && pendingFocus.current === "connect") {
+			pendingFocus.current = null;
+			node.focus();
+		}
+	}, []);
+	const claimSyncFocus = useCallback((target: "connected" | "connect") => {
+		pendingFocus.current = target;
+		const node =
+			target === "connected" ? connectedNode.current : connectNode.current;
+		if (node) {
+			pendingFocus.current = null;
+			node.focus();
+		}
+	}, []);
 	const since = formatSyncTime(credential.data?.updatedAt);
 	const lastSynced = formatSyncTime(status.data?.lastSyncAt);
 	const syncUnavailable = status.data?.syncConfigured === false;
@@ -82,6 +109,7 @@ export function SyncProviderPanel({
 		setBusy(false);
 		setConfirmingDisconnect(false);
 		if (ok) {
+			claimSyncFocus("connect");
 			setMessage(
 				"SimpleFIN disconnected. Your accounts and imported history are kept.",
 			);
@@ -93,7 +121,7 @@ export function SyncProviderPanel({
 			{!configured && (
 				<header className="flex flex-wrap items-start justify-between gap-4">
 					<h2
-						ref={headingRef}
+						ref={focusConnectHeading}
 						tabIndex={-1}
 						className="m-0 text-xl font-semibold sm:text-2xl"
 					>
@@ -128,7 +156,7 @@ export function SyncProviderPanel({
 									</span>
 									<div className="min-w-0">
 										<h3
-											ref={headingRef}
+											ref={focusConnectedHeading}
 											tabIndex={-1}
 											className="m-0 flex items-center gap-2 text-lg"
 										>
@@ -241,6 +269,7 @@ export function SyncProviderPanel({
 						<SyncOnboarding
 							readOnly={readOnly}
 							onConnected={() => {
+								claimSyncFocus("connected");
 								setMessage("SimpleFIN connected.");
 							}}
 						/>

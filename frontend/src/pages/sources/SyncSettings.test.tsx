@@ -1,4 +1,5 @@
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -7,8 +8,20 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../../mocks/resource.ts";
-import { resetServerQueryCache } from "../../state/serverQuery.ts";
-import { resetSyncSettingsClient } from "../../state/syncSettings.ts";
+import {
+	resetServerQueryCache,
+	serverQueryClient,
+} from "../../state/serverQuery.ts";
+import { getUserScope } from "../../auth/resourceScope.ts";
+import { userResourceKey } from "../../state/workspaceResources.ts";
+import {
+	refreshSyncSettings,
+	resetSyncSettingsClient,
+} from "../../state/syncSettings.ts";
+import {
+	getAppliedSyncStamp,
+	resetSyncWorkspaceRefresh,
+} from "../../state/syncWorkspaceRefresh.ts";
 import { SyncSettings } from "./SyncSettings.tsx";
 
 const accounts = [
@@ -31,6 +44,7 @@ function stubApi(state: {
 	throttled?: boolean;
 	lastSyncAt?: string;
 	syncEnabled?: boolean;
+	holdStatus?: Promise<void>;
 }) {
 	const jsonHeaders = () => {
 		const headers = new Headers({ "content-type": "application/json" });
@@ -134,7 +148,8 @@ function stubApi(state: {
 				{ headers: jsonHeaders() },
 			);
 		}
-		if (path === "/v1/status")
+		if (path === "/v1/status") {
+			await state.holdStatus;
 			return new Response(
 				JSON.stringify(
 					state.configured
@@ -154,6 +169,58 @@ function stubApi(state: {
 				),
 				{ headers: jsonHeaders() },
 			);
+		}
+		// A successful manual sync explicitly refreshes the workspace, so the
+		// stub serves those reads with empty-but-valid payloads.
+		if (method === "GET") {
+			if (path === "/v1/financial-model") {
+				record();
+				return new Response(
+					JSON.stringify({ model: null, issues: [], revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+			if (path === "/v1/amount-presets") {
+				record();
+				return new Response(JSON.stringify({ presets: [] }), {
+					headers: jsonHeaders(),
+				});
+			}
+			if (path.startsWith("/v1/accounts/balances")) {
+				record();
+				return new Response(
+					JSON.stringify({ accounts: [], asOf: "", revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+			if (path.startsWith("/v1/transactions/catalog")) {
+				record();
+				return new Response(JSON.stringify({ items: [], revision: "test" }), {
+					headers: jsonHeaders(),
+				});
+			}
+			if (path.startsWith("/v1/transactions")) {
+				record();
+				return new Response(
+					JSON.stringify({ transactions: [], revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+			if (path.startsWith("/v1/evaluations/summary")) {
+				record();
+				return new Response(
+					JSON.stringify({ evaluations: {}, revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+			if (path.startsWith("/v1/checkpoints")) {
+				record();
+				return new Response(
+					JSON.stringify({ checkpoints: [], revision: "test" }),
+					{ headers: jsonHeaders() },
+				);
+			}
+		}
 		throw new Error(`unexpected request ${init?.method ?? "GET"} ${path}`);
 	});
 	vi.stubGlobal("fetch", fetcher);
@@ -163,6 +230,7 @@ function stubApi(state: {
 beforeEach(() => {
 	acceptTestResource();
 	resetServerQueryCache();
+	resetSyncWorkspaceRefresh();
 	vi.unstubAllGlobals();
 });
 
@@ -170,6 +238,7 @@ afterEach(() => {
 	cleanup();
 	resetSyncSettingsClient();
 	resetServerQueryCache();
+	resetSyncWorkspaceRefresh();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
@@ -462,12 +531,16 @@ it("syncs now through the Sync now button", async () => {
 });
 
 it("shows an inline error when sync is throttled", async () => {
-	stubApi({ configured: true, links: [], throttled: true });
+	const requests = stubApi({ configured: true, links: [], throttled: true });
 	render(<SyncSettings accounts={accounts} readOnly={false} />);
 	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
 	expect(
 		await screen.findByText(/Could not sync now\. Check the connection/),
 	).toBeTruthy();
+	// A failed trigger refreshes nothing.
+	expect(
+		requests.some((request) => request.path === "/v1/financial-model"),
+	).toBe(false);
 });
 
 it("disables Sync now when read-only", async () => {
@@ -480,4 +553,105 @@ it("disables Sync now when read-only", async () => {
 			})) as HTMLButtonElement
 		).disabled,
 	).toBe(true);
+});
+
+it("refreshes the workspace after a successful manual sync", async () => {
+	const requests = stubApi({ configured: true, links: [] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
+	await waitFor(() =>
+		expect(screen.getByRole("status").textContent).toMatch(/Sync complete/),
+	);
+	// The manual action owns the workspace refresh: it must not wait for the
+	// scheduled monitor to notice the already-refreshed status.
+	await waitFor(() => {
+		expect(
+			requests.some((request) => request.path === "/v1/financial-model"),
+		).toBe(true);
+	});
+});
+
+it("does not move focus on the initial credential load", async () => {
+	stubApi({ configured: true, links: [] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	await screen.findByText(/Connected since/);
+	expect(document.activeElement).toBe(document.body);
+});
+
+it("awaits the manual status refresh before applying its sync stamp", async () => {
+	const state: {
+		configured: boolean;
+		lastSyncAt: string;
+		holdStatus?: Promise<void>;
+	} = {
+		configured: true,
+		lastSyncAt: "before",
+	};
+	const requests = stubApi(state);
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	await screen.findByText(/19 out of 24 syncs available/);
+	let finishStatus!: () => void;
+	state.holdStatus = new Promise<void>((resolve) => {
+		finishStatus = resolve;
+	});
+	state.lastSyncAt = "after";
+	fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+	await waitFor(() =>
+		expect(
+			serverQueryClient().isFetching({ queryKey: userResourceKey("status") }),
+		).toBe(1),
+	);
+	expect(
+		requests.some((request) => request.path === "/v1/financial-model"),
+	).toBe(false);
+	finishStatus();
+	await waitFor(() =>
+		expect(screen.getByRole("status").textContent).toMatch(/Sync complete/),
+	);
+	expect(getAppliedSyncStamp(getUserScope())).toBe("after");
+});
+
+it("moves focus to the connected heading after connecting", async () => {
+	stubApi({ configured: false });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	fireEvent.change(
+		await screen.findByPlaceholderText("Paste your setup token"),
+		{
+			target: { value: "dG9rZW4=" },
+		},
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
+	const heading = await screen.findByRole("heading", {
+		name: /SimpleFIN.*Connected/,
+	});
+	expect(document.activeElement).toBe(heading);
+});
+
+it("moves focus to the connect heading after disconnecting", async () => {
+	stubApi({ configured: true, links: [] });
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	await screen.findByText(/Connected since/);
+	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+	const confirms = await screen.findAllByRole("button", {
+		name: "Confirm disconnect",
+	});
+	fireEvent.click(confirms[confirms.length - 1]!);
+	const heading = await screen.findByRole("heading", {
+		name: "Connect bank accounts",
+	});
+	expect(document.activeElement).toBe(heading);
+});
+
+it("does not steal focus when the connection appears from a background load", async () => {
+	const state = { configured: false };
+	stubApi(state);
+	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	await screen.findByPlaceholderText("Paste your setup token");
+	const focused = document.activeElement;
+	state.configured = true;
+	await act(async () => {
+		await refreshSyncSettings(true);
+	});
+	await screen.findByText(/Connected since/);
+	expect(document.activeElement).toBe(focused);
 });
