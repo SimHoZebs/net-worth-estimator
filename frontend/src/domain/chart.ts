@@ -1,6 +1,6 @@
 import type { FundingGap } from "./fundingGaps.ts";
 import { summarizeFundingGap } from "./fundingGaps.ts";
-import { shiftDate } from "./format.ts";
+import { monthDay, shiftDate } from "./format.ts";
 import type { Projection, RangeResult } from "./result.ts";
 
 export interface LineChartGeometry {
@@ -319,6 +319,10 @@ export function trailingDailyPoints(
 	);
 	const start = shiftDate({ date: end, days: -(days - 1) });
 	const result: Projection["points"] = [];
+	// Balances forward-fill alongside totals: each day carries the latest
+	// known balance per account, so sparse snapshot rows expand into a
+	// continuous per-account series for the contribution stack.
+	const balances: Record<string, number> = {};
 	for (let offset = 0; offset < days; offset++) {
 		const date = shiftDate({ date: start, days: offset });
 		let current = sorted[0]!;
@@ -326,7 +330,10 @@ export function trailingDailyPoints(
 			if (point.date.slice(0, 10) <= date) current = point;
 			else break;
 		}
-		result.push({ date, total: current.total, balances: {} });
+		for (const [accountId, balance] of Object.entries(current.balances)) {
+			balances[accountId] = balance;
+		}
+		result.push({ date, total: current.total, balances: { ...balances } });
 	}
 	return result;
 }
@@ -357,6 +364,65 @@ export function nearestPointIndex(
 	}
 	return best;
 }
+export interface StackedAccountPoint {
+	day: string;
+	account: string;
+	balance: number;
+}
+
+export interface StackedAccountSeries {
+	id: string;
+	name: string;
+	endBalance: number;
+	/** Position in the full account order, so colors survive window changes. */
+	colorIndex: number;
+}
+
+/**
+ * Long-form per-account rows for the contribution stack, plus one series
+ * entry per account with a nonzero presence in the window. Days keep full
+ * labels; the chart axis thins them. The stack mirrors the line plot's
+ * window: every account series shares the same daily domain.
+ */
+export function stackedAccountRows({
+	points,
+	accounts,
+}: {
+	points: ReadonlyArray<Projection["points"][number]>;
+	accounts: ReadonlyArray<{ id: string; name: string }>;
+}): { rows: StackedAccountPoint[]; series: StackedAccountSeries[] } {
+	const present = new Set<string>();
+	for (const point of points) {
+		for (const [accountId, balance] of Object.entries(point.balances)) {
+			if (balance !== 0) present.add(accountId);
+		}
+	}
+	const ordered = accounts.filter((account) => present.has(account.id));
+	const names = new Map(ordered.map((account) => [account.id, account.name]));
+	const index = new Map(
+		accounts.map((account, position) => [account.id, position]),
+	);
+	const rows: StackedAccountPoint[] = [];
+	for (const point of points) {
+		const day = monthDay(point.date);
+		for (const account of ordered) {
+			rows.push({
+				day,
+				account: names.get(account.id) ?? account.id,
+				balance: point.balances[account.id] ?? 0,
+			});
+		}
+	}
+	const last = points.at(-1);
+	const series = ordered.map((account) => ({
+		id: account.id,
+		name: names.get(account.id) ?? account.id,
+		endBalance: last?.balances[account.id] ?? 0,
+		colorIndex: index.get(account.id) ?? 0,
+	}));
+	return { rows, series };
+}
+
 export function projectionCsv(rows: ChartModel["rows"]) {
 	return [
 		"Date,Base case,10th percentile,Median,90th percentile",
