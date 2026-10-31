@@ -424,7 +424,9 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 				"Posting sourceAccountId must not appear in destinations.",
 				[]any{"postings", index}...)
 		}
-		if posting.PostedTime <= 0 {
+		// Pending seeds and void holds carry no posted date: the bridge
+		// reports Posted == 0 until a charge posts.
+		if posting.PostedTime <= 0 && !posting.Pending && !posting.Void {
 			addIssue(issues, types.SeverityError, "posting.postedTime.invalid",
 				fmt.Sprintf("Posting '%s' posted time must be positive Unix seconds.", posting.ID),
 				pathWithField([]any{"postings", index}, "postedTime")...)

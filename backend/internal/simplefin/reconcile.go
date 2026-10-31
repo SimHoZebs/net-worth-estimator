@@ -29,29 +29,85 @@ func postingAmountCents(posting types.Posting) (int64, bool) {
 	return int64(math.Round(value * 100)), true
 }
 
-func settleMatch(stale types.Posting, candidate store.SyncPosting) bool {
+// rowOutflow reports whether a bank posting moves money out of its mirror
+// account. Bank rows never carry both sides, so the source leg alone
+// distinguishes an outflow authorization from an inflow one.
+func rowOutflow(posting types.Posting) bool {
+	return posting.SourceAccountID != nil
+}
+
+// settleJoinKeys verifies the non-amount join between a stale bank row and
+// a settled candidate: same mirror account, same direction, parseable
+// amounts, post within a week of the authorization, and overlapping names.
+// It returns both amounts in cents for the caller's amount comparison.
+func settleJoinKeys(stale types.Posting, candidate store.SyncPosting) (staleCents, candidateCents int64, ok bool) {
 	staleAccount, ok := rowAccount(stale)
 	if !ok {
-		return false
+		return 0, 0, false
 	}
 	candidateAccount, ok := rowAccount(candidate.Posting)
 	if !ok || staleAccount != candidateAccount {
-		return false
+		return 0, 0, false
 	}
-	staleCents, ok := postingAmountCents(stale)
+	if rowOutflow(stale) != rowOutflow(candidate.Posting) {
+		return 0, 0, false
+	}
+	staleCents, ok = postingAmountCents(stale)
 	if !ok {
-		return false
+		return 0, 0, false
 	}
-	candidateCents, ok := postingAmountCents(candidate.Posting)
-	if !ok || staleCents != candidateCents {
-		return false
+	candidateCents, ok = postingAmountCents(candidate.Posting)
+	if !ok || candidateCents <= 0 {
+		return 0, 0, false
 	}
 	gap := candidate.TransactionTime - stale.TransactionTime
 	if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
-		return false
+		return 0, 0, false
 	}
 	a, b := strings.ToUpper(strings.TrimSpace(candidate.Name)), strings.ToUpper(strings.TrimSpace(stale.Name))
-	return strings.Contains(a, b) || strings.Contains(b, a)
+	if !strings.Contains(a, b) && !strings.Contains(b, a) {
+		return 0, 0, false
+	}
+	return staleCents, candidateCents, true
+}
+
+func settleMatch(stale types.Posting, candidate store.SyncPosting) bool {
+	staleCents, candidateCents, ok := settleJoinKeys(stale, candidate)
+	return ok && staleCents == candidateCents
+}
+
+// settleTipBounds bounds a posted total against its authorization: tips and
+// final-amount adjustments move a charge up or down by a bounded fraction,
+// capped absolutely so a small auth never joins a large unrelated charge.
+// Zero-amount auths (card checks) never join: they vanish on their own.
+func settleTipBounds(staleCents int64) (minCents, maxCents int64, ok bool) {
+	if staleCents <= 0 {
+		return 0, 0, false
+	}
+	tol := staleCents / 4
+	if tol < 300 {
+		tol = 300
+	}
+	if tol > 5000 {
+		tol = 5000
+	}
+	return staleCents - tol, staleCents + tol, true
+}
+
+// settleMatchTolerant extends the exact join with tip-bounded amounts: a
+// restaurant auth posts higher with the tip, an Instacart final posts near
+// its estimate. Exact matches always qualify. Near matches still require a
+// unique candidate, enforced by the caller's ambiguity guard.
+func settleMatchTolerant(stale types.Posting, candidate store.SyncPosting) bool {
+	staleCents, candidateCents, ok := settleJoinKeys(stale, candidate)
+	if !ok {
+		return false
+	}
+	if staleCents == candidateCents {
+		return true
+	}
+	minCents, maxCents, ok := settleTipBounds(staleCents)
+	return ok && candidateCents >= minCents && candidateCents <= maxCents
 }
 
 // rowAccount returns the model account a bank posting touches.
@@ -78,13 +134,15 @@ func candidateKey(item store.SyncPosting) store.BankKey {
 
 // Reconcile translates one mapped snapshot plus loaded bank rows into store
 // directives. It owns every SimpleFIN lifecycle decision: pending items
-// upsert by key, vanished pending or void rows convert on a unique strict
-// posted match or void otherwise, and unmatched posted charges insert.
-// Only this provider's rows and keys participate; other providers' bank
-// rows are invisible to it. Covered limits stale handling to resolved
+// upsert by key, vanished pending or void rows convert on a unique
+// tip-bounded posted match or void otherwise, and unmatched posted charges
+// insert. Only this provider's rows and keys participate; other providers'
+// bank rows are invisible to it. Covered limits stale handling to resolved
 // accounts so unlinked accounts' rows are never touched. A candidate whose
 // key is already recorded is already imported and never reprocesses, so
-// repeat feeds are stable no-ops.
+// repeat feeds are stable no-ops. Tip-bounded matching applies only to
+// pending lifecycle transitions; the settled-to-settled duplicate check
+// stays exact so near-amount repeats never suppress a genuine second charge.
 func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
@@ -141,7 +199,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		}
 		match := -1
 		for i, candidate := range settled {
-			if used[i] || recorded(candidate) || !settleMatch(row.Posting, candidate) {
+			if used[i] || recorded(candidate) || !settleMatchTolerant(row.Posting, candidate) {
 				continue
 			}
 			if match != -1 {
@@ -173,16 +231,18 @@ present:
 		}
 		// A candidate matching live pending values defers: the pending
 		// row converts when it vanishes instead of duplicating now.
+		// Tip-bounded amounts defer like exact ones so a tipped total
+		// waits for its authorization instead of inserting beside it.
 		deferred := false
 		for _, item := range pending {
-			if settleMatch(item.Posting, candidate) {
+			if settleMatchTolerant(item.Posting, candidate) {
 				deferred = true
 				break
 			}
 		}
 		if !deferred {
 			for id := range seen {
-				if row := byID[id]; row.Posting.Pending && settleMatch(row.Posting, candidate) {
+				if row := byID[id]; row.Posting.Pending && settleMatchTolerant(row.Posting, candidate) {
 					deferred = true
 					break
 				}
@@ -192,8 +252,10 @@ present:
 			continue
 		}
 		// A candidate matching an existing settled bank row is already
-		// imported. Void rows never suppress: the void record stays and
-		// the posted charge inserts as its own row.
+		// imported. The check stays exact: a near-amount repeat at the
+		// same merchant is a genuine second charge, not a repost.
+		// Void rows never suppress: the void record stays and the
+		// posted charge inserts as its own row.
 		for _, row := range bank {
 			if row.Posting.Source != store.SourceSimpleFIN {
 				continue

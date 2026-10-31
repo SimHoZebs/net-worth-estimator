@@ -115,11 +115,20 @@ func (s *sqliteStore) DeletePosting(id string) error {
 		if err != nil {
 			return err
 		}
-		if !lifecycle.ownerEditable() {
+		// Owner rows are always removable. A void bank-owned row is removable
+		// too: it moves nothing in the replay, and its bridge key is already
+		// gone from the feed (vanished rows are reconciled from absence), so
+		// there is nothing for a later sync to rejoin. Only pending rows
+		// stay sync-owned here: pending seeds refresh in place on every feed.
+		// (Settled rows stay deletable at the store but hidden in the UI:
+		// deleting one cascades its sync keys, and the key stays in later
+		// feeds, so the next sync would re-import it under a new ID.)
+		voidBankRow := lifecycle.source != SourceUser && lifecycle.source != "" && !lifecycle.pending && lifecycle.void
+		if !lifecycle.ownerEditable() && !voidBankRow {
 			return SyncOwned(id)
 		}
-		// Bank sync keys survive as tombstones: a deleted bank row is never
-		// re-imported by later snapshots.
+		// Sync keys cascade with the row: posting_sync_keys references
+		// postings ON DELETE CASCADE.
 		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND user_id = :user_id`, id); err != nil {
 			return err
 		}
@@ -133,8 +142,9 @@ func (s *sqliteStore) MovePosting(id, beforeID string) error {
 
 // ConvertPostingToRule moves one posting across to a recurrence rule in a
 // single transaction. The entity ID stays claimed, the rule appends at the
-// end of the execution order. Sync-owned bank rows stay put: convert, like
-// delete, refuses live pending and void rows.
+// end of the execution order. Sync-owned bank rows stay put: convert refuses
+// live pending and void rows. (Delete instead allows removing a void bank
+// row; see DeletePosting.)
 func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error) {
 	rule.ID = postingID
 	err := withRowTx(s.db, func(tx *userTx) error {

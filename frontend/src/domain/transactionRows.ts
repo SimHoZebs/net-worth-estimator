@@ -117,7 +117,12 @@ export function transactionToDisplay(
 			typeof claim?.occurrenceDate === "string" && claim.occurrenceDate
 				? claim.occurrenceDate
 				: null,
-		postedDate: once ? settledDayOf(extra.postedTime) : null,
+		// Neither pending holds nor vanished holds have posted: legacy
+		// rows may still carry a fabricated sync-time posted instant.
+		postedDate:
+			once && extra.pending !== true && extra.void !== true
+				? settledDayOf(extra.postedTime)
+				: null,
 		pending: extra.pending === true,
 		void: extra.void === true,
 		syncOwned: row.syncOwned === true,

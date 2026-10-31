@@ -309,7 +309,12 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						kind: "posting",
 						frequency: "once",
 						syncOwned,
-						readOnly: syncOwned,
+						// Only lifecycle bank rows stay sync-owned: pending
+						// seeds refresh in place and voids convert. Settled
+						// bank rows are write-stable after import.
+						readOnly:
+							syncOwned &&
+							(posting.pending === true || posting.void === true),
 					});
 				}
 			}
