@@ -135,11 +135,14 @@ func convert(tx *sql.Tx) (int, error) {
 	if _, err := tx.Exec(purchaseSchema); err != nil {
 		return 0, err
 	}
-	rows, err := tx.Query(`SELECT p.user_id, p.id, p.position, p.name, p.source_account_id, p.destinations, p.amount_resolution_json, p.transaction_time, p.posted_time, q.priority, p.enabled,
-		p.source, p.pending, p.void, p.fulfills_rule_id,
+	rows, err := tx.Query(`SELECT p.user_id, p.id, s.position, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.transaction_time, p.posted_time, q.priority, s.enabled,
+		p.source, p.pending, p.void, c.fulfills_rule_id,
 		EXISTS(SELECT 1 FROM receipts r WHERE r.user_id = p.user_id AND r.posting_id = p.id),
 		EXISTS(SELECT 1 FROM posting_sync_keys k WHERE k.user_id = p.user_id AND k.posting_id = p.id)
-		FROM postings p JOIN purchase_policies q ON p.user_id = q.user_id AND p.id = q.posting_id ORDER BY p.user_id, q.priority, p.position`)
+		FROM postings p JOIN purchase_policies q ON p.user_id = q.user_id AND p.id = q.posting_id
+		JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id
+		LEFT JOIN posting_claims c ON c.user_id = p.user_id AND c.posting_id = p.id
+		ORDER BY p.user_id, q.priority, s.position`)
 	if err != nil {
 		return 0, err
 	}
@@ -153,10 +156,10 @@ func convert(tx *sql.Tx) (int, error) {
 	for rows.Next() {
 		var p purchase
 		var account, claim sql.NullString
-		var destinations, amountJSON, source string
+		var destinationIDs, amountJSON, source string
 		var transaction, posted int64
 		var pending, voided, receipts, syncKeys bool
-		if err := rows.Scan(&p.user, &p.id, &p.position, &p.name, &account, &destinations, &amountJSON, &transaction, &posted, &p.priority, &p.enabled, &source, &pending, &voided, &claim, &receipts, &syncKeys); err != nil {
+		if err := rows.Scan(&p.user, &p.id, &p.position, &p.name, &account, &destinationIDs, &amountJSON, &transaction, &posted, &p.priority, &p.enabled, &source, &pending, &voided, &claim, &receipts, &syncKeys); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -171,7 +174,7 @@ func convert(tx *sql.Tx) (int, error) {
 		}
 		expression, _ := amount.Config["expression"].(string)
 		cost, err := strconv.ParseFloat(strings.TrimSpace(expression), 64)
-		if err != nil || amount.Resolver != "expression" || len(amount.Inputs) != 0 || cost <= 0 || math.IsNaN(cost) || math.IsInf(cost, 0) || strings.TrimSpace(p.name) == "" || !account.Valid || destinations != "null" || claim.Valid || source != "user" || pending || voided || receipts || syncKeys {
+		if err != nil || amount.Resolver != "expression" || len(amount.Inputs) != 0 || cost <= 0 || math.IsNaN(cost) || math.IsInf(cost, 0) || strings.TrimSpace(p.name) == "" || !account.Valid || destinationIDs != "null" || claim.Valid || source != "user" || pending || voided || receipts || syncKeys {
 			rows.Close()
 			return 0, fmt.Errorf("purchase %s cannot convert safely: expected an owner-authored fixed outflow without claims, receipts, or bank links", p.id)
 		}

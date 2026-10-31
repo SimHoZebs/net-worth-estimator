@@ -46,7 +46,7 @@ func TestRefreshCopiesPrivateReceiptsButNeverPublishesThem(t *testing.T) {
 	}
 }
 
-func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForFinancialOnly(t *testing.T) {
+func TestRefreshPreservesPostingReceiptLinksPrivatelyButClearsThemForFinancialOnly(t *testing.T) {
 	dir := t.TempDir()
 	source, target := filepath.Join(dir, "source.db"), filepath.Join(dir, "target.db")
 	seed(t, source)
@@ -72,8 +72,8 @@ func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForFinancialOnly
 	if err := refresh(target, source, "other", "owner", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
-		t.Fatalf("private posting field = %s", got)
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner' AND posting_id=? AND id=?", p.ID, r.ID); got != "1" {
+		t.Fatalf("private receipt link count = %s", got)
 	}
 	// A second ordinary destination proves the private copy above stays
 	// intact while a financial-only copy strips receipt references.
@@ -89,10 +89,10 @@ func TestRefreshPreservesPostingReceiptFieldPrivatelyButClearsItForFinancialOnly
 	if err := refresh(target, source, "other", "second", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='second' AND id=?", p.ID); got != `[]` {
-		t.Fatalf("financial-only posting field = %s", got)
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='second' AND posting_id=?", p.ID); got != "0" {
+		t.Fatalf("financial-only receipt link count = %s", got)
 	}
-	if got := query(t, target, "SELECT receipt_ids FROM postings WHERE user_id='owner' AND id=?", p.ID); got != `["`+r.ID+`"]` {
-		t.Fatalf("financial-only publication changed private posting field = %s", got)
+	if got := query(t, target, "SELECT COUNT(*) FROM receipts WHERE user_id='owner' AND posting_id=? AND id=?", p.ID, r.ID); got != "1" {
+		t.Fatalf("financial-only publication changed private receipt links = %s", got)
 	}
 }

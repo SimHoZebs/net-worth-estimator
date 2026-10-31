@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 func TestSetupAndRuntimeRejectMissingAnalysisSchemaWithoutChanges(t *testing.T) {
@@ -49,5 +51,53 @@ func TestSetupAndRuntimeRejectMissingAnalysisSchemaWithoutChanges(t *testing.T) 
 	after, err := os.ReadFile(path)
 	if err != nil || !bytes.Equal(before, after) {
 		t.Fatalf("rejected setup changed source: %v", err)
+	}
+}
+
+func TestAnalysisLifecycleTriggersFireOnBothSatellites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trigger.db")
+	d, err := SetupDatabase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	s := privateTestPlan(t, d, "owner")
+	seedAccount(t, s, "checking")
+	account := "checking"
+	posting, err := s.CreatePosting(types.Posting{Name: "Trigger expense", SourceAccountID: &account, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}}, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision := func() int64 {
+		t.Helper()
+		var out int64
+		if err := s.db.QueryRow(`SELECT revision FROM analysis_inputs WHERE user_id = :user_id`).Scan(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if _, err := s.db.Exec(`INSERT INTO transaction_source_facts(posting_id, facts_json, user_id) VALUES (?, '{}', :user_id)`, posting.ID); err != nil {
+		t.Fatal(err)
+	}
+	before := revision()
+	if _, err := s.db.Exec(`UPDATE posting_sim SET enabled = 0 WHERE posting_id = ? AND user_id = :user_id`, posting.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := revision(); got != before+1 {
+		t.Fatalf("sim enabled flip revision = %d, want %d", got, before+1)
+	}
+	before = revision()
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 1 WHERE id = ? AND user_id = :user_id`, posting.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := revision(); got != before+1 {
+		t.Fatalf("pending flip revision = %d, want %d", got, before+1)
+	}
+	before = revision()
+	if _, err := s.db.Exec(`UPDATE postings SET name = 'Renamed' WHERE id = ? AND user_id = :user_id`, posting.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := revision(); got != before {
+		t.Fatalf("name update revision = %d, want unchanged %d", got, before)
 	}
 }

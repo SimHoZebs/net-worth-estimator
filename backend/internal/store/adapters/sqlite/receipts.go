@@ -11,7 +11,7 @@ import (
 )
 
 func receiptPosting(q queryer, id string) (types.Posting, error) {
-	rows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE id = ? AND user_id = :user_id`, id)
+	rows, err := q.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.id = ? AND p.user_id = :user_id`, id)
 	if err != nil {
 		return types.Posting{}, err
 	}
@@ -24,59 +24,6 @@ func receiptPosting(q queryer, id string) (types.Posting, error) {
 	}
 	p, err := scanPostingRow(rows)
 	return p, err
-}
-
-// parsePostingReceiptIDs decodes the stored receipt back-reference. A corrupt
-// value reads as empty; the next receipt write for that posting self-heals it.
-func parsePostingReceiptIDs(raw string) []string {
-	var ids []string
-	if err := json.Unmarshal([]byte(raw), &ids); err != nil {
-		return nil
-	}
-	return ids
-}
-
-func addPostingReceiptID(tx *userTx, postingID, receiptID string) error {
-	var raw string
-	if err := tx.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND user_id = :user_id`, postingID).Scan(&raw); err != nil {
-		return err
-	}
-	for _, id := range parsePostingReceiptIDs(raw) {
-		if id == receiptID {
-			return nil
-		}
-	}
-	data, err := json.Marshal(append(parsePostingReceiptIDs(raw), receiptID))
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND user_id = :user_id`, string(data), postingID)
-	return err
-}
-
-func removePostingReceiptID(tx *userTx, postingID, receiptID string) error {
-	var raw string
-	if err := tx.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND user_id = :user_id`, postingID).Scan(&raw); err == sql.ErrNoRows {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	ids := parsePostingReceiptIDs(raw)
-	kept := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if id != receiptID {
-			kept = append(kept, id)
-		}
-	}
-	if len(kept) == len(ids) {
-		return nil
-	}
-	data, err := json.Marshal(kept)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND user_id = :user_id`, string(data), postingID)
-	return err
 }
 
 func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (out types.Receipt, err error) {
@@ -142,7 +89,9 @@ func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename str
 		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, user_id) VALUES (?,?,?,?,?,?,?, :user_id)`, out.ID, postingID, image.Digest, out.Size, key, out.Revision, string(payload)); err != nil {
 			return err
 		}
-		return addPostingReceiptID(tx, postingID, out.ID)
+		// The receipts row itself is the link; no posting back-reference
+		// exists anymore.
+		return nil
 	})
 	return out, err
 }
@@ -171,24 +120,22 @@ func (s *sqliteStore) ListReceipts(postingID string) ([]types.Receipt, error) {
 	return out, rows.Err()
 }
 
-// ListPostingReceiptIDs reads the stored back-reference from each posting row.
-// Only postings with at least one receipt appear in the map.
+// ListPostingReceiptIDs derives links from the receipts table: each receipt
+// row points at its parent posting, so no posting-side back-reference is
+// stored or read. Only postings with at least one receipt appear in the map.
 func (s *sqliteStore) ListPostingReceiptIDs() (map[string][]string, error) {
-	rows, err := s.db.Query(`SELECT id, receipt_ids FROM postings WHERE user_id = :user_id`)
+	rows, err := s.db.Query(`SELECT posting_id, id FROM receipts WHERE user_id = :user_id ORDER BY posting_id, id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := map[string][]string{}
 	for rows.Next() {
-		var id, raw string
-		if err := rows.Scan(&id, &raw); err != nil {
+		var postingID, id string
+		if err := rows.Scan(&postingID, &id); err != nil {
 			return nil, err
 		}
-		ids := parsePostingReceiptIDs(raw)
-		if len(ids) != 0 {
-			out[id] = ids
-		}
+		out[postingID] = append(out[postingID], id)
 	}
 	return out, rows.Err()
 }
@@ -256,8 +203,8 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 		return err
 	}
 	err := withRowTx(s.db, func(tx *userTx) error {
-		var postingID string
-		if err := tx.QueryRow(`SELECT posting_id FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&postingID); err == sql.ErrNoRows {
+		var exists string
+		if err := tx.QueryRow(`SELECT posting_id FROM receipts WHERE id = ? AND user_id = :user_id`, id).Scan(&exists); err == sql.ErrNoRows {
 			return ErrReceiptNotFound
 		} else if err != nil {
 			return err
@@ -265,7 +212,8 @@ func (s *sqliteStore) DeleteReceipt(ctx context.Context, id string) error {
 		if _, err := tx.Exec(`DELETE FROM receipts WHERE id = ? AND user_id = :user_id`, id); err != nil {
 			return err
 		}
-		return removePostingReceiptID(tx, postingID, id)
+		// Deleting the receipt row removes the link; nothing else to clean.
+		return nil
 	})
 	if err == nil {
 		s.application.finishBlobWrite("")
@@ -322,9 +270,6 @@ func restoreReceipts(tx *userTx, receipts []preservedReceipt) error {
 		}
 		if _, err := tx.Exec(`INSERT INTO receipts (id, posting_id, digest, size, blob_key, revision, payload, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, :user_id)`,
 			receipt.id, receipt.postingID, receipt.digest, receipt.size, receipt.blobKey, receipt.revision, receipt.payload); err != nil {
-			return err
-		}
-		if err := addPostingReceiptID(tx, receipt.postingID, receipt.id); err != nil {
 			return err
 		}
 	}

@@ -22,7 +22,7 @@ import (
 // Keep identity and ownership tables outside this allowlist. Unknown scoped
 // tables fail closed so a schema extension cannot silently leave stale rows.
 var financialTables = []string{
-	"accounts", "checkpoints", "postings", "posting_sync_keys", "suppressed_sync_keys",
+	"accounts", "checkpoints", "postings", "posting_sim", "posting_claims", "posting_sync_keys", "suppressed_sync_keys",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
@@ -170,10 +170,6 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 				values = append(values, "'sample'")
 			case financialOnly && table.name == "sync_state" && column == "last_sync_at":
 				values = append(values, "''")
-			case financialOnly && table.name == "postings" && column == "receipt_ids":
-				// Financial-only publication excludes receipts, so copied
-				// postings must not reference private receipt IDs.
-				values = append(values, "'[]'")
 			case table.name == "sync_credentials" && (column == "access_url" || column == "bridge_host" || column == "updated_at"):
 				// The Bridge key never travels with a refresh or a
 				// financial-only publication: reconnect it where it will

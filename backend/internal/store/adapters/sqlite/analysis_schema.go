@@ -38,7 +38,7 @@ var analysisSchema = []string{
 	`CREATE INDEX IF NOT EXISTS analysis_findings_posting ON analysis_findings(user_id, posting_id, id)`,
 }
 
-var analysisTriggerNames = []string{"analysis_facts_insert", "analysis_facts_update", "analysis_facts_delete", "analysis_posting_lifecycle"}
+var analysisTriggerNames = []string{"analysis_facts_insert", "analysis_facts_update", "analysis_facts_delete", "analysis_posting_lifecycle", "analysis_posting_sim_lifecycle"}
 
 func analysisSchemaStatements() []string {
 	statements := append([]string(nil), analysisSchema...)
@@ -58,6 +58,11 @@ func analysisSchemaStatements() []string {
 	return append(statements, `CREATE TRIGGER IF NOT EXISTS analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
 		WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.id)
+		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
+		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`,
+		`CREATE TRIGGER IF NOT EXISTS analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
+		WHEN (OLD.enabled != NEW.enabled)
+		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.posting_id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`,
 		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('transaction-analysis-v1')`)
