@@ -40,6 +40,42 @@ test("unknown account slugs normalize back to the page", async ({ page }) => {
 	await expect(page.getByRole("dialog")).not.toBeVisible();
 });
 
+test("history restores an editor's evidence return target without leaking it to a new editor", async ({
+	page,
+}) => {
+	await page.goto("/#accounts");
+	await page
+		.getByRole("button", { name: "Open Home value transactions" })
+		.click();
+	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await page.getByRole("button", { name: "Add a planned transaction" }).click();
+	await expect(page).toHaveURL(/#accounts\/edit-transaction\/new$/);
+	await page.goBack();
+	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await page.goBack();
+	await expect(page).toHaveURL(/#accounts$/);
+	await page.goForward();
+	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await page.goForward();
+	await expect(page).toHaveURL(/#accounts\/edit-transaction\/new$/);
+	await expect(
+		page.getByRole("dialog", { name: "Add planned transaction" }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page).toHaveURL(/#accounts\/home-value$/);
+	await page
+		.getByRole("dialog", { name: "Home value", exact: true })
+		.getByRole("button", { name: "Close dialog" })
+		.click();
+	await expect(page).toHaveURL(/#accounts$/);
+	await page.getByRole("button", { name: "Add account" }).click();
+	await expect(
+		page.getByRole("dialog", { name: "Add account", exact: true }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page).toHaveURL(/#accounts$/);
+});
+
 test("editors have URLs and unknown editor ids normalize", async ({ page }) => {
 	await page.goto("/#accounts");
 	await page.getByRole("button", { name: "Add account" }).click();

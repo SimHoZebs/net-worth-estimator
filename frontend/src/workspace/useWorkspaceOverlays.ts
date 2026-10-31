@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
@@ -20,11 +20,13 @@ import {
 /** URL overlays resolve against saved row queries, never unsaved form fields. */
 export function useWorkspaceOverlays({
 	route,
+	returnTo,
 	pushHash,
 	replaceHash,
 }: {
 	route: WorkspaceRoute;
-	pushHash: (hash: string) => void;
+	returnTo: EvidenceTarget | null;
+	pushHash: (hash: string, returnTo?: EvidenceTarget | null) => void;
 	replaceHash: (hash: string) => void;
 }) {
 	const accounts = useSavedAccounts();
@@ -32,16 +34,10 @@ export function useWorkspaceOverlays({
 	const evaluations = useSavedEvaluations();
 	const rows: OverlayRows = { accounts, transactions, evaluations };
 	const resolution = resolveOverlayRoute(route, rows);
-	const [returnTo, setReturnTo] = useState<EvidenceTarget | null>(null);
 	const page = route.page;
 	useEffect(() => {
 		if (resolution.state === "unknown") replaceHash(pageHash(page));
 	}, [resolution.state, page, replaceHash]);
-	useEffect(() => {
-		if (resolution.state === "none" || resolution.state === "unknown")
-			// oxlint-disable-next-line react/set-state-in-effect
-			setReturnTo(null);
-	}, [resolution.state]);
 	const ready = resolution.state === "ready" ? resolution.overlay : null;
 	const evidence = ready?.kind === "evidence" ? ready.target : null;
 	const safeSpendingDetail =
@@ -53,7 +49,6 @@ export function useWorkspaceOverlays({
 				? ready.edit
 				: null;
 	const openEvidence = (target: EvidenceTarget) => {
-		setReturnTo(null);
 		pushHash(evidenceHash(page, target, rows));
 	};
 	const openEditor = (target: EditorTarget) => {
@@ -70,12 +65,10 @@ export function useWorkspaceOverlays({
 			);
 			return;
 		}
-		setReturnTo(null);
 		pushHash(editorHash(page, target));
 	};
 	const editFromEvidence = (target: EditorTarget) => {
-		setReturnTo(evidence);
-		pushHash(editorHash(page, target));
+		pushHash(editorHash(page, target), evidence);
 	};
 	const closeEditor = () => {
 		if (
@@ -86,7 +79,6 @@ export function useWorkspaceOverlays({
 			return;
 		}
 		if (returnTo) {
-			setReturnTo(null);
 			pushHash(evidenceHash(page, returnTo, rows));
 			return;
 		}

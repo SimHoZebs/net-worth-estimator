@@ -19,6 +19,7 @@ export function WorkspaceShell() {
 	const navigation = useWorkspaceNavigation();
 	const overlays = useWorkspaceOverlays({
 		route: navigation.route,
+		returnTo: navigation.returnTo,
 		pushHash: navigation.pushHash,
 		replaceHash: navigation.replaceHash,
 	});
