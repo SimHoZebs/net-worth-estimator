@@ -249,7 +249,7 @@ it("marks holds that did not post instead of posted", () => {
 });
 
 it("marks a live hold as not yet posted", () => {
-	const planTransaction = {
+	const savedTransaction = {
 		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000098",
 		name: "Live hold",
@@ -271,9 +271,9 @@ it("marks a live hold as not yet posted", () => {
 	};
 	const transaction: AccountTransaction = {
 		id: "recorded-01900000-0000-7000-8000-000000000098",
-		transactionId: planTransaction.id,
+		transactionId: savedTransaction.id,
 		date: "2026-10-20",
-		name: planTransaction.name,
+		name: savedTransaction.name,
 		source: "historical",
 		direction: "out",
 		category: "expense",
@@ -291,9 +291,9 @@ it("marks a live hold as not yet posted", () => {
 	render(
 		<TransactionDetail
 			transaction={transaction}
-			planTransaction={planTransaction}
+			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[planTransaction]}
+			transactions={[savedTransaction]}
 			onClose={() => {}}
 		/>,
 	);

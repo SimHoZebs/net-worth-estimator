@@ -194,4 +194,7 @@ func TestMapNormalizesSettledEventTimeToPosted(t *testing.T) {
 	if pending.Enabled || pending.Posting.TransactionTime != 1773129600 {
 		t.Fatalf("pending seed must stay disabled on its purchase timestamp: %+v", pending.Posting)
 	}
+	if pending.Posting.PostedTime != 0 {
+		t.Fatalf("pending seed must leave the missing posted date missing instead of fabricating the sync instant: %+v", pending.Posting)
+	}
 }

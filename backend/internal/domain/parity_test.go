@@ -121,6 +121,32 @@ func TestValidateFinancialModelRejectsMalformedDatesWithoutPanic(t *testing.T) {
 	}
 }
 
+func TestValidateFinancialModelAllowsMissingPostedDateOnBankLifecycleRows(t *testing.T) {
+	account := "checking"
+	source := account
+	document := &types.FinancialModel{
+		Accounts: []types.Account{cashAccount(account)},
+		Postings: []types.Posting{
+			{ID: "pending", Name: "Pending", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Pending: true},
+			{ID: "voided", Name: "Voided", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Void: true},
+			{ID: "settled", Name: "Settled", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+		},
+		Evaluations: types.EmptyEvaluationTables(),
+	}
+
+	issues := ValidateFinancialModel(document)
+
+	counts := map[string]int{}
+	for _, issue := range issues {
+		if issue.Severity == types.SeverityError {
+			counts[issue.Code]++
+		}
+	}
+	if counts["posting.postedTime.invalid"] != 1 {
+		t.Fatalf("expected exactly one posting.postedTime.invalid for the settled row, got %v", counts)
+	}
+}
+
 func TestPrepareSimulationRejectsMalformedProjectionStart(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
