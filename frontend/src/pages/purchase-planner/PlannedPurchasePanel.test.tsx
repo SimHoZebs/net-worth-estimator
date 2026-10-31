@@ -9,7 +9,6 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Account, PlannedPurchase } from "../../domain/model.ts";
 import {
 	moveSavedPurchase,
 	removeSavedPurchase,
@@ -35,29 +34,66 @@ vi.mock("../../state/useUserScope.ts", () => ({
 	useUserReadOnly: () => false,
 }));
 
+const { mockAccounts, mockPurchases } = vi.hoisted(() => {
+	const mockAccounts = [
+		{
+			id: "checking",
+			name: "Everyday checking",
+			kind: "cash" as const,
+			enabled: true,
+			archived: false,
+			balance: 18250,
+			minBalance: 2500,
+			maxBalance: null,
+			color: null,
+			observedOn: "2026-09-24",
+			balanceCheck: true,
+			source: "Manual entry",
+			readOnly: false,
+		},
+	];
+	const mockPurchases = [
+		{
+			id: "laptop",
+			name: "laptop",
+			amount: 500,
+			fromId: "checking",
+			startDate: "2026-09-24",
+			enabled: true,
+			readOnly: false,
+		},
+		{
+			id: "chair",
+			name: "chair",
+			amount: 500,
+			fromId: "checking",
+			startDate: "2026-09-24",
+			enabled: true,
+			readOnly: false,
+		},
+	];
+	return { mockAccounts, mockPurchases };
+});
+
+vi.mock("../../state/savedRows.ts", () => ({
+	useSavedAccounts: () => mockAccounts,
+	useSavedPurchases: () => mockPurchases,
+	useSavedStartDate: () => "2026-09-24",
+}));
+
+vi.mock("../../state/useRemoteProjection.ts", () => ({
+	useRemoteProjection: () => ({
+		base: null,
+		loading: false,
+		baseError: null,
+	}),
+}));
+
 const mockedMove = vi.mocked(moveSavedPurchase);
 const mockedRemove = vi.mocked(removeSavedPurchase);
 const mockedSaveNew = vi.mocked(saveNewPurchase);
 
-const accounts: Account[] = [
-	{
-		id: "checking",
-		name: "Everyday checking",
-		kind: "cash",
-		enabled: true,
-		archived: false,
-		balance: 18250,
-		minBalance: 2500,
-		maxBalance: null,
-		color: null,
-		observedOn: "2026-09-24",
-		balanceCheck: true,
-		source: "Manual entry",
-		readOnly: false,
-	},
-];
-
-function purchase(id: string): PlannedPurchase {
+function purchase(id: string) {
 	return {
 		id,
 		name: id,
@@ -69,17 +105,8 @@ function purchase(id: string): PlannedPurchase {
 	};
 }
 
-const purchases = [purchase("laptop"), purchase("chair")];
-
 function renderPanel() {
-	return render(
-		<PlannedPurchasePanel
-			accounts={accounts}
-			purchases={purchases}
-			startDate="2026-09-24"
-			schedule={null}
-		/>,
-	);
+	return render(<PlannedPurchasePanel />);
 }
 
 afterEach(() => {
