@@ -45,7 +45,9 @@ export function subscriptionSourceError(source: Transaction): Error | null {
 			"That transaction already records a recurring occurrence.",
 		);
 	}
-	if (source.readOnly || source.pending) {
+	// Pending bank charges may be claimed as one occurrence of a recurring
+	// rule; settled synced rows stay read-only.
+	if (source.readOnly && !source.pending) {
 		return new Error("Synced transactions cannot be marked as recurring.");
 	}
 	return null;

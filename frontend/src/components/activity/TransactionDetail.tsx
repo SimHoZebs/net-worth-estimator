@@ -698,10 +698,12 @@ function MarkAsSubscriptionAction({
   // its refresh) failed, retry reuses the same rule instead of silently
   // generating a replacement. No global draft or persistent state.
   const attemptRef = useRef<{ ruleId: string } | null>(null);
+  const canClaimPending =
+    savedTransaction.pending === true && savedTransaction.syncOwned === true;
   if (
     savedTransaction.frequency !== "once" ||
     savedTransaction.claimRuleId ||
-    locked
+    (locked && !canClaimPending)
   )
     return null;
   const mark = async () => {
