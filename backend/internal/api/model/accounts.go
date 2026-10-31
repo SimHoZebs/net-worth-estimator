@@ -79,7 +79,7 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 	if err != nil {
 		return nil, err
 	}
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
@@ -103,7 +103,7 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
@@ -129,7 +129,7 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 	} `json:"body"`
 }, error) {
 	id := input.ID
-	_, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = removeByID(model.Accounts, id, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteAccount(id)
@@ -154,7 +154,7 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 
 func (s *handler) moveAccount(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = moveBeforeID(model.Accounts, id, beforeID, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MoveAccount(id, beforeID)

@@ -3,7 +3,8 @@ package domain
 import "github.com/simhozebs/net-worth-estimator/backend/internal/types"
 
 // ResolveCurrentPosition uses the same historical preparation as projections,
-// but never simulates future events or executes forecast evaluations.
+// but never simulates future events, executes forecast evaluations, or
+// validates forecast evaluation configuration.
 // asOfDate is a "YYYY-MM-DD" date (inclusive end of that UTC day) or an RFC 3339 timestamp for an
 // exact cut: only events and observations at or before the cut apply, so
 // an 11:00 actual never affects a 10:00 balance. Balances are the adjusted
@@ -20,7 +21,7 @@ func ResolveCurrentPosition(model *types.FinancialModel, asOfDate string, overri
 			Path:     []any{"asOfDate"},
 		}}}
 	}
-	position, err := preparePositionAt(model, cutDay, cutInstant, overrides)
+	position, err := prepareFinancePositionAt(model, cutDay, cutInstant, overrides)
 	if err != nil {
 		return nil, err
 	}

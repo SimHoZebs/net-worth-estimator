@@ -295,11 +295,22 @@ func preparePosition(model *types.FinancialModel, startDate string, overrides ty
 }
 
 func preparePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
+	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinancialModel)
+}
+
+// prepareFinancePositionAt replays history for ordinary finance reads
+// (current position, account balances) using pure finance validation, so
+// no evaluation-owned check can block history.
+func prepareFinancePositionAt(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides) (*preparedPosition, error) {
+	return preparePositionWithValidator(model, startDate, cutInstant, overrides, ValidateFinanceModel)
+}
+
+func preparePositionWithValidator(model *types.FinancialModel, startDate string, cutInstant int64, overrides types.ModelOverrides, validate func(*types.FinancialModel) []types.ModelValidationIssue) (*preparedPosition, error) {
 	if model == nil {
 		model = &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
 	}
 	effectiveModel := types.ApplyModelOverrides(*model, overrides)
-	issues := ValidateFinancialModel(&effectiveModel)
+	issues := validate(&effectiveModel)
 	validationErrors := []types.ModelValidationIssue{}
 	for _, issue := range issues {
 		if issue.Severity == types.SeverityError {

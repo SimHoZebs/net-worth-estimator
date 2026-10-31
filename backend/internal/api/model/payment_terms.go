@@ -31,7 +31,7 @@ type paymentTermsOutput struct {
 
 func (s *handler) savePaymentTerms(_ context.Context, input *paymentTermsInput) (*paymentTermsOutput, error) {
 	terms := input.Body.toTerms()
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		replaced := false
 		for i, existing := range model.PaymentTerms {
 			if existing.AccountID == terms.AccountID {
@@ -55,7 +55,7 @@ func (s *handler) deletePaymentTerms(_ context.Context, input *struct {
 	AccountID string `path:"accountId"`
 }) (*reorderOutput, error) {
 	accountID := input.AccountID
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		kept := model.PaymentTerms[:0]
 		for _, terms := range model.PaymentTerms {
 			if terms.AccountID != accountID {
