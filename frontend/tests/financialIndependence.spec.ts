@@ -287,16 +287,14 @@ test("financial independence configuration updates minimum, duration, and fundin
 	await brokerage.click();
 	await expect(brokerage).toHaveAttribute("aria-pressed", "false");
 	await dialog.getByRole("button", { name: "Save configuration" }).click();
-	// Saving reloads the server model, which resets the inspector selection
-	// and closes the drawer. Reopen to inspect the recalculated outcome.
+	// Saving refreshes the result without discarding this inspector's state.
 	await expect(card.getByText("More horizon needed")).toBeVisible({
 		timeout: 20000,
 	});
-	await card
-		.getByRole("button", {
-			name: "Inspect independence for Financial independence",
-		})
-		.click();
+	await expect(dialog).toBeVisible();
+	await expect(minimum).toHaveValue("5000");
+	await expect(duration).toHaveValue("30");
+	await dialog.getByRole("tab", { name: "Overview" }).click();
 	await expect(
 		dialog.getByRole("progressbar", { name: "Required assessment period" }),
 	).toBeVisible();

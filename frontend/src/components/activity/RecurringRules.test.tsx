@@ -136,3 +136,107 @@ it("returns a rejected drag preview to the server order", async () => {
 		),
 	).toBe(true);
 });
+
+it("adopts reordered server rows outside a gesture", () => {
+	acceptTestResource();
+	resetServerQueryCache();
+	const account = financialModelFixture.accounts[0]!;
+	const transactions = ["first", "second"].map((id) => ({
+		...financialModelFixture.transactions[0]!,
+		id,
+		name: id,
+		frequency: "monthly" as const,
+		fromId: account.id,
+		toId: null,
+	}));
+	const view = render(<RecurringRules {...rulesProps(transactions)} />);
+	const labels = () =>
+		screen
+			.getAllByRole("button", { name: /^View / })
+			.map((button) => button.getAttribute("aria-label") ?? "");
+	expect(labels()[0]).toContain("first");
+	view.rerender(
+		<RecurringRules {...rulesProps([...transactions].reverse())} />,
+	);
+	expect(labels()[0]).toContain("second");
+	expect(labels()[1]).toContain("first");
+});
+
+it("settles a saved drag and adopts later independent server reorders", async () => {
+	acceptTestResource();
+	resetServerQueryCache();
+	const server = stubTestServer();
+	const account = financialModelFixture.accounts[0]!;
+	const transactions = ["first", "second"].map((id) => ({
+		...financialModelFixture.transactions[0]!,
+		id,
+		name: id,
+		frequency: "monthly" as const,
+		fromId: account.id,
+		toId: null,
+	}));
+	const view = render(<RecurringRules {...rulesProps(transactions)} />);
+	fireEvent.click(
+		screen.getByRole("button", { name: "Reorder recurring transactions" }),
+	);
+	const ids = () =>
+		screen.getAllByTestId("drag-row").map((row) => row.dataset.id);
+	const reorderCalls = () =>
+		server.calls.filter(
+			(call) =>
+				call.method === "POST" && call.url === "/v1/recurrence-rules/reorder",
+		).length;
+	// The gesture previews the drag and persists it on drop.
+	fireEvent.pointerDown(screen.getAllByTestId("drag-row")[0]!);
+	act(() => motion.reorder(["second", "first"]));
+	expect(ids()).toEqual(["second", "first"]);
+	fireEvent.pointerUp(screen.getAllByTestId("drag-row")[0]!);
+	// The save settles explicitly: the draft is discarded and saved rows
+	// render until the server echoes the new order.
+	await waitFor(() => expect(reorderCalls()).toBeGreaterThan(0));
+	await waitFor(() => expect(ids()).toEqual(["first", "second"]));
+	// The echoed saved order is adopted, and so is a later independent
+	// server reorder — no stale draft reappears.
+	view.rerender(
+		<RecurringRules {...rulesProps([...transactions].reverse())} />,
+	);
+	expect(ids()).toEqual(["second", "first"]);
+	view.rerender(<RecurringRules {...rulesProps(transactions)} />);
+	expect(ids()).toEqual(["first", "second"]);
+	// A second gesture snapshots those latest rows, not the settled draft.
+	fireEvent.pointerDown(screen.getAllByTestId("drag-row")[0]!);
+	act(() => motion.reorder(["second", "first"]));
+	expect(ids()).toEqual(["second", "first"]);
+	fireEvent.pointerUp(screen.getAllByTestId("drag-row")[0]!);
+	await waitFor(() => expect(reorderCalls()).toBeGreaterThan(2));
+	await waitFor(() => expect(ids()).toEqual(["first", "second"]));
+});
+
+it("moves rows with keyboard controls and rolls back a rejected move", async () => {
+	acceptTestResource();
+	resetServerQueryCache();
+	const server = stubTestServer();
+	const account = financialModelFixture.accounts[0]!;
+	const transactions = ["first", "second"].map((id) => ({
+		...financialModelFixture.transactions[0]!,
+		id,
+		name: id,
+		frequency: "monthly" as const,
+		fromId: account.id,
+		toId: null,
+	}));
+	render(<RecurringRules {...rulesProps(transactions)} />);
+	fireEvent.click(
+		screen.getByRole("button", { name: "Reorder recurring transactions" }),
+	);
+	const ids = () =>
+		screen.getAllByTestId("drag-row").map((row) => row.dataset.id);
+	server.writeOnce(
+		(method, path) =>
+			method === "POST" && path === "/v1/recurrence-rules/reorder",
+		new Error("The order could not be saved."),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Move first down" }));
+	expect(ids()).toEqual(["second", "first"]);
+	await waitFor(() => expect(ids()).toEqual(["first", "second"]));
+});

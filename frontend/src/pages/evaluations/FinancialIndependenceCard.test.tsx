@@ -307,4 +307,22 @@ describe("FinancialIndependenceCard", () => {
 		expect(dialog.getByText("90% required · 400 scenarios")).toBeTruthy();
 		expect(dialog.queryByRole("region", { name: "Base case" })).toBeNull();
 	});
+
+	it("keeps the inspector open across a recalculation and only closes it explicitly", () => {
+		const view = render(
+			<FinancialIndependenceCard item={independenceItem()} />,
+		);
+		const dialog = openInspector(view);
+		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
+		// A recalculation arrives as a new analysis identity for the same
+		// evaluation: the open inspector follows it instead of resetting.
+		view.rerender(<FinancialIndependenceCard item={independenceItem()} />);
+		const recalculated = within(
+			view.getByRole("dialog", { name: "Financial independence" }),
+		);
+		expect(recalculated.getByText("Funding as of Feb 2036")).toBeTruthy();
+		// Explicit close still owns dismissal.
+		fireEvent.click(view.getByRole("button", { name: "Close dialog" }));
+		expect(view.queryByRole("dialog")).toBeNull();
+	});
 });

@@ -54,7 +54,14 @@ export function FundingGapsCard({
 			projection,
 		],
 	);
-	const [selectedId, setSelectedId] = useSelectedId(projection);
+	const [selectedId, setSelectedId] = useSelectedId();
+	// The inspector follows its gap: a selected id with no current gap
+	// renders as no selection and closes, instead of falling back to a
+	// different gap.
+	const selected =
+		selectedId !== null && gaps.some((gap) => gap.id === selectedId)
+			? selectedId
+			: null;
 	const headingId = useId();
 	const first = gaps[0];
 	const summary = first ? summarizeFundingGap(first) : null;
@@ -222,10 +229,10 @@ export function FundingGapsCard({
 					</div>
 				)}
 			</Card>
-			{selectedId !== null && first && (
+			{selected !== null && (
 				<FundingGapsModal
 					gaps={gaps}
-					selectedId={selectedId}
+					selectedId={selected}
 					onSelect={setSelectedId}
 					onClose={() => setSelectedId(null)}
 				/>

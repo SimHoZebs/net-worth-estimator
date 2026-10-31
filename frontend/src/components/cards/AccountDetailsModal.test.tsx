@@ -18,6 +18,19 @@ vi.mock("../Modal.tsx", async (importOriginal) => ({
 	),
 }));
 
+// Selection assertions use a marker detail; editors keep browser coverage.
+vi.mock("../activity/TransactionDetail.tsx", () => ({
+	TransactionDetail: ({
+		transaction,
+	}: {
+		transaction: { name: string; date: string };
+	}) => (
+		<p data-testid="selected-transaction" data-date={transaction.date}>
+			{transaction.name}
+		</p>
+	),
+}));
+
 afterEach(cleanup);
 
 beforeEach(() => {
@@ -142,5 +155,70 @@ describe("AccountDetailsModal", () => {
 			view.getByRole("button", { name: "Next transaction page" }),
 		);
 		expect(view.getByRole("status").textContent).toMatch(/Showing 21–40 of/);
+	});
+
+	it("keeps an open transaction across data refreshes and closes it when its saved rule is gone", () => {
+		const projection = activityProjection();
+		const card = toAccountCard({
+			account: financialModelFixture.accounts[0]!,
+			projection,
+		});
+		const base = {
+			card,
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
+			readOnly: financialModelFixture.readOnly,
+			projection,
+			onClose: () => {},
+		};
+		const view = render(<AccountDetailsModal {...base} />);
+		fireEvent.change(view.getByLabelText("Search account transactions"), {
+			target: { value: "Everyday living" },
+		});
+		fireEvent.click(
+			view.getAllByRole("button", { name: /View Everyday living/ })[0]!,
+		);
+		expect(view.getByTestId("selected-transaction").textContent).toContain(
+			"Everyday living",
+		);
+		const selectedDate = view.getByTestId("selected-transaction").dataset.date;
+		// An unrelated refresh arrives with brand-new identities but the same
+		// records: the open detail stays on its row.
+		const refresh = activityProjection();
+		// An earlier occurrence shifts the index in every projected row id.
+		refresh.transactions.unshift(
+			transactionFixture({ transactionId: "earlier", date: "2026-09-25" }),
+		);
+		view.rerender(
+			<AccountDetailsModal
+				{...base}
+				card={toAccountCard({
+					account: financialModelFixture.accounts[0]!,
+					projection: refresh,
+				})}
+				accounts={[...financialModelFixture.accounts]}
+				transactions={[...financialModelFixture.transactions]}
+				projection={refresh}
+			/>,
+		);
+		expect(view.getByTestId("selected-transaction").textContent).toContain(
+			"Everyday living",
+		);
+		expect(view.getByTestId("selected-transaction").dataset.date).toBe(
+			selectedDate,
+		);
+		// The saved rule itself is gone: the detail closes instead of
+		// showing a stale row.
+		view.rerender(
+			<AccountDetailsModal
+				{...base}
+				projection={refresh}
+				transactions={financialModelFixture.transactions.filter(
+					(saved) => saved.id !== "living",
+				)}
+			/>,
+		);
+		expect(view.queryByTestId("selected-transaction")).toBeNull();
 	});
 });

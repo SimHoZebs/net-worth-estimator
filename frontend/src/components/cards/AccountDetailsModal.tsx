@@ -17,7 +17,7 @@ import { EmptyState } from "../EmptyState.tsx";
 import { Modal } from "../Modal.tsx";
 import { Progress } from "../Progress.tsx";
 import type { AccountCardModel } from "../../domain/accountCards.ts";
-import { useSelectedId } from "../entrySelection.ts";
+import { transactionSelectionKey, useSelectedId } from "../entrySelection.ts";
 
 type StatusFilter = "all" | "pending" | "posted";
 
@@ -82,7 +82,7 @@ export function AccountDetailsModal({
 				: [],
 		[card.id, accounts, transactions, startDate, projection],
 	);
-	const [selectedId, setSelectedId] = useSelectedId(ledger);
+	const [selectedId, setSelectedId] = useSelectedId();
 	const savedById = useMemo(
 		() => new Map(transactions.map((saved) => [saved.id, saved])),
 		[transactions],
@@ -118,7 +118,9 @@ export function AccountDetailsModal({
 			?.scrollIntoView({ block: "nearest" });
 	};
 	const selected = selectedId
-		? (ledger.find((transaction) => transaction.id === selectedId) ?? null)
+		? (ledger.find(
+				(transaction) => transactionSelectionKey(transaction) === selectedId,
+			) ?? null)
 		: null;
 	const selectedSavedTransaction = selected
 		? (savedById.get(selected.transactionId) ?? null)
@@ -224,7 +226,9 @@ export function AccountDetailsModal({
 								savedTransaction={
 									savedById.get(transaction.transactionId) ?? null
 								}
-								onEdit={() => setSelectedId(transaction.id)}
+								onEdit={() =>
+									setSelectedId(transactionSelectionKey(transaction))
+								}
 							/>
 						))}
 					</TransactionTable>
