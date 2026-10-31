@@ -56,6 +56,14 @@ export function ProjectionPlot({
 			: dotX - 14 - badgeWidth;
 	const badgeY =
 		dotY - 14 - badgeHeight >= top ? dotY - 14 - badgeHeight : dotY + 14;
+	// Wide plots earn more date ticks instead of stretching five labels
+	// across the extra space: 5 below 560 units, 7 below 800, else 9.
+	const tickFractions =
+		width < 560
+			? [0, 0.25, 0.5, 0.75, 1]
+			: width < 800
+				? [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1]
+				: [0, 1 / 8, 2 / 8, 3 / 8, 4 / 8, 5 / 8, 6 / 8, 7 / 8, 1];
 	return (
 		<svg
 			className="col-span-full col-start-1 row-start-1 block min-h-48 w-full cursor-crosshair overflow-visible sm:min-h-64 md:min-h-60 2xl:min-h-72"
@@ -103,6 +111,7 @@ export function ProjectionPlot({
 						y2={y(value)}
 						className="stroke-line"
 						strokeDasharray="3 5"
+						vectorEffect="non-scaling-stroke"
 					/>
 					<text
 						x={left - 14}
@@ -119,9 +128,10 @@ export function ProjectionPlot({
 				d={basePath}
 				fill="none"
 				className="stroke-primary"
-				strokeWidth="3"
+				strokeWidth="2.5"
 				strokeLinejoin="round"
 				strokeLinecap="round"
+				vectorEffect="non-scaling-stroke"
 			/>
 			{low <= 0 && 0 <= high && (
 				<g>
@@ -132,6 +142,7 @@ export function ProjectionPlot({
 						y2={y(0)}
 						className="stroke-muted"
 						strokeWidth="1.5"
+						vectorEffect="non-scaling-stroke"
 					/>
 					<text
 						x={width - right - 6}
@@ -143,7 +154,7 @@ export function ProjectionPlot({
 					</text>
 				</g>
 			)}
-			{[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+			{tickFractions.map((fraction) => {
 				const index = Math.round(fraction * (points.length - 1));
 				return (
 					<text
@@ -164,7 +175,8 @@ export function ProjectionPlot({
 				cy={y(values.at(-1) ?? 0)}
 				r="5"
 				className="fill-primary stroke-surface"
-				strokeWidth="3"
+				strokeWidth="2.5"
+				vectorEffect="non-scaling-stroke"
 			/>
 			{inspected !== null && selectedPoint && (
 				<g>
@@ -175,6 +187,7 @@ export function ProjectionPlot({
 						y2={height - bottom}
 						className="stroke-muted"
 						strokeDasharray="4 4"
+						vectorEffect="non-scaling-stroke"
 					/>
 					<line
 						x1={left}
@@ -183,6 +196,7 @@ export function ProjectionPlot({
 						y2={y(selectedValue)}
 						className="stroke-muted"
 						strokeDasharray="4 4"
+						vectorEffect="non-scaling-stroke"
 					/>
 					<circle
 						cx={x(selectedIndex)}
@@ -190,6 +204,7 @@ export function ProjectionPlot({
 						r="5"
 						className="fill-primary stroke-surface"
 						strokeWidth="2"
+						vectorEffect="non-scaling-stroke"
 					/>
 					<g>
 						<rect
@@ -200,6 +215,7 @@ export function ProjectionPlot({
 							rx="8"
 							className="fill-surface stroke-line"
 							strokeWidth="1"
+							vectorEffect="non-scaling-stroke"
 						/>
 						<text
 							x={badgeX + badgeWidth / 2}
