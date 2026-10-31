@@ -67,7 +67,7 @@ func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []types.
 		}
 		if _, err := tx.Exec(
 			`INSERT INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			position, checkpoint.AccountID, checkpoint.Balance, syncedSource(checkpoint.Source), checkpoint.ObservedAt,
+			position, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.ObservedAt,
 		); err != nil {
 			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
 		}
@@ -93,7 +93,7 @@ func remergePostings(tx *userTx, incoming []types.Posting, synced []types.Postin
 		position++
 	}
 	for i := range synced {
-		if err := insertPosting(tx, position, &synced[i], syncedSource(synced[i].Source)); err != nil {
+		if err := insertPosting(tx, position, &synced[i], synced[i].Source); err != nil {
 			return 0, fmt.Errorf("re-merge synced posting: %w", err)
 		}
 		position++
@@ -144,13 +144,17 @@ func loadSyncedPostings(tx *userTx) ([]types.Posting, error) {
 	return postings, rows.Close()
 }
 
-// syncedSource preserves a sync row's provider source on re-merge,
-// defaulting blank sources to the current provider.
-func syncedSource(source string) string {
-	if source == "" {
-		return SourceSimpleFIN
+// validateSyncCheckpointSource rejects checkpoints without explicit
+// provider provenance. Owner rows are never valid sync input, and no
+// provider is ever defaulted: translation must carry the source.
+func validateSyncCheckpointSource(checkpoint SyncCheckpoint) error {
+	if checkpoint.Source == "" {
+		return fmt.Errorf("sync checkpoint for %s requires a provider source", checkpoint.AccountID)
 	}
-	return source
+	if checkpoint.Source == SourceUser {
+		return fmt.Errorf("sync checkpoint for %s carries owner source", checkpoint.AccountID)
+	}
+	return nil
 }
 
 // GetLastSyncTime reports the last successful sync completion time, or ""
@@ -246,9 +250,12 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 		return summary, err
 	}
 	for _, checkpoint := range checkpoints {
+		if err := validateSyncCheckpointSource(checkpoint); err != nil {
+			return summary, err
+		}
 		result, err := tx.Exec(
 			`INSERT OR IGNORE INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			nextPosition, checkpoint.AccountID, checkpoint.Balance, SourceSimpleFIN, checkpoint.ObservedAt,
+			nextPosition, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.ObservedAt,
 		)
 		if err != nil {
 			return summary, fmt.Errorf("sync insert checkpoint: %w", err)
@@ -270,7 +277,10 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 		).Scan(&existingSource, &existingBalance); err != nil {
 			return summary, fmt.Errorf("sync read checkpoint conflict: %w", err)
 		}
-		if existingSource != SourceSimpleFIN {
+		// Owner rows win key collisions; a sync row from another provider
+		// never overwrites this provider's repeat write. Only the same
+		// provider source refreshes its own checkpoint.
+		if existingSource != checkpoint.Source {
 			summary.CheckpointsSkipped++
 			continue
 		}

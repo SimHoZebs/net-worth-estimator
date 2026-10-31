@@ -114,8 +114,8 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 		t.Fatalf("seed account: %v", err)
 	}
 	if _, err := database.ApplySyncPlan([]store.SyncCheckpoint{
-		{AccountID: "checking", Balance: 10, ObservedAt: 1785974399},
-		{AccountID: "checking", Balance: 20, ObservedAt: 1786060799},
+		{AccountID: "checking", Balance: 10, Source: store.SourceSimpleFIN, ObservedAt: 1785974399},
+		{AccountID: "checking", Balance: 20, Source: store.SourceSimpleFIN, ObservedAt: 1786060799},
 	}, nil); err != nil {
 		t.Fatalf("seed synced balance checks: %v", err)
 	}

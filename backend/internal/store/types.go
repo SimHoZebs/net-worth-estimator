@@ -65,8 +65,13 @@ type SyncCredential struct {
 func (c SyncCredential) Configured() bool { return c.AccessURL != "" }
 
 type SyncCheckpoint struct {
-	AccountID  string
-	Balance    float64
+	AccountID string
+	Balance   float64
+	// Source is the provider provenance carried from translation (never
+	// user). The store validates it at the boundary and never defaults
+	// it: owner rows keep collision precedence and repeat writes keep
+	// provider identity.
+	Source     string
 	ObservedAt int64
 }
 

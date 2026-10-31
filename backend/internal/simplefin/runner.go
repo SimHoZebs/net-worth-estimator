@@ -301,6 +301,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{
 			AccountID:  checkpoint.AccountID,
 			Balance:    checkpoint.Balance,
+			Source:     store.SourceSimpleFIN,
 			ObservedAt: checkpoint.ObservedAt,
 		})
 	}

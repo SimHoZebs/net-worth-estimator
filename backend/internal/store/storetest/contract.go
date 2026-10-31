@@ -61,6 +61,12 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("ApplySyncPlanOwnerWinsSameInstant", func(t *testing.T) {
 		testApplySyncPlanOwnerWinsSameInstant(t, newStore)
 	})
+	t.Run("ApplySyncPlanRejectsCheckpointsWithoutProviderSource", func(t *testing.T) {
+		testApplySyncPlanRejectsCheckpointsWithoutProviderSource(t, newStore)
+	})
+	t.Run("ApplySyncPlanKeepsProviderCheckpointIdentity", func(t *testing.T) {
+		testApplySyncPlanKeepsProviderCheckpointIdentity(t, newStore)
+	})
 	t.Run("SettledBankRowRoundTrip", func(t *testing.T) {
 		testSettledBankRowRoundTrip(t, newStore)
 	})
@@ -496,21 +502,21 @@ func testApplySyncPlanCheckpointLifecycle(t *testing.T, newStore func(*testing.T
 	seedAccount(t, st, "prime_card")
 
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100, Source: store.SourceSimpleFIN}},
 		nil)
 	if err != nil || summary.CheckpointsInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
 
 	again, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100, Source: store.SourceSimpleFIN}},
 		nil)
 	if err != nil || again.CheckpointsUpdated != 1 || again.CheckpointsInserted != 0 {
 		t.Fatalf("rerun = %+v, err %v", again, err)
 	}
 
 	changed, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 150}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 150, Source: store.SourceSimpleFIN}},
 		nil)
 	if err != nil || changed.CheckpointsUpdated != 1 {
 		t.Fatalf("update = %+v, err %v", changed, err)
@@ -538,7 +544,7 @@ func testApplySyncPlanSkipsUserCheckpoint(t *testing.T, newStore func(*testing.T
 	}
 	_ = extra
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785974399, Balance: 100, Source: store.SourceSimpleFIN}},
 		nil)
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
@@ -638,6 +644,90 @@ func syncPendingDirective(item store.SyncPosting) store.BankDirective {
 	}}
 }
 
+// testApplySyncPlanRejectsCheckpointsWithoutProviderSource proves the
+// boundary validates provenance: blank and owner sources are rejected, no
+// provider is ever defaulted, and nothing is written.
+func testApplySyncPlanRejectsCheckpointsWithoutProviderSource(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerModel(t, st)
+	for name, checkpoint := range map[string]store.SyncCheckpoint{
+		"blank source": {AccountID: "checking", Balance: 100, ObservedAt: 1785974399},
+		"owner source": {AccountID: "checking", Balance: 100, Source: store.SourceUser, ObservedAt: 1785974399},
+	} {
+		if _, err := st.ApplySyncPlan([]store.SyncCheckpoint{checkpoint}, nil); err == nil {
+			t.Fatalf("%s accepted without provider provenance", name)
+		}
+	}
+	loaded, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findCheckpoint(loaded, "checking", 1785974399); ok {
+		t.Fatalf("rejected checkpoint was written: %+v", loaded.Checkpoints)
+	}
+}
+
+// testApplySyncPlanKeepsProviderCheckpointIdentity proves repeat writes
+// keep provider identity: the same provider refreshes its own checkpoint,
+// while a different provider never overwrites it. Owner precedence stays
+// with testApplySyncPlanOwnerWinsSameInstant.
+func testApplySyncPlanKeepsProviderCheckpointIdentity(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	st := newStore(t)
+	seedOwnerModel(t, st)
+	const instant = int64(1785974399)
+	first, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 100, Source: store.SourceSimpleFIN, ObservedAt: instant}},
+		nil)
+	if err != nil || first.CheckpointsInserted != 1 {
+		t.Fatalf("seed = %+v, err %v", first, err)
+	}
+	foreign, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 999, Source: "plaid", ObservedAt: instant}},
+		nil)
+	if err != nil || foreign.CheckpointsSkipped != 1 {
+		t.Fatalf("foreign provider overwrite = %+v, err %v", foreign, err)
+	}
+	loaded, err := st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkpoint, ok := findCheckpoint(loaded, "checking", instant)
+	if !ok || checkpoint.Balance != 100 || checkpoint.Source != store.SourceSimpleFIN {
+		t.Fatalf("checkpoint identity lost: %+v", checkpoint)
+	}
+	refresh, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 150, Source: store.SourceSimpleFIN, ObservedAt: instant}},
+		nil)
+	if err != nil || refresh.CheckpointsUpdated != 1 {
+		t.Fatalf("same-provider refresh = %+v, err %v", refresh, err)
+	}
+	// A non-SimpleFIN provider inserts and refreshes its own instant with
+	// its own source carried through: provenance is provider-neutral.
+	const other = int64(1786060799)
+	seed, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 200, Source: "plaid", ObservedAt: other}},
+		nil)
+	if err != nil || seed.CheckpointsInserted != 1 {
+		t.Fatalf("other-provider insert = %+v, err %v", seed, err)
+	}
+	renew, err := st.ApplySyncPlan(
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 250, Source: "plaid", ObservedAt: other}},
+		nil)
+	if err != nil || renew.CheckpointsUpdated != 1 {
+		t.Fatalf("other-provider refresh = %+v, err %v", renew, err)
+	}
+	loaded, err = st.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherCheckpoint, ok := findCheckpoint(loaded, "checking", other)
+	if !ok || otherCheckpoint.Balance != 250 || otherCheckpoint.Source != "plaid" {
+		t.Fatalf("other-provider checkpoint = %+v, want balance 250 source plaid", otherCheckpoint)
+	}
+}
+
 const ownerPostingID = "01900000-0000-7000-8000-000000000010"
 
 func seedOwnerModel(t *testing.T, st store.Store) {
@@ -667,7 +757,7 @@ func seedSyncState(t *testing.T, st store.Store) {
 	}
 	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785628799, Balance: 111}},
+		[]store.SyncCheckpoint{{AccountID: "checking", ObservedAt: 1785628799, Balance: 111, Source: store.SourceSimpleFIN}},
 		[]store.BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
@@ -797,7 +887,7 @@ func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*t
 	st := newStore(t)
 	seedOwnerModel(t, st)
 	fresh, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 1000, ObservedAt: 1785903600}},
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 1000, Source: store.SourceSimpleFIN, ObservedAt: 1785903600}},
 		nil)
 	if err != nil || fresh.CheckpointsInserted != 1 {
 		t.Fatalf("fresh apply = %+v, err %v", fresh, err)
@@ -806,7 +896,7 @@ func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*t
 	// instant-keyed row: replay orders it chronologically and the latest
 	// instant still wins, so current state never rolls back.
 	late, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 5, ObservedAt: 1785817200}},
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 5, Source: store.SourceSimpleFIN, ObservedAt: 1785817200}},
 		nil)
 	if err != nil || late.CheckpointsInserted != 1 || late.CheckpointsSkipped != 0 {
 		t.Fatalf("backdated apply = %+v, err %v", late, err)
@@ -828,9 +918,9 @@ func testApplySyncPlanRetainsBackdatedObservation(t *testing.T, newStore func(*t
 	// batches converge on the same instant-keyed rows.
 	repeat, err := st.ApplySyncPlan(
 		[]store.SyncCheckpoint{
-			{AccountID: "checking", Balance: 1000, ObservedAt: 1785903600},
-			{AccountID: "checking", Balance: 5, ObservedAt: 1785817200},
-			{AccountID: "checking", Balance: 7, ObservedAt: 1785730800},
+			{AccountID: "checking", Balance: 1000, Source: store.SourceSimpleFIN, ObservedAt: 1785903600},
+			{AccountID: "checking", Balance: 5, Source: store.SourceSimpleFIN, ObservedAt: 1785817200},
+			{AccountID: "checking", Balance: 7, Source: store.SourceSimpleFIN, ObservedAt: 1785730800},
 		},
 		nil)
 	if err != nil || repeat.CheckpointsInserted != 1 || repeat.CheckpointsUpdated != 2 {
@@ -847,7 +937,7 @@ func testApplySyncPlanOwnerWinsSameInstant(t *testing.T, newStore func(*testing.
 		t.Fatalf("save owner: %v", err)
 	}
 	summary, err := st.ApplySyncPlan(
-		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 100, ObservedAt: instant}},
+		[]store.SyncCheckpoint{{AccountID: "checking", Balance: 100, Source: store.SourceSimpleFIN, ObservedAt: instant}},
 		nil)
 	if err != nil || summary.CheckpointsSkipped != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
