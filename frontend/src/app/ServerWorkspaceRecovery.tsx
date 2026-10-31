@@ -34,7 +34,9 @@ export function ServerWorkspaceRecovery() {
 			loading: false,
 		},
 		recover: importServerModel,
-		reload: retry,
+		reload: async () => {
+			await retry();
+		},
 	});
 	const { candidate, reading, readFile, clearCandidate } =
 		useFileReview<FinancialModel>({

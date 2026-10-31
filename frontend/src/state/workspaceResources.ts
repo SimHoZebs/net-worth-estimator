@@ -214,8 +214,8 @@ export function workspaceIsBusy() {
 	);
 }
 
-/** Explicit refreshes retain Query's last good data. A save completes before a refresh starts. */
-export async function reloadWorkspace() {
+/** Explicit refreshes retain Query's last good data. A save completes before a refresh starts. Returns whether the scoped model fetch succeeded. */
+export async function reloadWorkspace(): Promise<boolean> {
 	const scope = getUserScope();
 	const cache = serverQueryClient();
 	const mutationKey = ["workspace-write", scope.key, "model"];
@@ -228,7 +228,7 @@ export async function reloadWorkspace() {
 				}
 			});
 		});
-	if (scope !== getUserScope() || scope.status !== "ready") return;
+	if (scope !== getUserScope() || scope.status !== "ready") return false;
 	await cache.invalidateQueries({
 		queryKey: ["user-resources", scope.key],
 		refetchType: "none",
@@ -242,7 +242,8 @@ export async function reloadWorkspace() {
 		cache.fetchQuery(evalSummaryOptions(scope)),
 		cache.fetchQuery(transactionsOptions(scope)),
 	]);
-	if (scope === getUserScope() && results[1]?.status === "fulfilled") {
+	const modelOk = results[1]?.status === "fulfilled";
+	if (scope === getUserScope() && modelOk) {
 		// A successful explicit reload resets a temporary permission guard. Other save failures stay visible.
 		for (const mutation of cache
 			.getMutationCache()
@@ -253,6 +254,7 @@ export async function reloadWorkspace() {
 			)
 				cache.getMutationCache().remove(mutation);
 	}
+	return modelOk && scope === getUserScope();
 }
 
 export interface AccountBalances {
