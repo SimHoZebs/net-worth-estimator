@@ -1,13 +1,21 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { projectionFixture } from "../../mocks/projection.ts";
 import { ProjectionChart } from "../ProjectionChart.tsx";
 import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
+import { useSavedAccounts } from "../../state/savedRows.ts";
 import { useCheckpoints } from "../../state/workspaceResources.ts";
 
 vi.mock("../../state/useRemoteProjection.ts", () => ({
 	useRemoteProjection: vi.fn(),
 }));
+
+vi.mock("../../state/savedRows.ts", () => ({
+	useSavedAccounts: vi.fn(),
+}));
+
+const mockedAccounts = vi.mocked(useSavedAccounts);
 
 vi.mock("../../state/workspaceResources.ts", async (importOriginal) => ({
 	...(await importOriginal<
@@ -261,5 +269,53 @@ describe("projection chart inspection", () => {
 				.getByRole("slider", { name: "Inspect net worth date" })
 				.getAttribute("aria-valuetext"),
 		).toBe("Jul 2026: -$65,800");
+	});
+
+	it("toggles between the total line and the account stack", () => {
+		mockedAccounts.mockReturnValue(financialModelFixture.accounts);
+		mockChart(
+			projectionFixture({
+				points: [
+					{
+						date: "2026-06-02",
+						total: 600,
+						balances: { checking: 600, savings: 400, mortgage: -400 },
+					},
+					{
+						date: "2026-07-01",
+						total: 1000,
+						balances: { checking: 800, savings: 600, mortgage: -400 },
+					},
+				],
+			}),
+		);
+		render(<ProjectionChart onEvidence={vi.fn()} />);
+		// The total line renders first with its inspection slider.
+		expect(
+			screen.getByRole("slider", { name: "Inspect net worth date" }),
+		).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Accounts" }));
+		// The stack replaces the line and slider, with ending balances as text.
+		expect(
+			screen.queryByRole("slider", { name: "Inspect net worth date" }),
+		).toBeNull();
+		expect(
+			screen.getByRole("img", {
+				name: "Net worth by account over the trailing window",
+			}),
+		).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Total" }));
+		expect(
+			screen.getByRole("slider", { name: "Inspect net worth date" }),
+		).toBeTruthy();
+	});
+
+	it("explains an account view with no per-account data", () => {
+		mockedAccounts.mockReturnValue(financialModelFixture.accounts);
+		show();
+		fireEvent.click(screen.getByRole("button", { name: "Accounts" }));
+		expect(
+			screen.getByText("No per-account data in this window."),
+		).toBeTruthy();
 	});
 });
