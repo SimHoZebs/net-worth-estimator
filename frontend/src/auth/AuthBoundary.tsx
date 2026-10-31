@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode } from "react";
 import { Brand } from "@/components/Brand.tsx";
 import { Button } from "@/components/Button.tsx";
 import { redirectToSignIn } from "@/auth/navigation.ts";
@@ -6,22 +6,11 @@ import { SessionContext } from "@/auth/sessionContext.ts";
 import { useResourceSession } from "@/auth/useResourceSession.ts";
 
 export function AuthBoundary({ children }: { children: ReactNode }) {
-	const { session, error, refresh, phase, logout, logoutPending } =
+	const { session, error, refresh, logout, logoutPending } =
 		useResourceSession();
-	// Automatic sign-in fires at most once per mount. Re-verification on
-	// back-button restore or focus must land on the stable prompt with its
-	// manual button instead of starting a second login that orphans the first.
-	const redirected = useRef(false);
-	useEffect(() => {
-		if (
-			phase === "denied" &&
-			session?.authenticated === false &&
-			!redirected.current
-		) {
-			redirected.current = true;
-			redirectToSignIn();
-		}
-	}, [phase, session]);
+	// Automatic sign-in is owned by session verification's explicit denial
+	// decision (once per boundary mount). This boundary keeps only the
+	// stable prompt with its manual sign-in retry.
 	// Stale-while-revalidate: a verified account stays mounted while a
 	// later check runs or fails transiently. Only an explicit denial or a
 	// first load without any verified session takes over the full screen.
