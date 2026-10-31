@@ -82,8 +82,10 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		}
 		// Owner writes change values only. Source, pending, and void stay
 		// as stored so bank rows keep their provenance and lifecycle.
+		// Core values land in postings, enabled in posting_sim, and the
+		// claim in posting_claims; execution order never changes here.
 		posting.Source, posting.Pending, posting.Void = lifecycle.source, lifecycle.pending, lifecycle.void
-		if err := tx.QueryRow(`SELECT execution_order FROM postings WHERE id = ? AND user_id = :user_id`, posting.ID).Scan(&posting.ExecutionOrder); err != nil {
+		if err := tx.QueryRow(`SELECT execution_order FROM posting_sim WHERE posting_id = ? AND user_id = :user_id`, posting.ID).Scan(&posting.ExecutionOrder); err != nil {
 			return err
 		}
 		destinations, err := json.Marshal(posting.Destinations)
@@ -94,12 +96,21 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		if err != nil {
 			return err
 		}
-		var rule, date any
-		if posting.Claim != nil {
-			rule, date = posting.Claim.RuleID, posting.Claim.OccurrenceDate
+		if _, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = 0 WHERE id = ? AND user_id = :user_id`,
+			posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, posting.ID); err != nil {
+			return err
 		}
-		if _, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destinations = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, fulfills_rule_id = ?, fulfills_occurrence_date = ?, enabled = ?, pending = 0 WHERE id = ? AND user_id = :user_id`,
-			posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, rule, date, boolToInt(posting.Enabled), posting.ID); err != nil {
+		if _, err := tx.Exec(`UPDATE posting_sim SET enabled = ? WHERE posting_id = ? AND user_id = :user_id`,
+			boolToInt(posting.Enabled), posting.ID); err != nil {
+			return err
+		}
+		if posting.Claim != nil {
+			if _, err := tx.Exec(`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)
+				ON CONFLICT(user_id, posting_id) DO UPDATE SET fulfills_rule_id = excluded.fulfills_rule_id, fulfills_occurrence_date = excluded.fulfills_occurrence_date`,
+				posting.ID, posting.Claim.RuleID, posting.Claim.OccurrenceDate); err != nil {
+				return err
+			}
+		} else if _, err := tx.Exec(`DELETE FROM posting_claims WHERE posting_id = ? AND user_id = :user_id`, posting.ID); err != nil {
 			return err
 		}
 		return nil

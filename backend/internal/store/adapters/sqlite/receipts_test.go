@@ -9,6 +9,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -236,7 +237,7 @@ func TestReceiptCSVReplacementAndOwnerPendingMetadata(t *testing.T) {
 	}
 }
 
-func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
+func TestPostingReceiptLinksTrackLifecycle(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	s := privateTestPlan(t, d, "receipt-field")
 	p := seedReceiptPosting(t, s)
@@ -245,69 +246,89 @@ func TestPostingReceiptFieldTracksLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	field := func() string {
+	links := func() []string {
 		t.Helper()
-		var raw string
-		if err := s.db.QueryRow(`SELECT receipt_ids FROM postings WHERE id = ? AND user_id = :user_id`, p.ID).Scan(&raw); err != nil {
+		got, err := s.ListPostingReceiptIDs()
+		if err != nil {
 			t.Fatal(err)
 		}
-		return raw
+		return got[p.ID]
 	}
-	links, err := s.ListPostingReceiptIDs()
-	if err != nil || len(links[p.ID]) != 1 || links[p.ID][0] != r.ID {
-		t.Fatalf("links = %+v, %v", links, err)
+	stored := func() []string {
+		t.Helper()
+		rows, err := s.db.Query(`SELECT id FROM receipts WHERE posting_id = ? AND user_id = :user_id ORDER BY id`, p.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var ids []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			ids = append(ids, id)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return ids
 	}
-	// Duplicate uploads reuse the receipt and must not duplicate the field.
+	if got, want := links(), []string{r.ID}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("links = %v, want %v", got, want)
+	}
+	if got := stored(); !reflect.DeepEqual(got, []string{r.ID}) {
+		t.Fatalf("stored receipts = %v", got)
+	}
+	// Duplicate uploads reuse the receipt and must not duplicate the link.
 	image.Bytes = []byte("pixels")
 	if _, err := s.CreateReceipt(context.Background(), p.ID, "renamed.png", image); err != nil {
 		t.Fatal(err)
 	}
-	if got := field(); got != `["`+r.ID+`"]` {
-		t.Fatalf("field after duplicate = %s", got)
+	if got := links(); !reflect.DeepEqual(got, []string{r.ID}) {
+		t.Fatalf("links after duplicate = %v", got)
 	}
 	otherImage := types.ReceiptImage{Bytes: []byte("other pixels"), MediaType: "image/png"}
 	other, err := s.CreateReceipt(context.Background(), p.ID, "b.png", otherImage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	links, err = s.ListPostingReceiptIDs()
-	if err != nil || len(links[p.ID]) != 2 {
-		t.Fatalf("links = %+v, %v", links, err)
+	want := []string{r.ID, other.ID}
+	sort.Strings(want)
+	if got := links(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("links = %v, want %v", got, want)
 	}
-	// Ordinary posting edits preserve the field and keep it out of the model.
+	// Ordinary posting edits preserve the links and keep them out of the model.
 	p.Name = "Updated"
 	if _, err := s.UpdatePosting(p); err != nil {
 		t.Fatal(err)
 	}
-	links, err = s.ListPostingReceiptIDs()
-	if err != nil || len(links[p.ID]) != 2 {
-		t.Fatalf("links after edit = %+v, %v", links, err)
+	if got := links(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("links after edit = %v, want %v", got, want)
 	}
 	doc, _ := s.LoadModel()
 	raw, _ := json.Marshal(doc)
 	if strings.Contains(string(raw), r.ID) || strings.Contains(string(raw), "receipt") {
-		t.Fatal("receipt field leaked into the financial model")
+		t.Fatal("receipt link leaked into the financial model")
 	}
 	if err := s.DeleteReceipt(context.Background(), r.ID); err != nil {
 		t.Fatal(err)
 	}
-	links, err = s.ListPostingReceiptIDs()
-	if err != nil || len(links[p.ID]) != 1 || links[p.ID][0] != other.ID {
-		t.Fatalf("links after delete = %+v, %v", links, err)
+	if got := links(); !reflect.DeepEqual(got, []string{other.ID}) {
+		t.Fatalf("links after delete = %v", got)
 	}
 	if err := s.DeleteReceipt(context.Background(), other.ID); err != nil {
 		t.Fatal(err)
 	}
-	links, err = s.ListPostingReceiptIDs()
-	if err != nil || len(links) != 0 {
-		t.Fatalf("links after full delete = %+v, %v", links, err)
+	if got, err := s.ListPostingReceiptIDs(); err != nil || len(got) != 0 {
+		t.Fatalf("links after full delete = %+v, %v", got, err)
 	}
-	if got := field(); got != `[]` {
-		t.Fatalf("field after full delete = %s", got)
+	if got := stored(); len(got) != 0 {
+		t.Fatalf("stored receipts after full delete = %v", got)
 	}
 }
 
-func TestRepeatedSetupPreservesPostingReceiptField(t *testing.T) {
+func TestRepeatedSetupPreservesPostingReceipts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "receipt-field.db")
 	d, err := SetupDatabase(path)
 	if err != nil {
@@ -323,10 +344,43 @@ func TestRepeatedSetupPreservesPostingReceiptField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Valid stored order and formatting belong to the row, not deployment setup.
-	want := " [\"" + other.ID + "\", \"" + r.ID + "\"] "
-	if _, err := s.db.Exec(`UPDATE postings SET receipt_ids = ? WHERE id = ? AND user_id = :user_id`, want, p.ID); err != nil {
-		t.Fatal(err)
+	// Receipt links live in the receipts table now. Snapshot the stored
+	// rows and the derived links, then prove reopening preserves them.
+	snapshot := func() (string, map[string][]string) {
+		t.Helper()
+		rows, err := d.SQL().Query(`SELECT user_id, id, posting_id, digest, size, blob_key, revision, payload FROM receipts ORDER BY user_id, id`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var values [][]any
+		for rows.Next() {
+			row := make([]any, 8)
+			pointers := make([]any, len(row))
+			for i := range row {
+				pointers[i] = &row[i]
+			}
+			if err := rows.Scan(pointers...); err != nil {
+				t.Fatal(err)
+			}
+			values = append(values, row)
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		links, err := s.ListPostingReceiptIDs()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw), links
+	}
+	wantRows, wantLinks := snapshot()
+	if len(wantLinks[p.ID]) != 2 {
+		t.Fatalf("links = %+v, want both %s and %s", wantLinks, r.ID, other.ID)
 	}
 	d.Close()
 	for range 2 {
@@ -334,10 +388,13 @@ func TestRepeatedSetupPreservesPostingReceiptField(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var got string
-		err = d.SQL().QueryRow(`SELECT receipt_ids FROM postings WHERE user_id = 'owner' AND id = ?`, p.ID).Scan(&got)
-		if err != nil || got != want {
-			t.Fatalf("setup rewrote receipt links: %q, %v", got, err)
+		s = privateTestPlan(t, d, "owner")
+		gotRows, gotLinks := snapshot()
+		if gotRows != wantRows {
+			t.Fatalf("setup rewrote stored receipts:\nbefore %s\nafter %s", wantRows, gotRows)
+		}
+		if !reflect.DeepEqual(gotLinks, wantLinks) {
+			t.Fatalf("setup rewrote receipt links: %+v, want %+v", gotLinks, wantLinks)
 		}
 		if err := d.Close(); err != nil {
 			t.Fatal(err)

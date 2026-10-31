@@ -209,9 +209,20 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 	return nil
 }
 
+// postingSelect lists the columns that build a types.Posting: core fields
+// from postings, order/enabled/execution state from posting_sim, and the
+// optional claim from posting_claims. Every postings read that builds a
+// wire Posting must use this fragment with postingJoins so all three stay
+// in sync. types.Posting.Destinations keeps its wire name; it reads from
+// the destination_account_ids column.
+const postingSelect = `p.id, p.name, p.source_account_id, p.destination_account_ids, p.amount_resolution_json, p.posted_time, p.transaction_time, c.fulfills_rule_id, c.fulfills_occurrence_date, s.enabled, p.source, p.pending, p.void, s.execution_order`
+
+// postingJoins attaches the posting satellites to a postings alias p.
+const postingJoins = `FROM postings p LEFT JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id LEFT JOIN posting_claims c ON c.user_id = p.user_id AND c.posting_id = p.id`
+
 func insertPosting(tx *userTx, position int, posting *types.Posting, source string) error {
 	if posting.ExecutionOrder == 0 {
-		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM postings WHERE user_id = :user_id`).Scan(&posting.ExecutionOrder); err != nil {
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) + 1 FROM posting_sim WHERE user_id = :user_id`).Scan(&posting.ExecutionOrder); err != nil {
 			return fmt.Errorf("allocate posting execution order: %w", err)
 		}
 	}
@@ -227,19 +238,27 @@ func insertPosting(tx *userTx, position int, posting *types.Posting, source stri
 	if err != nil {
 		return fmt.Errorf("marshal amount %s: %w", posting.ID, err)
 	}
-	var sourceAccountID, claimRuleID, claimOccurrenceDate any
-	sourceAccountID = nullable(posting.SourceAccountID)
-	if posting.Claim != nil {
-		claimRuleID = posting.Claim.RuleID
-		claimOccurrenceDate = posting.Claim.OccurrenceDate
-	}
 	if _, err := tx.Exec(
-		`INSERT INTO postings (id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, user_id)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, :user_id)`,
-		posting.ID, position, posting.Name, sourceAccountID, string(destinationsJSON), string(amountJSON),
-		posting.PostedTime, posting.TransactionTime, claimRuleID, claimOccurrenceDate, boolToInt(posting.Enabled), source, boolToInt(source != SourceUser && posting.Pending), boolToInt(posting.Void), posting.ExecutionOrder,
+		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id)
+		 VALUES (?,?,?,?,?,?,?,?,?,?, :user_id)`,
+		posting.ID, posting.Name, nullable(posting.SourceAccountID), string(destinationsJSON), string(amountJSON),
+		posting.PostedTime, posting.TransactionTime, source, boolToInt(source != SourceUser && posting.Pending), boolToInt(posting.Void),
 	); err != nil {
 		return fmt.Errorf("insert posting %s: %w", posting.ID, err)
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id) VALUES (?, ?, ?, ?, :user_id)`,
+		posting.ID, position, boolToInt(posting.Enabled), posting.ExecutionOrder,
+	); err != nil {
+		return fmt.Errorf("insert posting sim %s: %w", posting.ID, err)
+	}
+	if posting.Claim != nil {
+		if _, err := tx.Exec(
+			`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)`,
+			posting.ID, posting.Claim.RuleID, posting.Claim.OccurrenceDate,
+		); err != nil {
+			return fmt.Errorf("insert posting claim %s: %w", posting.ID, err)
+		}
 	}
 	return nil
 }
@@ -295,17 +314,17 @@ func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 }
 
 func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
-	// postings.receipt_ids is a storage-only back-reference. It is never
-	// selected here, so it cannot enter FinancialModel, financial
-	// revisions, or projection identities; the API exposes it separately as
-	// receiptLinks. Creation/deletion maintain it in the same transaction as
-	// the receipt row (see addPostingReceiptID/removePostingReceiptID).
+	// Receipt links live in the receipts table now; scanPostingRow only
+	// assembles the wire Posting from postings plus its sim and claim
+	// satellites. Callers must select postingSelect with postingJoins so
+	// the column order below holds.
 	var posting types.Posting
 	var sourceAccountID, claimRuleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string
-	var enabled, pending, voided int64
+	var enabled, executionOrder sql.NullInt64
+	var pending, voided int64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &posting.ExecutionOrder); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &executionOrder); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -325,9 +344,12 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	if claimRuleID.Valid && claimOccurrenceDate.Valid {
 		posting.Claim = &types.PostingClaim{RuleID: claimRuleID.String, OccurrenceDate: claimOccurrenceDate.String}
 	}
-	posting.Enabled = enabled != 0
+	posting.Enabled = enabled.Valid && enabled.Int64 != 0
 	posting.Pending = pending != 0
 	posting.Void = voided != 0
+	if executionOrder.Valid {
+		posting.ExecutionOrder = executionOrder.Int64
+	}
 	if source.Valid {
 		posting.Source = source.String
 	}
@@ -500,7 +522,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE user_id = :user_id ORDER BY position`)
+	postingRows, err := q.Query(`SELECT ` + postingSelect + ` ` + postingJoins + ` WHERE p.user_id = :user_id ORDER BY s.position`)
 	if err != nil {
 		return nil, err
 	}

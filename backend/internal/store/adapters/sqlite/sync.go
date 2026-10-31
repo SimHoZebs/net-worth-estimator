@@ -16,8 +16,12 @@ func syncCheckpointKey(accountID string, observedAt int64) string {
 
 // nextTablePosition returns MAX(position)+1 for a position-ordered table, or
 // 0 when empty. One position-management helper shared by the sync apply and
-// model re-merge paths.
+// model re-merge paths. Posting display order lives in posting_sim, so a
+// "postings" request resolves to that satellite.
 func nextTablePosition(tx *userTx, table string) (int, error) {
+	if table == "postings" {
+		table = "posting_sim"
+	}
 	var maxPosition sql.NullInt64
 	if err := tx.QueryRow(`SELECT MAX(position) FROM ` + table + ` WHERE user_id = :user_id`).Scan(&maxPosition); err != nil {
 		return 0, fmt.Errorf("next %s position: %w", table, err)
@@ -125,7 +129,7 @@ func loadSyncedCheckpoints(tx *userTx) ([]types.Checkpoint, error) {
 }
 
 func loadSyncedPostings(tx *userTx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order FROM postings WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
+	rows, err := tx.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}

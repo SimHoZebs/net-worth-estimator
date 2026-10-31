@@ -85,7 +85,7 @@ func orderedIDs(tx *userTx, kind RowKind, evaluationType string) ([]string, erro
 	case RowAccount:
 		query = `SELECT id FROM accounts WHERE user_id = :user_id ORDER BY position`
 	case RowPosting:
-		query = `SELECT id FROM postings WHERE user_id = :user_id ORDER BY position`
+		query = `SELECT p.id FROM postings p LEFT JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id WHERE p.user_id = :user_id ORDER BY s.position`
 	case RowRule:
 		query = `SELECT id FROM recurrence_rules WHERE user_id = :user_id ORDER BY position`
 	case RowEvaluation:
@@ -124,7 +124,7 @@ func rewritePositions(tx *userTx, kind RowKind, evaluationType string, ids []str
 			query = `UPDATE accounts SET position = ? WHERE id = ? AND user_id = :user_id`
 			args = []any{position, id}
 		case RowPosting:
-			query = `UPDATE postings SET position = ? WHERE id = ? AND user_id = :user_id`
+			query = `UPDATE posting_sim SET position = ? WHERE posting_id = ? AND user_id = :user_id`
 			args = []any{position, id}
 		case RowRule:
 			query = `UPDATE recurrence_rules SET position = ? WHERE id = ? AND user_id = :user_id`
