@@ -300,8 +300,6 @@ func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.Simulatio
 	result.Summary.FinalNetWorth = roundCurrency(finalNetWorth)
 	result.TransactionEvents = publicTransactionEvents(path)
 
-	copyResultTables := func(dst *types.EvaluationResultTables) {}
-	_ = copyResultTables
 	return path, result
 }
 

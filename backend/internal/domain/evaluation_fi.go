@@ -486,15 +486,12 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	branchRules := shared.branchRules
 	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
 	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
-	transitions, err := CreateTransitionRuntime(types.SimulationInputs{
+	transitions := CreateTransitionRuntime(types.SimulationInputs{
 		Accounts:        path.EffectiveModel.Accounts,
 		Postings:        branchPostings,
 		RecurrenceRules: branchRules,
 		PaymentTerms:    path.EffectiveModel.PaymentTerms,
 	}, initializeBranchSimulationState(candidateBalances, path.TransactionEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
-	if err != nil {
-		return nil, err
-	}
 	balances := transitions.State.Balances
 	selectedAccountIDs := assetRateOrder
 	balanceTrajectoryRow := func(date IsoDate) map[string]any {

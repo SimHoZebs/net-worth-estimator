@@ -190,7 +190,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		return events[i].seq < events[j].seq
 	})
 
-	transitions, err := CreateTransitionRuntime(types.SimulationInputs{
+	transitions := CreateTransitionRuntime(types.SimulationInputs{
 		Accounts:         model.Accounts,
 		Postings:         model.Postings,
 		RecurrenceRules:  model.RecurrenceRules,
@@ -201,9 +201,6 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
 	}, projectionStartDate, nil)
-	if err != nil {
-		return nil, err
-	}
 
 	latestObserved := map[string]types.Checkpoint{}
 	historicalSnapshots := []types.HistoricalObservationSnapshot{}
