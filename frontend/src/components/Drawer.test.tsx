@@ -187,6 +187,32 @@ describe("drawer semantics", () => {
 });
 
 describe("animated close", () => {
+	it("starts a fresh session when externally dismissed and immediately reopened", async () => {
+		const onClose = vi.fn();
+		const sheet = (open: boolean) => (
+			<Drawer
+				side="right"
+				open={open}
+				label="Context"
+				onClose={onClose}
+				appearance={{ title: "Context" }}
+			>
+				<p>Details</p>
+			</Drawer>
+		);
+		const view = render(sheet(true));
+		const previous = view.getByRole("dialog", { name: "Context" });
+		fireEvent.click(view.getByRole("button", { name: "Close dialog" }));
+		view.rerender(sheet(false));
+		expect(view.queryByRole("dialog")).toBeNull();
+		view.rerender(sheet(true));
+		const reopened = view.getByRole("dialog", { name: "Context" });
+		expect(reopened).not.toBe(previous);
+		await waitFor(() => expect(reopened.style.opacity).toBe("1"));
+		expect(onClose).not.toHaveBeenCalled();
+		fireEvent.keyDown(window, { key: "Escape" });
+		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+	});
 	it("does not complete an old close action after external navigation removes the drawer", async () => {
 		const onClose = vi.fn();
 		const view = render(
