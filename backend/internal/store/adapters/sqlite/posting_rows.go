@@ -81,11 +81,22 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		if !lifecycle.ownerEditable() {
 			return SyncOwned(posting.ID)
 		}
-		// Owner writes change values only. Source, pending, and void stay
-		// as stored so bank rows keep their provenance and lifecycle.
-		// Core values land in postings, enabled in posting_sim, and the
-		// claim in posting_claims; execution order never changes here.
-		posting.Source, posting.Pending, posting.Void = lifecycle.source, lifecycle.pending, lifecycle.void
+		// Detect a pending bank charge being claimed as an occurrence: the
+		// claim converts it from a pending seed into a recorded occurrence.
+		var storedClaim int
+		_ = tx.QueryRow(`SELECT 1 FROM posting_claims WHERE posting_id = ? AND user_id = :user_id`, posting.ID).Scan(&storedClaim)
+		claiming := lifecycle.source != SourceUser && lifecycle.pending && posting.Claim != nil && storedClaim == 0
+		// Owner writes change values only. Source and void stay as stored so
+		// bank rows keep their provenance and lifecycle. Pending is preserved
+		// for ordinary edits and cleared only when claiming.
+		posting.Source, posting.Void = lifecycle.source, lifecycle.void
+		if lifecycle.source == SourceUser {
+			posting.Pending = false
+		} else if claiming {
+			posting.Pending = false
+		} else {
+			posting.Pending = lifecycle.pending
+		}
 		if err := tx.QueryRow(`SELECT execution_order FROM posting_sim WHERE posting_id = ? AND user_id = :user_id`, posting.ID).Scan(&posting.ExecutionOrder); err != nil {
 			return err
 		}
@@ -97,8 +108,8 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = 0 WHERE id = ? AND user_id = :user_id`,
-			posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, posting.ID); err != nil {
+		if _, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ? WHERE id = ? AND user_id = :user_id`,
+			posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(posting.Pending), posting.ID); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE posting_sim SET enabled = ? WHERE posting_id = ? AND user_id = :user_id`,
@@ -174,6 +185,11 @@ func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.Recurren
 		lifecycle, err := postingLifecycleOf(tx, postingID)
 		if err != nil {
 			return err
+		}
+		// Conversion suppresses and deletes the row; keep pending bank rows
+		// out of it, matching the original guard.
+		if lifecycle.source != SourceUser && lifecycle.pending {
+			return SyncOwned(postingID)
 		}
 		if !lifecycle.ownerEditable() {
 			return SyncOwned(postingID)
