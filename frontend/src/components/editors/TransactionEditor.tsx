@@ -34,7 +34,6 @@ import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
-import { sourceReadOnlyReason } from "./EditorForm.tsx";
 
 /** Transaction editor. Saves straight to the server; no draft involved. */
 export function TransactionEditor({
@@ -234,7 +233,6 @@ export function TransactionEditor({
 			title={`${item ? "Edit" : "Add"} planned transaction`}
 			onClose={onClose}
 		>
-			{readOnly && <Notice>{sourceReadOnlyReason}</Notice>}
 			{calculated && (
 				<Notice>
 					This amount is calculated each occurrence. Calculated transactions

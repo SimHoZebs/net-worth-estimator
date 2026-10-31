@@ -1,4 +1,3 @@
-import { LockKeyhole } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { updateAccount } from "@/api/generated/endpoints.ts";
 import { useEditDraft } from "../editors/useEditDraft.ts";
@@ -20,7 +19,6 @@ import {
 	getServerModel,
 	refreshAccounts,
 } from "../../state/workspaceResources.ts";
-import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 import { parseUnion } from "../../domain/guards.ts";
 
 function toAmountInput(value: number | null): string {
@@ -199,12 +197,6 @@ export function AccountDetails({
 					<button type="button" onClick={edit.reset}>
 						Discard edits and use current values
 					</button>
-				</Notice>
-			)}
-			{readOnly && (
-				<Notice>
-					<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
-					{sourceReadOnlyReason}
 				</Notice>
 			)}
 			{error && <ErrorNotice message={error} />}

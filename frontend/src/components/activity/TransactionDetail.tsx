@@ -9,7 +9,6 @@ import {
 	ChevronDown,
 	Clock3,
 	Link2,
-	LockKeyhole,
 	Repeat,
 	RotateCcw,
 	Save,
@@ -39,7 +38,6 @@ import { Notice } from "../Notice.tsx";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
-import { sourceReadOnlyReason } from "../editors/EditorForm.tsx";
 import {
 	convertTransaction,
 	createRule,
@@ -414,27 +412,11 @@ function ScheduleCapsule({
 	);
 }
 
-function ReadOnlyNotice({
-	savedTransaction,
-}: {
-	savedTransaction: Transaction;
-}) {
-	if (savedTransaction.readOnly) {
-		return (
-			<Notice className="my-4">
-				<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
-				{sourceReadOnlyReason}
-			</Notice>
-		);
-	}
-	return null;
-}
-
 function readOnlyReasonFor(savedTransaction: Transaction): string | undefined {
 	return savedTransaction.amountKnown === false
 		? "This amount is calculated each time. See the transaction list for the resolved amounts."
 		: savedTransaction.readOnly
-			? sourceReadOnlyReason
+			? "Read-only."
 			: undefined;
 }
 
@@ -505,7 +487,7 @@ function useTransactionEdit({
 	const draft = edit.value;
 	const formId = useId();
 	const rowReason = readOnlyReasonFor(savedTransaction);
-	const readOnlyReason = readOnlyProp ? sourceReadOnlyReason : rowReason;
+	const readOnlyReason = readOnlyProp ? "Read-only." : rowReason;
 	useBeforeUnload(activeField !== null && touched && !saving);
 	const updateDraft = (patch: Partial<TransactionDraft>, field: EditField) => {
 		if (readOnlyReason) return;
@@ -1045,7 +1027,11 @@ export function TransactionDetail({
 									</span>
 								)}
 								<span className="text-sm text-muted">
-									{categoryLabel(kind)}
+									{associatedAccountLabel({
+										fromAccount,
+										toAccount,
+										transaction,
+									})}
 								</span>
 							</div>
 						</div>
