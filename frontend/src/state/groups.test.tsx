@@ -1,10 +1,15 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { acceptOwnerResource, acceptTestResource } from "../mocks/resource.ts";
+import { acceptOwnerResource } from "../mocks/resource.ts";
 import { ok } from "../mocks/fetch.ts";
-import { getUserScope, suspendUserScope } from "../auth/resourceScope.ts";
+import {
+	deferred,
+	recordedRequests,
+	setupQueryScope,
+	teardownQueryScope,
+	ServerQueryWrapper,
+} from "../mocks/testScope.tsx";
+import { getUserScope } from "../auth/resourceScope.ts";
 import type { GroupRole, UserGroup } from "../pages/groupsApi.ts";
 import {
 	groupDetailKey,
@@ -14,15 +19,9 @@ import {
 	useGroups,
 	useRevokeInvite,
 } from "./groups.ts";
-import { resetServerQueryCache, serverQueryClient } from "./serverQuery.ts";
+import { serverQueryClient } from "./serverQuery.ts";
 
-function wrapper({ children }: { children: ReactNode }) {
-	return (
-		<QueryClientProvider client={serverQueryClient()}>
-			{children}
-		</QueryClientProvider>
-	);
-}
+const wrapper = ServerQueryWrapper;
 
 function group(
 	id: string,
@@ -42,37 +41,12 @@ function member(accountId: string, role: GroupRole = "member") {
 	return { accountId, role, displayName: accountId, joinedAt: 1 };
 }
 
-function seenRequests(fetcher: ReturnType<typeof vi.fn>) {
-	return fetcher.mock.calls.map((call) => {
-		const [url, init] = call as [string, RequestInit | undefined];
-		return {
-			url: String(url),
-			method: init?.method ?? "GET",
-			resource: new Headers(init?.headers).get("Waypoint-Resource"),
-		};
-	});
-}
-
-function deferred<T>() {
-	let resolve!: (value: T) => void;
-	let reject!: (cause: unknown) => void;
-	const promise = new Promise<T>((res, rej) => {
-		resolve = res;
-		reject = rej;
-	});
-	return { promise, resolve, reject };
-}
-
 beforeEach(() => {
-	resetServerQueryCache();
-	acceptTestResource();
+	setupQueryScope();
 });
 
 afterEach(() => {
-	cleanup();
-	suspendUserScope();
-	resetServerQueryCache();
-	vi.unstubAllGlobals();
+	teardownQueryScope();
 });
 
 it("loads the group list on mount with the verified user assertion", async () => {
@@ -81,7 +55,7 @@ it("loads the group list on mount with the verified user assertion", async () =>
 	const hook = renderHook(() => useGroups(), { wrapper });
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(hook.result.current.data).toEqual([group("g1")]);
-	const requests = seenRequests(fetcher);
+	const requests = recordedRequests(fetcher);
 	expect(requests).toHaveLength(1);
 	expect(requests[0]).toMatchObject({
 		url: "/v1/groups",
@@ -107,7 +81,7 @@ it("keeps the selected group's detail when another group's response arrives late
 	});
 	await waitFor(() =>
 		expect(
-			seenRequests(fetcher).some((request) =>
+			recordedRequests(fetcher).some((request) =>
 				request.url.endsWith("/v1/groups/a"),
 			),
 		).toBe(true),
@@ -153,7 +127,7 @@ it("never shows late invites for a previously selected group", async () => {
 	);
 	await waitFor(() =>
 		expect(
-			seenRequests(fetcher).some(
+			recordedRequests(fetcher).some(
 				(request) => request.url === "/v1/groups/a/invites",
 			),
 		).toBe(true),
@@ -193,7 +167,7 @@ it("shows no detail after deselection", async () => {
 	hook.rerender({ id: null });
 	expect(hook.result.current.data).toBeUndefined();
 	expect(
-		seenRequests(fetcher).some((request) => request.url.includes("none")),
+		recordedRequests(fetcher).some((request) => request.url.includes("none")),
 	).toBe(false);
 });
 
@@ -206,11 +180,11 @@ it("role-gates invites: members never fetch them", async () => {
 	);
 	await act(async () => {});
 	expect(hook.result.current.fetchStatus).toBe("idle");
-	expect(seenRequests(fetcher)).toHaveLength(0);
+	expect(recordedRequests(fetcher)).toHaveLength(0);
 	hook.rerender({ role: "admin" });
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(
-		seenRequests(fetcher).filter(
+		recordedRequests(fetcher).filter(
 			(request) => request.url === "/v1/groups/g/invites",
 		),
 	).toHaveLength(1);
@@ -237,7 +211,7 @@ it("createGroup invalidates the group list", async () => {
 		expect(list.result.current.data).toEqual([group("g1"), group("g2")]),
 	);
 	expect(
-		seenRequests(fetcher).filter(
+		recordedRequests(fetcher).filter(
 			(request) => request.url === "/v1/groups" && request.method === "GET",
 		),
 	).toHaveLength(2);
@@ -300,7 +274,9 @@ it("isolates identical group ids by user scope", async () => {
 	acceptOwnerResource("users/two");
 	hook.rerender();
 	await waitFor(() => expect(hook.result.current.data?.group.name).toBe("Two"));
-	const resources = seenRequests(fetcher).map((request) => request.resource);
+	const resources = recordedRequests(fetcher).map(
+		(request) => request.resource,
+	);
 	expect(resources).toEqual(["users/one", "users/two"]);
 	expect(serverQueryClient().getQueryData(groupDetailKey("g"))).toEqual({
 		group: { ...group("g"), name: "Two" },

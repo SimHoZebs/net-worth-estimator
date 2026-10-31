@@ -1,30 +1,15 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
-import type { ReactNode } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { suspendUserScope } from "../auth/resourceScope.ts";
 import { ok } from "../mocks/fetch.ts";
-import { acceptTestResource } from "../mocks/resource.ts";
 import {
-	resetServerQueryCache,
-	serverQueryClient,
-} from "../state/serverQuery.ts";
+	ServerQueryWrapper,
+	setupQueryScope,
+	teardownQueryScope,
+} from "../mocks/testScope.tsx";
 import type { GroupRole } from "./groupsApi.ts";
 import { GroupsPage } from "./GroupsPage.tsx";
 
-function wrapper({ children }: { children: ReactNode }) {
-	return (
-		<QueryClientProvider client={serverQueryClient()}>
-			{children}
-		</QueryClientProvider>
-	);
-}
+const wrapper = ServerQueryWrapper;
 
 function stubGroups(
 	groups: Array<{
@@ -98,16 +83,12 @@ function stubGroups(
 }
 
 beforeEach(() => {
-	resetServerQueryCache();
-	acceptTestResource();
+	setupQueryScope();
 	window.location.hash = "#groups";
 });
 
 afterEach(() => {
-	cleanup();
-	suspendUserScope();
-	resetServerQueryCache();
-	vi.unstubAllGlobals();
+	teardownQueryScope();
 	window.location.hash = "";
 });
 

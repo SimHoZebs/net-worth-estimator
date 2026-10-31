@@ -9,6 +9,7 @@ import {
 	independenceRow,
 } from "@/mocks/financialIndependence.ts";
 import { FinancialIndependenceCard } from "./FinancialIndependenceCard.tsx";
+import { stubMatchMedia } from "@/mocks/testScope.tsx";
 
 // Focus, dismissal, and responsive framing use the real shared Drawer in browser tests.
 vi.mock("@/components/Drawer.tsx", () => ({
@@ -31,12 +32,7 @@ vi.mock("@/components/Drawer.tsx", () => ({
 }));
 
 beforeEach(() => {
-	vi.stubGlobal("matchMedia", (query: string) => ({
-		matches: false,
-		media: query,
-		addEventListener: () => {},
-		removeEventListener: () => {},
-	}));
+	stubMatchMedia(false);
 });
 afterEach(() => {
 	cleanup();

@@ -1,17 +1,13 @@
 import {
 	act,
-	cleanup,
 	fireEvent,
 	render,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { acceptTestResource } from "../../mocks/resource.ts";
-import {
-	resetServerQueryCache,
-	serverQueryClient,
-} from "../../state/serverQuery.ts";
+import { setupQueryScope, teardownQueryScope } from "../../mocks/testScope.tsx";
+import { serverQueryClient } from "../../state/serverQuery.ts";
 import { getUserScope } from "../../auth/resourceScope.ts";
 import { userResourceKey } from "../../state/workspaceResources.ts";
 import {
@@ -228,19 +224,15 @@ function stubApi(state: {
 }
 
 beforeEach(() => {
-	acceptTestResource();
-	resetServerQueryCache();
+	setupQueryScope();
 	resetSyncWorkspaceRefresh();
-	vi.unstubAllGlobals();
 });
 
 afterEach(() => {
-	cleanup();
+	teardownQueryScope();
 	resetSyncSettingsClient();
-	resetServerQueryCache();
 	resetSyncWorkspaceRefresh();
 	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
 });
 
 it("shows a complete setup guide without a prerequisite click", async () => {

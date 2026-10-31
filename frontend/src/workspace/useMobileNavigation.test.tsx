@@ -7,18 +7,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Drawer } from "../components/Drawer.tsx";
+import { stubMatchMedia } from "../mocks/testScope.tsx";
 import { useMobileNavigation } from "./useMobileNavigation.ts";
 
 beforeEach(() => {
-	vi.stubGlobal("matchMedia", (query: string) => ({
-		matches: true,
-		media: query,
-		addEventListener: () => {},
-		removeEventListener: () => {},
-		addListener: () => {},
-		removeListener: () => {},
-		dispatchEvent: () => false,
-	}));
+	stubMatchMedia(true);
 });
 
 afterEach(() => {
