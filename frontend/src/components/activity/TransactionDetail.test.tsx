@@ -228,7 +228,7 @@ it("marks holds that did not post instead of posted", () => {
 		requested: 42.1,
 		shortfall: 0,
 		constraint: null,
-		excluded: true,
+		excluded: false,
 		pending: false,
 		void: true,
 	};
@@ -245,6 +245,61 @@ it("marks holds that did not post instead of posted", () => {
 	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
 	expect(screen.queryByText("Posted")).toBeNull();
 	expect(screen.queryByText("Pending")).toBeNull();
+	expect(screen.queryByText("Excluded")).toBeNull();
+});
+
+it("marks a live hold as not yet posted", () => {
+	const planTransaction = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000098",
+		name: "Live hold",
+		amount: 18.5,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		frequency: "once" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: true,
+		void: false,
+	};
+	const transaction: AccountTransaction = {
+		id: "recorded-01900000-0000-7000-8000-000000000098",
+		transactionId: planTransaction.id,
+		date: "2026-10-20",
+		name: planTransaction.name,
+		source: "historical",
+		direction: "out",
+		category: "expense",
+		counterparty: "Unknown account",
+		from: "Everyday checking",
+		to: "External spending",
+		amount: 18.5,
+		requested: 18.5,
+		shortfall: 0,
+		constraint: null,
+		excluded: false,
+		pending: true,
+		void: false,
+	};
+	render(
+		<TransactionDetail
+			transaction={transaction}
+			planTransaction={planTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={[planTransaction]}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.getByText("Pending")).toBeTruthy();
+	expect(screen.getByText("Not yet posted")).toBeTruthy();
+	expect(screen.queryByText("Excluded")).toBeNull();
 });
 
 it("saves row edits through the posting endpoint and closes", async () => {

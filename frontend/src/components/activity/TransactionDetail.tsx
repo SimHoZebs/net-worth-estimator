@@ -1018,6 +1018,7 @@ export function TransactionDetail({
 								)}
 								{!savedTransaction.enabled &&
 									!transaction.pending &&
+									!transaction.void &&
 									!showExcluded && <Badge tone="warning">Excluded</Badge>}
 								{savedTransaction.amountKnown === false && (
 									<Badge tone="neutral">Calculated</Badge>
