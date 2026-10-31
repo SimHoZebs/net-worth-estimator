@@ -5,6 +5,7 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthBoundary } from "@/auth/AuthBoundary.tsx";
 import { redirectToSignIn } from "@/auth/navigation.ts";
@@ -390,5 +391,134 @@ describe("provider-independent authentication boundary", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
 		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
 		expect(screen.getByText("Private workspace")).toBeTruthy();
+	});
+	it("redirects once when a later check denies a previously allowed guest", async () => {
+		const fetcher = vi.fn(async () =>
+			status({
+				enabled: true,
+				authenticated: false,
+				allowed: true,
+				resource: guestAccount,
+				user: guestUser,
+			}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
+		// Same resource, subject, and permissions with allowed flipped to
+		// false: the same-owner revalidation denial branch owns the redirect.
+		fetcher.mockImplementation(async () =>
+			status({
+				enabled: true,
+				authenticated: false,
+				allowed: false,
+				resource: guestAccount,
+				user: guestUser,
+			}),
+		);
+		window.dispatchEvent(new Event("focus"));
+		expect(
+			await screen.findByRole("button", { name: "Continue to sign in" }),
+		).toBeTruthy();
+		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
+		// A second re-verification lands on the stable prompt.
+		const calls = fetcher.mock.calls.length;
+		window.dispatchEvent(new Event("focus"));
+		await waitFor(() =>
+			expect(fetcher.mock.calls.length).toBeGreaterThan(calls),
+		);
+		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
+		// Manual sign-in retry still works after the single automatic one.
+		fireEvent.click(
+			screen.getByRole("button", { name: "Continue to sign in" }),
+		);
+		expect(redirectToSignIn).toHaveBeenCalledTimes(2);
+	});
+	it("redirects again after the boundary unmounts and mounts again", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				status({
+					enabled: true,
+					authenticated: false,
+					allowed: false,
+					resource: { ...guestAccount, permissions: [] },
+					user: guestUser,
+				}),
+			),
+		);
+		const first = render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		await screen.findByRole("button", { name: "Continue to sign in" });
+		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
+		first.unmount();
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+			</AuthBoundary>,
+		);
+		await screen.findByRole("button", { name: "Continue to sign in" });
+		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(2));
+	});
+	it("redirects once for a denied guest across a strict-mode remount", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				status({
+					enabled: true,
+					authenticated: false,
+					allowed: false,
+					resource: { ...guestAccount, permissions: [] },
+					user: guestUser,
+				}),
+			),
+		);
+		render(
+			<StrictMode>
+				<AuthBoundary>
+					<p>Private workspace</p>
+				</AuthBoundary>
+			</StrictMode>,
+		);
+		await screen.findByRole("button", { name: "Continue to sign in" });
+		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
+		window.dispatchEvent(new Event("focus"));
+		await waitFor(() =>
+			expect(screen.queryByText("Private workspace")).toBeNull(),
+		);
+		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
+	});
+	it("does not redirect on a transient outage for a verified user", async () => {
+		const fetcher = vi.fn(async () =>
+			status({
+				enabled: true,
+				authenticated: true,
+				allowed: true,
+				resource: privateAccount,
+				user: { subject: "known-account", name: "User" },
+			}),
+		);
+		vi.stubGlobal("fetch", fetcher);
+		render(
+			<AuthBoundary>
+				<p>Private workspace</p>
+				<NotificationCenter />
+			</AuthBoundary>,
+		);
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
+		fetcher.mockImplementationOnce(async () => status({}, 503));
+		fireEvent(window, new Event("focus"));
+		expect(await screen.findByRole("alert")).toBeTruthy();
+		expect(screen.getByText("Private workspace")).toBeTruthy();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 });
