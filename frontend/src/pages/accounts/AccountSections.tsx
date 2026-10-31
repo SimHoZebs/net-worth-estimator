@@ -12,6 +12,7 @@ import {
 	sortTransactionsByDate,
 	type TransactionOrder,
 } from "../../domain/transactionSort.ts";
+import { NO_CEILING_SENTINEL, NO_FLOOR_SENTINEL } from "../../api/contracts.ts";
 import {
 	type Account,
 	visibleAccounts,
@@ -102,8 +103,18 @@ function AccountsView({
 					enabled: row.enabled,
 					archived: row.archived,
 					balance: row.balance,
-					minBalance: row.minBalance ?? 0,
-					maxBalance: row.maxBalance,
+					minBalance:
+						row.minBalance === null ||
+						row.minBalance === NO_FLOOR_SENTINEL ||
+						row.minBalance < 0
+							? 0
+							: row.minBalance,
+					maxBalance:
+						row.maxBalance === null ||
+						row.maxBalance === NO_CEILING_SENTINEL ||
+						row.maxBalance < 0
+							? null
+							: row.maxBalance,
 					color: row.color ?? null,
 					observedOn: row.observedOn,
 					balanceCheck: row.hasCheckpoint,

@@ -28,15 +28,11 @@ export function AccountsPanel({
 		return <EmptyState icon={Wallet} title="No matching accounts" />;
 	return (
 		<DataTable
-			caption="Accounts with balances and protected balances."
+			caption="Accounts with balances."
 			showHeaders={showHeaders}
 			columns={[
 				{ label: "Account", className: "max-sm:p-4" },
 				{ label: "Balance", className: "max-sm:p-4" },
-				{
-					label: "Protected balance",
-					className: "max-sm:p-4",
-				},
 				{
 					label: "Actions",
 					srOnly: true,
@@ -72,9 +68,6 @@ export function AccountsPanel({
 									Observed {money(account.observedBalance)}
 								</small>
 							)}
-					</TableCell>
-					<TableCell className="max-sm:p-4">
-						{money(account.minBalance)}
 					</TableCell>
 					<TableCell className="max-sm:p-4">
 						<div className="flex justify-end gap-1">
