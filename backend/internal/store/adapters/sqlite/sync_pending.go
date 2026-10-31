@@ -36,6 +36,55 @@ func insertPostingSyncKey(tx *userTx, key postingSyncKey) error {
 	return err
 }
 
+// ensureSuppressionSchema creates the do-not-import list on demand so
+// databases provisioned before it existed keep working untouched.
+func ensureSuppressionSchema(tx *userTx) error {
+	_, err := tx.Exec(suppressedSyncKeysDDL)
+	return err
+}
+
+// suppressPostingKeys copies a row's bank ids onto the do-not-import list.
+// Keyless owner rows suppress nothing. All placeholders stay positional:
+// mixing ? with named arguments misbinds on this driver.
+func suppressPostingKeys(tx *userTx, postingID string, now int64) error {
+	_, err := tx.Exec(`INSERT OR IGNORE INTO suppressed_sync_keys (provider, bridge_account_id, transaction_id, suppressed_at, user_id)
+		SELECT provider, bridge_account_id, transaction_id, ?, ? FROM posting_sync_keys WHERE posting_id = ? AND user_id = ?`,
+		now, tx.userID, postingID, tx.userID)
+	return err
+}
+
+func loadSuppressedKeys(tx *userTx) (map[BankKey]struct{}, error) {
+	rows, err := tx.Query(`SELECT provider, bridge_account_id, transaction_id FROM suppressed_sync_keys WHERE user_id = :user_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[BankKey]struct{}{}
+	for rows.Next() {
+		var key BankKey
+		if err := rows.Scan(&key.Provider, &key.AccountID, &key.TransactionID); err != nil {
+			return nil, err
+		}
+		out[key] = struct{}{}
+	}
+	return out, rows.Err()
+}
+
+// suppressedUpsert reports whether every key of an upsert sits on the
+// do-not-import list. A removed charge stays removed: the feed keeps
+// sending it, apply keeps skipping it.
+func suppressedUpsert(suppressed map[BankKey]struct{}, upsert *BankUpsert) bool {
+	if len(upsert.Keys) == 0 {
+		return false
+	}
+	for _, key := range upsert.Keys {
+		if _, ok := suppressed[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // LoadBankPostings returns every bank-reported posting with the upstream
 // identities pointing at it. Adapters reconcile snapshots against this.
 func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
@@ -201,6 +250,16 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 				return fmt.Errorf("bank conversion requires a posting ID")
 			}
 			if err := checkBankPosting(conversion.Posting); err != nil {
+				return err
+			}
+			var present int
+			err := tx.QueryRow(`SELECT 1 FROM postings WHERE id = ? AND user_id = :user_id`, conversion.ID).Scan(&present)
+			if err == sql.ErrNoRows {
+				// The row was removed after the snapshot loaded: the
+				// values have nowhere to land, and the removal stands.
+				continue
+			}
+			if err != nil {
 				return err
 			}
 			if err := writeBankValues(tx, conversion.ID, conversion.Posting); err != nil {

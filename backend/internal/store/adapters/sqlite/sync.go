@@ -293,6 +293,28 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 		summary.CheckpointsUpdated++
 	}
 
+	if err := ensureSuppressionSchema(tx); err != nil {
+		return summary, err
+	}
+	suppressed, err := loadSuppressedKeys(tx)
+	if err != nil {
+		return summary, err
+	}
+	if len(suppressed) > 0 {
+		kept := directives[:0]
+		for _, directive := range directives {
+			if directive.Upsert != nil && suppressedUpsert(suppressed, directive.Upsert) {
+				continue
+			}
+			kept = append(kept, directive)
+		}
+		// Zero the tail so the dropped directives release their references.
+		for i := len(kept); i < len(directives); i++ {
+			directives[i] = BankDirective{}
+		}
+		directives = kept
+	}
+
 	if err := applyBankDirectives(tx, directives, &summary); err != nil {
 		return summary, err
 	}

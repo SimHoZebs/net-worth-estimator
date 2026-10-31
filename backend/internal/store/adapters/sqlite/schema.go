@@ -52,6 +52,19 @@ func seedUserTables(tx *userTx) error {
 	return nil
 }
 
+// suppressedSyncKeysDDL is the do-not-import list: bank ids the owner
+// removed stay removed. Fresh databases get it from schemaStatements;
+// existing databases self-heal through ensureSuppressionSchema at first
+// use, so no operator migration is needed.
+const suppressedSyncKeysDDL = `CREATE TABLE IF NOT EXISTS suppressed_sync_keys (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	provider TEXT NOT NULL,
+	bridge_account_id TEXT NOT NULL,
+	transaction_id TEXT NOT NULL,
+	suppressed_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
+)`
+
 func schemaStatements() []string {
 	return []string{
 		`CREATE TABLE IF NOT EXISTS sessions (
@@ -150,6 +163,7 @@ func schemaStatements() []string {
 			FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE,
 			PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
 		)`,
+		suppressedSyncKeysDDL,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,

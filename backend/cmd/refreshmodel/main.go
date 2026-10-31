@@ -22,7 +22,7 @@ import (
 // Keep identity and ownership tables outside this allowlist. Unknown scoped
 // tables fail closed so a schema extension cannot silently leave stale rows.
 var financialTables = []string{
-	"accounts", "checkpoints", "postings", "posting_sync_keys",
+	"accounts", "checkpoints", "postings", "posting_sync_keys", "suppressed_sync_keys",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
@@ -87,6 +87,11 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		return err
 	}
 	defer db.Close()
+	// The do-not-import list postdates some snapshots: create it on the
+	// target so its suppressions copy over instead of dropping silently.
+	if err := db.EnsureSuppressionSchema(); err != nil {
+		return fmt.Errorf("ensure suppression schema: %w", err)
+	}
 	absSource, err := filepath.Abs(source)
 	if err != nil {
 		return err
@@ -148,7 +153,10 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
-		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "transaction_source_facts" || strings.HasPrefix(table.name, "analysis_")) {
+		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || strings.HasPrefix(table.name, "analysis_")) {
+			// Guest publication carries no sync identity: the provisioned
+			// guest never syncs, so bank keys and the do-not-import list
+			// stay behind with the credentials. Full refresh copies both.
 			continue
 		}
 		columns, values := []string{"user_id"}, []string{"?"}
@@ -211,6 +219,14 @@ var identityTables = map[string]bool{
 	"group_members": true,
 }
 
+// lazyTables are allowlisted tables that may be absent from either side:
+// the store creates them on first use, so pre-existing snapshots and
+// databases keep working without a migration. Unknown scoped tables still
+// fail closed.
+var lazyTables = map[string]bool{
+	"suppressed_sync_keys": true,
+}
+
 func checkedTables(db *sql.DB) ([]tableShape, error) {
 	allowed := map[string]bool{}
 	for _, name := range financialTables {
@@ -262,13 +278,62 @@ func checkedTables(db *sql.DB) ([]tableShape, error) {
 		if schema == "main" {
 			result = shapes
 		} else {
-			if fmt.Sprint(result) != fmt.Sprint(shapes) {
-				return nil, errors.New("source and destination financial schemas differ; use a compatible current snapshot")
+			// Lazy tables may be absent from either side: the store
+			// creates them on first use, so a pre-existing snapshot
+			// without the do-not-import list still refreshes instead of
+			// failing the schema check. Every other table must match
+			// exactly, and copies run only for tables present on both
+			// sides. Unknown tables already failed closed above.
+			previous := map[string]tableShape{}
+			for _, shape := range result {
+				previous[shape.name] = shape
 			}
+			var merged []tableShape
+			for _, shape := range shapes {
+				prior, ok := previous[shape.name]
+				if !ok {
+					if lazyTables[shape.name] {
+						continue
+					}
+					return nil, errors.New("source and destination financial schemas differ; use a compatible current snapshot")
+				}
+				if fmt.Sprint(prior) != fmt.Sprint(shape) {
+					return nil, errors.New("source and destination financial schemas differ; use a compatible current snapshot")
+				}
+				merged = append(merged, shape)
+			}
+			for _, shape := range result {
+				if lazyTables[shape.name] {
+					continue
+				}
+				found := false
+				for _, incoming := range shapes {
+					if incoming.name == shape.name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return nil, errors.New("source and destination financial schemas differ; use a compatible current snapshot")
+				}
+			}
+			result = merged
 		}
 	}
-	if len(result) != len(financialTables) {
-		return nil, errors.New("application financial schema incomplete; use a compatible current snapshot")
+	for _, name := range financialTables {
+		if lazyTables[name] {
+			continue
+		}
+		found := false
+		for _, shape := range result {
+			if shape.name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, errors.New("application financial schema incomplete; use a compatible current snapshot")
+		}
 	}
 	return result, nil
 }
