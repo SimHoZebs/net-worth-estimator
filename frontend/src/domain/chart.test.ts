@@ -382,6 +382,27 @@ describe("chart presentation data", () => {
 			expect(model.high).toBeCloseTo(200 * 1.08, 6);
 			expect(model.low).toBeCloseTo(-124, 6);
 		});
+		it("honors measured width and height overrides", () => {
+			const model = projectionChartModel({
+				...options,
+				width: 10,
+				height: 10,
+			});
+			if (!model) throw new Error("Expected chart");
+			// Clamps tiny measurements to the documented floors.
+			expect(model.width).toBe(280);
+			expect(model.height).toBe(200);
+		});
+		it("honors large measured overrides", () => {
+			const model = projectionChartModel({
+				...options,
+				width: 1200,
+				height: 400,
+			});
+			if (!model) throw new Error("Expected chart");
+			expect(model.width).toBe(1200);
+			expect(model.height).toBe(400);
+		});
 	});
 	describe("nearestPointIndex", () => {
 		const points = [

@@ -31,9 +31,11 @@ import {
 export function ContributionStackPlot({
 	points,
 	accounts,
+	height,
 }: {
 	points: Projection["points"];
 	accounts: ReadonlyArray<{ id: string; name: string }>;
+	height?: number;
 }) {
 	const { rows, series } = useMemo(
 		() => stackedAccountRows({ points, accounts }),
@@ -99,7 +101,7 @@ export function ContributionStackPlot({
 				definition={definition}
 				ariaLabel="Net worth by account over the trailing window"
 				ariaDescription={description}
-				height={280}
+				height={height ?? 280}
 			/>
 		</div>
 	);
