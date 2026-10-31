@@ -151,3 +151,120 @@ func TestReconcileIgnoresUncoveredAccounts(t *testing.T) {
 		t.Fatalf("uncovered account produced directives: %+v", directives)
 	}
 }
+
+func TestReconcileConvertsTipAdjustedSettle(t *testing.T) {
+	// A restaurant auth posts higher with the tip: the pending seed
+	// converts instead of voiding beside a duplicate.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "58.00", false, 1785715200)}
+	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 0 || converts != 1 || len(voids) != 0 {
+		t.Fatalf("tip-adjusted = %+v, want one conversion", directives)
+	}
+	if directives[0].Convert.ID != "uuid-pending" {
+		t.Fatalf("convert targets %+v, want the vanished auth", directives[0].Convert)
+	}
+}
+
+func TestReconcileConvertsFinalBelowAuth(t *testing.T) {
+	// An Instacart estimate posts lower than authorized: still one charge.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Instacart", "prime_card", "100.00", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	settled := []store.SyncPosting{reconcilePosting("Instacart", "prime_card", "92.00", false, 1785715200)}
+	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 0 || converts != 1 || len(voids) != 0 {
+		t.Fatalf("below-auth final = %+v, want one conversion", directives)
+	}
+}
+
+func TestReconcileRejectsBeyondTolerance(t *testing.T) {
+	// +60% is not a tip: the auth voids and the posted charge inserts
+	// as its own row, exactly like an unmatched charge.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "80.00", false, 1785715200)}
+	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 1 || converts != 0 || len(voids) != 1 {
+		t.Fatalf("beyond-tolerance = %+v, want void plus insert", directives)
+	}
+}
+
+func TestReconcileHoldsAmbiguousTipMatches(t *testing.T) {
+	// Two near-amount candidates: no conversion, both insert, auth voids.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	candidates := []store.SyncPosting{
+		reconcilePosting("Bistro", "prime_card", "55.00", false, 1785715200),
+		reconcilePosting("Bistro", "prime_card", "56.00", false, 1785801600),
+	}
+	directives := Reconcile(nil, candidates, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 2 || converts != 0 || len(voids) != 1 {
+		t.Fatalf("ambiguous tip matches = %+v, want void plus two inserts", directives)
+	}
+}
+
+func TestReconcileNeverConvertsZeroAmountAuth(t *testing.T) {
+	// Card-check auths carry no amount to adjust: they vanish even when
+	// a zero or tiny charge posts nearby.
+	for _, amount := range []string{"0.00", "2.00"} {
+		bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "0.00", true, false,
+			pendingKey("prime_card", "old-auth"))}
+		settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", amount, false, 1785715200)}
+		directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+		upserts, converts, voids := directivesByAction(directives)
+		if upserts != 1 || converts != 0 || len(voids) != 1 {
+			t.Fatalf("zero auth vs %s = %+v, want void plus insert", amount, directives)
+		}
+	}
+}
+
+func reconcileInflowPosting(name, account, amount string, txTime int64) store.SyncPosting {
+	return store.SyncPosting{
+		ProviderAccountID: "bridge-" + account,
+		TransactionID:     name,
+		Posting: types.Posting{
+			Name:            name,
+			Destinations:    []string{account},
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      txTime,
+			TransactionTime: txTime,
+			Enabled:         true,
+		},
+	}
+}
+
+func TestReconcileRejectsDirectionMismatch(t *testing.T) {
+	// An outflow auth never joins an inflow posting, even at the exact
+	// amount and merchant.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Refund Desk", "prime_card", "42.10", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	settled := []store.SyncPosting{reconcileInflowPosting("Refund Desk", "prime_card", "42.10", 1785715200)}
+	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 1 || converts != 0 || len(voids) != 1 {
+		t.Fatalf("direction mismatch = %+v, want void plus insert", directives)
+	}
+}
+
+func TestReconcileSettledDedupStaysExact(t *testing.T) {
+	// A near-amount repeat at the same merchant is a genuine second
+	// charge and must insert; only an exact repeat is already imported.
+	bank := []store.BankRow{reconcileBankRow("uuid-settled", "Bistro", "prime_card", "50.00", false, false,
+		pendingKey("prime_card", "old-post"))}
+	near := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "52.00", false, 1785715200)}
+	directives := Reconcile(nil, near, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 1 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("near repeat = %+v, want one insert", directives)
+	}
+	exact := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "50.00", false, 1785715200)}
+	directives = Reconcile(nil, exact, bank, map[string]bool{"prime_card": true})
+	if len(directives) != 0 {
+		t.Fatalf("exact repeat = %+v, want suppression", directives)
+	}
+}

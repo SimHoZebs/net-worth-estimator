@@ -46,7 +46,7 @@ type Provision struct {
 
 // Plan is the mapped sync output before applying. Pending holds pending
 // authorizations; Settled holds posted charges. The reconciler converts a
-// vanished pending row on a unique strict posted match, voids it otherwise,
+// vanished pending row on a unique tip-bounded posted match, voids it otherwise,
 // and inserts unmatched posted charges as new rows; void rows never
 // suppress an insert.
 type Plan struct {
