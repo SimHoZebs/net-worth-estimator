@@ -1,6 +1,5 @@
 import { CircleHelp } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import type { BackendCheckpoint } from "../api/contracts.ts";
 import {
 	nearestPointIndex,
 	projectionChartModel,
@@ -8,7 +7,9 @@ import {
 	trailingDailyPoints,
 } from "../domain/chart.ts";
 import { dateLabel, money, todayIso } from "../domain/format.ts";
-import type { Projection } from "../domain/result.ts";
+import type { BackendCheckpoint } from "../api/contracts.ts";
+import { useCheckpoints } from "../state/workspaceResources.ts";
+import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { IconButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
@@ -17,22 +18,23 @@ import { Skeleton } from "./Skeleton.tsx";
 
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
-export function ProjectionChart({
-	projection,
-	checkpoints = EMPTY_CHECKPOINTS,
-	onEvidence,
-	pending = false,
-}: {
-	projection: Projection | null;
-	checkpoints?: readonly BackendCheckpoint[];
-	onEvidence: () => void;
-	pending?: boolean;
-}) {
+export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	const [inspected, setInspected] = useState<number | null>(null);
 	const [pinned, setPinned] = useState<number | null>(null);
 	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
 	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const id = useId().replaceAll(":", "");
+	// Outlook pins the horizon; the chart subscribes to the same cached
+	// forecast instead of receiving it as a prop.
+	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
+	const projectionQuery = useRemoteProjection({ years: 20, ranges: false });
+	const projection =
+		projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
+			? null
+			: projectionQuery.base;
+	const pending =
+		projectionQuery.status === "pending" ||
+		(projectionQuery.isPlaceholderData && projectionQuery.loading);
 	// The graph covers only the trailing window ending today: sparse engine
 	// rows expand into one daily point per day via latest-known fill. The
 	// past already happened, so there is one observed line and no scenarios.

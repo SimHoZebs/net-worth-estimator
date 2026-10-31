@@ -1,41 +1,58 @@
 import { Pin } from "lucide-react";
 import { useId } from "react";
-import type { Account, Transaction } from "@/domain/model.ts";
-import type {
-	EvaluationResult,
-	OtherEvaluation,
-	Projection,
-	RangeResult,
-} from "@/domain/result.ts";
+import type { EvaluationResult, OtherEvaluation } from "@/domain/result.ts";
 import { EvaluationCard } from "@/pages/evaluations/EvaluationCard.tsx";
 import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
+import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
+import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
+import {
+	useSavedAccounts,
+	useSavedEvaluations,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "@/state/savedRows.ts";
+import { useServerStatus } from "@/state/workspaceResources.ts";
 
 type PinnedItem =
 	| { kind: "evaluation"; result: EvaluationResult }
 	| { kind: "other"; result: OtherEvaluation };
 
-export function PinnedEvaluations({
-	accounts,
-	transactions,
-	startDate,
-	projection,
-	range,
-	pinnedIds,
-	pending = false,
-	pinsDisabled = false,
-	onPinChange,
-}: {
-	accounts: Account[];
-	transactions: Transaction[];
-	startDate: string;
-	projection: Projection | null;
-	range: RangeResult | null;
-	pinnedIds: string[] | null;
-	pending?: boolean;
-	pinsDisabled?: boolean;
-	onPinChange: (id: string) => void;
-}) {
+export function PinnedEvaluations() {
 	const headingId = useId();
+	// The card subscribes to its own queries; TanStack caches share the
+	// Outlook forecast instead of receiving it as props.
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
+	const evaluations = useSavedEvaluations();
+	const {
+		ids: pinnedIds,
+		toggle: togglePin,
+		loading: pinsLoading,
+	} = usePinnedEvaluations();
+	const projectionQuery = useRemoteProjection({
+		enabled: (accounts?.length ?? 0) > 0,
+		years: 20,
+		ranges:
+			evaluations?.some((evaluation) =>
+				(pinnedIds ?? []).includes(evaluation.id),
+			) ?? false,
+	});
+	const status = useServerStatus().data;
+	const base =
+		projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
+			? null
+			: projectionQuery.base;
+	const range = projectionQuery.range;
+	const projection = base;
+	const pending =
+		projectionQuery.status === "pending" ||
+		(projectionQuery.isPlaceholderData && projectionQuery.loading);
+	const pinsDisabled = pinsLoading || (status?.readOnly ?? false);
+	const onPinChange = (id: string) => {
+		void togglePin(id);
+	};
+	if (!accounts || !transactions || !startDate) return null;
 	// Only persisted pins select Outlook cards. Missing and unknown IDs never
 	// create implicit or fallback evaluations.
 	if (pending || !pinnedIds?.length || !projection) return null;
@@ -88,9 +105,6 @@ export function PinnedEvaluations({
 								<OtherEvaluationCard
 									item={item.result}
 									pin={pin}
-									accounts={accounts}
-									transactions={transactions}
-									startDate={startDate}
 									projection={projection}
 									range={range}
 								/>

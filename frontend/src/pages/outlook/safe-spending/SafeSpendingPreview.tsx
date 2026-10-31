@@ -30,14 +30,20 @@ import {
 	remainingMonthlyObligations,
 	spendingBalance,
 } from "@/domain/safeSpending.ts";
-import { safeSpendingFromEnvelope } from "@/domain/safeSpendingEval.ts";
+
 import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
-import {
-	visibleAccounts,
-	type Account,
-	type Transaction,
-} from "@/domain/model.ts";
+import { visibleAccounts } from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
+import { useCheckpoints } from "@/state/workspaceResources.ts";
+import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
+import {
+	useSavedAccounts,
+	useSavedEvaluations,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "@/state/savedRows.ts";
+import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
+import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingCyclePanel } from "@/pages/outlook/safe-spending/SafeSpendingCyclePanel.tsx";
@@ -59,42 +65,49 @@ import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/sa
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
 const EMPTY_TRANSACTIONS: Projection["transactions"] = [];
+const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 export function SafeSpendingPreview({
-	accounts,
-	transactions,
-	startDate,
-	readOnly,
-	checkpoints,
-	projection,
-	pending = false,
 	detail,
 	onDetail,
 	onTabChange,
-	envelope = null,
 }: {
-	accounts: Account[];
-	transactions: Transaction[];
-	startDate: string;
-	readOnly: boolean;
-	checkpoints: BackendCheckpoint[];
-	projection: Projection | null;
-	pending?: boolean;
 	detail: SafeSpendingDetailTab | null;
 	onDetail: (tab: SafeSpendingDetailTab | null) => void;
 	onTabChange: (tab: SafeSpendingDetailTab) => void;
-	// Future server evaluation envelope. Null today: the client derivation
-	// below stays the instant source of truth and never blocks on it.
-	envelope?: import("@/api/contracts.ts").EvaluationResultEnvelope | null;
 }) {
-	// Envelope renderer route: a future server evaluation swaps in here as
-	// progressive enhancement. Client math stays instant either way.
-	const serverView = safeSpendingFromEnvelope(envelope);
-	void serverView;
+	// The preview subscribes to its own queries; TanStack caches share the
+	// Outlook forecast instead of receiving it as props.
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
+	const readOnly = useUserReadOnly();
+	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
+	const evaluations = useSavedEvaluations();
+	const { ids: pinnedIds } = usePinnedEvaluations();
+	const projectionQuery = useRemoteProjection({
+		enabled: (accounts?.length ?? 0) > 0,
+		years: 20,
+		ranges:
+			evaluations?.some((evaluation) =>
+				(pinnedIds ?? []).includes(evaluation.id),
+			) ?? false,
+	});
+	const projection =
+		projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
+			? null
+			: projectionQuery.base;
+	const pending =
+		projectionQuery.status === "pending" ||
+		(projectionQuery.isPlaceholderData && projectionQuery.loading);
+	// Hooks stay mounted while rows load, so derivations below are
+	// null-safe; the null gate before rendering only skips output.
 	const projectionTransactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
 	const cards = useMemo(
 		() =>
-			visibleAccounts(accounts).filter((account) => account.kind === "debt"),
+			visibleAccounts(accounts ?? []).filter(
+				(account) => account.kind === "debt",
+			),
 		[accounts],
 	);
 	const settingsState = useSafeSpendingSettings();
@@ -108,10 +121,10 @@ export function SafeSpendingPreview({
 	// latest balance checkpoint). Never before the projection start.
 	const [displayToday] = useState(() => {
 		const today = todayIso();
-		const start = startDate.slice(0, 10);
+		const start = (startDate ?? today).slice(0, 10);
 		return today >= start ? today : start;
 	});
-	const staleData = displayToday > startDate.slice(0, 10);
+	const staleData = displayToday > (startDate ?? displayToday).slice(0, 10);
 
 	const trackedIds = useMemo(() => {
 		// Spending cards are debt accounts by convention (`*_card`); loans
@@ -129,9 +142,9 @@ export function SafeSpendingPreview({
 
 	const { cycle, closedCycle, perAccount, chargeCycles } = useCardCycleActivity(
 		{
-			accounts,
-			transactions,
-			startDate,
+			accounts: accounts ?? [],
+			transactions: transactions ?? [],
+			startDate: startDate ?? displayToday,
 			checkpoints,
 			projection,
 			cards,
@@ -144,25 +157,27 @@ export function SafeSpendingPreview({
 
 	const spendableAccounts = useMemo(
 		() =>
-			visibleAccounts(accounts).filter((account) => account.kind !== "debt"),
+			visibleAccounts(accounts ?? []).filter(
+				(account) => account.kind !== "debt",
+			),
 		[accounts],
 	);
 	const spendingIds = useMemo(() => {
 		const knownIds = spendableAccounts.map((account) => account.id);
-		const fallbackId = checkingAccountId(accounts);
+		const fallbackId = checkingAccountId(accounts ?? []);
 		const fallback =
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.spendingAccountIds, knownIds, fallback);
 	}, [settings.spendingAccountIds, spendableAccounts, accounts]);
 	const incomeIds = useMemo(() => {
 		const knownIds = spendableAccounts.map((account) => account.id);
-		const fallbackId = checkingAccountId(accounts);
+		const fallbackId = checkingAccountId(accounts ?? []);
 		const fallback =
 			fallbackId && knownIds.includes(fallbackId) ? [fallbackId] : [];
 		return resolveEffectiveIds(settings.incomeAccountIds, knownIds, fallback);
 	}, [settings.incomeAccountIds, spendableAccounts, accounts]);
 	const spendingDerived = useMemo(
-		() => spendingBalance(accounts, spendingIds),
+		() => spendingBalance(accounts ?? [], spendingIds),
 		[accounts, spendingIds],
 	);
 	const obligationTransactions = useMemo(
@@ -191,8 +206,8 @@ export function SafeSpendingPreview({
 	const income = useMemo(
 		() =>
 			safeSpendingIncome({
-				accounts,
-				rules: transactions,
+				accounts: accounts ?? [],
+				rules: transactions ?? [],
 				transactions: projectionTransactions,
 				incomeAccountIds: incomeIds,
 				incomeRuleIds: settings.incomeRuleIds,
@@ -216,7 +231,7 @@ export function SafeSpendingPreview({
 				? realizedCheckingOutflows({
 						transactions: projectionTransactions,
 						checkingIds: spendingIds,
-						after: startDate,
+						after: startDate ?? displayToday,
 						through: displayToday,
 					})
 				: 0,
@@ -242,7 +257,7 @@ export function SafeSpendingPreview({
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
-		return transactions
+		return (transactions ?? [])
 			.filter(
 				(transaction) =>
 					transaction.fromId !== null &&
@@ -282,8 +297,8 @@ export function SafeSpendingPreview({
 				checkingIds: spendingIds,
 				start: billsStart,
 				end: cycle.cycleEnd,
-				accounts,
-				savedTransactions: transactions,
+				accounts: accounts ?? [],
+				savedTransactions: transactions ?? [],
 			}),
 			getDate: (transaction) => transaction.date,
 			getId: (transaction) => transaction.id,
@@ -311,7 +326,7 @@ export function SafeSpendingPreview({
 		if (!spendingIds.length) return [];
 		const bills = new Set(trackedBillIds);
 		const ruleIds = new Set(
-			transactions
+			(transactions ?? [])
 				.filter((transaction) => transaction.frequency !== "once")
 				.map((transaction) => transaction.id),
 		);
@@ -331,7 +346,7 @@ export function SafeSpendingPreview({
 				? realizedCheckingOutflows({
 						transactions: directBaseTransactions,
 						checkingIds: spendingIds,
-						after: startDate,
+						after: startDate ?? displayToday,
 						through: displayToday,
 					})
 				: 0,
@@ -346,8 +361,8 @@ export function SafeSpendingPreview({
 				checkingIds: spendingIds,
 				start: cycle.cycleStart,
 				end: cycle.cycleEnd,
-				accounts,
-				savedTransactions: transactions,
+				accounts: accounts ?? [],
+				savedTransactions: transactions ?? [],
 			}),
 			getDate: (transaction) => transaction.date,
 			getId: (transaction) => transaction.id,
@@ -386,6 +401,9 @@ export function SafeSpendingPreview({
 			},
 		};
 	}, [chargeCycles, directTransactions, transactionOrder]);
+	// Saved rows gate rendering, not hooks: every subscription above stays
+	// mounted while rows load.
+	if (!accounts || !transactions || !startDate) return null;
 	if (!cards.length) {
 		return (
 			<Card aria-label="Safe card spending" className="relative">
