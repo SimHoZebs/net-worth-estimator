@@ -35,14 +35,11 @@ import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
 import { visibleAccounts } from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
-import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
 import {
 	useSavedAccounts,
-	useSavedEvaluations,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "@/state/savedRows.ts";
-import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx";
@@ -59,6 +56,7 @@ import {
 	useSafeSpendingSettings,
 } from "@/state/useSafeSpendingSettings.ts";
 import { useCardCycleActivity } from "@/pages/outlook/safe-spending/useCardCycleActivity.ts";
+import { useOutlookProjection } from "@/pages/outlook/useOutlookProjection.ts";
 import { HouseholdBudgetSummary } from "@/pages/outlook/safe-spending/HouseholdBudgetSummary.tsx";
 import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
@@ -83,23 +81,7 @@ export function SafeSpendingPreview({
 	const startDate = useSavedStartDate();
 	const readOnly = useUserReadOnly();
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
-	const evaluations = useSavedEvaluations();
-	const { ids: pinnedIds } = usePinnedEvaluations();
-	const projectionQuery = useRemoteProjection({
-		enabled: (accounts?.length ?? 0) > 0,
-		years: 20,
-		ranges:
-			evaluations?.some((evaluation) =>
-				(pinnedIds ?? []).includes(evaluation.id),
-			) ?? false,
-	});
-	const projection =
-		projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
-			? null
-			: projectionQuery.base;
-	const pending =
-		projectionQuery.status === "pending" ||
-		(projectionQuery.isPlaceholderData && projectionQuery.loading);
+	const { base: projection, pending } = useOutlookProjection();
 	// Hooks stay mounted while rows load, so derivations below are
 	// null-safe; the null gate before rendering only skips output.
 	const projectionTransactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
@@ -404,6 +386,7 @@ export function SafeSpendingPreview({
 	// Saved rows gate rendering, not hooks: every subscription above stays
 	// mounted while rows load.
 	if (!accounts || !transactions || !startDate) return null;
+	if (!projection && !pending) return null;
 	if (!cards.length) {
 		return (
 			<Card aria-label="Safe card spending" className="relative">

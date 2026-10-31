@@ -9,15 +9,17 @@ import {
 import { dateLabel, money, todayIso } from "../domain/format.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { useCheckpoints } from "../state/workspaceResources.ts";
-import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { useElementWidth } from "../state/useElementWidth.ts";
 import { useSavedAccounts } from "../state/savedRows.ts";
 import { visibleAccounts } from "../domain/model.ts";
-import { IconButton } from "./Button.tsx";
+import { IconButton, TextButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { ContributionStackPlot } from "./chart/ContributionStackPlot.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
+import { Notice } from "./Notice.tsx";
+import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
 import { Skeleton } from "./Skeleton.tsx";
 import { SegmentedControl } from "./SegmentedControl.tsx";
 
@@ -59,14 +61,8 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   );
   // Outlook pins the horizon; the chart subscribes to the same cached
   // forecast instead of receiving it as a prop.
-  const projectionQuery = useRemoteProjection({ years: 20, ranges: false });
-  const projection =
-    projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
-      ? null
-      : projectionQuery.base;
-  const pending =
-    projectionQuery.status === "pending" ||
-    (projectionQuery.isPlaceholderData && projectionQuery.loading);
+  const { base: projection, pending, loading, baseError, retryProjection, status } =
+    useOutlookProjection();
   // The graph covers only the trailing window ending today: sparse engine
   // rows expand into one daily point per day via latest-known fill. The
   // past already happened, so there is one observed line and no scenarios.
@@ -99,7 +95,13 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   const point = model?.points[selectedIndex] ?? model?.last;
   if (!model || !point) {
     // Only data slots skeletonize, and only while data is absent.
-    if (!pending) return null;
+    if (!pending)
+      return status === "error" ? (
+        <Notice tone="danger" className="mb-4">
+          <span>Could not calculate forecast. {baseError}</span>
+          <TextButton onClick={retryProjection}>Retry forecast</TextButton>
+        </Notice>
+      ) : null;
     return (
       <section
         className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
@@ -109,6 +111,29 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
             : `Net worth by account over the trailing ${days} days`
         }
       >
+        <div className="flex items-center justify-between gap-4 px-5 pt-4">
+          <SegmentedControl
+            ariaLabel="Trailing window"
+            value={String(days)}
+            onChange={(v) => {
+              setDays(Number(v));
+              setInspected(null);
+              setPinned(null);
+            }}
+            items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
+              value: String(d),
+              label: `${d} days`,
+            }))}
+          />
+          <IconButton
+            icon={CircleHelp}
+            size="sm"
+            iconSize={14}
+            className="size-6"
+            label="Inspect current net worth evidence"
+            onClick={onEvidence}
+          />
+        </div>
         <div aria-busy="true">
           <Skeleton className="h-56 w-full" />
         </div>
@@ -116,6 +141,19 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
     );
   }
   return (
+    <>
+      {status === "error" && (
+        <Notice tone="danger" className="mb-4">
+          <span>Could not calculate forecast. {baseError}</span>
+          <TextButton onClick={retryProjection}>Retry forecast</TextButton>
+        </Notice>
+      )}
+      {pending && (
+        <p className="sr-only" role="status">
+          Loading the projection.
+        </p>
+      )}
+      {loading && projection && <ProjectionUpdating />}
     <section
       className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
       aria-label={
@@ -204,5 +242,6 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
         </div>
       )}
     </section>
+    </>
   );
 }
