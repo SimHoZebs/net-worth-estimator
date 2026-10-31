@@ -395,7 +395,7 @@ if [ "$analysis" = 5 ]; then
     verify_same "$table" || fail "Candidate changed preexisting Analysis table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
   done
   triggers_same=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
-    SELECT EXISTS (SELECT sql FROM main.sqlite_master WHERE type = 'trigger' EXCEPT SELECT sql FROM before.sqlite_master WHERE type = 'trigger')
+    SELECT EXISTS (SELECT sql FROM main.sqlite_master WHERE type = 'trigger' AND name != 'analysis_posting_sim_lifecycle' EXCEPT SELECT sql FROM before.sqlite_master WHERE type = 'trigger' AND name != 'analysis_posting_sim_lifecycle')
         OR EXISTS (SELECT sql FROM before.sqlite_master WHERE type = 'trigger' EXCEPT SELECT sql FROM main.sqlite_master WHERE type = 'trigger');") \
     || fail "Cannot verify candidate triggers; refusing to publish."
   test "$triggers_same" = 0 || fail "Candidate changed Analysis triggers. Original unchanged; backup retained at $backup. Keep the API stopped."
