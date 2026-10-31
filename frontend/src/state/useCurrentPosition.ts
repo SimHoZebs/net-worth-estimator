@@ -3,25 +3,26 @@ import { resolveCurrentPosition } from "../api/generated/endpoints.ts";
 import type { PositionRequestBody } from "../api/generated/model/index.ts";
 import type { CurrentPositionResponse } from "../api/position.ts";
 import { currentPositionQueryKey } from "./serverQuery.ts";
-import {
-	useProjectionModel,
-	type ProjectionModelOptions,
-} from "./useProjectionModel.ts";
+import { useProjectionModel } from "./useProjectionModel.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
+import type { FinancialModel } from "../api/contracts.ts";
 
 export function useCurrentPosition({
+	model,
 	enabled = true,
-	...options
-}: ProjectionModelOptions & {
+}: {
+	model?: FinancialModel | null;
 	enabled?: boolean;
 } = {}) {
-	const { activeModel, modelKey } = useProjectionModel(options);
-	const asOfDate = activeModel ? projectionStartDate(activeModel) : "";
+	// Position is backend-owned historical replay: it keys on the saved
+	// model only, never on forecast evaluation preferences.
+	const { baseModel, baseKey } = useProjectionModel({ model });
+	const asOfDate = baseModel ? projectionStartDate(baseModel) : "";
 	const query = useQuery({
-		queryKey: currentPositionQueryKey(modelKey, asOfDate),
-		enabled: enabled && activeModel !== null,
+		queryKey: currentPositionQueryKey(baseKey, asOfDate),
+		enabled: enabled && baseModel !== null,
 		queryFn: async ({ signal }) => {
-			if (!activeModel) throw new Error("No financial model is available.");
+			if (!baseModel) throw new Error("No financial model is available.");
 			// Stored-only: the server resolves the saved model. The local
 			// model supplies only the as-of date.
 			const response = (
@@ -48,10 +49,10 @@ export function useCurrentPosition({
 		data: query.data ?? null,
 		status: !enabled
 			? ("disabled" as const)
-			: !activeModel
+			: !baseModel
 				? ("error" as const)
 				: query.status,
-		error: !activeModel
+		error: !baseModel
 			? "No financial model is available."
 			: (query.error?.message ?? null),
 		retry: () => {

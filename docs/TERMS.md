@@ -40,7 +40,7 @@ Two computations over the same saved model. The **base case** is the single calc
 
 ## D. Changes
 
-Base edits save immediately and re-project.
+Base edits save immediately and invalidate affected calculations. Components request a new projection only when they need its result.
 
 Use **changes** only for a what-if evaluation that is not yet promoted. **Promote** replays it as sequential saves. **Discard** deletes the evaluation.
 
@@ -76,6 +76,8 @@ Use **income evidence**. Its parts stay distinct: **deposit** (the record), **ca
 The **financial model** is the collection of accounts, transactions, balance checks, rules, payment terms, planned purchases, and evaluations. The **saved model** is its saved state, used for calculation and import/export.
 
 The **user** owns those rows. **Account** means a financial account.
+
+The financial model is the combined input for calculation and import/export. It does not make account maintenance or recorded activity part of the simulation lifecycle. Forecast outcomes and evidence Analysis each have their own lifecycle.
 
 A **guest** is a provisioned user with limited assigned permissions. Guest access uses the same user resource and data tables as other users.
 

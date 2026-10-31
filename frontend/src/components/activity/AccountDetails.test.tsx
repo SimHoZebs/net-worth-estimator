@@ -269,3 +269,39 @@ it("locks every field for read-only source records", () => {
 	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
 	expect(screen.queryByText(/refreshed copy/)).toBeNull();
 });
+
+it("shows zero instead of a no-op loader when a resolved forecast omits the account", () => {
+	render(
+		<AccountDetails
+			account={home}
+			endingBalance={null}
+			projected={{
+				loading: false,
+				error: null,
+				requested: true,
+				request: () => {},
+				retry: () => {},
+			}}
+		/>,
+	);
+	// Resolved-but-absent keeps the pre-split ?? 0 behavior.
+	expect(screen.queryByRole("button", { name: "Load forecast" })).toBeNull();
+	expect(screen.getByText("$0")).toBeTruthy();
+});
+
+it("offers Load forecast only before an explicit request", () => {
+	render(
+		<AccountDetails
+			account={home}
+			endingBalance={null}
+			projected={{
+				loading: false,
+				error: null,
+				requested: false,
+				request: () => {},
+				retry: () => {},
+			}}
+		/>,
+	);
+	expect(screen.getByRole("button", { name: "Load forecast" })).toBeTruthy();
+});

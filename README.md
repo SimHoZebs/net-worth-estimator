@@ -1,6 +1,6 @@
 # Net Worth Estimator Backend
 
-Go API and SQLite persistence for financial-model validation, deterministic projection, stochastic projection, configured evaluations, and SimpleFIN balance synchronization. `PRODUCT_INTENT.md` describes the product independently.
+Go API and SQLite persistence for household financial records, account maintenance, current position, evidence Analysis, and SimpleFIN synchronization. Deterministic and stochastic projections add future outcomes and configured evaluations. Financial records remain available independently of future simulation. `PRODUCT_INTENT.md` describes the product independently.
 
 ## CSV Seed Data
 

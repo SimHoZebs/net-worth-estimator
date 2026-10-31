@@ -34,10 +34,19 @@ function toAmountInput(value: number | null): string {
 export function AccountDetails({
 	account,
 	endingBalance,
+	projected,
 	readOnly: readOnlyProp,
 }: {
 	account: Account;
-	endingBalance: number;
+	endingBalance: number | null;
+	/** Explicit forecast state for the horizon metric; never auto-requests. */
+	projected?: {
+		loading: boolean;
+		error: string | null;
+		requested: boolean;
+		request: () => void;
+		retry: () => void;
+	};
 	readOnly?: boolean;
 }) {
 	const id = useId();
@@ -353,7 +362,27 @@ export function AccountDetails({
 			</fieldset>
 			<DetailList className="m-0">
 				<DetailRow label="Base case at horizon">
-					{money(endingBalance)}
+					{endingBalance !== null ? (
+						money(endingBalance)
+					) : projected?.loading ? (
+						<span role="status">Loading forecast…</span>
+					) : projected?.error ? (
+						<span role="alert">
+							{projected.error}{" "}
+							<button type="button" onClick={projected.retry}>
+								Retry forecast
+							</button>
+						</span>
+					) : projected?.requested ? (
+						// Forecast resolved but the account is absent from its balances (e.g. disabled): pre-split `?? 0` behavior, never a no-op Load button.
+						money(0)
+					) : projected?.request ? (
+						<button type="button" onClick={projected.request}>
+							Load forecast
+						</button>
+					) : (
+						<span role="status">Forecast unavailable.</span>
+					)}
 				</DetailRow>
 			</DetailList>
 			{!readOnly && (

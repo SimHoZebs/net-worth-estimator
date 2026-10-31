@@ -106,6 +106,24 @@ If another fixture API uses 8799, set `TEST_API_PORT=18899`. The harness uses a
 port-specific database under `/tmp/opencode/`. Set `CI=1` to reject existing
 servers instead of reusing them.
 
+### Finance independence
+
+`frontend/tests/financeIndependence.spec.ts` rejects forecast requests while
+account and transaction lists, recorded activity, and ordinary account details
+load. It also verifies saved edits after a forecast failure and local recovery
+for explicitly requested projected activity. Existing account-activity tests
+retain projected transfers, funding gaps, edits, and keyboard navigation.
+
+```bash
+CI=1 TEST_API_PORT=18893 TEST_FRONTEND_PORT=5183 \
+  npm --prefix frontend run test:browser -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
+```
+
+Backend regressions must distinguish financial validity from forecast readiness.
+An invalid forecast evaluation must not block unrelated finance maintenance or
+current-position reads. Projections must still reject invalid evaluation inputs,
+and financial edits must retain dependent-reference and identity checks.
+
 Receipt upload, image replacement, deletion, review, extraction fallback,
 provenance, reload, read-only, keyboard dismissal, and mobile accessibility checks live in
 `frontend/tests/receipts.spec.ts`. The mock replaces only extraction. The generated

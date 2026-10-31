@@ -71,15 +71,13 @@ export function AccountDetailsModal({
 	}
 	const ledger = useMemo(
 		() =>
-			projection
-				? accountTransactions({
-						accountId: card.id,
-						accounts,
-						transactions,
-						startDate,
-						projection,
-					})
-				: [],
+			accountTransactions({
+				accountId: card.id,
+				accounts,
+				transactions,
+				startDate,
+				projection,
+			}),
 		[card.id, accounts, transactions, startDate, projection],
 	);
 	const [selectedId, setSelectedId] = useSelectedId(ledger);

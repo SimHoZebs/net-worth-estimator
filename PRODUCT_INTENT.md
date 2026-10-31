@@ -4,11 +4,15 @@ This document defines the decisions, knowledge, safeguards, and outcomes the pro
 
 ## 1. Product thesis
 
-The Net Worth Estimator helps one household understand and deliberately improve its financial trajectory.
+The Net Worth Estimator helps one household manage its finances, understand its current position, and inspect possible future outcomes.
 
 It answers:
 
-> If we continue with the saved model, where does the base case end up, what could prevent that outcome, how uncertain is it, and which change should we inspect next?
+> What do we own and owe, what money has moved, and what should we do next?
+
+Simulation adds a further question: if we continue with the saved model, where does the base case end up, what could prevent that outcome, and which change should we inspect next?
+
+Accounts, recorded transactions, balance checks, and ordinary edits have their own lifecycle. They remain available when a forecast is absent, pending, or failed. Only components that need future outcomes depend on simulation. Evidence Analysis runs independently from both bank sync and simulation.
 
 The product turns financial records and assumptions into a defensible decision. It should help the user move from description to understanding to action without requiring the user to operate the calculation machinery or manage a spreadsheet.
 
@@ -246,13 +250,13 @@ Provenance must remain available whenever a user questions a material value.
 
 ## 6. Safe experimentation and comparison
 
-The central lifecycle is:
+The simulation lifecycle is:
 
 ```text
 saved model → what-if simulator → evaluated consequence → compare → promote or discard
 ```
 
-The base projection runs only off saved rows. Editing a row saves immediately and re-projects. Draft keystrokes never issue backend queries. A what-if must remain visibly distinct from saved state. Promote replays the what-if set as sequential saved row writes under last-write-wins with per-row validation. Discard deletes the what-if evaluation instance.
+The base projection runs only off saved rows. Editing a row saves immediately and invalidates affected calculations. Components that need a forecast request the updated result; record-only views do not start one. Draft keystrokes never issue backend queries. A what-if must remain visibly distinct from saved state. Promote replays the what-if set as sequential saved row writes under last-write-wins with per-row validation. Discard deletes the what-if evaluation instance.
 
 A comparison is useful when it answers:
 
@@ -310,6 +314,10 @@ The product should favor recognition over unnecessary reading, structure over re
 ### Make state visible
 
 The user should never need to guess whether an outcome belongs to saved state, a what-if scenario, a previous evaluation, or a calculation still in progress.
+
+### Keep capability failures local
+
+Financial records are authoritative inputs, not simulation outputs. Account details and recorded activity load independently from projected activity. Forecast errors and retries belong to the components that request a forecast. A failed evaluation must not prevent unrelated financial maintenance; edits must still preserve valid references between records.
 
 ### Optimize repeated understanding
 
