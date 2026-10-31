@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -110,25 +112,39 @@ func basePathStore(key string, entry *basePathEntry) {
 	basePathCache.entries[key] = entry
 }
 
+// basePathFlight shares one expensive base simulation across concurrent
+// identical requests, following the simulator-evaluation precedent.
+var basePathFlight singleflight.Group
+
 // projectBaseWithCache returns the prepared request, evaluator-facing path,
 // and base result for one base model hash, simulating only on miss.
-// The returned path and result are shared and read-only.
+// Simultaneous callers share one in-flight computation keyed by the same
+// hash instead of each running the full simulation. The returned path and
+// result are shared and read-only.
 func projectBaseWithCache(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.PreparedProjection, *types.ProjectionPath, *types.ProjectionResult, error) {
 	key := BaseModelHash(model, overrides, settings, monteCarloSample)
 	if entry, ok := basePathLookup(key); ok {
 		basePathCacheHits.Add(1)
 		return entry.prepared, entry.path, entry.result, nil
 	}
-	basePathCacheMisses.Add(1)
-	prepared, err := orchestratedPrepare(model, settings, overrides, monteCarloSample)
+	outcome, err, _ := basePathFlight.Do(key, func() (any, error) {
+		basePathCacheMisses.Add(1)
+		prepared, err := orchestratedPrepare(model, settings, overrides, monteCarloSample)
+		if err != nil {
+			return nil, err
+		}
+		run, err := orchestratedSimulate(prepared.Request)
+		if err != nil {
+			return nil, err
+		}
+		path, result := AdaptSimulationRun(prepared, &run)
+		entry := &basePathEntry{prepared: prepared, path: path, result: result}
+		basePathStore(key, entry)
+		return entry, nil
+	})
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	run, err := orchestratedSimulate(prepared.Request)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	path, result := AdaptSimulationRun(prepared, &run)
-	basePathStore(key, &basePathEntry{prepared: prepared, path: path, result: result})
-	return prepared, path, result, nil
+	entry := outcome.(*basePathEntry)
+	return entry.prepared, entry.path, entry.result, nil
 }

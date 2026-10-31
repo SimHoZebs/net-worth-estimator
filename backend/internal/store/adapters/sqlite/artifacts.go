@@ -8,7 +8,8 @@ import (
 const maxArtifacts = 256
 
 // GetArtifact / PutArtifact retrieve and store completed simulation results.
-// Retention is bounded across result kinds by maxArtifacts.
+// Retention is bounded per result kind by maxArtifacts, so a burst of one
+// kind cannot evict the other kind's stored results.
 func (s *sqliteStore) GetArtifact(identity string) (string, bool, error) {
 	row := s.db.QueryRow(`SELECT payload FROM projection_artifacts WHERE identity = ? AND user_id = :user_id`, identity)
 	var payload string
@@ -30,16 +31,17 @@ func (s *sqliteStore) PutArtifact(identity, kind, payload string) error {
 	if err != nil {
 		return err
 	}
-	return evictOldestArtifacts(s.db, maxArtifacts)
+	return evictOldestArtifactsOfKind(s.db, kind, maxArtifacts)
 }
 
-// evictOldestArtifacts drops the oldest rows beyond the bound regardless of
-// kind so stochastic entries cannot grow without bound.
-func evictOldestArtifacts(db *userDB, maxArtifacts int) error {
+// evictOldestArtifactsOfKind drops the oldest rows of one kind beyond the
+// bound, leaving other kinds untouched so a burst of range results cannot
+// push out the stored projection.
+func evictOldestArtifactsOfKind(db *userDB, kind string, maxArtifacts int) error {
 	_, err := db.Exec(`
-		DELETE FROM projection_artifacts WHERE user_id = :user_id AND identity IN (
-			SELECT identity FROM projection_artifacts WHERE user_id = :user_id
-			ORDER BY created_at, identity LIMIT MAX(0, (SELECT COUNT(*) FROM projection_artifacts WHERE user_id = :user_id) - :max_artifacts)
-		)`, sql.Named("max_artifacts", maxArtifacts))
+		DELETE FROM projection_artifacts WHERE user_id = :user_id AND kind = :kind AND identity IN (
+			SELECT identity FROM projection_artifacts WHERE user_id = :user_id AND kind = :kind
+			ORDER BY created_at, identity LIMIT MAX(0, (SELECT COUNT(*) FROM projection_artifacts WHERE user_id = :user_id AND kind = :kind) - :max_artifacts)
+		)`, sql.Named("kind", kind), sql.Named("max_artifacts", maxArtifacts))
 	return err
 }

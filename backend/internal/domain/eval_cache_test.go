@@ -152,4 +152,7 @@ func TestEvalCacheServesIdenticalResultsConcurrently(t *testing.T) {
 	if _, misses := SimulatorCacheStats(); misses != 1 {
 		t.Fatalf("concurrent identical requests must compute simulator evals once, got misses=%d", misses)
 	}
+	if _, misses := BasePathCacheStats(); misses != 1 {
+		t.Fatalf("concurrent identical requests must simulate the projection once, got misses=%d", misses)
+	}
 }
