@@ -90,12 +90,18 @@ export function projectionChartModel({
 	inflation,
 	realTerms,
 	narrow,
+	width,
+	height,
 }: {
 	projection: Projection;
 	range: RangeResult | null;
 	inflation: number;
 	realTerms: boolean;
 	narrow: boolean;
+	/** Measured plot width in CSS pixels. Overrides the narrow/desktop default so one viewBox unit maps to one rendered pixel. */
+	width?: number;
+	/** Measured plot height in CSS pixels. Overrides the narrow/desktop default. */
+	height?: number;
 }) {
 	const { points } = projection;
 	const start = points[0];
@@ -127,8 +133,17 @@ export function projectionChartModel({
 	);
 	const high = peak >= 0 ? Math.max(...upper, ...values, 1) * 1.08 : peak + pad;
 	const low = trough >= 0 ? Math.min(0, ...lower, ...values) : trough - pad;
-	const width = narrow ? 440 : 820;
-	const height = narrow ? 260 : 280;
+	// Prefer a measured container width so desktop renders at native scale
+	// instead of stretching the 820-unit desktop viewBox. The narrow/desktop
+	// defaults remain as the pre-measure fallback and for tests.
+	const resolvedWidth = Math.max(
+		280,
+		Math.round(width ?? (narrow ? 440 : 820)),
+	);
+	const resolvedHeight = Math.max(
+		200,
+		Math.round(height ?? (narrow ? 260 : 280)),
+	);
 	const left = 63,
 		right = 24,
 		top = 15,
@@ -137,8 +152,8 @@ export function projectionChartModel({
 		xMax: points.length - 1,
 		low,
 		high,
-		width,
-		height,
+		width: resolvedWidth,
+		height: resolvedHeight,
 		left,
 		right,
 		top,
@@ -180,8 +195,8 @@ export function projectionChartModel({
 		values,
 		high,
 		low,
-		width,
-		height,
+		width: resolvedWidth,
+		height: resolvedHeight,
 		left,
 		right,
 		top,
