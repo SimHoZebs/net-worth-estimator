@@ -5,13 +5,13 @@ import { Button, TextButton } from "../../components/Button.tsx";
 import { buttonStyles } from "../../components/buttonStyles.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import type { Account } from "../../domain/model.ts";
 import {
 	disconnectSyncKey,
 	triggerSyncNow,
 	useSyncCredential,
 } from "../../state/syncSettings.ts";
 import { useServerStatus } from "../../state/workspaceResources.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncConnectedAccounts } from "./SyncConnectedAccounts.tsx";
 import { SyncHelp } from "./SyncHelp.tsx";
 import { SyncOnboarding } from "./SyncOnboarding.tsx";
@@ -29,16 +29,13 @@ function formatSyncTime(value?: string): string | null {
 	}).format(time);
 }
 
-export function SyncProviderPanel({
-	accounts,
-	readOnly,
-}: {
-	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
-	readOnly: boolean;
-}) {
+export function SyncProviderPanel() {
 	const credential = useSyncCredential();
 	const configured = credential.data?.configured === true;
-	const status = useServerStatus({ enabled: configured });
+	// Status owns read-only gating, so it loads even before sync is
+	// configured; the credential gate only controls sync-specific UI.
+	const status = useServerStatus({ enabled: true });
+	const readOnly = useUserReadOnly();
 	const [busy, setBusy] = useState(false);
 	const [syncing, setSyncing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -199,7 +196,7 @@ export function SyncProviderPanel({
 									</a>
 								</div>
 							</div>
-							<SyncConnectedAccounts accounts={accounts} />
+							<SyncConnectedAccounts />
 							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
 								{confirmingDisconnect ? (
 									<div>
@@ -239,7 +236,6 @@ export function SyncProviderPanel({
 						</div>
 					) : (
 						<SyncOnboarding
-							readOnly={readOnly}
 							onConnected={() => {
 								setMessage("SimpleFIN connected.");
 							}}

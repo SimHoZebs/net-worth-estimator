@@ -3,6 +3,7 @@ import { useRef, type ReactNode } from "react";
 import { TextButton } from "../../components/Button.tsx";
 import { buttonStyles } from "../../components/buttonStyles.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
 import { simplefinLinks } from "./simplefinLinks.ts";
 
@@ -31,13 +32,8 @@ function SetupStep({
 	);
 }
 
-export function SyncOnboarding({
-	readOnly,
-	onConnected,
-}: {
-	readOnly: boolean;
-	onConnected: () => void;
-}) {
+export function SyncOnboarding({ onConnected }: { onConnected: () => void }) {
+	const readOnly = useUserReadOnly();
 	const inputRef = useRef<HTMLInputElement>(null);
 	return (
 		<div className="rounded-surface border border-line bg-surface p-5 sm:p-6">
@@ -115,11 +111,7 @@ export function SyncOnboarding({
 					<p className="mt-0 mb-4 text-sm leading-relaxed text-muted">
 						Paste the token you copied from SimpleFIN.
 					</p>
-					<SyncConnectForm
-						readOnly={readOnly}
-						onConnected={onConnected}
-						inputRef={inputRef}
-					/>
+					<SyncConnectForm onConnected={onConnected} inputRef={inputRef} />
 				</SetupStep>
 			</ol>
 		</div>
