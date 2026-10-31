@@ -2,7 +2,7 @@
 
 Outlook and an evidence view can request the same seeded range, such as `400` scenarios with seed `42`. The browser shares one query promise, but its intermediate-result callbacks and cancellation belong to the first view. Other views receive only the final result and can lose their transport when that first view closes.
 
-Open one server stream per mounted consumer through the existing range client and parser. Remove range-specific browser promise sharing, its key helper, and shared-owner abort recovery. The server already shares seeded calculations and supports independent stream attachment/detachment. Base-case browser caching is a separate mechanism.
+Open one server stream per mounted consumer through the existing range client and parser. Remove range-specific browser promise sharing, its key helper, and shared-owner abort recovery. The server already shares seeded calculations and supports independent stream attachment/detachment. Projection browser caching is a separate mechanism.
 
 - Browser sharing and cancellation: `frontend/src/state/useRemoteProjection.ts:865-967`.
 - Second consumer: `frontend/src/workspace/WorkspaceDialogs.tsx:16-47`.
