@@ -34,25 +34,15 @@ func financeIndependenceIDs(t *testing.T, responseBody []byte) string {
 	return payload.Row.ID
 }
 
-func financeIssueCodes(body []byte) []string {
+func financeHasIssueCode(body []byte, code string) bool {
 	var payload struct {
 		Issues []types.ModelValidationIssue `json:"issues"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil
+		return false
 	}
-	codes := make([]string, 0, len(payload.Issues))
 	for _, issue := range payload.Issues {
-		if issue.Severity == types.SeverityError {
-			codes = append(codes, issue.Code)
-		}
-	}
-	return codes
-}
-
-func financeHasIssueCode(body []byte, code string) bool {
-	for _, present := range financeIssueCodes(body) {
-		if present == code {
+		if issue.Severity == types.SeverityError && issue.Code == code {
 			return true
 		}
 	}
@@ -150,32 +140,25 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	}
 
 	// Unrelated finance writes persist despite the invalid forecast.
-	renamed := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/"+checkingID,
-		`{"name":"Checking renamed","kind":"cash","enabled":true}`)
-	if renamed.Code != http.StatusOK {
-		t.Fatalf("patch account status = %d, body %s", renamed.Code, renamed.Body.String())
+	patches := []struct{ method, path, body string }{
+		{http.MethodPatch, "/v1/accounts/" + checkingID,
+			`{"name":"Checking renamed","kind":"cash","enabled":true}`},
+		{http.MethodPatch, "/v1/postings/" + postingID,
+			`{"name":"Spend edited","sourceAccountId":"` + checkingID + `","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`},
+		{http.MethodPatch, "/v1/recurrence-rules/" + ruleID,
+			`{"name":"Salary edited","sourceAccountId":null,"destinations":["` + checkingID + `"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true}`},
 	}
-	var renamedPayload struct {
-		Persisted bool `json:"persisted"`
-	}
-	if err := json.Unmarshal(renamed.Body.Bytes(), &renamedPayload); err != nil || !renamedPayload.Persisted {
-		t.Fatalf("patch account must persist: %s", renamed.Body.String())
-	}
-	editedPosting := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+postingID,
-		`{"name":"Spend edited","sourceAccountId":"`+checkingID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`)
-	if editedPosting.Code != http.StatusOK {
-		t.Fatalf("patch posting status = %d, body %s", editedPosting.Code, editedPosting.Body.String())
-	}
-	if err := json.Unmarshal(editedPosting.Body.Bytes(), &renamedPayload); err != nil || !renamedPayload.Persisted {
-		t.Fatalf("patch posting must persist: %s", editedPosting.Body.String())
-	}
-	editedRule := doRowRequest(t, handler, http.MethodPatch, "/v1/recurrence-rules/"+ruleID,
-		`{"name":"Salary edited","sourceAccountId":null,"destinations":["`+checkingID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true}`)
-	if editedRule.Code != http.StatusOK {
-		t.Fatalf("patch rule status = %d, body %s", editedRule.Code, editedRule.Body.String())
-	}
-	if err := json.Unmarshal(editedRule.Body.Bytes(), &renamedPayload); err != nil || !renamedPayload.Persisted {
-		t.Fatalf("patch rule must persist: %s", editedRule.Body.String())
+	for _, patch := range patches {
+		response := doRowRequest(t, handler, patch.method, patch.path, patch.body)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s %s status = %d, body %s", patch.method, patch.path, response.Code, response.Body.String())
+		}
+		var persisted struct {
+			Persisted bool `json:"persisted"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &persisted); err != nil || !persisted.Persisted {
+			t.Fatalf("%s %s must persist: %s", patch.method, patch.path, response.Body.String())
+		}
 	}
 
 	// The deterministic projection still reports the evaluation errors.

@@ -116,14 +116,15 @@ describe("finance-first transaction activity", () => {
 		fireEvent.change(sourceSelect(), { target: { value: "all" } });
 		expect(onSourceChange).toHaveBeenCalledWith("all");
 		expect(defaultAccountViewFilters.source).toBe("historical");
-	});
 
-	it("keeps the source select when saved rules can project without recorded facts", () => {
-		const onSourceChange = vi.fn();
-		const props = recordedProps();
+		// Saved rules can project without recorded facts, so the select
+		// stays available for the empty-but-projectable account.
+		onSourceChange.mockClear();
+		cleanup();
+		const empty = recordedProps();
 		render(
 			<Transactions
-				{...props}
+				{...empty}
 				occurrences={[]}
 				canRequestForecast
 				onSourceChange={onSourceChange}

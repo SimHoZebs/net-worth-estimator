@@ -1,7 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
+
+async function openCheckingActivity(page: Page) {
+	await page.goto("/#accounts");
+	await page
+		.getByRole("button", { name: "Open Everyday checking transactions" })
+		.click();
+	return page.getByRole("dialog", { name: "Everyday checking" });
+}
 
 test("finance lists, recorded activity, and account details request no forecast", async ({
 	page,
@@ -22,11 +30,7 @@ test("finance lists, recorded activity, and account details request no forecast"
 		page.getByRole("button", { name: "View Monthly investing on Monthly" }),
 	).toBeVisible();
 	await expect(page.getByText("Varies", { exact: true })).toBeVisible();
-	await page.getByRole("link", { name: "Accounts", exact: true }).click();
-	await page
-		.getByRole("button", { name: "Open Everyday checking transactions" })
-		.click();
-	const account = page.getByRole("dialog", { name: "Everyday checking" });
+	const account = await openCheckingActivity(page);
 	await expect(
 		account.getByRole("button", { name: /View Household payroll/ }),
 	).toHaveCount(2);
@@ -73,11 +77,7 @@ test("account and transaction edits survive a failed forecast", async ({
 		})
 		.toBe("900");
 	await page.keyboard.press("Escape");
-	await page.getByRole("link", { name: "Accounts", exact: true }).click();
-	await page
-		.getByRole("button", { name: "Open Everyday checking transactions" })
-		.click();
-	const account = page.getByRole("dialog", { name: "Everyday checking" });
+	const account = await openCheckingActivity(page);
 	await account.getByRole("tab", { name: "Account details" }).click();
 	await account.getByLabel("Protected balance in USD").fill("250");
 	await account.getByRole("button", { name: "Save changes" }).click();
@@ -110,11 +110,7 @@ test("projected activity owns its error and retry without blocking recorded hist
 			json: { error: "Forecast unavailable for test" },
 		});
 	});
-	await page.goto("/#accounts");
-	await page
-		.getByRole("button", { name: "Open Everyday checking transactions" })
-		.click();
-	const account = page.getByRole("dialog", { name: "Everyday checking" });
+	const account = await openCheckingActivity(page);
 	await expect(
 		account.getByRole("button", { name: /View Household payroll/ }),
 	).toHaveCount(2);

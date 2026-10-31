@@ -12,45 +12,32 @@ import (
 // full validation and finance writes reject only newly introduced
 // evaluation orphans.
 
-func financeFixtureWithBrokenForecast(t *testing.T) *types.FinancialModel {
+func financeFixture(t *testing.T, kind string) *types.FinancialModel {
 	t.Helper()
 	model := observerFixture()
-	model.Evaluations.NetWorthThreshold = []types.ThresholdEvaluation{{
-		InstanceID: "broken-threshold",
-		Name:       "Broken",
-		Enabled:    true,
-		Config:     map[string]any{"target": "not-a-number"},
-	}}
-	return model
-}
-
-func financeFixtureWithDanglingForecast(t *testing.T) *types.FinancialModel {
-	t.Helper()
-	model := observerFixture()
-	model.Evaluations.AccountBalance = []types.BalanceEvaluation{{
-		InstanceID: "ghost-watch",
-		Name:       "Ghost",
-		Enabled:    true,
-		Config:     map[string]any{"accountId": "does-not-exist", "target": 100.0},
-	}}
-	return model
-}
-
-func financeFixtureWithDuplicateForecastID(t *testing.T) *types.FinancialModel {
-	t.Helper()
-	model := observerFixture()
-	model.Evaluations.NetWorthThreshold = []types.ThresholdEvaluation{{
-		InstanceID: "shared-id",
-		Name:       "First",
-		Enabled:    true,
-		Config:     map[string]any{"target": 100.0},
-	}}
-	model.Evaluations.AccountBalance = []types.BalanceEvaluation{{
-		InstanceID: "shared-id",
-		Name:       "Second",
-		Enabled:    true,
-		Config:     map[string]any{"accountId": "checking", "target": 100.0},
-	}}
+	switch kind {
+	case "broken":
+		model.Evaluations.NetWorthThreshold = []types.ThresholdEvaluation{{
+			InstanceID: "broken-threshold", Name: "Broken", Enabled: true,
+			Config: map[string]any{"target": "not-a-number"},
+		}}
+	case "dangling":
+		model.Evaluations.AccountBalance = []types.BalanceEvaluation{{
+			InstanceID: "ghost-watch", Name: "Ghost", Enabled: true,
+			Config: map[string]any{"accountId": "does-not-exist", "target": 100.0},
+		}}
+	case "duplicate":
+		model.Evaluations.NetWorthThreshold = []types.ThresholdEvaluation{{
+			InstanceID: "shared-id", Name: "First", Enabled: true,
+			Config: map[string]any{"target": 100.0},
+		}}
+		model.Evaluations.AccountBalance = []types.BalanceEvaluation{{
+			InstanceID: "shared-id", Name: "Second", Enabled: true,
+			Config: map[string]any{"accountId": "checking", "target": 100.0},
+		}}
+	default:
+		t.Fatalf("unknown fixture kind %q", kind)
+	}
 	return model
 }
 
@@ -73,7 +60,7 @@ func hasAnyError(issues []types.ModelValidationIssue) bool {
 }
 
 func TestFinanceValidationIgnoresEveryEvaluationOwnedCheck(t *testing.T) {
-	broken := financeFixtureWithBrokenForecast(t)
+	broken := financeFixture(t, "broken")
 	if issues := ValidateFinanceModel(broken); hasAnyError(issues) {
 		t.Fatalf("finance validation must pass with broken forecast config, got %+v", issues)
 	}
@@ -81,7 +68,7 @@ func TestFinanceValidationIgnoresEveryEvaluationOwnedCheck(t *testing.T) {
 		t.Fatalf("full validation must still flag broken forecast config, got %+v", issues)
 	}
 
-	dangling := financeFixtureWithDanglingForecast(t)
+	dangling := financeFixture(t, "dangling")
 	if issues := ValidateFinanceModel(dangling); hasAnyError(issues) {
 		t.Fatalf("finance validation must pass with dangling forecast reference, got %+v", issues)
 	}
@@ -89,7 +76,7 @@ func TestFinanceValidationIgnoresEveryEvaluationOwnedCheck(t *testing.T) {
 		t.Fatalf("full validation must still flag dangling forecast reference, got %+v", issues)
 	}
 
-	duplicate := financeFixtureWithDuplicateForecastID(t)
+	duplicate := financeFixture(t, "duplicate")
 	if issues := ValidateFinanceModel(duplicate); hasAnyError(issues) {
 		t.Fatalf("finance validation must pass with duplicate forecast ID, got %+v", issues)
 	}
@@ -100,9 +87,9 @@ func TestFinanceValidationIgnoresEveryEvaluationOwnedCheck(t *testing.T) {
 
 func TestCurrentPositionIndependentOfEveryEvaluationOwnedCheck(t *testing.T) {
 	models := map[string]*types.FinancialModel{
-		"broken config": financeFixtureWithBrokenForecast(t),
-		"dangling ref":  financeFixtureWithDanglingForecast(t),
-		"duplicate ID":  financeFixtureWithDuplicateForecastID(t),
+		"broken config": financeFixture(t, "broken"),
+		"dangling ref":  financeFixture(t, "dangling"),
+		"duplicate ID":  financeFixture(t, "duplicate"),
 	}
 	for name, model := range models {
 		position, err := ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
@@ -120,9 +107,9 @@ func TestProjectionStillRejectsEveryEvaluationOwnedCheck(t *testing.T) {
 		model *types.FinancialModel
 		code  string
 	}{
-		"broken config": {financeFixtureWithBrokenForecast(t), "evaluation.config.invalid"},
-		"dangling ref":  {financeFixtureWithDanglingForecast(t), "evaluation.accountBalance.accountId.invalid"},
-		"duplicate ID":  {financeFixtureWithDuplicateForecastID(t), "evaluation.instanceId.duplicate"},
+		"broken config": {financeFixture(t, "broken"), "evaluation.config.invalid"},
+		"dangling ref":  {financeFixture(t, "dangling"), "evaluation.accountBalance.accountId.invalid"},
+		"duplicate ID":  {financeFixture(t, "duplicate"), "evaluation.instanceId.duplicate"},
 	}
 	for name, test := range models {
 		settings := &types.ProjectionRuntimeSettings{
@@ -167,46 +154,39 @@ func TestFinanceWriteChangeBlocksNewOrphanButToleratesPreexisting(t *testing.T) 
 	}
 
 	// Preexisting dangling reference plus unrelated repair: allowed.
-	dangling := financeFixtureWithDanglingForecast(t)
+	dangling := financeFixture(t, "dangling")
 	danglingBaseline := EvaluationReferenceIssues(dangling)
-	repaired := financeFixtureWithDanglingForecast(t)
+	repaired := financeFixture(t, "dangling")
 	repaired.Accounts[0].Name = "Renamed"
 	if issues := ValidateFinanceWriteChange(danglingBaseline, repaired); hasAnyError(issues) {
 		t.Fatalf("write must tolerate preexisting dangling reference, got %+v", issues)
 	}
 
 	// Preexisting broken config plus unrelated repair: allowed.
-	broken := financeFixtureWithBrokenForecast(t)
+	broken := financeFixture(t, "broken")
 	brokenBaseline := EvaluationReferenceIssues(broken)
-	brokenRepaired := financeFixtureWithBrokenForecast(t)
+	brokenRepaired := financeFixture(t, "broken")
 	brokenRepaired.Accounts[0].Name = "Renamed"
 	if issues := ValidateFinanceWriteChange(brokenBaseline, brokenRepaired); hasAnyError(issues) {
 		t.Fatalf("write must tolerate preexisting broken config, got %+v", issues)
 	}
 
 	// Real finance errors still block, even with preexisting forecast breakage.
-	invalid := financeFixtureWithDanglingForecast(t)
+	invalid := financeFixture(t, "dangling")
 	ghost := "does-not-exist"
 	invalid.Postings[0].SourceAccountID = &ghost
 	if issues := ValidateFinanceWriteChange(danglingBaseline, invalid); !hasErrorCode(issues, "posting.source.missing") {
 		t.Fatalf("write must keep finance route checks, got %+v", issues)
 	}
-}
-
-func TestFinanceValidationStillEnforcesFinanceRules(t *testing.T) {
-	model := observerFixture()
-	ghost := "does-not-exist"
-	model.Postings[0].SourceAccountID = &ghost
-	if issues := ValidateFinanceModel(model); !hasErrorCode(issues, "posting.source.missing") {
+	if issues := ValidateFinanceModel(invalid); !hasErrorCode(issues, "posting.source.missing") {
 		t.Fatalf("finance validation must keep finance route checks, got %+v", issues)
 	}
-}
 
-func TestFinanceWriteChangeRetainsFinanceWarnings(t *testing.T) {
-	model := financeFixtureWithBrokenForecast(t)
-	model.Accounts[0].Enabled = true
-	model.Accounts[0].Color = nil
-	issues := ValidateFinanceWriteChange(EvaluationReferenceIssues(model), model)
+	// Finance warnings survive alongside tolerated forecast breakage.
+	warned := financeFixture(t, "broken")
+	warned.Accounts[0].Enabled = true
+	warned.Accounts[0].Color = nil
+	issues := ValidateFinanceWriteChange(EvaluationReferenceIssues(warned), warned)
 	if hasAnyError(issues) {
 		t.Fatalf("unrelated forecast config must not block write: %+v", issues)
 	}
