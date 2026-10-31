@@ -31,12 +31,12 @@ Use **balance check**. Its date column is **balance**; its tab is "Balance check
 - A bank hold that vanished without posting shows **Did not post**; a live
   hold shows **Pending**.
 
-## C. Projection, base case and range
+## C. Projection and range
 
-Two computations over the same saved model. The **base case** is the single calculated path. The **range** is a percentile band across sampled scenarios.
+Two computations over the same saved model. The **projection** is the single calculated path. The **range** is a percentile band across sampled scenarios.
 
 - **Scenario** names one sampled assumption set, as in "80% of 400 scenarios".
-- **What-if** names a simulator evaluation that layers hypothetical additions, disables, and modified copies on saved state without changing it. It is distinct from a sampled scenario. Promote replays it as sequential saves. Discard deletes the evaluation.
+- **What-if** names a simulator evaluation that branches from the projection to test hypothetical additions, disables, and modified copies without changing saved state. It is distinct from a sampled scenario. Promote replays it as sequential saves. Discard deletes the evaluation.
 
 ## D. Changes
 
@@ -58,7 +58,7 @@ Use **evaluation**. The three roles below are distinct and stay distinct:
 
 Use **Funding gaps** for the default transaction-funding evaluation and its outlook summary. Use **Funding gap** for one inspector item and **No projected funding gaps** for a clear result. Keep custom evaluation names. `postingFulfillment` remains the engine's storage and API identifier; the stored default name "Posting fulfillment" displays as "Funding gaps" without a data rewrite.
 
-`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the five evaluation tables: financial independence, net-worth threshold, account balance, posting fulfillment, cycle fulfillment. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
+`EvaluationTypeOrder` in `backend/internal/types/model.go` fixes the display order of the evaluation tables: financial independence, net-worth threshold, account balance, posting fulfillment, cycle fulfillment, planned purchases, what-if. `EvaluationRegistry` in `backend/internal/domain/evaluation_runtime.go` owns the registered definitions; the cycle fulfillment definition lands with its runtime.
 
 ## F. Income evidence
 
