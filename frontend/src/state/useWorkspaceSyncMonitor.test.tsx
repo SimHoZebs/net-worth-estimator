@@ -1,12 +1,10 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { ok } from "../mocks/fetch.ts";
 import { acceptTestResource } from "../mocks/resource.ts";
+import { setupQueryScope, teardownQueryScope } from "../mocks/testScope.tsx";
 import { setServerStatusFixture } from "../mocks/workspace.ts";
-import {
-	deterministicQueryKey,
-	resetServerQueryCache,
-	serverQueryClient,
-} from "./serverQuery.ts";
+import { deterministicQueryKey, serverQueryClient } from "./serverQuery.ts";
 import {
 	acceptUserScope,
 	canonicalApiBaseUrl,
@@ -30,18 +28,9 @@ const status = {
 
 function stubSync(lastSyncAt = "after") {
 	const fetcher = vi.fn(async (url: unknown, _init?: RequestInit) => {
-		const headers = new Headers({ "content-type": "application/json" });
-		const resource = getUserScope().resource?.id;
-		if (resource) headers.set("Waypoint-Resource", resource);
 		const path = String(url);
-		if (path.endsWith("/v1/status"))
-			return new Response(JSON.stringify({ ...status, lastSyncAt }), {
-				headers,
-			});
-		return new Response(
-			JSON.stringify({ model: null, issues: [], revision: "r1" }),
-			{ headers },
-		);
+		if (path.endsWith("/v1/status")) return ok({ ...status, lastSyncAt });
+		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
 	return fetcher;
@@ -60,10 +49,8 @@ function modelFetches(fetcher: ReturnType<typeof vi.fn>) {
 }
 
 beforeEach(() => {
-	acceptTestResource();
-	resetServerQueryCache();
+	setupQueryScope();
 	resetSyncWorkspaceRefresh();
-	vi.unstubAllGlobals();
 	Object.defineProperty(document, "visibilityState", {
 		configurable: true,
 		value: "visible",
@@ -71,11 +58,9 @@ beforeEach(() => {
 	setServerStatusFixture({ ...status, lastSyncAt: "before" });
 });
 afterEach(() => {
-	cleanup();
-	resetServerQueryCache();
+	teardownQueryScope();
 	resetSyncWorkspaceRefresh();
 	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
 });
 
 it("refreshes the model and invalidates only the current resource's financial calculations", async () => {
@@ -117,33 +102,20 @@ it("does not reload after an explicit sync refresh already applied the stamp", a
 });
 
 it("retries a sync whose model reload failed", async () => {
-	const headers = () => {
-		const responseHeaders = new Headers({
-			"content-type": "application/json",
-		});
-		const resource = getUserScope().resource?.id;
-		if (resource) responseHeaders.set("Waypoint-Resource", resource);
-		return responseHeaders;
-	};
 	let modelCalls = 0;
 	const fetcher = vi.fn(async (url: unknown) => {
 		const path = String(url);
 		if (path.endsWith("/v1/status"))
-			return new Response(JSON.stringify({ ...status, lastSyncAt: "after" }), {
-				headers: headers(),
-			});
+			return ok({ ...status, lastSyncAt: "after" });
 		if (path.endsWith("/v1/financial-model")) {
 			modelCalls += 1;
 			if (modelCalls === 1)
 				return new Response(JSON.stringify({ detail: "boom" }), {
 					status: 500,
-					headers: headers(),
+					headers: { "content-type": "application/json" },
 				});
 		}
-		return new Response(
-			JSON.stringify({ model: null, issues: [], revision: "r1" }),
-			{ headers: headers() },
-		);
+		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
 	const key = deterministicQueryKey("model", 10);
@@ -169,14 +141,6 @@ it("retries a sync whose model reload failed", async () => {
 });
 
 it("retains a detected sync while the workspace is busy", async () => {
-	const headers = () => {
-		const responseHeaders = new Headers({
-			"content-type": "application/json",
-		});
-		const resource = getUserScope().resource?.id;
-		if (resource) responseHeaders.set("Waypoint-Resource", resource);
-		return responseHeaders;
-	};
 	let resolveStatus!: (value: Response) => void;
 	const statusGate = new Promise<Response>((resolve) => {
 		resolveStatus = resolve;
@@ -187,14 +151,9 @@ it("retains a detected sync while the workspace is busy", async () => {
 		if (path.endsWith("/v1/status")) {
 			statusCalls += 1;
 			if (statusCalls === 1) return statusGate;
-			return new Response(JSON.stringify({ ...status, lastSyncAt: "after" }), {
-				headers: headers(),
-			});
+			return ok({ ...status, lastSyncAt: "after" });
 		}
-		return new Response(
-			JSON.stringify({ model: null, issues: [], revision: "r1" }),
-			{ headers: headers() },
-		);
+		return ok({ model: null, issues: [], revision: "r1" });
 	});
 	vi.stubGlobal("fetch", fetcher);
 	renderHook(() => useWorkspaceSyncMonitor(true));
@@ -215,11 +174,7 @@ it("retains a detected sync while the workspace is busy", async () => {
 	});
 	const pending = mutation.execute(undefined);
 	await waitFor(() => expect(finish).toBeDefined());
-	resolveStatus(
-		new Response(JSON.stringify({ ...status, lastSyncAt: "after" }), {
-			headers: headers(),
-		}),
-	);
+	resolveStatus(ok({ ...status, lastSyncAt: "after" }));
 	// The poll completes against the shared cache, but the workspace is busy,
 	// so the change is retained instead of applied or consumed.
 	await waitFor(() =>

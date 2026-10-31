@@ -1,20 +1,17 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ServerStatus } from "../api/index.ts";
-import { acceptOwnerResource, acceptTestResource } from "../mocks/resource.ts";
+import { acceptOwnerResource } from "../mocks/resource.ts";
 import { stubTestServer } from "../mocks/waypointServer.ts";
 import { setServerStatusFixture } from "../mocks/workspace.ts";
 import { getUserScope } from "../auth/resourceScope.ts";
-import {
-	deterministicQueryKey,
-	resetServerQueryCache,
-	serverQueryClient,
-} from "./serverQuery.ts";
+import { deterministicQueryKey, serverQueryClient } from "./serverQuery.ts";
 import {
 	getAppliedSyncStamp,
 	markSyncApplied,
 	refreshWorkspaceAfterSync,
 	resetSyncWorkspaceRefresh,
 } from "./syncWorkspaceRefresh.ts";
+import { setupQueryScope, teardownQueryScope } from "../mocks/testScope.tsx";
 
 const status: ServerStatus = {
 	readOnly: false,
@@ -24,17 +21,14 @@ const status: ServerStatus = {
 };
 
 beforeEach(() => {
-	acceptTestResource();
-	resetServerQueryCache();
+	setupQueryScope();
 	resetSyncWorkspaceRefresh();
-	vi.unstubAllGlobals();
 });
 
 afterEach(() => {
-	resetServerQueryCache();
+	teardownQueryScope();
 	resetSyncWorkspaceRefresh();
 	vi.restoreAllMocks();
-	vi.unstubAllGlobals();
 });
 
 it("refreshes the workspace and marks the stamp applied", async () => {
