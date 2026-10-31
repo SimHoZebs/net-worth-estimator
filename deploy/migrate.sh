@@ -187,7 +187,11 @@ if [ "$analysis" = 5 ]; then
 fi
 posting_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='posting_id_migrations';") \
   || fail "Cannot inspect posting-ID audit table."
-
+postings_split=0
+if [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'posting_sim';")" = 1 ] && \
+   [ "$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('postings') WHERE name = 'destination_account_ids';")" = 1 ]; then
+  postings_split=1
+fi
 mode=""
 if [ "$cols" = "$LEGACY_COLS" ]; then
   mode="convert"
@@ -226,8 +230,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ]; then
-  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ]; then  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
   exit 0
 fi
 
