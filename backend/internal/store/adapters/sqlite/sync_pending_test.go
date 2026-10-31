@@ -119,13 +119,18 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
+	posting := bankSeedPosting("Pending", "prime_card", "10", true)
+	posting.Enabled = true
 	applyDirectives(t, database, []BankDirective{{Upsert: &BankUpsert{
-		Posting: bankSeedPosting("Pending", "prime_card", "10", true),
+		Posting: posting,
 		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
 	}}})
 	loaded, err := database.LoadModel()
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !loaded.Postings[0].Enabled {
+		t.Fatal("void transition must start with an enabled posting")
 	}
 	id := loaded.Postings[0].ID
 	first := applyDirectives(t, database, []BankDirective{{Void: id}})
@@ -137,7 +142,7 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 		t.Fatalf("repeat void churned: %+v", second)
 	}
 	after, err := database.LoadModel()
-	if err != nil || len(after.Postings) != 1 || after.Postings[0].Pending || !after.Postings[0].Void {
+	if err != nil || len(after.Postings) != 1 || after.Postings[0].Pending || !after.Postings[0].Void || after.Postings[0].Enabled {
 		t.Fatalf("void row = %+v, %v", after, err)
 	}
 }
