@@ -882,11 +882,11 @@ export function TransactionDetail({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const once = savedTransaction.frequency === "once";
   const canEdit = !edit.readOnlyReason;
-  // Settled bank rows are editable but never deletable through the UI:
-  // a deleted settled row would be re-imported by the next sync, while
-  // excluding it keeps it out of projections. Phantom voids go through
-  // the dedicated remove flow below instead of the generic delete.
-  const canDelete = canEdit && !savedTransaction.syncOwned;
+  // Settled bank rows are editable and removable through the UI: removing
+  // one suppresses its bank ids, so the feed will not re-import it.
+  // Live pending holds stay locked: each feed refreshes them in place,
+  // so an edit could not survive the next refresh.
+  const canDelete = canEdit && !savedTransaction.pending;
   const voidCandidates = transaction.void
     ? voidSettleCandidates({
         voidRow: savedTransaction,
@@ -911,9 +911,10 @@ export function TransactionDetail({
     savedTransaction.postedDate !== edit.draft.startDate;
   const fromAccount = accountFor(accounts, edit.draft.fromId || null);
   const toAccount = accountFor(accounts, edit.draft.toId || null);
+  const showPosted = savedTransaction.postedDate !== null;
   const hasStatusPill =
     transaction.pending ||
-    transaction.source === "historical" ||
+    showPosted ||
     showExcluded ||
     showShortfall ||
     savedTransaction.amountKnown === false ||
@@ -1046,7 +1047,7 @@ export function TransactionDetail({
                     <Clock3 size={10} aria-hidden="true" />
                     Pending
                   </Badge>
-                ) : transaction.source === "historical" ? (
+                ) : showPosted ? (
                   <Badge tone="success">
                     <Check size={10} aria-hidden="true" />
                     Posted
