@@ -8,14 +8,6 @@ import {
 } from "../mocks/workspace.ts";
 import { Outlook } from "./Outlook.tsx";
 
-vi.mock("../state/useRemoteProjection.ts", () => ({
-	useRemoteProjection: () => ({
-		base: null,
-		loading: false,
-		status: "disabled",
-	}),
-}));
-
 const blankData = {
 	...financialModelFixture,
 	accounts: [],

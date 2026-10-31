@@ -9,11 +9,13 @@ import {
 import { dateLabel, money, todayIso } from "../domain/format.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { useCheckpoints } from "../state/workspaceResources.ts";
-import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
-import { IconButton } from "./Button.tsx";
+import { IconButton, TextButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
+import { Notice } from "./Notice.tsx";
+import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
 import { Skeleton } from "./Skeleton.tsx";
 import { SegmentedControl } from "./SegmentedControl.tsx";
 
@@ -28,14 +30,8 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   // Outlook pins the horizon; the chart subscribes to the same cached
   // forecast instead of receiving it as a prop.
   const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
-  const projectionQuery = useRemoteProjection({ years: 20, ranges: false });
-  const projection =
-    projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
-      ? null
-      : projectionQuery.base;
-  const pending =
-    projectionQuery.status === "pending" ||
-    (projectionQuery.isPlaceholderData && projectionQuery.loading);
+  const { base: projection, pending, loading, baseError, retryProjection, status } =
+    useOutlookProjection();
   // The graph covers only the trailing window ending today: sparse engine
   // rows expand into one daily point per day via latest-known fill. The
   // past already happened, so there is one observed line and no scenarios.
@@ -93,7 +89,13 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   );
   if (!model || !point) {
     // Only data slots skeletonize, and only while data is absent.
-    if (!pending) return null;
+    if (!pending)
+      return status === "error" ? (
+        <Notice tone="danger" className="mb-4">
+          <span>Could not calculate forecast. {baseError}</span>
+          <TextButton onClick={retryProjection}>Retry forecast</TextButton>
+        </Notice>
+      ) : null;
     return (
       <section
         className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
@@ -107,6 +109,19 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
     );
   }
   return (
+    <>
+      {status === "error" && (
+        <Notice tone="danger" className="mb-4">
+          <span>Could not calculate forecast. {baseError}</span>
+          <TextButton onClick={retryProjection}>Retry forecast</TextButton>
+        </Notice>
+      )}
+      {pending && (
+        <p className="sr-only" role="status">
+          Loading the projection.
+        </p>
+      )}
+      {loading && projection && <ProjectionUpdating />}
     <section
       className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
       aria-label={`Net worth over the trailing ${days} days`}
@@ -139,5 +154,6 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
         />
       </div>
     </section>
+    </>
   );
 }
