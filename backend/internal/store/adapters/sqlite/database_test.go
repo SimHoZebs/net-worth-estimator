@@ -319,6 +319,26 @@ func TestSharedDatabaseArtifactEvictionIsPlanLocal(t *testing.T) {
 	}
 }
 
+func TestSharedDatabaseArtifactEvictionIsKindLocal(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	a, _ := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
+	if err := a.PutArtifact("projection", "deterministic", "keep"); err != nil {
+		t.Fatal(err)
+	}
+	for i := range maxArtifacts + 4 {
+		if err := a.PutArtifact(fmt.Sprint(i), "stochastic", "payload"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := countRows(t, a, "projection_artifacts", ""); got != maxArtifacts+1 {
+		t.Fatalf("artifact count = %d", got)
+	}
+	payload, found, err := a.GetArtifact("projection")
+	if err != nil || !found || payload != "keep" {
+		t.Fatalf("range burst evicted the stored projection = %q found %v err %v", payload, found, err)
+	}
+}
+
 func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
