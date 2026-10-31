@@ -56,9 +56,14 @@ CREATE TRIGGER analysis_facts_delete AFTER DELETE ON transaction_source_facts BE
   INSERT INTO analysis_inputs(user_id, revision) VALUES (OLD.user_id, 1)
   ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;
 END;
-CREATE TRIGGER analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
+CREATE TRIGGER IF NOT EXISTS analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
   WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
   AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.id)
+  BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
+  ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END;
+CREATE TRIGGER IF NOT EXISTS analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
+  WHEN (OLD.enabled != NEW.enabled)
+  AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.posting_id)
   BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
   ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END;
 INSERT INTO schema_migrations(name) VALUES ('transaction-analysis-v1'), ('analysis-feedback-v1');
