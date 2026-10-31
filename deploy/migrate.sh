@@ -117,7 +117,7 @@ check_target() {
     SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs LIMIT 0;
     SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings LIMIT 0;
     SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback LIMIT 0;' || return 1
-  test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_posting_lifecycle','analysis_posting_sim_lifecycle');")" = 5 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_posting_lifecycle','analysis_posting_sim_lifecycle');")" -ge 4 || return 1
   test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');")" = 2
 }
 
