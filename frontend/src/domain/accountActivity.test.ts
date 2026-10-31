@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import { activityProjection } from "../mocks/projection.ts";
+import type { Transaction } from "./model.ts";
 import {
 	accountTransactions,
 	defaultActivityFilters,
 	filterTransactions,
+	voidSettleCandidates,
 } from "./accountActivity.ts";
 
 const projection = activityProjection();
@@ -470,5 +472,84 @@ describe("bank evidence statuses", () => {
 				(row) => row.transactionId === "01900000-0000-7000-8000-000000000012",
 			)?.excluded,
 		).toBe(true);
+	});
+});
+
+describe("void posted-version candidates", () => {
+	function bankRow(overrides: Partial<Transaction>): Transaction {
+		return {
+			id: "01900000-0000-7000-8000-000000000020",
+			name: "Bistro",
+			amount: 50,
+			amountKnown: true,
+			fromId: "checking",
+			toId: null,
+			frequency: "once",
+			startDate: "2026-10-20",
+			endDate: null,
+			annualIncrease: 0,
+			enabled: false,
+			readOnly: true,
+			claimRuleId: null,
+			claimOccurrenceDate: null,
+			postedDate: null,
+			pending: false,
+			void: true,
+			syncOwned: true,
+			...overrides,
+		} as Transaction;
+	}
+
+	function settledRow(overrides: Partial<Transaction>): Transaction {
+		return bankRow({
+			id: "01900000-0000-7000-8000-000000000021",
+			name: "Bistro",
+			amount: 58,
+			enabled: true,
+			readOnly: false,
+			pending: false,
+			void: false,
+			startDate: "2026-10-21",
+			...overrides,
+		});
+	}
+
+	const voidHold = bankRow({});
+
+	it("flags a unique tip-bounded posted total", () => {
+		expect(
+			voidSettleCandidates({
+				voidRow: voidHold,
+				transactions: [settledRow({})],
+			}).map((row) => row.id),
+		).toEqual(["01900000-0000-7000-8000-000000000021"]);
+	});
+
+	it("lists ambiguous matches for the reviewer instead of holding out", () => {
+		const candidates = voidSettleCandidates({
+			voidRow: voidHold,
+			transactions: [
+				settledRow({ id: "a", amount: 55, startDate: "2026-10-21" }),
+				settledRow({ id: "b", amount: 56, startDate: "2026-10-22" }),
+			],
+		});
+		expect(candidates.map((row) => row.id).sort()).toEqual(["a", "b"]);
+	});
+
+	it("excludes beyond-tolerance, direction, account, and lifecycle mismatches", () => {
+		const smallVoid = bankRow({ amount: 42.1 });
+		const rows = [
+			settledRow({ id: "far", amount: 80 }),
+			settledRow({ id: "inflow", amount: 42.1, fromId: null, toId: "checking" }),
+			settledRow({ id: "other", toId: "savings", fromId: null }),
+			settledRow({ id: "pending", pending: true, enabled: false }),
+			settledRow({ id: "voided", void: true, enabled: false }),
+			settledRow({ id: "manual", syncOwned: false, readOnly: false }),
+			settledRow({ id: "late", startDate: "2026-11-20" }),
+			settledRow({ id: "zero", amount: 0, amountKnown: false }),
+		];
+		expect(
+			voidSettleCandidates({ voidRow: smallVoid, transactions: rows }),
+		).toEqual([]);
 	});
 });

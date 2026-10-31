@@ -282,7 +282,12 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 					StartDate:       startDate,
 					Enabled:         posting.Enabled,
 					SyncOwned:       syncOwned,
-					ReadOnly:        syncOwned,
+					// Only lifecycle bank rows stay sync-owned: pending
+					// seeds refresh in place and voids convert, so owner
+					// edits would be clobbered. Settled bank rows are
+					// write-stable after import, so the owner can edit,
+					// exclude, and remove phantoms through them.
+					ReadOnly:        syncOwned && (posting.Pending || posting.Void),
 					Claim:           posting.Claim,
 					Pending:         posting.Pending,
 					Void:            posting.Void,
