@@ -143,17 +143,6 @@ export function ProjectionChart({
 					onBlur={() => setInspected(null)}
 				/>
 			</div>
-			<div
-				className="mx-5 mt-1 mb-5 flex min-h-15 flex-wrap content-center gap-x-3 gap-y-2 rounded-control bg-surface-2 px-3 py-2 text-xs tabular-nums"
-				aria-live="polite"
-			>
-				<strong>{dateLabel(point.date)}</strong>
-				<span className="text-muted">
-					<b className="ml-1 text-ink">
-						{money(model.adjust(point.total, point.date))}
-					</b>
-				</span>
-			</div>
 		</section>
 	);
 }
