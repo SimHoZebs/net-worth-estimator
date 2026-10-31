@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -108,19 +109,19 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 
 func (s *handler) deletePlannedPurchase(_ context.Context, input *struct {
 	ID string `path:"id"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.PlannedPurchases = removeByID(model.PlannedPurchases, input.ID, plannedPurchaseID)
 	}, func() (struct{}, error) { return struct{}{}, s.store.DeletePlannedPurchase(input.ID) })
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{revision}}, nil
 }
 
-func (s *handler) movePlannedPurchase(_ context.Context, input *reorderInput) (*reorderOutput, error) {
+func (s *handler) movePlannedPurchase(_ context.Context, input *reorderInput) (*modelstate.ReorderOutput, error) {
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.PlannedPurchases = moveBeforeID(model.PlannedPurchases, input.Body.ID, input.Body.BeforeID, plannedPurchaseID)
 		for i := range model.PlannedPurchases {
@@ -132,7 +133,7 @@ func (s *handler) movePlannedPurchase(_ context.Context, input *reorderInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{revision}}, nil
 }

@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -126,7 +127,7 @@ func (s *handler) updateRule(_ context.Context, input *struct {
 
 func (s *handler) deleteRule(_ context.Context, input *struct {
 	ID string `path:"id"`
-}) (*reorderOutput, error) {
+}) (*modelstate.ReorderOutput, error) {
 	id := input.ID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
@@ -136,12 +137,12 @@ func (s *handler) deleteRule(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }
 
-func (s *handler) moveRule(_ context.Context, input *reorderInput) (*reorderOutput, error) {
+func (s *handler) moveRule(_ context.Context, input *reorderInput) (*modelstate.ReorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
 	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.RecurrenceRules = moveBeforeID(model.RecurrenceRules, id, beforeID, ruleID)
@@ -151,7 +152,7 @@ func (s *handler) moveRule(_ context.Context, input *reorderInput) (*reorderOutp
 	if err != nil {
 		return nil, err
 	}
-	return &reorderOutput{Body: struct {
+	return &modelstate.ReorderOutput{Body: struct {
 		Revision string `json:"revision"`
 	}{Revision: revision}}, nil
 }
