@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
-import type { Account, PlannedPurchase } from "../../domain/model.ts";
+import { ProjectionUpdating } from "../../components/ProjectionUpdating.tsx";
+import type { PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
-import type { PurchaseSchedule } from "../../domain/result.ts";
 import {
 	moveSavedPurchase,
 	removeSavedPurchase,
 } from "../../state/purchaseWrites.ts";
+import { PURCHASE_EVALUATIONS } from "../../state/purchaseEvaluation.ts";
+import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
 import { useUiStore } from "../../state/uiStore.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
+import {
+	useSavedAccounts,
+	useSavedPurchases,
+	useSavedStartDate,
+} from "../../state/savedRows.ts";
 import { PlannedPurchaseEditor } from "./PlannedPurchaseEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";
@@ -19,17 +26,17 @@ import { PurchasePlanner } from "./PurchasePlanner.tsx";
  * writes targeted row operations and refreshes authoritative state; the form
  * only closes after the server persisted the change.
  */
-export function PlannedPurchasePanel({
-	accounts,
-	purchases,
-	startDate,
-	schedule,
-}: {
-	accounts: Account[];
-	purchases: PlannedPurchase[];
-	startDate: string;
-	schedule: PurchaseSchedule | null;
-}) {
+export function PlannedPurchasePanel() {
+	const accounts = useSavedAccounts();
+	const purchases = useSavedPurchases();
+	const startDate = useSavedStartDate();
+	const projection = useRemoteProjection({
+		ranges: false,
+		evaluations: PURCHASE_EVALUATIONS,
+	});
+	const base = projection.base instanceof Error ? null : projection.base;
+	const current = base !== null && !projection.loading && !projection.baseError;
+	const schedule = current ? (base?.plannedPurchases ?? null) : null;
 	const blocked = useUserReadOnly();
 	const years = useUiStore((state) => state.years);
 	const locked = blocked;
@@ -41,6 +48,7 @@ export function PlannedPurchasePanel({
 	const [removeError, setRemoveError] = useState<string | null>(null);
 	const [moveError, setMoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
+	if (!accounts || !purchases || !startDate) return null;
 	const items = toPurchaseViewItems({ purchases, accounts, schedule });
 	const end = horizonDate({ start: startDate, years });
 
@@ -78,6 +86,7 @@ export function PlannedPurchasePanel({
 
 	return (
 		<>
+			{projection.loading && base && <ProjectionUpdating />}
 			<PurchasePlanner
 				items={items}
 				forecastEnd={end}
