@@ -16,10 +16,11 @@ type postingLifecycle struct {
 }
 
 // ownerEditable reports whether an owner write may touch the row. Owner
-// rows are always editable. Bank rows become editable once settled; live
-// pending and void rows stay sync-owned so the sync never fights the owner.
+// rows are always editable. Bank rows are owner-editable, including while
+// pending; only live void rows stay sync-owned so the sync never fights
+// the owner.
 func (l postingLifecycle) ownerEditable() bool {
-	return l.source == SourceUser || (!l.pending && !l.void)
+	return l.source == SourceUser || !l.void
 }
 
 func postingLifecycleOf(tx *userTx, id string) (postingLifecycle, error) {
@@ -130,10 +131,9 @@ func (s *sqliteStore) DeletePosting(id string) error {
 		// Owner rows are always removable. A void bank-owned row is removable
 		// too: it moves nothing in the replay, and its bridge key is already
 		// gone from the feed (vanished rows are reconciled from absence), so
-		// there is nothing for a later sync to rejoin. Only pending rows
-		// stay sync-owned here: pending seeds refresh in place on every feed.
-		// Settled rows are removable as well: their bank ids move to the
-		// do-not-import list first, so later feeds skip them.
+		// there is nothing for a later sync to rejoin. Settled and pending
+		// rows are removable as well: their bank ids move to the do-not-import
+		// list first, so later feeds skip them.
 		voidBankRow := lifecycle.source != SourceUser && lifecycle.source != "" && !lifecycle.pending && lifecycle.void
 		if !lifecycle.ownerEditable() && !voidBankRow {
 			return SyncOwned(id)
@@ -166,8 +166,8 @@ func (s *sqliteStore) MovePosting(id, beforeID string) error {
 // ConvertPostingToRule moves one posting across to a recurrence rule in a
 // single transaction. The entity ID stays claimed, the rule appends at the
 // end of the execution order. Sync-owned bank rows stay put: convert refuses
-// live pending and void rows. (Delete instead allows removing a void bank
-// row; see DeletePosting.)
+// live void rows. (Delete instead allows removing a void bank row; see
+// DeletePosting.)
 func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error) {
 	rule.ID = postingID
 	err := withRowTx(s.db, func(tx *userTx) error {
