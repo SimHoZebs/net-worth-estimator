@@ -29,10 +29,34 @@ func hasErrorIssues(issues []types.ModelValidationIssue) bool {
 	return false
 }
 
-// runRowWrite validates and persists one model-entry change, then computes
-// its revision from the stored snapshot used for response warnings.
-// Handlers wrap row/issues/persisted/revision in their output shape.
+// runRowWrite validates and persists one model-entry change with full
+// validation (finance plus forecast evaluation configuration), then
+// computes its revision from the stored snapshot used for response
+// warnings. Handlers wrap row/issues/persisted/revision in their output
+// shape. Evaluation writes use it so a broken forecast cannot be saved.
 func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
+	return runRowWriteWithValidator(s, mutate, persist, domain.ValidateFinancialModel, domain.ValidateFinancialModel)
+}
+
+// runFinanceRowWrite validates and persists one ordinary finance row.
+// The gate is ValidateFinanceWriteChange: the candidate's finance errors
+// plus evaluation reference errors newly introduced relative to the
+// stored baseline. Preexisting forecast reference, config-shape, and
+// identity errors never block repairing unrelated valid financial rows.
+// Success-path issues carry finance-only warnings; forecast diagnostics
+// stay on the whole-model read.
+func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
+	var baseline []types.ModelValidationIssue
+	return runRowWriteWithValidator(s, func(model *types.FinancialModel) {
+		// Capture references before helpers compact shared backing arrays.
+		baseline = domain.EvaluationReferenceIssues(model)
+		mutate(model)
+	}, persist, func(candidate *types.FinancialModel) []types.ModelValidationIssue {
+		return domain.ValidateFinanceWriteChange(baseline, candidate)
+	}, domain.ValidateFinanceModel)
+}
+
+func runRowWriteWithValidator[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue) (T, []types.ModelValidationIssue, bool, string, error) {
 	var zero T
 	model, err := s.store.LoadModel()
 	if err != nil {
@@ -42,7 +66,7 @@ func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), pe
 		model = &types.FinancialModel{Evaluations: types.EmptyEvaluationTables()}
 	}
 	mutate(model)
-	issues := domain.ValidateFinancialModel(model)
+	issues := validateCandidate(model)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}
@@ -64,7 +88,7 @@ func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), pe
 	if err != nil {
 		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
-	issues = domain.ValidateFinancialModel(model)
+	issues = validateStored(model)
 	if issues == nil {
 		issues = []types.ModelValidationIssue{}
 	}

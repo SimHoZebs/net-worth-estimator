@@ -66,7 +66,7 @@ func keepEchoedDestinations(stored, incoming []string) []string {
 
 func (s *handler) createPosting(_ context.Context, input *postingInput) (*postingOutput, error) {
 	posting := input.Body.toPosting("")
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.CreatePosting(posting)
@@ -97,7 +97,7 @@ func (s *handler) updatePosting(_ context.Context, input *struct {
 		}
 	}
 	posting := input.Body.toPosting(input.ID)
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.UpdatePosting(posting)
@@ -115,7 +115,7 @@ func (s *handler) deletePosting(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
 	id := input.ID
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = removeByID(model.Postings, id, postingID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeletePosting(id)
@@ -130,7 +130,7 @@ func (s *handler) deletePosting(_ context.Context, input *struct {
 
 func (s *handler) movePosting(_ context.Context, input *reorderInput) (*reorderOutput, error) {
 	id, beforeID := input.Body.ID, input.Body.BeforeID
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = moveBeforeID(model.Postings, id, beforeID, postingID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.MovePosting(id, beforeID)

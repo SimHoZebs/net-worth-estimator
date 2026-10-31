@@ -33,8 +33,65 @@ func validateUniqueIDs(issues *[]types.ModelValidationIssue, ids []string, codeP
 }
 
 // ValidateFinancialModel runs all cross-field checks and returns issues in
-// stable validation order.
+// stable validation order. It covers finance records plus forecast
+// evaluation configuration: simulation and evaluation writes use it.
 func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidationIssue {
+	return validateModel(model, true)
+}
+
+// ValidateFinanceModel runs the pure finance subset used by ordinary
+// records, reads, and historical current-position replay. It excludes
+// every evaluation-owned check (instance identity, config shape, and
+// account references), so a broken forecast can never block finance
+// work. Finance writes use ValidateFinanceWriteChange instead, which
+// adds back the reference guard for newly introduced orphans.
+func ValidateFinanceModel(model *types.FinancialModel) []types.ModelValidationIssue {
+	return validateModel(model, false)
+}
+
+// EvaluationReferenceIssues reports dangling evaluation account
+// references without running finance or evaluation config-shape checks.
+// Finance row writes snapshot the stored baseline to reject only newly
+// introduced orphans while tolerating preexisting forecast breakage.
+func EvaluationReferenceIssues(model *types.FinancialModel) []types.ModelValidationIssue {
+	if model == nil {
+		return []types.ModelValidationIssue{}
+	}
+	accountIDs := make(map[string]bool, len(model.Accounts))
+	for _, account := range model.Accounts {
+		accountIDs[account.ID] = true
+	}
+	issues := []types.ModelValidationIssue{}
+	validateEvaluationAccountReferences(&issues, model, accountIDs)
+	return issues
+}
+
+// ValidateFinanceWriteChange gates one finance row write. It reports the
+// candidate's finance errors plus evaluation reference errors the change
+// newly introduces relative to the stored baseline. Preexisting forecast
+// reference, config-shape, and identity errors never block repairing
+// unrelated valid financial rows.
+func ValidateFinanceWriteChange(storedReferences []types.ModelValidationIssue, candidate *types.FinancialModel) []types.ModelValidationIssue {
+	issues := ValidateFinanceModel(candidate)
+	known := make(map[string]bool, len(storedReferences))
+	for _, issue := range storedReferences {
+		if issue.Severity == types.SeverityError {
+			known[referenceIssueKey(issue)] = true
+		}
+	}
+	for _, issue := range EvaluationReferenceIssues(candidate) {
+		if issue.Severity == types.SeverityError && !known[referenceIssueKey(issue)] {
+			issues = append(issues, issue)
+		}
+	}
+	return issues
+}
+
+func referenceIssueKey(issue types.ModelValidationIssue) string {
+	return issue.Code + "\x00" + issue.Message
+}
+
+func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.ModelValidationIssue {
 	issues := []types.ModelValidationIssue{}
 	accountIDs := make(map[string]bool, len(model.Accounts))
 	for _, account := range model.Accounts {
@@ -69,7 +126,9 @@ func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidation
 	validateUniqueIDs(&issues, purchaseIDList, "plannedPurchase.id", func(index int, field string) []any {
 		return pathWithField([]any{"plannedPurchases", index}, field)
 	})
-	validateEvaluationInstanceIDs(&issues, model)
+	if includeEvaluation {
+		validateEvaluationInstanceIDs(&issues, model)
+	}
 
 	// Transaction identity checks: posting, rule, and planned-purchase IDs share
 	// one namespace with account IDs.
@@ -143,8 +202,10 @@ func ValidateFinancialModel(model *types.FinancialModel) []types.ModelValidation
 	validateRuleSchedules(&issues, model, accountIDs)
 	validatePostingClaims(&issues, model)
 	validateAccountBounds(&issues, model.Accounts)
-	validateEvaluationConfigs(&issues, model)
-	validateEvaluationAccountReferences(&issues, model, accountIDs)
+	if includeEvaluation {
+		validateEvaluationConfigs(&issues, model)
+		validateEvaluationAccountReferences(&issues, model, accountIDs)
+	}
 	validatePaymentTerms(&issues, model, accountIDs)
 	validatePaymentTermsCoverage(&issues, model)
 

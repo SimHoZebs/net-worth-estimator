@@ -69,7 +69,7 @@ func (s *handler) listPlannedPurchases(_ context.Context, _ *struct{}) (*struct 
 
 func (s *handler) createPlannedPurchase(_ context.Context, input *struct{ Body plannedPurchaseBody }) (*plannedPurchaseOutput, error) {
 	p := input.Body.purchase("")
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			for _, existing := range model.PlannedPurchases {
 				if existing.Priority >= p.Priority {
@@ -90,7 +90,7 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 	Body plannedPurchaseBody
 }) (*plannedPurchaseOutput, error) {
 	p := input.Body.purchase(input.ID)
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			for _, existing := range model.PlannedPurchases {
 				if existing.ID == p.ID {
@@ -109,7 +109,7 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 func (s *handler) deletePlannedPurchase(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*reorderOutput, error) {
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.PlannedPurchases = removeByID(model.PlannedPurchases, input.ID, plannedPurchaseID)
 	}, func() (struct{}, error) { return struct{}{}, s.store.DeletePlannedPurchase(input.ID) })
 	if err != nil {
@@ -121,7 +121,7 @@ func (s *handler) deletePlannedPurchase(_ context.Context, input *struct {
 }
 
 func (s *handler) movePlannedPurchase(_ context.Context, input *reorderInput) (*reorderOutput, error) {
-	_, _, _, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, _, _, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.PlannedPurchases = moveBeforeID(model.PlannedPurchases, input.Body.ID, input.Body.BeforeID, plannedPurchaseID)
 		for i := range model.PlannedPurchases {
 			model.PlannedPurchases[i].Priority = i

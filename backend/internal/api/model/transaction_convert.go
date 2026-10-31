@@ -81,7 +81,7 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 			}
 		}
 	}
-	_, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	_, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = removeByID(model.Postings, id, postingID)
 		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
 		if kind == "rule" {
