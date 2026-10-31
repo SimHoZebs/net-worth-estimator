@@ -267,5 +267,5 @@ it("locks every field for read-only source records", () => {
 	// descendants behind it.
 	expect(container.querySelector("fieldset[disabled]")).toBeTruthy();
 	expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
-	expect(screen.getByText(/refreshed copy/)).toBeTruthy();
+	expect(screen.queryByText(/refreshed copy/)).toBeNull();
 });

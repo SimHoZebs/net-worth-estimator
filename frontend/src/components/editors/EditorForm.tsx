@@ -116,6 +116,3 @@ export function EditorForm({
 		</Modal>
 	);
 }
-
-export const sourceReadOnlyReason =
-	"Change it at the source and import a refreshed copy.";
