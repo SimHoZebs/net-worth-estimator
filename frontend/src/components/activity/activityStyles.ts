@@ -24,7 +24,7 @@ export const transactionCellStyles = cva("py-3", {
 	variants: {
 		column: {
 			date: "w-[1%] pr-3 pl-0 text-xs whitespace-nowrap text-muted max-sm:hidden",
-			name: "w-auto px-3 whitespace-normal max-sm:px-2",
+			name: "w-auto px-5 whitespace-normal max-sm:px-4",
 			amount:
 				"w-32 pr-1 pl-3 text-right whitespace-nowrap tabular-nums max-sm:w-24 max-sm:pr-0 max-sm:pl-2",
 		},
@@ -32,7 +32,7 @@ export const transactionCellStyles = cva("py-3", {
 });
 
 export const transactionAmountStyles = cva(
-	"m-0 text-sm font-semibold max-sm:text-xs",
+	"text-sm font-semibold max-sm:text-xs",
 	{
 		variants: { positive: { true: "text-success-text", false: "" } },
 	},

@@ -139,7 +139,7 @@ export function TransactionRow({
 							: `${transaction.direction === "in" ? "+" : "−"}${exactMoney(transaction.amount)}`}
 					</strong>
 					{transaction.shortfall > 0.01 && (
-						<small className="m-0 block text-xs text-warning-text">
+						<small className="block text-xs text-warning-text">
 							{exactMoney(transaction.requested)} planned
 						</small>
 					)}
