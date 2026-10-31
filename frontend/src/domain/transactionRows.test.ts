@@ -161,7 +161,37 @@ describe("transaction rows", () => {
 			readOnly: true,
 			pending: false,
 			void: true,
+			postedTime: 1785817200,
+			transactionTime: 1785800000,
 		} as never);
 		expect(bankRow).toMatchObject({ pending: false, void: true });
+		// A vanished hold never posted: even a legacy fabricated posted
+		// instant must not surface as a posted date.
+		expect(bankRow.postedDate).toBeNull();
+		const pendingRow = transactionToDisplay({
+			id: "pending-1",
+			kind: "posting",
+			name: "Live auth",
+			sourceAccountId: "cash",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "18.50" },
+				inputs: {},
+			},
+			frequency: "once",
+			startDate: "2026-02-16",
+			endDate: null,
+			enabled: false,
+			syncOwned: true,
+			readOnly: true,
+			pending: true,
+			transactionTime: 1785800000,
+		} as never);
+		expect(pendingRow).toMatchObject({
+			pending: true,
+			void: false,
+			postedDate: null,
+		});
 	});
 });
