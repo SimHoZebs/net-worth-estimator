@@ -211,7 +211,7 @@ func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now 
 	}
 	var checkpoints []store.SyncCheckpoint
 	for _, checkpoint := range plan.Checkpoints {
-		checkpoints = append(checkpoints, store.SyncCheckpoint{AccountID: checkpoint.AccountID, Balance: checkpoint.Balance, ObservedAt: checkpoint.ObservedAt})
+		checkpoints = append(checkpoints, store.SyncCheckpoint{AccountID: checkpoint.AccountID, Balance: checkpoint.Balance, Source: store.SourceSimpleFIN, ObservedAt: checkpoint.ObservedAt})
 	}
 	bank, err := database.LoadBankPostings()
 	if err != nil {

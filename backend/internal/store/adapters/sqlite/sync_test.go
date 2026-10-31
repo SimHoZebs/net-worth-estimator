@@ -106,7 +106,7 @@ func seedSyncState(t *testing.T, store store.Store) {
 	}
 	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
 	summary, err := store.ApplySyncPlan(
-		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, ObservedAt: 1785628799}},
+		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, Source: SourceSimpleFIN, ObservedAt: 1785628799}},
 		[]BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
