@@ -14,7 +14,16 @@ import {
 	summarizeFundingGap,
 } from "@/domain/fundingGaps.ts";
 import { fundingLabels } from "@/domain/fundingTerminology.ts";
-import type { OtherEvaluationCardProps } from "@/components/evaluationCard.ts";
+import type { OtherEvaluation } from "@/domain/result.ts";
+import type {
+	EvaluationPin,
+	OtherEvaluationCardProps,
+} from "@/components/evaluationCard.ts";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "@/state/savedRows.ts";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
 import { IconButton } from "@/components/Button.tsx";
 import { Badge } from "@/components/Badge.tsx";
@@ -26,25 +35,31 @@ import { useSelectedId } from "@/components/entrySelection.ts";
 /** The same configured funding-gap preview and inspector on both pages. */
 export function FundingGapsCard({
 	item,
-	accounts,
-	transactions,
-	startDate,
 	projection,
 	pin = null,
-}: OtherEvaluationCardProps) {
+}: {
+	item: OtherEvaluation;
+	projection: OtherEvaluationCardProps["projection"];
+	pin?: EvaluationPin | null;
+}) {
+	const accounts = useSavedAccounts();
+	const transactions = useSavedTransactions();
+	const startDate = useSavedStartDate();
 	const gaps = useMemo(
 		() =>
-			orderedFundingGaps(
-				item.enabled
-					? deriveFundingGaps({
-							accounts,
-							transactions,
-							startDate,
-							projection,
-							postingIds: item.postingIds,
-						})
-					: [],
-			),
+			!accounts || !transactions || !startDate
+				? []
+				: orderedFundingGaps(
+						item.enabled
+							? deriveFundingGaps({
+									accounts,
+									transactions,
+									startDate,
+									projection,
+									postingIds: item.postingIds,
+								})
+							: [],
+					),
 		[
 			item.enabled,
 			item.postingIds,

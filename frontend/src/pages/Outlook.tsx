@@ -1,5 +1,4 @@
 import { Wallet } from "lucide-react";
-import type { BackendCheckpoint } from "../api/contracts.ts";
 import { ProjectionChart } from "../components/ProjectionChart.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { ProjectionUpdating } from "../components/ProjectionUpdating.tsx";
@@ -14,15 +13,9 @@ import {
 	useSavedTransactions,
 } from "../state/savedRows.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
-import {
-	useCheckpoints,
-	useServerStatus,
-} from "../state/workspaceResources.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";
 import { SafeSpendingPreview } from "./outlook/safe-spending/SafeSpendingPreview.tsx";
-
-const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 type OutlookProps = {
 	onAddAccount: () => void;
@@ -65,19 +58,13 @@ function OutlookContent({
 	onSafeSpendingDetail,
 	onSafeSpendingTab,
 }: OutlookProps) {
-	// Every data input subscribes where the query is declared; only UI
-	// callbacks arrive as props. Saved rows arrive through the row hooks;
-	// null means not loaded yet, [] means loaded blank.
-	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
+	// The page owns its own gating and global forecast status; children
+	// subscribe to their own queries via the shared TanStack cache.
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
 	const startDate = useSavedStartDate();
 	const evaluations = useSavedEvaluations();
-	const {
-		ids: pinnedIds,
-		toggle: togglePin,
-		loading: pinsLoading,
-	} = usePinnedEvaluations();
+	const { ids: pinnedIds } = usePinnedEvaluations();
 	const projection = useRemoteProjection({
 		enabled: (accounts?.length ?? 0) > 0,
 		// The chart no longer offers horizon or range switches, so Outlook
@@ -90,7 +77,6 @@ function OutlookContent({
 				(pinnedIds ?? []).includes(evaluation.id),
 			) ?? false,
 	});
-	const status = useServerStatus().data;
 	const writeBlocked = useUserReadOnly();
 	// Previous-input placeholders are not forecasts for the active model.
 	const base =
@@ -129,35 +115,11 @@ function OutlookContent({
 					</TextButton>
 				</Notice>
 			)}
-			<ProjectionChart
-				projection={base}
-				checkpoints={checkpoints}
-				onEvidence={onEvidence}
-				pending={pending}
-			/>
-			<PinnedEvaluations
-				accounts={accounts}
-				transactions={transactions}
-				startDate={startDate}
-				projection={base}
-				range={projection.range}
-				pinnedIds={pinnedIds}
-				pending={pending}
-				pinsDisabled={pinsLoading || (status?.readOnly ?? false)}
-				onPinChange={(id) => {
-					void togglePin(id);
-				}}
-			/>
+			<ProjectionChart onEvidence={onEvidence} />
+			<PinnedEvaluations />
 			{(base || pending) && (
 				<div className="mt-6 max-sm:mt-5" aria-busy={pending}>
 					<SafeSpendingPreview
-						accounts={accounts}
-						transactions={transactions}
-						startDate={startDate}
-						readOnly={writeBlocked}
-						checkpoints={checkpoints}
-						projection={base}
-						pending={pending}
 						detail={safeSpendingDetail}
 						onDetail={onSafeSpendingDetail}
 						onTabChange={onSafeSpendingTab}

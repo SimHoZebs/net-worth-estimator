@@ -1,4 +1,3 @@
-import type { Account, Transaction } from "../domain/model.ts";
 import type {
 	OtherEvaluation,
 	Projection,
@@ -16,7 +15,4 @@ export interface OtherEvaluationCardProps {
 	projection: Projection | null;
 	pin?: EvaluationPin | null;
 	range?: RangeResult | null;
-	accounts: Account[];
-	transactions: Transaction[];
-	startDate: string;
 }

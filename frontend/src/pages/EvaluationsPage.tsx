@@ -4,8 +4,7 @@ import { Button } from "@/components/Button.tsx";
 import { EmptyState } from "@/components/EmptyState.tsx";
 import { ErrorNotice } from "@/components/ErrorNotice.tsx";
 import { ProjectionUpdating } from "@/components/ProjectionUpdating.tsx";
-import type { Account, Evaluation, Transaction } from "@/domain/model.ts";
-import type { Projection, RangeResult } from "@/domain/result.ts";
+import type { Evaluation } from "@/domain/model.ts";
 import { deleteEvaluation } from "@/api/generated/endpoints.ts";
 import {
 	summaryEvaluations,
@@ -34,72 +33,41 @@ export function EvaluationsPage({
 }: {
 	onEdit: (evaluation: Evaluation | null) => void;
 }) {
-	// Saved rows and projection subscribe where the query is declared;
-	// only UI callbacks arrive as props.
+	// The grid subscribes to its own queries; only UI callbacks arrive as
+	// props. Saved rows arrive through the row hooks; null means not loaded.
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
 	const startDate = useSavedStartDate();
-	const summary = useEvaluationSummary().data;
-	const savedEvaluations = useMemo(
-		() => summaryEvaluations(summary),
-		[summary],
-	);
-	const financialIndependenceEnabled = useMemo(
-		() =>
-			summary?.evaluations.financialIndependence.some((item) => item.enabled) ??
-			false,
-		[summary],
-	);
-	const projection = useRemoteProjection({
-		// Reuse the regular range request for configured financial independence
-		// confidence. Inspecting dates and evidence never starts a calculation.
-		ranges: savedEvaluations.length > 0 || financialIndependenceEnabled,
-	});
-	const base = projection.base instanceof Error ? null : projection.base;
-	if (!accounts || !transactions || !startDate) return null;
-	return (
-		<>
-			{projection.loading && base && <ProjectionUpdating />}
-			<EvaluationsContent
-				accounts={accounts}
-				transactions={transactions}
-				startDate={startDate}
-				projection={base}
-				range={projection.range}
-				onEdit={onEdit}
-			/>
-		</>
-	);
-}
-
-function EvaluationsContent({
-	accounts,
-	transactions,
-	startDate,
-	projection,
-	range,
-	onEdit,
-}: {
-	accounts: Account[];
-	transactions: Transaction[];
-	startDate: string;
-	projection: Projection | null;
-	range: RangeResult | null;
-	onEdit: (evaluation: Evaluation | null) => void;
-}) {
-	const pending = projection === null;
-	// Other evaluation kinds are configured server-side, so their count is
-	// unknowable until the projection lands; they join the grid on arrival.
-	const others = projection?.otherEvaluations ?? [];
 	const summary = useEvaluationSummary();
 	const savedIds = useMemo(
 		() => summaryInstanceIds(summary.data),
 		[summary.data],
 	);
-	const evaluations = useMemo(
+	const savedEvaluations = useMemo(
 		() => summaryEvaluations(summary.data),
 		[summary.data],
 	);
+	const financialIndependenceEnabled = useMemo(
+		() =>
+			summary.data?.evaluations.financialIndependence.some(
+				(item) => item.enabled,
+			) ?? false,
+		[summary.data],
+	);
+	const projectionQuery = useRemoteProjection({
+		// Reuse the regular range request for configured financial independence
+		// confidence. Inspecting dates and evidence never starts a calculation.
+		ranges: savedEvaluations.length > 0 || financialIndependenceEnabled,
+	});
+	const base =
+		projectionQuery.base instanceof Error ? null : projectionQuery.base;
+	const range = projectionQuery.range;
+	const projection = base;
+	const pending = projection === null;
+	// Other evaluation kinds are configured server-side, so their count is
+	// unknowable until the projection lands; they join the grid on arrival.
+	const others = projection?.otherEvaluations ?? [];
+	const evaluations = savedEvaluations;
 	const balances = useAccountBalances();
 	const status = useServerStatus().data;
 	const { ids: pinnedIds, toggle: togglePin } = usePinnedEvaluations();
@@ -134,8 +102,10 @@ function EvaluationsContent({
 				);
 		});
 	};
+	if (!accounts || !transactions || !startDate) return null;
 	return (
 		<>
+			{projectionQuery.loading && projection && <ProjectionUpdating />}
 			<div className="mb-6 flex items-center justify-between gap-4 max-sm:flex-wrap">
 				<Button type="button" variant="primary" onClick={() => onEdit(null)}>
 					<Plus size={16} />
@@ -178,9 +148,6 @@ function EvaluationsContent({
 					<OtherEvaluationCard
 						key={item.id}
 						item={item}
-						accounts={accounts}
-						transactions={transactions}
-						startDate={startDate}
 						projection={projection}
 						range={range}
 						pin={{

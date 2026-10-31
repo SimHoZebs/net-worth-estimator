@@ -1,11 +1,30 @@
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dateLabel } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
 import { financialModelFixture } from "@/mocks/financialModel.ts";
 import { OtherEvaluationCard } from "@/pages/evaluations/OtherEvaluationCard.tsx";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "@/state/savedRows.ts";
+
+vi.mock("@/state/savedRows.ts", () => ({
+	useSavedAccounts: vi.fn(),
+	useSavedTransactions: vi.fn(),
+	useSavedStartDate: vi.fn(),
+	useSavedEvaluations: vi.fn(),
+}));
 
 afterEach(cleanup);
+beforeEach(() => {
+	vi.mocked(useSavedAccounts).mockReturnValue(financialModelFixture.accounts);
+	vi.mocked(useSavedTransactions).mockReturnValue(
+		financialModelFixture.transactions,
+	);
+	vi.mocked(useSavedStartDate).mockReturnValue(financialModelFixture.startDate);
+});
 
 const financialIndependence: OtherEvaluation = {
 	id: "fi",
@@ -39,9 +58,6 @@ function renderCard(item: OtherEvaluation) {
 	return render(
 		<OtherEvaluationCard
 			item={item}
-			accounts={financialModelFixture.accounts}
-			transactions={financialModelFixture.transactions}
-			startDate={financialModelFixture.startDate}
 			projection={null}
 			pin={{ pinned: false, onPinChange: () => {} }}
 		/>,

@@ -2,6 +2,42 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectionFixture } from "../../mocks/projection.ts";
 import { ProjectionChart } from "../ProjectionChart.tsx";
+import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
+import { useCheckpoints } from "../../state/workspaceResources.ts";
+
+vi.mock("../../state/useRemoteProjection.ts", () => ({
+	useRemoteProjection: vi.fn(),
+}));
+
+vi.mock("../../state/workspaceResources.ts", async (importOriginal) => ({
+	...(await importOriginal<
+		typeof import("../../state/workspaceResources.ts")
+	>()),
+	useCheckpoints: vi.fn(),
+}));
+
+const mockedProjection = vi.mocked(useRemoteProjection);
+const mockedCheckpoints = vi.mocked(useCheckpoints);
+
+function mockChart(
+	projection: ReturnType<typeof projectionFixture> | null,
+	checkpoints: {
+		observedAt: number;
+		AccountId: string;
+		Balance: number;
+		source: string;
+	}[] = [],
+) {
+	mockedProjection.mockReturnValue({
+		base: projection,
+		isPlaceholderData: false,
+		status: "success",
+		loading: false,
+	} as ReturnType<typeof useRemoteProjection>);
+	mockedCheckpoints.mockReturnValue({
+		data: { checkpoints },
+	} as ReturnType<typeof useCheckpoints>);
+}
 
 beforeEach(() => {
 	vi.useFakeTimers({ toFake: ["Date"] });
@@ -26,51 +62,47 @@ afterEach(() => {
 // and $1,800 on 2026-07-01.
 function show() {
 	const onEvidence = vi.fn();
-	render(
-		<ProjectionChart
-			projection={projectionFixture({
-				points: [
-					{ date: "2026-06-02", total: 1000, balances: {} },
-					{ date: "2026-06-20", total: 1400, balances: {} },
-					{ date: "2026-07-01", total: 1800, balances: {} },
-				],
-			})}
-			onEvidence={onEvidence}
-		/>,
+	mockChart(
+		projectionFixture({
+			points: [
+				{ date: "2026-06-02", total: 1000, balances: {} },
+				{ date: "2026-06-20", total: 1400, balances: {} },
+				{ date: "2026-07-01", total: 1800, balances: {} },
+			],
+		}),
 	);
+	render(<ProjectionChart onEvidence={onEvidence} />);
 	return { onEvidence };
 }
 
 describe("projection chart inspection", () => {
 	it("keeps the first-sync delta fixed across window changes and inspection", () => {
-		render(
-			<ProjectionChart
-				projection={projectionFixture({
-					currentNetWorth: 1800,
-					points: [
-						{ date: "2026-01-01", total: 500, balances: {} },
-						{ date: "2026-02-01", total: 1000, balances: {} },
-						{ date: "2026-07-01", total: 1800, balances: {} },
-						{ date: "2027-01-01", total: 9000, balances: {} },
-					],
-				})}
-				checkpoints={[
-					{
-						observedAt: Date.parse("2026-02-01T09:00:00Z") / 1000,
-						AccountId: "cash",
-						Balance: 1000,
-						source: "simplefin",
-					},
-					{
-						observedAt: Date.parse("2026-07-01T09:00:00Z") / 1000,
-						AccountId: "cash",
-						Balance: 1800,
-						source: "simplefin",
-					},
-				]}
-				onEvidence={vi.fn()}
-			/>,
+		mockChart(
+			projectionFixture({
+				currentNetWorth: 1800,
+				points: [
+					{ date: "2026-01-01", total: 500, balances: {} },
+					{ date: "2026-02-01", total: 1000, balances: {} },
+					{ date: "2026-07-01", total: 1800, balances: {} },
+					{ date: "2027-01-01", total: 9000, balances: {} },
+				],
+			}),
+			[
+				{
+					observedAt: Date.parse("2026-02-01T09:00:00Z") / 1000,
+					AccountId: "cash",
+					Balance: 1000,
+					source: "simplefin",
+				},
+				{
+					observedAt: Date.parse("2026-07-01T09:00:00Z") / 1000,
+					AccountId: "cash",
+					Balance: 1800,
+					source: "simplefin",
+				},
+			],
 		);
+		render(<ProjectionChart onEvidence={vi.fn()} />);
 		expect(screen.getByText("+$800 (+80%)")).toBeTruthy();
 		expect(screen.getByText("since first sync · Feb 1, 2026")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "90 days" }));
@@ -85,20 +117,15 @@ describe("projection chart inspection", () => {
 	])(
 		"shows signed and unchanged deltas for current worth %s",
 		(currentNetWorth, label) => {
-			render(
-				<ProjectionChart
-					projection={projectionFixture({ currentNetWorth })}
-					checkpoints={[
-						{
-							observedAt: Date.parse("2026-01-01T09:00:00Z") / 1000,
-							AccountId: "cash",
-							Balance: 1000,
-							source: "simplefin",
-						},
-					]}
-					onEvidence={vi.fn()}
-				/>,
-			);
+			mockChart(projectionFixture({ currentNetWorth }), [
+				{
+					observedAt: Date.parse("2026-01-01T09:00:00Z") / 1000,
+					AccountId: "cash",
+					Balance: 1000,
+					source: "simplefin",
+				},
+			]);
+			render(<ProjectionChart onEvidence={vi.fn()} />);
 			expect(screen.getByText(label)).toBeTruthy();
 		},
 	);
@@ -219,17 +246,15 @@ describe("projection chart inspection", () => {
 	});
 
 	it("hides the $0 line for an all-debt window", () => {
-		render(
-			<ProjectionChart
-				projection={projectionFixture({
-					points: [
-						{ date: "2026-06-10", total: -66200, balances: {} },
-						{ date: "2026-07-01", total: -65800, balances: {} },
-					],
-				})}
-				onEvidence={vi.fn()}
-			/>,
+		mockChart(
+			projectionFixture({
+				points: [
+					{ date: "2026-06-10", total: -66200, balances: {} },
+					{ date: "2026-07-01", total: -65800, balances: {} },
+				],
+			}),
 		);
+		render(<ProjectionChart onEvidence={vi.fn()} />);
 		expect(screen.queryByText(/No debt/)).toBeNull();
 		expect(
 			screen
