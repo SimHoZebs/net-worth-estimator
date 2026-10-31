@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { motion } from "motion/react";
 import {
 	type ReactNode,
 	useEffect,
@@ -65,24 +65,19 @@ export function Drawer({
 	behavior,
 	children,
 }: DrawerProps) {
-	// The session owns one open lifetime: it mounts when the drawer opens and
-	// unmounts when it closes, so per-open state (closing, opener) below is
-	// always fresh. No effect resets closing on open changes.
+	// Explicit dismissal animates before onClose. External navigation ends
+	// the session immediately, so a rapid reopen cannot reuse an old close.
+	if (!open) return null;
 	return createPortal(
-		<AnimatePresence>
-			{open && (
-				<DrawerSession
-					key="drawer-session"
-					side={side}
-					onClose={onClose}
-					label={label}
-					appearance={appearance}
-					behavior={behavior}
-				>
-					{children}
-				</DrawerSession>
-			)}
-		</AnimatePresence>,
+		<DrawerSession
+			side={side}
+			onClose={onClose}
+			label={label}
+			appearance={appearance}
+			behavior={behavior}
+		>
+			{children}
+		</DrawerSession>,
 		document.body,
 	);
 }
@@ -121,7 +116,6 @@ function DrawerSession({
 	// opener on close. A fresh mount starts empty, so reopening captures anew.
 	const openerRef = useRef<Element | null>(null);
 	const [closing, setClosing] = useState(false);
-	const isPresent = useIsPresent();
 	// Once-only close: motion reports completion per animated value, so the
 	// first close completion wins and replayed exits stay silent. Written only
 	// in the animation callback, never mirrored by an effect.
@@ -224,14 +218,12 @@ function DrawerSession({
 	// Direct render prop: the latest onClose runs once when the exit
 	// animation completes, with no ref mirror in between.
 	const handleAnimationComplete = () => {
-		// An external navigation ends the session before its exit animation.
-		// Only a close action from the still-present session may navigate.
-		if (!isPresent || !closing || closeNotifiedRef.current) return;
+		if (!panelEl.current?.isConnected || !closing || closeNotifiedRef.current)
+			return;
 		closeNotifiedRef.current = true;
 		onClose();
 	};
-	// The session implies open: unmounting (open false above) ends the
-	// lifetime through AnimatePresence exits, never through a reset.
+	// The session implies open. Unmount ends its lifetime without a reset.
 	return (
 		<>
 			{backdrop && (
@@ -242,9 +234,8 @@ function DrawerSession({
 					aria-label={`Close ${label}`}
 					onClick={requestClose}
 					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					exit={{ opacity: 0 }}
-					transition={backdropTransition}
+					animate={{ opacity: closing ? 0 : 1 }}
+					transition={closing ? drawerTransition : backdropTransition}
 				/>
 			)}
 			{side === "left" ? (
@@ -259,7 +250,6 @@ function DrawerSession({
 					{...(modal ? { role: "dialog", "aria-modal": true as const } : {})}
 					initial={slide.initial}
 					animate={closing ? slide.exit : slide.animate}
-					exit={slide.exit}
 					transition={drawerTransition}
 					onAnimationComplete={handleAnimationComplete}
 				>
@@ -282,7 +272,6 @@ function DrawerSession({
 					aria-labelledby={titleId}
 					initial={slide.initial}
 					animate={closing ? slide.exit : slide.animate}
-					exit={slide.exit}
 					transition={drawerTransition}
 					onAnimationComplete={handleAnimationComplete}
 				>
