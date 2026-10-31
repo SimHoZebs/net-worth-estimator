@@ -47,24 +47,12 @@ export function AccountSections({
 	onEdit: (target: EditorTarget) => void;
 	onAccount: (id: string) => void;
 }) {
-	// Saved rows subscribe here; only the viewed tab and UI
-	// callbacks arrive as props. Rows are destructured into atomic
-	// inputs for the panels below.
-	const accounts = useSavedAccounts();
-	const startDate = useSavedStartDate();
-	const readOnly = useUserReadOnly();
-	if (!accounts || !startDate) return null;
+	// Each view subscribes to its own queries; only the viewed tab and UI
+	// callbacks arrive as props.
 	if (view === "accounts") {
 		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;
 	}
-	return (
-		<TransactionsView
-			accounts={accounts}
-			startDate={startDate}
-			readOnly={readOnly}
-			onEdit={onEdit}
-		/>
-	);
+	return <TransactionsView onEdit={onEdit} />;
 }
 
 function AccountsView({
@@ -210,16 +198,13 @@ function AccountsView({
 }
 
 function TransactionsView({
-	accounts,
-	startDate,
-	readOnly,
 	onEdit,
 }: {
-	accounts: Account[];
-	startDate: string;
-	readOnly: boolean;
 	onEdit: (target: EditorTarget) => void;
 }) {
+	const accounts = useSavedAccounts();
+	const startDate = useSavedStartDate();
+	const readOnly = useUserReadOnly();
 	const [query, setQuery] = useState("");
 	const [schedule, setSchedule] = useState<ScheduleFilter>("all");
 	const [order, setOrder] = useState<TransactionOrder>(
@@ -230,7 +215,8 @@ function TransactionsView({
 	const transactionsQuery = useTransactions();
 	// Finance-first: rows render from saved query rows alone. Literal
 	// amounts show directly; formula-derived amounts stay Varies without
-	// a forecast request.
+	// a forecast request. Memos stay mounted while rows load, so inputs
+	// are null-safe; the null gate below only skips rendering.
 	const rows = useMemo(
 		() =>
 			(transactionsQuery.data?.transactions ?? []).map((row) =>
@@ -242,7 +228,7 @@ function TransactionsView({
 		() =>
 			visibleTransactions({
 				transactions: rows,
-				accounts,
+				accounts: accounts ?? [],
 			}),
 		[rows, accounts],
 	);
@@ -276,6 +262,7 @@ function TransactionsView({
 			}),
 		[visible, query, schedule, order],
 	);
+	if (!accounts || !startDate) return null;
 	const pageCount = Math.max(
 		1,
 		Math.ceil(sortedTransactions.length / TRANSACTIONS_PAGE_SIZE),
