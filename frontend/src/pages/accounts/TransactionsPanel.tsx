@@ -57,6 +57,13 @@ export function TransactionsPanel({
 			>
 				{transactions.map((transaction) => {
 					const pending = isPendingTransaction(transaction);
+					// Bank lifecycle states are evidence, never exclusions: a
+					// settled sync row counts as excluded only when the owner
+					// disables it.
+					const excluded =
+						!transaction.enabled &&
+						(transaction.syncOwned !== true ||
+							(!pending && transaction.void !== true));
 					// External endpoints only restate the direction, so the route
 					// names real accounts only. The date lives in its own column.
 					const route = [transaction.fromId, transaction.toId]
@@ -101,9 +108,16 @@ export function TransactionsPanel({
 							slots={{
 								subtitle: route ? <span>{route}</span> : undefined,
 								mobile: <span>{dateText}</span>,
-								badges: (pending || !transaction.enabled) && (
+								badges: (pending || transaction.void || excluded) && (
 									<>
-										{pending ? (
+										{transaction.void ? (
+											<Badge
+												tone="neutral"
+												className={transactionBadgeStyles()}
+											>
+												Did not post
+											</Badge>
+										) : pending ? (
 											<Badge
 												tone="neutral"
 												className={transactionBadgeStyles()}
@@ -111,7 +125,7 @@ export function TransactionsPanel({
 												Pending
 											</Badge>
 										) : (
-											!transaction.enabled && (
+											excluded && (
 												<Badge
 													tone="warning"
 													className={transactionBadgeStyles()}
