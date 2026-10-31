@@ -41,11 +41,18 @@ export function AccountsPanel({
 			]}
 		>
 			{accounts.map((account) => (
-				<TableRow key={account.id}>
-					<TableHeader scope="row" className="max-sm:p-4">
+				<TableRow
+					key={account.id}
+					className="group cursor-pointer hover:bg-surface-2"
+					onClick={(event) => {
+						if ((event.target as HTMLElement).closest("button")) return;
+						onAccount(account.id);
+					}}
+				>
+					<TableHeader scope="row" className="py-5 max-sm:px-4 max-sm:py-5">
 						<button
 							type="button"
-							className="group flex items-center gap-3 rounded-control border-0 bg-transparent px-0 py-1 text-left text-inherit"
+							className="group flex items-center gap-3 rounded-control border-0 bg-transparent text-left text-inherit"
 							aria-label={`Open ${account.name} transactions`}
 							onClick={() => onAccount(account.id)}
 						>
@@ -61,13 +68,6 @@ export function AccountsPanel({
 					</TableHeader>
 					<TableCell className="tabular-nums max-sm:p-4">
 						{money(account.balance)}
-						{account.observedBalance !== null &&
-							account.observedBalance !== undefined &&
-							account.observedBalance !== account.balance && (
-								<small className="block text-xs text-muted">
-									Observed {money(account.observedBalance)}
-								</small>
-							)}
 					</TableCell>
 					<TableCell className="max-sm:p-4">
 						<div className="flex justify-end gap-1">

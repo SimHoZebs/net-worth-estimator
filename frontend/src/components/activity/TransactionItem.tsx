@@ -55,7 +55,7 @@ export function TransactionItemRow({
 			>
 				<button
 					type="button"
-					className="flex w-full items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left max-sm:gap-2"
+					className="flex w-full items-center gap-3 rounded-control border-0 bg-transparent text-left max-sm:gap-2"
 					aria-label={actionLabel}
 					onClick={onSelect}
 					disabled={selectDisabled}
