@@ -425,7 +425,7 @@ export function stackedAccountRows({
 
 export function projectionCsv(rows: ChartModel["rows"]) {
 	return [
-		"Date,Base case,10th percentile,Median,90th percentile",
+		"Date,Projection,10th percentile,Median,90th percentile",
 		...rows.map((point) =>
 			[
 				point.date,

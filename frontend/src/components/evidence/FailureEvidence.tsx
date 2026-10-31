@@ -26,7 +26,7 @@ export function FailureEvidence({
 	if (!failure)
 		return (
 			<Modal title="All transactions funded" onClose={onClose}>
-				<p>No underfunded transactions occur in this base-case horizon.</p>
+				<p>No underfunded transactions occur in this projection horizon.</p>
 			</Modal>
 		);
 	const ledger = failureLedger({

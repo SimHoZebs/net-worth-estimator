@@ -112,7 +112,7 @@ export function EvaluationCard({
 					) : met ? (
 						"Met at the start of this model"
 					) : result?.firstDate ? (
-						"First reached in the base case"
+						"First reached in the projection"
 					) : (
 						"Not reached in the evaluated period"
 					)}

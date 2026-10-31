@@ -10,7 +10,7 @@ import (
 // sourceless inflows shaped like `balance * rate`; a negative sampled rate
 // must shrink the destination balance instead of clamping to zero.
 // Clamping discards the entire downside of the return distribution and
-// biases stochastic bands above the base case.
+// biases stochastic bands above the projection.
 
 func lossFloatPtr(value float64) *float64 { return &value }
 
