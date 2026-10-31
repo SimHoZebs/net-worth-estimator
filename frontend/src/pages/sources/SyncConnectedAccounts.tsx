@@ -2,16 +2,15 @@ import { Landmark } from "lucide-react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
-import type { Account } from "../../domain/model.ts";
+import { useSavedAccounts } from "../../state/savedRows.ts";
 import { refreshSyncSettings, useSyncLinks } from "../../state/syncSettings.ts";
 
-export function SyncConnectedAccounts({
-	accounts,
-}: {
-	accounts: Pick<Account, "id" | "kind" | "color" | "name">[];
-}) {
+export function SyncConnectedAccounts() {
 	const links = useSyncLinks();
-	const byId = new Map(accounts.map((account) => [account.id, account]));
+	const savedAccounts = useSavedAccounts();
+	const byId = new Map(
+		(savedAccounts ?? []).map((account) => [account.id, account]),
+	);
 	return (
 		<div className="border-t border-line p-5 sm:p-6">
 			<h3 className="mt-0 mb-4 text-base">Synced accounts</h3>

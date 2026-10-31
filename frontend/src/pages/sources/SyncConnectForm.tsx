@@ -3,16 +3,16 @@ import { useId, useState, type Ref } from "react";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { InputField } from "../../components/Field.tsx";
 import { connectSyncKey } from "../../state/syncSettings.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
 
 export function SyncConnectForm({
-	readOnly,
 	onConnected,
 	inputRef,
 }: {
-	readOnly: boolean;
 	onConnected: () => void;
 	inputRef: Ref<HTMLInputElement>;
 }) {
+	const readOnly = useUserReadOnly();
 	const [token, setToken] = useState("");
 	const [visible, setVisible] = useState(false);
 	const [busy, setBusy] = useState(false);

@@ -1,18 +1,9 @@
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
-import type { Account } from "../../domain/model.ts";
 import { useSyncCredential } from "../../state/syncSettings.ts";
 import { SyncProviderPanel } from "./SyncProviderPanel.tsx";
 
-type SyncAccount = Pick<Account, "id" | "kind" | "color" | "name">;
-
-export function SyncSettings({
-	accounts,
-	readOnly,
-}: {
-	accounts: SyncAccount[];
-	readOnly: boolean;
-}) {
+export function SyncSettings() {
 	const credential = useSyncCredential();
 
 	if (credential.isPending || credential.isError) {
@@ -36,7 +27,7 @@ export function SyncSettings({
 
 	return (
 		<section aria-label="Bank sync">
-			<SyncProviderPanel accounts={accounts} readOnly={readOnly} />
+			<SyncProviderPanel />
 		</section>
 	);
 }

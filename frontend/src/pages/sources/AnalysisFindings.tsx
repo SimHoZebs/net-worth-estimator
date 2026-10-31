@@ -9,6 +9,8 @@ import {
 	useAnalysisFindings,
 	useDismissAnalysisFinding,
 } from "@/state/analyses.ts";
+import { useTransactionCatalog } from "@/state/workspaceResources.ts";
+import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { Badge } from "@/components/Badge.tsx";
 import { Button } from "@/components/Button.tsx";
 import {
@@ -19,17 +21,17 @@ import {
 } from "@/components/DataTable.tsx";
 import { ErrorNotice } from "@/components/ErrorNotice.tsx";
 
-export function AnalysisFindings({
-	postings,
-	readOnly,
-}: {
-	postings: { id: string; name: string }[];
-	readOnly: boolean;
-}) {
+export function AnalysisFindings() {
 	const [cursors, setCursors] = useState([""]);
 	const query = useAnalysisFindings(undefined, cursors.at(-1) ?? "");
 	const analyses = useAnalyses();
 	const review = useDismissAnalysisFinding();
+	const catalog = useTransactionCatalog().data;
+	const readOnly = useUserReadOnly();
+	const postings = (catalog?.items ?? []).map((item) => ({
+		id: item.id,
+		name: item.name,
+	}));
 	const findings = query.data?.findings ?? [];
 	const names = new Map(postings.map((posting) => [posting.id, posting.name]));
 	const state = analyses.data?.analyses?.find(

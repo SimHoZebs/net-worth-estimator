@@ -8,8 +8,10 @@ import {
 import {
 	useAmountPresets,
 	useAmountResolvers,
+	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { useSavedAccounts } from "../../state/savedRows.ts";
 import {
 	createPreset,
 	updatePreset,
@@ -82,16 +84,20 @@ function slugify(value: string): string {
 		.replace(/^-+|-+$/g, "");
 }
 
-export function AmountCatalog({
-	accounts,
-	postings,
-}: {
-	accounts: { id: string; name: string }[];
-	postings: { id: string; name: string }[];
-}) {
+export function AmountCatalog() {
 	const id = useId();
 	const remote = useAmountResolvers().data;
 	const serverPresets = useAmountPresets().data ?? null;
+	const savedAccounts = useSavedAccounts();
+	const catalog = useTransactionCatalog().data;
+	const accounts = (savedAccounts ?? []).map((account) => ({
+		id: account.id,
+		name: account.name,
+	}));
+	const postings = (catalog?.items ?? []).map((item) => ({
+		id: item.id,
+		name: item.name,
+	}));
 	const presetThunks = { createPreset, updatePreset, deletePreset, movePreset };
 	const readOnly = useUserReadOnly();
 

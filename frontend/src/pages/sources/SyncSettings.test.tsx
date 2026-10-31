@@ -7,7 +7,14 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { acceptTestResource } from "../../mocks/resource.ts";
-import { resetServerQueryCache } from "../../state/serverQuery.ts";
+import {
+	resetServerQueryCache,
+	serverQueryClient,
+} from "../../state/serverQuery.ts";
+import {
+	balancesOptions,
+	statusOptions,
+} from "../../state/workspaceResources.ts";
 import { resetSyncSettingsClient } from "../../state/syncSettings.ts";
 import { SyncSettings } from "./SyncSettings.tsx";
 
@@ -31,6 +38,7 @@ function stubApi(state: {
 	throttled?: boolean;
 	lastSyncAt?: string;
 	syncEnabled?: boolean;
+	readOnly?: boolean;
 }) {
 	const jsonHeaders = () => {
 		const headers = new Headers({ "content-type": "application/json" });
@@ -139,14 +147,14 @@ function stubApi(state: {
 				JSON.stringify(
 					state.configured
 						? {
-								readOnly: false,
+								readOnly: state.readOnly ?? false,
 								syncConfigured: state.syncEnabled ?? true,
 								lastSyncAt: state.lastSyncAt,
 								syncQuotaUsed: 5,
 								syncQuotaLimit: 24,
 							}
 						: {
-								readOnly: false,
+								readOnly: state.readOnly ?? false,
 								syncConfigured: false,
 								syncQuotaUsed: 0,
 								syncQuotaLimit: 24,
@@ -154,9 +162,63 @@ function stubApi(state: {
 				),
 				{ headers: jsonHeaders() },
 			);
+		if (path.startsWith("/v1/accounts/balances")) {
+			record();
+			return new Response(
+				JSON.stringify({
+					accounts: accounts.map((account) => ({
+						id: account.id,
+						name: account.name,
+						kind: account.kind,
+						enabled: true,
+						archived: false,
+						balance: 100,
+						minBalance: null,
+						maxBalance: null,
+						color: account.color ?? undefined,
+						observedOn: "2026-10-26",
+						hasCheckpoint: false,
+						readOnly: false,
+						syncOwned: false,
+					})),
+					asOf: "2026-10-26",
+					revision: "test",
+				}),
+				{ headers: jsonHeaders() },
+			);
+		}
 		throw new Error(`unexpected request ${init?.method ?? "GET"} ${path}`);
 	});
 	vi.stubGlobal("fetch", fetcher);
+	// Seed status and balances synchronously so first render already sees
+	// read-only gating and account labels; queries remain cached and shared.
+	const cache = serverQueryClient();
+	cache.setQueryData(statusOptions().queryKey, {
+		readOnly: state.readOnly ?? false,
+		syncConfigured: state.configured ? (state.syncEnabled ?? true) : false,
+		lastSyncAt: state.lastSyncAt,
+		syncQuotaUsed: 5,
+		syncQuotaLimit: 24,
+	});
+	cache.setQueryData(balancesOptions().queryKey, {
+		accounts: accounts.map((account) => ({
+			id: account.id,
+			name: account.name,
+			kind: account.kind,
+			enabled: true,
+			archived: false,
+			balance: 100,
+			minBalance: null,
+			maxBalance: null,
+			color: account.color ?? undefined,
+			observedOn: "2026-10-26",
+			hasCheckpoint: false,
+			readOnly: false,
+			syncOwned: false,
+		})),
+		asOf: "2026-10-26",
+		revision: "test",
+	});
 	return requests;
 }
 
@@ -176,7 +238,7 @@ afterEach(() => {
 
 it("shows a complete setup guide without a prerequisite click", async () => {
 	const requests = stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(await screen.findByText("Not connected")).toBeTruthy();
 	for (const title of [
 		"Link your banks in SimpleFIN",
@@ -205,7 +267,7 @@ it("shows a complete setup guide without a prerequisite click", async () => {
 
 it("connects through the inline token form and reports the connection", async () => {
 	const requests = stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
 		{
@@ -232,7 +294,7 @@ it("connects through the inline token form and reports the connection", async ()
 
 it("only asks for a setup token and trims it before connecting", async () => {
 	const requests = stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	const token = await screen.findByLabelText("Setup token");
 	expect(screen.queryByLabelText("Access URL")).toBeNull();
 	expect(screen.queryByRole("button", { name: /access URL/i })).toBeNull();
@@ -252,7 +314,7 @@ it("only asks for a setup token and trims it before connecting", async () => {
 
 it("rejects a blank token without making a connection request", async () => {
 	const requests = stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.change(await screen.findByLabelText("Setup token"), {
 		target: { value: "   " },
 	});
@@ -265,7 +327,7 @@ it("rejects a blank token without making a connection request", async () => {
 
 it("focuses the token field from the returning-user shortcut", async () => {
 	stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.click(
 		await screen.findByRole("button", { name: "I already have a token" }),
 	);
@@ -274,7 +336,7 @@ it("focuses the token field from the returning-user shortcut", async () => {
 
 it("refreshes status and links after connecting", async () => {
 	const requests = stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
 		{
@@ -302,7 +364,7 @@ it("lists every synced account", async () => {
 			{ modelAccountId: "prime_card", bridgeName: "Old Card Name" },
 		],
 	});
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(await screen.findByText("Synced accounts")).toBeTruthy();
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	expect(screen.getByText("Prime Card")).toBeTruthy();
@@ -317,20 +379,20 @@ it("falls back to the bridge name when the model account is gone", async () => {
 		configured: true,
 		links: [{ modelAccountId: "deleted", bridgeName: "Old Bridge Name" }],
 	});
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(await screen.findByText("Synced accounts")).toBeTruthy();
 	expect(await screen.findByText("Old Bridge Name")).toBeTruthy();
 });
 
 it("shows an empty state when no accounts are synced", async () => {
 	stubApi({ configured: true, links: [] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(await screen.findByText("No synced accounts yet.")).toBeTruthy();
 });
 
 it("shows an inline error when synced accounts fail to load", async () => {
 	stubApi({ configured: true, failLinks: true });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(
 		await screen.findByText("The synced accounts could not be loaded."),
 	).toBeTruthy();
@@ -339,7 +401,7 @@ it("shows an inline error when synced accounts fail to load", async () => {
 
 it("shows an error when the token is rejected", async () => {
 	stubApi({ configured: false, failConnect: true });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.change(
 		await screen.findByPlaceholderText("Paste your setup token"),
 		{
@@ -365,7 +427,7 @@ it("disconnects after confirmation", async () => {
 		configured: true,
 		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
 	});
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	const confirms = await screen.findAllByRole("button", {
@@ -384,9 +446,10 @@ it("disconnects after confirmation", async () => {
 it("disables writes when read-only", async () => {
 	stubApi({
 		configured: true,
+		readOnly: true,
 		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
 	});
-	render(<SyncSettings accounts={accounts} readOnly={true} />);
+	render(<SyncSettings />);
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	expect(
 		screen.queryByRole("button", { name: /Checking|Prime Card/ }),
@@ -401,8 +464,8 @@ it("disables writes when read-only", async () => {
 });
 
 it("explains read-only access and disables the credential form", async () => {
-	stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={true} />);
+	stubApi({ configured: false, readOnly: true });
+	render(<SyncSettings />);
 	expect(
 		(
 			(await screen.findByRole("button", {
@@ -418,7 +481,7 @@ it("explains read-only access and disables the credential form", async () => {
 
 it("keeps the setup token in a single-line input", async () => {
 	stubApi({ configured: false });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(
 		(await screen.findByPlaceholderText("Paste your setup token")).tagName,
 	).toBe("INPUT");
@@ -437,7 +500,7 @@ it("keeps the setup token in a single-line input", async () => {
 
 it("shows bridge quota usage when connected", async () => {
 	stubApi({ configured: true, links: [] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	expect(
 		await screen.findByText("19 out of 24 syncs available", { exact: false }),
 	).toBeTruthy();
@@ -445,7 +508,7 @@ it("shows bridge quota usage when connected", async () => {
 
 it("syncs now through the Sync now button", async () => {
 	const requests = stubApi({ configured: true, links: [] });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
 	await waitFor(() => {
 		expect(
@@ -463,7 +526,7 @@ it("syncs now through the Sync now button", async () => {
 
 it("shows an inline error when sync is throttled", async () => {
 	stubApi({ configured: true, links: [], throttled: true });
-	render(<SyncSettings accounts={accounts} readOnly={false} />);
+	render(<SyncSettings />);
 	fireEvent.click(await screen.findByRole("button", { name: "Sync now" }));
 	expect(
 		await screen.findByText(/Could not sync now\. Check the connection/),
@@ -471,8 +534,8 @@ it("shows an inline error when sync is throttled", async () => {
 });
 
 it("disables Sync now when read-only", async () => {
-	stubApi({ configured: true, links: [] });
-	render(<SyncSettings accounts={accounts} readOnly={true} />);
+	stubApi({ configured: true, links: [], readOnly: true });
+	render(<SyncSettings />);
 	expect(
 		(
 			(await screen.findByRole("button", {
