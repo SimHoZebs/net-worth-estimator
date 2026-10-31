@@ -74,24 +74,14 @@ func TestReconcileUpsertsPendingByKey(t *testing.T) {
 	}
 }
 
-func TestReconcileConvertsVanishedPendingOnUniqueMatch(t *testing.T) {
+func TestReconcileVoidsVanishedPendingAndInsertsSettled(t *testing.T) {
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false,
 		pendingKey("prime_card", "old-auth"))}
 	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
-	if upserts != 0 || converts != 1 || len(voids) != 0 {
+	if upserts != 1 || converts != 0 || len(voids) != 1 || voids[0] != "uuid-pending" {
 		t.Fatalf("directives = %+v", directives)
-	}
-	convert := directives[0].Convert
-	if convert.ID != "uuid-pending" {
-		t.Fatalf("convert targets %+v, want the vanished row", convert)
-	}
-	if len(convert.AddKeys) != 1 || convert.AddKeys[0] != pendingKey("prime_card", "Corner Store") {
-		t.Fatalf("convert adds %+v", convert.AddKeys)
-	}
-	if convert.Posting.Pending || convert.Posting.Void {
-		t.Fatalf("convert values still pending: %+v", convert.Posting)
 	}
 }
 
@@ -116,19 +106,20 @@ func TestReconcileVoidsWithoutMatchAndHoldsAmbiguous(t *testing.T) {
 	}
 }
 
-func TestReconcileSkipsRecordedCandidatesAndDefersToPresentPending(t *testing.T) {
+func TestReconcileSkipsRecordedCandidatesAndInsertsBesideLivePending(t *testing.T) {
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false,
 		pendingKey("prime_card", "old-auth"))}
-	// Same charge still pending and now posted under the same bank key: the
-	// posted candidate defers to the pending row instead of duplicating it.
+	// Same charge still pending and now posted under a new bank key: the
+	// pending seed refreshes and the posted charge inserts beside it. The
+	// hold voids once it vanishes from the feed.
 	stillPending := reconcilePosting("Corner Store", "prime_card", "42.10", true, 1785628800)
 	stillPending.TransactionID = "old-auth"
 	pending := []store.SyncPosting{stillPending}
 	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(pending, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
-	if upserts != 1 || converts != 0 || len(voids) != 0 {
-		t.Fatalf("deferred = %+v", directives)
+	if upserts != 2 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("alongside live hold = %+v", directives)
 	}
 	// A recorded posted key never reprocesses, even if still in the feed.
 	recorded := reconcileBankRow("uuid-settled", "Corner Store", "prime_card", "42.10", false, false,
@@ -152,31 +143,29 @@ func TestReconcileIgnoresUncoveredAccounts(t *testing.T) {
 	}
 }
 
-func TestReconcileConvertsTipAdjustedSettle(t *testing.T) {
-	// A restaurant auth posts higher with the tip: the pending seed
-	// converts instead of voiding beside a duplicate.
+func TestReconcileVoidsTipAdjustedAuthAndInserts(t *testing.T) {
+	// A restaurant auth posts higher with the tip: the hold voids and the
+	// posted charge inserts as its own row.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
 	settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "58.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
-	if upserts != 0 || converts != 1 || len(voids) != 0 {
-		t.Fatalf("tip-adjusted = %+v, want one conversion", directives)
-	}
-	if directives[0].Convert.ID != "uuid-pending" {
-		t.Fatalf("convert targets %+v, want the vanished auth", directives[0].Convert)
+	if upserts != 1 || converts != 0 || len(voids) != 1 {
+		t.Fatalf("tip-adjusted = %+v, want one void plus one insert", directives)
 	}
 }
 
-func TestReconcileConvertsFinalBelowAuth(t *testing.T) {
-	// An Instacart estimate posts lower than authorized: still one charge.
+func TestReconcileVoidsAuthBelowFinalAndInserts(t *testing.T) {
+	// An Instacart estimate posts lower than authorized: the hold voids
+	// and the final charge inserts as its own row.
 	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Instacart", "prime_card", "100.00", true, false,
 		pendingKey("prime_card", "old-auth"))}
 	settled := []store.SyncPosting{reconcilePosting("Instacart", "prime_card", "92.00", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
 	upserts, converts, voids := directivesByAction(directives)
-	if upserts != 0 || converts != 1 || len(voids) != 0 {
-		t.Fatalf("below-auth final = %+v, want one conversion", directives)
+	if upserts != 1 || converts != 0 || len(voids) != 1 {
+		t.Fatalf("below-auth final = %+v, want one void plus one insert", directives)
 	}
 }
 
