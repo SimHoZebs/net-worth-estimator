@@ -172,14 +172,11 @@ func termsPaymentModel() types.SimulationInputs {
 
 func executeTermsOccurrence(t *testing.T, model types.SimulationInputs, balances map[string]float64, date string) PostingExecutionTransition {
 	t.Helper()
-	runtime, err := CreateTransitionRuntime(model, SimulationState{
+	runtime := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     balances,
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
 	}, "2026-09-01", nil)
-	if err != nil {
-		t.Fatalf("create runtime: %v", err)
-	}
 	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", date), date, false)
 	if err != nil {
 		t.Fatalf("execute posting: %v", err)
@@ -235,14 +232,11 @@ func TestLateFeePostingAssessesShortfall(t *testing.T) {
 		Priority:  9,
 		Enabled:   true,
 	})
-	runtime, err := CreateTransitionRuntime(model, SimulationState{
+	runtime := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     map[string]float64{"checking": 50, "prime_card": -2000},
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
 	}, "2026-09-01", nil)
-	if err != nil {
-		t.Fatalf("create runtime: %v", err)
-	}
 	// Checking holds 50 above a zero floor against a 100 minimum: the payment
 	// realizes 50.
 	payment, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "pay-prime", "2026-09-10"), "2026-09-10", false)
@@ -339,14 +333,11 @@ func TestBalanceFeePostingDebitsChecking(t *testing.T) {
 			},
 		},
 	}
-	runtime, err := CreateTransitionRuntime(model, SimulationState{
+	runtime := CreateTransitionRuntime(model, SimulationState{
 		Balances:                     map[string]float64{checking: 1400},
 		LatestRealizedPostingAmounts: map[string]float64{},
 		RealizedPostingAmountsByYear: map[string]map[string]float64{},
 	}, "2026-09-01", nil)
-	if err != nil {
-		t.Fatalf("create runtime: %v", err)
-	}
 	assessed, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "checking-fee", "2026-09-01"), "2026-09-01", false)
 	if err != nil {
 		t.Fatalf("execute fee: %v", err)
