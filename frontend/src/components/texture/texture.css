@@ -1,0 +1,55 @@
+@reference "../../styles/index.css";
+
+/* Texture carries meaning alongside each tone utility. Consumed through
+   data-tone/data-pattern attributes by SegmentedBar and chart legends. */
+@layer components {
+	[data-pattern="stripes"] {
+		/* Keep stripes soft so each series color remains distinct. */
+		background-image: repeating-linear-gradient(
+			45deg,
+			color-mix(in oklab, var(--color-white) 35%, transparent) 0 --spacing(0.5),
+			transparent --spacing(0.5) --spacing(2)
+		);
+	}
+	[data-pattern="dots"] {
+		background-image: radial-gradient(
+			circle,
+			color-mix(in oklab, var(--color-white) 30%, transparent) --spacing(0.5),
+			transparent --spacing(0.5)
+		);
+		background-size: --spacing(2) --spacing(2);
+	}
+	[data-tone="blue"][data-pattern="dots"] {
+		background-image: radial-gradient(
+			circle,
+			color-mix(in oklab, var(--chart-series-3) 45%, var(--color-black))
+				--spacing(0.5),
+			transparent --spacing(0.5)
+		);
+		background-size: --spacing(2) --spacing(2);
+	}
+	[data-tone="plum"][data-pattern="dots"] {
+		background-image: radial-gradient(
+			circle,
+			color-mix(in oklab, var(--chart-series-4) 45%, var(--color-black))
+				--spacing(0.5),
+			transparent --spacing(0.5)
+		);
+		background-size: --spacing(2) --spacing(2);
+	}
+	[data-pattern="hatch"] {
+		background-image:
+			repeating-linear-gradient(
+				45deg,
+				color-mix(in oklab, var(--color-white) 50%, transparent) 0
+					--spacing(0.5),
+				transparent --spacing(0.5) --spacing(1.5)
+			),
+			repeating-linear-gradient(
+				-45deg,
+				color-mix(in oklab, var(--color-white) 50%, transparent) 0
+					--spacing(0.5),
+				transparent --spacing(0.5) --spacing(1.5)
+			);
+	}
+}

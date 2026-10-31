@@ -1,24 +1,24 @@
 import { money } from "../domain/format.ts";
 import { cssVariables } from "./cssVariables.ts";
 import { mergeStyles } from "./mergeStyles.ts";
-import "./SegmentedBar.css";
+import {
+	TONE_BACKGROUNDS,
+	type TexturePattern,
+	type TextureTone,
+} from "./texture/texture.ts";
+import "./texture/texture.css";
 
 /**
  * Fill texture for a bar segment. Texture carries the meaning alongside
  * color (never color alone): bills read as stripes, reserves as dots,
  * warnings as crosshatch everywhere this bar is used.
  */
-export type SegmentPattern = "solid" | "stripes" | "dots" | "hatch";
+export type SegmentPattern = TexturePattern;
 
 /** Sage is the single green tone, so adjacent segments stay distinct. */
-export type SegmentTone = "sage" | "tan" | "blue" | "plum";
+export type SegmentTone = TextureTone;
 
-const toneClasses: Record<SegmentTone, string> = {
-	sage: "bg-chart-series-1",
-	tan: "bg-chart-series-2",
-	blue: "bg-chart-series-3",
-	plum: "bg-chart-series-4",
-};
+const toneClasses: Record<SegmentTone, string> = TONE_BACKGROUNDS;
 
 export interface BarSegment {
 	label: string;

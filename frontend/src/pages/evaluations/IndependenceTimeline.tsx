@@ -5,6 +5,7 @@ import type {
 } from "@/domain/financialIndependence.ts";
 import { dateLabel } from "@/domain/format.ts";
 import { independenceChartModel } from "@/domain/independenceChart.ts";
+import { TextureDefs } from "@/components/texture/TextureDefs.tsx";
 import { useMediaQuery, viewportQueries } from "@/state/useMediaQuery.ts";
 
 export function IndependenceTimeline({
@@ -61,39 +62,28 @@ export function IndependenceTimeline({
 						? ` Starts after ${dateLabel(analysis.candidates.at(-1)!.date)} need a longer projection for the full ${analysis.evaluationYears === null ? "assessment period" : `${analysis.evaluationYears}-year outlook`}.`
 						: ""}
 				</desc>
-				<defs>
-					<pattern
-						id={`${id}-tail`}
-						width="8"
-						height="8"
-						patternUnits="userSpaceOnUse"
-						patternTransform="rotate(45)"
-					>
-						<line
-							x1="0"
-							x2="0"
-							y1="0"
-							y2="8"
-							className="stroke-line-strong"
-							strokeWidth="2"
-						/>
-					</pattern>
-					<pattern
-						id={`${id}-withdrawals`}
-						width="7"
-						height="7"
-						patternUnits="userSpaceOnUse"
-					>
-						<rect width="7" height="7" className="fill-chart-band" />
-						<circle
-							cx="2"
-							cy="2"
-							r=".9"
-							className="fill-primary"
-							opacity=".5"
-						/>
-					</pattern>
-				</defs>
+				<TextureDefs
+					entries={[
+						{
+							id: `${id}-tail`,
+							background: null,
+							mark: "var(--line-strong)",
+							markOpacity: 1,
+							motif: "stripes",
+							size: 8,
+							width: 2,
+						},
+						{
+							id: `${id}-withdrawals`,
+							background: "var(--chart-band)",
+							mark: "var(--primary)",
+							markOpacity: 0.5,
+							motif: "dots",
+							size: 7,
+							width: 0.9,
+						},
+					]}
+				/>
 				{tail && (
 					<rect
 						x={model.lastX}
