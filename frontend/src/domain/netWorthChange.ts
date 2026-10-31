@@ -1,4 +1,5 @@
 import type { BackendCheckpoint } from "../api/contracts.ts";
+import { isoDateFromEpochSeconds } from "./format.ts";
 import type { Projection } from "./result.ts";
 
 /** Compare engine totals, never individual checkpoints or chart-window fills. */
@@ -8,9 +9,7 @@ export function netWorthChangeSinceFirstSync(
 ) {
 	const firstSyncDate = checkpoints
 		.filter((checkpoint) => checkpoint.source === "simplefin")
-		.map((checkpoint) =>
-			new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10),
-		)
+		.map((checkpoint) => isoDateFromEpochSeconds(checkpoint.observedAt))
 		.reduce<string | null>(
 			(first, day) => (first === null || day < first ? day : first),
 			null,

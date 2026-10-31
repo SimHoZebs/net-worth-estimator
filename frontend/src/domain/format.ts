@@ -52,6 +52,11 @@ export function isIsoDate(value: string): boolean {
 	);
 }
 
+/** YYYY-MM-DD from Unix seconds (UTC). */
+export function isoDateFromEpochSeconds(seconds: number): string {
+	return isoDate(new Date(seconds * 1000));
+}
+
 export function daysBetweenInclusive(startIso: string, endIso: string): number {
 	const start = utcDate(startIso).getTime();
 	const end = utcDate(endIso).getTime();

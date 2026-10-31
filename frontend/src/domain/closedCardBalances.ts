@@ -1,5 +1,6 @@
 import { latestCheckpoint } from "../api/checkpoints.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
+import { isoDateFromEpochSeconds } from "./format.ts";
 
 export interface ClosedCardBalance {
 	id: string;
@@ -33,7 +34,7 @@ export function closedCardBalances({
 			...card,
 			amount: checkpoint ? Math.max(0, -checkpoint.Balance) : null,
 			observedOn: checkpoint
-				? new Date(checkpoint.observedAt * 1000).toISOString().slice(0, 10)
+				? isoDateFromEpochSeconds(checkpoint.observedAt)
 				: null,
 		};
 	});

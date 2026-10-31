@@ -39,21 +39,7 @@ go run ./cmd/importcsv \
 - There is no HTTP reset route. Use a database backup and the offline import tool for replacement.
 - Canonical edits and artifacts survive redeployment only when the SQLite file is on durable storage.
 
-Database setup is a deployment step, not server initialization:
-
-```bash
-CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
-```
-
-The server requires that existing, compatible database. It never creates a missing
-database or repairs its schema. Use the same path in `NET_WORTH_ESTIMATOR_DB`.
-
-`setupdb` creates a fresh database or validates an existing current schema. It
-does not upgrade older schemas or repair incomplete ones. Version upgrades use
-separate one-time operator scripts, with the app stopped and a verified backup.
-
-See [the shared database guide](docs/shared-database.md). Runtime startup never merges
-files or assigns their ownership from the first login.
+Database setup is a deployment step handled by `setupdb` (see [the shared database guide](docs/shared-database.md)). The server never creates or repairs the schema; version upgrades use separate one-time operator scripts with a backup.
 
 ## SimpleFIN Synchronization
 

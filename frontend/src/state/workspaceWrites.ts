@@ -1,5 +1,4 @@
 import { useIsMutating, useMutationState } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import {
 	createAmountPreset,
 	deleteAmountPreset,
@@ -13,8 +12,9 @@ import {
 	type FinancialModel,
 	READ_ONLY_IMPORT_MESSAGE,
 } from "@/api/index.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import {
 	getServerModel,
 	getServerStatus,
@@ -185,7 +185,7 @@ async function write<T>(
 }
 
 export function useWorkspaceSaving() {
-	useSyncExternalStore(subscribeUserScope, getUserScope);
+	useUserScope();
 	return (
 		useIsMutating(
 			{ mutationKey: workspaceWriteKey("model") },
@@ -195,7 +195,7 @@ export function useWorkspaceSaving() {
 }
 
 export function useWorkspaceWriteError(kind: "model" | "presets" = "model") {
-	useSyncExternalStore(subscribeUserScope, getUserScope);
+	useUserScope();
 	const errors = useMutationState(
 		{
 			filters: { mutationKey: workspaceWriteKey(kind) },

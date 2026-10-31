@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import {
 	connectSyncCredential,
 	disconnectSyncCredential,
@@ -11,13 +10,10 @@ import type {
 	SyncCredentialBody,
 	AccountLink,
 } from "@/api/generated/model/index.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-	type UserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope, type UserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import { userResourceKey } from "@/state/workspaceResources.ts";
 
 export function syncCredentialKey(scope = getUserScope()) {
@@ -237,7 +233,7 @@ export function resetSyncSettingsClient(): void {
 subscribeUserScope(resetSyncSettingsClient);
 
 export function useSyncCredential() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{ ...credentialOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
@@ -245,7 +241,7 @@ export function useSyncCredential() {
 }
 
 export function useSyncLinks(enabled = true) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{ ...linksOptions(scope), enabled: scope.status === "ready" && enabled },
 		serverQueryClient(),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { appJsonStorage, THEME_STORAGE_KEY } from "./persisted.ts";
@@ -131,12 +131,5 @@ export function useTheme() {
 	const cycle = useThemeStore((state) => state.cycle);
 	const resolved = resolvePreference(preference);
 
-	const setStoredPreference = useCallback(
-		(next: ThemePreference) => {
-			setPreference(next);
-		},
-		[setPreference],
-	);
-
-	return { preference, resolved, setPreference: setStoredPreference, cycle };
+	return { preference, resolved, setPreference, cycle };
 }

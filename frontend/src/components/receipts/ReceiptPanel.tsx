@@ -4,9 +4,9 @@ import { receiptReviewLabel } from "@/domain/receipt.ts";
 import { useServerModel, useServerStatus } from "@/state/workspaceResources.ts";
 import {
 	useReceiptActions,
-	useReceiptScope,
 	useReceipts,
 } from "@/state/receipts.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
@@ -19,7 +19,7 @@ export function ReceiptPanel({
 	postingId: string;
 	readOnly: boolean;
 }) {
-	const scope = useReceiptScope();
+	const scope = useUserScope();
 	const model = useServerModel({ enabled: false });
 	const status = useServerStatus({ enabled: false });
 	const saved = model.data?.model?.postings.find(

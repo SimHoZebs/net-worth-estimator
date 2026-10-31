@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import {
 	dismissAnalysisFinding,
 	listAnalyses,
@@ -9,14 +8,15 @@ import {
 import type { AnalysisFeedbackInput } from "@/api/generated/model/analysisFeedbackInput.ts";
 import { ApiNetworkError } from "@/api/http.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
+import { useUserScope } from "./useUserScope.ts";
 
 export const analysisFindingsKey = (scope = getUserScope()) =>
 	["user-resources", scope.key, "analysis-findings"] as const;
 
 export function useAnalysisFindings(postingIds?: string[], cursor = "") {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	const ids = postingIds
 		? [...new Set(postingIds)].sort().join(",")
 		: undefined;
@@ -42,7 +42,7 @@ export function useAnalysisFindings(postingIds?: string[], cursor = "") {
 }
 
 export function useAnalyses() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: ["user-resources", scope.key, "analyses"],
@@ -59,7 +59,7 @@ export function useAnalyses() {
 }
 
 export function useDismissAnalysisFinding() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
@@ -89,7 +89,7 @@ export function useDismissAnalysisFinding() {
 }
 
 export function useReviewAnalysisFinding() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{

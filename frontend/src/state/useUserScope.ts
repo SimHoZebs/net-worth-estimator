@@ -17,9 +17,7 @@ export function useUserScope(): UserScope {
 }
 
 /** Verified user scope for the mounted session. */
-export function useVerifiedResource(): UserScope {
-	return useUserScope();
-}
+export const useVerifiedResource = useUserScope;
 
 /** Verified user id (`users/*`) or null while pending. */
 export function useVerifiedUserId(): string | null {

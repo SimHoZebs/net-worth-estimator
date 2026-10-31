@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import {
 	getPinnedEvaluations,
 	setPinnedEvaluations,
@@ -7,6 +6,7 @@ import {
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 
 export function pinnedEvaluationsKey() {
 	return ["pinned-evaluations", getUserScope().key] as const;
@@ -118,7 +118,7 @@ export function resetPinnedEvaluationsClient() {
 subscribeUserScope(resetPinnedEvaluationsClient);
 
 export function usePinnedEvaluations() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	const query = useQuery(
 		{ ...pinsOptions(), enabled: scope.status === "ready" },
 		serverQueryClient(),

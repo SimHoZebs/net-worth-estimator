@@ -1,12 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-	type UserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope, type UserScope } from "@/auth/resourceScope.ts";
 import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,
@@ -14,6 +10,7 @@ import {
 import { readSafeSpendingSettings } from "@/state/safeSpendingStorage.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { notifyError, dismissKey } from "@/state/notifications.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 
 // Query caches server-owned safe-spending settings. Settings stay outside
 // the base projection identity, so edits do not rerun the base simulation.
@@ -210,7 +207,7 @@ export async function refreshSafeSpendingSettings() {
 
 /** Query owns both the saved response and its explicit optimistic updates. */
 export function useSafeSpendingSettings(): SafeSpendingSettingsState {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	useQuery(
 		{ ...settingsOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
