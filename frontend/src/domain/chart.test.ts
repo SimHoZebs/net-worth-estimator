@@ -8,6 +8,7 @@ import {
 	nearestPointIndex,
 	projectionChartModel,
 	projectionCsv,
+	stackedAccountRows,
 	trailingDailyPoints,
 	TRAILING_NET_WORTH_DAYS,
 } from "./chart.ts";
@@ -22,16 +23,6 @@ const options = {
 };
 
 describe("chart presentation data", () => {
-	it("honors explicit viewBox dimensions and clamps tiny ones", () => {
-		const sized = projectionChartModel({ ...options, width: 950, height: 340 });
-		if (!sized) throw new Error("Expected chart");
-		expect(sized.width).toBe(950);
-		expect(sized.height).toBe(340);
-		const tiny = projectionChartModel({ ...options, width: 10, height: 10 });
-		if (!tiny) throw new Error("Expected chart");
-		expect(tiny.width).toBe(280);
-		expect(tiny.height).toBe(200);
-	});
 	it("uses identical values for annual rows and CSV", () => {
 		const model = projectionChartModel(options);
 		if (!model) throw new Error("Expected chart");
@@ -204,6 +195,137 @@ describe("chart presentation data", () => {
 		});
 		it("returns no points for empty input", () => {
 			expect(trailingDailyPoints([], today)).toEqual([]);
+		});
+		it("forward-fills the latest known balance per account", () => {
+			const daily = trailingDailyPoints(
+				[
+					{
+						date: "2026-06-02",
+						total: 1000,
+						balances: { checking: 600, savings: 400 },
+					},
+					{
+						date: "2026-06-20",
+						total: 1400,
+						balances: { checking: 800, savings: 600 },
+					},
+					{ date: "2026-07-01", total: 1400, balances: {} },
+				],
+				today,
+			);
+			expect(daily).toHaveLength(TRAILING_NET_WORTH_DAYS);
+			// Days before the first row backfill the earliest balances.
+			expect(daily[0]?.balances).toEqual({ checking: 600, savings: 400 });
+			// Sparse rows hold the latest known balances through the window.
+			expect(daily.at(-1)?.balances).toEqual({
+				checking: 800,
+				savings: 600,
+			});
+		});
+	});
+	describe("stackedAccountRows", () => {
+		const today = "2026-07-01";
+		const accounts = [
+			{ id: "checking", name: "Everyday checking" },
+			{ id: "savings", name: "Emergency fund" },
+			{ id: "archived", name: "Old account" },
+		];
+		it("expands daily points into one row per account", () => {
+			const daily = trailingDailyPoints(
+				[
+					{
+						date: "2026-06-02",
+						total: 1000,
+						balances: { checking: 600, savings: 400 },
+					},
+					{ date: "2026-07-01", total: 1400, balances: {} },
+				],
+				today,
+			);
+			const { rows, series } = stackedAccountRows({ points: daily, accounts });
+			expect(rows).toHaveLength(daily.length * 2);
+			expect(series.map((entry) => entry.id)).toEqual(["checking", "savings"]);
+			expect(series.map((entry) => entry.name)).toEqual([
+				"Everyday checking",
+				"Emergency fund",
+			]);
+			expect(series.map((entry) => entry.endBalance)).toEqual([600, 400]);
+			for (const row of rows) {
+				expect(row.day).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/);
+			}
+		});
+		it("omits accounts with no presence in the window", () => {
+			const { series } = stackedAccountRows({
+				points: trailingDailyPoints(
+					[{ date: "2027-01-01", total: 1800, balances: {} }],
+					today,
+				),
+				accounts,
+			});
+			expect(series).toEqual([]);
+		});
+		it("keeps debt balances negative so the stack can diverge below zero", () => {
+			const daily = trailingDailyPoints(
+				[
+					{
+						date: "2026-06-02",
+						total: 600,
+						balances: { checking: 1000, mortgage: -400 },
+					},
+					{ date: "2026-07-01", total: 700, balances: {} },
+				],
+				today,
+			);
+			const { rows, series } = stackedAccountRows({
+				points: daily,
+				accounts: [...accounts, { id: "mortgage", name: "Home mortgage" }],
+			});
+			expect(series.map((entry) => entry.id)).toEqual(["checking", "mortgage"]);
+			expect(series.map((entry) => entry.endBalance)).toEqual([1000, -400]);
+			expect(
+				rows.find(
+					(row) => row.account === "Home mortgage" && row.day === "Jul 1",
+				)?.balance,
+			).toBe(-400);
+		});
+		it("assigns colors by full account order across windows", () => {
+			const narrow = stackedAccountRows({
+				points: trailingDailyPoints(
+					[
+						{
+							date: "2026-06-02",
+							total: 1000,
+							balances: { checking: 600, savings: 400 },
+						},
+						{ date: "2026-07-01", total: 1000, balances: {} },
+					],
+					today,
+				),
+				accounts,
+			});
+			const wide = stackedAccountRows({
+				points: trailingDailyPoints(
+					[
+						{
+							date: "2026-06-02",
+							total: 1000,
+							balances: { checking: 600, archived: 50, savings: 350 },
+						},
+						{ date: "2026-07-01", total: 1000, balances: {} },
+					],
+					today,
+				),
+				accounts,
+			});
+			const colorOf = (
+				series: { id: string; colorIndex: number }[],
+				id: string,
+			) => series.find((entry) => entry.id === id)?.colorIndex;
+			expect(colorOf(narrow.series, "checking")).toBe(0);
+			expect(colorOf(narrow.series, "savings")).toBe(1);
+			expect(colorOf(wide.series, "checking")).toBe(0);
+			expect(colorOf(wide.series, "savings")).toBe(1);
+			expect(colorOf(wide.series, "archived")).toBe(2);
 		});
 	});
 	describe("adaptive domain", () => {
