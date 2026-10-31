@@ -11,6 +11,7 @@ import type { BackendCheckpoint } from "../api/contracts.ts";
 import { useCheckpoints } from "../state/workspaceResources.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
+import { useElementWidth } from "../state/useElementWidth.ts";
 import { IconButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
@@ -25,6 +26,21 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
   const narrow = useMediaQuery(viewportQueries.belowSm);
   const id = useId().replaceAll(":", "");
+  const [plotWrapRef, plotWrapWidth] = useElementWidth<HTMLDivElement>();
+  // Render the viewBox at the container's native pixel width so desktop does
+  // not just stretch the mobile artwork: one viewBox unit stays close to one
+  // CSS pixel and strokes keep their weight. Falls back to the
+  // narrow/desktop defaults before the first measurement.
+  const measuredWidth =
+    plotWrapWidth === null ? null : Math.max(280, Math.round(plotWrapWidth - 16));
+  const measuredHeight =
+    measuredWidth === null
+      ? null
+      : measuredWidth < 480
+        ? 260
+        : measuredWidth < 760
+          ? 300
+          : 340;
   // Outlook pins the horizon; the chart subscribes to the same cached
   // forecast instead of receiving it as a prop.
   const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
@@ -52,9 +68,11 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
             inflation: 0,
             realTerms: false,
             narrow,
+            ...(measuredWidth === null ? {} : { width: measuredWidth }),
+            ...(measuredHeight === null ? {} : { height: measuredHeight }),
           })
         : null,
-    [projection, narrow, today, days],
+    [projection, narrow, today, days, measuredWidth, measuredHeight],
   );
   const defaultIndex = useMemo(
     () => (model ? nearestPointIndex(model.points, today) : 0),
@@ -115,7 +133,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
         <NetWorthSummary projection={projection} checkpoints={checkpoints} />
       )}
       {topRow}
-      <div className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
+      <div ref={plotWrapRef} className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
         <ProjectionPlot
           model={model}
           id={id}
