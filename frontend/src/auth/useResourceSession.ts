@@ -21,6 +21,7 @@ import {
 } from "./sessionChanges.ts";
 import type { Session } from "./sessionContext.ts";
 import { discoverSession, sessionScopeInput } from "./sessionDiscovery.ts";
+import { redirectToSignIn } from "./navigation.ts";
 import { dismissKey, notifyError } from "../state/notifications.ts";
 
 interface SessionOwner {
@@ -58,6 +59,11 @@ export function useResourceSession() {
 	const verification = useRef<Verification | null>(null);
 	const signingOut = useRef<LogoutAttempt | null>(null);
 	const mounted = useRef(false);
+	// Automatic sign-in fires at most once per boundary mount. The denial
+	// decision owns the redirect (not a render effect), so re-verification
+	// on focus, visibility, pageshow, or a late allowed->denied transition
+	// lands on the stable prompt instead of starting a second login.
+	const signInRedirected = useRef(false);
 
 	const verify = useCallback(function verifySession(): Promise<void> {
 		verification.current?.controller.abort();
@@ -72,6 +78,22 @@ export function useResourceSession() {
 		// Suspending upfront wiped the UI on every focus event and on
 		// transient outages, which flickered and hid usable data.
 		const pending = previous ? null : suspendUserScope();
+		// Explicit denial owns the automatic sign-in. The flag lives here
+		// in the owner transition (not a render detector or a structural
+		// owner guard) so it stays once-per-mount across owner changes,
+		// re-verification, and every denial branch below.
+		const denyAccess = (next: SessionOwner) => {
+			owner.current = next;
+			setSession(next.session);
+			setStatus({
+				phase: "denied",
+				error: "This user does not have access.",
+			});
+			if (!next.session.authenticated && !signInRedirected.current) {
+				signInRedirected.current = true;
+				redirectToSignIn();
+			}
+		};
 		check.pending = (async () => {
 			try {
 				if (!previous) await cancelResourceQueries();
@@ -104,12 +126,7 @@ export function useResourceSession() {
 					}
 					if (signal.aborted) return;
 					if (!next.session.allowed) {
-						owner.current = next;
-						setSession(next.session);
-						setStatus({
-							phase: "denied",
-							error: "This user does not have access.",
-						});
+						denyAccess(next);
 						return;
 					}
 					const verified = acceptUserScope(input, pending!);
@@ -139,12 +156,7 @@ export function useResourceSession() {
 						}
 						await clearResourceQueryCache();
 						if (signal.aborted) return;
-						owner.current = next;
-						setSession(next.session);
-						setStatus({
-							phase: "denied",
-							error: "This user does not have access.",
-						});
+						denyAccess(next);
 						return;
 					}
 					if (signal.aborted) return;
@@ -165,12 +177,7 @@ export function useResourceSession() {
 				await clearResourceQueryCache();
 				if (signal.aborted) return;
 				if (!next.session.allowed) {
-					owner.current = next;
-					setSession(next.session);
-					setStatus({
-						phase: "denied",
-						error: "This user does not have access.",
-					});
+					denyAccess(next);
 					return;
 				}
 				const verified = acceptUserScope(input, hardPending);
