@@ -69,7 +69,7 @@ export function FinancialIndependenceCard({
 }) {
 	const headingId = useId();
 	const analysis = item.financialIndependence;
-	const [inspector, setInspector] = useSelectedEntry<true>(analysis);
+	const [inspector, setInspector] = useSelectedEntry<true>(null);
 	const candidate =
 		analysis?.candidates.find((row) => row.date === analysis.defaultDate) ??
 		analysis?.candidates[0];

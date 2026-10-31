@@ -22,7 +22,7 @@ export function AccountCardGrid({
 	projection: Projection | null;
 	query: string;
 }) {
-	const [selectedId, setSelectedId] = useSelectedId(accounts);
+	const [selectedId, setSelectedId] = useSelectedId();
 	const cards = useMemo(
 		() => toAccountCards({ accounts, projection }),
 		[accounts, projection],

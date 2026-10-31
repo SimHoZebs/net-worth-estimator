@@ -8,7 +8,7 @@ import {
 	Repeat,
 } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
@@ -137,8 +137,13 @@ export function RecurringRules({
 			),
 		[transactions, account.id],
 	);
-	if (selectedId !== null && !rules.some((rule) => rule.id === selectedId))
-		setSelectedId(null);
+	// Local identity only: the rule is resolved from current rows each
+	// render, so updates stay current while a removed rule renders as no
+	// selection and closes the detail.
+	const selected =
+		selectedId === null
+			? null
+			: (rules.find((rule) => rule.id === selectedId) ?? null);
 
 	const persistOrder = async (orderedIds: string[]): Promise<boolean> => {
 		// Rebuild the account order with row moves, anchoring from the end
@@ -156,72 +161,81 @@ export function RecurringRules({
 		return true;
 	};
 
-	// Local drag order. Reorder fires onReorder continuously mid-drag, so
-	// writing straight to the store re-renders and resets motion's internal
-	// order before siblings can displace. Instead the drag plays out in
-	// local state (siblings push/pull freely) and persists once on drop.
-	const [localIds, setLocalIds] = useState<string[]>([]);
-	const localIdsRef = useRef<string[]>([]);
-	const draggingRef = useRef(false);
-	const ids = rules.map((transaction) => transaction.id);
-	useEffect(() => {
-		if (!draggingRef.current) {
-			setLocalIds(ids);
-			localIdsRef.current = ids;
-		}
-		// oxlint-disable-next-line react/exhaustive-deps
-	}, [rules, editing]);
-	const handleReorder = (orderedIds: string[]) => {
-		localIdsRef.current = orderedIds;
-		setLocalIds(orderedIds);
+	// Saved order derives straight from server rows, so refreshes, removals,
+	// and reorders outside a gesture render directly. Reorder fires
+	// onReorder continuously mid-drag, so writing straight to the store
+	// re-renders and resets motion's internal order before siblings can
+	// displace. Instead a gesture snapshots a temporary order at drag start,
+	// plays out in that draft, and settles explicitly on drop.
+	const savedIds = useMemo(
+		() => rules.map((transaction) => transaction.id),
+		[rules],
+	);
+	const [draftIds, setDraftIds] = useState<string[] | null>(null);
+	const draftRef = useRef<string[] | null>(null);
+	const setDraft = (next: string[] | null) => {
+		draftRef.current = next;
+		setDraftIds(next);
 	};
+	const sameOrder = (left: string[], right: string[]) =>
+		left.length === right.length &&
+		left.every((id, index) => id === right[index]);
+	// A draft that matches saved rows renders as saved rows, so an
+	// unchanged gesture never holds a stale copy.
+	const displayedIds =
+		draftIds && !sameOrder(draftIds, savedIds) ? draftIds : savedIds;
 	const orderedRules = useMemo(() => {
 		const byId = new Map(
 			rules.map((transaction) => [transaction.id, transaction]),
 		);
-		const ordered = localIds
+		const ordered = displayedIds
 			.map((id) => byId.get(id))
 			.filter((item): item is Transaction => item !== undefined);
 		for (const transaction of rules) {
 			if (!ordered.includes(transaction)) ordered.push(transaction);
 		}
 		return ordered;
-	}, [rules, localIds]);
+	}, [rules, displayedIds]);
+	const beginGesture = () => {
+		if (draftRef.current === null) {
+			setDraft(rules.map((transaction) => transaction.id));
+		}
+	};
+	const handleReorder = (orderedIds: string[]) => {
+		setDraft(orderedIds);
+	};
 
 	const handleDrop = () => {
-		draggingRef.current = false;
+		const next = draftRef.current;
+		if (next === null) return;
 		const current = rules.map((transaction) => transaction.id);
-		const next = localIdsRef.current;
-		if (
-			current.length !== next.length ||
-			current.some((id, index) => id !== next[index])
-		) {
-			void persistOrder(next).then((ok) => {
-				if (!ok) {
-					localIdsRef.current = current;
-					setLocalIds(current);
-				}
-			});
+		if (sameOrder(next, current)) {
+			setDraft(null);
+			return;
 		}
+		// The in-flight order settles explicitly on completion: a newer
+		// gesture replaces the draft, so only this gesture's own preview is
+		// discarded — on success the saved rows take over, on failure the
+		// server order returns.
+		const sent = next;
+		void persistOrder(next).then(() => {
+			if (draftRef.current === sent) setDraft(null);
+		});
 	};
 
 	const moveBy = (id: string, delta: -1 | 1) => {
-		const ids = rules.map((transaction) => transaction.id);
-		const index = ids.indexOf(id);
+		const base = draftRef.current ?? rules.map((transaction) => transaction.id);
+		const index = base.indexOf(id);
 		const target = index + delta;
-		if (index < 0 || target < 0 || target >= ids.length) return;
-		const next = [...ids];
+		if (index < 0 || target < 0 || target >= base.length) return;
+		const next = [...base];
 		const [removed] = next.splice(index, 1);
 		if (removed === undefined) return;
 		next.splice(target, 0, removed);
-		localIdsRef.current = next;
-		setLocalIds(next);
-		void persistOrder(next).then((ok) => {
-			if (!ok) {
-				const current = rules.map((transaction) => transaction.id);
-				localIdsRef.current = current;
-				setLocalIds(current);
-			}
+		const sent = next;
+		setDraft(next);
+		void persistOrder(next).then(() => {
+			if (draftRef.current === sent) setDraft(null);
 		});
 	};
 
@@ -308,7 +322,12 @@ export function RecurringRules({
 								? "Finish reordering recurring transactions"
 								: "Reorder recurring transactions"
 						}
-						onClick={() => setEditing((previous) => !previous)}
+						onClick={() => {
+							// Leaving edit mode settles like a drop: the draft
+							// returns to saved rows instead of lingering.
+							if (editing) setDraft(null);
+							setEditing((previous) => !previous);
+						}}
 					>
 						{editing ? "Done" : "Edit"}
 					</Button>
@@ -317,7 +336,7 @@ export function RecurringRules({
 			{editing ? (
 				<Reorder.Group
 					axis="y"
-					values={localIds}
+					values={displayedIds}
 					onReorder={handleReorder}
 					className="m-0 flex list-none flex-col border-t border-line p-0"
 					aria-label={`Reorder recurring transactions for ${account.name}`}
@@ -327,9 +346,7 @@ export function RecurringRules({
 							key={transaction.id}
 							id={transaction.id}
 							label={`${index + 1} of ${orderedRules.length}: ${transaction.name}`}
-							onDragStart={() => {
-								draggingRef.current = true;
-							}}
+							onDragStart={beginGesture}
 							onDrop={handleDrop}
 							controls={
 								<span className="ml-auto flex items-center gap-1 max-sm:gap-0.5">
@@ -349,6 +366,7 @@ export function RecurringRules({
 										type="button"
 										aria-label={`Edit ${transaction.name}`}
 										onClick={() => {
+											setDraft(null);
 											setEditing(false);
 											setSelectedId(transaction.id);
 										}}
@@ -384,25 +402,20 @@ export function RecurringRules({
 					))}
 				</ul>
 			)}
-			{selectedId &&
-				(() => {
-					const transaction = rules.find((item) => item.id === selectedId);
-					if (!transaction) return null;
-					return (
-						<TransactionDetail
-							transaction={ruleTransaction({
-								transaction,
-								accounts,
-								startDate,
-							})}
-							savedTransaction={transaction}
-							accounts={accounts}
-							transactions={transactions}
-							readOnly={readOnly}
-							onClose={() => setSelectedId(null)}
-						/>
-					);
-				})()}
+			{selected && (
+				<TransactionDetail
+					transaction={ruleTransaction({
+						transaction: selected,
+						accounts,
+						startDate,
+					})}
+					savedTransaction={selected}
+					accounts={accounts}
+					transactions={transactions}
+					readOnly={readOnly}
+					onClose={() => setSelectedId(null)}
+				/>
+			)}
 		</>
 	);
 }
