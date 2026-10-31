@@ -14,6 +14,9 @@ after(async () => { for (const directory of owned) await rm(directory, { recursi
 await run("go", ["build", "-o", join(tools, "setupdb"), "./cmd/setupdb"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-posting-sim-split"), "./scripts/one-time/posting-sim-split"], {
+  cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
+});
 await run("go", ["build", "-o", join(tools, "upgrade-planned-purchases"), "./scripts/one-time/planned-purchases"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
@@ -29,7 +32,8 @@ async function sourceDatabase() {
   const db = join(directory, "application.db");
   await run(join(tools, "setupdb"), ["--db", db, "--issuer", "https://fixture.invalid", "--subject", "owner"]);
   const owner = await sql(db, "SELECT id FROM users;");
-  await sql(db, `DROP TRIGGER analysis_posting_lifecycle;
+  await sql(db, `DROP TRIGGER IF EXISTS analysis_posting_lifecycle;
+    DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
     DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
     DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
     DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');`);
@@ -40,9 +44,12 @@ async function sourceDatabase() {
 async function seedFinalRows(db, owner) {
   await sql(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES
     ('${owner}',1,0,'checking',100,'user',1773187199);`);
-  await sql(db, `INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source,pending,void,execution_order) VALUES
-    ('${owner}','settled-a',0,'Groceries','checking','null','{}',1773140400,1773129600,0,'simplefin',0,0,1),
-    ('${owner}','manual-a',1,'Owner','checking','null','{}',1773140400,1773129600,0,'user',0,0,4);`);
+  await sql(db, `INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES
+    ('${owner}','settled-a','Groceries','checking','null','{}',1773140400,1773129600,'simplefin',0,0),
+    ('${owner}','manual-a','Owner','checking','null','{}',1773140400,1773129600,'user',0,0);`);
+  await sql(db, `INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES
+    ('${owner}','settled-a',0,0,1),
+    ('${owner}','manual-a',1,0,4);`);
   await sql(db, `INSERT INTO posting_sync_keys(user_id,provider,bridge_account_id,transaction_id,posting_id) VALUES
     ('${owner}','simplefin','bridge-checking','tx1','settled-a');`);
 }
@@ -62,7 +69,7 @@ test("Analysis migration completes schema on a verified candidate and repeats wi
   assert.equal(await sql(db, "PRAGMA foreign_key_check;"), "");
   assert.equal(await sql(db, snapshot), before);
   // Final checkpoints never trigger the legacy bank repair.
-  assert.equal(await sql(db, "SELECT enabled, transaction_time FROM postings WHERE id = 'settled-a';"), "0|1773129600");
+  assert.equal(await sql(db, "SELECT s.enabled, p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.id = 'settled-a';"), "0|1773129600");
   assert.equal(await sql(db, "SELECT count(*) FROM analysis_feedback; SELECT count(*) FROM analysis_findings;"), "0\n0");
   const names = await backups(directory);
   assert.equal(names.length, 1);
@@ -130,8 +137,10 @@ async function seedRetiredPurchase(db, owner, expression = "125.50") {
       posting_id TEXT NOT NULL, priority INTEGER NOT NULL CHECK(priority>=0),
       PRIMARY KEY(user_id,posting_id),
       FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE);
-    INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source)
-      VALUES ('${owner}','01900000-0000-7000-8000-000000000099',2,'Desk','checking','null','{"resolver":"expression","config":{"expression":"${expression}"},"inputs":{}}',1769904000,1769904000,1,'user');
+    INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
+      VALUES ('${owner}','01900000-0000-7000-8000-000000000099','Desk','checking','null','{"resolver":"expression","config":{"expression":"${expression}"},"inputs":{}}',1769904000,1769904000,'user',0,0);
+    INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order)
+      VALUES ('${owner}','01900000-0000-7000-8000-000000000099',2,1,0);
     INSERT INTO entity_ids(user_id,id,kind) VALUES ('${owner}','01900000-0000-7000-8000-000000000099','posting');
     INSERT INTO purchase_policies(user_id,posting_id,priority) VALUES ('${owner}','01900000-0000-7000-8000-000000000099',3);`);
 }
@@ -207,8 +216,10 @@ sqlite3 "$NET_WORTH_ESTIMATOR_DB" <<'SQL'
 DROP TABLE planned_purchases;
 CREATE TABLE purchase_policies(user_id TEXT NOT NULL REFERENCES users(id),posting_id TEXT NOT NULL,priority INTEGER NOT NULL,PRIMARY KEY(user_id,posting_id),FOREIGN KEY(user_id,posting_id) REFERENCES postings(user_id,id) ON DELETE CASCADE);
 INSERT INTO accounts(user_id,id,position,name,kind,enabled) SELECT id,'cash',0,'Cash','cash',1 FROM users;
-INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source)
- SELECT id,'01900000-0000-7000-8000-000000000099',0,'Desk','cash','null','{"resolver":"expression","config":{"expression":"125.50"},"inputs":{}}',1769904000,1769904000,1,'user' FROM users;
+INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void)
+ SELECT id,'01900000-0000-7000-8000-000000000099','Desk','cash','null','{"resolver":"expression","config":{"expression":"125.50"},"inputs":{}}',1769904000,1769904000,'user',0,0 FROM users;
+INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order)
+ SELECT id,'01900000-0000-7000-8000-000000000099',0,1,0 FROM users;
 INSERT INTO entity_ids(user_id,id,kind) SELECT id,'01900000-0000-7000-8000-000000000099','posting' FROM users;
 INSERT INTO purchase_policies(user_id,posting_id,priority) SELECT id,'01900000-0000-7000-8000-000000000099',3 FROM users;
 SQL
@@ -235,8 +246,10 @@ if /app/migrate.sh 2>/dev/null; then exit 1; fi
 owner="$(sqlite3 "$NET_WORTH_ESTIMATOR_DB" 'SELECT id FROM users;')"
 sqlite3 "$NET_WORTH_ESTIMATOR_DB" "INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('$owner','checking',0,'Fixture checking','cash',1);
   INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('$owner',1,0,'checking',100,'user',1773187199);
-  INSERT INTO postings(user_id,id,position,name,source_account_id,destinations,amount_resolution_json,posted_time,transaction_time,enabled,source,pending,void,execution_order) VALUES ('$owner','settled-a',0,'Groceries','checking','null','{}',1773140400,1773140400,1,'simplefin',0,0,1);"
-sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_posting_lifecycle;
+  INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('$owner','settled-a','Groceries','checking','null','{}',1773140400,1773140400,'simplefin',0,0);
+  INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES ('$owner','settled-a',0,1,1);"
+sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER IF EXISTS analysis_posting_lifecycle;
+  DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
   DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
   DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
   DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');"

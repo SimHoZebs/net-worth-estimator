@@ -94,7 +94,7 @@ check_base_columns() {
   SELECT group_id, user_id, role, joined_at, display_name FROM group_members LIMIT 0;
   SELECT id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at FROM group_invites LIMIT 0;
   SELECT user_id, id, position, name, kind, min_balance, max_balance, color, enabled FROM accounts LIMIT 0;
-  SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, fulfills_rule_id, fulfills_occurrence_date, enabled, source, pending, void, execution_order, receipt_ids FROM postings LIMIT 0;
+  SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void FROM postings LIMIT 0;
   SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys LIMIT 0;
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
@@ -117,7 +117,7 @@ check_target() {
     SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs LIMIT 0;
     SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings LIMIT 0;
     SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback LIMIT 0;' || return 1
-  test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_posting_lifecycle');")" = 4 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='trigger' AND name IN ('analysis_facts_insert','analysis_facts_update','analysis_facts_delete','analysis_posting_lifecycle','analysis_posting_sim_lifecycle');")" = 5 || return 1
   test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');")" = 2
 }
 
@@ -165,7 +165,9 @@ marker=$(sqlite3 -readonly "$db" "SELECT count(*) FROM schema_migrations WHERE n
   || fail "Cannot inspect schema marker; refusing to guess."
 test "$marker" = 1 || fail "Unsupported application schema."
 check_base_columns "$db" || fail "Incomplete application schema. Refusing automatic repair."
-
+postings_destination=$(sqlite3 -readonly "$db" "SELECT COUNT(*) FROM pragma_table_info('postings') WHERE name IN ('destinations','destination_account_ids');") \
+  || fail "Cannot inspect postings columns; refusing to guess."
+test "$postings_destination" -ge 1 || fail "Postings lack a destination column; refusing automatic repair."
 purchases=$(sqlite3 -readonly "$db" "SELECT group_concat(name, ',') FROM (SELECT name FROM sqlite_schema WHERE type='table' AND name IN ('purchase_policies','planned_purchases') ORDER BY name);")
 case "$purchases" in
   purchase_policies)
@@ -242,6 +244,13 @@ info "Backup ready at $backup ($sha)"
 candidate="$backup/candidate.db"
 cp "$before" "$candidate" || fail "Cannot stage the migration candidate."
 
+# Split pre-split postings into fact plus sim/claim satellites before any
+# checkpoint, Analysis, or purchase work. The tool is idempotent on an
+# already-split target.
+if ! upgrade-posting-sim-split --db "$candidate" > "$backup/posting-sim.log" 2>&1; then
+  printf 'migrate: posting split failed: %s\n' "$(cat "$backup/posting-sim.log")" >&2
+  fail "Candidate posting split failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
 # Convert legacy checkpoints and repair settled bank rows inside the
 # candidate only. Every postcondition is an assertion row: a violated
 # CHECK aborts the script before COMMIT, the CLI exits nonzero, and
@@ -281,12 +290,21 @@ INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
 ) THEN 0 ELSE 1 END;
 DROP TABLE checkpoints;
 ALTER TABLE checkpoints_new RENAME TO checkpoints;
-UPDATE postings SET enabled = 1 WHERE source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND enabled = 0;
+DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
+UPDATE posting_sim SET enabled = 1
+WHERE EXISTS (SELECT 1 FROM postings p WHERE p.user_id = posting_sim.user_id AND p.id = posting_sim.posting_id AND p.source NOT IN ('user', 'model', '') AND p.pending = 0 AND p.void = 0 AND posting_sim.enabled = 0);
 UPDATE postings SET transaction_time = posted_time WHERE source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND transaction_time != posted_time;
+CREATE TRIGGER analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
+		WHEN (OLD.enabled != NEW.enabled)
+		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.posting_id)
+		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
+		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END;
 INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (
+  SELECT 1 FROM posting_sim s JOIN postings p ON p.user_id = s.user_id AND p.id = s.posting_id
+  WHERE p.source NOT IN ('user', 'model', '') AND p.pending = 0 AND p.void = 0 AND s.enabled = 0
+) OR EXISTS (
   SELECT 1 FROM postings
-  WHERE (source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND enabled = 0)
-     OR (source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND transaction_time != posted_time)
+  WHERE source NOT IN ('user', 'model', '') AND pending = 0 AND void = 0 AND transaction_time != posted_time
 ) THEN 0 ELSE 1 END;
 INSERT INTO assert_ok(ok) SELECT CASE WHEN EXISTS (SELECT 1 FROM pragma_integrity_check WHERE integrity_check != 'ok') THEN 0 ELSE 1 END;
 INSERT INTO assert_ok(ok) SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_foreign_key_check) != 0 THEN 0 ELSE 1 END;
@@ -330,7 +348,7 @@ verify_same() {
   test "$changed" = 0
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','postings','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback') ORDER BY name;") \
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','postings','posting_sim','posting_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback') ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
@@ -354,16 +372,15 @@ if [ "$mode" = convert ]; then
   test "$post_same" = 0 || fail "Candidate changed non-settled postings. Original unchanged; backup retained at $backup. Keep the API stopped."
   post_repair=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (
     SELECT 1 FROM before.postings o LEFT JOIN main.postings n ON n.user_id = o.user_id AND n.id = o.id
+    LEFT JOIN main.posting_sim s ON s.user_id = o.user_id AND s.posting_id = o.id
     WHERE o.source NOT IN ('user', 'model', '') AND o.pending = 0 AND o.void = 0
-      AND (n.id IS NULL OR n.enabled != 1 OR n.transaction_time != n.posted_time
-        OR n.position IS NOT o.position OR n.name IS NOT o.name
-        OR n.source_account_id IS NOT o.source_account_id OR n.destinations IS NOT o.destinations
+      AND (n.id IS NULL OR n.transaction_time != n.posted_time
+        OR n.name IS NOT o.name
+        OR n.source_account_id IS NOT o.source_account_id
         OR n.amount_resolution_json IS NOT o.amount_resolution_json
         OR n.posted_time IS NOT o.posted_time
-        OR n.fulfills_rule_id IS NOT o.fulfills_rule_id
-        OR n.fulfills_occurrence_date IS NOT o.fulfills_occurrence_date
         OR n.source IS NOT o.source OR n.pending IS NOT o.pending OR n.void IS NOT o.void
-        OR n.execution_order IS NOT o.execution_order OR n.receipt_ids IS NOT o.receipt_ids));") \
+        OR s.posting_id IS NULL OR s.enabled != 1));") \
     || fail "Cannot verify candidate postings; refusing to publish."
   test "$post_repair" = 0 || fail "Candidate bank repair is incomplete or overreached. Original unchanged; backup retained at $backup. Keep the API stopped."
 else
@@ -398,7 +415,8 @@ if [ "$purchases" = purchase_policies ]; then
     printf 'migrate: purchase conversion failed: %s\n' "$(cat "$backup/purchases.log")" >&2
     fail "Candidate purchase conversion failed. Original unchanged; backup retained at $backup."
   fi
-  purchase_tables=$(sqlite3 -readonly "$purchase_before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('purchase_policies','postings','entity_ids') ORDER BY name;")
+  purchase_tables=$(sqlite3 -readonly "$purchase_before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('purchase_policies','postings','posting_sim','posting_claims','entity_ids') ORDER BY name;") \
+    || fail "Cannot list backup tables; refusing to publish."
   for table in $purchase_tables; do
     case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
     verify_same "$table" "$purchase_before" || fail "Purchase conversion changed preserved table $table. Original unchanged; backup retained at $backup."
@@ -409,8 +427,8 @@ if [ "$purchases" = purchase_policies ]; then
       OR EXISTS(SELECT p.* FROM original.postings p WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=p.user_id AND q.posting_id=p.id) EXCEPT SELECT * FROM main.postings)
       OR EXISTS(SELECT * FROM main.entity_ids WHERE kind!='planned-purchase' EXCEPT SELECT e.* FROM original.entity_ids e WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=e.user_id AND q.posting_id=e.id))
       OR EXISTS(SELECT e.* FROM original.entity_ids e WHERE NOT EXISTS(SELECT 1 FROM original.purchase_policies q WHERE q.user_id=e.user_id AND q.posting_id=e.id) EXCEPT SELECT * FROM main.entity_ids WHERE kind!='planned-purchase')
-      OR EXISTS(SELECT 1 FROM original.purchase_policies q JOIN original.postings p ON p.user_id=q.user_id AND p.id=q.posting_id LEFT JOIN main.planned_purchases n ON n.user_id=p.user_id AND n.id=p.id LEFT JOIN main.entity_ids e ON e.user_id=p.user_id AND e.id=p.id
-        WHERE n.id IS NULL OR e.kind IS NOT 'planned-purchase' OR n.name IS NOT p.name OR n.position IS NOT p.position OR n.funding_account_id IS NOT p.source_account_id OR n.cost IS NOT CAST(json_extract(p.amount_resolution_json,'$.config.expression') AS REAL) OR n.earliest_date IS NOT date(CASE WHEN p.transaction_time>0 THEN p.transaction_time ELSE p.posted_time END,'unixepoch') OR n.priority IS NOT q.priority OR n.enabled IS NOT p.enabled);")
+      OR EXISTS(SELECT 1 FROM original.purchase_policies q JOIN original.postings p ON p.user_id=q.user_id AND p.id=q.posting_id JOIN original.posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id LEFT JOIN main.planned_purchases n ON n.user_id=p.user_id AND n.id=p.id LEFT JOIN main.entity_ids e ON e.user_id=p.user_id AND e.id=p.id
+        WHERE n.id IS NULL OR e.kind IS NOT 'planned-purchase' OR n.name IS NOT p.name OR n.position IS NOT s.position OR n.funding_account_id IS NOT p.source_account_id OR n.cost IS NOT CAST(json_extract(p.amount_resolution_json,'$.config.expression') AS REAL) OR n.earliest_date IS NOT date(CASE WHEN p.transaction_time>0 THEN p.transaction_time ELSE p.posted_time END,'unixepoch') OR n.priority IS NOT q.priority OR n.enabled IS NOT s.enabled);")
   test "$purchase_delta" = 0 || fail "Purchase conversion changed unexpected rows. Original unchanged; backup retained at $backup."
 fi
 

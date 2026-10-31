@@ -12,7 +12,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/ \
     ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel ./cmd/syncaudit
 
-# Independent one-time operator tool. Neither server nor setupdb imports it.
+# Independent one-time operator tools. Neither server nor setupdb imports them.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/upgrade-posting-sim-split ./scripts/one-time/posting-sim-split
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/upgrade-planned-purchases ./scripts/one-time/planned-purchases
 

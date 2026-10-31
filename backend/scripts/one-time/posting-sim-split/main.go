@@ -43,13 +43,13 @@ const postingClaimsSchema = `CREATE TABLE posting_claims (
 	FOREIGN KEY(user_id, fulfills_rule_id) REFERENCES recurrence_rules(user_id, id) DEFERRABLE INITIALLY DEFERRED
 )`
 
-const analysisPostingLifecycleTrigger = `CREATE TRIGGER analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
+const analysisPostingLifecycleTrigger = `CREATE TRIGGER IF NOT EXISTS analysis_posting_lifecycle AFTER UPDATE OF pending, void ON postings
 		WHEN (OLD.pending != NEW.pending OR OLD.void != NEW.void)
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
 		ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1; END`
 
-const analysisPostingSimLifecycleTrigger = `CREATE TRIGGER analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
+const analysisPostingSimLifecycleTrigger = `CREATE TRIGGER IF NOT EXISTS analysis_posting_sim_lifecycle AFTER UPDATE OF enabled ON posting_sim
 		WHEN (OLD.enabled != NEW.enabled)
 		AND EXISTS(SELECT 1 FROM transaction_source_facts WHERE user_id = NEW.user_id AND posting_id = NEW.posting_id)
 		BEGIN INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
@@ -354,10 +354,12 @@ func convert(tx *sql.Tx) (int, error) {
 }
 
 func ensureAnalysisTriggers(tx *sql.Tx) error {
-	for _, name := range []string{"analysis_posting_lifecycle", "analysis_posting_sim_lifecycle"} {
-		if _, err := tx.Exec(`DROP TRIGGER IF EXISTS ` + name); err != nil {
-			return err
-		}
+	var count int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'transaction_source_facts'`).Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		return nil
 	}
 	if _, err := tx.Exec(analysisPostingLifecycleTrigger); err != nil {
 		return err

@@ -17,6 +17,14 @@ await run("go", ["build", "-o", join(tools, "setupdb"), "./cmd/setupdb"], {
   cwd: new URL("../backend/", import.meta.url).pathname,
   env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "upgrade-posting-sim-split"), "./scripts/one-time/posting-sim-split"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
+await run("go", ["build", "-o", join(tools, "upgrade-planned-purchases"), "./scripts/one-time/planned-purchases"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
 
 const sqlite = (db, sql) => run("sqlite3", [db, sql]);
 const rows = async (db, sql) => (await sqlite(db, sql)).stdout.trim();
@@ -50,6 +58,7 @@ async function fullBase(directory, name = "application.db") {
 // modelling an already-Analysis date source.
 async function toLegacyCheckpoints(db, stripAnalysis = true) {
   const analysis = stripAnalysis ? `DROP TRIGGER IF EXISTS analysis_posting_lifecycle;
+    DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
     DROP TRIGGER IF EXISTS analysis_facts_insert;
     DROP TRIGGER IF EXISTS analysis_facts_update;
     DROP TRIGGER IF EXISTS analysis_facts_delete;
@@ -70,12 +79,18 @@ async function seedBankRows(db, owner, extraUser) {
     ('${owner}', 1, 0, '2026-03-10', 'checking', 100, 'user'),
     ('${extraUser}', 1, 0, '2026-03-10', 'checking', 300, 'simplefin'),
     ('${owner}', 3, 2, '2026-03-11', 'checking', 150, 'user');`);
-  await sqlite(db, `INSERT INTO postings(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, void, execution_order) VALUES
-    ('${owner}', 'settled-a', 0, 'Groceries', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'simplefin', 0, 0, 1),
-    ('${owner}', 'pending-a', 1, 'Hold', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'simplefin', 1, 0, 2),
-    ('${owner}', 'void-a', 2, 'Vanished', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'simplefin', 0, 1, 3),
-    ('${owner}', 'manual-a', 3, 'Owner', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'user', 0, 0, 4),
-    ('${extraUser}', 'settled-b', 0, 'Fuel', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'simplefin', 0, 0, 1);`);
+  await sqlite(db, `INSERT INTO postings(user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void) VALUES
+    ('${owner}', 'settled-a', 'Groceries', 'checking', 'null', '{}', 1773140400, 1773129600, 'simplefin', 0, 0),
+    ('${owner}', 'pending-a', 'Hold', 'checking', 'null', '{}', 1773140400, 1773129600, 'simplefin', 1, 0),
+    ('${owner}', 'void-a', 'Vanished', 'checking', 'null', '{}', 1773140400, 1773129600, 'simplefin', 0, 1),
+    ('${owner}', 'manual-a', 'Owner', 'checking', 'null', '{}', 1773140400, 1773129600, 'user', 0, 0),
+    ('${extraUser}', 'settled-b', 'Fuel', 'checking', 'null', '{}', 1773140400, 1773129600, 'simplefin', 0, 0);`);
+  await sqlite(db, `INSERT INTO posting_sim(user_id, posting_id, position, enabled, execution_order) VALUES
+    ('${owner}', 'settled-a', 0, 0, 1),
+    ('${owner}', 'pending-a', 1, 0, 2),
+    ('${owner}', 'void-a', 2, 0, 3),
+    ('${owner}', 'manual-a', 3, 0, 4),
+    ('${extraUser}', 'settled-b', 0, 0, 1);`);
   await sqlite(db, `INSERT INTO posting_sync_keys(user_id, provider, bridge_account_id, transaction_id, posting_id) VALUES
     ('${owner}', 'simplefin', 'bridge-checking', 'tx1', 'settled-a'),
     ('${extraUser}', 'simplefin', 'bridge-checking', 'tx2', 'settled-b');`);
@@ -83,7 +98,7 @@ async function seedBankRows(db, owner, extraUser) {
   await sqlite(db, `INSERT INTO blob_objects(key,state,expires_at) VALUES ('receipt-blob','live',0);
     INSERT INTO blob_data(key,data) VALUES ('receipt-blob',X'000102FF');
     INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES ('${owner}','receipt-1','settled-a','synthetic-digest',4,'receipt-blob',3,'{"privateNote":"retained synthetic attachment"}');
-    UPDATE postings SET receipt_ids='["receipt-1"]' WHERE user_id='${owner}' AND id='settled-a';`);
+    `);
 }
 
 const privateAttachments = (db) => rows(db, `SELECT user_id,id,posting_id,digest,size,blob_key,revision,payload FROM receipts ORDER BY user_id,id;
@@ -155,7 +170,7 @@ test("legacy date checkpoints convert and Analysis provisions on a full base", a
     `${owner}|1|0|checking|100.0|user|${DAY_CLOSE_0310}`,
     `${owner}|3|2|checking|150.0|user|${DAY_CLOSE_0311}`,
   ]);
-  assert.deepEqual((await rows(db, "SELECT user_id || '/' || id, enabled || '/' || transaction_time FROM postings ORDER BY 1;")).split("\n"), [
+  assert.deepEqual((await rows(db, "SELECT p.user_id || '/' || p.id, s.enabled || '/' || p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id ORDER BY 1;")).split("\n"), [
     `user:b/settled-b|1/1773140400`,
     `${owner}/manual-a|0/1773129600`,
     `${owner}/pending-a|0/1773129600`,
@@ -190,7 +205,7 @@ test("already-Analysis date source converts with byte-identical Analysis rows", 
   await migrate(db);
 
   assert.equal(await rows(db, "SELECT observed_at FROM checkpoints ORDER BY user_id, id LIMIT 1;"), `${DAY_CLOSE_0310}`);
-  assert.equal(await rows(db, "SELECT enabled, transaction_time FROM postings WHERE id = 'settled-a';"), "1|1773140400");
+  assert.equal(await rows(db, "SELECT s.enabled, p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.id = 'settled-a';"), "1|1773140400");
   assert.equal(await analysisSnapshot(db), analysisBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
@@ -204,7 +219,7 @@ test("complete target repeats read-only and preserves owner disables byte-identi
   await toLegacyCheckpoints(db);
   await seedBankRows(db, owner, guest);
   await migrate(db);
-  await sqlite(db, `UPDATE postings SET enabled = 0 WHERE user_id = '${owner}' AND id = 'settled-a';`);
+  await sqlite(db, `UPDATE posting_sim SET enabled = 0 WHERE user_id = '${owner}' AND posting_id = 'settled-a';`);
   await seedAnalysisChain(db, owner);
   const hashBefore = await sha256File(db);
   const analysisBefore = await analysisSnapshot(db);
@@ -215,7 +230,7 @@ test("complete target repeats read-only and preserves owner disables byte-identi
   assert.equal(await sha256File(db), hashBefore);
   assert.deepEqual(await backups(directory), backupsBefore);
   assert.equal(await analysisSnapshot(db), analysisBefore);
-  assert.equal(await rows(db, `SELECT enabled FROM postings WHERE user_id = '${owner}' AND id = 'settled-a';`), "0");
+  assert.equal(await rows(db, `SELECT enabled FROM posting_sim WHERE user_id = '${owner}' AND posting_id = 'settled-a';`), "0");
 });
 
 test("complete target verification leaves committed WAL data untouched", async (t) => {
@@ -255,7 +270,7 @@ test("legacy conversion publishes committed WAL data and retains its verified ba
   assert.ok((await stat(db + "-wal")).size > 0);
   await migrate(db);
   assert.equal(await rows(db, `SELECT balance,observed_at FROM checkpoints WHERE user_id='${owner}' AND id=1;`), `125.0|${DAY_CLOSE_0310}`);
-  assert.equal(await rows(db, `SELECT enabled,transaction_time FROM postings WHERE user_id='${owner}' AND id='settled-a';`), "1|1773140400");
+  assert.equal(await rows(db, `SELECT s.enabled,p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.user_id='${owner}' AND p.id='settled-a';`), "1|1773140400");
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await rows(db, "SELECT count(*) FROM pragma_foreign_key_check;"), "0");
   assert.equal(await privateAttachments(db), attachmentsBefore);
@@ -278,7 +293,8 @@ test("candidate verification rejects lost bank identities and a changed checkpoi
     const guest = await secondUser(db);
     await toLegacyCheckpoints(db);
     await seedBankRows(db, owner, guest);
-    await sqlite(db, `INSERT INTO postings(user_id,id,position,name,amount_resolution_json,posted_time,transaction_time,enabled,source) VALUES ('${owner}','unlinked-bank',9,'Bank record without a sync key','{}',1773140400,1773129600,0,'simplefin');`);
+    await sqlite(db, `INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('${owner}','unlinked-bank','Bank record without a sync key','checking','null','{}',1773140400,1773129600,'simplefin',0,0);
+    INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES ('${owner}','unlinked-bank',9,0,0);`);
     const stub = join(directory, "setupdb");
     await writeFile(stub, `#!/bin/sh\n"${join(tools, "setupdb")}" "$@" || exit $?\nsqlite3 "$2" "${sabotage}"\n`, { mode: 0o700 });
     const before = await sha256File(db);
@@ -516,8 +532,8 @@ sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_posting_lifecycle;
   INSERT INTO posting_sync_keys(user_id, provider, bridge_account_id, transaction_id, posting_id) VALUES ('$owner', 'simplefin', 'bridge-checking', 'tx1', 'settled-a');"
 /app/migrate.sh >/dev/null
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT observed_at FROM checkpoints;')" = 1773187199
-test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT enabled, transaction_time FROM postings WHERE id = 'settled-a';")" = "1|1773140400"
-test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT enabled, transaction_time FROM postings WHERE id = 'manual-a';")" = "0|1773129600"
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT s.enabled, p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.id = 'settled-a';")" = "1|1773140400"
+test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT s.enabled, p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.id = 'manual-a';")" = "0|1773129600"
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA integrity_check;')" = ok
 test -z "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'PRAGMA foreign_key_check;')"
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT COUNT(*) FROM analysis_feedback;')" = 0
