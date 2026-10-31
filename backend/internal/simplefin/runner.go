@@ -255,18 +255,11 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	if err != nil {
 		return nil, err
 	}
-	resolved := map[string]string{}
-	links, err := r.store.ListAccountLinks()
-	if err != nil {
-		return nil, err
-	}
-	for _, link := range links {
-		resolved[link.BridgeAccountID] = link.ModelAccountID
-	}
-	plan, err := Map(set, resolved, now)
-	if err != nil {
-		return nil, err
-	}
+	// Provision before translation so the mapping is final when rows are
+	// emitted: a new account's first sync imports its checkpoint and its
+	// transactions together instead of dropping the transactions as
+	// unmapped. Map skips only non-USD and invalid-amount rows; stale
+	// links are excluded from the snapshot and counted separately.
 	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
 		provisions = append(provisions, store.SyncProvision{
@@ -277,6 +270,28 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		})
 	}
 	resolved, provisioned, stale, err := r.store.ProvisionSyncAccounts(provisions)
+	if err != nil {
+		return nil, err
+	}
+	// Stale links never reach translation: exclude those bridge accounts
+	// from the snapshot so Map does not also count them as unmapped.
+	// The copy keeps the fetched response untouched; stale accounts are
+	// counted once under SkipStaleLink below.
+	mapped := *set
+	if len(stale) > 0 {
+		dropped := make(map[string]struct{}, len(stale))
+		for _, id := range stale {
+			dropped[id] = struct{}{}
+		}
+		kept := make([]Account, 0, len(set.Accounts))
+		for _, account := range set.Accounts {
+			if _, ok := dropped[account.ID]; !ok {
+				kept = append(kept, account)
+			}
+		}
+		mapped.Accounts = kept
+	}
+	plan, err := Map(&mapped, resolved, now)
 	if err != nil {
 		return nil, err
 	}

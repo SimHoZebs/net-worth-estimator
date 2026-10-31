@@ -87,17 +87,38 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 		t.Fatalf("delete ghost: %v", err)
 	}
 	runner := NewRunner(database, Config{}, nil)
+	transacted := int64(1773129600)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{Accounts: []Account{
-			{ID: "bridge-old", Name: "Old", Currency: "USD", Balance: "10.00"},
+			{ID: "bridge-old", Name: "Old", Currency: "USD", Balance: "10.00", BalanceDate: 1773133200,
+				Transactions: []Transaction{{
+					ID: "stale-tx", Posted: 1773140400, Amount: "-25.00",
+					Description: "Stale Charge", TransactedAt: &transacted,
+				}}},
 		}}, nil
 	}
 	summary, err := runner.Sync(context.Background())
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	if summary.Skipped["linked-account-missing"] != 1 || summary.CheckpointsInserted != 0 {
-		t.Fatalf("summary = %+v, want 1 stale skip and no checkpoints", summary)
+	if summary.Skipped["linked-account-missing"] != 1 {
+		t.Fatalf("summary = %+v, want 1 stale skip", summary)
+	}
+	if _, ok := summary.Skipped["unmapped-account"]; ok {
+		t.Fatalf("stale account double-counted as unmapped: %+v", summary.Skipped)
+	}
+	if summary.CheckpointsInserted != 0 || summary.SettledInserted != 0 || summary.PendingInserted != 0 || summary.AccountsProvisioned != 0 {
+		t.Fatalf("summary = %+v, want no checkpoint/posting writes or provisioning", summary)
+	}
+	model, err := database.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.Postings) != 0 || len(model.Checkpoints) != 0 {
+		t.Fatalf("stale sync wrote rows: postings=%d checkpoints=%d", len(model.Postings), len(model.Checkpoints))
+	}
+	if len(model.Accounts) != 2 {
+		t.Fatalf("stale sync recreated the deleted account: %+v", model.Accounts)
 	}
 }
 

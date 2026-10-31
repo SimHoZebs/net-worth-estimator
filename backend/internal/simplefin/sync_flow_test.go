@@ -1,6 +1,7 @@
 package simplefin
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -226,6 +227,58 @@ func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now 
 		t.Fatal(err)
 	}
 	return summary, model
+}
+
+// First sync against a blank model provisions the account and imports the
+// checkpoint and the settled transaction together. Provisioning runs
+// before translation, so the mapping is final when rows are emitted and
+// the first sync drops nothing as unmapped. 09:00 observation 1000,
+// settled -100 posted 11:00; the 12:00 position is 900 on the first sync,
+// not only the second.
+func TestFirstSyncImportsCheckpointAndSettledTogether(t *testing.T) {
+	database := openRunnerStore(t)
+	if err := database.InitializeModel(); err != nil {
+		t.Fatal(err)
+	}
+	runner := NewRunner(database, Config{}, nil)
+	runner.now = func() time.Time { return time.Unix(1773144000, 0).UTC() }
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		set := settledFeed(t, 1773140400, 1773129600)
+		return &set, nil
+	}
+	assertPosition := func(sync string) {
+		t.Helper()
+		model, err := database.LoadModel()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(model.Postings) != 1 {
+			t.Fatalf("%s: postings = %d, want 1 translated settled row", sync, len(model.Postings))
+		}
+		position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := position.NetWorth; got != 900 {
+			t.Fatalf("%s: 12:00 position = %v, want 900 (09:00 anchor 1000 minus 11:00 actual)", sync, got)
+		}
+	}
+	first, err := runner.Sync(context.Background())
+	if err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+	if first.AccountsProvisioned != 1 || first.CheckpointsInserted != 1 || first.SettledInserted != 1 {
+		t.Fatalf("first sync = %+v, want 1 provisioned + 1 checkpoint + 1 settled", first)
+	}
+	assertPosition("first sync")
+	second, err := runner.Sync(context.Background())
+	if err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	if second.SettledInserted != 0 {
+		t.Fatalf("second sync duplicated the settled row: %+v", second)
+	}
+	assertPosition("second sync")
 }
 
 // End-to-end provider feed: a settled posted expense participates as an
