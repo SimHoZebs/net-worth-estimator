@@ -8,19 +8,8 @@ import {
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubMatchMedia } from "../mocks/testScope.tsx";
 import { Drawer } from "./Drawer.tsx";
-
-function stubMatchMedia(matches: boolean) {
-	vi.stubGlobal("matchMedia", (query: string) => ({
-		matches,
-		media: query,
-		addEventListener: () => {},
-		removeEventListener: () => {},
-		addListener: () => {},
-		removeListener: () => {},
-		dispatchEvent: () => false,
-	}));
-}
 
 beforeEach(() => {
 	stubMatchMedia(false);
