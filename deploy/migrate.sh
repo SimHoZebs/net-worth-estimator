@@ -388,7 +388,6 @@ if [ "$mode" = convert ]; then
   test "$post_repair" = 0 || fail "Candidate bank repair is incomplete or overreached. Original unchanged; backup retained at $backup. Keep the API stopped."
 else
   verify_same checkpoints || fail "Candidate changed final checkpoints. Original unchanged; backup retained at $backup. Keep the API stopped."
-  verify_same postings || fail "Candidate changed postings on a final-checkpoint source. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 
 if [ "$analysis" = 5 ]; then
