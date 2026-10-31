@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import {
 	attachReceipt,
 	deleteReceipt,
@@ -15,13 +14,10 @@ import type {
 	ReceiptDetails,
 } from "@/api/generated/model/index.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { getUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import { useServerModel, userResourceKey } from "./workspaceResources.ts";
-
-export function useReceiptScope() {
-	return useSyncExternalStore(subscribeUserScope, getUserScope);
-}
+import { useUserScope } from "./useUserScope.ts";
 
 export const receiptCollectionKey = (
 	postingId: string,
@@ -31,7 +27,7 @@ export const receiptDetailKey = (id: string, scope = getUserScope()) =>
 	["receipt-detail", scope.key, id] as const;
 
 export function useReceipts(postingId: string, enabled: boolean) {
-	const scope = useReceiptScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: receiptCollectionKey(postingId, scope),
@@ -50,7 +46,7 @@ export function useReceiptLinks(postingId: string): string[] {
 }
 
 export function useReceipt(id: string) {
-	const scope = useReceiptScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: receiptDetailKey(id, scope),
@@ -64,7 +60,7 @@ export function useReceipt(id: string) {
 }
 
 export function useReceiptImage(id: string, digest: string) {
-	const scope = useReceiptScope();
+	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: ["receipt-image", scope.key, id, digest],
@@ -82,7 +78,7 @@ function useReceiptWrite<T>(
 	postingId: string,
 	perform: (input: T) => Promise<ReceiptOutputBody | undefined>,
 ) {
-	const scope = useReceiptScope();
+	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{

@@ -1,15 +1,14 @@
-import { useSyncExternalStore } from "react";
-import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { useSession } from "@/auth/sessionContext.ts";
 import {
 	useAmountPresets,
 	useServerModel,
 	useServerStatus,
 } from "@/state/workspaceResources.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import { useWorkspaceSyncMonitor } from "@/state/useWorkspaceSyncMonitor.ts";
 
 export function useWorkspaceStartup(): void {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	const resourceId = useSession()?.session.resource.id;
 	const enabled =
 		scope.status === "ready" &&

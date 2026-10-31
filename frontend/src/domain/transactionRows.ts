@@ -1,6 +1,8 @@
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import type { Transaction } from "./model.ts";
 
+import { isoDateFromEpochSeconds } from "./format.ts";
+
 const NUMERIC_EXPRESSION = /^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
 
 /** Literal figure from a stored amount, or null for calculated recipes. */
@@ -66,12 +68,12 @@ function dayFromStamps(
 				? postedTime
 				: 0;
 	if (!stamp) return null;
-	return new Date(stamp * 1000).toISOString().slice(0, 10);
+	return isoDateFromEpochSeconds(stamp);
 }
 
 function settledDayOf(postedTime: unknown): string | null {
 	if (typeof postedTime !== "number" || postedTime <= 0) return null;
-	return new Date(postedTime * 1000).toISOString().slice(0, 10);
+	return isoDateFromEpochSeconds(postedTime);
 }
 
 function displayFrequencyOf(frequency: string): Transaction["frequency"] {

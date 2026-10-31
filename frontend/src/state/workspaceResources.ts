@@ -1,5 +1,9 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
+import { getUserScope, type UserScope } from "@/auth/resourceScope.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
+import { serverModelFingerprint } from "@/state/remoteStorage.ts";
+import { notifyError } from "@/state/notifications.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 import {
 	getFinancialModel,
 	getAmountResolvers,
@@ -22,14 +26,6 @@ import {
 	type FinancialModelResponse,
 	type ServerStatus,
 } from "@/api/index.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-	type UserScope,
-} from "@/auth/resourceScope.ts";
-import { serverQueryClient } from "@/state/serverQuery.ts";
-import { serverModelFingerprint } from "@/state/remoteStorage.ts";
-import { notifyError } from "@/state/notifications.ts";
 
 export interface ServerModel extends FinancialModelResponse {
 	fingerprint: string | null;
@@ -150,7 +146,7 @@ export function resolversOptions(scope = getUserScope()) {
 }
 
 export function useAmountResolvers() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...resolversOptions(scope),
@@ -175,7 +171,7 @@ export function getServerStatus(scope = getUserScope()) {
 		: undefined;
 }
 export function useServerModel(options: { enabled?: boolean } = {}) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...modelOptions(scope),
@@ -186,7 +182,7 @@ export function useServerModel(options: { enabled?: boolean } = {}) {
 	);
 }
 export function useServerStatus(options: { enabled?: boolean } = {}) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...statusOptions(scope),
@@ -197,7 +193,7 @@ export function useServerStatus(options: { enabled?: boolean } = {}) {
 	);
 }
 export function useAmountPresets(options: { enabled?: boolean } = {}) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...presetsOptions(scope),
@@ -364,7 +360,7 @@ export function catalogOptions(scope = getUserScope()) {
 }
 
 export function useAccountBalances(options: { asOf?: string } = {}) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...balancesOptions(scope, options.asOf),
@@ -422,7 +418,7 @@ export function useTransactions(
 		recurring?: "once" | "recurring" | "all";
 	} = {},
 ) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...transactionsOptions(scope, filters),
@@ -434,7 +430,7 @@ export function useTransactions(
 }
 
 export function useTransactionCatalog() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...catalogOptions(scope),
@@ -547,7 +543,7 @@ export function evalSummaryOptions(scope = getUserScope()) {
 }
 
 export function useCheckpoints(filters: ListCheckpointsParams = {}) {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...checkpointsOptions(scope, filters),
@@ -574,7 +570,7 @@ export function getCheckpoints(
 }
 
 export function useEvaluationSummary() {
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	return useQuery(
 		{
 			...evalSummaryOptions(scope),

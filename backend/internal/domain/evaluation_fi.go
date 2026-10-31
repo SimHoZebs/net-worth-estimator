@@ -591,6 +591,40 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 			}
 			requestedExpense := remainingExpense
 			allocatedRequest := 0.0
+			recordWithdrawal := func(sourceAccountID *string, requestedAmount float64, limitRemaining *float64) {
+				var balancesBefore map[string]float64
+				if !summaryOnly {
+					balancesBefore = SnapshotBalances(balances)
+				}
+				transaction, _ := transitions.ExecuteGeneratedTransaction(AccountTransactionAction{
+					SourceAccountID: sourceAccountID,
+					Destinations:    nil,
+					RequestedAmount: requestedAmount,
+					LimitRemaining:  limitRemaining,
+				})
+				if balancesBefore != nil {
+					constraints := ClassifyTransactionConstraints(transactionConstraintInput{
+						SourceAccountID: sourceAccountID,
+						Destinations:    nil,
+						RequestedAmount: requestedAmount,
+						RealizedAmount:  transaction.Result.RealizedAmount,
+						BalancesBefore:  balancesBefore,
+						AccountsByID:    accountsByID,
+						LimitRemaining:  limitRemaining,
+					})
+					state.withdrawalAttempts = append(state.withdrawalAttempts, withdrawalAttempt{
+						date:               period.StartDate,
+						accountID:          sourceAccountID,
+						requestedAmount:    requestedAmount,
+						realizedAmount:     transaction.Result.RealizedAmount,
+						bindingConstraints: constraints,
+					})
+				}
+				if sourceAccountID != nil {
+					state.remainingWithdrawalByAccount[*sourceAccountID] = math.Max(0, state.remainingWithdrawalByAccount[*sourceAccountID]-transaction.Result.RealizedAmount)
+				}
+				remainingExpense -= transaction.Result.RealizedAmount
+			}
 			for index, entry := range capacities {
 				var requestedAmount float64
 				if index == len(capacities)-1 {
@@ -602,69 +636,11 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 				}
 				allocatedRequest += requestedAmount
 				actionLimitCopy := entry.actionLimit
-				var balancesBefore map[string]float64
-				if !summaryOnly {
-					balancesBefore = SnapshotBalances(balances)
-				}
-				transaction, _ := transitions.ExecuteGeneratedTransaction(AccountTransactionAction{
-					SourceAccountID: &entry.accountID,
-					Destinations:    nil,
-					RequestedAmount: requestedAmount,
-					LimitRemaining:  &actionLimitCopy,
-				})
-				if balancesBefore != nil {
-					constraints := ClassifyTransactionConstraints(transactionConstraintInput{
-						SourceAccountID: &entry.accountID,
-						Destinations:    nil,
-						RequestedAmount: requestedAmount,
-						RealizedAmount:  transaction.Result.RealizedAmount,
-						BalancesBefore:  balancesBefore,
-						AccountsByID:    accountsByID,
-						LimitRemaining:  &actionLimitCopy,
-					})
-					attemptDate := period.StartDate
-					state.withdrawalAttempts = append(state.withdrawalAttempts, withdrawalAttempt{
-						date:               attemptDate,
-						accountID:          &entry.accountID,
-						requestedAmount:    requestedAmount,
-						realizedAmount:     transaction.Result.RealizedAmount,
-						bindingConstraints: constraints,
-					})
-				}
-				state.remainingWithdrawalByAccount[entry.accountID] = math.Max(0, state.remainingWithdrawalByAccount[entry.accountID]-transaction.Result.RealizedAmount)
-				remainingExpense -= transaction.Result.RealizedAmount
+				recordWithdrawal(&entry.accountID, requestedAmount, &actionLimitCopy)
 			}
 			if len(capacities) == 0 && requestedExpense > fiEpsilon {
 				zeroLimit := 0.0
-				var balancesBefore map[string]float64
-				if !summaryOnly {
-					balancesBefore = SnapshotBalances(balances)
-				}
-				transaction, _ := transitions.ExecuteGeneratedTransaction(AccountTransactionAction{
-					SourceAccountID: nil,
-					Destinations:    nil,
-					RequestedAmount: requestedExpense,
-					LimitRemaining:  &zeroLimit,
-				})
-				if balancesBefore != nil {
-					constraints := ClassifyTransactionConstraints(transactionConstraintInput{
-						SourceAccountID: nil,
-						Destinations:    nil,
-						RequestedAmount: requestedExpense,
-						RealizedAmount:  transaction.Result.RealizedAmount,
-						BalancesBefore:  balancesBefore,
-						AccountsByID:    accountsByID,
-						LimitRemaining:  &zeroLimit,
-					})
-					attemptDate := period.StartDate
-					state.withdrawalAttempts = append(state.withdrawalAttempts, withdrawalAttempt{
-						date:               attemptDate,
-						accountID:          nil,
-						requestedAmount:    requestedExpense,
-						realizedAmount:     transaction.Result.RealizedAmount,
-						bindingConstraints: constraints,
-					})
-				}
+				recordWithdrawal(nil, requestedExpense, &zeroLimit)
 			}
 			if remainingExpense > fiEpsilon {
 				state.hadWithdrawalShortfall = true

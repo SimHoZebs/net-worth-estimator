@@ -101,27 +101,4 @@ account foreign key uses that same user scope. Import, clear, private refresh,
 and approved guest publication include these rows. Canonical JSON exports preserve
 purchases. Model CSVs do not represent them.
 
-Version upgrades use a separate, one-time operator script:
-
-```bash
-# Stop the app and back up the database first. Run from the repository root.
-CGO_ENABLED=0 go -C backend run ./scripts/one-time/planned-purchases --db /absolute/path/app.db
-CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /absolute/path/app.db
-```
-
-The [offline deployment operation](../deploy/MIGRATIONS.md) packages this tool as
-`/app/upgrade-planned-purchases`. With all API writers stopped, it takes a verified
-backup, converts a candidate, checks preserved data, and publishes only the complete
-current schema. Timestamp and Analysis upgrades run in that same maintenance
-operation. Neither the server nor `setupdb` invokes conversion.
-
-The script atomically converts `purchase_policies` and its posting rows for all
-users. It preserves IDs, names, fixed costs, funding accounts, UTC earliest dates,
-enabled state, and queue order. It removes the old posting rows and policy table.
-Repeated execution does not duplicate purchases. The script has no app/store
-imports and is not part of server startup or `setupdb`.
-
-The script stops and rolls back if an old row has a variable/invalid cost, bank
-ownership, a claim, attached receipts, bank links, or Analysis evidence. Resolve those rows before
-retry. It never silently discards evidence. Restore the backup to undo a completed
-upgrade. See [the one-time script](../backend/scripts/one-time/planned-purchases/README.md).
+Version upgrades use a separate one-time operator script. Follow [deploy/MIGRATIONS.md](../deploy/MIGRATIONS.md) and the [planned purchases upgrade script](../backend/scripts/one-time/planned-purchases/README.md). Neither the server nor `setupdb` invokes conversion.

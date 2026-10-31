@@ -142,24 +142,18 @@ func ValidateFIPlanConfig(config any) error {
 		if !ok {
 			return fmt.Errorf("Financial independence configuration is invalid.")
 		}
-		included, ok := source["included"].(bool)
-		if !ok {
+		if _, ok := source["included"].(bool); !ok {
 			return fmt.Errorf("Financial independence configuration is invalid.")
 		}
-		_ = included
 		switch source["type"] {
 		case "cashflow":
-			postingID, ok := source["postingId"].(string)
-			if !ok || len(source) > 3 {
+			if _, ok := source["postingId"].(string); !ok || len(source) > 3 {
 				return fmt.Errorf("Financial independence configuration is invalid.")
 			}
-			_ = postingID
 		case "asset":
-			accountID, ok := source["accountId"].(string)
-			if !ok {
+			if _, ok := source["accountId"].(string); !ok {
 				return fmt.Errorf("Financial independence configuration is invalid.")
 			}
-			_ = accountID
 			if override, present := source["withdrawalRateOverride"]; present {
 				num, okNum := override.(float64)
 				if !okNum || math.IsNaN(num) || math.IsInf(num, 0) {
@@ -177,22 +171,26 @@ func ValidateFIPlanConfig(config any) error {
 		return fmt.Errorf("Financial independence configuration is invalid.")
 	}
 	policyValue, present := obj["principalPolicy"]
-	validPolicies := map[string]bool{
-		string(types.PrincipalAllowDrawdown):   true,
-		string(types.PrincipalPreserveNominal): true,
-		string(types.PrincipalPreserveReal):    true,
+	if !present {
+		return fmt.Errorf("Financial independence configuration is invalid.")
 	}
 	policyString, ok := policyValue.(string)
-	if !present || !ok || !validPolicies[policyString] {
+	if !ok {
+		return fmt.Errorf("Financial independence configuration is invalid.")
+	}
+	switch policyString {
+	case string(types.PrincipalAllowDrawdown), string(types.PrincipalPreserveNominal), string(types.PrincipalPreserveReal):
+	default:
 		return fmt.Errorf("Financial independence configuration is invalid.")
 	}
 	if basisRaw, present := obj["annualExpenseTargetBasis"]; present {
 		basis, ok := basisRaw.(string)
-		validBases := map[string]bool{
-			string(types.ExpenseBasisProjectionStart): true,
-			string(types.ExpenseBasisFIDateDollars):   true,
+		if !ok {
+			return fmt.Errorf("Financial independence configuration is invalid.")
 		}
-		if !ok || !validBases[basis] {
+		switch basis {
+		case string(types.ExpenseBasisProjectionStart), string(types.ExpenseBasisFIDateDollars):
+		default:
 			return fmt.Errorf("Financial independence configuration is invalid.")
 		}
 	}

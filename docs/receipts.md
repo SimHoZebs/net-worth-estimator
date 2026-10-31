@@ -8,9 +8,7 @@ operations do not change financial revisions or projection identities.
 
 For a new application database, run explicit setup before the API starts:
 
-```bash
-CGO_ENABLED=0 go -C backend run ./cmd/setupdb --db /private/application.db
-```
+See [the shared database guide](shared-database.md) for `setupdb` usage.
 
 The fresh schema includes user-scoped receipts and private blob storage. Existing
 databases must already have the complete current schema. Neither setup nor

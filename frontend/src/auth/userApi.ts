@@ -1,5 +1,4 @@
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
 import {
 	changeAccountPassword,
 	getAccountProfile,
@@ -14,12 +13,9 @@ import type {
 import { ApiHttpError } from "../api/http.ts";
 import { getApiBaseUrl } from "../api/runtime.ts";
 import { serverQueryClient } from "../state/serverQuery.ts";
-import {
-	canonicalApiBaseUrl,
-	getUserScope,
-	subscribeUserScope,
-} from "./resourceScope.ts";
+import { canonicalApiBaseUrl, getUserScope } from "./resourceScope.ts";
 import type { Session } from "./sessionContext.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
 
 async function userRequest<T>(
 	scope: ReturnType<typeof getUserScope>,
@@ -65,7 +61,7 @@ function isUserScope(
 export function useUserResources(session: Session | null) {
 	const client = serverQueryClient();
 	const baseUrl = getApiBaseUrl();
-	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
+	const scope = useUserScope();
 	const key = ["user", scope.key] as const;
 	const options = queryOptions({
 		queryKey: key,

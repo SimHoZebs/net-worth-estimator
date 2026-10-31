@@ -206,17 +206,12 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 			if totals.requestedAmount > 0 {
 				completionRate = math.Max(0, 1-totals.unfulfilledAmount/totals.requestedAmount)
 			}
-			var annualCap any
-			if cap, ok := detailCaps[posting.ID]; ok {
-				annualCap = cap
-			}
 			entry := map[string]any{
 				"postingId":                posting.ID,
 				"name":                     posting.Name,
 				"sourceAccountId":          posting.SourceAccountID,
 				"sourceAccountLabel":       sourceLabel,
 				"destinations":             destinations,
-				"annualCap":                annualCap,
 				"requestedAmount":          roundAmount(totals.requestedAmount),
 				"realizedAmount":           roundAmount(totals.realizedAmount),
 				"destinationLimitedAmount": roundAmount(totals.destinationLimitedAmount),
@@ -224,6 +219,9 @@ func EvaluatePostingFulfillment(path *types.ProjectionPath, config types.Posting
 				"completionRate":           completionRate,
 				"firstUnderfulfilledDate":  totals.firstUnderfulfilledDate,
 				"unfulfilledAmount":        roundAmount(totals.unfulfilledAmount),
+			}
+			if cap, ok := detailCaps[posting.ID]; ok {
+				entry["annualCap"] = cap
 			}
 			result.Postings = append(result.Postings, entry)
 		}

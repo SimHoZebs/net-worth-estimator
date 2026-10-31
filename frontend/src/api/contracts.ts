@@ -32,8 +32,6 @@ export interface ProblemDetails extends HumaMetadata {
 	[key: string]: unknown;
 }
 
-export type IsoDateOrNull = IsoDate | null;
-export type OptionalString = string | null;
 
 export const NO_FLOOR_SENTINEL = -10_000_000_000_000;
 export const NO_CEILING_SENTINEL = 10_000_000_000_000;
@@ -85,7 +83,6 @@ export interface OtherPostingAmountResolution extends HumaMetadata {
 export type PostingAmountResolution =
 	| ExpressionPostingAmountResolution
 	| OtherPostingAmountResolution;
-export type AmountResolution = PostingAmountResolution;
 
 export interface AmountFieldSpec extends HumaMetadata {
 	key: string;
@@ -204,8 +201,13 @@ export type RecurrenceRule = BackendRecurrenceRule;
 
 export type EvaluationConfig = JsonValue;
 export type EvaluationResultPayload = JsonValue;
-export type Link = HumaLink;
-export type Links = HumaLinks;
+
+export type FinancialIndependenceConfig = EvaluationConfig;
+export type NetWorthThresholdConfig = EvaluationConfig;
+export type AccountBalanceConfig = EvaluationConfig;
+export type PostingFulfillmentConfig = EvaluationConfig;
+export type CycleFulfillmentConfig = EvaluationConfig;
+export type AccountBalanceEvaluation = EvaluationInstance<AccountBalanceConfig>;
 
 export interface EvaluationInstance<
 	TConfig extends EvaluationConfig = EvaluationConfig,
@@ -216,16 +218,10 @@ export interface EvaluationInstance<
 	config: TConfig;
 }
 
-export type FinancialIndependenceConfig = EvaluationConfig;
-export type NetWorthThresholdConfig = EvaluationConfig;
-export type AccountBalanceConfig = EvaluationConfig;
-export type PostingFulfillmentConfig = EvaluationConfig;
-export type CycleFulfillmentConfig = EvaluationConfig;
 export type FinancialIndependenceEvaluation =
 	EvaluationInstance<FinancialIndependenceConfig>;
 export type NetWorthThresholdEvaluation =
 	EvaluationInstance<NetWorthThresholdConfig>;
-export type AccountBalanceEvaluation = EvaluationInstance<AccountBalanceConfig>;
 export type PostingFulfillmentEvaluation =
 	EvaluationInstance<PostingFulfillmentConfig>;
 export type CycleFulfillmentEvaluation =
@@ -492,8 +488,6 @@ export interface StochasticProjectionResponse extends HumaMetadata {
 	error?: string;
 }
 
-export type StochasticRequest = StochasticProjectionRequest;
-export type StochasticRequestBody = StochasticProjectionRequest;
 export type StochasticResponse = StochasticProjectionResponse;
 
 export interface ServerStatus extends HumaMetadata {
