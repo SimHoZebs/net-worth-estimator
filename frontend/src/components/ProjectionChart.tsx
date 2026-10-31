@@ -12,8 +12,11 @@ import { useCheckpoints } from "../state/workspaceResources.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { useElementWidth } from "../state/useElementWidth.ts";
+import { useSavedAccounts } from "../state/savedRows.ts";
+import { visibleAccounts } from "../domain/model.ts";
 import { IconButton } from "./Button.tsx";
 import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
+import { ContributionStackPlot } from "./chart/ContributionStackPlot.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
 import { Skeleton } from "./Skeleton.tsx";
 import { SegmentedControl } from "./SegmentedControl.tsx";
@@ -24,6 +27,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   const [inspected, setInspected] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
   const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
+  const [view, setView] = useState<"total" | "accounts">("total");
   const narrow = useMediaQuery(viewportQueries.belowSm);
   const id = useId().replaceAll(":", "");
   const [plotWrapRef, plotWrapWidth] = useElementWidth<HTMLDivElement>();
@@ -41,9 +45,20 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
         : measuredWidth < 760
           ? 300
           : 340;
+  const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
+  const savedAccounts = useSavedAccounts();
+  const stackAccounts = useMemo(
+    () =>
+      visibleAccounts(savedAccounts ?? [])
+        .filter((account) => account.enabled)
+        .map((account) => ({
+          id: account.id,
+          name: account.name,
+        })),
+    [savedAccounts],
+  );
   // Outlook pins the horizon; the chart subscribes to the same cached
   // forecast instead of receiving it as a prop.
-  const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
   const projectionQuery = useRemoteProjection({ years: 20, ranges: false });
   const projection =
     projectionQuery.base instanceof Error || projectionQuery.isPlaceholderData
@@ -82,42 +97,18 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
     ? Math.min(inspected ?? pinned ?? defaultIndex, model.points.length - 1)
     : 0;
   const point = model?.points[selectedIndex] ?? model?.last;
-  // The evidence action lives here so the position breakdown stays
-  // reachable; the dialog fetches its own data.
-  const topRow = (
-    <div className="flex items-center justify-between gap-4 px-5 pt-4">
-      <SegmentedControl
-        ariaLabel="Trailing window"
-        value={String(days)}
-        onChange={(v) => {
-          setDays(Number(v));
-          setInspected(null);
-          setPinned(null);
-        }}
-        items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
-          value: String(d),
-          label: `${d} days`,
-        }))}
-      />
-      <IconButton
-        icon={CircleHelp}
-        size="sm"
-        iconSize={14}
-        className="size-6"
-        label="Inspect current net worth evidence"
-        onClick={onEvidence}
-      />
-    </div>
-  );
   if (!model || !point) {
     // Only data slots skeletonize, and only while data is absent.
     if (!pending) return null;
     return (
       <section
         className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
-        aria-label={`Net worth over the trailing ${days} days`}
+        aria-label={
+          view === "total"
+            ? `Net worth over the trailing ${days} days`
+            : `Net worth by account over the trailing ${days} days`
+        }
       >
-        {topRow}
         <div aria-busy="true">
           <Skeleton className="h-56 w-full" />
         </div>
@@ -127,35 +118,90 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
   return (
     <section
       className="overflow-hidden rounded-surface border border-line bg-surface print:break-inside-avoid"
-      aria-label={`Net worth over the trailing ${days} days`}
+      aria-label={
+        view === "total"
+          ? `Net worth over the trailing ${days} days`
+          : `Net worth by account over the trailing ${days} days`
+      }
     >
       {projection && (
-        <NetWorthSummary projection={projection} checkpoints={checkpoints} />
-      )}
-      {topRow}
-      <div ref={plotWrapRef} className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
-        <ProjectionPlot
-          model={model}
-          id={id}
-          inspected={inspected ?? pinned}
-          selectedIndex={selectedIndex}
-          onInspect={setInspected}
-          onPin={(index) =>
-            setPinned((previous) => (previous === index ? null : index))
+        <NetWorthSummary
+          projection={projection}
+          checkpoints={checkpoints}
+          actions={
+            <>
+              <SegmentedControl
+                ariaLabel="Trailing window"
+                value={String(days)}
+                onChange={(v) => {
+                  setDays(Number(v));
+                  setInspected(null);
+                  setPinned(null);
+                }}
+                items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
+                  value: String(d),
+                  label: `${d} days`,
+                }))}
+              />
+              <SegmentedControl
+                ariaLabel="Chart view"
+                value={view}
+                onChange={setView}
+                items={[
+                  { value: "total", label: "Total" },
+                  { value: "accounts", label: "Accounts" },
+                ]}
+              />
+              <IconButton
+                icon={CircleHelp}
+                size="sm"
+                iconSize={14}
+                className="size-6"
+                label="Inspect current net worth evidence"
+                onClick={onEvidence}
+              />
+            </>
           }
         />
-        <input
-          className="relative col-start-2 row-start-1 h-3 w-full min-w-0 self-end cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
-          type="range"
-          min="0"
-          max={model.points.length - 1}
-          value={selectedIndex}
-          aria-label="Inspect net worth date"
-          aria-valuetext={`${dateLabel(point.date)}: ${money(model.adjust(point.total, point.date))}`}
-          onChange={(event) => setInspected(Number(event.target.value))}
-          onBlur={() => setInspected(null)}
-        />
-      </div>
+      )}
+      {view === "total" ? (
+        <div ref={plotWrapRef} className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2">
+          <ProjectionPlot
+            model={model}
+            id={id}
+            inspected={inspected ?? pinned}
+            selectedIndex={selectedIndex}
+            onInspect={setInspected}
+            onPin={(index) =>
+              setPinned((previous) => (previous === index ? null : index))
+            }
+          />
+          <input
+            className="relative col-start-2 row-start-1 h-3 w-full min-w-0 self-end cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
+            type="range"
+            min="0"
+            max={model.points.length - 1}
+            value={selectedIndex}
+            aria-label="Inspect net worth date"
+            aria-valuetext={`${dateLabel(point.date)}: ${money(model.adjust(point.total, point.date))}`}
+            onChange={(event) => setInspected(Number(event.target.value))}
+            onBlur={() => setInspected(null)}
+          />
+        </div>
+      ) : (
+        <div className="px-5 pt-2 pb-5">
+          {savedAccounts === null ? (
+            <div aria-busy="true">
+              <Skeleton className="h-56 w-full" />
+            </div>
+          ) : (
+            <ContributionStackPlot
+              points={model.points}
+              accounts={stackAccounts}
+            />
+          )}
+        </div>
+      )}
     </section>
   );
 }
