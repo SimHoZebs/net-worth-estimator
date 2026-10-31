@@ -33,7 +33,7 @@ describe("chart presentation data", () => {
 			expect(Number(cells[1])).toBeCloseTo(row.total, 2);
 		}
 	});
-	it("adjusts bands and base case by the same inflation factor", () => {
+	it("adjusts bands and projection by the same inflation factor", () => {
 		const range = {
 			points: projection.points.map((point) => ({
 				date: point.date,

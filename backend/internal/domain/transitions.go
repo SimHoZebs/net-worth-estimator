@@ -187,7 +187,7 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 	// A negative amount on a sourceless inflow posting is an investment
 	// loss: it reduces destination balances instead of clamping to zero.
 	// Clamping discards the entire downside of sampled return
-	// distributions, which biases stochastic bands above the base case.
+	// distributions, which biases stochastic bands above the projection.
 	if rawRequested < 0 && IsExternalInflow(posting) {
 		result := ResolveNegativeInflowTransaction(posting, rawRequested, t.State.Balances, t.accountByID)
 		transition := t.applyAndCollectDeltas(result, func() {

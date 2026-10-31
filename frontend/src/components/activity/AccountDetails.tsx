@@ -361,7 +361,7 @@ export function AccountDetails({
 				</div>
 			</fieldset>
 			<DetailList className="m-0">
-				<DetailRow label="Base case at horizon">
+				<DetailRow label="Projection at horizon">
 					{endingBalance !== null ? (
 						money(endingBalance)
 					) : projected?.loading ? (

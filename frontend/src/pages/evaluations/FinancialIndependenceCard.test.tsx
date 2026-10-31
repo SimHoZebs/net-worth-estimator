@@ -282,7 +282,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(view.queryByRole("dialog")).toBeNull();
 	});
 
-	it("separates a self-sustaining base case from modeled scenario probability", () => {
+	it("separates a self-sustaining projection from modeled scenario probability", () => {
 		const envelope = independenceEnvelope({
 			rows: [independenceRow()],
 			runOutcomes: [],
@@ -299,12 +299,12 @@ describe("FinancialIndependenceCard", () => {
 				}}
 			/>,
 		);
-		expect(view.getByText("Base case")).toBeTruthy();
+		expect(view.getByText("Projection")).toBeTruthy();
 		expect(view.queryByText("65%")).toBeNull();
 		expect(view.queryByText(/90% required/)).toBeNull();
 		const dialog = openInspector(view);
 		expect(dialog.getByText("Self-sustaining · Feb 2036")).toBeTruthy();
 		expect(dialog.getByText("90% required · 400 scenarios")).toBeTruthy();
-		expect(dialog.queryByRole("region", { name: "Base case" })).toBeNull();
+		expect(dialog.queryByRole("region", { name: "Projection" })).toBeNull();
 	});
 });

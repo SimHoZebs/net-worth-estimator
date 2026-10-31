@@ -101,7 +101,7 @@ test("compact financial independence cards open an inspector without more calcul
 	).toBeVisible();
 	await expect(dialog.getByText("Not reached", { exact: true })).toHaveCount(0);
 	await expect(
-		dialog.getByRole("region", { name: "Base case", exact: true }),
+		dialog.getByRole("region", { name: "Projection", exact: true }),
 	).toHaveCount(0);
 	const startDate = dialog.getByRole("combobox", { name: "Start date" });
 	await expect(startDate).toHaveCount(0);
@@ -217,7 +217,7 @@ test("a complete test that cannot fit the horizon does not appear as financial f
 	).toBeVisible();
 });
 
-test("a self-sustaining base-case date remains distinct from its spending coverage", async ({
+test("a self-sustaining projection date remains distinct from its spending coverage", async ({
 	page,
 	request,
 }) => {
@@ -233,7 +233,7 @@ test("a self-sustaining base-case date remains distinct from its spending covera
 		name: "Financial independence",
 		exact: true,
 	});
-	await expect(card.getByText("Base case", { exact: true })).toBeVisible();
+	await expect(card.getByText("Projection", { exact: true })).toBeVisible();
 	await expect(card.getByText("Not reached", { exact: true })).toHaveCount(0);
 	await expect(
 		card.getByRole("button", { name: /Inspect evidence/ }),
@@ -249,7 +249,7 @@ test("a self-sustaining base-case date remains distinct from its spending covera
 	});
 	await expect(dialog.getByText(/^Self-sustaining ·/)).toBeVisible();
 	await expect(
-		dialog.getByRole("region", { name: "Base case", exact: true }),
+		dialog.getByRole("region", { name: "Projection", exact: true }),
 	).toHaveCount(0);
 });
 
@@ -403,7 +403,7 @@ for (const theme of ["light", "dark"]) {
 			expect(configure.violations).toEqual([]);
 			await dialog.getByRole("tab", { name: "Overview" }).click();
 			await expect(
-				dialog.getByRole("region", { name: "Base case", exact: true }),
+				dialog.getByRole("region", { name: "Projection", exact: true }),
 			).toHaveCount(0);
 			await expect(
 				dialog.getByText("Not reached", { exact: true }),
