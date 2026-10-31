@@ -194,32 +194,63 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	if _, err := database.ApplySyncPlan(nil, []store.BankDirective{{Void: bankID}}); err != nil {
 		t.Fatalf("bank void: %v", err)
 	}
+	settled := types.Posting{
+		Name: "Settled bank charge", Source: store.SourceSimpleFIN, SourceAccountID: ptr("card"),
+		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "18.50"}, Inputs: map[string]types.AmountInputBinding{}},
+		PostedTime:      1785715200,
+		TransactionTime: 1785715200,
+		Enabled:         true,
+	}
+	if _, err := database.ApplySyncPlan(nil, []store.BankDirective{{
+		Upsert: &store.BankUpsert{Posting: settled, Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}}},
+	}}); err != nil {
+		t.Fatalf("bank settled upsert: %v", err)
+	}
 	response := doRowRequest(t, handler, http.MethodGet, "/v1/transactions", "")
 	if response.Code != http.StatusOK {
 		t.Fatalf("list status = %d, body %s", response.Code, response.Body.String())
 	}
 	var payload struct {
 		Transactions []struct {
-			ID   string `json:"id"`
-			Void bool   `json:"void"`
+			ID        string `json:"id"`
+			Void      bool   `json:"void"`
+			SyncOwned bool   `json:"syncOwned"`
+			ReadOnly  bool   `json:"readOnly"`
 		} `json:"transactions"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	seen := map[string]bool{}
+	seen := map[string]struct {
+		void, syncOwned, readOnly bool
+	}{}
 	for _, row := range payload.Transactions {
-		seen[row.ID] = row.Void
+		seen[row.ID] = struct {
+			void, syncOwned, readOnly bool
+		}{row.Void, row.SyncOwned, row.ReadOnly}
 	}
-	if len(seen) != 2 {
-		t.Fatalf("rows = %+v, want both postings", payload.Transactions)
+	if len(seen) != 3 {
+		t.Fatalf("rows = %+v, want owner, void, and settled bank rows", payload.Transactions)
 	}
-	if !seen[bankID] {
+	if !seen[bankID].void {
 		t.Fatalf("bank row void = false, want the sync void flag reported")
 	}
 	for _, posting := range model.Postings {
-		if posting.Source != store.SourceSimpleFIN && seen[posting.ID] {
+		if posting.Source != store.SourceSimpleFIN && seen[posting.ID].void {
 			t.Fatalf("owner row %s void = true, want false", posting.ID)
+		}
+	}
+	// Only lifecycle bank rows stay read-only: pending holds and vanished
+	// holds refresh or convert in place, while settled bank rows are
+	// owner-editable like manual actuals.
+	for _, row := range payload.Transactions {
+		switch {
+		case !row.SyncOwned && row.ReadOnly:
+			t.Fatalf("owner row %s readOnly = true, want editable", row.ID)
+		case row.SyncOwned && row.Void && !row.ReadOnly:
+			t.Fatalf("void bank row %s readOnly = false, want sync-owned", row.ID)
+		case row.SyncOwned && !row.Void && row.ReadOnly:
+			t.Fatalf("settled bank row %s readOnly = true, want owner-editable", row.ID)
 		}
 	}
 }

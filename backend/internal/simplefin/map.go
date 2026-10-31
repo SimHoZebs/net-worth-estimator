@@ -46,7 +46,7 @@ type Provision struct {
 
 // Plan is the mapped sync output before applying. Pending holds pending
 // authorizations; Settled holds posted charges. The reconciler converts a
-// vanished pending row on a unique strict posted match, voids it otherwise,
+// vanished pending row on a unique tip-bounded posted match, voids it otherwise,
 // and inserts unmatched posted charges as new rows; void rows never
 // suppress an insert.
 type Plan struct {
@@ -176,20 +176,28 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 			}
 			source := modelAccountID
 			postedTime := transaction.Posted
-			if postedTime <= 0 {
-				postedTime = now.Unix()
-			}
-			// Settled movements affect the reported balance when posted,
-			// not at the earlier purchase timestamp: normalize the settled
-			// event time to the post instant. Pending seeds keep the
-			// purchase timestamp for pending-to-settled matching. Manual
-			// postings are untouched: their TransactionTime-first ordering
-			// is unchanged.
 			transactionTime := postedTime
 			if seed {
+				// Pending seeds have no posted date by definition
+				// (IsPending means the bridge sent Posted == 0): keep
+				// whatever the bridge reported instead of fabricating
+				// the sync instant. The purchase timestamp carries the
+				// event time for pending-to-settled matching, falling
+				// back to arrival when the bridge sends none.
 				if transaction.TransactedAt != nil && *transaction.TransactedAt > 0 {
 					transactionTime = *transaction.TransactedAt
+				} else {
+					transactionTime = now.Unix()
 				}
+			} else {
+				if postedTime <= 0 {
+					postedTime = now.Unix()
+				}
+				// Settled movements affect the reported balance when posted,
+				// not at the earlier purchase timestamp: normalize the settled
+				// event time to the post instant. Manual postings are
+				// untouched: their TransactionTime-first ordering is unchanged.
+				transactionTime = postedTime
 			}
 			posting := store.SyncPosting{
 				ProviderAccountID: account.ID,

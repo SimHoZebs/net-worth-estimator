@@ -9,6 +9,7 @@ import {
 	ChevronDown,
 	Clock3,
 	Link2,
+	LockKeyhole,
 	Repeat,
 	RotateCcw,
 	Save,
@@ -16,8 +17,18 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import type { AccountTransaction } from "../../domain/accountActivity.ts";
+import {
+	useId,
+	useRef,
+	useState,
+	type FormEvent,
+	type ReactNode,
+} from "react";
+import type {
+	AccountTransaction,
+} from "../../domain/accountActivity.ts";
+import { voidSettleCandidates } from "../../domain/accountActivity.ts";
+import { dateLabel, money } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { buildSubscriptionConversion } from "../../domain/subscriptions.ts";
@@ -412,6 +423,26 @@ function ScheduleCapsule({
 	);
 }
 
+function ReadOnlyNotice({
+	savedTransaction,
+	appReadOnly,
+}: {
+	savedTransaction: Transaction;
+	appReadOnly?: boolean;
+}) {
+	// Void holds are the only read-only rows with an action attached: the
+	// picker and remove flow below. Other locked rows stay unexplained,
+	// matching the read-only treatment elsewhere in the modal.
+	if (!savedTransaction.readOnly || !savedTransaction.void) return null;
+	return (
+		<Notice className="my-4">
+			<LockKeyhole size={18} className="mt-px" aria-hidden="true" />
+			This hold vanished without posting, so there is nothing to edit.
+			{!appReadOnly &&
+				" If it posted after all, pick the posted charge below and remove this record."}
+		</Notice>
+	);
+}
 function readOnlyReasonFor(savedTransaction: Transaction): string | undefined {
 	return savedTransaction.amountKnown === false
 		? "This amount is calculated each time. See the transaction list for the resolved amounts."
@@ -854,10 +885,33 @@ export function TransactionDetail({
 		onClose,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
+	const [confirmingVoidRemove, setConfirmingVoidRemove] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const once = savedTransaction.frequency === "once";
 	const canEdit = !edit.readOnlyReason;
+	// Settled bank rows are editable but never deletable through the UI:
+	// a deleted settled row would be re-imported by the next sync, while
+	// excluding it keeps it out of projections. Phantom voids go through
+	// the dedicated remove flow below instead of the generic delete.
+	const canDelete = canEdit && !savedTransaction.syncOwned;
+	const voidCandidates = transaction.void
+		? voidSettleCandidates({
+				voidRow: savedTransaction,
+				transactions: transactions ?? [],
+			})
+		: [];
+	const [postedPick, setPostedPick] = useState("");
+	// A pick that is not among the current candidates reads as unpicked,
+	// which also resets the selection when the modal moves to another row.
+	const effectivePick = voidCandidates.some(
+		(candidate) => candidate.id === postedPick,
+	)
+		? postedPick
+		: "";
+	const pickedPosted = voidCandidates.find(
+		(candidate) => candidate.id === effectivePick,
+	);
 	const showShortfall = transaction.shortfall > 0.01;
 	const showExcluded = transaction.excluded && !transaction.pending;
 	const postedDiffers =
@@ -1017,6 +1071,7 @@ export function TransactionDetail({
 								)}
 								{!savedTransaction.enabled &&
 									!transaction.pending &&
+									!transaction.void &&
 									!showExcluded && <Badge tone="warning">Excluded</Badge>}
 								{savedTransaction.amountKnown === false && (
 									<Badge tone="neutral">Calculated</Badge>
@@ -1210,7 +1265,7 @@ export function TransactionDetail({
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}
 					/>
-					{canEdit && (
+					{canDelete && (
 						<div className="mt-4">
 							<Button
 								type="button"
@@ -1226,6 +1281,36 @@ export function TransactionDetail({
 							</Button>
 						</div>
 					)}
+					{transaction.void && !readOnly && (
+						<div className="mt-4 flex min-w-0 flex-col items-start gap-2">
+							<SelectField
+								label="Posted as"
+								name="postedVersion"
+								value={effectivePick}
+								onChange={(event) => setPostedPick(event.target.value)}
+							>
+								<option value="">No link — just remove</option>
+								{voidCandidates.map((candidate) => (
+									<option key={candidate.id} value={candidate.id}>
+										{candidate.name} — {money(candidate.amount)} on{" "}
+										{dateLabel(candidate.startDate, true)}
+									</option>
+								))}
+							</SelectField>
+							<Button
+								type="button"
+								variant="danger"
+								size="sm"
+								onClick={() => {
+									setDeleteError(null);
+									setConfirmingVoidRemove(true);
+								}}
+							>
+								<Trash2 size={16} aria-hidden="true" />
+								Remove vanished hold
+							</Button>
+						</div>
+					)}
 					{edit.error && <ErrorNotice message={edit.error} />}
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">
@@ -1238,6 +1323,7 @@ export function TransactionDetail({
 							onDiscard={edit.discardAndClose}
 						/>
 					)}
+					<ReadOnlyNotice savedTransaction={savedTransaction} appReadOnly={readOnly} />
 				</form>
 				{once && (
 					<TransactionAnalysisPanel
@@ -1272,6 +1358,38 @@ export function TransactionDetail({
 					<p>
 						This deletes the transaction immediately. It is removed from the
 						saved model.
+					</p>
+				</ConfirmDialog>
+			)}
+			{confirmingVoidRemove && (
+				<ConfirmDialog
+					title={`Remove ${savedTransaction.name}?`}
+					eyebrow="Changes"
+					onCancel={() => {
+						if (!deleting) {
+							setConfirmingVoidRemove(false);
+							setDeleteError(null);
+						}
+					}}
+					onConfirm={() => void removeTransaction()}
+					cancelLabel="Keep hold"
+					confirmLabel="Remove hold"
+					busyLabel="Removing…"
+					busy={deleting}
+					error={deleteError}
+				>
+					<p>
+						{pickedPosted ? (
+							<>
+								It posted as {pickedPosted.name} for{" "}
+								{money(pickedPosted.amount)} on{" "}
+								{dateLabel(pickedPosted.startDate, true)}. The posted
+								charge is untouched; this clears the vanished hold
+								record.
+							</>
+						) : (
+							"No posted charge was picked. This clears the vanished hold record."
+						)}
 					</p>
 				</ConfirmDialog>
 			)}

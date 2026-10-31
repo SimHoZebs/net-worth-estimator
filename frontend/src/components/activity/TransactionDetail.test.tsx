@@ -228,7 +228,7 @@ it("marks holds that did not post instead of posted", () => {
 		requested: 42.1,
 		shortfall: 0,
 		constraint: null,
-		excluded: true,
+		excluded: false,
 		pending: false,
 		void: true,
 	};
@@ -243,8 +243,141 @@ it("marks holds that did not post instead of posted", () => {
 	);
 	expect(screen.getByText("Did not post")).toBeTruthy();
 	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
+	expect(screen.getByText(/vanished without posting/)).toBeTruthy();
 	expect(screen.queryByText("Posted")).toBeNull();
 	expect(screen.queryByText("Pending")).toBeNull();
+	expect(screen.queryByText("Excluded")).toBeNull();
+});
+
+it("marks a live hold as not yet posted", () => {
+	const savedTransaction = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000098",
+		name: "Live hold",
+		amount: 18.5,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		frequency: "once" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: true,
+		void: false,
+	};
+	const transaction: AccountTransaction = {
+		id: "recorded-01900000-0000-7000-8000-000000000098",
+		transactionId: savedTransaction.id,
+		date: "2026-10-20",
+		name: savedTransaction.name,
+		source: "historical",
+		direction: "out",
+		category: "expense",
+		counterparty: "Unknown account",
+		from: "Everyday checking",
+		to: "External spending",
+		amount: 18.5,
+		requested: 18.5,
+		shortfall: 0,
+		constraint: null,
+		excluded: false,
+		pending: true,
+		void: false,
+	};
+	render(
+		<TransactionDetail
+			transaction={transaction}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={[savedTransaction]}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.getByText("Pending")).toBeTruthy();
+	expect(screen.getByText("Not yet posted")).toBeTruthy();
+	expect(screen.queryByText("Excluded")).toBeNull();
+});
+
+it("lets the owner pick the posted charge and remove the vanished hold", async () => {
+	const server = stubTestServer();
+	const settled = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000097",
+		name: "Bistro dinner",
+		amount: 58,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		frequency: "once" as const,
+		startDate: "2026-10-21",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: true,
+		readOnly: false,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: "2026-10-21",
+		pending: false,
+		void: false,
+		syncOwned: true,
+	};
+	const voidHold = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000096",
+		name: "Bistro",
+		amount: 50,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		frequency: "once" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: true,
+		syncOwned: true,
+	};
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(voidHold)}
+			savedTransaction={voidHold}
+			accounts={financialModelFixture.accounts}
+			transactions={[voidHold, settled]}
+			onClose={onClose}
+		/>,
+	);
+	const picker = screen.getByLabelText("Posted as");
+	expect(picker.textContent).toContain("Bistro dinner");
+	fireEvent.change(picker, { target: { value: settled.id } });
+	fireEvent.click(screen.getByRole("button", { name: "Remove vanished hold" }));
+	const confirm = screen.getByRole("dialog", {
+		name: "Remove Bistro?",
+	});
+	expect(confirm.textContent).toContain("Bistro dinner");
+	fireEvent.click(
+		within(confirm).getByRole("button", { name: "Remove hold" }),
+	);
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "DELETE" &&
+					call.url === "/v1/postings/01900000-0000-7000-8000-000000000096",
+			),
+		).toBe(true),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
 
 it("saves row edits through the posting endpoint and closes", async () => {

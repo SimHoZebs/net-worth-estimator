@@ -97,6 +97,38 @@ func TestSyncFlowPendingSettlesThroughConversion(t *testing.T) {
 	}
 }
 
+func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
+	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
+	// Dinner authorizes $50, then posts at $58 with the tip: the pending
+	// seed converts instead of voiding beside a duplicate.
+	first := applyFlow(t, database,
+		[]store.SyncPosting{flowPosting("auth-a", "Bistro", "prime_card", "50.00", true, "2026-08-02")}, nil)
+	if first.PendingInserted != 1 {
+		t.Fatalf("seed = %+v", first)
+	}
+	second := applyFlow(t, database, nil,
+		[]store.SyncPosting{flowPosting("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
+	if second.SettledConverted != 1 || second.PendingDeleted != 0 {
+		t.Fatalf("tip settle = %+v, want one conversion", second)
+	}
+	after := bankRowIDs(t, database)
+	if len(after) != 1 {
+		t.Fatalf("tip settle duplicated the row: %+v", after)
+	}
+	for _, row := range after {
+		if row.Pending || row.Void || !row.Enabled {
+			t.Fatalf("converted row = %+v, want enabled settled", row)
+		}
+	}
+	// A repeat of the identical feed is a stable no-op.
+	third := applyFlow(t, database, nil,
+		[]store.SyncPosting{flowPosting("post-a", "Bistro", "prime_card", "58.00", false, "2026-08-03")})
+	if third.SettledConverted != 0 || third.SettledInserted != 0 || third.PendingDeleted != 0 {
+		t.Fatalf("repeat = %+v", third)
+	}
+}
+
 func TestSyncFlowVanishedPendingVoidsAndHeals(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)

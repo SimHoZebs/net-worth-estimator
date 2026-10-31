@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/ \
-    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel
+    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel ./cmd/syncaudit
 
 # Independent one-time operator tool. Neither server nor setupdb imports it.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
