@@ -1,30 +1,27 @@
 import { ArrowLeft, Plus, Users } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "../components/Button.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { ErrorNotice } from "../components/ErrorNotice.tsx";
 import { InputField } from "../components/Field.tsx";
 import { Modal } from "../components/Modal.tsx";
 import { dialogActionsStyles } from "../components/dialogStyles.ts";
+import {
+	useCreateGroup,
+	useCreateInvite,
+	useDeleteGroup,
+	useGroupDetail,
+	useGroupInvites,
+	useGroups,
+	useJoinGroup,
+	useLeaveGroup,
+	useRemoveMember,
+	useRevokeInvite,
+	useUpdateMemberRole,
+} from "../state/groups.ts";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { groupHash, pageHash } from "../workspace/route.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
-import {
-	acceptInvite,
-	createGroup,
-	createInvite,
-	deleteGroup,
-	getGroup,
-	leaveGroup,
-	listGroups,
-	listInvites,
-	removeMember,
-	revokeInvite,
-	updateMemberRole,
-	type GroupInvite,
-	type GroupMember,
-	type UserGroup,
-} from "./groupsApi.ts";
 
 export function GroupsPage() {
 	const { route, pushHash } = useWorkspaceNavigation();
@@ -32,77 +29,48 @@ export function GroupsPage() {
 		route.page === "groups" && route.overlay?.type === "group"
 			? route.overlay.key
 			: null;
-	const [groups, setGroups] = useState<UserGroup[] | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const [detailError, setDetailError] = useState<string | null>(null);
 	const [showCreate, setShowCreate] = useState(false);
 	const [name, setName] = useState("");
 	const [code, setCode] = useState("");
-	const [members, setMembers] = useState<GroupMember[]>([]);
-	const [invites, setInvites] = useState<GroupInvite[]>([]);
-	const [detailGroup, setDetailGroup] = useState<UserGroup | null>(null);
 	const [creating, setCreating] = useState(false);
 	const [joining, setJoining] = useState(false);
 
-	const reload = useCallback(async () => {
-		try {
-			setError(null);
-			setGroups(await listGroups());
-		} catch {
-			setError("Groups could not be loaded.");
-		}
-	}, []);
+	// Server state lives in TanStack Query, keyed by user scope and selected
+	// group. A late response for group A resolves into A's cache entry and
+	// never overwrites the selected group B; deselection disables the detail
+	// queries so no stale detail remains visible.
+	const groupsQuery = useGroups();
+	const groups = groupsQuery.data ?? null;
+	const detailQuery = useGroupDetail(selected);
+	const detail = selected
+		? (detailQuery.data?.group ??
+			groups?.find((group) => group.id === selected) ??
+			null)
+		: null;
+	const members = detailQuery.data?.members ?? [];
+	const verifiedRole = detailQuery.data?.group.role ?? null;
+	const canManageInvites = verifiedRole === "owner" || verifiedRole === "admin";
+	const invitesQuery = useGroupInvites(selected, verifiedRole);
+	// Cached invites stay hidden once the role no longer manages them.
+	const invites = canManageInvites ? (invitesQuery.data ?? []) : [];
+	const detailError = detailQuery.isError ? "Group could not be loaded." : null;
 
-	// Initial load from the API is external sync, not a render cascade.
-	useEffect(() => {
-		// oxlint-disable-next-line react/set-state-in-effect
-		void reload();
-	}, [reload]);
-
-	useEffect(() => {
-		if (!selected) {
-			// Clearing detail state when navigation leaves a group is the
-			// intended sync, not a render cascade.
-			// oxlint-disable-next-line react/set-state-in-effect
-			setMembers([]);
-			setInvites([]);
-			setDetailError(null);
-			setDetailGroup(null);
-			return;
-		}
-		let cancelled = false;
-		(async () => {
-			try {
-				setDetailError(null);
-				const detail = await getGroup(selected);
-				if (cancelled) return;
-				setDetailGroup(detail.group);
-				setMembers(detail.members);
-				const role = detail.group.role;
-				if (role === "owner" || role === "admin") {
-					setInvites(await listInvites(selected));
-				} else {
-					setInvites([]);
-				}
-			} catch {
-				if (!cancelled) {
-					setDetailError("Group could not be loaded.");
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [selected]);
+	const createGroupMutation = useCreateGroup();
+	const joinGroupMutation = useJoinGroup();
+	const leaveGroupMutation = useLeaveGroup();
+	const deleteGroupMutation = useDeleteGroup();
+	const updateMemberRoleMutation = useUpdateMemberRole();
+	const removeMemberMutation = useRemoveMember();
+	const createInviteMutation = useCreateInvite();
+	const revokeInviteMutation = useRevokeInvite();
 
 	async function onCreate(event: React.FormEvent) {
 		event.preventDefault();
 		if (!name.trim()) return;
 		setCreating(true);
 		try {
-			const group = await createGroup(name.trim());
+			const group = await createGroupMutation.mutateAsync(name.trim());
 			setName("");
-			setGroups((current) => (current ? [...current, group] : [group]));
 			setShowCreate(false);
 			pushHash(groupHash(group.id));
 			notifySuccess("groups-notice", "Group created.");
@@ -118,9 +86,8 @@ export function GroupsPage() {
 		if (!code.trim()) return;
 		setJoining(true);
 		try {
-			const group = await acceptInvite(code.trim());
+			const group = await joinGroupMutation.mutateAsync(code.trim());
 			setCode("");
-			await reload();
 			pushHash(groupHash(group.id));
 			notifySuccess("groups-notice", "Joined group.");
 		} catch {
@@ -132,9 +99,8 @@ export function GroupsPage() {
 
 	async function onLeave(id: string) {
 		try {
-			await leaveGroup(id);
+			await leaveGroupMutation.mutateAsync(id);
 			pushHash(pageHash("groups"));
-			await reload();
 			notifySuccess("groups-notice", "Left group.");
 		} catch {
 			notifyError("groups", "Could not leave group.");
@@ -143,9 +109,8 @@ export function GroupsPage() {
 
 	async function onDelete(id: string) {
 		try {
-			await deleteGroup(id);
+			await deleteGroupMutation.mutateAsync(id);
 			pushHash(pageHash("groups"));
-			await reload();
 			notifySuccess("groups-notice", "Group deleted.");
 		} catch {
 			notifyError("groups", "Could not delete group.");
@@ -154,8 +119,11 @@ export function GroupsPage() {
 
 	async function onPromote(groupId: string, accountId: string) {
 		try {
-			await updateMemberRole(groupId, accountId, "admin");
-			setMembers((await getGroup(groupId)).members);
+			await updateMemberRoleMutation.mutateAsync({
+				groupId,
+				accountId,
+				role: "admin",
+			});
 			notifySuccess("groups-notice", "Member is now an admin.");
 		} catch {
 			notifyError("groups", "Role could not be changed.");
@@ -164,10 +132,7 @@ export function GroupsPage() {
 
 	async function onRemove(groupId: string, accountId: string) {
 		try {
-			await removeMember(groupId, accountId);
-			const next = await getGroup(groupId);
-			setMembers(next.members);
-			void reload();
+			await removeMemberMutation.mutateAsync({ groupId, accountId });
 			notifySuccess("groups-notice", "Member removed.");
 		} catch {
 			notifyError("groups", "Member could not be removed.");
@@ -176,8 +141,7 @@ export function GroupsPage() {
 
 	async function onRevoke(groupId: string, inviteId: string) {
 		try {
-			await revokeInvite(groupId, inviteId);
-			setInvites(await listInvites(groupId));
+			await revokeInviteMutation.mutateAsync({ groupId, inviteId });
 			notifySuccess("groups-notice", "Invite revoked.");
 		} catch {
 			notifyError("groups", "Invite could not be revoked.");
@@ -185,8 +149,7 @@ export function GroupsPage() {
 	}
 	async function onInvite(groupId: string) {
 		try {
-			const { code: fresh } = await createInvite(groupId);
-			setInvites(await listInvites(groupId));
+			const { code: fresh } = await createInviteMutation.mutateAsync(groupId);
 			try {
 				await navigator.clipboard?.writeText(fresh);
 			} catch {
@@ -197,10 +160,6 @@ export function GroupsPage() {
 			notifyError("groups", "Invite could not be created.");
 		}
 	}
-
-	const detail = selected
-		? (detailGroup ?? groups?.find((group) => group.id === selected) ?? null)
-		: null;
 
 	if (selected) {
 		return (
@@ -285,6 +244,13 @@ export function GroupsPage() {
 							))}
 						</ul>
 
+						{canManageInvites && invitesQuery.isError && (
+							<ErrorNotice
+								message="Invites could not be loaded."
+								action="Retry invites"
+								onAction={() => void invitesQuery.refetch()}
+							/>
+						)}
 						{invites.length > 0 && (
 							<ul className="grid list-none gap-2 p-0">
 								{invites.map((invite) => (
@@ -346,11 +312,11 @@ export function GroupsPage() {
 				</Button>
 			</div>
 
-			{error && (
+			{groupsQuery.isError && (
 				<ErrorNotice
-					message={error}
+					message="Groups could not be loaded."
 					action="Retry"
-					onAction={() => void reload()}
+					onAction={() => void groupsQuery.refetch()}
 				/>
 			)}
 
