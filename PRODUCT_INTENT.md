@@ -10,7 +10,7 @@ It answers:
 
 > What do we own and owe, what money has moved, and what should we do next?
 
-Simulation adds a further question: if we continue with the saved model, where does the base case end up, what could prevent that outcome, and which change should we inspect next?
+Simulation adds a further question: if we continue with the saved model, where does the projection end up, what could prevent that outcome, and which change should we inspect next?
 
 Accounts, recorded transactions, balance checks, and ordinary edits have their own lifecycle. They remain available when a forecast is absent, pending, or failed. Only components that need future outcomes depend on simulation. Evidence Analysis runs independently from both bank sync and simulation.
 
@@ -19,7 +19,7 @@ The product turns financial records and assumptions into a defensible decision. 
 A useful answer can establish:
 
 - the current financial position;
-- the base-case destination;
+- the projection destination;
 - the most important uncertainty;
 - the first meaningful failure or constraint;
 - the date and cause of a goal outcome;
@@ -69,7 +69,7 @@ The product must help the user complete these jobs:
 | User question                    | Required response                                                                                                                         |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Where are we now?                | Current net worth, account balances, recorded-versus-modeled status, and data freshness.                                                  |
-| What happens if nothing changes? | A base-case projection from the saved model through the selected horizon.                                                                |
+| What happens if nothing changes? | A projection from the saved model through the selected horizon.                                                                                 |
 | How uncertain is that outcome?   | A median and an interpretable range across sampled scenarios when ranges are enabled.                                                     |
 | Can we reach our goals?          | Goal outcomes, dates, status, and uncertainty where available.                                                                            |
 | What fails first?                | The first underfulfilled transaction or goal, with its date, amount, and limiting constraint.                                                |
@@ -94,7 +94,6 @@ The product must make these concepts understandable without specialist documenta
 | **Saved model**             | The saved collection of accounts, transactions, balance checks, assumptions, source information, and goal definitions. The base projection runs only off this saved state.                                                                                                                                                                         |
 | **What-if**                 | A simulator evaluation that layers hypothetical additions, disables, and modified copies on top of the saved model without changing it. A modified row is a disable plus an addition. Promote replays the set as sequential row writes. Discard deletes the evaluation instance.                                                              |
 | **Projection**              | A calculated future path from the saved model and chosen horizon.                                                                                                                                                                                                                                                                              |
-| **Base case**               | The projection using central assumptions without sampled variation. It is a calculation, not a prediction of what must happen.                                                                                                                                                                                                                  |
 | **Range**                   | A percentile band across sampled scenarios. Its meaning must remain clear without requiring specialist terminology.                                                                                                                                                                                                                            |
 | **Goal check**              | A named question applied to a projection, such as whether a goal is reached, spending is sustainable, or planned transactions are fulfilled.                                                                                                                                                                                                      |
 | **Financial independence**  | A configurable goal check combining a minimum-net-worth gate, configured annual-expense coverage, selected funding sources, a withdrawal policy, explicitly selected continuing transactions, a principal policy, and required confidence. Continuing transactions are user-selected and never inferred from labels, categories, identity, or rates. |
@@ -120,7 +119,7 @@ The product must establish:
 The as-of cut is the end of the viewed date, or an exact timestamp when
 one is given; later events never affect the stated position. The product must not silently substitute old or bundled data when the intended source fails.
 
-### 5.2 Base-case outcome
+### 5.2 Projection outcome
 
 For a selected horizon, the product must establish:
 
@@ -277,7 +276,7 @@ A comparison must not imply that it stores or restores another saved model.
 
 ### Lead with the decision
 
-A user should be able to identify the current position, base-case destination, major uncertainty, important risk, and next useful action without first interpreting calculation machinery.
+A user should be able to identify the current position, projection destination, major uncertainty, important risk, and next useful action without first interpreting calculation machinery.
 
 ### Preserve a path to evidence
 
@@ -290,14 +289,14 @@ The product must visibly distinguish:
 - recorded balances and transactions;
 - source-provided or user-provided assumptions;
 - planned transactions;
-- base-case projections;
+- projections;
 - ranges derived from sampled scenarios;
 - goal outcomes; and
 - posting-derived inferences.
 
 ### Use plain outcomes and preserve depth
 
-Primary language should describe outcomes such as “base case,” “range,” “shortfall,” “net pay,” “planned transaction,” and “goal.” Specialist detail remains available when it helps the user evaluate, modify, or understand a conclusion.
+Primary language should describe outcomes such as “projection,” “range,” “shortfall,” “net pay,” “planned transaction,” and “goal.” Specialist detail remains available when it helps the user evaluate, modify, or understand a conclusion.
 
 Explanation should be progressive:
 
@@ -391,7 +390,7 @@ A source integration may support the model-maintainer workflow, but source avail
 
 The product is aligned with this intent when a user can:
 
-- state the current position, base-case future position, and most important uncertainty;
+- state the current position, projected future position, and most important uncertainty;
 - identify the first meaningful failure and its cause;
 - distinguish recorded, planned, modeled, and inferred information;
 - understand whether an outcome is saved, what-if, provisional, stale, or incomplete;

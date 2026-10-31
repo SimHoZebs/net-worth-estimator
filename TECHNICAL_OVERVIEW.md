@@ -62,7 +62,7 @@ independently of bank sync and never creates recurrence rules or changes financi
 rows. See [Analysis lifecycle, persistence, and BNPL detection](docs/analyses.md).
 Image bytes also have a separate blob storage port (`backend/internal/blobstore`,
 with SQLite and filesystem adapters, private references, and durable cleanup
-in `backend/internal/store/blob_storage.go`).
+in `backend/internal/store/adapters/sqlite/blob_storage.go`).
 
 `store.Database` owns the shared connection. Each financial store holds one
 immutable user ID. The user router creates that scope only after Casdoor verifies
@@ -116,7 +116,7 @@ connection with a two-second deadline. See [the deployment contract](deploy/READ
 
 Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `model` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
 
-Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/postings/{id}/receipts`) and Analysis feedback (`/v1/analysis-findings...`, `/v1/analysis-feedback`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
 
 - Error-severity issues from the write's validation boundary prevent persistence.
   Ordinary finance writes validate financial records and protect existing valid
@@ -320,6 +320,15 @@ The current schema stores:
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
 | `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
+| `sync_credentials`         | per-user bank bridge address and selected cards for safe-spending math                                        |
+| `user_groups`              | named member groups                                                                                           |
+| `group_members`            | group membership with owner, admin, or member role                                                             |
+| `group_invites`            | single- or multi-use invite codes with expiry and revocation                                                   |
+| `transaction_source_facts` | bank-supplied transaction evidence: description, payee, memo, amount, currency, timestamps                     |
+| `analysis_inputs`          | monotonic user-scoped revision invalidated by fact changes                                                    |
+| `analysis_runs`            | execution records with producer version, input revision, and reproducible input snapshot                       |
+| `analysis_findings`        | one current finding per analysis, transaction, and finding kind                                                |
+| `analysis_feedback`        | append-only answer history with actor, prediction, detector version, and review                                |
 | `projection_artifacts`   | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 | `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
@@ -552,7 +561,7 @@ The kernel:
 
 ## 9. Evaluation Runtime
 
-`EvaluationRegistry` contains six process-wide definitions:
+`EvaluationRegistry` holds the process-wide definitions:
 
 | Go definition                     | Type                    |
 | --------------------------------- | ----------------------- |
@@ -561,6 +570,7 @@ The kernel:
 | `accountBalanceDefinition`        | `accountBalance`        |
 | `postingFulfillmentDefinition`    | `postingFulfillment`    |
 | `cycleFulfillmentDefinition`      | `cycleFulfillment`      |
+| `plannedPurchasesDefinition`      | `plannedPurchases`      |
 | `whatIfDefinition`                | `whatIf`                |
 
 `types.EvaluationTypeOrder` fixes table order. Each table preserves stored order. Instance IDs are globally unique across all tables.

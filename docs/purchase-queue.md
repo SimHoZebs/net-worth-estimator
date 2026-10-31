@@ -85,7 +85,7 @@ when replenished funds protect all later established payments.
 
 The schedule recalculates for each sampled scenario with that scenario's rates.
 Purchase candidate dates stay inside the evaluation branch. The frontend timeline shows the
-base-case schedule, not a guarantee or a range of purchase dates. Unfunded items
+projection schedule, not a guarantee or a range of purchase dates. Unfunded items
 have no invented date. A stale or failed forecast shows no current purchase date.
 
 Financial-independence branches do not replay or schedule planned purchases.
