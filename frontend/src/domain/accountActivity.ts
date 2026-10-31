@@ -79,7 +79,7 @@ export function accountTransactions({
 	accounts: Account[];
 	transactions: Transaction[];
 	startDate: string;
-	projection: Projection;
+	projection?: Projection | null;
 }): AccountTransaction[] {
 	if (
 		!accounts.some((account) => account.id === accountId && !account.archived)
@@ -179,52 +179,54 @@ export function accountTransactions({
 			.filter((transaction) => transaction.void === true)
 			.map((transaction) => transaction.id),
 	);
-	const startDateHasCheckpoint = projection.startDateHasCheckpoint ?? true;
-	const projected: AccountTransaction[] = projection.transactions
-		.filter(
-			(transaction) =>
-				(transaction.date > startDate ||
-					(transaction.date === startDate && !startDateHasCheckpoint)) &&
-				(transaction.accountDeltas.length > 0
-					? transaction.accountDeltas.some(
-							(delta) => delta.accountId === accountId,
-						)
-					: transaction.fromId === accountId ||
-						transaction.toId === accountId) &&
-				transaction.requested > 0,
-		)
-		.map((transaction, index) => {
-			const selectedDelta = transaction.accountDeltas.find(
-				(delta) => delta.accountId === accountId,
-			);
-			const destinationCount = transaction.accountDeltas.filter(
-				(delta) => delta.delta > 0,
-			).length;
-			const accountAmount = selectedDelta
-				? Math.abs(selectedDelta.delta)
-				: transaction.realized;
-			const accountRequested =
-				selectedDelta && selectedDelta.delta < 0
-					? transaction.requested
-					: destinationCount > 1
-						? accountAmount
-						: transaction.requested;
-			return {
-				id: `projected-${transaction.transactionId}-${transaction.date}-${index}`,
-				transactionId: transaction.transactionId,
-				date: transaction.date,
-				name: transaction.name,
-				source: "projected",
-				...connection(transaction),
-				amount: accountAmount,
-				requested: accountRequested,
-				shortfall: Math.max(0, accountRequested - accountAmount),
-				constraint: transaction.constraint,
-				excluded: false,
-				pending: pendingIds.has(transaction.transactionId),
-				void: voidIds.has(transaction.transactionId),
-			};
-		});
+	const startDateHasCheckpoint = projection?.startDateHasCheckpoint ?? true;
+	const projected: AccountTransaction[] = !projection
+		? []
+		: projection.transactions
+				.filter(
+					(transaction) =>
+						(transaction.date > startDate ||
+							(transaction.date === startDate && !startDateHasCheckpoint)) &&
+						(transaction.accountDeltas.length > 0
+							? transaction.accountDeltas.some(
+									(delta) => delta.accountId === accountId,
+								)
+							: transaction.fromId === accountId ||
+								transaction.toId === accountId) &&
+						transaction.requested > 0,
+				)
+				.map((transaction, index) => {
+					const selectedDelta = transaction.accountDeltas.find(
+						(delta) => delta.accountId === accountId,
+					);
+					const destinationCount = transaction.accountDeltas.filter(
+						(delta) => delta.delta > 0,
+					).length;
+					const accountAmount = selectedDelta
+						? Math.abs(selectedDelta.delta)
+						: transaction.realized;
+					const accountRequested =
+						selectedDelta && selectedDelta.delta < 0
+							? transaction.requested
+							: destinationCount > 1
+								? accountAmount
+								: transaction.requested;
+					return {
+						id: `projected-${transaction.transactionId}-${transaction.date}-${index}`,
+						transactionId: transaction.transactionId,
+						date: transaction.date,
+						name: transaction.name,
+						source: "projected",
+						...connection(transaction),
+						amount: accountAmount,
+						requested: accountRequested,
+						shortfall: Math.max(0, accountRequested - accountAmount),
+						constraint: transaction.constraint,
+						excluded: false,
+						pending: pendingIds.has(transaction.transactionId),
+						void: voidIds.has(transaction.transactionId),
+					};
+				});
 	return [...recorded, ...projected];
 }
 

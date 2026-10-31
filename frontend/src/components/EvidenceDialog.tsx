@@ -18,6 +18,9 @@ export function EvidenceDialog({
 	startDate,
 	readOnly,
 	projection,
+	projectionLoading = false,
+	projectionError = null,
+	retryProjection,
 	temporary = false,
 	onClose,
 	onEdit,
@@ -27,7 +30,11 @@ export function EvidenceDialog({
 	transactions: Transaction[];
 	startDate: string;
 	readOnly: boolean;
-	projection: Projection;
+	/** Required for failure/safe-spending; account renders without it. */
+	projection?: Projection | null;
+	projectionLoading?: boolean;
+	projectionError?: string | null;
+	retryProjection?: () => void;
 	temporary?: boolean;
 	onClose: () => void;
 	onEdit: (target: EditorTarget) => void;
@@ -40,18 +47,35 @@ export function EvidenceDialog({
 	};
 	switch (target.kind) {
 		case "failure":
-			return (
-				<FailureEvidence
-					accounts={accounts}
-					transactions={transactions}
-					startDate={startDate}
-					readOnly={readOnly}
-					projection={projection}
-					failure={projection.firstFailure}
-					onClose={onClose}
-				/>
-			);
-		case "safe-spending":
+		case "safe-spending": {
+			if (!projection) {
+				if (projectionLoading) {
+					return <p role="status">Loading forecast…</p>;
+				}
+				return (
+					<p role="alert">
+						{projectionError ?? "Forecast unavailable."}{" "}
+						{retryProjection ? (
+							<button type="button" onClick={retryProjection}>
+								Retry forecast
+							</button>
+						) : null}
+					</p>
+				);
+			}
+			if (target.kind === "failure") {
+				return (
+					<FailureEvidence
+						accounts={accounts}
+						transactions={transactions}
+						startDate={startDate}
+						readOnly={readOnly}
+						projection={projection}
+						failure={projection.firstFailure}
+						onClose={onClose}
+					/>
+				);
+			}
 			return (
 				<SafeSpendingEvidence
 					startDate={startDate}
@@ -59,6 +83,7 @@ export function EvidenceDialog({
 					onClose={onClose}
 				/>
 			);
+		}
 		case "account": {
 			const account = accounts.find(
 				(item) => item.id === target.id && !item.archived,
@@ -70,7 +95,6 @@ export function EvidenceDialog({
 					accounts={accounts}
 					transactions={transactions}
 					startDate={startDate}
-					projection={projection}
 					readOnly={readOnly}
 					temporary={temporary}
 					onClose={onClose}

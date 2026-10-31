@@ -1,7 +1,6 @@
 import { Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
-import { BaseProjectionView } from "../../components/BaseProjectionView.tsx";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { TablePagination } from "../../components/DataTable.tsx";
 import { Button } from "../../components/Button.tsx";
@@ -20,8 +19,6 @@ import {
 } from "../../domain/model.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { resolveTransactionAmounts } from "../../domain/resolvedTransactionAmounts.ts";
-import type { Projection } from "../../domain/result.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshAccounts,
@@ -61,17 +58,12 @@ export function AccountSections({
 		return <AccountsView onEdit={onEdit} onAccount={onAccount} />;
 	}
 	return (
-		<BaseProjectionView>
-			{({ base }) => (
-				<TransactionsView
-					accounts={accounts}
-					startDate={startDate}
-					readOnly={readOnly}
-					projection={base}
-					onEdit={onEdit}
-				/>
-			)}
-		</BaseProjectionView>
+		<TransactionsView
+			accounts={accounts}
+			startDate={startDate}
+			readOnly={readOnly}
+			onEdit={onEdit}
+		/>
 	);
 }
 
@@ -221,13 +213,11 @@ function TransactionsView({
 	accounts,
 	startDate,
 	readOnly,
-	projection,
 	onEdit,
 }: {
 	accounts: Account[];
 	startDate: string;
 	readOnly: boolean;
-	projection?: Projection | null;
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const [query, setQuery] = useState("");
@@ -238,19 +228,15 @@ function TransactionsView({
 	const [page, setPage] = useState(0);
 	const listId = useId();
 	const transactionsQuery = useTransactions();
-	const resolvedAmounts = useMemo(
-		() =>
-			projection
-				? resolveTransactionAmounts(projection.transactions)
-				: new Map(),
-		[projection],
-	);
+	// Finance-first: rows render from saved query rows alone. Literal
+	// amounts show directly; formula-derived amounts stay Varies without
+	// a forecast request.
 	const rows = useMemo(
 		() =>
 			(transactionsQuery.data?.transactions ?? []).map((row) =>
-				transactionToDisplay(row, resolvedAmounts.get(row.id)),
+				transactionToDisplay(row),
 			),
-		[transactionsQuery.data, resolvedAmounts],
+		[transactionsQuery.data],
 	);
 	const visible = useMemo(
 		() =>
@@ -365,7 +351,6 @@ function TransactionsView({
 						accounts={visibleAccounts(accounts)}
 						startDate={startDate}
 						readOnly={readOnly}
-						resolvedAmounts={resolvedAmounts}
 					/>
 				)}
 			</div>

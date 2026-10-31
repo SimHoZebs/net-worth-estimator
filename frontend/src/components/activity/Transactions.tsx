@@ -26,6 +26,9 @@ export function Transactions({
 	readOnly,
 	showHeaders = false,
 	onEdit,
+	onSourceChange,
+	canRequestForecast = false,
+	projected,
 }: {
 	/** Projected/recorded occurrences for the current view. */
 	occurrences: AccountTransaction[];
@@ -36,6 +39,21 @@ export function Transactions({
 	readOnly: boolean;
 	showHeaders?: boolean;
 	onEdit: (target: EditorTarget) => void;
+	/** Notifies the dialog when the viewer asks for projected activity. */
+	onSourceChange?: (source: ActivityFilters["source"]) => void;
+	/**
+	 * Saved rules can project for this account even with zero recorded
+	 * facts. Keeps the source select available so projected activity
+	 * stays requestable; truly empty accounts keep the add-only state.
+	 */
+	canRequestForecast?: boolean;
+	/** Forecast state scoped to projected activity only. */
+	projected?: {
+		loading: boolean;
+		error: string | null;
+		requested: boolean;
+		retry: () => void;
+	};
 }) {
 	const [filters, setFilters] = useState<ActivityFilters>(
 		defaultAccountViewFilters,
@@ -63,14 +81,17 @@ export function Transactions({
 	const update = (change: Partial<ActivityFilters>) => {
 		setFilters((previous) => ({ ...previous, ...change }));
 		setPage(0);
+		if (change.source !== undefined) onSourceChange?.(change.source);
 	};
+	const resetFilters = () => update(defaultAccountViewFilters);
 	const turnPage = (next: number) => {
 		setPage(next);
 		document
 			.getElementById(`${id}-table`)
 			?.scrollIntoView({ block: "nearest" });
 	};
-	if (!occurrences.length)
+	const showsProjected = filters.source !== "historical";
+	if (!occurrences.length && !canRequestForecast)
 		return (
 			<EmptyState
 				icon={ArrowRightLeft}
@@ -91,6 +112,17 @@ export function Transactions({
 				totalCount={occurrences.length}
 				onChange={update}
 			/>
+			{showsProjected && projected?.loading ? (
+				<p role="status">Loading projected activity…</p>
+			) : null}
+			{showsProjected && projected?.error ? (
+				<p role="alert">
+					{projected.error}{" "}
+					<button type="button" onClick={projected.retry}>
+						Retry forecast
+					</button>
+				</p>
+			) : null}
 			{filtered.length ? (
 				<>
 					<TransactionAnalysisProvider
@@ -146,12 +178,19 @@ export function Transactions({
 						/>
 					)}
 				</>
+			) : !occurrences.length ? (
+				<EmptyState
+					icon={ArrowRightLeft}
+					title="No transactions for this account yet"
+					action="Add a planned transaction"
+					onAction={() => onEdit({ kind: "transaction", item: null })}
+				/>
 			) : (
 				<EmptyState
 					icon={ListFilter}
 					title="No matching transactions"
 					action="Clear transaction filters"
-					onAction={() => update(defaultAccountViewFilters)}
+					onAction={resetFilters}
 				/>
 			)}
 		</>

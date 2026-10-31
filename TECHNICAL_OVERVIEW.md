@@ -1,6 +1,6 @@
 # Technical Overview: Net Worth Estimator Backend
 
-The backend is the authoritative implementation for model validation, persistence, deterministic simulation, stochastic simulation, and configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds account-scoped financial data and application identity state.
+The backend owns financial records, validation, persistence, historical current position, evidence Analysis, and optional deterministic and stochastic simulation with configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds user-scoped financial data and application identity state.
 
 `PRODUCT_INTENT.md` defines the product experience. This document defines the current Go contracts and domain behavior.
 
@@ -24,6 +24,33 @@ Store interface backed by SQLite
 - `internal/types` defines the JSON and domain values shared across those layers.
 
 The model aggregate is `types.FinancialModel`. Payroll is modeled as ordinary recurrence rules chained by priority and model-value references: gross pay, pre-tax contributions, employer match, and progressive-bracket tax are separate rules, not a separate income pipeline.
+
+### Finance and forecast lifecycles
+
+Financial records are authoritative inputs. A projection consumes those inputs;
+it does not control account maintenance or access to recorded activity.
+
+- Account and transaction reads do not execute future simulation.
+- Current position shares chronological replay with the projection baseline.
+  Shared replay preserves the observed-versus-modeled balance contract without
+  requiring a forecast result.
+- Financial validation and forecast-evaluation validation have separate owners.
+  Financial edits preserve legitimate references, while an unrelated invalid
+  forecast configuration does not block maintenance.
+- Simulation preparation retains complete input validation. Projection and
+  evaluation errors stay with their requesting components.
+- The frontend's recorded account activity and ordinary transaction lists do
+  not request a forecast. Selecting projected activity requests its own result
+  and exposes its own loading, error, and retry state.
+- Record lists show stored literal amounts. Formula-based planned amounts stay
+  `Varies` until a component explicitly requests their calculated outcome;
+  the browser does not duplicate backend amount resolution.
+- Evidence Analysis remains independent of sync and projection execution.
+
+This boundary uses the existing tables. It does not change account participation,
+balance constraints, stored amount descriptors, or historical replay arithmetic.
+Future transaction search and subscription Analysis can consume financial
+records without a new dependency on projection execution.
 
 ### Shared persistence and ownership
 
@@ -91,7 +118,10 @@ Each issue contains `severity`, `code`, `message`, and `path`. The stored model 
 
 Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{row, issues, persisted, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions.
 
-- Any error-severity issue prevents persistence.
+- Error-severity issues from the write's validation boundary prevent persistence.
+  Ordinary finance writes validate financial records and protect existing valid
+  evaluation references. Evaluation writes validate the complete model.
+  Preexisting unrelated forecast errors remain diagnostics on the model read.
 - Warning-only writes are persisted.
 - A rejected request changes nothing.
 - The `source` field on checkpoint and posting inputs is not trusted. The store recomputes ownership.
@@ -306,7 +336,7 @@ The authenticated user router initializes a blank private workspace on first aut
 
 ### Row writes and ownership
 
-Each row write runs one transaction: validate the resulting model, then insert, replace, delete, or reorder one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path.
+Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path.
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
@@ -433,7 +463,12 @@ Annual-cap usage is observed from realized amounts by transaction ID (posting or
 
 ## 6. Validation and Preparation
 
-`domain.ValidateFinancialModel` is the authoritative validator. It checks:
+`domain.ValidateFinancialModel` performs complete validation for projections,
+evaluation writes, and model diagnostics. Finance reads and writes use the
+financial-record subset without a forecast-readiness requirement. Finance writes
+also reject newly introduced evaluation reference errors.
+
+Complete validation checks:
 
 - duplicate account, posting, rule, and cross-type evaluation IDs;
 - account/posting/rule ID collisions (one shared namespace);
