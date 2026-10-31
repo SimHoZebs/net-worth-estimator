@@ -111,7 +111,7 @@ func upgrade(path string) (int, error) {
 		}
 	}
 	u := &url.URL{Scheme: "file", Path: abs}
-	db, err := sql.Open("sqlite", u.String()+"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
+	db, err := sql.Open("sqlite", u.String()+"?mode=rw&_pragma=busy_timeout(5000)&_pragma=foreign_keys(0)")
 	if err != nil {
 		return 0, err
 	}
@@ -339,13 +339,36 @@ func convert(tx *sql.Tx) (int, error) {
 			}
 		}
 	}
-	if _, err := tx.Exec(`ALTER TABLE postings RENAME COLUMN destinations TO destination_account_ids`); err != nil {
+	// Rebuild postings into the post-split core shape. Dropping columns one
+	// at a time fails on legacy schemas whose foreign keys reference a removed
+	// column, so recreate the table explicitly.
+	if _, err := tx.Exec(`CREATE TABLE postings_new (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		id TEXT NOT NULL,
+		name TEXT NOT NULL,
+		source_account_id TEXT,
+		destination_account_ids TEXT,
+		amount_resolution_json TEXT NOT NULL,
+		posted_time INTEGER NOT NULL,
+		transaction_time INTEGER NOT NULL,
+		source TEXT NOT NULL DEFAULT 'user',
+		pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
+		void INTEGER NOT NULL DEFAULT 0 CHECK (void IN (0, 1)),
+		PRIMARY KEY (user_id, id),
+		FOREIGN KEY(user_id, source_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
+	)`); err != nil {
 		return 0, err
 	}
-	for _, column := range []string{"position", "enabled", "execution_order", "fulfills_rule_id", "fulfills_occurrence_date", "receipt_ids"} {
-		if _, err := tx.Exec(`ALTER TABLE postings DROP COLUMN ` + column); err != nil {
-			return 0, err
-		}
+	if _, err := tx.Exec(`INSERT INTO postings_new(user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void)
+		SELECT user_id, id, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, source, pending, void
+		FROM postings`); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`DROP TABLE postings`); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`ALTER TABLE postings_new RENAME TO postings`); err != nil {
+		return 0, err
 	}
 	if err := ensureAnalysisTriggers(tx); err != nil {
 		return 0, err
