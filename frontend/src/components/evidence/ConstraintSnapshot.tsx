@@ -1,11 +1,10 @@
 import { money } from "../../domain/format.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
-import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import type { FailureLedger } from "../../domain/constraintSnapshot.ts";
 import type { TransactionResult } from "../../domain/result.ts";
 import { AccountEntry } from "../AccountEntry.tsx";
 import { TransactionDetail } from "../activity/TransactionDetail.tsx";
-import { useSelectedEntry } from "../entrySelection.ts";
+import { transactionSelectionKey, useSelectedId } from "../entrySelection.ts";
 import { TransactionRow } from "../activity/TransactionRow.tsx";
 import { TransactionTable } from "../activity/TransactionTable.tsx";
 
@@ -29,11 +28,17 @@ export function ConstraintSnapshot({
 	showHeaders?: boolean;
 }) {
 	const gap = failure.requested - failure.realized;
-	const [selected, setSelected] = useSelectedEntry<{
-		transaction: AccountTransaction;
-		savedTransaction: Transaction;
-		failing: boolean;
-	}>(failure);
+	// Local identity only: the row is resolved from the current ledger each
+	// render, so a refresh keeps the detail open while a removed row (or a
+	// removed saved rule) renders as no selection and closes it.
+	const [selectedId, setSelectedId] = useSelectedId();
+	const selected =
+		selectedId === null
+			? null
+			: (ledger.rows.find(
+					(row) => transactionSelectionKey(row.transaction) === selectedId,
+				) ?? null);
+	const selectedSavedTransaction = selected?.savedTransaction ?? null;
 	return (
 		<figure className="mt-3 mb-0.5">
 			{ledger.accountIcon ? (
@@ -55,9 +60,7 @@ export function ConstraintSnapshot({
 						key={transaction.id}
 						transaction={transaction}
 						savedTransaction={savedTransaction}
-						onEdit={(item) =>
-							setSelected({ transaction, savedTransaction: item, failing })
-						}
+						onEdit={() => setSelectedId(transactionSelectionKey(transaction))}
 						shortfallLabel={failing ? `Shortfall ${money(gap)}` : undefined}
 					/>
 				))}
@@ -65,17 +68,17 @@ export function ConstraintSnapshot({
 			{ledger.overflow > 0 && (
 				<p className="mt-2 text-xs text-muted">+{ledger.overflow} more</p>
 			)}
-			{selected && (
+			{selected && selectedSavedTransaction && (
 				<TransactionDetail
 					transaction={selected.transaction}
-					savedTransaction={selected.savedTransaction}
+					savedTransaction={selectedSavedTransaction}
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}
 					shortfallLabel={
 						selected.failing ? `Shortfall ${money(gap)}` : undefined
 					}
-					onClose={() => setSelected(null)}
+					onClose={() => setSelectedId(null)}
 				/>
 			)}
 		</figure>

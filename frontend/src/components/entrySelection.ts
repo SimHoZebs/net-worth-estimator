@@ -1,32 +1,32 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import type { AccountTransaction } from "../domain/accountActivity.ts";
 
-/** Single holder for a selected id. Clears when `resetKey` changes (e.g. a
- * new saved data arrives) so stale ids never render a silent `null`. Dialog
- * presence stays owned by the dialog components themselves (Modal/Drawer
- * self-register with the modal stack); the holder never registers. */
-export function useSelectedId(
-	resetKey: unknown,
-): [string | null, (id: string | null) => void] {
-	const [selectedId, setSelectedId] = useState<string | null>(null);
-	// Clearing a stale selection when saved data changes is the intended sync,
-	// not a render cascade.
-	useEffect(() => {
-		// oxlint-disable-next-line react/set-state-in-effect
-		setSelectedId(null);
-	}, [resetKey]);
-	return [selectedId, setSelectedId];
+/** Projected row ids include a list index, not just occurrence identity. */
+export function transactionSelectionKey(
+	transaction: AccountTransaction,
+): string {
+	return transaction.source === "historical"
+		? transaction.id
+		: JSON.stringify([transaction.transactionId, transaction.date]);
 }
 
-/** Single holder for a selected entry object. Same reset rule, no presence. */
+/** Single holder for a selected id. The id is local identity, never a copy
+ * of financial records: callers resolve it against current records each
+ * render (a missing id renders as no selection, so deletion closes without
+ * synchronization), and clear it on explicit dismissal.
+ * A genuinely different scope (another evaluation) remounts through the
+ * list `key`, so no reset identity is needed here. */
+export function useSelectedId(
+	initial: string | null = null,
+): [string | null, (id: string | null) => void] {
+	return useState<string | null>(initial);
+}
+
+/** Same holder for simple presence flags. Prefer ids resolved from current
+ * records wherever a record exists; keep this for selections with no
+ * record to resolve (for example an inspector opened for an analysis). */
 export function useSelectedEntry<T>(
-	resetKey: unknown,
+	initial: T | null = null,
 ): [T | null, (entry: T | null) => void] {
-	const [selected, setSelected] = useState<T | null>(null);
-	// Clearing a stale selection when saved data changes is the intended sync,
-	// not a render cascade.
-	useEffect(() => {
-		// oxlint-disable-next-line react/set-state-in-effect
-		setSelected(null);
-	}, [resetKey]);
-	return [selected, setSelected];
+	return useState<T | null>(initial);
 }
