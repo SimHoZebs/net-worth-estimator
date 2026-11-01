@@ -158,6 +158,21 @@ Explicit sharing rules:
   member's original stay deferred.
 - Forged owner, posting, account, and audience IDs fail closed as
   not-found so shared data is not enumerable.
+- Mutating social requests carry a client-generated UUID request ID
+  (`requestId`). The store records one outcome per (actor, request ID):
+  a retry replays the recorded outcome without re-executing, while a key
+  reused for a different action or target fails with 409. Failed attempts
+  never consume the key.
+- A source revision landing mid-accept fails with 409 and rolls the copy
+  back instead of recording a torn link. Concurrent accepts converge on
+  one copy through the deterministic link identity instead of leaking a
+  uniqueness error. Ordinary 409 operation conflicts never trigger
+  session discovery.
+- Committed changes append one audit row with actor, action, target, and
+  time, readable by the source owner at `GET /v1/shared/audit`. There is
+  no audience-side audit read. Audit payloads carry no transaction
+  evidence: no amounts, names, accounts, memos, or posting content.
+  Replays return the recorded result to its own actor only.
 
 ## Linked transactions (FND-04)
 

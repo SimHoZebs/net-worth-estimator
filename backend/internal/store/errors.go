@@ -36,6 +36,13 @@ var ErrGroupForbidden = errors.New("forbidden")
 // without leaking internals.
 var ErrGroupInvalid = errors.New("invalid group request")
 
+// ErrSharingConflict reports a social write that lost a race: the source
+// transaction was revised mid-accept, or a request ID already completed a
+// different action. Handlers map it to 409. The message carries no row
+// content or identities, so it is safe to show. Callers retry with a fresh
+// read (and, for a new attempt, a new request ID).
+var ErrSharingConflict = errors.New("the sharing request conflicts with a committed change")
+
 var (
 	ErrReceiptNotFound   = errors.New("receipt or posting not found")
 	ErrReceiptConflict   = errors.New("receipt changed; reload before retrying")

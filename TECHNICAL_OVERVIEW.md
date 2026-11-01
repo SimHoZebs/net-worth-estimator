@@ -317,6 +317,8 @@ The current schema stores:
 | `evaluations`            | type, user-scoped instance ID, order, label, enablement, and JSON config                                      |
 | `entity_ids`             | shared ID registry across accounts, postings, planned purchases, rules, and evaluations |
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
+| `sharing_requests`       | one recorded outcome per (actor, request ID) for mutating social requests; retries replay it                   |
+| `sharing_audit`          | append-only cross-user change trace: actor, action, target identities, and time; no transaction evidence       |
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
 | `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
@@ -371,6 +373,45 @@ Completed deterministic results and completed seeded stochastic results are stor
 Result writes are best-effort. A malformed stored payload is unavailable for retrieval. A storage failure does not prevent the requested simulation from execution.
 
 Stored simulation results are durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and results on replacement.
+
+### Social operations
+
+Cross-user transaction sharing (`backend/internal/sharing`, store consent
+methods, `docs/authorization.md`) is retry-safe and traceable:
+
+- Every mutating social request (grant, revoke, exclusion, removal,
+  accept, link refresh) carries a client-generated UUID request ID in
+  canonical lowercase form: over HTTP (`requestId`) for grant, revoke,
+  exclusion, removal, and accept, and at the store boundary for all six
+  (link refresh has no HTTP route yet; its handler belongs to a
+  dependent). The store records one outcome row per (actor, request ID):
+  a retry with the same key replays the recorded outcome byte-for-byte
+  without re-executing, while a key reused for a different action or
+  target fails with `store.ErrSharingConflict` (HTTP 409, no
+  session-discovery code). Failed attempts never consume the key.
+- A source revision landing mid-accept fails explicitly with
+  `store.ErrSharingConflict` and rolls the copy back instead of recording
+  a torn link. Concurrent accepts losing the deterministic link-identity
+  race resolve to the winner's copy instead of leaking a uniqueness
+  error. The four consent mutations each run in one transaction on the
+  store's single connection, so grant/revoke/exclude ordering is total.
+  Accept and refresh commit in the documented statement order
+  (link/provenance update, then audit, then key), so an interrupted
+  request retries as a new execution converging to current rather than
+  replaying an unapplied outcome.
+- Committed mutations append one `sharing_audit` row carrying actor,
+  action, target identities, link, outcome status, request ID, and time.
+  Replays and heals append none. Owners read their posting's trace at
+  `GET /v1/shared/audit`; there is no audience-side read. Audit payloads
+  never carry transaction evidence (no amounts, names, accounts, memos,
+  or posting content). Replays return the recorded result to its own
+  actor only; the accept replay is the recipient's own copy, never a
+  cross-user read.
+
+Dependents reuse this shape: versioned splits (SOC-04B) close retry races
+with request IDs and fail concurrent revisions explicitly, and
+concurrency coverage (QA-02) asserts idempotent replay plus
+share/revoke ordering through these endpoints.
 
 ## 4. Artifact Identity
 
@@ -693,6 +734,8 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/projections/`                 | position, projections, result identity, and SSE           |
 | `backend/internal/api/projections/runs.go`           | shared seeded computation and subscriber state           |
 | `backend/internal/api/internal/modelstate/`          | shared model revision and storage-error HTTP contracts    |
+| `backend/internal/sharing/`                       | cross-user grant/exclusion/copy/audit HTTP operations     |
+| `backend/internal/store/adapters/sqlite/sharing*.go` | consent rows, link identities, request IDs, and audit  |
 | `backend/internal/api/integration/`                 | whole-router HTTP contract tests                         |
 | `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle     |
 | `backend/internal/store/model.go`                   | seed/import replacement and ordered reload              |

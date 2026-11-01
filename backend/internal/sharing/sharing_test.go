@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
@@ -109,7 +110,22 @@ func resourceOf(user string) string {
 }
 
 func grantBody(postingID, audienceType, audienceID string) string {
-	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID})
+	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID, "requestId": uuid.NewString()})
+	return string(out)
+}
+
+func copyBody(owner, postingID string) string {
+	out, _ := json.Marshal(map[string]string{"owner": owner, "postingId": postingID, "requestId": uuid.NewString()})
+	return string(out)
+}
+
+func grantKeyBody(postingID, audienceType, audienceID, key string) string {
+	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID, "requestId": key})
+	return string(out)
+}
+
+func copyKeyBody(owner, postingID, key string) string {
+	out, _ := json.Marshal(map[string]string{"owner": owner, "postingId": postingID, "requestId": key})
 	return string(out)
 }
 
@@ -121,6 +137,7 @@ func TestSharingRoutesClaimedByIdentity(t *testing.T) {
 		"/v1/shared/grants",
 		"/v1/shared/exclusions",
 		"/v1/shared/copies",
+		"/v1/shared/audit",
 		"/v1/shared/postings",
 		"/v1/shared/postings/users/abc/" + sharedPostingID,
 	} {
@@ -386,8 +403,7 @@ func TestSharingHTTPCopyIndependent(t *testing.T) {
 	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	copyBody, _ := json.Marshal(map[string]string{"owner": resourceOf(alice), "postingId": sharedPostingID})
-	w := do(t, h, "POST", "/v1/shared/copies", "bob", string(copyBody))
+	w := do(t, h, "POST", "/v1/shared/copies", "bob", copyBody(resourceOf(alice), sharedPostingID))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("copy = %d (%s), want 201", w.Code, w.Body.String())
 	}
@@ -429,11 +445,10 @@ func TestSharingHTTPCopySeedsRecipientModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustPosting(t, storeA, sharedPostingID)
-	if _, err := db.GrantSharedPosting(alice, sharedPostingID, store.SharingAudienceUser, bob); err != nil {
+	if _, err := db.GrantSharedPosting(alice, sharedPostingID, store.SharingAudienceUser, bob, uuid.NewString()); err != nil {
 		t.Fatal(err)
 	}
-	copyBody, _ := json.Marshal(map[string]string{"owner": resourceOf(alice), "postingId": sharedPostingID})
-	w := do(t, h, "POST", "/v1/shared/copies", "bob", string(copyBody))
+	w := do(t, h, "POST", "/v1/shared/copies", "bob", copyBody(resourceOf(alice), sharedPostingID))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("copy = %d (%s), want 201", w.Code, w.Body.String())
 	}
@@ -462,20 +477,22 @@ func TestSharingHTTPGrantExclusionConflicts(t *testing.T) {
 	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grant)
+	// Each logical request carries its own key: reusing the grant's key
+	// for a different action is a 409, so every step below mints a body.
+	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grantBody(sharedPostingID, "user", bob))
 	if w.Code != http.StatusBadRequest || strings.Contains(w.Body.String(), "sql:") {
 		t.Fatalf("exclusion over grant = %d (%s), want safe 400", w.Code, w.Body.String())
 	}
-	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grant); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", bob)); w.Code != http.StatusOK {
 		t.Fatalf("revoke = %d, want 200", w.Code)
 	}
-	if w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grant); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grantBody(sharedPostingID, "user", bob)); w.Code != http.StatusCreated {
 		t.Fatalf("exclusion = %d (%s), want 201", w.Code, w.Body.String())
 	}
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant); w.Code != http.StatusBadRequest {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", bob)); w.Code != http.StatusBadRequest {
 		t.Fatalf("grant over exclusion = %d, want 400", w.Code)
 	}
-	if w := do(t, h, "DELETE", "/v1/shared/exclusions", "alice", grant); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/exclusions", "alice", grantBody(sharedPostingID, "user", bob)); w.Code != http.StatusOK {
 		t.Fatalf("remove exclusion = %d, want 200", w.Code)
 	}
 	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant); w.Code != http.StatusCreated {
@@ -484,5 +501,175 @@ func TestSharingHTTPGrantExclusionConflicts(t *testing.T) {
 	w = do(t, h, "POST", "/v1/shared/grants", "alice", `{"postingId":`)
 	if w.Code != http.StatusBadRequest || strings.Contains(w.Body.String(), "sql:") {
 		t.Fatalf("malformed body = %d (%s), want safe 400", w.Code, w.Body.String())
+	}
+}
+
+// Mutating social requests require a UUID request ID: missing and
+// malformed keys fail with 400 before touching storage.
+func TestSharingHTTPRequestIDRequired(t *testing.T) {
+	h, db := testHandler(t, false)
+	alice, storeA := mustUser(t, db, "alice")
+	bob := mustID(t, db, "bob")
+	mustPosting(t, storeA, sharedPostingID)
+
+	bodies := map[string]string{
+		"missing":   `{"postingId":"` + sharedPostingID + `","audienceType":"user","audienceId":"` + bob + `"}`,
+		"malformed": `{"postingId":"` + sharedPostingID + `","audienceType":"user","audienceId":"` + bob + `","requestId":"nope"}`,
+	}
+	for name, body := range bodies {
+		if w := do(t, h, "POST", "/v1/shared/grants", "alice", body); w.Code != http.StatusBadRequest {
+			t.Fatalf("grant %s key = %d, want 400", name, w.Code)
+		}
+		if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", body); w.Code != http.StatusBadRequest {
+			t.Fatalf("revoke %s key = %d, want 400", name, w.Code)
+		}
+	}
+	copyBodies := map[string]string{
+		"missing":   `{"owner":"` + resourceOf(alice) + `","postingId":"` + sharedPostingID + `"}`,
+		"malformed": `{"owner":"` + resourceOf(alice) + `","postingId":"` + sharedPostingID + `","requestId":"nope"}`,
+	}
+	for name, body := range copyBodies {
+		if w := do(t, h, "POST", "/v1/shared/copies", "bob", body); w.Code != http.StatusBadRequest {
+			t.Fatalf("copy %s key = %d, want 400", name, w.Code)
+		}
+	}
+	// Rejected keys changed nothing: no grant was recorded.
+	if w := do(t, h, "GET", "/v1/shared/grants", "alice", ""); w.Body.String() != "{\"grants\":[]}\n" {
+		t.Fatalf("grants after rejected keys = %s, want empty", w.Body.String())
+	}
+}
+
+// A retry with the same key replays the recorded outcome byte-for-byte.
+func TestSharingHTTPReplayIdentical(t *testing.T) {
+	h, db := testHandler(t, false)
+	alice, storeA := mustUser(t, db, "alice")
+	bob := mustID(t, db, "bob")
+	mustPosting(t, storeA, sharedPostingID)
+
+	grant := grantKeyBody(sharedPostingID, "user", bob, uuid.NewString())
+	first := do(t, h, "POST", "/v1/shared/grants", "alice", grant)
+	second := do(t, h, "POST", "/v1/shared/grants", "alice", grant)
+	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
+		t.Fatalf("grant replay = %d/%d, want 201/201", first.Code, second.Code)
+	}
+	if first.Body.String() != second.Body.String() {
+		t.Fatalf("replayed grant differs:\n%s\n%s", first.Body.String(), second.Body.String())
+	}
+	copy := copyKeyBody(resourceOf(alice), sharedPostingID, uuid.NewString())
+	firstCopy := do(t, h, "POST", "/v1/shared/copies", "bob", copy)
+	secondCopy := do(t, h, "POST", "/v1/shared/copies", "bob", copy)
+	if firstCopy.Code != http.StatusCreated || secondCopy.Code != http.StatusCreated {
+		t.Fatalf("copy replay = %d/%d, want 201/201", firstCopy.Code, secondCopy.Code)
+	}
+	if firstCopy.Body.String() != secondCopy.Body.String() {
+		t.Fatalf("replayed copy differs:\n%s\n%s", firstCopy.Body.String(), secondCopy.Body.String())
+	}
+}
+
+// A key reused for a different action fails with 409 and no session
+// discovery code: ordinary operation conflicts never retarget the session.
+func TestSharingHTTPRequestIDReuseConflicts(t *testing.T) {
+	h, db := testHandler(t, false)
+	_, storeA := mustUser(t, db, "alice")
+	bob := mustID(t, db, "bob")
+	mustPosting(t, storeA, sharedPostingID)
+
+	key := uuid.NewString()
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantKeyBody(sharedPostingID, "user", bob, key)); w.Code != http.StatusCreated {
+		t.Fatalf("grant = %d, want 201", w.Code)
+	}
+	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grantKeyBody(sharedPostingID, "user", bob, key))
+	if w.Code != http.StatusConflict {
+		t.Fatalf("exclusion with grant key = %d, want 409", w.Code)
+	}
+	if strings.Contains(w.Body.String(), "RESOURCE_CHANGED") {
+		t.Fatalf("conflict triggers session discovery: %s", w.Body.String())
+	}
+	w = do(t, h, "DELETE", "/v1/shared/grants", "alice", grantKeyBody(sharedPostingID, "user", bob, key))
+	if w.Code != http.StatusConflict {
+		t.Fatalf("revoke with grant key = %d, want 409", w.Code)
+	}
+}
+
+// The owner reads their posting's trace in order: actor, action, target,
+// and time per event, with no transaction evidence in the payload. Other
+// owners read only their own scope, never another owner's trace.
+func TestSharingHTTPAuditTrace(t *testing.T) {
+	h, db := testHandler(t, false)
+	alice, storeA := mustUser(t, db, "alice")
+	bob := mustID(t, db, "bob")
+	mustPosting(t, storeA, sharedPostingID)
+
+	grantKey, copyKey, revokeKey := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantKeyBody(sharedPostingID, "user", bob, grantKey)); w.Code != http.StatusCreated {
+		t.Fatalf("grant = %d, want 201", w.Code)
+	}
+	if w := do(t, h, "POST", "/v1/shared/copies", "bob", copyKeyBody(resourceOf(alice), sharedPostingID, copyKey)); w.Code != http.StatusCreated {
+		t.Fatalf("copy = %d, want 201", w.Code)
+	}
+	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantKeyBody(sharedPostingID, "user", bob, revokeKey)); w.Code != http.StatusOK {
+		t.Fatalf("revoke = %d, want 200", w.Code)
+	}
+	target := "/v1/shared/audit?postingId=" + sharedPostingID
+	w := do(t, h, "GET", target, "alice", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("audit = %d (%s), want 200", w.Code, w.Body.String())
+	}
+	var trace struct {
+		Audit []store.SharingAuditEvent `json:"audit"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &trace); err != nil {
+		t.Fatal(err)
+	}
+	want := []struct{ action, actor, key string }{
+		{store.SharingAuditGrantShared, alice, grantKey},
+		{store.SharingAuditCopyAccepted, bob, copyKey},
+		{store.SharingAuditRevokeShared, alice, revokeKey},
+	}
+	if len(trace.Audit) != len(want) {
+		t.Fatalf("audit events = %+v, want %d in order", trace.Audit, len(want))
+	}
+	for i, event := range want {
+		got := trace.Audit[i]
+		if got.Action != event.action || got.ActorUserID != event.actor || got.RequestID != event.key {
+			t.Fatalf("audit event %d = %+v, want %v", i, got, event)
+		}
+		if got.OwnerUserID != alice || got.PostingID != sharedPostingID || got.CreatedAt == 0 || got.Seq == 0 {
+			t.Fatalf("audit event %d target/time = %+v, want owner posting and time", i, got)
+		}
+		if i > 0 && got.Seq <= trace.Audit[i-1].Seq {
+			t.Fatalf("audit sequence out of order: %+v", trace.Audit)
+		}
+	}
+	// No transaction evidence in the wire payload: no posting object,
+	// amount descriptor, account reference, or name.
+	for _, leaked := range []string{`"posting":{`, `"amount"`, "sourceAccount", "Posting " + sharedPostingID} {
+		if strings.Contains(w.Body.String(), leaked) {
+			t.Fatalf("audit payload leaks evidence %q: %s", leaked, w.Body.String())
+		}
+	}
+	// Another owner reads only their own scope: bob sees an empty trace
+	// for alice's posting, not her history.
+	w = do(t, h, "GET", target, "bob", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("cross-owner audit = %d, want 200", w.Code)
+	}
+	var foreign struct {
+		Audit []store.SharingAuditEvent `json:"audit"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &foreign); err != nil {
+		t.Fatal(err)
+	}
+	if len(foreign.Audit) != 0 {
+		t.Fatalf("cross-owner audit = %+v, want empty", foreign.Audit)
+	}
+	if w := do(t, h, "GET", target, "", ""); w.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous audit = %d, want 401", w.Code)
+	}
+	if w := do(t, h, "GET", "/v1/shared/audit", "alice", ""); w.Code != http.StatusBadRequest {
+		t.Fatalf("audit without posting = %d, want 400", w.Code)
+	}
+	if w := do(t, h, "POST", target, "alice", ""); w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("audit write = %d, want 405", w.Code)
 	}
 }

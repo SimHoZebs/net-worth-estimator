@@ -271,6 +271,60 @@ type SharingLinkRefresh struct {
 	CurrentSourceRevision string      `json:"currentSourceRevision,omitempty"`
 }
 
+// Social-operation audit and idempotency contract (FND-05). Every mutating
+// social request carries a client-generated UUID request ID. The store
+// records one outcome row per (actor, request ID): a retry with the same
+// key replays the recorded outcome without re-executing, while the same
+// key naming a different action or target fails with ErrSharingConflict.
+// Replays never append audit rows; only committed mutations do.
+//
+// Audit rows carry actor, action, target identities, and time only. They
+// never carry transaction evidence: no amounts, names, account references,
+// memos, or posting content. Dependents (SOC-04B splits, QA-02 concurrency
+// coverage) reuse this shape: request IDs close retry races, recorded
+// revisions make concurrent edits fail explicitly, and the audit trail
+// stays free of private evidence.
+
+// Social audit actions recorded in SharingAuditEvent.Action.
+const (
+	SharingAuditGrantShared     = "grant-shared"
+	SharingAuditRevokeShared    = "revoke-shared"
+	SharingAuditExcludeShared   = "exclude-shared"
+	SharingAuditRemoveExclusion = "remove-exclusion"
+	SharingAuditCopyAccepted    = "copy-accepted"
+	SharingAuditLinkRefreshed   = "link-refreshed"
+)
+
+// SharingAuditEvent is one committed cross-user change: who acted, what
+// they did, which owner-scoped transaction and audience it targets, and
+// when. Audience and link fields apply only to the actions that name them;
+// Status carries the link-refresh outcome. RequestID ties the event to the
+// idempotency key that executed it.
+type SharingAuditEvent struct {
+	Seq         int64  `json:"seq"`
+	ActorUserID string `json:"actorUserId"`
+	Action      string `json:"action"`
+	OwnerUserID string `json:"ownerUserId"`
+	PostingID   string `json:"postingId"`
+	Audience    string `json:"audienceType,omitempty"`
+	AudienceID  string `json:"audienceId,omitempty"`
+	LinkID      string `json:"linkId,omitempty"`
+	Status      string `json:"status,omitempty"`
+	RequestID   string `json:"requestId"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
+// SharingRevocation names one removed consent row: the owner-scoped
+// transaction plus the audience it no longer covers. It is the recorded
+// outcome of a revoke or exclusion-removal request, so retries replay it.
+type SharingRevocation struct {
+	OwnerUserID string `json:"ownerUserId"`
+	PostingID   string `json:"postingId"`
+	Audience    string `json:"audienceType"`
+	AudienceID  string `json:"audienceId"`
+	Intent      string `json:"intent"`
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {

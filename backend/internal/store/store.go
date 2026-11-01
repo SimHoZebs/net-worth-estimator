@@ -140,21 +140,33 @@ type Database interface {
 	// source owner may grant; callers must pass the authenticated owner's
 	// own user ID. A grant for an audience with an active exclusion is
 	// rejected until the exclusion is removed. Grants are idempotent.
-	GrantSharedPosting(ownerID, postingID, audienceType, audienceID string) (SharingGrant, error)
+	// requestID is a client-generated UUID: a retry with the same key
+	// replays the recorded grant, while the same key naming a different
+	// action or target fails with ErrSharingConflict.
+	GrantSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (SharingGrant, error)
 	// RevokeSharedPosting deletes one explicit grant. Subsequent reads deny
-	// access unless another independent valid grant survives.
-	RevokeSharedPosting(ownerID, postingID, audienceType, audienceID string) error
+	// access unless another independent valid grant survives. requestID
+	// carries the same idempotency contract as GrantSharedPosting.
+	RevokeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) error
 	// ExcludeSharedPosting records the owner's explicit exclusion of one
 	// audience for one posting, including a wildcard (audience "all") that
 	// covers current and future audiences. An audience with an active grant
 	// cannot be excluded until the grant is revoked. Exclusions are
 	// idempotent. A user exclusion denies that person even through group
-	// grants; other group members stay authorized.
-	ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID string) (SharingGrant, error)
-	// RemoveSharedExclusion deletes one explicit exclusion.
-	RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID string) error
+	// grants; other group members stay authorized. requestID carries the
+	// same idempotency contract as GrantSharedPosting.
+	ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (SharingGrant, error)
+	// RemoveSharedExclusion deletes one explicit exclusion. requestID
+	// carries the same idempotency contract as GrantSharedPosting.
+	RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID, requestID string) error
 	// ListSharingGrants returns the owner's explicit grants and exclusions.
 	ListSharingGrants(ownerID string) ([]SharingGrant, error)
+	// ListSharingAudit returns the committed cross-user changes for one
+	// owner-scoped posting in sequence order. Callers must pass the source
+	// owner's own user ID: audit reads are owner-scoped like grant lists.
+	// Events carry actor, action, target identities, and time only, never
+	// transaction evidence.
+	ListSharingAudit(ownerID, postingID string) ([]SharingAuditEvent, error)
 	// CheckSharedPostingAccess evaluates read-time authorization for one
 	// owner-scoped posting and requester: current group and source-owner
 	// membership, owner consent (explicit grant), exclusions, and
@@ -180,8 +192,12 @@ type Database interface {
 	// intact, instead of minting duplicates. Every copy records its
 	// stable link identity (FND-04). Later revocation never rewrites or
 	// erases the copy. Source-original writes by another member stay
-	// deferred (no such path exists).
-	CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
+	// deferred (no such path exists). requestID is a client-generated
+	// UUID: retries with the same key replay the recorded copy. A source
+	// revision landing mid-accept fails with ErrSharingConflict and rolls
+	// the copy back instead of recording a torn link; the caller retries
+	// with a fresh read and a new key.
+	CopySharedPosting(ownerID, postingID, requesterID, requestID string) (types.Posting, error)
 	// GetSharingLink resolves the stable link for one of the recipient's
 	// own copies. It reports ErrNotFound for unknown copies, copies owned
 	// by another recipient, and malformed IDs, so link memory is never
@@ -197,7 +213,8 @@ type Database interface {
 	// live authorization and source state and records the outcome on the
 	// link row. It never writes the recipient's copy: recipient edits
 	// survive refresh, revocation, and source deletion alike. See
-	// SharingLinkRefresh for the status contract.
-	RefreshSharingLink(recipientID, copyPostingID string) (SharingLinkRefresh, error)
+	// SharingLinkRefresh for the status contract. requestID carries the
+	// same idempotency contract as GrantSharedPosting.
+	RefreshSharingLink(recipientID, copyPostingID, requestID string) (SharingLinkRefresh, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

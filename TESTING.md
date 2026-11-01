@@ -309,6 +309,15 @@ backend/scripts/verify.sh ./internal/simplefin
 backend/scripts/verify.sh ./cmd/server
 ```
 
+Social-operation audit and idempotency (FND-05) live in the sharing suites.
+Exercise them directly, including the race detector over the concurrent
+accept/edit storm:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/store/adapters/sqlite/ ./internal/sharing/ -run 'Sharing' -count=1
+go -C backend test -race ./internal/store/adapters/sqlite/ ./internal/sharing/ -run 'SharingConcurrent' -count=1
+```
+
 `backend/scripts/verify.sh` sets `CGO_ENABLED=0` and runs:
 
 1. `gofmt` check;
