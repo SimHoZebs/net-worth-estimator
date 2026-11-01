@@ -14,11 +14,10 @@ import (
 // the recipient-owned copy.
 func grantAndAccept(t *testing.T, h *sharing.Handler, db store.Database, alice, bob string) types.Posting {
 	t.Helper()
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", bob)); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob)); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	copyBody, _ := json.Marshal(map[string]string{"owner": resourceOf(alice), "postingId": sharedPostingID})
-	w := do(t, h, "POST", "/v1/shared/copies", "bob", string(copyBody))
+	w := do(t, h, "POST", "/v1/shared/copies", "bob", copyBody(t, resourceOf(alice), sharedPostingID))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("copy = %d (%s), want 201", w.Code, w.Body.String())
 	}
@@ -160,7 +159,7 @@ func TestSharingHTTPRevocationKeepsEditableCopy(t *testing.T) {
 
 	renamePosting(t, storeB, copied, "Recipient edited copy")
 
-	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", bob)); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob)); w.Code != http.StatusOK {
 		t.Fatalf("revoke = %d, want 200", w.Code)
 	}
 	readTarget := "/v1/shared/postings/" + resourceOf(alice) + "/" + sharedPostingID

@@ -91,7 +91,7 @@ func TestSharingPolicyOffByDefault(t *testing.T) {
 	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
 		t.Fatal("automatic access allowed with no policy")
 	}
-	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatalf("manual grant with automatic off: %v", err)
 	}
 	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed || access.Reason != "manual-user" {
@@ -403,10 +403,10 @@ func TestSharingPolicyRevocationAfterCommit(t *testing.T) {
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, posting.ID, bob)
+	copied, err := d.CopySharedPosting(alice, posting.ID, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +419,7 @@ func TestSharingPolicyRevocationAfterCommit(t *testing.T) {
 	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); !access.Allowed || access.Reason != "manual-user" {
 		t.Fatalf("access after disable = %+v, want surviving manual-user grant", access)
 	}
-	if err := d.RevokeSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RevokeSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
@@ -655,7 +655,7 @@ func TestSharingPolicyExclusionBeatsAutomatic(t *testing.T) {
 		Enabled: true, AccountIDs: []string{"checking"},
 		StartDate: "2026-01-01", EndDate: "2026-12-31",
 	})
-	if _, err := d.ExcludeSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.ExcludeSharedPosting(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {
@@ -664,10 +664,10 @@ func TestSharingPolicyExclusionBeatsAutomatic(t *testing.T) {
 	if access := checkPolicyAccess(t, d, alice, posting.ID, carol); !access.Allowed {
 		t.Fatal("exclusion leaked to another member")
 	}
-	if err := d.RemoveSharedExclusion(alice, posting.ID, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RemoveSharedExclusion(alice, posting.ID, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, posting.ID, store.SharingAudienceAll, ""); err != nil {
+	if _, err := d.ExcludeSharedPosting(alice, posting.ID, store.SharingAudienceAll, "", sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkPolicyAccess(t, d, alice, posting.ID, bob); access.Allowed {

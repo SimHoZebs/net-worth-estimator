@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
@@ -364,7 +365,7 @@ func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay st
 				return err
 			}
 		}
-		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceGroup, group.ID); err != nil {
+		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceGroup, group.ID, uuid.NewString()); err != nil {
 			return err
 		}
 		seeded = append(seeded, map[string]string{"id": posted.ID, "name": seed.Name})

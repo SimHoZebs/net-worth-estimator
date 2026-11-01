@@ -191,10 +191,24 @@ func (d *Database) sharingLinkGrant(ownerID, postingID, requesterID string) (str
 // authorization and source state and records the outcome on the link row.
 // It never writes the postings table: the recipient's copy and its edits
 // survive every outcome, and an unauthorized refresh exposes no source
-// content (not even the current revision).
-func (d *Database) RefreshSharingLink(recipientID, copyPostingID string) (store.SharingLinkRefresh, error) {
+// content (not even the current revision). requestID is a client UUID: a
+// retry replays the recorded outcome. The link update commits before the
+// outcome key, so an interrupted refresh retries as a new execution
+// converging to current rather than replaying an unapplied outcome.
+func (d *Database) RefreshSharingLink(recipientID, copyPostingID, requestID string) (store.SharingLinkRefresh, error) {
+	if err := checkSharingRequestID(requestID); err != nil {
+		return store.SharingLinkRefresh{}, err
+	}
 	link, err := d.GetSharingLink(recipientID, copyPostingID)
 	if err != nil {
+		return store.SharingLinkRefresh{}, err
+	}
+	if recorded, err := lookupSharingRequest(d.db, recipientID, requestID); err == nil {
+		if err := matchSharingRequest(recorded, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourcePostingID, "", "", link.LinkID); err != nil {
+			return store.SharingLinkRefresh{}, err
+		}
+		return decodeSharingResult[store.SharingLinkRefresh](recorded)
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return store.SharingLinkRefresh{}, err
 	}
 	now := time.Now().Unix()
@@ -204,6 +218,32 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID string) (store.
 		}
 		link.RefreshedAt = now
 		return nil
+	}
+	// finish records the committed outcome: one audit row for the
+	// mutation plus the idempotency key, in one short transaction so a
+	// concurrent same-key refresh cannot double-audit. A key collision
+	// means a concurrent same-key refresh committed first, so its outcome
+	// wins: our audit row rolls back and the winner replays. The rollback
+	// precedes the replay read: the store holds one connection, so reading
+	// while our transaction stands open would deadlock on our own lock.
+	finish := func(outcome store.SharingLinkRefresh) (store.SharingLinkRefresh, error) {
+		tx, err := d.db.Begin()
+		if err != nil {
+			return store.SharingLinkRefresh{}, err
+		}
+		defer tx.Rollback()
+		if err := auditShareEvent(tx, link.SourceOwnerID, recipientID, store.SharingAuditLinkRefreshed,
+			link.SourcePostingID, "", "", link.LinkID, outcome.Status, requestID); err != nil {
+			return store.SharingLinkRefresh{}, err
+		}
+		if err := recordSharingRequest(tx, recipientID, requestID, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourcePostingID, "", "", link.LinkID, outcome); err != nil {
+			_ = tx.Rollback()
+			if isUniqueViolation(err) {
+				return d.replaySharingRefresh(recipientID, requestID, link)
+			}
+			return store.SharingLinkRefresh{}, err
+		}
+		return outcome, tx.Commit()
 	}
 	var present int
 	if err := d.db.QueryRow(`SELECT COUNT(*) FROM postings WHERE user_id = ? AND id = ?`, link.SourceOwnerID, link.SourcePostingID).Scan(&present); err != nil {
@@ -215,7 +255,7 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID string) (store.
 		if err := touch(); err != nil {
 			return store.SharingLinkRefresh{}, err
 		}
-		return store.SharingLinkRefresh{Link: link, Status: store.SharingLinkSourceGone}, nil
+		return finish(store.SharingLinkRefresh{Link: link, Status: store.SharingLinkSourceGone})
 	}
 	access, err := d.CheckSharedPostingAccess(link.SourceOwnerID, link.SourcePostingID, recipientID)
 	if err != nil {
@@ -227,7 +267,7 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID string) (store.
 		if err := touch(); err != nil {
 			return store.SharingLinkRefresh{}, err
 		}
-		return store.SharingLinkRefresh{Link: link, Status: store.SharingLinkUnauthorized}, nil
+		return finish(store.SharingLinkRefresh{Link: link, Status: store.SharingLinkUnauthorized})
 	}
 	source, err := d.ReadSharedPosting(link.SourceOwnerID, link.SourcePostingID, recipientID)
 	if err != nil {
@@ -254,5 +294,18 @@ func (d *Database) RefreshSharingLink(recipientID, copyPostingID string) (store.
 	link.GrantAudienceID = audienceID
 	link.GrantReason = reason
 	link.RefreshedAt = now
-	return store.SharingLinkRefresh{Link: link, Status: status, CurrentSourceRevision: revision}, nil
+	return finish(store.SharingLinkRefresh{Link: link, Status: status, CurrentSourceRevision: revision})
+}
+
+// replaySharingRefresh re-reads a just-committed same-key outcome after a
+// key collision: a concurrent refresh with the same key committed first.
+func (d *Database) replaySharingRefresh(recipientID, requestID string, link store.SharingLink) (store.SharingLinkRefresh, error) {
+	recorded, err := lookupSharingRequest(d.db, recipientID, requestID)
+	if err != nil {
+		return store.SharingLinkRefresh{}, err
+	}
+	if err := matchSharingRequest(recorded, store.SharingAuditLinkRefreshed, link.SourceOwnerID, link.SourcePostingID, "", "", link.LinkID); err != nil {
+		return store.SharingLinkRefresh{}, err
+	}
+	return decodeSharingResult[store.SharingLinkRefresh](recorded)
 }

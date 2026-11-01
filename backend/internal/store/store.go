@@ -187,20 +187,30 @@ type Database interface {
 	// of their postings with one audience (a user or a group). Only the
 	// source owner may grant; callers must pass the authenticated owner's
 	// own user ID. A grant for an audience with an active exclusion is
-	// rejected until the exclusion is removed. Grants are idempotent.
-	GrantSharedPosting(ownerID, postingID, audienceType, audienceID string) (SharingGrant, error)
+	// rejected until the exclusion is removed. requestID is a
+	// client-generated UUID: a retry replays the recorded grant without
+	// re-executing, while a key reused for a different action or target
+	// fails with ErrSharingConflict. Failed attempts never consume the
+	// key. Every committed grant appends one sharing_audit row carrying
+	// the request key in its detail payload.
+	GrantSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (SharingGrant, error)
 	// RevokeSharedPosting deletes one explicit grant. Subsequent reads deny
-	// access unless another independent valid grant survives.
-	RevokeSharedPosting(ownerID, postingID, audienceType, audienceID string) error
+	// access unless another independent valid grant survives. requestID
+	// carries the grant idempotency contract: a retry replays the recorded
+	// revocation instead of reporting the now-missing grant.
+	RevokeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) error
 	// ExcludeSharedPosting records the owner's explicit exclusion of one
 	// audience for one posting, including a wildcard (audience "all") that
 	// covers current and future audiences. An audience with an active grant
 	// cannot be excluded until the grant is revoked. Exclusions are
 	// idempotent. A user exclusion denies that person even through group
-	// grants; other group members stay authorized.
-	ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID string) (SharingGrant, error)
-	// RemoveSharedExclusion deletes one explicit exclusion.
-	RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID string) error
+	// grants; other group members stay authorized. requestID carries the
+	// grant idempotency contract.
+	ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (SharingGrant, error)
+	// RemoveSharedExclusion deletes one explicit exclusion. requestID
+	// carries the grant idempotency contract: a retry replays the recorded
+	// removal.
+	RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID, requestID string) error
 	// ListSharingGrants returns the owner's explicit grants and exclusions.
 	ListSharingGrants(ownerID string) ([]SharingGrant, error)
 	// CheckSharedPostingAccess evaluates read-time authorization for one
@@ -237,11 +247,18 @@ type Database interface {
 	// key, so accepting a share never manufactures a duplicate bank
 	// posting. Copies are idempotent per source-plus-recipient triple:
 	// repeat accepts return the existing recipient row, with its edits
-	// intact, instead of minting duplicates. Every copy records its
-	// stable link identity (FND-04). Later revocation never rewrites or
+	// intact, instead of minting duplicates. requestID is a
+	// client-generated UUID: retries with the same key replay the recorded
+	// copy, while a key reused for a different action or target fails with
+	// ErrSharingConflict. A source revision landing mid-accept fails with
+	// ErrSharingConflict and rolls the copy back instead of recording a
+	// torn link; a concurrent accept losing the link-identity race resolves
+	// to the winner's copy. Every copy records its
+	// stable link identity (FND-04) and appends one copy-accepted audit row
+	// carrying the link and the request key. Later revocation never rewrites or
 	// erases the copy. Source-original writes by another member stay
 	// deferred (no such path exists).
-	CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
+	CopySharedPosting(ownerID, postingID, requesterID, requestID string) (types.Posting, error)
 	// GetSharingLink resolves the stable link for one of the recipient's
 	// own copies. It reports ErrNotFound for unknown copies, copies owned
 	// by another recipient, and malformed IDs, so link memory is never
@@ -256,9 +273,12 @@ type Database interface {
 	// RefreshSharingLink re-checks one of the recipient's links against
 	// live authorization and source state and records the outcome on the
 	// link row. It never writes the recipient's copy: recipient edits
-	// survive refresh, revocation, and source deletion alike. See
+	// survive refresh, revocation, and source deletion alike. requestID is
+	// a client-generated UUID: a retry replays the recorded outcome, and
+	// each committed refresh appends one link-refreshed audit row carrying
+	// the link, the outcome status, and the request key. See
 	// SharingLinkRefresh for the status contract.
-	RefreshSharingLink(recipientID, copyPostingID string) (SharingLinkRefresh, error)
+	RefreshSharingLink(recipientID, copyPostingID, requestID string) (SharingLinkRefresh, error)
 	// WithdrawUserGrant deletes a direct user-audience grant addressed to
 	// the recipient themselves. It is the recipient's own refusal path: it
 	// never touches grants addressed to anyone else or group-audience
@@ -313,11 +333,15 @@ type Database interface {
 	// no amounts, payees, or row IDs leave the owner's scope.
 	PreviewSharingPolicy(ownerID, groupID string) (SharingPolicyPreview, error)
 	// ListSharingAudit returns the committed cross-user changes for one
-	// owner-scoped posting in sequence order, including split-created,
-	// split-updated, and split-accepted rows. Callers must pass the source
-	// owner's own user ID: audit reads are owner-scoped like grant lists.
-	// Events carry actor, action, target identities, and time only, never
-	// transaction evidence.
+	// owner-scoped posting in sequence order: consent rows (grant, revoke,
+	// exclude, unexclude), accepted-copy and link-refresh rows, and
+	// split-created, split-updated, and split-accepted rows. Callers must
+	// pass the source owner's own user ID: audit reads are owner-scoped
+	// like grant lists, with no audience-side read. Events carry actor,
+	// action, target identities, link, outcome status, request key, and
+	// time only, never transaction evidence. Link, status, and key decode
+	// from the audit detail payload; actions that name none leave them
+	// empty.
 	ListSharingAudit(ownerID, postingID string) ([]SharingAuditEvent, error)
 	// CreateSplit persists version 1 of a split obligation dividing one
 	// shared transaction across its participants. The actor must be the

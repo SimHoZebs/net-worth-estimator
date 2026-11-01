@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -421,7 +422,11 @@ func (d *Database) AcceptInboxShare(recipientID, ownerID, postingID string) (sto
 		}
 	}
 	if copyID == "" {
-		copied, err := d.CopySharedPosting(ownerID, postingID, recipientID)
+		// The inbox accept path carries no client request key (the HTTP
+		// inbox routes take none), so each accept executes under a fresh
+		// server key. Triple-dedup still converges concurrent accepts on
+		// one copy with one audit row.
+		copied, err := d.CopySharedPosting(ownerID, postingID, recipientID, uuid.NewString())
 		if err != nil {
 			return store.InboxShareItem{}, err
 		}
