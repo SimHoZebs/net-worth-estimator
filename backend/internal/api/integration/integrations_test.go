@@ -35,6 +35,17 @@ func getIntegrations(t *testing.T, handler http.Handler) []integrationEntry {
 	return payload.Providers
 }
 
+func simplefinEntry(t *testing.T, providers []integrationEntry) integrationEntry {
+	t.Helper()
+	for _, entry := range providers {
+		if entry.ID == "simplefin" {
+			return entry
+		}
+	}
+	t.Fatalf("providers = %+v, want a simplefin entry", providers)
+	return integrationEntry{}
+}
+
 func TestListIntegrationsReflectsSimpleFINConnection(t *testing.T) {
 	database := openAPIStore(t)
 	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {
@@ -47,8 +58,8 @@ func TestListIntegrationsReflectsSimpleFINConnection(t *testing.T) {
 	handler := New(database, Config{SyncRunner: runner})
 
 	providers := getIntegrations(t, handler)
-	if len(providers) != 1 || providers[0].ID != "simplefin" {
-		t.Fatalf("providers = %+v, want one simplefin entry", providers)
+	if len(providers) != 2 || providers[0].ID != "simplefin" || providers[1].ID != "gmail" {
+		t.Fatalf("providers = %+v, want [simplefin gmail] in registration order", providers)
 	}
 	if providers[0].Connected || providers[0].SyncConfigured {
 		t.Fatalf("providers = %+v, want disconnected", providers)
@@ -61,10 +72,7 @@ func TestListIntegrationsReflectsSimpleFINConnection(t *testing.T) {
 	}
 
 	providers = getIntegrations(t, handler)
-	if len(providers) != 1 {
-		t.Fatalf("providers = %+v, want one entry", providers)
-	}
-	entry := providers[0]
+	entry := simplefinEntry(t, providers)
 	if !entry.Connected || !entry.SyncConfigured {
 		t.Fatalf("entry = %+v, want connected and configured", entry)
 	}
@@ -86,7 +94,7 @@ func TestListIntegrationsReflectsSimpleFINConnection(t *testing.T) {
 		t.Fatalf("disconnect status = %d, body %s", remove.Code, remove.Body.String())
 	}
 	providers = getIntegrations(t, handler)
-	if len(providers) != 1 || providers[0].Connected {
+	if entry := simplefinEntry(t, providers); entry.Connected {
 		t.Fatalf("providers = %+v, want disconnected after disconnect", providers)
 	}
 }
@@ -106,7 +114,7 @@ func TestListIntegrationsReportsLastSync(t *testing.T) {
 		t.Fatalf("stamp sync: %v", err)
 	}
 	providers := getIntegrations(t, handler)
-	if len(providers) != 1 || providers[0].LastSyncAt != "2026-10-26T00:00:00Z" {
+	if entry := simplefinEntry(t, providers); entry.LastSyncAt != "2026-10-26T00:00:00Z" {
 		t.Fatalf("providers = %+v, want recorded last sync", providers)
 	}
 }
