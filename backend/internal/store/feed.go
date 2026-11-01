@@ -15,7 +15,7 @@ import (
 
 // feedNumericExpression mirrors the record lists' literal detection: a
 // plain numeric recipe counts as fixed; anything else calculates.
-var feedNumericExpression = regexp.MustCompile(`^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$`)
+var feedNumericExpression = regexp.MustCompile(`(?i)^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$`)
 
 func parseFeedNumeric(text string) (float64, bool) {
 	if text == "" || !feedNumericExpression.MatchString(text) {
@@ -60,9 +60,10 @@ func FeedLiteralAmount(amount types.PostingAmountResolution) (float64, bool) {
 	}
 	if expression, ok := amount.Config["expression"]; ok {
 		if text, ok := expression.(string); ok {
-			return parseFeedNumeric(strings.TrimSpace(text))
+			if value, ok := parseFeedNumeric(strings.TrimSpace(text)); ok {
+				return value, true
+			}
 		}
-		return 0, false
 	}
 	for _, key := range []string{"value", "amount"} {
 		if raw, ok := amount.Config[key]; ok {

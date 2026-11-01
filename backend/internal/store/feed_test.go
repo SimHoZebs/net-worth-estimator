@@ -19,6 +19,9 @@ func TestFeedLiteralAmount(t *testing.T) {
 		fixed  bool
 	}{
 		{"numeric expression", expression(map[string]any{"expression": "10.5"}), 10.5, true},
+		{"uppercase exponent", expression(map[string]any{"expression": "1E3"}), 1000, true},
+		{"formula with value fallback", expression(map[string]any{"expression": "balance * 2", "value": 7.25}), 7.25, true},
+		{"non-string expression with value fallback", expression(map[string]any{"expression": 42, "value": 7.25}), 7.25, true},
 		{"padded expression", expression(map[string]any{"expression": "  42 "}), 42, true},
 		{"negative exponent", expression(map[string]any{"expression": "-1.5e3"}), -1500, true},
 		{"formula", expression(map[string]any{"expression": "balance * 2"}), 0, false},
