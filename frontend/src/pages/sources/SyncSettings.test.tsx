@@ -50,6 +50,10 @@ function stubApi(state: {
 	syncEnabled?: boolean;
 	readOnly?: boolean;
 	holdStatus?: Promise<void>;
+	gmailConnected?: boolean;
+	gmailLookback?: number;
+	failGmailCredential?: boolean;
+	gmailUnavailable?: boolean;
 }) {
 	const jsonHeaders = () => {
 		const headers = new Headers({ "content-type": "application/json" });
@@ -141,6 +145,33 @@ function stubApi(state: {
 		}
 		if (path === "/v1/sync/simplefin/cards") {
 			throw new Error("cards endpoint must not be called");
+		}
+		if (path === "/v1/integrations/gmail/credential") {
+			record();
+			if (state.gmailUnavailable)
+				return new Response(JSON.stringify({ detail: "gmail is not configured" }), {
+					status: 503,
+					headers: jsonHeaders(),
+				});
+			if (state.failGmailCredential)
+				return new Response(JSON.stringify({ detail: "boom" }), {
+					status: 500,
+					headers: jsonHeaders(),
+				});
+			return new Response(
+				JSON.stringify(
+					state.gmailConnected
+						? {
+								connected: true,
+								emailAddress: "reader@example.com",
+								connectedAt: "2026-10-26T00:00:00Z",
+								scopes: "https://www.googleapis.com/auth/gmail.readonly",
+								lookbackDays: state.gmailLookback ?? 90,
+							}
+						: { connected: false, lookbackDays: state.gmailLookback ?? 90 },
+				),
+				{ headers: jsonHeaders() },
+			);
 		}
 		if (path === "/v1/sync/simplefin/accounts") {
 			record();
@@ -365,11 +396,26 @@ it("ignores unregistered provider IDs without extra sections", async () => {
 	stubApi({
 		configured: true,
 		links: [],
+		extraProviders: [{ id: "carrier-pigeon" }],
+	});
+	render(<SyncSettings />);
+	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
+	expect(screen.queryByText("carrier-pigeon")).toBeNull();
+});
+
+it("renders the Gmail section for the registered gmail provider", async () => {
+	stubApi({
+		configured: true,
+		links: [],
 		extraProviders: [{ id: "gmail" }],
 	});
 	render(<SyncSettings />);
 	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
-	expect(screen.queryByText("gmail")).toBeNull();
+	expect(
+		await screen.findByRole("heading", {
+			name: "Connect Gmail for receipt discovery",
+		}),
+	).toBeTruthy();
 });
 
 it("shows an error when the provider list fails to load", async () => {
