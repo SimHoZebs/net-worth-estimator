@@ -253,6 +253,24 @@ authorized-only preview. Inbox mutations stay idempotent under retry, and
 creation endpoints must take idempotency keys so retries cannot create
 duplicate requests.
 
+SOC-02 HTTP contract (recipient scope, existing shapes only):
+
+- `POST /v1/shared/copies` accepts `{owner, postingId}` and returns the
+  recipient-owned copy as `{"posting": <transaction>}`. The copy is an
+  ordinary owner-authored row (`source: "user"`, never pending or void,
+  no bank sync key); repeat accepts return the existing row with its
+  edits intact. Recipient edits to the copy never reach the source, and
+  there is still no path that edits another member's original (405).
+- `GET /v1/shared/copies/{copyId}/link` returns `{"link": <SharingLink>}`
+  with the deterministic link ID, source and recipient identities,
+  observed source revision, and authorizing grant. It is the recipient's
+  own provenance, so it stays readable after revocation.
+- `POST /v1/shared/copies/{copyId}/refresh` returns the
+  `SharingLinkRefresh` value (`link`, `status`, and `currentSourceRevision`
+  only while authorized). Statuses are `current`, `source-changed`,
+  `unauthorized`, and `source-gone`. Refresh records on the link row and
+  obeys the read-only kill switch; it never writes the copy.
+
 Casdoor's external permission API evaluates the model and stored policy rows.
 Use the model's deny rules or remove the relevant policy/binding to revoke
 access. Do not treat application-sign-in approval or UI enable flags as an
