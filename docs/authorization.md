@@ -208,6 +208,75 @@ driver binds arguments to placeholders sequentially by index and ignores
 `sql.Named` wrapping, so the auto-appended `:user_id` argument binds to
 whatever placeholder stands last — keep `:named` placeholders textually
 last or values silently misbind with no error.
+## Linked transactions (FND-04)
+
+A link binds one source-owner posting to one recipient-owned private copy
+through immutable identities stored in `sharing_copies`. The copy stays
+an ordinary recipient-owned posting; the link is its provenance, not a
+shared-transaction response DTO (reads still return the existing
+transaction shape only).
+
+Identities on one link (`store.SharingLink`):
+
+- Source transaction ID: `sourceOwnerId` plus `sourcePostingId`.
+- Link ID: `link_` plus 64 lowercase hex characters, derived as
+  `SHA-256("nwe-sharing-link/v1" || sourceOwnerId || sourcePostingId ||
+  recipientUserId)` with `0x00` separators (`store.SharingLinkID`). One
+  link per source-plus-recipient triple: repeat accepts return the
+  existing recipient row instead of minting duplicates, so the link ID is
+  stable across refresh, revocation, re-grant, and retry replays. The
+  `link_` prefix keeps links out of the row-ID registry shared by
+  accounts, postings, rules, and evaluations. A future scheme change must
+  use a new namespace.
+- Source revision: opaque hex content hash of the source posting snapshot
+  observed at the last authorized copy or refresh
+  (`store.SharingSourceRevision`). Compare revisions for staleness; never
+  parse them.
+- Recipient owner: `recipientUserId` plus `copyPostingId`.
+- Sharing-grant identifiers: `grantAudienceType`, `grantAudienceId`, and
+  `grantReason` naming the concrete surviving grant (direct user grant,
+  or the first group grant in group-ID order where both parties hold
+  current membership).
+
+`CopySharedPosting` records the link at accept time and is idempotent per
+triple. Copies are always owner-authored with no bank sync key, so
+accepting a share never manufactures a duplicate bank posting.
+
+`RefreshSharingLink` re-checks live authorization and source state and
+records the outcome on the link row. It never writes the recipient's
+copy, so recipient edits survive every outcome. Statuses: `current`
+(authorized, revision matches), `source-changed` (authorized, link
+records the new revision while the copy keeps its edits),
+`unauthorized` (revoked, excluded, or membership ended; exposes no
+source content, not even the revision), `source-gone` (defensive: the
+source row is missing while the link survives, which `DeletePosting`
+never produces itself since it drops links with consent; the copy stays
+intact as an ordinary row). Source-row deletion through the API drops the
+link with the source consent; recipient-side copy deletion
+drops only its own link.
+
+Dependents (SOC-02 recipient copies, SOC-04B splits, FND-05 audit) should
+key on `linkId` for idempotency and reference, compare `sourceRevision`
+for staleness, and re-check authorization at read time rather than
+caching link state.
+
+SOC-02 HTTP contract (recipient scope, existing shapes only):
+
+- `POST /v1/shared/copies` accepts `{owner, postingId}` and returns the
+  recipient-owned copy as `{"posting": <transaction>}`. The copy is an
+  ordinary owner-authored row (`source: "user"`, never pending or void,
+  no bank sync key); repeat accepts return the existing row with its
+  edits intact. Recipient edits to the copy never reach the source, and
+  there is still no path that edits another member's original (405).
+- `GET /v1/shared/copies/{copyId}/link` returns `{"link": <SharingLink>}`
+  with the deterministic link ID, source and recipient identities,
+  observed source revision, and authorizing grant. It is the recipient's
+  own provenance, so it stays readable after revocation.
+- `POST /v1/shared/copies/{copyId}/refresh` returns the
+  `SharingLinkRefresh` value (`link`, `status`, and `currentSourceRevision`
+  only while authorized). Statuses are `current`, `source-changed`,
+  `unauthorized`, and `source-gone`. Refresh records on the link row and
+  obeys the read-only kill switch; it never writes the copy.
 
 Casdoor's external permission API evaluates the model and stored policy rows.
 Use the model's deny rules or remove the relevant policy/binding to revoke

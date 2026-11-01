@@ -17,6 +17,14 @@
 // no delegated write path for another member's original: writes to a
 // source original stay deferred, so non-GET methods on the read path
 // report 405.
+//
+// Recipient-owned copies (SOC-02) expose their FND-04 link provenance at
+// /v1/shared/copies/{copyId}/link (a read of the recipient's own memory,
+// allowed in read-only mode) and a refresh at
+// /v1/shared/copies/{copyId}/refresh that re-checks live authorization
+// and source state. Refresh records its outcome on the link row and never
+// rewrites the copy, so source changes surface only while authorized and
+// the copy survives revocation.
 package sharing
 
 import (
@@ -56,6 +64,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/grants", h.serveGrants)
 	mux.HandleFunc("/v1/shared/exclusions", h.serveExclusions)
 	mux.HandleFunc("/v1/shared/copies", h.serveCopies)
+	mux.HandleFunc("/v1/shared/copies/", h.serveCopyLink)
 	mux.HandleFunc("/v1/shared/postings", h.serveSharedList)
 	mux.HandleFunc("/v1/shared/postings/", h.serveSharedRead)
 	return middleware.Recoverer(api.CORSMiddleware(h.origins)(mux))
@@ -348,6 +357,60 @@ func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"posting": copied})
+}
+
+// serveCopyLink serves one recipient-owned copy's link provenance. The
+// link is the recipient's own memory: resolving it performs no source
+// authorization check, so it stays readable after revocation. Refresh
+// re-checks live authorization and records the outcome on the link row;
+// it never writes the copy, so recipient edits survive every outcome
+// and source changes surface only while authorized. Refresh mutates the
+// link row, so it obeys the read-only kill switch; the link read does
+// not. Unknown, foreign, and malformed copy IDs all report 404 so link
+// memory is never enumerable across users.
+func (h *Handler) serveCopyLink(w http.ResponseWriter, r *http.Request) {
+	recipient, _, ok := h.caller(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Sign in to view shared transactions.")
+		return
+	}
+	rest := strings.TrimPrefix(r.URL.Path, "/v1/shared/copies/")
+	copyID, action, found := strings.Cut(rest, "/")
+	if !found || copyID == "" || action == "" || strings.Contains(action, "/") {
+		writeProblem(w, http.StatusNotFound, "Shared transaction link not found.")
+		return
+	}
+	switch action {
+	case "link":
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
+			return
+		}
+		link, err := h.db.GetSharingLink(recipient, copyID)
+		if err != nil {
+			writeStoreError(w, err, "Shared transaction link not found.")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"link": link})
+	case "refresh":
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
+			return
+		}
+		if h.locked(w, r) {
+			return
+		}
+		refreshed, err := h.db.RefreshSharingLink(recipient, copyID)
+		if err != nil {
+			writeStoreError(w, err, "Shared transaction link not found.")
+			return
+		}
+		writeJSON(w, http.StatusOK, refreshed)
+	default:
+		writeProblem(w, http.StatusNotFound, "Shared transaction link not found.")
+	}
 }
 
 // resourceOwner converts the user-resource form (users/<64hex>) used by

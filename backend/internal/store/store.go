@@ -184,9 +184,15 @@ type Database interface {
 	RebuildSharingIndex(ownerID string) error
 	// CopySharedPosting accepts one authorized shared posting into the
 	// requester's own private model as an independent row: new ID,
-	// recipient ownership, no claim, and no remote coupling. Later
-	// revocation never rewrites or erases the copy. Source-original writes
-	// by another member stay deferred (no such path exists).
+	// recipient ownership, no claim, and no remote coupling. The copy is
+	// owner-authored (SourceUser, never pending or void) with no bank sync
+	// key, so accepting a share never manufactures a duplicate bank
+	// posting. Copies are idempotent per source-plus-recipient triple:
+	// repeat accepts return the existing recipient row, with its edits
+	// intact, instead of minting duplicates. Every copy records its
+	// stable link identity (FND-04). Later revocation never rewrites or
+	// erases the copy. Source-original writes by another member stay
+	// deferred (no such path exists).
 	CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
 	// SetSharingPolicy creates or replaces one member's automatic-sharing
 	// preference for one group (GRP-02). Only the owning member may set
@@ -207,5 +213,22 @@ type Database interface {
 	// member's stored policy plus the current audience size. Counts only:
 	// no amounts, payees, or row IDs leave the owner's scope.
 	PreviewSharingPolicy(ownerID, groupID string) (SharingPolicyPreview, error)
+	// GetSharingLink resolves the stable link for one of the recipient's
+	// own copies. It reports ErrNotFound for unknown copies, copies owned
+	// by another recipient, and malformed IDs, so link memory is never
+	// enumerable across users. It performs no source authorization check:
+	// the link is the recipient's own provenance.
+	GetSharingLink(recipientID, copyPostingID string) (SharingLink, error)
+	// GetSharingLinkByID resolves one of the recipient's links by its
+	// stable link ID, for callers that hold links (group feeds, splits,
+	// audit) rather than copy row IDs. Scope and failure behavior match
+	// GetSharingLink.
+	GetSharingLinkByID(linkID, recipientID string) (SharingLink, error)
+	// RefreshSharingLink re-checks one of the recipient's links against
+	// live authorization and source state and records the outcome on the
+	// link row. It never writes the recipient's copy: recipient edits
+	// survive refresh, revocation, and source deletion alike. See
+	// SharingLinkRefresh for the status contract.
+	RefreshSharingLink(recipientID, copyPostingID string) (SharingLinkRefresh, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

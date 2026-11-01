@@ -36,17 +36,29 @@ func sharingSchemaStatements() []string {
 			CHECK ((audience_type = 'all' AND audience_id = '' AND intent = 'excluded') OR (audience_type IN ('user', 'group') AND audience_id <> ''))
 		)`,
 		`CREATE INDEX IF NOT EXISTS sharing_grants_grantee ON sharing_grants(audience_type, audience_id, intent)`,
-		// sharing_copies records provenance for recipient-owned copies.
-		// The copy itself is an ordinary posting in the recipient's model:
-		// revocation never rewrites or erases it. Stable link identities
-		// (link ID, source revision) land with FND-04.
+		// sharing_copies records provenance plus the stable linked-transaction
+		// representation (FND-04) for recipient-owned copies. The copy itself
+		// is an ordinary posting in the recipient's model: revocation never
+		// rewrites or erases it. One row binds the immutable identities of a
+		// link: the source transaction (source_owner_id, source_posting_id),
+		// the stable link_id, the source_revision observed at the last
+		// authorized copy or refresh, the recipient owner (recipient_user_id,
+		// copy_posting_id), and the authorizing sharing-grant identifiers
+		// (grant audience type/id plus the access reason).
 		`CREATE TABLE IF NOT EXISTS sharing_copies (
 			recipient_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			copy_posting_id TEXT NOT NULL,
 			source_owner_id TEXT NOT NULL,
 			source_posting_id TEXT NOT NULL,
+			link_id TEXT NOT NULL,
+			source_revision TEXT NOT NULL DEFAULT '',
+			grant_audience_type TEXT NOT NULL DEFAULT '',
+			grant_audience_id TEXT NOT NULL DEFAULT '',
+			grant_reason TEXT NOT NULL DEFAULT '',
 			copied_at INTEGER NOT NULL,
-			PRIMARY KEY (recipient_user_id, copy_posting_id)
+			refreshed_at INTEGER NOT NULL DEFAULT 0,
+			PRIMARY KEY (recipient_user_id, copy_posting_id),
+			UNIQUE (link_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS sharing_copies_source ON sharing_copies(source_owner_id, source_posting_id)`,
 	}
@@ -599,6 +611,12 @@ func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPosting
 // otherwise reject the row). Destination IDs carry no store foreign key
 // and stay verbatim for the recipient to relink. Amount descriptors stay
 // verbatim; reference validation remains the API write boundary's job.
+// CreatePosting recomputes lifecycle, so the copy is always owner-authored
+// with no bank sync key: accepting a share never manufactures a duplicate
+// bank posting. Copies are idempotent per source-plus-recipient triple: a
+// repeat accept returns the existing recipient row, with its edits intact,
+// and resolves to the same stable link (FND-04) instead of minting a
+// duplicate.
 func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error) {
 	source, err := d.ReadSharedPosting(ownerID, postingID, requesterID)
 	if err != nil {
@@ -610,6 +628,15 @@ func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (ty
 	}
 	if recipients != 1 {
 		return types.Posting{}, store.ErrNotFound
+	}
+	recipient := &sqliteStore{db: &userDB{DB: d.db, userID: requesterID}, application: d}
+	// Idempotent accept: the stable link names one source-plus-recipient
+	// triple, so a repeat accept returns the existing recipient row with
+	// its edits intact instead of minting a duplicate.
+	if existing, ok, err := d.findSharingCopy(ownerID, postingID, requesterID); err != nil {
+		return types.Posting{}, err
+	} else if ok {
+		return existing, nil
 	}
 	copy := source
 	copy.ID = ""
@@ -623,7 +650,6 @@ func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (ty
 			copy.SourceAccountID = nil
 		}
 	}
-	recipient := &sqliteStore{db: &userDB{DB: d.db, userID: requesterID}, application: d}
 	created, err := recipient.CreatePosting(copy)
 	if err != nil {
 		return types.Posting{}, err
@@ -647,8 +673,23 @@ func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (ty
 		}
 		return types.Posting{}, err
 	}
-	if _, err := d.db.Exec(`INSERT INTO sharing_copies(recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, copied_at) VALUES (?, ?, ?, ?, ?)`,
-		requesterID, created.ID, ownerID, postingID, time.Now().Unix()); err != nil {
+	revision, err := store.SharingSourceRevision(source)
+	if err != nil {
+		if derr := recipient.DeletePosting(created.ID); derr != nil {
+			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
+		}
+		return types.Posting{}, fmt.Errorf("record sharing copy: %w", err)
+	}
+	audienceType, audienceID, reason, err := d.sharingLinkGrant(ownerID, postingID, requesterID)
+	if err != nil {
+		if derr := recipient.DeletePosting(created.ID); derr != nil {
+			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
+		}
+		return types.Posting{}, err
+	}
+	now := time.Now().Unix()
+	if _, err := d.db.Exec(`INSERT INTO sharing_copies(recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, link_id, source_revision, grant_audience_type, grant_audience_id, grant_reason, copied_at, refreshed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		requesterID, created.ID, ownerID, postingID, store.SharingLinkID(ownerID, postingID, requesterID), revision, audienceType, audienceID, reason, now, now); err != nil {
 		if derr := recipient.DeletePosting(created.ID); derr != nil {
 			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
 		}
