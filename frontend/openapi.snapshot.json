@@ -2385,6 +2385,25 @@
 				"required": ["row", "issues", "persisted"],
 				"type": "object"
 			},
+			"Preview-recurring-promotionResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Preview-recurring-promotionResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"preview": {
+						"$ref": "#/components/schemas/RecurringPromotionPreview"
+					}
+				},
+				"required": ["preview"],
+				"type": "object"
+			},
 			"Principal": {
 				"additionalProperties": false,
 				"properties": {
@@ -2650,6 +2669,71 @@
 					"horizonYears",
 					"evaluations"
 				],
+				"type": "object"
+			},
+			"Promote-recurring-patternResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Promote-recurring-patternResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"patternKey": {
+						"type": "string"
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"row": {
+						"$ref": "#/components/schemas/RecurrenceRule"
+					}
+				},
+				"required": ["row", "issues", "persisted", "revision", "patternKey"],
+				"type": "object"
+			},
+			"ProposedRecurringRule": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"type": "string"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"frequency": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
+				"required": ["name", "amount", "frequency", "startDate", "enabled"],
 				"type": "object"
 			},
 			"Receipt": {
@@ -2953,6 +3037,89 @@
 					"annualCap",
 					"priority",
 					"enabled"
+				],
+				"type": "object"
+			},
+			"RecurringPromotionOccurrence": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"type": "string"
+					},
+					"date": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					}
+				},
+				"required": ["postingId", "date", "amount"],
+				"type": "object"
+			},
+			"RecurringPromotionPreview": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"cadence": {
+						"type": "string"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"direction": {
+						"type": "string"
+					},
+					"existingRuleId": {
+						"type": "string"
+					},
+					"findingId": {
+						"type": "string"
+					},
+					"merchant": {
+						"type": "string"
+					},
+					"occurrences": {
+						"items": {
+							"$ref": "#/components/schemas/RecurringPromotionOccurrence"
+						},
+						"type": ["array", "null"]
+					},
+					"patternKey": {
+						"type": "string"
+					},
+					"promotable": {
+						"type": "boolean"
+					},
+					"reason": {
+						"type": "string"
+					},
+					"rule": {
+						"$ref": "#/components/schemas/ProposedRecurringRule"
+					},
+					"typicalAmount": {
+						"type": "string"
+					},
+					"upcoming": {
+						"items": {
+							"$ref": "#/components/schemas/UpcomingRecurringOccurrence"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"findingId",
+					"patternKey",
+					"merchant",
+					"cadence",
+					"occurrences",
+					"typicalAmount",
+					"currency",
+					"direction",
+					"accountId",
+					"promotable",
+					"reason"
 				],
 				"type": "object"
 			},
@@ -3928,6 +4095,19 @@
 					"readOnly"
 				],
 				"type": "object"
+			},
+			"UpcomingRecurringOccurrence": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"type": "string"
+					},
+					"date": {
+						"type": "string"
+					}
+				},
+				"required": ["date", "amount"],
+				"type": "object"
 			}
 		}
 	},
@@ -4623,6 +4803,89 @@
 					}
 				},
 				"summary": "Confirm or reject a finding and record plan duration"
+			}
+		},
+		"/v1/analysis-findings/{id}/recurring-preview": {
+			"get": {
+				"operationId": "preview-recurring-promotion",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Preview-recurring-promotionResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Preview the forecast rule a confirmed repeating pattern would create"
+			}
+		},
+		"/v1/analysis-findings/{id}/recurring-promotion": {
+			"post": {
+				"operationId": "promote-recurring-pattern",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Promote-recurring-patternResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create the approved forecast rule for a confirmed repeating pattern"
 			}
 		},
 		"/v1/auth/change-password": {

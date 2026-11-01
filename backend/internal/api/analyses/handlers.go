@@ -20,18 +20,20 @@ type analysisStatus struct {
 }
 
 type handler struct {
-	store    store.AnalysisStore
+	store    store.Store
 	canWrite func(context.Context) bool
 	actor    func(context.Context) string
 }
 
 // Register adds passive Analysis reads and explicit review operations.
-func Register(api huma.API, st store.AnalysisStore, canWrite func(context.Context) bool, actor func(context.Context) string) {
+func Register(api huma.API, st store.Store, canWrite func(context.Context) bool, actor func(context.Context) string) {
 	s := &handler{store: st, canWrite: canWrite, actor: actor}
 	huma.Register(api, huma.Operation{OperationID: "list-analyses", Method: "GET", Path: "/v1/analyses", Summary: "Read background analysis status without starting work"}, s.listAnalyses)
 	huma.Register(api, huma.Operation{OperationID: "list-analysis-findings", Method: "GET", Path: "/v1/analysis-findings", Summary: "Read persisted transaction findings"}, s.listAnalysisFindings)
 	huma.Register(api, huma.Operation{OperationID: "dismiss-analysis-finding", Method: "PATCH", Path: "/v1/analysis-findings/{id}", Summary: "Dismiss or restore a transaction finding"}, s.dismissAnalysisFinding)
 	huma.Register(api, huma.Operation{OperationID: "review-analysis-finding", Method: "POST", Path: "/v1/analysis-findings/{id}/feedback", Summary: "Confirm or reject a finding and record plan duration"}, s.reviewAnalysisFinding)
+	huma.Register(api, huma.Operation{OperationID: "preview-recurring-promotion", Method: "GET", Path: "/v1/analysis-findings/{id}/recurring-preview", Summary: "Preview the forecast rule a confirmed repeating pattern would create"}, s.previewRecurringPromotion)
+	huma.Register(api, huma.Operation{OperationID: "promote-recurring-pattern", Method: "POST", Path: "/v1/analysis-findings/{id}/recurring-promotion", Summary: "Create the approved forecast rule for a confirmed repeating pattern"}, s.promoteRecurringPattern)
 	huma.Register(api, huma.Operation{OperationID: "list-analysis-feedback", Method: "GET", Path: "/v1/analysis-feedback", Summary: "Read private labeled feedback with prediction provenance"}, s.listAnalysisFeedback)
 }
 

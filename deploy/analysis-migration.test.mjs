@@ -35,7 +35,7 @@ async function sourceDatabase() {
   await sql(db, `DROP TRIGGER IF EXISTS analysis_posting_lifecycle;
     DROP TRIGGER IF EXISTS analysis_posting_sim_lifecycle;
     DROP TABLE analysis_feedback; DROP TABLE analysis_findings; DROP TABLE analysis_runs;
-    DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs;
+    DROP TABLE transaction_source_facts; DROP TABLE analysis_inputs; DROP TABLE analysis_promotions;
     DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');`);
   await sql(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES
     ('${owner}','checking',0,'Fixture checking','cash',1);`);
@@ -57,7 +57,8 @@ const analysisSnapshot = async (db) => sql(db, `SELECT user_id, posting_id, fact
   SELECT user_id, revision FROM analysis_inputs ORDER BY 1;
   SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs ORDER BY 1, 2;
   SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
-  SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;`);
+  SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;
+  SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY 1, 2;`);
 
 test("Analysis migration completes schema on a verified candidate and repeats without writes", async () => {
   const { directory, db, owner } = await sourceDatabase();

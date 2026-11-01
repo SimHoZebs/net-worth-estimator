@@ -44,6 +44,11 @@ CREATE TABLE analysis_feedback (
   FOREIGN KEY(user_id, run_id) REFERENCES analysis_runs(user_id, id)
 );
 CREATE INDEX analysis_feedback_finding ON analysis_feedback(user_id, finding_id, id);
+CREATE TABLE analysis_promotions (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id, pattern_key)
+);
 CREATE TRIGGER analysis_facts_insert AFTER INSERT ON transaction_source_facts BEGIN
   INSERT INTO analysis_inputs(user_id, revision) VALUES (NEW.user_id, 1)
   ON CONFLICT(user_id) DO UPDATE SET revision = revision + 1;

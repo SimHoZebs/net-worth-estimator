@@ -64,7 +64,7 @@ async function toLegacyCheckpoints(db, stripAnalysis = true) {
     DROP TRIGGER IF EXISTS analysis_facts_delete;
     DROP TABLE IF EXISTS analysis_feedback; DROP TABLE IF EXISTS analysis_findings;
     DROP TABLE IF EXISTS analysis_runs; DROP TABLE IF EXISTS transaction_source_facts;
-    DROP TABLE IF EXISTS analysis_inputs;
+    DROP TABLE IF EXISTS analysis_inputs; DROP TABLE IF EXISTS analysis_promotions;
     DELETE FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');` : "";
   await sqlite(db, `${analysis}
     DROP TABLE checkpoints;
@@ -126,7 +126,8 @@ const analysisSnapshot = async (db) => rows(db, `SELECT user_id, posting_id, fac
   SELECT user_id, revision FROM analysis_inputs ORDER BY 1;
   SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs ORDER BY 1, 2;
   SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
-  SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;`);
+  SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;
+  SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions ORDER BY 1, 2;`);
 
 test("one-time audit-table removal preserves all current data and the backup", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-audit-"));
@@ -209,6 +210,38 @@ test("already-Analysis date source converts with byte-identical Analysis rows", 
   assert.equal(await analysisSnapshot(db), analysisBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
   assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+});
+
+test("pre-promotion Analysis source gains only the empty promotion link table", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-promotions-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE analysis_promotions;`);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('${owner}',1,0,'checking',100,'user',${DAY_CLOSE_0310});`);
+  await sqlite(db, `INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('${owner}','settled-a','Grocer','checking','null','{}',1773140400,1773129600,'simplefin',0,0);`);
+  await sqlite(db, `INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES ('${owner}','settled-a',0,1,0);`);
+  await sqlite(db, `INSERT INTO entity_ids(user_id,id,kind) VALUES ('${owner}','settled-a','posting');`);
+  await seedAnalysisChain(db, owner);
+  const fiveTableSnapshot = `SELECT user_id, posting_id, facts_json FROM transaction_source_facts ORDER BY 1, 2;
+    SELECT user_id, revision FROM analysis_inputs ORDER BY 1;
+    SELECT user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json FROM analysis_runs ORDER BY 1, 2;
+    SELECT user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision FROM analysis_findings ORDER BY 1, 2;
+    SELECT user_id, id, request_id, finding_id, run_id, created_at, payload_json FROM analysis_feedback ORDER BY 1, 2;`;
+  const analysisBefore = await rows(db, fiveTableSnapshot);
+
+  await migrate(db);
+
+  assert.equal(await rows(db, fiveTableSnapshot), analysisBefore);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM analysis_promotions;"), "0");
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+
+  const backupsBefore = await backups(directory);
+  const result = await migrate(db);
+  assert.match(result.stdout, /verified, nothing to do/);
+  assert.deepEqual(await backups(directory), backupsBefore);
+  assert.equal(await analysisSnapshot(db), analysisBefore);
 });
 
 test("complete target repeats read-only and preserves owner disables byte-identical", async (t) => {

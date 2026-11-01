@@ -1,4 +1,4 @@
-package analysis
+package analysis_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
@@ -23,7 +24,7 @@ func recurringDay(year int, month time.Month, day int) int64 {
 
 func analyzeRecurring(t *testing.T, items []types.AnalysisTransaction) []types.AnalysisDetection {
 	t.Helper()
-	result, err := (Recurring{}).Analyze(context.Background(), types.AnalysisSnapshot{Transactions: items})
+	result, err := (analysis.Recurring{}).Analyze(context.Background(), types.AnalysisSnapshot{Transactions: items})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +188,7 @@ func TestRecurringCancellationAndDeterminism(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := (Recurring{}).Analyze(ctx, types.AnalysisSnapshot{Transactions: items}); err != context.Canceled {
+	if _, err := (analysis.Recurring{}).Analyze(ctx, types.AnalysisSnapshot{Transactions: items}); err != context.Canceled {
 		t.Fatalf("cancellation=%v", err)
 	}
 }
@@ -221,7 +222,7 @@ func TestRecurringCoexistsWithBNPLAndLeavesModelAlone(t *testing.T) {
 	if _, err := scoped.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})); err != nil {
 		t.Fatal(err)
 	}
-	runner, err := NewRunner(database, Definitions()...)
+	runner, err := analysis.NewRunner(database, analysis.Definitions()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +290,7 @@ func TestRecurringSingleTransactionKeepsFindingCount(t *testing.T) {
 	if _, err := scoped.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})); err != nil {
 		t.Fatal(err)
 	}
-	runner, err := NewRunner(database, Definitions()...)
+	runner, err := analysis.NewRunner(database, analysis.Definitions()...)
 	if err != nil {
 		t.Fatal(err)
 	}

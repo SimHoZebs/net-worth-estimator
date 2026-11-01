@@ -25,6 +25,16 @@ var ErrNotFound = errors.New("not found")
 var ErrAnalysisFeedbackConflict = errors.New("the finding changed; review it again")
 var ErrAnalysisFeedbackInvalid = errors.New("invalid analysis feedback")
 
+// ErrRecurringPromotionInvalid reports a pattern that cannot become a
+// forecast rule: a non-recurring finding or incoherent evidence. Handlers
+// map it to 422 and may show its message.
+var ErrRecurringPromotionInvalid = errors.New("recurring pattern cannot become a forecast rule")
+
+// ErrRecurringPromotionConflict reports a pattern whose state changed since
+// confirmation, or that already has an active generated rule. Handlers map
+// it to 409 and may show its message.
+var ErrRecurringPromotionConflict = errors.New("recurring pattern changed or already has a forecast rule")
+
 // ErrGroupForbidden reports a group action the caller's role may not perform.
 // It distinguishes denial (403) from unknown groups or members (404,
 // ErrNotFound).
