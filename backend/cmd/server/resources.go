@@ -12,6 +12,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
@@ -80,9 +81,21 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		ReadOnly:       apiConfig.ReadOnly,
 	})
 	groupRoutes := groupHandler.Routes()
+	// Sharing routes carry the same own-user permission checks and resource
+	// header as every other user route (enforced in identity.Wrap) plus
+	// per-posting source-owner consent in the sharing handler.
+	sharingHandler := sharing.New(database, loginConfig.Issuer, sharing.Config{
+		AllowedOrigins: apiConfig.AllowedOrigins,
+		ReadOnly:       apiConfig.ReadOnly,
+	})
+	sharingRoutes := sharingHandler.Routes()
 	combined := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if identity.IsGroupRoute(r.URL.Path) {
 			groupRoutes.ServeHTTP(w, r)
+			return
+		}
+		if identity.IsSharingRoute(r.URL.Path) {
+			sharingRoutes.ServeHTTP(w, r)
 			return
 		}
 		router.ServeHTTP(w, r)

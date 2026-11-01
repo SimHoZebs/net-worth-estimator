@@ -135,5 +135,46 @@ type Database interface {
 	AcceptInvite(code, userID, displayName string) (Group, error)
 	TouchMemberDisplay(userID, displayName string)
 	RemoveGroupMembershipsForUser(userID string) error
+	// GrantSharedPosting records the owner's explicit decision to share one
+	// of their postings with one audience (a user or a group). Only the
+	// source owner may grant; callers must pass the authenticated owner's
+	// own user ID. A grant for an audience with an active exclusion is
+	// rejected until the exclusion is removed. Grants are idempotent.
+	GrantSharedPosting(ownerID, postingID, audienceType, audienceID string) (SharingGrant, error)
+	// RevokeSharedPosting deletes one explicit grant. Subsequent reads deny
+	// access unless another independent valid grant survives.
+	RevokeSharedPosting(ownerID, postingID, audienceType, audienceID string) error
+	// ExcludeSharedPosting records the owner's explicit exclusion of one
+	// audience for one posting, including a wildcard (audience "all") that
+	// covers current and future audiences. An audience with an active grant
+	// cannot be excluded until the grant is revoked. Exclusions are
+	// idempotent. A user exclusion denies that person even through group
+	// grants; other group members stay authorized.
+	ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID string) (SharingGrant, error)
+	// RemoveSharedExclusion deletes one explicit exclusion.
+	RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID string) error
+	// ListSharingGrants returns the owner's explicit grants and exclusions.
+	ListSharingGrants(ownerID string) ([]SharingGrant, error)
+	// CheckSharedPostingAccess evaluates read-time authorization for one
+	// owner-scoped posting and requester: current group and source-owner
+	// membership, owner consent (explicit grant), exclusions, and
+	// revocation state. It queries current rows on every call; there is no
+	// positive auth cache and no materialized index shortcut.
+	CheckSharedPostingAccess(ownerID, postingID, requesterID string) (SharedPostingAccess, error)
+	// ReadSharedPosting returns the owner's posting in the existing
+	// transaction shape when the requester is currently authorized. Missing
+	// and denied postings both report ErrNotFound so existence is not
+	// enumerable. It never exposes accounts, balances, models, secrets,
+	// or receipts.
+	ReadSharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
+	// ListSharedPostings returns every posting currently shared with the
+	// requester, each in the existing transaction shape with its owner.
+	ListSharedPostings(requesterID string) ([]SharedPostingRef, error)
+	// CopySharedPosting accepts one authorized shared posting into the
+	// requester's own private model as an independent row: new ID,
+	// recipient ownership, no claim, and no remote coupling. Later
+	// revocation never rewrites or erases the copy. Source-original writes
+	// by another member stay deferred (no such path exists).
+	CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

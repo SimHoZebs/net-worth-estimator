@@ -174,6 +174,55 @@ type GroupInvite struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
+// Sharing audience kinds for cross-user transaction authorization (FND-02).
+// A grant names one posting owned by one user and visible to one audience:
+// a single user, every current member of a group, or (exclusions only) all
+// current and future audiences.
+const (
+	SharingAudienceUser  = "user"
+	SharingAudienceGroup = "group"
+	SharingAudienceAll   = "all"
+)
+
+// Sharing intent states. Explicit intent for one posting plus one audience
+// is a single row: default (absent), explicitly shared, or excluded.
+// Explicit share and exclusion cannot coexist for the same audience.
+const (
+	SharingIntentShared   = "shared"
+	SharingIntentExcluded = "excluded"
+)
+
+// SharingGrant is one explicit owner decision for one posting and audience.
+// OwnerUserID and PostingID form the owner-scoped transaction identity;
+// AudienceType is user, group, or all (wildcard exclusions only);
+// AudienceID is the grantee user ID, group ID, or empty for wildcard.
+type SharingGrant struct {
+	OwnerUserID string `json:"ownerUserId"`
+	PostingID   string `json:"postingId"`
+	Audience    string `json:"audienceType"`
+	AudienceID  string `json:"audienceId"`
+	Intent      string `json:"intent"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
+// SharedPostingAccess is the result of a read-time authorization check.
+// Allowed is true only when at least one independent valid grant survives
+// current membership, exclusion, and revocation state. Reason names the
+// surviving grant kind ("manual-user" or "manual-group"); policy-derived
+// automatic reasons land with GRP-02.
+type SharedPostingAccess struct {
+	Allowed bool   `json:"allowed"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+// SharedPostingRef pairs a shared posting with its source owner. The
+// posting value reuses the existing transaction model; there is no
+// separate cross-user DTO and no column-level ACL.
+type SharedPostingRef struct {
+	OwnerUserID string        `json:"ownerUserId"`
+	Posting     types.Posting `json:"posting"`
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {

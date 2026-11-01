@@ -74,5 +74,16 @@ func IsGroupRoute(path string) bool {
 		path == "/v1/invites/accept"
 }
 
+// IsSharingRoute reports cross-user transaction-sharing routes (FND-02).
+// Like group calls, they require the standard own-user permission checks
+// and resource header; source-owner consent, audience membership, and
+// revocation state are additionally enforced per posting by the sharing
+// handler. It matches exactly the routes the sharing handler serves.
+func IsSharingRoute(path string) bool {
+	return path == "/v1/shared/grants" || path == "/v1/shared/exclusions" ||
+		path == "/v1/shared/copies" || path == "/v1/shared/postings" ||
+		strings.HasPrefix(path, "/v1/shared/postings/")
+}
+
 // isGroupRoute is the internal alias used by the request pipeline.
 func isGroupRoute(path string) bool { return IsGroupRoute(path) }

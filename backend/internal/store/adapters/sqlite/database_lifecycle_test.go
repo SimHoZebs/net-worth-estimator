@@ -38,6 +38,7 @@ func TestDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 		{"marker-accounts-only", `CREATE TABLE schema_migrations(name TEXT PRIMARY KEY); INSERT INTO schema_migrations VALUES ('shared-accounts-v1')`, ErrSetupRequired},
 		{"missing-identity", `DROP TABLE sessions`, ErrSetupRequired},
 		{"missing-groups", `DROP TABLE group_members`, ErrSetupRequired},
+		{"missing-sharing", `DROP TABLE sharing_grants`, ErrSetupRequired},
 		{"missing-financial", `DROP TABLE account_links`, ErrSetupRequired},
 		{"missing-purchases", `DROP TABLE planned_purchases`, ErrSetupRequired},
 		{"missing-column", `ALTER TABLE sessions DROP COLUMN data`, ErrSetupRequired},
