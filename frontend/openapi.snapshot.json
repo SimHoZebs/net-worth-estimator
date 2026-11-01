@@ -1615,6 +1615,28 @@
 				"required": ["model", "issues"],
 				"type": "object"
 			},
+			"IntegrationListOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/IntegrationListOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"providers": {
+						"items": {
+							"$ref": "#/components/schemas/ProviderEntry"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["providers"],
+				"type": "object"
+			},
 			"Item": {
 				"additionalProperties": false,
 				"properties": {
@@ -2650,6 +2672,31 @@
 					"horizonYears",
 					"evaluations"
 				],
+				"type": "object"
+			},
+			"ProviderEntry": {
+				"additionalProperties": false,
+				"properties": {
+					"connected": {
+						"type": "boolean"
+					},
+					"connectedAt": {
+						"type": "string"
+					},
+					"detail": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"lastSyncAt": {
+						"type": "string"
+					},
+					"syncConfigured": {
+						"type": "boolean"
+					}
+				},
+				"required": ["id", "connected", "syncConfigured"],
 				"type": "object"
 			},
 			"Receipt": {
@@ -5125,6 +5172,34 @@
 					}
 				},
 				"summary": "Load the canonical financial model with diagnostics"
+			}
+		},
+		"/v1/integrations": {
+			"get": {
+				"operationId": "list-integrations",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/IntegrationListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List integration providers with connection and sync status"
 			}
 		},
 		"/v1/payment-terms": {
