@@ -96,7 +96,8 @@ and save.
   `hide`/`restore` events remain separate from explicit positive/negative labels.
 - `POST /v1/analysis-findings/{id}/feedback` accepts `requestId`, `runId`,
   `revision`, and `action`. `confirm` records Yes. `reject` records No and
-  dismisses the flag. `set-duration` requires a confirmed answer and a
+  dismisses the flag. Confirm and reject apply to every independent claim
+  kind; `set-duration` requires a confirmed BNPL answer and a
   `duration` of `{count, unit}` with an integer count of 1–5200 and weeks or months.
   Duration means the total plan term, not remaining payments or a repayment schedule.
   Writes require permission and a writable server. An exact request-ID replay
