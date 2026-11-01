@@ -29,8 +29,8 @@ Per group membership, each member owns one automatic-sharing policy:
 - **Single date interval** `[start, end]`, ISO `YYYY-MM-DD` calendar days.
   Start defaults to setup day, persisted as a fixed date (not rolling). End
   defaults blank/open. Both editable before opt-in (decision 3).
-- **Policy generation**: a monotonically bumped number per policy, used to
-  fence stale index rows on revocation (see §8).
+- **Policy version number**: bumped on every policy change, used to fence
+  stale lookup references on revocation (see §8).
 
 Eligibility of one posting under one policy (automatic reason):
 
@@ -39,7 +39,7 @@ Eligibility of one posting under one policy (automatic reason):
    in the selected set. Transfers follow the same rule; no category filters.
    At most one automatic reference per posting+group however many accounts
    match (decision 2).
-3. Posting's canonical date (see §2, open Q1/Q2) falls inside the interval,
+3. Posting's canonical date (see §2) falls inside the interval,
    inclusive on both ends.
 4. Pending and posted postings are treated identically (decision 5).
 5. No applicable exclusion survives (see §5).
@@ -49,7 +49,7 @@ window, removes inherited eligibility after commit; moving it back can restore
 it. An independent valid manual grant is never silently revoked by those edits
 (decision 4).
 
-## 2. Canonical date, timezone, boundaries (DECIDED Q1; OPEN Q2)
+## 2. Canonical date, timezone, boundaries (DECIDED Q1, Q2)
 
 > **Q1 — canonical date field. DECIDED.** The canonical sharing date is the
 > transaction date, used as the single date source with no fallback logic in
@@ -60,15 +60,14 @@ it. An independent valid manual grant is never silently revoked by those edits
 > that sync reconciliation work, cross-referenced here, and is out of scope
 > for GRP-02/GRP-05, which consume the canonical date as given.
 
-> **Q2 — timezone and interval semantics.** Options: (a) universal calendar
-> days counted the same for every viewer, inclusive both ends, ISO
-> `YYYY-MM-DD` **[recommended]** — deterministic across viewers, no leak
-> through totals; (b) each viewer's local timezone — rejected: the same
-> posting would be eligible for one viewer and not another, and totals would
-> diverge; (c) exclusive end — rejected: contradicts the "fixed date,
-> editable" product language. Recommendation: (a).
+> **Q2 — day counting. DECIDED.** The sharer's own sharing interval governs,
+> evaluated on one shared calendar for everyone, with both the start and the
+> end dates included. Nobody's viewing range affects anyone else's
+> eligibility: sharing is based on the sharer's date range, another user's
+> range is irrelevant, and a purchase is inside the range for everyone or for
+> no one.
 
-## 3. Consent preview and late-import behavior (OPEN — Q3)
+## 3. Consent preview and late-import behavior (DECIDED Q3)
 
 - Before enabling history, warn that existing **and later-imported**
   backdated rows in range qualify automatically (decision 3). No secondary
@@ -76,32 +75,26 @@ it. An independent valid manual grant is never silently revoked by those edits
 - Preview must show audience and exposure computed from the current eligible
   set.
 
-> **Q3 — history-preview content.** Options: (a) counts + date range +
-> account coverage only, never amounts/payees **[recommended]** — informs
-> consent without disclosing payload to shoulder-surfers/logs; (b) full row
-> preview — rejected: preview itself becomes a disclosure surface;
-> (c) no preview — rejected: contradicts GRP-00/GRP-04 consent requirements.
-> Recommendation: (a), with the late-import warning verbatim in the UI copy.
+> **Q3 — history-preview content. DECIDED.** The preview shows counts plus
+> date range plus account coverage only — never amounts or payees — with the
+> late-import warning shown before enabling history. The exact consent-screen
+> wording returns for review in the settings-UI work.
 
 Late-import rule: any row created by bank sync, CSV import, or model
 publication whose canonical date falls in range and whose accounts match
 qualifies without extra review, exactly like a pre-existing row.
 
-## 4. Void / deleted / disabled lifecycle (OPEN — Q4)
+## 4. Void / deleted / disabled lifecycle (DECIDED Q4)
 
-Observed store behavior: `Void` is sync-only (vanished authorization),
-`Pending` is bank lifecycle metadata owner writes cannot set, owner deletes
-of settled bank rows are permitted
-(`backend/internal/types/model.go:215`, `delete_void_bank_test.go`).
-
-> **Q4 — lifecycle eligibility.** Options: (a) share only rows that exist,
-> are not void, and are enabled; pending shares like posted; deleted rows
-> drop all automatic references; void-marking drops them atomically
-> **[recommended]** — follows decisions 5–6 and replay (disabled rows do not
-> execute); (b) share disabled rows — rejected: contradicts "current"
-> eligibility and leaks model drafts; (c) retain void rows until GC —
-> rejected: shares authorizations the bank already withdrew. Recommendation:
-> (a). Account deletion or ID reuse must re-validate selected-account
+> **Q4 — lifecycle eligibility. DECIDED, with deliberate deviation from the
+> earlier atomic-drop proposal.** Voided and deleted rows RETAIN their sharing
+> references until cleanup, rather than dropping them atomically. Storage
+> cleanup is therefore lazy. The compensating guarantee is explicit: every
+> shared read re-checks at read time that the row still exists and is not
+> void, so a retained reference can never serve a withdrawn row (see §7 for
+> both halves of the guarantee). New transactions follow the existing
+> non-void enabled rule; pending transactions are treated like posted ones.
+> Account deletion or account-ID reuse must re-validate selected-account
 > ownership; dangling references match nothing.
 
 ## 5. Manual grants and exclusions
@@ -135,79 +128,63 @@ of settled bank rows are permitted
 - Exclusions and current permissions apply uniformly to feeds, direct reads,
   totals, counts and aggregates (decision 11).
 
-## 7. Atomic revocation, concurrency, audit
+## 7. Revocation, concurrency, audit
 
-- Revocation (policy disable/narrow, account deselect, grant revoke,
-  exclusion add, membership removal) takes effect at commit: after commit, no
-  new unauthorized read may succeed via a stale index row or cache. Index
-  maintenance is permission-critical and must be **atomic with the
-  source/policy mutation in the same SQLite transaction**, or reads must
-  re-validate generation/membership synchronously (fail-closed).
-- Generation fencing: every policy mutation bumps `policy_generation`; index
-  rows carry the generation they were built under; readers reject rows from
-  older generations even if a bulk writer stalls mid-backfill. Rebuilds may
-  temporarily **under-share, never over-share** (decision 6).
-- Writes are caller-serialized (one server, one SQLite writer,
-  `store.go` contract) but backends must still serialize concurrent writes
-  safely. No positive auth caching (`docs/authorization.md`); singleflight
-  dedup is for computation only and must never serve a stale permission.
+- Revocation has two halves that hold together. First half, lazy storage
+  cleanup: voided and deleted rows keep their sharing references until
+  cleanup (see §4), and policy changes (disable, narrowing, account
+  deselection, grant revocation, exclusion added, membership removal) bump
+  the policy version number so stale references are fenced. Second half,
+  fail-closed read-time checks: every shared read re-checks at read time
+  that the row still exists, is not void, and the reference belongs to the
+  current policy version — so after commit, no new unauthorized read may
+  succeed through a retained reference or a cache.
+- Rebuilds may temporarily **under-share, never over-share** (decision 6).
+- There is one database writer; concurrent writes are still serialized
+  safely. Permission decisions are never cached. Computation dedup must never
+  serve a stale permission.
 - Audit: persist policy creates/updates/disables, manual grant/exclusion
-  changes, and generation bumps with actor, timestamp, and before/after
+  changes, and version bumps with actor, timestamp, and before/after
   coverage. Mutations idempotent under retry with transactional snapshots.
 
-## 8. Visibility index schema and reads (OPEN — Q5)
+## 8. Visibility lookup design and reads (DECIDED Q5)
 
-Constraints: no per-posting payload copies (decision 6), no full scan of every
-owner's postings on reads (GRP-05), one reference per posting+group.
+Constraints: no financial data copied into the lookup (decision 6), no full
+scan of every owner's purchases on reads, one reference per purchase+group.
 
-> **Q5 — index schema/query plan.** Recommended baseline:
-> `group_visibility(owner_user_id, posting_id, group_id, policy_generation,
-> reason)` with unique `(group_id, posting_id)` and index on
-> `(group_id, owner_user_id, posting_id)` for keyset pagination; plus
-> `group_share_policy(owner_user_id, group_id, enabled, accounts, start, end,
-> policy_generation)` and `share_intent(posting_id, audience, state,
-> wildcard)` with mutual-exclusion constraint. Feed reads page the index,
-> then re-validate membership + generation + exclusions row-by-row before
-> serializing through the existing transaction shape. Alternatives: (b)
-> scan-on-read — rejected at scale per GRP-05; (c) payload copies in the
-> index — rejected per decision 6. Recommendation: baseline above; exact DDL
-> and `EXPLAIN QUERY PLAN` evidence required in GRP-05.
+> **Q5 — lookup design. DECIDED.** A lightweight reference list with no
+> financial data copied. Feed reads page the reference list, then re-check
+> membership, policy version, exclusions, and row existence row-by-row
+> (see §7) before showing anything through the existing transaction shape.
+> Exact table definitions and speed evidence are deferred to the server
+> build.
 
 Interrupted backfills resume from the last committed key and remain
 under-sharing until complete.
 
 ## 9. Write-path assessment
 
-Every path that can change eligibility must maintain or fence the index in
-the same commit:
+Every path that can change eligibility must maintain or fence the lookup in
+the same write:
 
-| Write path | Location | Index obligation |
-|---|---|---|
-| Create/Update/DeletePosting | `store.go:47`, `posting_rows.go` | recompute automatic references for owner's policies in-tx |
-| ApplySyncPlan (pending→posted, late inserts, void-marking) | `store.go:93` | same; voids/deletes drop references atomically |
-| ConvertPostingToRule / ConvertRuleToPosting | `store.go`, `posting_rows.go:182` | posting side gains/loses references; rules themselves are not shared rows (recommendation — rules expand to occurrences only) |
-| Create/Update/DeleteRule | `store.go` | no direct index change (see above) |
-| ImportModel / Clear | `import.go`, store contract | full rebuild under new generation (under-share until done) |
-| `refreshmodel` operator copy, guest publication | `cmd/refreshmodel`, `shared-database.md` | destination rebuild; never copy source index rows |
-| Account update/delete, policy/intent writes (new) | GRP-02/GRP-05 | bump generation; re-derive affected references in-tx |
-| MovePosting/MoveRule (position only) | `store.go` | none (identity/date/accounts unchanged) |
-| Checkpoint/receipt/evaluation writes | `store.go`, `ReceiptStore` | none (not shared rows) |
+| Changed data | Sharing-lookup obligation |
+|---|---|
+| Purchase create/edit/delete | recompute automatic references for the owner's policies in the same write |
+| Bank sync (pending-to-posted, late inserts, void marking) | same; voided/deleted rows keep references until cleanup and reads re-check (see §4, §7) |
+| Purchase-to-repeating-schedule conversion and back | the purchase side gains/loses references; repeating schedules themselves are not shared rows |
+| Repeating-schedule create/edit/delete | no direct lookup change (see above) |
+| Model import / full reset | full rebuild under a new policy version (under-share until done) |
+| Operator copy, guest publication | destination rebuild; never copy source references |
+| Account update/delete, policy/consent writes (new) | bump version; re-derive affected references in the same write |
+| Reordering rows (position only) | none (identity/date/accounts unchanged) |
+| Balance observations / receipt / forecast-setting writes | none (not shared rows) |
 
-## 10. Propagation mechanism (OPEN — Q6, ADR-D12 gate)
+## 10. Update method (DECIDED Q6)
 
-> **Q6 — write hooks vs transaction events vs revision keys.**
-> Options: (a) synchronous in-transaction index maintenance inside the
-> existing `sqliteStore` write methods **[recommended]** — smallest new
-> machinery, atomicity falls out of the current one-writer SQLite
-> transaction model; (b) transaction-scoped event dispatch to subscribers —
-> acceptable only if bounded, in-process, and fail-closed (a failed
-> subscriber aborts the tx); (c) persisted revision keys with lazy
-> invalidation — acceptable for forecast caches, **not** for the permission
-> index unless reads synchronously fence stale generations.
-> No Kafka/NATS/broker and no generic event framework without measured
-> evidence — that is the PERF-01 gate (ADR-D11/D12). Forecast computation
-> may stay lazy; access control may not. Recommendation: (a), with PERF-01
-> run before any (b)/(c) production adoption.
+> **Q6 — update method. DECIDED.** Sharing permissions are maintained inside
+> the same database write that changes the purchase, policy, or consent.
+> No separate messaging system without benchmark evidence first. Forecast
+> computation may stay lazy; access control may not.
 
 ## 11. ADR-D3..D10 application (explicit gaps)
 
@@ -228,14 +205,17 @@ the same commit:
 - Required matrix: forged user/owner/account IDs; cross-group ID replay;
   friend-through-group overlap; wildcard present+future exclusion;
   mutual-exclusion races; revocation races (read-during-revoke);
-  stale-generation reads; bank-sync pending→posted and backdated inserts;
+  stale-version reads; bank-sync pending-to-posted and backdated inserts;
   duplicate multi-account matches counted once; membership leave/remove;
-  totals/feed/detail consistency; index `EXPLAIN QUERY PLAN` at 100/1k/10k
-  postings; interrupted-backfill resume (under-share, never over-share).
+  totals/feed/detail consistency; lookup speed evidence at 100/1k/10k
+  purchases (deferred to the server build); interrupted-backfill resume
+  (under-share, never over-share).
 
 ## 13. Acceptance gate
 
-This spec is accepted only after explicit review of Q2–Q6 and §11 gaps
-(Q1 already decided, §2). Acceptance unblocks GRP-02 (preferences) and GRP-05 (authorization), which
+Q1–Q6 are now decided. The architecture-gaps section (§11, missing RFC
+decisions D4–D10 with reconstructed assumptions) stays flagged as
+provisional and returns for correction if the RFC contradicts it.
+Acceptance unblocks GRP-02 (preferences) and GRP-05 (authorization), which
 stay **blocked** until then. GRP-01/GRP-03/GRP-04 depend on the same answers
 and must not bake in contradictory assumptions meanwhile.
