@@ -166,6 +166,11 @@ func (s *sqliteStore) DeletePosting(id string) error {
 		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND user_id = :user_id`, id); err != nil {
 			return err
 		}
+		// A deleted transaction authorizes nothing afterwards: explicit
+		// consent rows for it go in the same transaction.
+		if err := deleteSharingForPosting(tx, id); err != nil {
+			return err
+		}
 		return releaseRowID(tx, id)
 	})
 }
@@ -204,6 +209,9 @@ func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.Recurren
 		}
 		if _, err := tx.Exec(`DELETE FROM postings WHERE id = ? AND user_id = :user_id`, postingID); err != nil {
 			return fmt.Errorf("convert posting %s: %w", postingID, err)
+		}
+		if err := deleteSharingForPosting(tx, postingID); err != nil {
+			return err
 		}
 		position, err := nextTablePosition(tx, "recurrence_rules")
 		if err != nil {

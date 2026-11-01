@@ -131,9 +131,33 @@ permissions. The owner assignment is a one-time data migration, not signup role 
 
 ## Scope limits
 
-The first resource boundary is the whole user. Per-row sharing, a user picker,
-an IAM management screen, and cross-user collaboration are out of scope. New action/resource policies belong in Casdoor. New resource visibility
-must also pass the API's resource-resolution and storage-isolation boundary.
+The first resource boundary is the whole user. Transaction-level sharing
+(FND-02) grants explicitly named postings to explicit audiences without
+widening that boundary: a shared read returns one owner-scoped posting in
+the existing transaction shape only, never accounts, balances, models,
+secrets, or receipts. A user picker, an IAM management screen, and
+cross-user collaboration beyond explicit posting grants remain out of
+scope. New action/resource policies belong in Casdoor. New resource
+visibility must also pass the API's resource-resolution and
+storage-isolation boundary.
+
+Explicit sharing rules:
+
+- Only the source owner may grant, exclude, or revoke their own postings;
+  a group administrator cannot grant for another member.
+- Group-audience grants authorize only while both requester and source
+  owner hold current membership; removal denies immediately.
+- Explicit share and exclusion cannot coexist for one posting plus one
+  audience; a user exclusion denies that person even through group
+  grants, a group exclusion denies its current members, and a wildcard
+  exclusion denies all current and future audiences.
+- Revocation deletes the grant; later reads deny unless another
+  independent valid grant survives. There is no positive auth cache.
+- Accepted copies are recipient-owned rows: independently editable, never
+  rewritten or erased by revocation. Delegated writes to another
+  member's original stay deferred.
+- Forged owner, posting, account, and audience IDs fail closed as
+  not-found so shared data is not enumerable.
 
 Casdoor's external permission API evaluates the model and stored policy rows.
 Use the model's deny rules or remove the relevant policy/binding to revoke

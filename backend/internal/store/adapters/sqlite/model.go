@@ -40,6 +40,11 @@ func deleteModelRows(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM pinned_evaluations WHERE user_id = :user_id`); err != nil {
 		return err
 	}
+	// Model replacement invalidates explicit consent for the replaced rows:
+	// post-import IDs are new rows, and old grants must not attach to them.
+	if err := clearSharingForUser(tx); err != nil {
+		return err
+	}
 	return nil
 }
 

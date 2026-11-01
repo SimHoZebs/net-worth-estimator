@@ -29,6 +29,16 @@ func newGroupID() (string, error) {
 	return id.String(), nil
 }
 
+// deleteGroupSharingRows drops explicit consent rows naming a deleted
+// group audience. Reads already deny through missing membership; this
+// keeps owner grant lists from surfacing dead audiences.
+func deleteGroupSharingRows(tx *sql.Tx, groupID string) error {
+	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE audience_type = 'group' AND audience_id = ?`, groupID); err != nil {
+		return fmt.Errorf("clear group sharing consent: %w", err)
+	}
+	return nil
+}
+
 func newInviteCode() (string, string, error) {
 	raw := make([]byte, 24)
 	if _, err := rand.Read(raw); err != nil {
@@ -250,6 +260,12 @@ func (d *Database) DeleteGroup(groupID, userID string) error {
 	if n == 0 {
 		return ErrNotFound
 	}
+	// A deleted group is a dead audience: drop its explicit consent rows in
+	// the same transaction so owner grant lists stop surfacing it. Reads
+	// already deny through missing membership.
+	if err := deleteGroupSharingRows(tx, groupID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -406,6 +422,9 @@ func (d *Database) LeaveGroup(groupID, userID string) error {
 			}
 			// Sole owner leaving deletes the group.
 			if _, err := tx.Exec(`DELETE FROM user_groups WHERE id = ?`, groupID); err != nil {
+				return err
+			}
+			if err := deleteGroupSharingRows(tx, groupID); err != nil {
 				return err
 			}
 			return tx.Commit()
@@ -667,6 +686,12 @@ func DeleteGroupMemberships(db *sql.DB, userID string) error {
 		// former groups only.
 		if _, err := tx.Exec(`DELETE FROM user_groups WHERE id IN (`+placeholders+`) AND id NOT IN (SELECT group_id FROM group_members)`, args...); err != nil {
 			return err
+		}
+		// Consent rows naming groups deleted here (or surviving from
+		// before this cleanup existed) go too, scoped to groups with no
+		// remaining row so live audiences keep their grants.
+		if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE audience_type = 'group' AND audience_id IN (`+placeholders+`) AND audience_id NOT IN (SELECT id FROM user_groups)`, args...); err != nil {
+			return fmt.Errorf("clear group sharing consent: %w", err)
 		}
 	}
 	// Revoke, rather than delete, surviving invites the user created so
