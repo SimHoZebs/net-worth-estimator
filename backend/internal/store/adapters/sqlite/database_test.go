@@ -54,6 +54,11 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 			// sides of a share, not the scoped user_id column.
 			continue
 		}
+		if table == "splits" || table == "split_allocations" {
+			// Split obligations key on source owner, initiator, and
+			// participant IDs, not the scoped user_id column.
+			continue
+		}
 		if table == "sessions" || table == "identity_grants" || table == "identity_logout_marks" || table == "identity_logout_tokens" {
 			continue
 		}

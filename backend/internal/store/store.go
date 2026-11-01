@@ -216,5 +216,55 @@ type Database interface {
 	// SharingLinkRefresh for the status contract. requestID carries the
 	// same idempotency contract as GrantSharedPosting.
 	RefreshSharingLink(recipientID, copyPostingID, requestID string) (SharingLinkRefresh, error)
+	// CreateSplit persists version 1 of a split obligation dividing one
+	// shared transaction across its participants. The actor must be the
+	// initiator, and every participant (initiator included) must hold
+	// current shared-posting access to the source; anything else fails
+	// closed without revealing who holds access. Shares come from
+	// domain.AllocateSplit over the caller's total, currency, participants,
+	// and overrides. requestID is a client-generated UUID: a retry with the
+	// same key replays the recorded split, while the same key naming a
+	// different action or target fails with ErrSharingConflict. One key
+	// creates one split per source posting: a second, intentionally
+	// different split needs a fresh key. The recorded source revision names
+	// the source content the version divides. Split writes never touch
+	// postings, checkpoints, or balances.
+	CreateSplit(actorID string, input SplitInput, requestID string) (Split, error)
+	// UpdateSplit appends a new version to a split with status proposed and
+	// reset acceptances; accepted shares only change through this explicit
+	// version step, never by silent edit. Only the initiator may revise,
+	// and expectedVersion must name the current version or the update fails
+	// with ErrSharingConflict. Every participant of the new version must
+	// hold current source access, and shares are recomputed by
+	// domain.AllocateSplit. requestID carries the CreateSplit idempotency
+	// contract against the split link; a replay additionally requires the
+	// caller's expected version to be the recorded version's predecessor,
+	// so a new attempt reusing a key conflicts instead of replaying stale
+	// history.
+	UpdateSplit(actorID, splitID string, expectedVersion int64, input SplitInput, requestID string) (Split, error)
+	// AcceptSplit records the actor's own acceptance of the current split
+	// version. The actor must be a participant of that version and
+	// expectedVersion must name the current version; accepting a
+	// superseded version fails with ErrSharingConflict. When every
+	// participant has accepted, the version's status becomes accepted.
+	// Acceptance writes no postings, checkpoints, or balances: it moves no
+	// money. requestID carries the CreateSplit idempotency contract
+	// against the split link; a replay additionally requires the caller's
+	// expected version to equal the recorded version.
+	AcceptSplit(actorID, splitID string, expectedVersion int64, requestID string) (Split, error)
+	// GetSplit returns the latest version of one split. The requester must
+	// be the initiator or a participant of that version; anyone else
+	// receives ErrNotFound so split membership is not enumerable. Reads
+	// perform no live source authorization check: the split is the
+	// participants' own obligation record and survives source edits,
+	// revocation, and source deletion, mirroring accepted-copy provenance.
+	GetSplit(requesterID, splitID string) (Split, error)
+	// ListSplits returns the latest version of every split where the
+	// requester is initiator or participant, in stable order.
+	ListSplits(requesterID string) ([]Split, error)
+	// ListSplitVersions returns every version of one split in ascending
+	// version order, including superseded and accepted history. Access
+	// matches GetSplit.
+	ListSplitVersions(requesterID, splitID string) ([]Split, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

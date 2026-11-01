@@ -319,6 +319,8 @@ The current schema stores:
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
 | `sharing_requests`       | one recorded outcome per (actor, request ID) for mutating social requests; retries replay it                   |
 | `sharing_audit`          | append-only cross-user change trace: actor, action, target identities, and time; no transaction evidence       |
+| `splits`                 | one immutable row per split version: source, initiator, currency, total, version, and acceptance state         |
+| `split_allocations`      | per-version participant shares in integer minor units plus per-participant acceptance                          |
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
 | `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
@@ -408,9 +410,20 @@ methods, `docs/authorization.md`) is retry-safe and traceable:
   actor only; the accept replay is the recipient's own copy, never a
   cross-user read.
 
-Dependents reuse this shape: versioned splits (SOC-04B) close retry races
-with request IDs and fail concurrent revisions explicitly, and
-concurrency coverage (QA-02) asserts idempotent replay plus
+Dependents reuse this shape. Versioned splits (SOC-04B,
+`backend/internal/store/adapters/sqlite/splits.go`, store-level only)
+close retry races with request IDs and fail concurrent revisions
+explicitly: `CreateSplit`/`UpdateSplit`/`AcceptSplit` record one outcome
+per (actor, request ID) in `sharing_requests`, append identity-only
+`split-created`/`split-updated`/`split-accepted` audit rows (source
+target, split link, resulting status), and report stale expected versions
+as `store.ErrSharingConflict`. Splits persist source, initiator,
+participant, amount, version, and acceptance state in `splits` plus
+`split_allocations`; every revision appends a version with reset
+acceptances, accepted history is never edited, and split writes never
+touch postings, checkpoints, accounts, or balances, so acceptance moves
+no money.
+Concurrency coverage (QA-02) asserts idempotent replay plus
 share/revoke ordering through these endpoints.
 
 ## 4. Artifact Identity

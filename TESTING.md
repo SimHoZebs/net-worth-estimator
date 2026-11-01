@@ -318,6 +318,14 @@ CGO_ENABLED=0 go -C backend test ./internal/store/adapters/sqlite/ ./internal/sh
 go -C backend test -race ./internal/store/adapters/sqlite/ ./internal/sharing/ -run 'SharingConcurrent' -count=1
 ```
 
+Versioned splits (SOC-04B) live in the split suite alongside the sharing
+suites, including the race detector over the concurrent revision storm:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/store/adapters/sqlite/ -run 'TestSplit' -count=1
+go -C backend test -race ./internal/store/adapters/sqlite/ -run 'TestSplitConcurrent' -count=1
+```
+
 `backend/scripts/verify.sh` sets `CGO_ENABLED=0` and runs:
 
 1. `gofmt` check;
