@@ -20,7 +20,8 @@ after at least 30 seconds. Computation receives a 20-second context deadline.
 
 `backend/internal/analysis` owns definitions and the worker. Its persistence port
 is `store.AnalysisStore`. Add a definition to `analysis.Definitions()` to reuse
-the lifecycle. Income-pattern and subscription detection remain future consumers.
+the lifecycle. Recurring-pattern detection is a built-in consumer alongside
+BNPL. Transfer and receipt detection remain future consumers.
 The current worker rechecks the changed user's complete saved evidence snapshot.
 It skips unchanged input revisions. It does not require a broker or external API.
 
@@ -84,6 +85,35 @@ imported transactions, create debt accounts, change account values, or change
 projection identities. A future model-editing action requires explicit review
 and save.
 
+## Recurring first release
+
+Recurring means repeated payments and deposits with an approximately regular
+cadence. Merchant identity, cadence evidence, and forecast rules remain distinct.
+
+- Weekly, biweekly, monthly, quarterly, and annual patterns are detected from
+  settled bank evidence grouped by source, account, currency, direction, and a
+  normalized merchant key. Three occurrences establish weekly through quarterly
+  patterns; two establish an annual pattern.
+- Each occurrence carries its own finding. Its evidence lists every occurrence
+  in the pattern plus the estimated cadence and typical source amount, so the
+  user can inspect the full basis without trusting a single row.
+- Merchant-name variants share one pattern through merchant-key normalization;
+  small amount and timing differences stay inside a stated tolerance while a
+  far-off gap or outlier amount breaks the pattern. The cadence thresholds and
+  tolerances are heuristics with qualitative strength, not calibrated
+  probabilities. No accuracy guarantee exists.
+- Confirm and reject corrections apply to recurring findings without rewriting
+  immutable source facts. Plan duration stays BNPL-specific and never corrects
+  a recurrence claim. Editing cadence or amount estimates beyond confirm and
+  reject is an open product decision.
+- A fortnightly installment series may hold both a Possible BNPL claim and a
+  biweekly recurring claim on the same transactions. Withdrawing, confirming,
+  or rejecting one producer's claim never disturbs the independent claim.
+
+Like BNPL, recurring findings never create recurrence rules or change the
+financial model. Promoting a confirmed pattern into a forecast rule is a
+separate explicit action with its own review.
+
 ## API and interface
 
 - `GET /v1/analyses` reads execution status without starting work.
@@ -96,7 +126,8 @@ and save.
   `hide`/`restore` events remain separate from explicit positive/negative labels.
 - `POST /v1/analysis-findings/{id}/feedback` accepts `requestId`, `runId`,
   `revision`, and `action`. `confirm` records Yes. `reject` records No and
-  dismisses the flag. `set-duration` requires a confirmed answer and a
+  dismisses the flag. Confirm and reject apply to every independent claim
+  kind; `set-duration` requires a confirmed BNPL answer and a
   `duration` of `{count, unit}` with an integer count of 1–5200 and weeks or months.
   Duration means the total plan term, not remaining payments or a repayment schedule.
   Writes require permission and a writable server. An exact request-ID replay
