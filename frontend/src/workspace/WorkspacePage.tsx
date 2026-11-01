@@ -2,6 +2,7 @@ import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import { EvaluationsPage } from "../pages/EvaluationsPage.tsx";
 import { GroupsPage } from "../pages/GroupsPage.tsx";
+import { InboxPage } from "../pages/InboxPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { AccountsPage } from "../pages/AccountsPage.tsx";
@@ -69,6 +70,8 @@ export function WorkspacePage({
 			);
 		case "groups":
 			return <GroupsPage />;
+		case "inbox":
+			return <InboxPage />;
 		case "sources":
 			return <SourcesPage />;
 	}

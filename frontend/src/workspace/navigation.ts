@@ -2,6 +2,7 @@ import {
 	ArrowRightLeft,
 	type Compass,
 	Flag,
+	Inbox,
 	LayoutDashboard,
 	Settings,
 	ShoppingBag,
@@ -16,6 +17,7 @@ export type Page =
 	| "purchases"
 	| "evaluations"
 	| "groups"
+	| "inbox"
 	| "sources";
 export type PageDefinition = {
 	id: Page;
@@ -60,6 +62,12 @@ export const pages: PageDefinition[] = [
 		label: "Groups",
 		icon: Users,
 		title: "Manage your groups",
+	},
+	{
+		id: "inbox",
+		label: "Inbox",
+		icon: Inbox,
+		title: "Transactions shared with you",
 	},
 	{
 		id: "sources",
