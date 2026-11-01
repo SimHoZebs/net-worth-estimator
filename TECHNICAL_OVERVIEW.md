@@ -649,6 +649,19 @@ Two rounding rules stay explicit: deterministic public currency, fulfillment amo
 
 ## 11. SimpleFIN Flow
 
+### Provider contracts
+
+`internal/integrations` defines the replaceable provider contract behind the
+integrations management page. A `Provider` adapter reports one user-scoped,
+display-only status snapshot (`connected`, `syncConfigured`, connection and
+last-sync times, and non-secret detail such as the Bridge host). The
+`Registry` snapshots adapters in list order, and `GET /v1/integrations`
+serves that snapshot. `NewSimpleFIN` adapts the existing Bridge sync; later
+providers register their own IDs and endpoints without changing this
+contract. Snapshots never contain credential secrets; per-user isolation is
+covered by same-database two-user tests in `internal/integrations` and the
+`list-integrations` contract test in `internal/api/integration`.
+
 `internal/simplefin` is configured once in `cmd/server`:
 
 - The Bridge key is connected per user through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
