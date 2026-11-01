@@ -27,7 +27,7 @@ var financialTables = []string{
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
 	"receipts",
-	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback",
+	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
 }
 
 func main() {

@@ -22,7 +22,7 @@
 #
 # Supported sources are the full `shared-accounts-v1` base with either
 # checkpoint shape (deployed date-only, or final observation instants) and
-# with zero or all five Analysis tables. Partial Analysis schemas, unknown
+# with zero or all six Analysis tables. Partial Analysis schemas, unknown
 # checkpoint shapes (including a date+observed_at mix, which was never
 # deployed), pre-user-scope tables, malformed or NULL or normalized-invalid
 # dates, and missing or non-integer or non-positive posted instants all fail
@@ -121,8 +121,16 @@ check_target() {
   test "$(sqlite3 -readonly "$1" "SELECT count(*) FROM schema_migrations WHERE name IN ('transaction-analysis-v1','analysis-feedback-v1');")" = 2
 }
 
+# Promotions link one confirmed pattern to its generated forecast rule.
+# Sources that predate the link table carry the other five Analysis tables;
+# the candidate provisions this one for them below.
+check_promotions() {
+  sqlite3 -readonly "$1" '
+    SELECT user_id, pattern_key, rule_id, created_at FROM analysis_promotions LIMIT 0;' || return 1
+}
+
 analysis_count() {
-  sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback');"
+  sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions');"
 }
 
 cp_cols() {
@@ -179,11 +187,14 @@ esac
 
 analysis=$(analysis_count "$db") || fail "Cannot inspect Analysis schema; refusing to guess."
 case "$analysis" in
-  0|5) ;;
+  0|5|6) ;;
   *) fail "Partial Analysis schema. Refusing automatic repair." ;;
 esac
-if [ "$analysis" = 5 ]; then
+if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
+fi
+if [ "$analysis" = 6 ]; then
+  check_promotions "$db" || fail "Incomplete promotion schema. Refusing automatic repair."
 fi
 posting_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='posting_id_migrations';") \
   || fail "Cannot inspect posting-ID audit table."
@@ -230,7 +241,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ]; then  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ]; then  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
   exit 0
 fi
 
@@ -322,9 +333,20 @@ fi
 
 # Frozen upgrade SQL stays outside application setup. A complete Analysis
 # schema stays untouched; partial schemas already failed the source preflight.
+# A source that predates promotion links keeps its five tables verified
+# above and gains only the empty link table here.
 if [ "$analysis" = 0 ]; then
   if ! sqlite3 "$candidate" < "$script_dir/analysis-schema.sql" > "$backup/analysis.log" 2>&1; then
     fail "Candidate Analysis upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+if [ "$analysis" = 5 ]; then
+  if ! sqlite3 "$candidate" "CREATE TABLE analysis_promotions (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+    PRIMARY KEY(user_id, pattern_key)
+  );" > "$backup/analysis.log" 2>&1; then
+    fail "Candidate promotion upgrade failed. Original unchanged; backup retained at $backup."
   fi
 fi
 
@@ -333,6 +355,7 @@ fi
 # checkpoint date-to-instant conversion and the settled-bank repair may
 # differ; Analysis rows for preexisting Analysis must be byte-identical.
 check_target "$candidate" || fail "Candidate Analysis verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+check_promotions "$candidate" || fail "Candidate promotion verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_integrity "$candidate" || fail "Candidate integrity check failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 test "$(cp_cols "$candidate")" = "$FINAL_COLS" &&
   test "$(scoped_pk "$candidate")" = 1 &&
@@ -351,7 +374,7 @@ verify_same() {
   test "$changed" = 0
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','postings','posting_sim','posting_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback') ORDER BY name;") \
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','postings','posting_sim','posting_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions') ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
@@ -390,17 +413,20 @@ else
   verify_same checkpoints || fail "Candidate changed final checkpoints. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 
-if [ "$analysis" = 5 ]; then
+if [ "$analysis" = 5 ] || [ "$analysis" = 6 ]; then
   for table in transaction_source_facts analysis_inputs analysis_runs analysis_findings analysis_feedback; do
     verify_same "$table" || fail "Candidate changed preexisting Analysis table $table. Original unchanged; backup retained at $backup. Keep the API stopped."
   done
+  if [ "$analysis" = 6 ]; then
+    verify_same analysis_promotions || fail "Candidate changed preexisting Analysis table analysis_promotions. Original unchanged; backup retained at $backup. Keep the API stopped."
+  fi
   triggers_same=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
     SELECT EXISTS (SELECT sql FROM main.sqlite_master WHERE type = 'trigger' AND name != 'analysis_posting_sim_lifecycle' EXCEPT SELECT sql FROM before.sqlite_master WHERE type = 'trigger' AND name != 'analysis_posting_sim_lifecycle')
         OR EXISTS (SELECT sql FROM before.sqlite_master WHERE type = 'trigger' EXCEPT SELECT sql FROM main.sqlite_master WHERE type = 'trigger');") \
     || fail "Cannot verify candidate triggers; refusing to publish."
   test "$triggers_same" = 0 || fail "Candidate changed Analysis triggers. Original unchanged; backup retained at $backup. Keep the API stopped."
 else
-  empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback);") \
+  empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback) + (SELECT COUNT(*) FROM analysis_promotions);") \
     || fail "Cannot verify provisioned Analysis tables; refusing to publish."
   test "$empty" = 0 || fail "Provisioned Analysis tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi

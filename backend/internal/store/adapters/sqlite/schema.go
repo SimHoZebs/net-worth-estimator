@@ -440,6 +440,7 @@ var requiredSchemaColumns = map[string]string{
 	"analysis_runs":            "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
 	"analysis_findings":        "user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
 	"analysis_feedback":        "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
+	"analysis_promotions":      "user_id, pattern_key, rule_id, created_at",
 	"receipts":                 receiptColumns,
 	"blob_objects":             "key, state, expires_at",
 	"blob_data":                "key, data",
@@ -508,7 +509,7 @@ func validateSchemaObjects(db queryer) error {
 // expectedSchemaTables lists every table SetupDatabase manages.
 func expectedSchemaTables() []string {
 	return []string{
-		"transaction_source_facts", "analysis_inputs", "analysis_runs", "analysis_findings", "analysis_feedback",
+		"transaction_source_facts", "analysis_inputs", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
 		"receipts",
 		"blob_objects",
 		"blob_data",

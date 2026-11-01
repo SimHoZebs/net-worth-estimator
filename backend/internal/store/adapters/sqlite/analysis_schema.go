@@ -36,6 +36,11 @@ var analysisSchema = []string{
 		FOREIGN KEY(user_id, run_id) REFERENCES analysis_runs(user_id, id)
 	)`,
 	`CREATE INDEX IF NOT EXISTS analysis_findings_posting ON analysis_findings(user_id, posting_id, id)`,
+	`CREATE TABLE IF NOT EXISTS analysis_promotions (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		pattern_key TEXT NOT NULL, rule_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+		PRIMARY KEY(user_id, pattern_key)
+	)`,
 }
 
 var analysisTriggerNames = []string{"analysis_facts_insert", "analysis_facts_update", "analysis_facts_delete", "analysis_posting_lifecycle", "analysis_posting_sim_lifecycle"}

@@ -35,7 +35,7 @@ func hasErrorIssues(issues []types.ModelValidationIssue) bool {
 // warnings. Handlers wrap row/issues/persisted/revision in their output
 // shape. Evaluation writes use it so a broken forecast cannot be saved.
 func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
-	return runRowWriteWithValidator(s, mutate, persist, domain.ValidateFinancialModel, domain.ValidateFinancialModel)
+	return runRowWriteWithValidator(s.store, mutate, persist, domain.ValidateFinancialModel, domain.ValidateFinancialModel)
 }
 
 // runFinanceRowWrite validates and persists one ordinary finance row.
@@ -47,7 +47,7 @@ func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), pe
 // stay on the whole-model read.
 func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
 	var baseline []types.ModelValidationIssue
-	return runRowWriteWithValidator(s, func(model *types.FinancialModel) {
+	return runRowWriteWithValidator(s.store, func(model *types.FinancialModel) {
 		// Capture references before helpers compact shared backing arrays.
 		baseline = domain.EvaluationReferenceIssues(model)
 		mutate(model)
@@ -56,9 +56,41 @@ func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialMod
 	}, domain.ValidateFinanceModel)
 }
 
-func runRowWriteWithValidator[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue) (T, []types.ModelValidationIssue, bool, string, error) {
+// PersistFinanceRule validates and persists one generated recurrence rule
+// through the ordinary finance write boundary, so pattern promotion shares
+// the manual row-write contract: validation, revision, and last-write-wins.
+// Generated rules append after the current maximum priority.
+func PersistFinanceRule(st store.Store, rule types.RecurrenceRule) (types.RecurrenceRule, []types.ModelValidationIssue, bool, string, error) {
+	resolved := rule
+	return runFinanceRowWriteWithStore(st, func(model *types.FinancialModel) {
+		max := -1
+		for _, existing := range model.RecurrenceRules {
+			if existing.Priority > max {
+				max = existing.Priority
+			}
+		}
+		resolved.Priority = max + 1
+		model.RecurrenceRules = replaceByID(model.RecurrenceRules, resolved.ID, ruleID, resolved)
+	}, func() (types.RecurrenceRule, error) {
+		return st.CreateRule(resolved)
+	})
+}
+
+// runFinanceRowWriteWithStore is runFinanceRowWrite over an explicit store
+// so analysis promotion reuses the finance boundary without duplicating it.
+func runFinanceRowWriteWithStore[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
+	var baseline []types.ModelValidationIssue
+	return runRowWriteWithValidator(st, func(model *types.FinancialModel) {
+		baseline = domain.EvaluationReferenceIssues(model)
+		mutate(model)
+	}, persist, func(candidate *types.FinancialModel) []types.ModelValidationIssue {
+		return domain.ValidateFinanceWriteChange(baseline, candidate)
+	}, domain.ValidateFinanceModel)
+}
+
+func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error), validateCandidate, validateStored func(*types.FinancialModel) []types.ModelValidationIssue) (T, []types.ModelValidationIssue, bool, string, error) {
 	var zero T
-	model, err := s.store.LoadModel()
+	model, err := st.LoadModel()
 	if err != nil {
 		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
@@ -72,7 +104,7 @@ func runRowWriteWithValidator[T any](s *handler, mutate func(model *types.Financ
 	}
 	if hasErrorIssues(issues) {
 		// The invalid candidate differs from stored state. Reload its identity.
-		revision, err := modelstate.CurrentRevision(s.store)
+		revision, err := modelstate.CurrentRevision(st)
 		if err != nil {
 			return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 		}
@@ -84,7 +116,7 @@ func runRowWriteWithValidator[T any](s *handler, mutate func(model *types.Financ
 	}
 	// Re-read warnings against the persisted model so the response
 	// reflects stored state, not the request echo.
-	model, err = s.store.LoadModel()
+	model, err = st.LoadModel()
 	if err != nil {
 		return zero, nil, false, "", huma.Error500InternalServerError(err.Error())
 	}
