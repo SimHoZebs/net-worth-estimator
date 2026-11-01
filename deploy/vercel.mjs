@@ -10,10 +10,10 @@ export function vercelConfig(env) {
   return {
     $schema: "https://openapi.vercel.sh/vercel.json",
     framework: null,
-    installCommand: "npm --prefix frontend ci",
-    buildCommand: "npm --prefix frontend run build",
+    installCommand: "bun install --frozen-lockfile",
+    buildCommand: "bun --filter ./frontend api:generate && bun --filter ./frontend build",
     outputDirectory: "frontend/dist",
-    devCommand: "npm --prefix frontend run dev -- --host 0.0.0.0",
+    devCommand: "bun --filter ./frontend dev",
     routes: [
       {
         src: "^/(v1(?:/.*)?|healthz|readyz)$",

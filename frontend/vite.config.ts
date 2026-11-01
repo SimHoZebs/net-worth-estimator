@@ -12,10 +12,17 @@ export default defineConfig({
 	build: {
 		rollupOptions: {
 			output: {
-				manualChunks: {
-					react: ["react", "react-dom"],
-					query: ["@tanstack/react-query"],
-					form: ["zod", "errore"],
+				// Rolldown accepts only the function form. Keep the framework,
+				// query, and form libraries in their own chunks for caching.
+				manualChunks: (id: string) => {
+					if (/node_modules\/react(-dom)?\//.test(id)) return "react";
+					if (id.includes("node_modules/@tanstack/react-query/"))
+						return "query";
+					if (
+						id.includes("node_modules/zod/") ||
+						id.includes("node_modules/errore/")
+					)
+						return "form";
 				},
 			},
 		},

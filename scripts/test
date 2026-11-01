@@ -2,28 +2,33 @@
 # Unified test dispatcher: documents the unit vs integration split in one place.
 # Unit needs no servers, Docker daemon, or credentials.
 # Integration boots servers, Docker images, or a real provider.
-# Usage: scripts/test [--unit|--integration|--all|--help]
+# Usage: scripts/test [--unit|--integration|--all|--gate [--no-browser] [--shards=N]|--help]
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'EOF'
-Usage: scripts/test [--unit|--integration|--all|--help]
+Usage: scripts/test [--unit|--integration|--all|--gate [--no-browser] [--shards=N]|--help]
 
   --unit         go test + vitest + config contract tests (no servers/daemon/credentials)
   --integration  playwright browser suite (fixtureapi + Vite over real HTTP)
   --all          --unit then --integration (tests only; not the completion gate:
                lint, typecheck, and build still run separately per TESTING.md)
+  --gate         full completion gate: install check, one API generation, then
+               backend, frontend, and extension gates in parallel groups,
+               then the sharded browser suite
+  --no-browser   with --gate: skip the browser suite (fast run)
+  --shards=N     with --gate: browser shards (default: TEST_BROWSER_SHARDS or CPU/2, max 4)
   --help         this message
 
 Matrix:
   unit         backend/scripts/verify.sh (CGO_ENABLED=0 gofmt+vet+test ./...)
-               npm --prefix frontend test (vitest: src/** and scripts/**, jsdom)
-               npm --prefix extension test (node:test, no external APIs)
+               bun --filter ./frontend test (vitest: src/** and scripts/**, jsdom)
+               bun --filter ./extension test (node:test, no external APIs)
                node --test dev/*.test.mjs auth/casdoor/*.test.mjs (Compose CLI, no daemon)
-  integration  npm --prefix frontend run test:browser (tests/*.spec.ts, single worker)
-               npm --prefix extension run test:browser (disposable browser profile)
+  integration  bun --filter ./frontend test:browser (tests/*.spec.ts, sharded)
+               bun --filter ./extension test:browser (disposable browser profile)
                Manual, credential-gated (not in this dispatcher):
                  auth/test-integration.mjs (CASDOOR_TEST_MUTATIONS=1, disposable tmp/)
                  scripts/smoke-backend.sh / smoke-compose.sh (running stack + cookie jar)
@@ -33,27 +38,143 @@ EOF
 }
 
 run_unit() {
+  node scripts/check-install.mjs
   backend/scripts/verify.sh
-  npm --prefix frontend test
-  npm --prefix extension test
+  # No pre-hooks: generate the API client explicitly and once.
+  bun --filter ./frontend api:generate
+  bun --filter ./frontend test
+  bun --filter ./extension test
   # shellcheck disable=SC2086
   node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 }
 
 run_integration() {
-  npm --prefix frontend run test:browser
-  npm --prefix extension run test:browser
+  bun --filter ./frontend test:browser
+  bun --filter ./extension test:browser
 }
 
-mode="${1:---help}"
-if [ "$#" -gt 1 ]; then
-  echo "error: unexpected extra arguments (use --help)" >&2
-  exit 2
-fi
-case "$mode" in
+# Full completion gate. Frontend gates run in sequence because they share
+# generated API files. The backend, extension, and frontend groups run at the
+# same time. Browser shards start only after those pass, because each shard
+# also starts a Go server and a Vite server.
+run_gate() {
+  local run_browser="$1" shards="$2"
+  # Global on purpose: cleanup_logs runs on EXIT, after run_gate returns.
+  logs="$(mktemp -d "${TMPDIR:-/tmp}/waypoint-gate.XXXXXX")"
+  cleanup_logs() {
+    if [ -n "${KEEP_GATE_LOGS:-}" ]; then
+      echo "gate: logs kept at $logs"
+    else
+      rm -rf "$logs"
+    fi
+  }
+  trap cleanup_logs EXIT
+
+  local names=() pids=()
+  local failed=0
+
+  start() {
+    local name="$1"
+    shift
+    names+=("$name")
+    "$@" >"$logs/$name.log" 2>&1 &
+    pids+=("$!")
+  }
+
+  report() {
+    local name="$1" code="$2"
+    if [ "$code" -eq 0 ]; then
+      printf '  ok    %s\n' "$name"
+      return
+    fi
+    printf '  FAIL  %s\n' "$name"
+    tail -40 "$logs/$name.log" | sed 's/^/        /'
+    failed=1
+  }
+
+  echo "gate: install drift"
+  node scripts/check-install.mjs
+
+  echo "gate: generating API client up front"
+  bun --filter ./frontend api:generate >/dev/null
+
+  echo "gate: backend, frontend, extension"
+  start backend backend/scripts/verify.sh
+  start extension bash -c "bun --filter ./extension test && bun --filter ./extension lint && bun --filter ./extension build"
+  start frontend-lint bun --filter ./frontend lint
+  start frontend-checks bash -c "bun --filter ./frontend typecheck && bun --filter ./frontend test && bun --filter ./frontend build"
+
+  local index
+  for index in "${!pids[@]}"; do
+    if wait "${pids[$index]}"; then
+      report "${names[$index]}" 0
+    else
+      report "${names[$index]}" 1
+    fi
+  done
+
+  if [ "$run_browser" -eq 1 ]; then
+    if [ "$failed" -ne 0 ]; then
+      echo "gate: skipping browser suite because other gates failed"
+    else
+      echo "gate: browser suite"
+      if [ -n "$shards" ]; then
+        export TEST_BROWSER_SHARDS="$shards"
+      fi
+      if ! bun --filter ./frontend test:browser >"$logs/browser.log" 2>&1; then
+        report browser 1
+      else
+        report browser 0
+      fi
+    fi
+  fi
+
+  if [ "$failed" -ne 0 ]; then
+    echo "gate: failed"
+    exit 1
+  fi
+  echo "gate: passed"
+}
+
+mode=""
+run_browser=1
+shards=""
+for argument in "$@"; do
+  case "$argument" in
+    --unit|--integration|--all|--gate|--help|-h)
+      if [ -n "$mode" ]; then
+        echo "error: only one mode flag (use --help)" >&2
+        exit 2
+      fi
+      mode="$argument"
+      ;;
+    --no-browser) run_browser=0 ;;
+    --shards=*) shards="${argument#--shards=}" ;;
+    *) echo "error: unknown argument '$argument' (use --help)" >&2; exit 2 ;;
+  esac
+done
+
+case "${mode:---help}" in
+  --gate|--help|-h) ;;
+  *)
+    if [ "$run_browser" -eq 0 ] || [ -n "$shards" ]; then
+      echo "error: --no-browser and --shards need --gate (use --help)" >&2
+      exit 2
+    fi
+    ;;
+esac
+
+case "${mode:---help}" in
   --help|-h) usage; exit 0 ;;
   --unit) run_unit ;;
   --integration) run_integration ;;
   --all) run_unit; run_integration ;;
+  --gate)
+    if [ -n "$shards" ] && ! [[ "$shards" =~ ^[1-9][0-9]*$ ]]; then
+      echo "error: --shards needs a positive integer" >&2
+      exit 2
+    fi
+    run_gate "$run_browser" "$shards"
+    ;;
   *) echo "error: unknown mode '$mode' (use --help)" >&2; exit 2 ;;
 esac

@@ -61,6 +61,16 @@ test("Vercel fails closed on incomplete or unsafe deployment settings", () => {
   assert.throws(() => vercelConfig({ ...settings, NET_WORTH_ESTIMATOR_PROXY_SECRET: "short" }), /PROXY_SECRET/);
 });
 
+test("Vercel installs with bun and builds the frontend workspace", () => {
+  const config = vercelConfig(settings);
+  assert.equal(config.installCommand, "bun install --frozen-lockfile");
+  assert.equal(
+    config.buildCommand,
+    "bun --filter ./frontend api:generate && bun --filter ./frontend build",
+  );
+  assert.equal(config.devCommand, "bun --filter ./frontend dev");
+});
+
 test("the root config exports the evaluated deployment configuration", () => {
   const result = spawnSync(process.execPath, ["--input-type=module", "-e", 'const { config } = await import("./vercel.mjs"); console.log(JSON.stringify(config));'], {
     cwd: fileURLToPath(new URL("../", import.meta.url)),

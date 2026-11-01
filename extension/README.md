@@ -6,8 +6,8 @@ then save directly to Waypoint. No Gemini Nano dependency.
 
 ## Install
 
-1. Install dependencies with `npm --prefix extension ci`.
-2. Run `npm --prefix extension run build`.
+1. Install dependencies with `bun install --frozen-lockfile`.
+2. Run `bun --filter ./extension build`.
 3. Open `chrome://extensions` or `brave://extensions`.
 4. Enable Developer mode. Select **Load unpacked**, then `extension/dist`.
 5. Pin the extension and open it on a product page.
@@ -110,12 +110,12 @@ scope are added.
 ## Verify
 
 ```bash
-npm --prefix extension ci
-npm --prefix extension test
-npm --prefix extension run lint
-npm --prefix extension run build
-npm --prefix extension exec playwright install chromium
-npm --prefix extension run test:browser
+bun install --frozen-lockfile
+bun --filter ./extension test
+bun --filter ./extension lint
+bun --filter ./extension build
+(cd extension && bunx --no-install playwright install chromium)
+bun --filter ./extension test:browser
 backend/scripts/verify.sh
 ```
 

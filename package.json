@@ -1,0 +1,10 @@
+{
+	"name": "net-worth-estimator",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"frontend",
+		"extension"
+	]
+}

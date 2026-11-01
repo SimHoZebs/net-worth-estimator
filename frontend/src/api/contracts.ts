@@ -32,7 +32,6 @@ export interface ProblemDetails extends HumaMetadata {
 	[key: string]: unknown;
 }
 
-
 export const NO_FLOOR_SENTINEL = -10_000_000_000_000;
 export const NO_CEILING_SENTINEL = 10_000_000_000_000;
 

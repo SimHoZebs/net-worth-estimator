@@ -2,7 +2,11 @@ import { useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { setSafeSpendingSettings } from "@/api/generated/endpoints.ts";
 import type { SafeSpendingSettings } from "@/api/contracts.ts";
-import { getUserScope, subscribeUserScope, type UserScope } from "@/auth/resourceScope.ts";
+import {
+	getUserScope,
+	subscribeUserScope,
+	type UserScope,
+} from "@/auth/resourceScope.ts";
 import {
 	DEFAULT_CYCLE_STATEMENT_DAY,
 	DEFAULT_PROTECTED_RESERVE,

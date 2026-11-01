@@ -540,7 +540,12 @@ describe("void posted-version candidates", () => {
 		const smallVoid = bankRow({ amount: 42.1 });
 		const rows = [
 			settledRow({ id: "far", amount: 80 }),
-			settledRow({ id: "inflow", amount: 42.1, fromId: null, toId: "checking" }),
+			settledRow({
+				id: "inflow",
+				amount: 42.1,
+				fromId: null,
+				toId: "checking",
+			}),
 			settledRow({ id: "other", toId: "savings", fromId: null }),
 			settledRow({ id: "pending", pending: true, enabled: false }),
 			settledRow({ id: "voided", void: true, enabled: false }),

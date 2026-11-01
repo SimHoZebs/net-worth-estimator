@@ -1,7 +1,10 @@
 import type { Projection, RangeResult } from "../../domain/result.ts";
 import { usePinnedEvaluations } from "../../state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
-import { useSavedAccounts, useSavedEvaluations } from "../../state/savedRows.ts";
+import {
+	useSavedAccounts,
+	useSavedEvaluations,
+} from "../../state/savedRows.ts";
 
 export type OutlookProjection = {
 	base: Projection | null;

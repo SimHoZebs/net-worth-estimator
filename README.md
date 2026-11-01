@@ -85,8 +85,8 @@ CGO_ENABLED=0 go -C backend run ./cmd/server
 
 ```bash
 # terminal 2
-npm --prefix frontend ci
-npm --prefix frontend run dev
+bun install --frozen-lockfile
+bun --filter ./frontend dev
 ```
 
 The Vite server runs on `http://localhost:5178` and proxies `/v1` to `127.0.0.1:8787`.
