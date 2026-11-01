@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OtherEvaluation, Projection } from "@/domain/result.ts";
+import type { Account, Transaction } from "@/domain/model.ts";
 import { financialModelFixture } from "@/mocks/financialModel.ts";
 import { projectionFixture, transactionFixture } from "@/mocks/projection.ts";
 import { FundingGapsCard } from "./FundingGapsCard.tsx";
@@ -24,7 +25,35 @@ vi.mock("./FundingGapsModal.tsx", () => ({
 	),
 }));
 
-afterEach(cleanup);
+// Saved rows arrive through colocated queries; mutable holders let a test
+// swap data identities the way a background refetch does. The holders start
+// empty because vi.hoisted runs before imports initialize; beforeEach seeds
+// the fixture data.
+const savedRows = vi.hoisted(
+	(): {
+		accounts: Account[];
+		transactions: Transaction[];
+		startDate: string;
+	} => ({ accounts: [], transactions: [], startDate: "" }),
+);
+vi.mock("@/state/savedRows.ts", () => ({
+	useSavedAccounts: () => savedRows.accounts,
+	useSavedTransactions: () => savedRows.transactions,
+	useSavedStartDate: () => savedRows.startDate,
+}));
+
+beforeEach(() => {
+	savedRows.accounts = financialModelFixture.accounts;
+	savedRows.transactions = financialModelFixture.transactions;
+	savedRows.startDate = financialModelFixture.startDate;
+});
+
+afterEach(() => {
+	cleanup();
+	savedRows.accounts = financialModelFixture.accounts;
+	savedRows.transactions = financialModelFixture.transactions;
+	savedRows.startDate = financialModelFixture.startDate;
+});
 
 const item: OtherEvaluation = {
 	id: "funding",
@@ -48,9 +77,6 @@ function cardProps(
 ) {
 	return {
 		item: overrides.item ?? item,
-		accounts: financialModelFixture.accounts,
-		transactions: financialModelFixture.transactions,
-		startDate: financialModelFixture.startDate,
 		projection:
 			overrides.projection ??
 			projectionFixture({
@@ -71,14 +97,9 @@ describe("FundingGapsCard", () => {
 		const refresh = projectionFixture({
 			transactions: [transactionFixture()],
 		});
-		view.rerender(
-			<FundingGapsCard
-				{...cardProps()}
-				accounts={[...financialModelFixture.accounts]}
-				transactions={[...financialModelFixture.transactions]}
-				projection={refresh}
-			/>,
-		);
+		savedRows.accounts = [...financialModelFixture.accounts];
+		savedRows.transactions = [...financialModelFixture.transactions];
+		view.rerender(<FundingGapsCard {...cardProps()} projection={refresh} />);
 		expect(view.getByTestId("funding-selection").textContent).toBe(
 			"renovation-2026-03-06",
 		);
