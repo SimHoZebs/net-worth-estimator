@@ -309,6 +309,14 @@ backend/scripts/verify.sh ./internal/simplefin
 backend/scripts/verify.sh ./cmd/server
 ```
 
+Split settlements (SOC-05) live in the store and settlement suites,
+including the race detector over the concurrent retry storm:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/store/ ./internal/store/adapters/sqlite/ -run 'Settlement' -count=1
+go -C backend test -race ./internal/store/adapters/sqlite/ -run 'TestSettlementConcurrent' -count=1
+```
+
 `backend/scripts/verify.sh` sets `CGO_ENABLED=0` and runs:
 
 1. `gofmt` check;

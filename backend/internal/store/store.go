@@ -321,5 +321,26 @@ type Database interface {
 	// version order, including superseded and accepted history. Access
 	// matches GetSplit.
 	ListSplitVersions(requesterID, splitID string) ([]Split, error)
+	// RecordSettlement appends one payoff record against one
+	// participant's share of one split (SOC-05). The actor and the
+	// participant must be provisioned users; the split ID must be a
+	// canonical UUID. The amount must be positive. An optional link to
+	// one real payment (owner plus posting) must name both halves or
+	// neither, and one real payment backs at most one settlement, so a
+	// linked payment is never double-counted. requestID is a
+	// client-generated UUID: a retry with the same key replays the
+	// recorded settlement, while the same key naming a different
+	// settlement fails with ErrSettlementConflict. The write touches
+	// only settlement rows: it never writes postings, checkpoints,
+	// accounts, or balances, so recording a settlement moves no money.
+	// Split-membership fencing (only current split participants may
+	// record and read) lands with the SOC-04B split reads; until then
+	// the split ID is opaque and any provisioned user may record.
+	RecordSettlement(actorID string, input SettlementInput, requestID string) (Settlement, error)
+	// ListSettlements returns the append-only settlement history for one
+	// split in record order. Unknown splits report an empty history.
+	// Split-membership fencing lands with the SOC-04B split reads;
+	// until then any provisioned user may read.
+	ListSettlements(requesterID, splitID string) ([]Settlement, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

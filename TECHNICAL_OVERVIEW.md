@@ -317,6 +317,8 @@ The current schema stores:
 | `evaluations`            | type, user-scoped instance ID, order, label, enablement, and JSON config                                      |
 | `entity_ids`             | shared ID registry across accounts, postings, planned purchases, rules, and evaluations |
 | `account_links`          | bridge-to-model bindings with snapshot, origin, and last-seen date                                            |
+| `split_settlements`      | append-only payoff records against one split participant, with optional real-payment link                      |
+| `split_settlement_requests` | one recorded settlement per (actor, request ID); retries replay it                                         |
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
 | `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
@@ -371,6 +373,31 @@ Completed deterministic results and completed seeded stochastic results are stor
 Result writes are best-effort. A malformed stored payload is unavailable for retrieval. A storage failure does not prevent the requested simulation from execution.
 
 Stored simulation results are durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and results on replacement.
+
+### Split settlements
+
+Payoff against shared-expense obligations (SOC-05,
+`backend/internal/store/settlement.go`,
+`backend/internal/store/adapters/sqlite/settlements.go`, store-level
+only) is an append-only ledger kept separate from balances:
+`RecordSettlement` writes one `split_settlements` row plus one
+`split_settlement_requests` idempotency row and never touches
+postings, checkpoints, accounts, or balances, so recording a
+settlement moves no money. Each record names one split, the
+participant whose obligation it reduces, a positive integer-minor-unit
+amount, and an optional link to one real payment; one real payment
+backs at most one settlement, so linked payments are never
+double-counted. Retries reuse a client-generated UUID request ID per
+(actor, key): replays return the recorded settlement, concurrent
+identical retries converge to one row, and a key reused for a
+different settlement fails with `store.ErrSettlementConflict`.
+Outstanding, partially-settled, and settled states are derived, never
+stored: `SummarizeSettlements` combines caller-supplied owed shares
+with the recorded history (each row counted once), and
+`SplitSettlementState` rolls the positions into one split state.
+Split-membership fencing for record and read access lands with the
+SOC-04B split reads, which also supply the owed shares; until then the
+split ID is opaque and any provisioned user may record or read.
 
 ## 4. Artifact Identity
 
@@ -699,6 +726,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning              |
 | `backend/internal/store/sync.go`                    | sync application and bank directives                      |
 | `backend/internal/store/artifacts.go`               | bounded artifact storage                                |
+| `backend/internal/store/settlement.go`, `adapters/sqlite/settlements.go` | split settlement ledger, derived states  |
 | `backend/internal/csvio/import.go`                  | canonical model CSV parsing                             |
 | `backend/internal/domain/validation.go`             | authoritative model validation                          |
 | `backend/internal/domain/prepare.go`                | overrides, history, dates, initial state                |

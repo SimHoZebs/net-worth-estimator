@@ -59,6 +59,11 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 			// participant IDs, not the scoped user_id column.
 			continue
 		}
+		if table == "split_settlements" || table == "split_settlement_requests" {
+			// Settlement rows key on split, participant, and actor IDs,
+			// not the scoped user_id column.
+			continue
+		}
 		if table == "sessions" || table == "identity_grants" || table == "identity_logout_marks" || table == "identity_logout_tokens" {
 			continue
 		}

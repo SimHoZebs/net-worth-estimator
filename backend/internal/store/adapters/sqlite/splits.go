@@ -633,6 +633,16 @@ func clearSplitsForUser(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM split_allocations WHERE split_id NOT IN (SELECT split_id FROM splits)`); err != nil {
 		return fmt.Errorf("clear split allocations: %w", err)
 	}
+	// Settlements attach to splits, so dropping cleared splits drops their
+	// settlement history too: a settlement must never attach to an
+	// unrelated new row. The request keys the user executed go with the
+	// shared social clear path alongside split keys.
+	if _, err := tx.Exec(`DELETE FROM split_settlements WHERE split_id NOT IN (SELECT split_id FROM splits)`); err != nil {
+		return fmt.Errorf("clear split settlements: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM split_settlement_requests WHERE settlement_id NOT IN (SELECT settlement_id FROM split_settlements) OR actor_id = :user_id`); err != nil {
+		return fmt.Errorf("clear split settlement requests: %w", err)
+	}
 	return nil
 }
 
