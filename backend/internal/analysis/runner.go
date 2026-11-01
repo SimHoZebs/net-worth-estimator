@@ -19,7 +19,7 @@ type Definition interface {
 
 // Definitions is the composition point for built-in analyses. Definitions share
 // a lifecycle, not a classification switch or financial-model mutation path.
-func Definitions() []Definition { return []Definition{BNPL{}} }
+func Definitions() []Definition { return []Definition{BNPL{}, Recurring{}} }
 
 type Database interface {
 	ListAnalysisUsers() ([]string, error)

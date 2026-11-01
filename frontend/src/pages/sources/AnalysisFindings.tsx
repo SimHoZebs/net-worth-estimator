@@ -32,7 +32,12 @@ export function AnalysisFindings() {
 		id: item.id,
 		name: item.name,
 	}));
-	const findings = query.data?.findings ?? [];
+	const findings = (query.data?.findings ?? []).filter(
+		// Recurring findings keep their own producer vocabulary and have no
+		// list labels yet; the Sources list stays BNPL-only until FIN-02
+		// renders them with reviewed copy.
+		(finding) => finding.kind === "bnpl",
+	);
 	const names = new Map(postings.map((posting) => [posting.id, posting.name]));
 	const state = analyses.data?.analyses?.find(
 		(item) => item.type === "bnpl",
