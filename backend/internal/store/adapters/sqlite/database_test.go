@@ -44,8 +44,8 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 		if table == "user_groups" || table == "group_members" || table == "group_invites" {
 			continue
 		}
-		if table == "sharing_grants" || table == "sharing_copies" {
-			// Cross-user consent rows key on owner/recipient IDs, not the
+		if table == "sharing_grants" || table == "sharing_copies" || table == "inbox_share_state" {
+			// Cross-user consent and inbox rows key on owner/recipient IDs, not the
 			// scoped user_id column the snapshot below assumes.
 			continue
 		}

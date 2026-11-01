@@ -223,6 +223,47 @@ type SharedPostingRef struct {
 	Posting     types.Posting `json:"posting"`
 }
 
+// Inbox item kinds (FND-03). "share" items arrive through FND-02 grants and
+// are derived from the ListSharedPostings primitive. "split-request" is the
+// producer contract for SOC-03 (assigned shares) and SOC-04C (split
+// requests): those producers persist their own request rows (split
+// persistence itself belongs to SOC-04B) and surface them through the same
+// item envelope and status vocabulary below.
+const (
+	InboxKindShare        = "share"
+	InboxKindSplitRequest = "split-request"
+)
+
+// Inbox item statuses. Pending, accepted, and declined record the
+// recipient's own decision state; canceled is derived when a previously
+// visible share loses authorization (revocation, exclusion, ended
+// membership, or source deletion) before the recipient decides. A recorded
+// accept or decline wins over a later loss of authorization.
+const (
+	InboxStatusPending  = "pending"
+	InboxStatusAccepted = "accepted"
+	InboxStatusDeclined = "declined"
+	InboxStatusCanceled = "canceled"
+)
+
+// InboxShareItem is one received transaction share in the recipient's
+// inbox. Preview (Posting) is present only while the recipient is
+// currently authorized; without authorization the item carries sender
+// identity, status, and timestamps only, never transaction content.
+type InboxShareItem struct {
+	Kind              string         `json:"kind"`
+	OwnerUserID       string         `json:"ownerUserId"`
+	PostingID         string         `json:"postingId"`
+	SenderDisplayName string         `json:"senderDisplayName,omitempty"`
+	Status            string         `json:"status"`
+	Unread            bool           `json:"unread"`
+	Dismissed         bool           `json:"dismissed"`
+	ReceivedAt        int64          `json:"receivedAt"`
+	DecidedAt         int64          `json:"decidedAt,omitempty"`
+	CopyPostingID     string         `json:"copyPostingId,omitempty"`
+	Posting           *types.Posting `json:"posting,omitempty"`
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {

@@ -316,7 +316,7 @@ func schemaStatements() []string {
 			created_at INTEGER NOT NULL
 		)`,
 	}
-	return append(statements, sharingSchemaStatements()...)
+	return append(append(statements, sharingSchemaStatements()...), inboxSchemaStatements()...)
 }
 
 // seedAmountPresets is the factory default recipe list. It runs once on a
@@ -454,6 +454,7 @@ var requiredSchemaColumns = map[string]string{
 	"group_invites":            "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
 	"sharing_grants":           "owner_user_id, posting_id, audience_type, audience_id, intent, created_at",
 	"sharing_copies":           "recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, copied_at",
+	"inbox_share_state":        "recipient_user_id, owner_user_id, posting_id, status, unread, dismissed, received_at, decided_at, copy_posting_id",
 	"accounts":                 "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
 	"checkpoints":              "user_id, id, position, model_account_id, balance, source, observed_at",
 	"postings":                 "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
@@ -525,6 +526,7 @@ func expectedSchemaTables() []string {
 		"group_invites",
 		"sharing_grants",
 		"sharing_copies",
+		"inbox_share_state",
 		"accounts",
 		"checkpoints",
 		"postings",

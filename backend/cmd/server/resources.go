@@ -12,6 +12,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
@@ -89,6 +90,14 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		ReadOnly:       apiConfig.ReadOnly,
 	})
 	sharingRoutes := sharingHandler.Routes()
+	// Inbox routes carry the same own-user permission checks and resource
+	// header as every other user route (enforced in identity.Wrap) plus
+	// per-share authorization in the inbox handler on every call.
+	inboxHandler := inbox.New(database, loginConfig.Issuer, inbox.Config{
+		AllowedOrigins: apiConfig.AllowedOrigins,
+		ReadOnly:       apiConfig.ReadOnly,
+	})
+	inboxRoutes := inboxHandler.Routes()
 	combined := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if identity.IsGroupRoute(r.URL.Path) {
 			groupRoutes.ServeHTTP(w, r)
@@ -96,6 +105,10 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		}
 		if identity.IsSharingRoute(r.URL.Path) {
 			sharingRoutes.ServeHTTP(w, r)
+			return
+		}
+		if identity.IsInboxRoute(r.URL.Path) {
+			inboxRoutes.ServeHTTP(w, r)
 			return
 		}
 		router.ServeHTTP(w, r)

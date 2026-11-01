@@ -85,5 +85,16 @@ func IsSharingRoute(path string) bool {
 		strings.HasPrefix(path, "/v1/shared/postings/")
 }
 
+// IsInboxRoute reports received-share inbox routes (FND-03). Like sharing
+// calls, they require the standard own-user permission checks and
+// resource header; per-share authorization is additionally enforced by
+// the inbox handler on every call. It matches exactly the routes the
+// inbox handler serves.
+func IsInboxRoute(path string) bool {
+	return path == "/v1/inbox" || path == "/v1/inbox/shares/accept" ||
+		path == "/v1/inbox/shares/decline" || path == "/v1/inbox/shares/dismiss" ||
+		path == "/v1/inbox/shares/read"
+}
+
 // isGroupRoute is the internal alias used by the request pipeline.
 func isGroupRoute(path string) bool { return IsGroupRoute(path) }
