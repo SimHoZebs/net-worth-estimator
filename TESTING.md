@@ -10,7 +10,7 @@ scripts/test --integration   # playwright browser suite (fixtureapi + Vite over 
 scripts/test --all           # unit then integration
 ```
 
-Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. Sharing one worker cut the suite from about 32s to about 6s for 121 files / 958 tests. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
 
 The purchase-capture extension adds `bun --filter ./extension test` to unit and
 `bun --filter ./extension test:browser` to integration. Install its dependencies
@@ -79,8 +79,7 @@ explicitly and once; before running scripts directly, generate it yourself
 with `bun --filter ./frontend api:generate`.
 
 `typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
-It runs on `bun check` (about 0.3s for both projects against about 10s under
-`tsc`); `build` runs the same `bun check` pass before `vite build`, so the
+It runs on `bun check` for both projects; `build` runs the same `bun check` pass before `vite build`, so the
 artifact path keeps type safety without a separate checker. Both configs avoid
 `baseUrl`, which current checkers removed. The `typescript` package remains as
 a parser library for the typography and style-scale lint scripts.

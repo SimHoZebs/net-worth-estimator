@@ -4,6 +4,7 @@ core.*
 uploads/
 tmp/
 .env.dev
+.env.dev.*
 /tasks/to-groom/long-chaining/
 /node_modules/
 /.vercel/
