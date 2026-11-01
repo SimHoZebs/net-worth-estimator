@@ -27,10 +27,14 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 const resetPath = "/__fixture/reset"
@@ -106,10 +110,12 @@ func main() {
 	// A reset must not interleave with an in-flight request holding the store.
 	var mu sync.Mutex
 	live := &switcher{}
+	sharingSeeded := false
 
 	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction) error {
 		mu.Lock()
 		defer mu.Unlock()
+		sharingSeeded = false
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
@@ -131,12 +137,12 @@ func main() {
 			}
 		}
 		readOnly = nextReadOnly
-		live.set(api.New(database, api.Config{
+		live.set(fixtureHandler(combinedFixtureAPI(application, api.New(database, api.Config{
 			ReceiptSource:  receiptSource,
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
 			ResourceID:     fixtureResourceID,
-		}))
+		}), allowedOrigins, readOnly)))
 		return nil
 	}
 
@@ -151,6 +157,44 @@ func main() {
 	defer stopAnalyses()
 
 	mux := http.NewServeMux()
+	// Sharing seed provisions a second user, a group with the fixture user as
+	// a member, and group-granted postings for shared-feed browser tests. It
+	// runs once per reset; repeat calls report conflict so seeds stay
+	// deterministic.
+	mux.Handle("/__fixture/sharing", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			writer.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if sharingSeeded {
+			writer.WriteHeader(http.StatusConflict)
+			fmt.Fprintln(writer, "sharing already seeded; reset first")
+			return
+		}
+		var body struct {
+			GroupName    string               `json:"groupName"`
+			OwnerDisplay string               `json:"ownerDisplay"`
+			Postings     []fixtureSeedPosting `json:"postings"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(writer, "invalid sharing seed")
+			return
+		}
+		if body.GroupName == "" || body.OwnerDisplay == "" || len(body.Postings) == 0 {
+			writer.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(writer, "groupName, ownerDisplay, and postings are required")
+			return
+		}
+		if err := seedFixtureSharing(application, body.GroupName, body.OwnerDisplay, body.Postings, writer); err != nil {
+			writer.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(writer, err)
+			return
+		}
+		sharingSeeded = true
+	}))
 	mux.Handle(resetPath, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
 			writer.WriteHeader(http.StatusMethodNotAllowed)
@@ -210,7 +254,116 @@ func main() {
 	<-closed
 }
 
-// switcher serves whichever API handler the most recent restore installed.
+// combinedFixtureAPI serves the production API plus the group and sharing
+// handlers browser tests need for the shared feed. Group and sharing calls
+// carry the same synthetic scoped identity as every other fixture request
+// through the PrincipalContext test seam; the browser itself keeps the
+// production session contract with no alternate authentication mode.
+func combinedFixtureAPI(application *sqlite.Database, router http.Handler, allowedOrigins []string, readOnly bool) http.Handler {
+	groupRoutes := groups.New(application, fixtureIssuer, groups.Config{AllowedOrigins: allowedOrigins, ReadOnly: readOnly}).Routes()
+	sharingRoutes := sharing.New(application, fixtureIssuer, sharing.Config{AllowedOrigins: allowedOrigins, ReadOnly: readOnly}).Routes()
+	seam := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := identity.PrincipalContext(r.Context(), identity.Principal{Subject: fixtureSubject, Name: "Browser test"})
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+	groupSeam := seam(groupRoutes)
+	sharingSeam := seam(sharingRoutes)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if identity.IsGroupRoute(r.URL.Path) {
+			groupSeam.ServeHTTP(w, r)
+			return
+		}
+		if identity.IsSharingRoute(r.URL.Path) {
+			sharingSeam.ServeHTTP(w, r)
+			return
+		}
+		router.ServeHTTP(w, r)
+	})
+}
+
+// fixtureSeedPosting describes one seeded shared posting: a display name,
+// an amount recipe (a plain number counts as fixed, anything else stays
+// calculated), a transaction day, and whether the row is a pending bank
+// row.
+type fixtureSeedPosting struct {
+	Name    string `json:"name"`
+	Amount  string `json:"amount"`
+	Day     string `json:"day"`
+	Pending bool   `json:"pending"`
+}
+
+// seedFixtureSharing provisions the shared-feed browser fixture: a second
+// user owning an account and the requested postings, a group naming the
+// fixture user as a member, and one group grant per posting. Pending rows
+// flip through the same lifecycle columns bank sync writes. It answers the
+// seed request with the group ID, the owner resource, and the posting IDs.
+func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay string, postings []fixtureSeedPosting, writer http.ResponseWriter) error {
+	ownerID, err := application.EnsureGroupUser(fixtureIssuer, "sharing-owner")
+	if err != nil {
+		return err
+	}
+	scoped, err := application.EnsureUser(ownerID, fixtureIssuer, "sharing-owner")
+	if err != nil {
+		return err
+	}
+	source := "checking"
+	if _, err := scoped.CreateAccount(types.Account{ID: source, Name: "Checking", Enabled: true}); err != nil {
+		return err
+	}
+	group, err := application.CreateGroup(ownerID, groupName, ownerDisplay)
+	if err != nil {
+		return err
+	}
+	_, code, err := application.CreateInvite(group.ID, ownerID, 5, time.Hour)
+	if err != nil {
+		return err
+	}
+	if _, err := application.AcceptInvite(code, fixtureActor, "Browser test"); err != nil {
+		return err
+	}
+	seeded := []map[string]string{}
+	for _, seed := range postings {
+		if seed.Name == "" || seed.Amount == "" {
+			return fmt.Errorf("seeded postings require a name and an amount")
+		}
+		day := seed.Day
+		if day == "" {
+			day = "2026-06-15"
+		}
+		stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
+		if err != nil {
+			return fmt.Errorf("seeded day %q is not YYYY-MM-DD", seed.Day)
+		}
+		posted, err := scoped.CreatePosting(types.Posting{
+			Name: seed.Name, SourceAccountID: &source,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+			Enabled:         true,
+		})
+		if err != nil {
+			return err
+		}
+		if seed.Pending {
+			if _, err := application.SQL().Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
+				return err
+			}
+		}
+		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceGroup, group.ID); err != nil {
+			return err
+		}
+		seeded = append(seeded, map[string]string{"id": posted.ID, "name": seed.Name})
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(writer).Encode(map[string]any{
+		"groupId":  group.ID,
+		"owner":    "users/" + ownerID[len("user:"):],
+		"postings": seeded,
+	})
+}
+
 type switcher struct {
 	mu      sync.RWMutex
 	current http.Handler
