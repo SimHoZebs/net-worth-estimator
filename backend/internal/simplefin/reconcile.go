@@ -121,6 +121,16 @@ func rowAccount(posting types.Posting) (string, bool) {
 	return "", false
 }
 
+// settledGroupKey buckets settled rows by the same join prefix settleJoinKeys
+// filters on: mirror account plus outflow direction. Amount, time window,
+// and name checks still run per candidate inside the bucket.
+func settledGroupKey(account string, outflow bool) string {
+	if outflow {
+		return account + "\x001"
+	}
+	return account + "\x000"
+}
+
 func bankKey(provider, account, transaction string) store.BankKey {
 	return store.BankKey{Provider: provider, AccountID: account, TransactionID: transaction}
 }
@@ -202,19 +212,33 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		account, ok := rowAccount(item.Posting)
 		return ok && covered[account]
 	}
+	settledByAccount := map[string][]store.BankRow{}
+	for _, row := range bank {
+		if row.Posting.Source != store.SourceSimpleFIN {
+			continue
+		}
+		if row.Posting.Pending || row.Posting.Void {
+			continue
+		}
+		account, ok := rowAccount(row.Posting)
+		if !ok {
+			continue
+		}
+		key := settledGroupKey(account, rowOutflow(row.Posting))
+		settledByAccount[key] = append(settledByAccount[key], row)
+	}
 	duplicateSuppressed := func(candidate store.SyncPosting) bool {
 		// A candidate matching an existing settled bank row is already
 		// imported. The check stays exact: a near-amount repeat at the
 		// same merchant is a genuine second charge, not a repost.
 		// Void rows never suppress: the void record stays and the
 		// posted charge inserts as its own row.
-		for _, row := range bank {
-			if row.Posting.Source != store.SourceSimpleFIN {
-				continue
-			}
-			if row.Posting.Pending || row.Posting.Void {
-				continue
-			}
+		account, ok := rowAccount(candidate.Posting)
+		if !ok {
+			return false
+		}
+		key := settledGroupKey(account, rowOutflow(candidate.Posting))
+		for _, row := range settledByAccount[key] {
 			if settleMatch(row.Posting, candidate) {
 				return true
 			}

@@ -1,6 +1,8 @@
 package simplefin
 
 import (
+	"strings"
+
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
@@ -25,7 +27,14 @@ type HistoricalVoidPair struct {
 // Only this provider's rows participate. No writes; the listing is the
 // whole operation.
 func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []HistoricalVoidPair {
-	var settled []store.BankRow
+	type settledCandidate struct {
+		row             store.BankRow
+		cents           int64
+		name            string
+		outflow         bool
+		transactionTime int64
+	}
+	var settled []settledCandidate
 	for _, row := range bank {
 		if row.Posting.Source != store.SourceSimpleFIN || row.Posting.Pending || row.Posting.Void {
 			continue
@@ -33,7 +42,17 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
 			continue
 		}
-		settled = append(settled, row)
+		cents, ok := postingAmountCents(row.Posting)
+		if !ok || cents <= 0 {
+			continue
+		}
+		settled = append(settled, settledCandidate{
+			row:             row,
+			cents:           cents,
+			name:            strings.ToUpper(strings.TrimSpace(row.Posting.Name)),
+			outflow:         rowOutflow(row.Posting),
+			transactionTime: row.Posting.TransactionTime,
+		})
 	}
 	var pairs []HistoricalVoidPair
 	for _, row := range bank {
@@ -43,32 +62,52 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
 			continue
 		}
-		var match *store.BankRow
+		staleCents, ok := postingAmountCents(row.Posting)
+		if !ok || staleCents <= 0 {
+			continue
+		}
+		staleName := strings.ToUpper(strings.TrimSpace(row.Posting.Name))
+		staleOutflow := rowOutflow(row.Posting)
+		minCents, maxCents, ok := settleTipBounds(staleCents)
+		if !ok {
+			continue
+		}
+		var match *settledCandidate
 		ambiguous := false
 		for i := range settled {
-			candidate := store.SyncPosting{Posting: settled[i].Posting}
-			if !settleMatchTolerant(row.Posting, candidate) {
+			candidate := &settled[i]
+			if candidate.outflow != staleOutflow {
+				continue
+			}
+			gap := candidate.transactionTime - row.Posting.TransactionTime
+			if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
+				continue
+			}
+			if !strings.Contains(candidate.name, staleName) && !strings.Contains(staleName, candidate.name) {
+				continue
+			}
+			if candidate.cents != staleCents && (candidate.cents < minCents || candidate.cents > maxCents) {
 				continue
 			}
 			if match != nil {
 				ambiguous = true
 				break
 			}
-			match = &settled[i]
+			match = candidate
 		}
 		if match == nil || ambiguous {
 			continue
 		}
 		voidAmount, _ := row.Posting.Amount.Config["expression"].(string)
-		settledAmount, _ := match.Posting.Amount.Config["expression"].(string)
+		settledAmount, _ := match.row.Posting.Amount.Config["expression"].(string)
 		pairs = append(pairs, HistoricalVoidPair{
 			VoidID:        row.Posting.ID,
-			SettledID:     match.Posting.ID,
-			Name:          match.Posting.Name,
+			SettledID:     match.row.Posting.ID,
+			Name:          match.row.Posting.Name,
 			VoidAmount:    voidAmount,
 			SettledAmount: settledAmount,
 			VoidTime:      row.Posting.TransactionTime,
-			SettledTime:   match.Posting.PostedTime,
+			SettledTime:   match.row.Posting.PostedTime,
 		})
 	}
 	return pairs

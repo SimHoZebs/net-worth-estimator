@@ -172,6 +172,31 @@ func RuleScheduleDates(rule *types.RecurrenceRule, endDate string) []string {
 	return dates
 }
 
+// ruleOccursOn tests one date without expanding the whole prefix: advance
+// until reaching or passing the date. Daily rules with hundreds of claims
+// no longer re-expand the shared prefix per claim.
+func ruleOccursOn(rule *types.RecurrenceRule, date string) bool {
+	if !validScheduleFrequency(rule.Frequency) {
+		return false
+	}
+	if CompareIsoDates(date, rule.StartDate) < 0 {
+		return false
+	}
+	if rule.EndDate != nil && CompareIsoDates(date, *rule.EndDate) > 0 {
+		return false
+	}
+	for periodCount := 0; ; periodCount++ {
+		occurrenceDate := advanceDate(rule.StartDate, rule.Frequency, periodCount)
+		comparison := CompareIsoDates(occurrenceDate, date)
+		if comparison == 0 {
+			return true
+		}
+		if comparison > 0 {
+			return false
+		}
+	}
+}
+
 // ResolvedOccurrences is the output of rule expansion: synthesized instance
 // postings plus the date-indexed occurrences to execute. Instances is owned
 // by the caller and must outlive execution; occurrences point into it.

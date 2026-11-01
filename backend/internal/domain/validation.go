@@ -94,12 +94,9 @@ func referenceIssueKey(issue types.ModelValidationIssue) string {
 func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.ModelValidationIssue {
 	issues := []types.ModelValidationIssue{}
 	accountIDs := make(map[string]bool, len(model.Accounts))
-	for _, account := range model.Accounts {
-		accountIDs[account.ID] = true
-	}
-
 	accountIDList := make([]string, len(model.Accounts))
 	for i, account := range model.Accounts {
+		accountIDs[account.ID] = true
 		accountIDList[i] = account.ID
 	}
 	validateUniqueIDs(&issues, accountIDList, "account.id", func(index int, field string) []any {
@@ -195,7 +192,7 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 		checkpointKeys[key] = true
 	}
 
-	dependencies := validateTransactionAmounts(&issues, model, accountIDs)
+	dependencies := validateTransactionAmounts(&issues, model, accountIDs, transactionIDs)
 	validatePurchases(&issues, model, dependencies)
 	validatePostingDependencies(&issues, model, dependencies)
 	validatePostingRoutes(&issues, model.Postings, accountIDs)
@@ -220,12 +217,14 @@ func pathWithField(path []any, field string) []any {
 
 func validateEvaluationInstanceIDs(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
 	seen := map[string]bool{}
-	for _, evaluationType := range types.EvaluationTypeOrder {
-		for _, instance := range evaluationInstances(model, evaluationType) {
+	// Single pass over Tables(): no per-type ByType lookup, and new tables
+	// ride along with zero changes here.
+	for _, table := range model.Evaluations.Tables() {
+		for _, instance := range *table.Rows {
 			if seen[instance.InstanceID] {
 				addIssue(issues, types.SeverityError, "evaluation.instanceId.duplicate",
 					fmt.Sprintf("ID '%s' is duplicated across behavior configuration files.", instance.InstanceID),
-					[]any{"evaluations", evaluationType}...)
+					[]any{"evaluations", table.Type}...)
 				continue
 			}
 			seen[instance.InstanceID] = true
@@ -233,32 +232,17 @@ func validateEvaluationInstanceIDs(issues *[]types.ModelValidationIssue, model *
 	}
 }
 
-type instanceRef struct {
-	Type       string
-	InstanceID string
-	Enabled    bool
-	Config     any
-}
-
-func evaluationInstances(model *types.FinancialModel, evaluationType string) []instanceRef {
-	refs := []instanceRef{}
-	if rows := model.Evaluations.ByType(evaluationType); rows != nil {
-		for _, item := range *rows {
-			refs = append(refs, instanceRef{evaluationType, item.InstanceID, item.Enabled, item.Config})
-		}
-	}
-	return refs
-}
-
 func validateEvaluationConfigs(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
-	for _, evaluationType := range types.EvaluationTypeOrder {
-		for index, instance := range evaluationInstances(model, evaluationType) {
-			definition, ok := evaluationRegistryInstance.Get(evaluationType)
-			if !ok {
-				continue
-			}
+	// Single pass over Tables(): config validation shares the iteration
+	// instead of re-expanding every table a second time.
+	for _, table := range model.Evaluations.Tables() {
+		definition, ok := evaluationRegistryInstance.Get(table.Type)
+		if !ok {
+			continue
+		}
+		for index, instance := range *table.Rows {
 			if err := definition.ValidateConfig(instance.Config); err != nil {
-				path := []any{"evaluations", evaluationType, index}
+				path := []any{"evaluations", table.Type, index}
 				addIssue(issues, types.SeverityError, "evaluation.config.invalid", err.Error(), path...)
 			}
 		}
@@ -298,8 +282,7 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, m
 // validateTransactionAmounts validates amount descriptors for manual postings
 // and rule templates together. References may name posting or rule IDs, so
 // the dependency graph spans both.
-func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) map[string][]string {
-	transactionIDsSet := TransactionIDs(model)
+func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool, transactionIDsSet map[string]bool) map[string][]string {
 	dependencies := map[string][]string{}
 	validateAmount := func(id string, amount types.PostingAmountResolution, path []any) {
 		deps, err := ValidateAmountDescriptor(amount, &AmountReferenceContext{
@@ -542,8 +525,8 @@ func validatePostingClaims(issues *[]types.ModelValidationIssue, model *types.Fi
 				append(base, "occurrenceDate")...)
 			continue
 		}
-		scheduled := RuleScheduleDates(rule, claim.OccurrenceDate)
-		if len(scheduled) == 0 || scheduled[len(scheduled)-1] != claim.OccurrenceDate {
+		scheduled := ruleOccursOn(rule, claim.OccurrenceDate)
+		if !scheduled {
 			addIssue(issues, types.SeverityError, "posting.claim.date.unscheduled",
 				fmt.Sprintf("Posting '%s' claims %s, which is not a scheduled occurrence of rule '%s'.", posting.ID, claim.OccurrenceDate, rule.ID),
 				append(base, "occurrenceDate")...)

@@ -116,31 +116,43 @@ func orderedIDs(tx *userTx, kind RowKind, evaluationType string) ([]string, erro
 }
 
 func rewritePositions(tx *userTx, kind RowKind, evaluationType string, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	var idColumn, table, extra string
+	var extraArgs []any
+	switch kind {
+	case RowAccount:
+		table, idColumn = "accounts", "id"
+	case RowPosting:
+		table, idColumn = "posting_sim", "posting_id"
+	case RowRule:
+		table, idColumn = "recurrence_rules", "id"
+	case RowEvaluation:
+		table, idColumn, extra, extraArgs = "evaluations", "instance_id", " AND type = ?", []any{evaluationType}
+	case RowPreset:
+		table, idColumn = "amount_presets", "id"
+	default:
+		return fmt.Errorf("move unsupported for %q", kind)
+	}
+	var cases strings.Builder
+	args := make([]any, 0, len(ids)*2+len(extraArgs))
 	for position, id := range ids {
-		var query string
-		var args []any
-		switch kind {
-		case RowAccount:
-			query = `UPDATE accounts SET position = ? WHERE id = ? AND user_id = :user_id`
-			args = []any{position, id}
-		case RowPosting:
-			query = `UPDATE posting_sim SET position = ? WHERE posting_id = ? AND user_id = :user_id`
-			args = []any{position, id}
-		case RowRule:
-			query = `UPDATE recurrence_rules SET position = ? WHERE id = ? AND user_id = :user_id`
-			args = []any{position, id}
-		case RowEvaluation:
-			query = `UPDATE evaluations SET position = ? WHERE type = ? AND instance_id = ? AND user_id = :user_id`
-			args = []any{position, evaluationType, id}
-		case RowPreset:
-			query = `UPDATE amount_presets SET position = ? WHERE id = ? AND user_id = :user_id`
-			args = []any{position, id}
-		default:
-			return fmt.Errorf("move unsupported for %q", kind)
+		if position > 0 {
+			cases.WriteString(" ")
 		}
-		if _, err := tx.Exec(query, args...); err != nil {
-			return fmt.Errorf("rewrite position for %s %s: %w", kind, id, err)
-		}
+		cases.WriteString("WHEN ? THEN ?")
+		args = append(args, id, position)
+	}
+	in := make([]string, len(ids))
+	for i, id := range ids {
+		in[i] = "?"
+		args = append(args, id)
+	}
+	args = append(args, extraArgs...)
+	query := `UPDATE ` + table + ` SET position = CASE ` + idColumn + ` ` + cases.String() + ` END WHERE ` + idColumn + ` IN (` + strings.Join(in, ",") + `)` + extra + ` AND user_id = :user_id`
+	if _, err := tx.Exec(query, args...); err != nil {
+		return fmt.Errorf("rewrite positions for %s: %w", kind, err)
 	}
 	return nil
 }
@@ -152,12 +164,16 @@ func moveRow(tx *userTx, kind RowKind, evaluationType, id, beforeID string) erro
 	if err != nil {
 		return err
 	}
-	found := false
-	kept := ids[:0]
+	kept := make([]string, 0, len(ids)+1)
+	found, placed := false, beforeID == ""
 	for _, existing := range ids {
 		if existing == id {
 			found = true
 			continue
+		}
+		if existing == beforeID {
+			kept = append(kept, id)
+			placed = true
 		}
 		kept = append(kept, existing)
 	}
@@ -166,20 +182,8 @@ func moveRow(tx *userTx, kind RowKind, evaluationType, id, beforeID string) erro
 	}
 	if beforeID == "" {
 		kept = append(kept, id)
-	} else {
-		placed := false
-		result := make([]string, 0, len(kept)+1)
-		for _, existing := range kept {
-			if existing == beforeID {
-				result = append(result, id)
-				placed = true
-			}
-			result = append(result, existing)
-		}
-		if !placed {
-			return NotFound(beforeID)
-		}
-		kept = result
+	} else if !placed {
+		return NotFound(beforeID)
 	}
 	return rewritePositions(tx, kind, evaluationType, kept)
 }
@@ -482,13 +486,17 @@ func deleteCheckpoints(tx *userTx, accountID string, observedAt int64) error {
 	return nil
 }
 
-func validEvaluationType(evalType string) bool {
+var validEvaluationTypeSet = func() map[string]struct{} {
+	set := make(map[string]struct{}, len(types.EvaluationTypeOrder))
 	for _, ordered := range types.EvaluationTypeOrder {
-		if ordered == evalType {
-			return true
-		}
+		set[ordered] = struct{}{}
 	}
-	return false
+	return set
+}()
+
+func validEvaluationType(evalType string) bool {
+	_, ok := validEvaluationTypeSet[evalType]
+	return ok
 }
 
 // CreateEvaluation inserts one evaluation instance. Empty instance IDs
