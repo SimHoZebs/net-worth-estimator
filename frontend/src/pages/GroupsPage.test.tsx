@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ok } from "../mocks/fetch.ts";
 import {
@@ -134,7 +134,7 @@ it("shows group detail with members and invites for an owner", async () => {
 	await waitFor(() =>
 		expect(screen.getByRole("heading", { name: "Household" })).toBeTruthy(),
 	);
-	expect(screen.getByText(/alice/)).toBeTruthy();
+	expect(within(screen.getByRole("list", { name: "Members" })).getByText(/alice/)).toBeTruthy();
 	expect(screen.getByRole("button", { name: "New invite code" })).toBeTruthy();
 	expect(await screen.findByText("Uses 1/5")).toBeTruthy();
 	expect(requested).toContain("/v1/groups/g1/invites");
@@ -177,7 +177,7 @@ it("shows an invite error with explicit retry without hiding the loaded group", 
 	window.location.hash = "#groups/g1";
 	render(<GroupsPage />, { wrapper });
 	expect(await screen.findByText("Invites could not be loaded.")).toBeTruthy();
-	expect(screen.getByText(/alice/)).toBeTruthy();
+	expect(within(screen.getByRole("list", { name: "Members" })).getByText(/alice/)).toBeTruthy();
 	expect(screen.getByRole("heading", { name: "Household" })).toBeTruthy();
 	detail.failInvites = false;
 	fireEvent.click(screen.getByRole("button", { name: "Retry invites" }));
@@ -195,6 +195,6 @@ it("uses the confirmed detail role, not an old list role, to request invites", a
 	);
 	window.location.hash = "#groups/g1";
 	render(<GroupsPage />, { wrapper });
-	await screen.findByText(/alice/);
+	await within(screen.getByRole("list", { name: "Members" })).findByText(/alice/);
 	expect(requested).not.toContain("/v1/groups/g1/invites");
 });

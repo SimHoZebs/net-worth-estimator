@@ -28,16 +28,23 @@
 package sharing
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 // Config carries transport policy shared with the plan API. Sharing obeys
@@ -68,6 +75,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/postings", h.serveSharedList)
 	mux.HandleFunc("/v1/shared/postings/", h.serveSharedRead)
 	mux.HandleFunc("/v1/shared/policies/", h.servePolicies)
+	mux.HandleFunc("/v1/shared/groups/", h.serveGroupFeed)
 	return middleware.Recoverer(api.CORSMiddleware(h.origins)(mux))
 }
 
@@ -513,6 +521,248 @@ func (h *Handler) serveCopyLink(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeProblem(w, http.StatusNotFound, "Shared transaction link not found.")
 	}
+}
+
+// serveGroupFeed serves one group's shared transaction feed (GRP-03): the
+// requester's authorized postings in that group, each listed once with its
+// source member and audiences, plus viewer-specific totals over the
+// filtered set. Date, member, and direction filters narrow the authorized
+// set for navigation only and never widen eligibility. Pagination is a
+// keyset over the owner-then-posting order: cursor names the last item of
+// the previous page. Filters, totals, and pages all derive from the same
+// gated read, so counts and sums always describe exactly the listed set.
+func (h *Handler) serveGroupFeed(w http.ResponseWriter, r *http.Request) {
+	requester, _, ok := h.caller(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Sign in to view shared transactions.")
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
+		return
+	}
+	rest := strings.TrimPrefix(r.URL.Path, "/v1/shared/groups/")
+	parts := strings.SplitN(rest, "/", 3)
+	if len(parts) != 2 || parts[0] == "" || parts[1] != "feed" {
+		writeProblem(w, http.StatusNotFound, "Shared transactions not found.")
+		return
+	}
+	if _, err := uuid.Parse(parts[0]); err != nil {
+		writeProblem(w, http.StatusNotFound, "Shared transactions not found.")
+		return
+	}
+	groupID := parts[0]
+	items, err := h.db.ListGroupSharedFeed(requester, groupID)
+	if err != nil {
+		writeStoreError(w, err, "Shared transactions not found.")
+		return
+	}
+	filters, err := parseFeedFilters(r.URL.Query())
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	filtered := applyFeedFilters(items, filters)
+	totals := sumFeedTotals(filtered)
+	page, next, hasMore := pageFeedItems(filtered, filters.cursor, filters.limit)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"groupId": groupID,
+		"items":   page,
+		"totals":  totals,
+		"page":    map[string]any{"nextCursor": next, "hasMore": hasMore},
+	})
+}
+
+// feedDirection classifies a posting by money movement: external inflow,
+// external outflow, or an account-to-account transfer. Rows with neither
+// side classify nowhere and appear only when no direction filter applies.
+func feedDirection(posting types.Posting) string {
+	switch {
+	case posting.SourceAccountID == nil && len(posting.Destinations) > 0:
+		return "in"
+	case posting.SourceAccountID != nil && len(posting.Destinations) == 0:
+		return "out"
+	case posting.SourceAccountID != nil && len(posting.Destinations) > 0:
+		return "transfer"
+	default:
+		return ""
+	}
+}
+
+type feedFilters struct {
+	start     string
+	end       string
+	members   map[string]bool
+	direction map[string]bool
+	cursor    feedCursor
+	limit     int
+}
+
+type feedCursor struct {
+	set     bool
+	owner   string
+	posting string
+}
+
+// parseFeedFilters reads the navigation filters. Every rejection is a 400
+// with a plain-language reason: dates are YYYY-MM-DD days, members are
+// user resources, directions are money in, money out, or transfer, and the
+// page takes at most 100 items.
+func parseFeedFilters(query url.Values) (feedFilters, error) {
+	filters := feedFilters{
+		start:     strings.TrimSpace(query.Get("startDate")),
+		end:       strings.TrimSpace(query.Get("endDate")),
+		members:   map[string]bool{},
+		direction: map[string]bool{},
+		limit:     20,
+	}
+	for _, day := range []string{filters.start, filters.end} {
+		if day == "" {
+			continue
+		}
+		if _, err := time.Parse("2006-01-02", day); err != nil {
+			return feedFilters{}, errors.New("Filter dates use YYYY-MM-DD.")
+		}
+	}
+	if filters.start != "" && filters.end != "" && filters.start > filters.end {
+		return feedFilters{}, errors.New("The start date is after the end date.")
+	}
+	for _, member := range query["member"] {
+		owner, err := resourceOwner(strings.TrimSpace(member))
+		if err != nil {
+			return feedFilters{}, errors.New("Member filters name a user.")
+		}
+		filters.members[owner] = true
+	}
+	for _, direction := range query["direction"] {
+		switch strings.TrimSpace(direction) {
+		case "in", "out", "transfer":
+			filters.direction[strings.TrimSpace(direction)] = true
+		default:
+			return feedFilters{}, errors.New("Direction filters are money in, money out, or transfer.")
+		}
+	}
+	if raw := strings.TrimSpace(query.Get("limit")); raw != "" {
+		limit, err := strconv.Atoi(raw)
+		if err != nil || limit < 1 || limit > 100 {
+			return feedFilters{}, errors.New("A page takes 1 to 100 transactions.")
+		}
+		filters.limit = limit
+	}
+	if raw := strings.TrimSpace(query.Get("cursor")); raw != "" {
+		cursor, err := decodeFeedCursor(raw)
+		if err != nil {
+			return feedFilters{}, errors.New("The page cursor is invalid. Start from the first page.")
+		}
+		filters.cursor = cursor
+	}
+	return filters, nil
+}
+
+// applyFeedFilters narrows the gated feed for navigation. Items arrive
+// authorized; filtering only hides, so eligibility never widens here.
+func applyFeedFilters(items []store.GroupFeedItem, filters feedFilters) []store.GroupFeedItem {
+	if filters.start == "" && filters.end == "" && len(filters.members) == 0 && len(filters.direction) == 0 {
+		return items
+	}
+	filtered := []store.GroupFeedItem{}
+	for _, item := range items {
+		if len(filters.members) > 0 && !filters.members[item.OwnerUserID] {
+			continue
+		}
+		if len(filters.direction) > 0 && !filters.direction[feedDirection(item.Posting)] {
+			continue
+		}
+		if filters.start != "" || filters.end != "" {
+			day := time.Unix(item.Posting.TransactionTime, 0).UTC().Format("2006-01-02")
+			if filters.start != "" && day < filters.start {
+				continue
+			}
+			if filters.end != "" && day > filters.end {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
+}
+
+// sumFeedTotals computes viewer-specific totals over the filtered feed:
+// one count per authorized posting, the rounded sum of fixed amounts, and
+// the pending and calculated-amount rows inside the count but outside the
+// sum. Totals and pages derive from the same filtered set, so they always
+// agree.
+func sumFeedTotals(items []store.GroupFeedItem) store.GroupFeedTotals {
+	totals := store.GroupFeedTotals{Count: len(items)}
+	for _, item := range items {
+		if item.Posting.Pending {
+			totals.PendingCount++
+		}
+		amount, fixed := store.FeedLiteralAmount(item.Posting.Amount)
+		if !fixed {
+			totals.VaryingCount++
+			continue
+		}
+		totals.TotalAmount += amount
+	}
+	totals.TotalAmount = math.Round(totals.TotalAmount*100) / 100
+	return totals
+}
+
+// pageFeedItems slices one keyset page over the owner-then-posting order.
+// The cursor names the last item of the previous page; items at or before
+// it stay behind. The next cursor names the page's last item when more
+// items remain.
+func pageFeedItems(items []store.GroupFeedItem, cursor feedCursor, limit int) ([]store.GroupFeedItem, string, bool) {
+	start := 0
+	if cursor.set {
+		for i, item := range items {
+			if item.OwnerUserID == cursor.owner && item.Posting.ID == cursor.posting {
+				start = i + 1
+				break
+			}
+			if item.OwnerUserID > cursor.owner ||
+				(item.OwnerUserID == cursor.owner && item.Posting.ID > cursor.posting) {
+				start = i
+				break
+			}
+			start = i + 1
+		}
+	}
+	if start > len(items) {
+		start = len(items)
+	}
+	end := start + limit
+	hasMore := end < len(items)
+	if end > len(items) {
+		end = len(items)
+	}
+	page := items[start:end]
+	if len(page) == 0 {
+		return []store.GroupFeedItem{}, "", false
+	}
+	next := ""
+	if hasMore {
+		next = encodeFeedCursor(page[len(page)-1].OwnerUserID, page[len(page)-1].Posting.ID)
+	}
+	return page, next, hasMore
+}
+
+func encodeFeedCursor(owner, posting string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(owner + "\x00" + posting))
+}
+
+func decodeFeedCursor(raw string) (feedCursor, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return feedCursor{}, err
+	}
+	owner, posting, found := strings.Cut(string(decoded), "\x00")
+	if !found || owner == "" || posting == "" {
+		return feedCursor{}, errors.New("invalid feed cursor")
+	}
+	return feedCursor{set: true, owner: owner, posting: posting}, nil
 }
 
 // resourceOwner converts the user-resource form (users/<64hex>) used by

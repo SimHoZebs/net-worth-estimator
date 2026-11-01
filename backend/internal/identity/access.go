@@ -84,7 +84,8 @@ func IsSharingRoute(path string) bool {
 		path == "/v1/shared/copies" || strings.HasPrefix(path, "/v1/shared/copies/") ||
 		path == "/v1/shared/postings" ||
 		strings.HasPrefix(path, "/v1/shared/postings/") ||
-		strings.HasPrefix(path, "/v1/shared/policies/")
+		strings.HasPrefix(path, "/v1/shared/policies/") ||
+		strings.HasPrefix(path, "/v1/shared/groups/")
 }
 
 // IsInboxRoute reports received-share inbox routes (FND-03). Like sharing

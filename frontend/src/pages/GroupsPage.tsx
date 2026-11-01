@@ -23,6 +23,7 @@ import {
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { groupHash, pageHash } from "../workspace/route.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
+import { SharedFeed } from "./groups/SharedFeed.tsx";
 
 export function GroupsPage() {
 	const { route, pushHash } = useWorkspaceNavigation();
@@ -202,7 +203,7 @@ export function GroupsPage() {
 							</div>
 						)}
 
-						<ul className="grid list-none gap-2 p-0">
+						<ul aria-label="Members" className="grid list-none gap-2 p-0">
 							{members.map((member) => (
 								<li
 									key={member.accountId}
@@ -244,6 +245,16 @@ export function GroupsPage() {
 								</li>
 							))}
 						</ul>
+
+						{selected && (
+							<SharedFeed
+								groupId={selected}
+								members={members.map((member) => ({
+									accountId: member.accountId,
+									displayName: member.displayName,
+								}))}
+							/>
+						)}
 
 						{canManageInvites && invitesQuery.isError && (
 							<ErrorNotice

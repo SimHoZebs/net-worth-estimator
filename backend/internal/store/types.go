@@ -424,6 +424,47 @@ type SharingAuditEvent struct {
 	CreatedAt   int64  `json:"createdAt"`
 }
 
+// Feed audience types naming one path through which the viewer is
+// authorized for a feed item: a group the item is shared in, or a direct
+// share from the source member.
+const (
+	FeedAudienceGroup  = "group"
+	FeedAudienceDirect = "direct"
+)
+
+// GroupFeedAudience names one authorizing path for a feed item as the
+// viewer sees it. Group paths carry the group's current name; a direct
+// share carries the source member's display name in Name with an empty ID.
+type GroupFeedAudience struct {
+	Type string `json:"type"`
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name"`
+}
+
+// GroupFeedItem is one transaction in a group feed. The posting reuses the
+// existing transaction shape; SourceDisplayName is the name the group
+// knows the source member by, and Audiences lists every path authorizing
+// this viewer (group names plus direct share), so a posting reachable
+// several ways still lists once.
+type GroupFeedItem struct {
+	OwnerUserID       string              `json:"ownerUserId"`
+	SourceDisplayName string              `json:"sourceDisplayName"`
+	Audiences         []GroupFeedAudience `json:"audiences"`
+	Posting           types.Posting       `json:"posting"`
+}
+
+// GroupFeedTotals are the viewer-specific totals over the filtered feed
+// set: Count lists each authorized posting once, TotalAmount sums the
+// fixed-amount postings rounded to cents, VaryingCount names how many
+// counted postings carry calculated amounts outside the sum, and
+// PendingCount names how many counted postings are pending bank rows.
+type GroupFeedTotals struct {
+	Count        int     `json:"count"`
+	TotalAmount  float64 `json:"totalAmount"`
+	VaryingCount int     `json:"varyingCount"`
+	PendingCount int     `json:"pendingCount"`
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {

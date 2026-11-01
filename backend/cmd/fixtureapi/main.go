@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,7 +33,9 @@ import (
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 const resetPath = "/__fixture/reset"
@@ -198,6 +201,39 @@ func main() {
 	defer stopAnalyses()
 
 	mux := http.NewServeMux()
+	// Sharing seed provisions a fresh second user, a group with the fixture
+	// user as a member, and group-granted postings for shared-feed browser
+	// tests. Every call mints a new owner, so seeds never collide with state
+	// surviving the user-scoped reset; group names must be distinct per call
+	// within a run so the UI lists one matching group.
+	mux.Handle("/__fixture/sharing", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			writer.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		var body struct {
+			GroupName    string               `json:"groupName"`
+			OwnerDisplay string               `json:"ownerDisplay"`
+			Postings     []fixtureSeedPosting `json:"postings"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(writer, "invalid sharing seed")
+			return
+		}
+		if body.GroupName == "" || body.OwnerDisplay == "" || len(body.Postings) == 0 {
+			writer.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(writer, "groupName, ownerDisplay, and postings are required")
+			return
+		}
+		if err := seedFixtureSharing(application, body.GroupName, body.OwnerDisplay, body.Postings, writer); err != nil {
+			writer.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(writer, err)
+			return
+		}
+	}))
 	mux.Handle(resetPath, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
 			writer.WriteHeader(http.StatusMethodNotAllowed)
@@ -257,7 +293,90 @@ func main() {
 	<-closed
 }
 
-// switcher serves whichever API handler the most recent restore installed.
+// fixtureSeedPosting describes one seeded shared posting: a display name,
+// an amount recipe (a plain number counts as fixed, anything else stays
+// calculated), a transaction day, and whether the row is a pending bank
+// row.
+type fixtureSeedPosting struct {
+	Name    string `json:"name"`
+	Amount  string `json:"amount"`
+	Day     string `json:"day"`
+	Pending bool   `json:"pending"`
+}
+
+// seedFixtureSharing provisions the shared-feed browser fixture: a second
+// user owning an account and the requested postings, a group naming the
+// fixture user as a member, and one group grant per posting. Pending rows
+// flip through the same lifecycle columns bank sync writes. It answers the
+// seed request with the group ID, the owner resource, and the posting IDs.
+var fixtureSeedOwners int64
+
+func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay string, postings []fixtureSeedPosting, writer http.ResponseWriter) error {
+	subject := fmt.Sprintf("sharing-owner-%d", atomic.AddInt64(&fixtureSeedOwners, 1))
+	ownerID, err := application.EnsureGroupUser(fixtureIssuer, subject)
+	if err != nil {
+		return err
+	}
+	scoped, err := application.EnsureUser(ownerID, fixtureIssuer, subject)
+	if err != nil {
+		return err
+	}
+	source := "checking"
+	if _, err := scoped.CreateAccount(types.Account{ID: source, Name: "Checking", Enabled: true}); err != nil {
+		return err
+	}
+	group, err := application.CreateGroup(ownerID, groupName, ownerDisplay)
+	if err != nil {
+		return err
+	}
+	_, code, err := application.CreateInvite(group.ID, ownerID, 5, time.Hour)
+	if err != nil {
+		return err
+	}
+	if _, err := application.AcceptInvite(code, fixtureActor, "Browser test"); err != nil {
+		return err
+	}
+	seeded := []map[string]string{}
+	for _, seed := range postings {
+		if seed.Name == "" || seed.Amount == "" {
+			return fmt.Errorf("seeded postings require a name and an amount")
+		}
+		day := seed.Day
+		if day == "" {
+			day = "2026-06-15"
+		}
+		stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
+		if err != nil {
+			return fmt.Errorf("seeded day %q is not YYYY-MM-DD", seed.Day)
+		}
+		posted, err := scoped.CreatePosting(types.Posting{
+			Name: seed.Name, SourceAccountID: &source,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+			Enabled:         true,
+		})
+		if err != nil {
+			return err
+		}
+		if seed.Pending {
+			if _, err := application.SQL().Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
+				return err
+			}
+		}
+		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceGroup, group.ID); err != nil {
+			return err
+		}
+		seeded = append(seeded, map[string]string{"id": posted.ID, "name": seed.Name})
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(writer).Encode(map[string]any{
+		"groupId":  group.ID,
+		"owner":    "users/" + ownerID[len("user:"):],
+		"postings": seeded,
+	})
+}
+
 type switcher struct {
 	mu      sync.RWMutex
 	current http.Handler

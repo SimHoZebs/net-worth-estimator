@@ -379,5 +379,20 @@ type Database interface {
 	// submitted. Counts only: no amounts, payees, or row IDs leave the
 	// owner's scope. Non-members report ErrNotFound.
 	PreviewSharingPolicyDraft(ownerID, groupID string, input SharingPolicyInput) (SharingPolicyPreview, error)
+	// ListGroupSharedFeed returns the per-group shared transaction feed
+	// (GRP-03): every posting the requester is currently authorized to
+	// read that belongs in the named group, each listed once however
+	// many group grants, policies, accounts, or direct shares match.
+	// Candidates come from the indexed references plus the explicit
+	// manual grants, and every candidate passes CheckSharedPostingAccess
+	// before it is read, so a stale reference under-shares but never
+	// over-shares. A posting belongs in the group feed when the viewer
+	// reaches it through the group (manual group grant or automatic
+	// policy) or through a direct share from one of the group's current
+	// members. Non-members and unknown groups report ErrNotFound so
+	// group visibility is not enumerable. Results order by owner then
+	// posting; keyset feed pagination over the result belongs to the
+	// HTTP consumer.
+	ListGroupSharedFeed(requesterID, groupID string) ([]GroupFeedItem, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }
