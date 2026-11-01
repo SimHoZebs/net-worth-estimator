@@ -417,6 +417,40 @@ test("backups stay private and exclusive across attempts", async (t) => {
   assert.equal(names.length, 1);
 });
 
+test("downgrade recovery restores the verified backup with users and rows intact", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-downgrade-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  const guest = await secondUser(db);
+  await toLegacyCheckpoints(db);
+  await seedBankRows(db, owner, guest);
+  const dumpBefore = (await sqlite(db, ".dump")).stdout;
+  const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
+  const checkpointsBefore = await rows(db, "SELECT user_id, id, position, date, model_account_id, balance, source FROM checkpoints ORDER BY user_id, id;");
+
+  await migrate(db);
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM checkpoints WHERE typeof(observed_at) != 'integer' OR observed_at <= 0;"), "0");
+
+  // Operator downgrade: verify the retained backup, then publish it back over
+  // the migrated database with the SQLite backup API. No reverse migration runs.
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+  const backup = join(directory, names[0], "before.db");
+  assert.equal(await rows(backup, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(backup, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  await sqlite(backup, `.backup main '${db}'`);
+
+  assert.equal((await sqlite(db, ".dump")).stdout, dumpBefore);
+  assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
+  assert.equal(await rows(db, "SELECT user_id, id, position, date, model_account_id, balance, source FROM checkpoints ORDER BY user_id, id;"), checkpointsBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+
+  // The restored source migrates cleanly again, so recovery leaves a retryable state.
+  await migrate(db);
+  assert.equal(await rows(db, "SELECT observed_at FROM checkpoints WHERE user_id = 'user:b';"), `${DAY_CLOSE_0310}`);
+});
+
 test("shared hook stays shell plus setupdb/sqlite3 and outside server startup", async () => {
   await run("bash", ["-n", script.pathname]);
   await run("/bin/sh", ["-n", script.pathname]);
