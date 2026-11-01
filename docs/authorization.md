@@ -208,6 +208,30 @@ driver binds arguments to placeholders sequentially by index and ignores
 `sql.Named` wrapping, so the auto-appended `:user_id` argument binds to
 whatever placeholder stands last — keep `:named` placeholders textually
 last or values silently misbind with no error.
+
+## Group shared transaction feed (GRP-03)
+
+The per-group feed (`GET /v1/shared/groups/{groupId}/feed`) shows one
+member's authorized postings in one group, each listed once with the
+source member's group display name and every path authorizing the viewer
+(group names plus direct share). A posting belongs in the group feed when
+the viewer reaches it through the group (manual group grant or automatic
+policy) or through a direct share from one of the group's current
+members. Discovery reads the indexed references plus the explicit manual
+grants; `CheckSharedPostingAccess` re-validates membership and policy
+version on every candidate with no index shortcut, so leaving or removal
+revokes source-original access immediately. Friend-specific (user),
+group, and wildcard exclusions deny the feed, the detail read, and the
+counts alike; pending postings qualify exactly like posted ones. Date,
+member, and movement-direction filters narrow the authorized set for
+navigation only and never widen eligibility. Viewer-specific totals (one
+count per posting, the rounded sum of fixed amounts, plus the pending and
+calculated-amount rows inside the count but outside the sum) derive from
+the same filtered set as the listing, so they always agree. Keyset pages
+walk the owner-then-posting order with an opaque cursor. Saving a copy
+reuses the SOC-02 accept flow, yielding an independently editable
+recipient row; source edits by recipients stay deferred, and
+read-only-permission is not a separate representation.
 ## Linked transactions (FND-04)
 
 A link binds one source-owner posting to one recipient-owned private copy
