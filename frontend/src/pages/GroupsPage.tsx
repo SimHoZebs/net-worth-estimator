@@ -202,7 +202,7 @@ export function GroupsPage() {
 							</div>
 						)}
 
-						<ul className="grid list-none gap-2 p-0">
+						<ul aria-label="Members" className="grid list-none gap-2 p-0">
 							{members.map((member) => (
 								<li
 									key={member.accountId}
