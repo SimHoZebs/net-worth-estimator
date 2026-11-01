@@ -49,28 +49,24 @@ window, removes inherited eligibility after commit; moving it back can restore
 it. An independent valid manual grant is never silently revoked by those edits
 (decision 4).
 
-## 2. Canonical date, timezone, boundaries (OPEN — Q1, Q2)
+## 2. Canonical date, timezone, boundaries (DECIDED Q1; OPEN Q2)
 
-Current code derives a posting's calendar day as UTC day of `transactionTime`
-with `postedTime` fallback (`postingDay` in
-`backend/internal/domain/recurrence.go:86`, ordering in
-`backend/internal/domain/chrono.go:89`). Both fields are Unix seconds
-(`backend/internal/types/model.go:211`).
+> **Q1 — canonical date field. DECIDED.** The canonical sharing date is the
+> transaction date, used as the single date source with no fallback logic in
+> group sharing. Both the transaction date and the posted date must always be
+> present on every posting — if either is optional today, that is a defect.
+> Guaranteeing both fields is the job of the bank-data sync reconciliation
+> layer, not the sharing derivation. Any missing-date hardening belongs to
+> that sync reconciliation work, cross-referenced here, and is out of scope
+> for GRP-02/GRP-05, which consume the canonical date as given.
 
-> **Q1 — canonical date field.** Options: (a) `postingDay` semantics
-> (transactionTime, postedTime fallback) **[recommended]** — matches replay,
-> position and statement-cycle arithmetic, tolerates legacy rows with zero
-> transactionTime; (b) transactionTime only — rejects legacy/malformed rows;
-> (c) postedTime only — contradicts decision 3 ("current transaction date,
-> not the bank sync date"). Recommendation: (a).
-
-> **Q2 — timezone and interval semantics.** Options: (a) UTC calendar days,
-> inclusive both ends, ISO `YYYY-MM-DD` **[recommended]** — matches
-> `ParseAsOfCut`/day-close convention (`chrono.go:26`), deterministic across
-> viewers, no leak through totals; (b) viewer-local timezone — rejected:
-> same posting eligible for one viewer and not another, totals diverge;
-> (c) exclusive end — rejected: contradicts "fixed date, editable" product
-> language. Recommendation: (a).
+> **Q2 — timezone and interval semantics.** Options: (a) universal calendar
+> days counted the same for every viewer, inclusive both ends, ISO
+> `YYYY-MM-DD` **[recommended]** — deterministic across viewers, no leak
+> through totals; (b) each viewer's local timezone — rejected: the same
+> posting would be eligible for one viewer and not another, and totals would
+> diverge; (c) exclusive end — rejected: contradicts the "fixed date,
+> editable" product language. Recommendation: (a).
 
 ## 3. Consent preview and late-import behavior (OPEN — Q3)
 
@@ -239,7 +235,7 @@ the same commit:
 
 ## 13. Acceptance gate
 
-This spec is accepted only after explicit review of Q1–Q6 and §11 gaps.
-Acceptance unblocks GRP-02 (preferences) and GRP-05 (authorization), which
+This spec is accepted only after explicit review of Q2–Q6 and §11 gaps
+(Q1 already decided, §2). Acceptance unblocks GRP-02 (preferences) and GRP-05 (authorization), which
 stay **blocked** until then. GRP-01/GRP-03/GRP-04 depend on the same answers
 and must not bake in contradictory assumptions meanwhile.
