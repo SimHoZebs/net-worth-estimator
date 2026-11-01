@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -81,22 +82,36 @@ func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []types.
 }
 
 // remergePostings writes owner postings, then restores authoritative sync rows.
+// Execution orders allocate once per batch instead of one MAX query per row.
 func remergePostings(tx *userTx, incoming []types.Posting, synced []types.Posting, startPosition int) (int, error) {
 	position := startPosition
 	syncedIDs := make(map[string]bool, len(synced))
 	for _, posting := range synced {
 		syncedIDs[posting.ID] = true
 	}
+	var nextOrder int64
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) FROM posting_sim WHERE user_id = :user_id`).Scan(&nextOrder); err != nil {
+		return 0, fmt.Errorf("read max execution order: %w", err)
+	}
+	nextOrder++
+	allocate := func(posting *types.Posting) {
+		if posting.ExecutionOrder == 0 {
+			posting.ExecutionOrder = nextOrder
+			nextOrder++
+		}
+	}
 	for i := range incoming {
 		if syncedIDs[incoming[i].ID] {
 			continue
 		}
+		allocate(&incoming[i])
 		if err := insertPosting(tx, position, &incoming[i], SourceUser); err != nil {
 			return 0, err
 		}
 		position++
 	}
 	for i := range synced {
+		allocate(&synced[i])
 		if err := insertPosting(tx, position, &synced[i], synced[i].Source); err != nil {
 			return 0, fmt.Errorf("re-merge synced posting: %w", err)
 		}
@@ -198,14 +213,65 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 		return nil, 0, nil, fmt.Errorf("provision begin: %w", err)
 	}
 	defer tx.Rollback()
-	for _, item := range items {
-		var modelAccountID string
-		if err := tx.QueryRow(`SELECT model_account_id FROM account_links WHERE bridge_account_id = ? AND user_id = :user_id`, item.BridgeID).Scan(&modelAccountID); err == nil {
-			exists, err := accountExists(tx, modelAccountID)
-			if err != nil {
+	linkByBridge := map[string]string{}
+	if len(items) > 0 {
+		placeholders := make([]string, len(items))
+		args := make([]any, len(items))
+		for i, item := range items {
+			placeholders[i] = "?"
+			args[i] = item.BridgeID
+		}
+		rows, err := tx.Query(`SELECT bridge_account_id, model_account_id FROM account_links WHERE bridge_account_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...)
+		if err != nil {
+			return nil, 0, nil, fmt.Errorf("read account links: %w", err)
+		}
+		for rows.Next() {
+			var bridgeID, modelAccountID string
+			if err := rows.Scan(&bridgeID, &modelAccountID); err != nil {
+				rows.Close()
 				return nil, 0, nil, err
 			}
-			if !exists {
+			linkByBridge[bridgeID] = modelAccountID
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, 0, nil, err
+		}
+		rows.Close()
+	}
+	existingAccounts := map[string]struct{}{}
+	if len(linkByBridge) > 0 {
+		ids := make([]string, 0, len(linkByBridge))
+		for _, modelID := range linkByBridge {
+			ids = append(ids, modelID)
+		}
+		placeholders := make([]string, len(ids))
+		args := make([]any, len(ids))
+		for i, id := range ids {
+			placeholders[i] = "?"
+			args[i] = id
+		}
+		rows, err := tx.Query(`SELECT id FROM accounts WHERE id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...)
+		if err != nil {
+			return nil, 0, nil, fmt.Errorf("check accounts: %w", err)
+		}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, 0, nil, err
+			}
+			existingAccounts[id] = struct{}{}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, 0, nil, err
+		}
+		rows.Close()
+	}
+	for _, item := range items {
+		if modelAccountID, ok := linkByBridge[item.BridgeID]; ok {
+			if _, exists := existingAccounts[modelAccountID]; !exists {
 				stale = append(stale, item.BridgeID)
 				continue
 			}
@@ -214,8 +280,6 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 			}
 			resolved[item.BridgeID] = modelAccountID
 			continue
-		} else if err != sql.ErrNoRows {
-			return nil, 0, nil, fmt.Errorf("read account link %s: %w", item.BridgeID, err)
 		}
 		modelAccountID, created, err := EnsureLinkedAccount(tx, item.BridgeID, item.Name, item.Currency, item.Kind)
 		if err != nil {
@@ -257,7 +321,24 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 		if err := validateSyncCheckpointSource(checkpoint); err != nil {
 			return summary, err
 		}
+		// Owner rows win key collisions; a sync row from another provider
+		// never overwrites this provider's repeat write. Only the same
+		// provider source refreshes its own checkpoint. Update-first
+		// avoids the old insert-then-select-then-update round trips.
 		result, err := tx.Exec(
+			`UPDATE checkpoints SET balance = ? WHERE model_account_id = ? AND observed_at = ? AND source = ? AND user_id = :user_id`,
+			checkpoint.Balance, checkpoint.AccountID, checkpoint.ObservedAt, checkpoint.Source,
+		)
+		if err != nil {
+			return summary, fmt.Errorf("sync update checkpoint: %w", err)
+		}
+		if updated, err := result.RowsAffected(); err != nil {
+			return summary, fmt.Errorf("sync checkpoint rows: %w", err)
+		} else if updated > 0 {
+			summary.CheckpointsUpdated++
+			continue
+		}
+		result, err = tx.Exec(
 			`INSERT OR IGNORE INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
 			nextPosition, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.ObservedAt,
 		)
@@ -273,28 +354,7 @@ func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []B
 			nextPosition++
 			continue
 		}
-		var existingSource string
-		var existingBalance float64
-		if err := tx.QueryRow(
-			`SELECT source, balance FROM checkpoints WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`,
-			checkpoint.AccountID, checkpoint.ObservedAt,
-		).Scan(&existingSource, &existingBalance); err != nil {
-			return summary, fmt.Errorf("sync read checkpoint conflict: %w", err)
-		}
-		// Owner rows win key collisions; a sync row from another provider
-		// never overwrites this provider's repeat write. Only the same
-		// provider source refreshes its own checkpoint.
-		if existingSource != checkpoint.Source {
-			summary.CheckpointsSkipped++
-			continue
-		}
-		if _, err := tx.Exec(
-			`UPDATE checkpoints SET balance = ? WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`,
-			checkpoint.Balance, checkpoint.AccountID, checkpoint.ObservedAt,
-		); err != nil {
-			return summary, fmt.Errorf("sync update checkpoint: %w", err)
-		}
-		summary.CheckpointsUpdated++
+		summary.CheckpointsSkipped++
 	}
 
 	if err := ensureSuppressionSchema(tx); err != nil {

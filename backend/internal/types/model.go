@@ -61,13 +61,17 @@ var accountKinds = []AccountKind{
 	AccountKindProperty,
 }
 
-func (k AccountKind) Valid() bool {
-	for _, candidate := range accountKinds {
-		if k == candidate {
-			return true
-		}
+var accountKindSet = func() map[AccountKind]struct{} {
+	set := make(map[AccountKind]struct{}, len(accountKinds))
+	for _, kind := range accountKinds {
+		set[kind] = struct{}{}
 	}
-	return false
+	return set
+}()
+
+func (k AccountKind) Valid() bool {
+	_, ok := accountKindSet[k]
+	return ok
 }
 
 type Account struct {

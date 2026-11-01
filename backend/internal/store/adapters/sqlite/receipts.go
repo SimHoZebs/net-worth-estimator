@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -24,6 +25,12 @@ func receiptPosting(q queryer, id string) (types.Posting, error) {
 	}
 	p, err := scanPostingRow(rows)
 	return p, err
+}
+
+// GetPosting reads one posting for receipt fingerprinting without loading
+// the full model. Missing rows report ErrReceiptNotFound.
+func (s *sqliteStore) GetPosting(id string) (types.Posting, error) {
+	return receiptPosting(s.db, id)
 }
 
 func (s *sqliteStore) CreateReceipt(ctx context.Context, postingID, filename string, image types.ReceiptImage) (out types.Receipt, err error) {
@@ -238,9 +245,24 @@ type preservedReceipt struct {
 // loadReceiptsForPostings snapshots receipt rows so CSV replacement can
 // restore evidence for preserved postings after row deletion cascades.
 func loadReceiptsForPostings(tx *userTx, postingIDs []string) ([]preservedReceipt, error) {
+	if len(postingIDs) == 0 {
+		return nil, nil
+	}
 	var out []preservedReceipt
-	for _, postingID := range postingIDs {
-		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id = ? AND user_id = :user_id ORDER BY id`, postingID)
+	const chunkSize = 500
+	for start := 0; start < len(postingIDs); start += chunkSize {
+		end := start + chunkSize
+		if end > len(postingIDs) {
+			end = len(postingIDs)
+		}
+		chunk := postingIDs[start:end]
+		placeholders := make([]string, len(chunk))
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			placeholders[i] = "?"
+			args[i] = id
+		}
+		rows, err := tx.Query(`SELECT id, posting_id, digest, size, blob_key, revision, payload FROM receipts WHERE posting_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id ORDER BY id`, args...)
 		if err != nil {
 			return nil, err
 		}

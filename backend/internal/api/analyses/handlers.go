@@ -102,11 +102,16 @@ func (s *handler) listAnalysisFindings(_ context.Context, input *listAnalysisFin
 		items = items[:input.Limit]
 		output.Body.NextCursor = items[len(items)-1].ID
 	}
+	versions := make(map[string]string, len(analysis.Definitions()))
 	for _, definition := range analysis.Definitions() {
-		for i := range items {
-			if items[i].Status == "active" && items[i].AnalysisType == definition.Type() && items[i].AnalyzerVersion != definition.Version() {
-				items[i].Stale = true
-			}
+		versions[definition.Type()] = definition.Version()
+	}
+	for i := range items {
+		if items[i].Status != "active" {
+			continue
+		}
+		if version, ok := versions[items[i].AnalysisType]; ok && items[i].AnalyzerVersion != version {
+			items[i].Stale = true
 		}
 	}
 	output.Body.Findings = items

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -155,16 +156,100 @@ func resolveBankKeys(tx *userTx, keys []BankKey) (string, error) {
 	return resolved, nil
 }
 
+// batchResolveBankKeys loads every distinct upsert key in the directive batch
+// with chunked tuple-IN queries instead of one point SELECT per key.
+func batchResolveBankKeys(tx *userTx, directives []BankDirective) (map[BankKey]string, error) {
+	unique := map[BankKey]struct{}{}
+	for _, directive := range directives {
+		if directive.Upsert == nil {
+			continue
+		}
+		for _, key := range directive.Upsert.Keys {
+			if !validBankKey(key) {
+				return nil, fmt.Errorf("bank key requires provider, account, and transaction identities")
+			}
+			unique[key] = struct{}{}
+		}
+	}
+	out := map[BankKey]string{}
+	if len(unique) == 0 {
+		return out, nil
+	}
+	keys := make([]BankKey, 0, len(unique))
+	for key := range unique {
+		keys = append(keys, key)
+	}
+	const chunkSize = 200
+	for start := 0; start < len(keys); start += chunkSize {
+		end := start + chunkSize
+		if end > len(keys) {
+			end = len(keys)
+		}
+		chunk := keys[start:end]
+		tuples := make([]string, len(chunk))
+		args := make([]any, 0, len(chunk)*3)
+		for i, key := range chunk {
+			tuples[i] = "(?,?,?)"
+			args = append(args, key.Provider, key.AccountID, key.TransactionID)
+		}
+		rows, err := tx.Query(`SELECT provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys WHERE (provider, bridge_account_id, transaction_id) IN (`+strings.Join(tuples, ",")+`) AND user_id = :user_id`, args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var key BankKey
+			var postingID string
+			if err := rows.Scan(&key.Provider, &key.AccountID, &key.TransactionID, &postingID); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[key] = postingID
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	return out, nil
+}
+
+func resolveBankKeysFromMap(keys []BankKey, byKey map[BankKey]string) (string, error) {
+	resolved := ""
+	for _, key := range keys {
+		if !validBankKey(key) {
+			return "", fmt.Errorf("bank key requires provider, account, and transaction identities")
+		}
+		postingID, ok := byKey[key]
+		if !ok {
+			continue
+		}
+		if resolved != "" && resolved != postingID {
+			return "", fmt.Errorf("bank keys identify different postings")
+		}
+		resolved = postingID
+	}
+	return resolved, nil
+}
+
 func recordBankKeys(tx *userTx, postingID string, keys []BankKey) error {
+	if len(keys) == 0 {
+		return nil
+	}
 	for _, key := range keys {
 		if !validBankKey(key) {
 			return fmt.Errorf("bank key requires provider, account, and transaction identities")
 		}
-		if err := insertPostingSyncKey(tx, postingSyncKey{provider: key.Provider, accountID: key.AccountID, transactionID: key.TransactionID, postingID: postingID}); err != nil {
-			return err
-		}
 	}
-	return nil
+	placeholders := make([]string, len(keys))
+	args := make([]any, 0, len(keys)*4)
+	for i, key := range keys {
+		placeholders[i] = "(?,?,?,?, :user_id)"
+		args = append(args, key.Provider, key.AccountID, key.TransactionID, postingID)
+	}
+	_, err := tx.Exec(`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES `+strings.Join(placeholders, ","),
+		args...)
+	return err
 }
 
 func writeBankValues(tx *userTx, id string, posting types.Posting) error {
@@ -226,6 +311,15 @@ func mirrorAccount(posting types.Posting) (string, bool) {
 // refreshes, conversions and void flips count on actual change.
 func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncApplySummary) error {
 	position, err := nextTablePosition(tx, "postings")
+	if err != nil {
+		return err
+	}
+	var nextOrder int64
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(execution_order), 0) FROM posting_sim WHERE user_id = :user_id`).Scan(&nextOrder); err != nil {
+		return fmt.Errorf("read max execution order: %w", err)
+	}
+	nextOrder++
+	byKey, err := batchResolveBankKeys(tx, directives)
 	if err != nil {
 		return err
 	}
@@ -292,7 +386,7 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			if len(upsert.Keys) == 0 {
 				return fmt.Errorf("bank upsert requires at least one key")
 			}
-			postingID, err := resolveBankKeys(tx, upsert.Keys)
+			postingID, err := resolveBankKeysFromMap(upsert.Keys, byKey)
 			if err != nil {
 				return err
 			}
@@ -300,7 +394,10 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			if postingID == "" {
 				// The adapter carries the resolved participation state
 				// (settled on, pending off); the store never overrides it.
-				posting.ExecutionOrder = 0
+				// Execution order always allocates fresh from the batch
+				// counter, ignoring any carried value.
+				posting.ExecutionOrder = nextOrder
+				nextOrder++
 				posting.ID, err = newRowID()
 				if err != nil {
 					return err

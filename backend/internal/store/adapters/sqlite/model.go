@@ -571,13 +571,19 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, err
 	}
 	defer evaluationRows.Close()
+	// Index the tables once: per-row ByType would rebuild the table list
+	// for every stored evaluation.
+	evaluationTables := map[string]*[]types.EvaluationInstance[types.JsonValue]{}
+	for _, table := range model.Evaluations.Tables() {
+		evaluationTables[table.Type] = table.Rows
+	}
 	for evaluationRows.Next() {
 		var evaluationType, instanceID, name, configJSON string
 		var enabled int64
 		if err := evaluationRows.Scan(&evaluationType, &instanceID, &name, &enabled, &configJSON); err != nil {
 			return nil, err
 		}
-		if rows := model.Evaluations.ByType(evaluationType); rows != nil {
+		if rows := evaluationTables[evaluationType]; rows != nil {
 			config := map[string]any{}
 			if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
 				return nil, fmt.Errorf("parse %s config %s: %w", evaluationType, instanceID, err)

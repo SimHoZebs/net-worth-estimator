@@ -95,6 +95,11 @@ func (s *Service) ListLinks() (map[string][]string, error) {
 }
 
 func (s *Service) posting(id string) (types.Posting, error) {
+	if reader, ok := s.repository.(interface {
+		GetPosting(string) (types.Posting, error)
+	}); ok {
+		return reader.GetPosting(id)
+	}
 	model, err := s.repository.LoadModel()
 	if err != nil {
 		return types.Posting{}, err
