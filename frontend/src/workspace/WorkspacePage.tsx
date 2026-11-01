@@ -5,6 +5,7 @@ import { GroupsPage } from "../pages/GroupsPage.tsx";
 import { Outlook } from "../pages/Outlook.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import { AccountsPage } from "../pages/AccountsPage.tsx";
+import { FlowsPage } from "../pages/flows/FlowsPage.tsx";
 import { TransactionsPage } from "../pages/TransactionsPage.tsx";
 import { PurchasesPage } from "../pages/PurchasesPage.tsx";
 import { SourcesPage } from "../pages/SourcesPage.tsx";
@@ -61,6 +62,8 @@ export function WorkspacePage({
 			);
 		case "purchases":
 			return <PurchasesPage />;
+		case "flows":
+			return <FlowsPage />;
 		case "evaluations":
 			return (
 				<EvaluationsPage

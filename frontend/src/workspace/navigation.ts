@@ -7,12 +7,14 @@ import {
 	ShoppingBag,
 	Users,
 	Wallet,
+	Waves,
 } from "lucide-react";
 
 export type Page =
 	| "outlook"
 	| "accounts"
 	| "transactions"
+	| "flows"
 	| "purchases"
 	| "evaluations"
 	| "groups"
@@ -42,6 +44,12 @@ export const pages: PageDefinition[] = [
 		label: "Transactions",
 		icon: ArrowRightLeft,
 		title: "Planned transactions",
+	},
+	{
+		id: "flows",
+		label: "Money flows",
+		icon: Waves,
+		title: "Where your money moves",
 	},
 	{
 		id: "purchases",
