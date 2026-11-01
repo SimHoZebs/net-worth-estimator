@@ -125,6 +125,8 @@ func TestSharingRoutesClaimedByIdentity(t *testing.T) {
 		"/v1/shared/copies/" + sharedPostingID + "/refresh",
 		"/v1/shared/postings",
 		"/v1/shared/postings/users/abc/" + sharedPostingID,
+		"/v1/shared/policies/01900000-0000-7000-8000-0000000000c1",
+		"/v1/shared/policies/01900000-0000-7000-8000-0000000000c1/preview",
 	} {
 		if !identity.IsSharingRoute(path) {
 			t.Fatalf("sharing path not claimed: %s", path)
@@ -154,6 +156,9 @@ func TestSharingHTTPRequiresAuthentication(t *testing.T) {
 		{"POST", "/v1/shared/copies", `{"owner":"users/abc"}`},
 		{"GET", "/v1/shared/copies/" + sharedPostingID + "/link", ""},
 		{"POST", "/v1/shared/copies/" + sharedPostingID + "/refresh", ""},
+		{"GET", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1", ""},
+		{"PUT", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1", `{"enabled":false}`},
+		{"POST", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1/preview", `{"accountIds":[]}`},
 	} {
 		w := do(t, h, route.method, route.target, "", route.body)
 		if w.Code != http.StatusUnauthorized {
@@ -247,6 +252,147 @@ func mustGroupID(t *testing.T, db store.Database, owner string) string {
 		t.Fatalf("groups = %+v, %v", groups, err)
 	}
 	return groups[0].ID
+}
+
+func policyTarget(groupID string) string {
+	return "/v1/shared/policies/" + groupID
+}
+
+func decodePolicyResponse(t *testing.T, body []byte) store.SharingPolicy {
+	t.Helper()
+	var out struct {
+		Policy store.SharingPolicy `json:"policy"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Policy
+}
+
+func decodePreviewResponse(t *testing.T, body []byte) store.SharingPolicyPreview {
+	t.Helper()
+	var out struct {
+		Preview store.SharingPolicyPreview `json:"preview"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Preview
+}
+
+// The consent flow through HTTP: an absent preference reports 404 (off by
+// default), the draft preview counts exposure without persisting, enabling
+// requires an owned account, and one member's opt-in never touches another
+// member's state. No admin override path exists: the owner is always the
+// authenticated caller.
+func TestSharingHTTPPolicyConsentFlow(t *testing.T) {
+	h, db := testHandler(t, false)
+	_, storeA := mustUser(t, db, "alice")
+	mustUser(t, db, "bob")
+	mustPosting(t, storeA, sharedPostingID)
+	groupID := mustGroup(t, db, "alice", "bob")
+	target := policyTarget(groupID)
+
+	if w := do(t, h, "GET", target, "alice", ""); w.Code != http.StatusNotFound {
+		t.Fatalf("absent policy = %d, want 404 (off by default)", w.Code)
+	}
+	// Draft preview counts the one in-range posting for the two members
+	// without persisting: a follow-up read still reports absent.
+	previewBody := `{"accountIds":["checking"],"startDate":"2026-01-01"}`
+	w := do(t, h, "POST", target+"/preview", "alice", previewBody)
+	if w.Code != http.StatusOK {
+		t.Fatalf("preview = %d (%s), want 200", w.Code, w.Body.String())
+	}
+	preview := decodePreviewResponse(t, w.Body.Bytes())
+	if preview.EligiblePostings != 1 || preview.MemberCount != 2 {
+		t.Fatalf("preview = %+v, want 1 eligible posting and 2 members", preview)
+	}
+	if previewBody := w.Body.String(); strings.Contains(previewBody, "Checking") || strings.Contains(previewBody, sharedPostingID) {
+		t.Fatalf("preview leaks row detail: %s", previewBody)
+	}
+	if w := do(t, h, "GET", target, "alice", ""); w.Code != http.StatusNotFound {
+		t.Fatalf("preview persisted policy = %d, want 404", w.Code)
+	}
+	// Enabling with zero accounts is rejected; a disabled draft persists.
+	if w := do(t, h, "PUT", target, "alice", `{"enabled":true}`); w.Code != http.StatusBadRequest {
+		t.Fatalf("enable without accounts = %d (%s), want 400", w.Code, w.Body.String())
+	}
+	if w := do(t, h, "PUT", target, "alice", `{"enabled":false,"accountIds":["checking"]}`); w.Code != http.StatusOK {
+		t.Fatalf("disabled save = %d (%s), want 200", w.Code, w.Body.String())
+	}
+	if policy := decodePolicyResponse(t, do(t, h, "GET", target, "alice", "").Body.Bytes()); policy.Enabled {
+		t.Fatalf("saved draft enabled itself: %+v", policy)
+	}
+	// Enabling opts in with a fixed setup-day-resolved start and an open
+	// end; disabling again revokes on commit with a version bump.
+	enable := `{"enabled":true,"accountIds":["checking"],"startDate":"2026-01-01"}`
+	policy := decodePolicyResponse(t, do(t, h, "PUT", target, "alice", enable).Body.Bytes())
+	if !policy.Enabled || policy.StartDate != "2026-01-01" || policy.EndDate != "" || policy.Version != 2 {
+		t.Fatalf("enabled policy = %+v, want enabled from 2026-01-01 open-ended at version 2", policy)
+	}
+	if w := do(t, h, "PUT", target, "alice", `{"enabled":false,"accountIds":["checking"],"startDate":"2026-01-01"}`); w.Code != http.StatusOK {
+		t.Fatalf("disable = %d (%s), want 200", w.Code, w.Body.String())
+	}
+	if policy := decodePolicyResponse(t, do(t, h, "GET", target, "alice", "").Body.Bytes()); policy.Enabled || policy.Version != 3 {
+		t.Fatalf("disabled policy = %+v, want disabled at version 3", policy)
+	}
+	// Bob's opt-in is independent: Alice stays off.
+	bobTarget := target
+	if w := do(t, h, "PUT", bobTarget, "bob", `{"enabled":true,"accountIds":["checking"]}`); w.Code != http.StatusOK {
+		t.Fatalf("bob enable = %d (%s), want 200", w.Code, w.Body.String())
+	}
+	if policy := decodePolicyResponse(t, do(t, h, "GET", target, "alice", "").Body.Bytes()); policy.Enabled {
+		t.Fatalf("bob opt-in leaked into alice: %+v", policy)
+	}
+	// Leaving hides the surviving row without deleting it: reads fail
+	// closed, and rejoining resumes the stored preference.
+	bobID, err := db.EnsureGroupUser(testIssuer, "bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	aliceID, err := db.EnsureGroupUser(testIssuer, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RemoveMember(groupID, aliceID, bobID); err != nil {
+		t.Fatal(err)
+	}
+	if w := do(t, h, "GET", target, "bob", ""); w.Code != http.StatusNotFound {
+		t.Fatalf("ex-member policy read = %d, want 404", w.Code)
+	}
+	if w := do(t, h, "POST", target+"/preview", "bob", previewBody); w.Code != http.StatusNotFound {
+		t.Fatalf("ex-member preview = %d, want 404", w.Code)
+	}
+	_, code, err := db.CreateInvite(groupID, aliceID, 5, 24*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.AcceptInvite(code, bobID, "bob"); err != nil {
+		t.Fatal(err)
+	}
+	if policy := decodePolicyResponse(t, do(t, h, "GET", target, "bob", "").Body.Bytes()); !policy.Enabled {
+		t.Fatalf("rejoin did not resume bob's preference: %+v", policy)
+	}
+	// Outsiders and invalid input fail closed without enumeration.
+	if w := do(t, h, "GET", target, "carol", ""); w.Code != http.StatusNotFound {
+		t.Fatalf("outsider policy read = %d, want 404", w.Code)
+	}
+	mustUser(t, db, "carol")
+	if w := do(t, h, "POST", target+"/preview", "carol", previewBody); w.Code != http.StatusNotFound {
+		t.Fatalf("outsider preview = %d, want 404", w.Code)
+	}
+	for _, bad := range []struct{ method, body string }{
+		{"PUT", `{"enabled":true,"accountIds":["nope"],"startDate":"2026-01-01"}`},
+		{"PUT", `{"enabled":true,"accountIds":["checking"],"startDate":"not-a-day"}`},
+		{"PUT", `{"enabled":true,"accountIds":["checking"],"startDate":"2026-02-01","endDate":"2026-01-01"}`},
+	} {
+		if w := do(t, h, bad.method, target, "alice", bad.body); w.Code != http.StatusBadRequest {
+			t.Fatalf("%s %s = %d, want 400", bad.method, bad.body, w.Code)
+		}
+	}
+	if w := do(t, h, "POST", target+"/preview", "alice", `{"accountIds":["checking"],"endDate":"2026-01-01"}`); w.Code != http.StatusBadRequest {
+		t.Fatalf("preview with end before resolved start = %d, want 400", w.Code)
+	}
 }
 
 // Forged owner/posting IDs, stale membership, and outsiders all report

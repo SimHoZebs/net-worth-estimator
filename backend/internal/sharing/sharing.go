@@ -67,6 +67,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/copies/", h.serveCopyLink)
 	mux.HandleFunc("/v1/shared/postings", h.serveSharedList)
 	mux.HandleFunc("/v1/shared/postings/", h.serveSharedRead)
+	mux.HandleFunc("/v1/shared/policies/", h.servePolicies)
 	return middleware.Recoverer(api.CORSMiddleware(h.origins)(mux))
 }
 
@@ -310,6 +311,107 @@ func (h *Handler) serveSharedRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ownerUserId": owner, "posting": posting})
+}
+
+// servePolicies serves one member's automatic-sharing preference for one
+// group (GRP-02) plus the counts-only consent preview (GRP-04). The owner
+// is always the authenticated caller: there is no owner field to forge,
+// so a group administrator cannot read or force another member's consent.
+// An absent preference reports 404, which means automatic sharing is off.
+func (h *Handler) servePolicies(w http.ResponseWriter, r *http.Request) {
+	owner, _, ok := h.caller(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Sign in to share transactions.")
+		return
+	}
+	rest := strings.TrimPrefix(r.URL.Path, "/v1/shared/policies/")
+	groupID, tail, _ := strings.Cut(rest, "/")
+	if groupID == "" || strings.Contains(tail, "/") {
+		writeProblem(w, http.StatusNotFound, "Sharing preference not found.")
+		return
+	}
+	if tail == "preview" {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
+			return
+		}
+		// Preview persists nothing, so the read-only guard does not apply:
+		// the consent screen can count exposure while writes are locked.
+		body, err := readBody(w, r, 1<<16)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
+			return
+		}
+		input, err := decodePolicyInput(body)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
+			return
+		}
+		preview, err := h.db.PreviewSharingPolicyDraft(owner, groupID, input)
+		if err != nil {
+			writeStoreError(w, err, "Sharing preference not found.")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"preview": preview})
+		return
+	}
+	if tail != "" {
+		writeProblem(w, http.StatusNotFound, "Sharing preference not found.")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		policy, err := h.db.GetSharingPolicy(owner, groupID)
+		if err != nil {
+			writeStoreError(w, err, "Sharing preference not found.")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
+	case http.MethodPut:
+		if h.locked(w, r) {
+			return
+		}
+		body, err := readBody(w, r, 1<<16)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
+			return
+		}
+		input, err := decodePolicyInput(body)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
+			return
+		}
+		policy, err := h.db.SetSharingPolicy(owner, groupID, input)
+		if err != nil {
+			writeStoreError(w, err, "Sharing preference not found.")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"policy": policy})
+	default:
+		w.Header().Set("Allow", "GET, PUT")
+		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
+	}
+}
+
+type policyInput struct {
+	Enabled    bool     `json:"enabled"`
+	AccountIDs []string `json:"accountIds"`
+	StartDate  string   `json:"startDate"`
+	EndDate    string   `json:"endDate"`
+}
+
+func decodePolicyInput(body []byte) (store.SharingPolicyInput, error) {
+	var input policyInput
+	if err := json.Unmarshal(body, &input); err != nil {
+		return store.SharingPolicyInput{}, err
+	}
+	return store.SharingPolicyInput{
+		Enabled:    input.Enabled,
+		AccountIDs: input.AccountIDs,
+		StartDate:  strings.TrimSpace(input.StartDate),
+		EndDate:    strings.TrimSpace(input.EndDate),
+	}, nil
 }
 
 func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {

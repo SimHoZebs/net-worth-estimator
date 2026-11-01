@@ -342,5 +342,12 @@ type Database interface {
 	// Split-membership fencing lands with the SOC-04B split reads;
 	// until then any provisioned user may read.
 	ListSettlements(requesterID, splitID string) ([]Settlement, error)
+	// PreviewSharingPolicyDraft counts the currently eligible postings for
+	// unsaved preference values plus the current audience size, without
+	// persisting anything (GRP-04 consent preview). Counts are computed
+	// as if the draft were enabled; the echoed Enabled flag stays as
+	// submitted. Counts only: no amounts, payees, or row IDs leave the
+	// owner's scope. Non-members report ErrNotFound.
+	PreviewSharingPolicyDraft(ownerID, groupID string, input SharingPolicyInput) (SharingPolicyPreview, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }
