@@ -87,6 +87,9 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM gmail_credentials WHERE user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear gmail credentials: %w", err)
 	}
+	if _, err := tx.Exec(`DELETE FROM email_receipts WHERE user_id = :user_id`); err != nil {
+		return fmt.Errorf("clear email receipts: %w", err)
+	}
 	if _, err := tx.Exec(`DELETE FROM projection_artifacts WHERE user_id = :user_id`); err != nil {
 		return err
 	}

@@ -26,7 +26,7 @@ var financialTables = []string{
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "gmail_credentials", "amount_presets", "safe_spending_settings",
-	"receipts",
+	"receipts", "email_receipts",
 	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
 }
 
@@ -153,10 +153,11 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		if table.name == "projection_artifacts" || table.name == "receipts" {
 			continue
 		}
-		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || strings.HasPrefix(table.name, "analysis_")) {
+		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || table.name == "email_receipts" || strings.HasPrefix(table.name, "analysis_")) {
 			// Guest publication carries no sync identity: the provisioned
 			// guest never syncs, so bank keys and the do-not-import list
 			// stay behind with the credentials. Full refresh copies both.
+			// Email receipt evidence stays private like image receipts.
 			continue
 		}
 		columns, values := []string{"user_id"}, []string{"?"}
@@ -228,6 +229,7 @@ var identityTables = map[string]bool{
 // fail closed.
 var lazyTables = map[string]bool{
 	"suppressed_sync_keys": true,
+	"email_receipts":       true,
 }
 
 func checkedTables(db *sql.DB) ([]tableShape, error) {

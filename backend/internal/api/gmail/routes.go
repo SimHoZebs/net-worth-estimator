@@ -2,7 +2,9 @@ package gmail
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -49,6 +51,24 @@ func Register(api huma.API, st store.Store, service *gmailservice.Service, readO
 		Path:        "/lookback",
 		Summary:     "Set the Gmail initial scan lookback in days",
 	}, s.setLookback)
+	huma.Register(api, huma.Operation{
+		OperationID: "scan-gmail-receipts",
+		Method:      "POST",
+		Path:        "/scan",
+		Summary:     "Scan Gmail for purchase and refund receipts",
+	}, s.scan)
+	huma.Register(api, huma.Operation{
+		OperationID: "list-gmail-receipts",
+		Method:      "GET",
+		Path:        "/receipts",
+		Summary:     "Read extracted Gmail receipt evidence",
+	}, s.listReceipts)
+	huma.Register(api, huma.Operation{
+		OperationID: "review-gmail-receipt",
+		Method:      "PATCH",
+		Path:        "/receipts/{id}",
+		Summary:     "Confirm or correct one extracted Gmail receipt",
+	}, s.reviewReceipt)
 }
 
 type gmailCredentialBody struct {
@@ -152,6 +172,129 @@ func (s *handler) setLookback(ctx context.Context, input *gmailLookbackInput) (*
 		return nil, huma.Error400BadRequest(err.Error())
 	}
 	return &gmailCredentialOutput{Body: credentialBody(credential)}, nil
+}
+
+type gmailScanOutput struct {
+	Body gmailservice.ScanSummary
+}
+
+// scan runs receipt discovery with the INT-02 token and cursor: the
+// service refreshes the access token server-side, lists the initial or
+// incremental window, triages each unseen message, and advances the
+// history cursor. Per-message failures are isolated in the summary;
+// only listing, cursor, and grant failures fail the request.
+func (s *handler) scan(ctx context.Context, _ *struct{}) (*gmailScanOutput, error) {
+	service, err := s.serviceOr503()
+	if err != nil {
+		return nil, err
+	}
+	summary, err := service.Scan(ctx, s.store)
+	if err != nil {
+		switch {
+		case errors.Is(err, gmailservice.ErrNotConnected):
+			return nil, huma.Error400BadRequest("Gmail is not connected")
+		default:
+			return nil, huma.Error500InternalServerError("The Gmail scan failed")
+		}
+	}
+	return &gmailScanOutput{Body: summary}, nil
+}
+
+type gmailReceiptsInput struct {
+	Verdict string `query:"verdict" maxLength:"200" doc:"Comma-separated verdicts: receipt, refund, shipping-only, ordinary, failed"`
+	Status  string `query:"status" maxLength:"200" doc:"Comma-separated statuses: ready, needs-review, confirmed"`
+	Cursor  string `query:"cursor" maxLength:"100"`
+	Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"100"`
+}
+
+type gmailReceiptsOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         struct {
+		Receipts   []store.EmailReceipt `json:"receipts"`
+		NextCursor string               `json:"nextCursor"`
+	}
+}
+
+func splitFilter(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := []string{}
+	for _, part := range strings.Split(value, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+func (s *handler) listReceipts(_ context.Context, input *gmailReceiptsInput) (*gmailReceiptsOutput, error) {
+	filter := store.EmailReceiptFilter{
+		Verdict: splitFilter(input.Verdict),
+		Status:  splitFilter(input.Status),
+		Cursor:  input.Cursor,
+		Limit:   input.Limit + 1,
+	}
+	for _, verdict := range filter.Verdict {
+		switch verdict {
+		case store.EmailReceiptVerdictReceipt, store.EmailReceiptVerdictRefund,
+			store.EmailReceiptVerdictShipping, store.EmailReceiptVerdictOrdinary,
+			store.EmailReceiptVerdictFailed:
+		default:
+			return nil, huma.Error422UnprocessableEntity("Unknown receipt verdict")
+		}
+	}
+	for _, status := range filter.Status {
+		switch status {
+		case store.EmailReceiptStatusReady, store.EmailReceiptStatusNeedsReview, store.EmailReceiptStatusConfirmed:
+		default:
+			return nil, huma.Error422UnprocessableEntity("Unknown receipt status")
+		}
+	}
+	items, err := s.store.ListEmailReceipts(filter)
+	if err != nil {
+		return nil, huma.Error500InternalServerError("Gmail receipts are temporarily unavailable")
+	}
+	output := &gmailReceiptsOutput{CacheControl: "private, no-store"}
+	output.Body.Receipts = []store.EmailReceipt{}
+	if len(items) > input.Limit {
+		items = items[:input.Limit]
+		output.Body.NextCursor = items[len(items)-1].ID
+	}
+	output.Body.Receipts = append(output.Body.Receipts, items...)
+	return output, nil
+}
+
+type gmailReviewInput struct {
+	ID   string `path:"id" maxLength:"100"`
+	Body struct {
+		// Correction overlays the original extraction; null confirms the
+		// extraction as-is. The original values stay preserved.
+		Correction *store.EmailReceiptCorrection `json:"correction,omitempty"`
+	}
+}
+
+type gmailReceiptOutput struct {
+	CacheControl string `header:"Cache-Control"`
+	Body         struct {
+		Receipt store.EmailReceipt `json:"receipt"`
+	}
+}
+
+// reviewReceipt confirms or corrects one extraction. The correction
+// overlays the original values and marks the row confirmed; the
+// original extraction and provenance are preserved for INT-04 matching.
+func (s *handler) reviewReceipt(_ context.Context, input *gmailReviewInput) (*gmailReceiptOutput, error) {
+	receipt, err := s.store.ReviewEmailReceipt(input.ID, input.Body.Correction)
+	if err != nil {
+		if store.IsNotFound(err) {
+			return nil, huma.Error404NotFound("Gmail receipt not found")
+		}
+		return nil, huma.Error500InternalServerError("The Gmail receipt could not be reviewed")
+	}
+	output := &gmailReceiptOutput{CacheControl: "private, no-store"}
+	output.Body.Receipt = receipt
+	return output, nil
 }
 
 // CallbackHandler serves the Google OAuth redirect as a plain chi route:

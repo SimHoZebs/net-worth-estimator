@@ -465,6 +465,85 @@ type GroupFeedTotals struct {
 	PendingCount int     `json:"pendingCount"`
 }
 
+// Email receipt verdicts (INT-03). Receipt and refund verdicts carry
+// extracted evidence for INT-04 matching; shipping-only and ordinary
+// verdicts record only the Gmail message identity for scan dedupe and
+// never extraction fields. Failed verdicts isolate a per-message
+// fetch/parse failure with diagnostics instead of failing the scan.
+const (
+	EmailReceiptVerdictReceipt  = "receipt"
+	EmailReceiptVerdictRefund   = "refund"
+	EmailReceiptVerdictShipping = "shipping-only"
+	EmailReceiptVerdictOrdinary = "ordinary"
+	EmailReceiptVerdictFailed   = "failed"
+)
+
+// Email receipt review statuses. Ready means high-confidence extraction
+// with nothing to review; needs-review means low-confidence extraction
+// awaiting the user; confirmed means the user confirmed or corrected it.
+const (
+	EmailReceiptStatusReady       = "ready"
+	EmailReceiptStatusNeedsReview = "needs-review"
+	EmailReceiptStatusConfirmed   = "confirmed"
+)
+
+// EmailReceiptCorrection is the user's confirmed or corrected extraction.
+// The original extracted values stay in the row; the correction overlays
+// them, so review never rewrites immutable source evidence.
+type EmailReceiptCorrection struct {
+	Merchant    string `json:"merchant,omitempty"`
+	ReceiptDate string `json:"receiptDate,omitempty"`
+	AmountCents *int64 `json:"amountCents,omitempty"`
+	Currency    string `json:"currency,omitempty"`
+	Reference   string `json:"reference,omitempty"`
+}
+
+// EmailReceipt is one Gmail message triaged by receipt discovery. Message
+// bodies and snippets are never persisted: only the message identity,
+// display headers for receipt-like mail, extracted evidence, provenance,
+// and review state are stored. Ordinary and shipping-only mail keep the
+// identity and verdict only, so repeat scans dedupe without retaining
+// mail content.
+type EmailReceipt struct {
+	ID             string                  `json:"id"`
+	GmailMessageID string                  `json:"gmailMessageId"`
+	ThreadID       string                  `json:"threadId,omitempty"`
+	FromAddress    string                  `json:"fromAddress,omitempty"`
+	Subject        string                  `json:"subject,omitempty"`
+	MessageDate    string                  `json:"messageDate,omitempty"`
+	Verdict        string                  `json:"verdict"`
+	Merchant       string                  `json:"merchant,omitempty"`
+	ReceiptDate    string                  `json:"receiptDate,omitempty"`
+	AmountText     string                  `json:"amountText,omitempty"`
+	AmountCents    *int64                  `json:"amountCents,omitempty"`
+	Currency       string                  `json:"currency,omitempty"`
+	Reference      string                  `json:"reference,omitempty"`
+	Confidence     *float64                `json:"confidence,omitempty"`
+	Diagnostics    []string                `json:"diagnostics,omitempty"`
+	Provenance     types.ReceiptProvenance `json:"provenance"`
+	Status         string                  `json:"status"`
+	Correction     *EmailReceiptCorrection `json:"correction,omitempty"`
+	ScannedAt      string                  `json:"scannedAt"`
+}
+
+// EmailReceiptFilter selects extracted receipts for review and matching.
+// Verdict and Status are exact matches when non-empty; Cursor pages past
+// a receipt ID; Limit caps rows (defaults and maxima apply at the store).
+type EmailReceiptFilter struct {
+	Verdict []string
+	Status  []string
+	Cursor  string
+	Limit   int
+}
+
+// ReceiptProvenanceForEmail identifies extracted email receipt
+// provenance. It versions the complete INT-03 detector/extractor
+// composition so a future change invalidates cached review standing,
+// and INT-04 matching consumes the same identity for receipt claims.
+func ReceiptProvenanceForEmail() types.ReceiptProvenance {
+	return types.ReceiptProvenance{Producer: "gmail-receipt-email", Version: "v1"}
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {
