@@ -294,8 +294,8 @@ duplicate requests.
 
 SOC-02 HTTP contract (recipient scope, existing shapes only):
 
-- `POST /v1/shared/copies` accepts `{owner, postingId}` and returns the
-  recipient-owned copy as `{"posting": <transaction>}`. The copy is an
+- `POST /v1/shared/copies` accepts `{owner, postingId, requestId}` and
+  returns the recipient-owned copy as `{"posting": <transaction>}`. The copy is an
   ordinary owner-authored row (`source: "user"`, never pending or void,
   no bank sync key); repeat accepts return the existing row with its
   edits intact. Recipient edits to the copy never reach the source, and
@@ -308,7 +308,34 @@ SOC-02 HTTP contract (recipient scope, existing shapes only):
   `SharingLinkRefresh` value (`link`, `status`, and `currentSourceRevision`
   only while authorized). Statuses are `current`, `source-changed`,
   `unauthorized`, and `source-gone`. Refresh records on the link row and
-  obeys the read-only kill switch; it never writes the copy.
+  obeys the read-only kill switch; it never writes the copy. It accepts
+  an optional `requestId` body for idempotent retry and mints a server
+  key when none travels; each committed refresh appends one
+  `link-refreshed` audit row carrying the link, the outcome status, and
+  the key.
+
+## Social-operation audit and idempotency
+
+Every mutating consent, accept, and refresh request carries a
+client-generated UUID request ID (`requestId` over HTTP on the grant,
+exclusion, copy, and refresh routes; refresh mints a server key when
+none travels). The store records one outcome row per
+(actor, request ID): a retry replays the recorded outcome without
+re-executing, a key reused for a different action or target fails with
+`ErrSharingConflict` (HTTP 409, no session-discovery code), and failed
+attempts never consume the key. A source revision landing mid-accept
+fails explicitly and rolls the copy back; concurrent accepts resolve to
+the winner's copy. Committed mutations append one `sharing_audit` row
+each — consent kinds (`grant`, `revoke`, `exclude`, `unexclude`) with
+the request key in the detail payload, `copy-accepted` with the link
+and key, `link-refreshed` with the link, status, and key — carrying
+actor, action, target identities, and time only, never transaction
+evidence. Replays and heals append none. The source owner reads one
+posting's trace at `GET /v1/shared/audit?postingId=<uuid>` as
+`{"audit": [...]}` in sequence order; there is no audience-side read.
+Model replacement and scope clears drop the keys and user-touching
+audit rows the cleared user executed or owns, so a cleared scope
+restarts with an empty trace.
 ## Automatic sharing policies
 
 Per-group automatic preferences (GRP-02) let each member opt their own
@@ -347,8 +374,10 @@ account-strip narrowing (with version bumps), membership leave and
 removal, group deletion, and model replacement; voided rows retain their
 reference while the live gate denies them, and deleted rows drop theirs.
 Policy, grant, and exclusion mutations append one `sharing_audit` row
-with actor, timestamp, and before/after coverage in the same
-transaction; idempotent retries audit nothing. Operator recovery uses
+with actor, timestamp, and before/after coverage (policies) or the
+request key (consent) in the same
+transaction; keyed consent retries and heals audit nothing (policy
+writes carry no request key and audit every PUT). Operator recovery uses
 `RebuildSharingIndex`, which re-derives one owner's slice from live rows
 in one transaction for current memberships only and never over-shares. Consumers (feed,
 consent UI): list results order by owner then posting with the existing
