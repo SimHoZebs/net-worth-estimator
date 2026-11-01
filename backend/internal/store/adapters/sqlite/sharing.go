@@ -24,7 +24,7 @@ import (
 // is the row's absence, and explicit share and exclusion cannot coexist
 // for the same audience because they share the primary key.
 func sharingSchemaStatements() []string {
-	return []string{
+	statements := []string{
 		`CREATE TABLE IF NOT EXISTS sharing_grants (
 			owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			posting_id TEXT NOT NULL,
@@ -62,6 +62,7 @@ func sharingSchemaStatements() []string {
 		)`,
 		`CREATE INDEX IF NOT EXISTS sharing_copies_source ON sharing_copies(source_owner_id, source_posting_id)`,
 	}
+	return append(statements, sharingPolicySchemaStatements()...)
 }
 
 func validSharingUserID(id string) bool {
@@ -341,15 +342,17 @@ func (d *Database) ListSharingGrants(ownerID string) ([]store.SharingGrant, erro
 }
 
 // CheckSharedPostingAccess re-evaluates authorization from current rows on
-// every call. Denial covers missing postings, malformed IDs, exclusions,
-// revoked grants, and ended memberships without distinguishing them.
+// every call. Denial covers missing postings, malformed IDs, void rows,
+// exclusions, revoked grants, disabled or narrowed policies, and ended
+// memberships without distinguishing them. Manual explicit grants and the
+// policy-derived automatic reason compose as a union under exclusions.
 func (d *Database) CheckSharedPostingAccess(ownerID, postingID, requesterID string) (store.SharedPostingAccess, error) {
 	denied := store.SharedPostingAccess{Allowed: false}
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) || !validSharingUserID(requesterID) {
 		return denied, nil
 	}
 	var present int
-	if err := d.db.QueryRow(`SELECT COUNT(*) FROM postings WHERE user_id = ? AND id = ?`, ownerID, postingID).Scan(&present); err != nil {
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM postings WHERE user_id = ? AND id = ? AND void = 0`, ownerID, postingID).Scan(&present); err != nil {
 		return denied, err
 	}
 	if present != 1 {
@@ -425,7 +428,12 @@ func (d *Database) CheckSharedPostingAccess(ownerID, postingID, requesterID stri
 		}
 		return store.SharedPostingAccess{Allowed: true, Reason: "manual-group"}, nil
 	}
-	return denied, nil
+	// Policy-derived automatic access (GRP-02) composes under the same
+	// exclusions checked above: an enabled policy covering the posting's
+	// current accounts and transaction date authorizes while both parties
+	// hold current membership. Disable or narrow revokes on commit because
+	// this reads live rows with no cache.
+	return d.automaticPolicyAccess(ownerID, postingID, requesterID)
 }
 
 // ReadSharedPosting returns one authorized posting in the existing
@@ -454,9 +462,11 @@ func (d *Database) ReadSharedPosting(ownerID, postingID, requesterID string) (ty
 }
 
 // ListSharedPostings returns every posting currently shared with the
-// requester. Candidates come from the small explicit-grant table, never
-// from scanning owners' postings; each candidate is re-authorized through
-// CheckSharedPostingAccess before it is read.
+// requester. Manual candidates come from the small explicit-grant table,
+// never from scanning owners' postings; automatic candidates come from
+// owners holding enabled policies in the requester's groups. Each
+// candidate is re-authorized through CheckSharedPostingAccess before it is
+// read, and one posting lists once however many accounts or reasons match.
 func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPostingRef, error) {
 	if !validSharingUserID(requesterID) {
 		return nil, fmt.Errorf("%w: requester must be a user ID", store.ErrGroupInvalid)
@@ -507,6 +517,33 @@ func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPosting
 		return nil, err
 	}
 	groupRows.Close()
+	// Automatic candidates (GRP-02): owners with enabled policies in the
+	// requester's groups contribute their currently covered postings. This
+	// bounded scan is the interim discovery path; the later reference index
+	// (GRP-05) replaces it while CheckSharedPostingAccess stays the final
+	// gate below.
+	owners, err := d.automaticPolicyOwners(requesterID)
+	if err != nil {
+		return nil, err
+	}
+	for _, owner := range owners {
+		if owner == requesterID {
+			// Own rows live in the private model, never in the shared
+			// list: the owner reason would otherwise echo them here.
+			continue
+		}
+		policies, err := d.ownerGroupPolicies(owner, requesterID)
+		if err != nil {
+			return nil, err
+		}
+		ids, err := eligiblePolicyPostings(d.db, owner, policies)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			add(owner, id)
+		}
+	}
 	refs := []store.SharedPostingRef{}
 	for _, key := range candidates {
 		access, err := d.CheckSharedPostingAccess(key.owner, key.posting, requesterID)
@@ -647,6 +684,9 @@ func deleteSharingForPosting(tx *userTx, postingID string) error {
 func clearSharingForUser(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear sharing grants: %w", err)
+	}
+	if err := clearSharingPoliciesForUser(tx); err != nil {
+		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM sharing_copies WHERE recipient_user_id = :user_id OR source_owner_id = :user_id`); err != nil {
 		return fmt.Errorf("clear sharing copies: %w", err)
