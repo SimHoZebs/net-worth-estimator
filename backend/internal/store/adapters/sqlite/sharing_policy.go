@@ -82,7 +82,9 @@ func requirePolicyMember(tx *sql.Tx, groupID, ownerID string) error {
 // SetSharingPolicy creates or replaces one member's preference in one
 // transaction: membership, account ownership, and interval validation run
 // with the version-bumped write, so disable/narrow revokes automatic
-// access on commit.
+// access on commit. The same transaction fences the old index generation
+// and re-derives the (owner, group) slice at the new version, and appends
+// one audit row with before/after coverage.
 func (d *Database) SetSharingPolicy(ownerID, groupID string, input store.SharingPolicyInput) (store.SharingPolicy, error) {
 	if !validSharingUserID(ownerID) {
 		return store.SharingPolicy{}, fmt.Errorf("%w: policy owner must be a user ID", store.ErrGroupInvalid)
@@ -132,6 +134,15 @@ func (d *Database) SetSharingPolicy(ownerID, groupID string, input store.Sharing
 	default:
 		return store.SharingPolicy{}, err
 	}
+	var before store.SharingPolicy
+	hasBefore := false
+	if existing, err := scanSharingPolicy(tx.QueryRow(
+		`SELECT owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at FROM sharing_policies WHERE owner_user_id = ? AND group_id = ?`,
+		ownerID, groupID)); err == nil {
+		before, hasBefore = existing, true
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return store.SharingPolicy{}, err
+	}
 	now := time.Now().Unix()
 	if _, err := tx.Exec(`INSERT INTO sharing_policies(owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -140,14 +151,21 @@ func (d *Database) SetSharingPolicy(ownerID, groupID string, input store.Sharing
 		ownerID, groupID, boolToInt(normalized.Enabled), string(accountsJSON), normalized.StartDate, normalized.EndDate, version, now); err != nil {
 		return store.SharingPolicy{}, fmt.Errorf("record sharing policy: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
-		return store.SharingPolicy{}, err
-	}
-	return store.SharingPolicy{
+	policy := store.SharingPolicy{
 		OwnerUserID: ownerID, GroupID: groupID, Enabled: normalized.Enabled,
 		AccountIDs: normalized.AccountIDs, StartDate: normalized.StartDate,
 		EndDate: normalized.EndDate, Version: version, UpdatedAt: now,
-	}, nil
+	}
+	if err := rebuildVisibilityForOwnerGroupRaw(tx, ownerID, groupID); err != nil {
+		return store.SharingPolicy{}, err
+	}
+	if err := auditSharingRaw(tx, ownerID, ownerID, "policy-set", "", "", "", groupID, policyAuditDetail(before, policy, hasBefore)); err != nil {
+		return store.SharingPolicy{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return store.SharingPolicy{}, err
+	}
+	return policy, nil
 }
 
 // GetSharingPolicy returns one member's stored preference. Absence reports
@@ -277,16 +295,18 @@ func (d *Database) PreviewSharingPolicy(ownerID, groupID string) (store.SharingP
 // stripSharingPolicyAccount removes one deleted account from the owner's
 // policies in the same write, bumping each touched version so stale
 // generations fence immediately. A policy narrowed to zero accounts keeps
-// its row and flag but matches nothing.
+// its row and flag but matches nothing. Each touched (owner, group) index
+// slice is re-derived at the bumped version in the same transaction, and
+// one audit row per touched policy records before/after coverage.
 func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 	rows, err := tx.Query(`SELECT group_id, account_ids_json, version FROM sharing_policies WHERE owner_user_id = :user_id`)
 	if err != nil {
 		return err
 	}
 	type stripped struct {
-		group    string
-		accounts []string
-		version  int64
+		group         string
+		before, after []string
+		version       int64
 	}
 	var touched []stripped
 	for rows.Next() {
@@ -301,7 +321,10 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 			rows.Close()
 			return fmt.Errorf("parse sharing policy accounts: %w", err)
 		}
-		kept := accounts[:0]
+		// Snapshot before filtering: kept compacts a fresh slice so the
+		// audit's before-coverage keeps the original selection.
+		before := append([]string(nil), accounts...)
+		kept := make([]string, 0, len(accounts))
 		removed := false
 		for _, id := range accounts {
 			if id == accountID {
@@ -314,7 +337,7 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 			if kept == nil {
 				kept = []string{}
 			}
-			touched = append(touched, stripped{group, kept, version + 1})
+			touched = append(touched, stripped{group: group, before: before, after: kept, version: version + 1})
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -324,13 +347,29 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 	rows.Close()
 	now := time.Now().Unix()
 	for _, item := range touched {
-		encoded, err := json.Marshal(item.accounts)
+		encoded, err := json.Marshal(item.after)
 		if err != nil {
 			return fmt.Errorf("encode sharing policy accounts: %w", err)
 		}
 		if _, err := tx.Exec(`UPDATE sharing_policies SET account_ids_json = ?, version = ?, updated_at = ? WHERE group_id = ? AND owner_user_id = :user_id`,
 			string(encoded), item.version, now, item.group); err != nil {
 			return fmt.Errorf("strip sharing account %s: %w", accountID, err)
+		}
+		if err := rebuildVisibilityForOwnerGroupScoped(tx, item.group); err != nil {
+			return err
+		}
+		before, after := item.before, item.after
+		if before == nil {
+			before = []string{}
+		}
+		if after == nil {
+			after = []string{}
+		}
+		beforeJSON, _ := json.Marshal(map[string]any{"accounts": before})
+		afterJSON, _ := json.Marshal(map[string]any{"accounts": after, "version": item.version})
+		if err := auditSharingScoped(tx, tx.userID, "policy-strip", "", "", "", item.group,
+			fmt.Sprintf(`{"before":%s,"after":%s,"stripped_account":%q}`, beforeJSON, afterJSON, accountID)); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -397,84 +436,6 @@ func (d *Database) automaticPolicyAccess(ownerID, postingID, requesterID string)
 		}
 	}
 	return denied, nil
-}
-
-// automaticPolicyOwners lists owners holding an enabled policy in a group
-// the requester belongs to while still holding membership themselves.
-// Candidate discovery for shared lists; every candidate is re-authorized
-// through CheckSharedPostingAccess before it is read, so this guides but
-// never grants. The later reference index (GRP-05) replaces this scan.
-func (d *Database) automaticPolicyOwners(requesterID string) ([]string, error) {
-	rows, err := d.db.Query(`SELECT DISTINCT sp.owner_user_id FROM sharing_policies sp
-		JOIN group_members requester ON requester.group_id = sp.group_id AND requester.user_id = ?
-		JOIN group_members owner ON owner.group_id = sp.group_id AND owner.user_id = sp.owner_user_id
-		WHERE sp.enabled = 1 ORDER BY sp.owner_user_id`, requesterID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var owners []string
-	for rows.Next() {
-		var owner string
-		if err := rows.Scan(&owner); err != nil {
-			return nil, err
-		}
-		owners = append(owners, owner)
-	}
-	return owners, rows.Err()
-}
-
-// eligiblePolicyPostings returns the IDs of one owner's non-void postings
-// covered by any of the given policies. One ID appears once however many
-// accounts or policies match.
-func eligiblePolicyPostings(db *sql.DB, ownerID string, policies []store.SharingPolicy) ([]string, error) {
-	var enabled []store.SharingPolicy
-	for _, policy := range policies {
-		if policy.Enabled && len(policy.AccountIDs) > 0 {
-			enabled = append(enabled, policy)
-		}
-	}
-	if len(enabled) == 0 {
-		return nil, nil
-	}
-	postings, err := loadPolicyPostings(db, ownerID)
-	if err != nil {
-		return nil, err
-	}
-	var ids []string
-	for _, posting := range postings {
-		for _, policy := range enabled {
-			if policyPostingEligible(policy, posting) {
-				ids = append(ids, posting.id)
-				break
-			}
-		}
-	}
-	return ids, nil
-}
-
-// ownerGroupPolicies loads one owner's policies for groups the requester
-// also belongs to, so list paths evaluate exactly the audiences that can
-// authorize the requester.
-func (d *Database) ownerGroupPolicies(ownerID, requesterID string) ([]store.SharingPolicy, error) {
-	rows, err := d.db.Query(`SELECT sp.owner_user_id, sp.group_id, sp.enabled, sp.account_ids_json, sp.start_date, sp.end_date, sp.version, sp.updated_at
-		FROM sharing_policies sp
-		JOIN group_members requester ON requester.group_id = sp.group_id AND requester.user_id = ?
-		JOIN group_members owner ON owner.group_id = sp.group_id AND owner.user_id = sp.owner_user_id
-		WHERE sp.owner_user_id = ?`, requesterID, ownerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var policies []store.SharingPolicy
-	for rows.Next() {
-		policy, err := scanSharingPolicy(rows)
-		if err != nil {
-			return nil, err
-		}
-		policies = append(policies, policy)
-	}
-	return policies, rows.Err()
 }
 
 // deleteGroupSharingPolicies drops preference rows naming a deleted group

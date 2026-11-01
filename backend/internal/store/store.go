@@ -160,7 +160,9 @@ type Database interface {
 	// membership, owner consent (explicit grant or enabled automatic-sharing
 	// policy covering the posting's current accounts and transaction date),
 	// exclusions, and revocation state. It queries current rows on every call;
-	// there is no positive auth cache and no materialized index shortcut.
+	// there is no positive auth cache and no materialized index shortcut:
+	// the visibility index only discovers list candidates, while this
+	// function alone decides every list and detail read from live rows.
 	CheckSharedPostingAccess(ownerID, postingID, requesterID string) (SharedPostingAccess, error)
 	// ReadSharedPosting returns the owner's posting in the existing
 	// transaction shape when the requester is currently authorized. Missing
@@ -170,7 +172,16 @@ type Database interface {
 	ReadSharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
 	// ListSharedPostings returns every posting currently shared with the
 	// requester, each in the existing transaction shape with its owner.
+	// Automatic discovery reads the write-maintained visibility index at
+	// the current policy version, ordered by owner then posting; one
+	// posting lists once however many accounts, groups, or reasons match.
 	ListSharedPostings(requesterID string) ([]SharedPostingRef, error)
+	// RebuildSharingIndex re-derives one owner's whole visibility index
+	// from live policies and postings in one transaction for operator
+	// recovery. Normal writes maintain the index incrementally; a rebuild
+	// only lands live-covered postings for current memberships, so it
+	// never over-shares.
+	RebuildSharingIndex(ownerID string) error
 	// CopySharedPosting accepts one authorized shared posting into the
 	// requester's own private model as an independent row: new ID,
 	// recipient ownership, no claim, and no remote coupling. The copy is

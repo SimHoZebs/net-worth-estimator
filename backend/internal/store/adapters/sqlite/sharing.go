@@ -62,7 +62,11 @@ func sharingSchemaStatements() []string {
 		)`,
 		`CREATE INDEX IF NOT EXISTS sharing_copies_source ON sharing_copies(source_owner_id, source_posting_id)`,
 	}
-	return append(statements, sharingPolicySchemaStatements()...)
+	// The visibility index and audit log ship with the consent schema so
+	// fresh and migrated databases gain them together.
+	statements = append(statements, sharingPolicySchemaStatements()...)
+	statements = append(statements, sharingVisibilitySchemaStatements()...)
+	return append(statements, sharingAuditSchemaStatements()...)
 }
 
 func validSharingUserID(id string) bool {
@@ -213,6 +217,9 @@ func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audience
 		ownerID, postingID, audienceType, audienceID, now); err != nil {
 		return store.SharingGrant{}, fmt.Errorf("record sharing grant: %w", err)
 	}
+	if err := auditSharingRaw(tx, ownerID, ownerID, "grant", postingID, audienceType, audienceID, "", ""); err != nil {
+		return store.SharingGrant{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return store.SharingGrant{}, err
 	}
@@ -220,7 +227,8 @@ func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audience
 }
 
 // RevokeSharedPosting deletes one explicit grant. Later reads deny access
-// unless another independent valid grant survives.
+// unless another independent valid grant survives. The delete and its audit
+// row commit together; revoking an absent grant reports not-found.
 func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienceID string) error {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
@@ -228,7 +236,12 @@ func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienc
 	if err := checkSharingAudience(audienceType, audienceID, false); err != nil {
 		return err
 	}
-	result, err := d.db.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = ? AND audience_id = ? AND intent = 'shared'`,
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = ? AND audience_id = ? AND intent = 'shared'`,
 		ownerID, postingID, audienceType, audienceID)
 	if err != nil {
 		return err
@@ -237,7 +250,10 @@ func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienc
 	if n == 0 {
 		return store.ErrNotFound
 	}
-	return nil
+	if err := auditSharingRaw(tx, ownerID, ownerID, "revoke", postingID, audienceType, audienceID, "", ""); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ExcludeSharedPosting records the owner's explicit exclusion. The guard
@@ -293,13 +309,17 @@ func (d *Database) ExcludeSharedPosting(ownerID, postingID, audienceType, audien
 		ownerID, postingID, audienceType, audienceID, now); err != nil {
 		return store.SharingGrant{}, fmt.Errorf("record sharing exclusion: %w", err)
 	}
+	if err := auditSharingRaw(tx, ownerID, ownerID, "exclude", postingID, audienceType, audienceID, "", ""); err != nil {
+		return store.SharingGrant{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return store.SharingGrant{}, err
 	}
 	return store.SharingGrant{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentExcluded, CreatedAt: now}, nil
 }
 
-// RemoveSharedExclusion deletes one explicit exclusion.
+// RemoveSharedExclusion deletes one explicit exclusion. The delete and its
+// audit row commit together; removing an absent exclusion reports not-found.
 func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID string) error {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
@@ -307,7 +327,12 @@ func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audie
 	if err := checkSharingAudience(audienceType, audienceID, true); err != nil {
 		return err
 	}
-	result, err := d.db.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = ? AND audience_id = ? AND intent = 'excluded'`,
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = ? AND audience_id = ? AND intent = 'excluded'`,
 		ownerID, postingID, audienceType, audienceID)
 	if err != nil {
 		return err
@@ -316,7 +341,10 @@ func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audie
 	if n == 0 {
 		return store.ErrNotFound
 	}
-	return nil
+	if err := auditSharingRaw(tx, ownerID, ownerID, "unexclude", postingID, audienceType, audienceID, "", ""); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ListSharingGrants returns the owner's explicit grants and exclusions in
@@ -341,11 +369,15 @@ func (d *Database) ListSharingGrants(ownerID string) ([]store.SharingGrant, erro
 	return grants, rows.Err()
 }
 
-// CheckSharedPostingAccess re-evaluates authorization from current rows on
-// every call. Denial covers missing postings, malformed IDs, void rows,
-// exclusions, revoked grants, disabled or narrowed policies, and ended
-// memberships without distinguishing them. Manual explicit grants and the
-// policy-derived automatic reason compose as a union under exclusions.
+// CheckSharedPostingAccess evaluates read-time authorization for one
+// owner-scoped posting and requester: current group and source-owner
+// membership, owner consent (explicit grant or enabled automatic-sharing
+// policy covering the posting's current accounts and transaction date),
+// exclusions, and revocation state. It queries current rows on every call;
+// there is no positive auth cache. It takes no index shortcut: the
+// visibility index only discovers list candidates, while this function
+// alone decides every list and detail read from live rows, so a stale or
+// missing reference can under-share a list but never over-share a read.
 func (d *Database) CheckSharedPostingAccess(ownerID, postingID, requesterID string) (store.SharedPostingAccess, error) {
 	denied := store.SharedPostingAccess{Allowed: false}
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) || !validSharingUserID(requesterID) {
@@ -462,11 +494,13 @@ func (d *Database) ReadSharedPosting(ownerID, postingID, requesterID string) (ty
 }
 
 // ListSharedPostings returns every posting currently shared with the
-// requester. Manual candidates come from the small explicit-grant table,
-// never from scanning owners' postings; automatic candidates come from
-// owners holding enabled policies in the requester's groups. Each
-// candidate is re-authorized through CheckSharedPostingAccess before it is
-// read, and one posting lists once however many accounts or reasons match.
+// requester. Manual candidates come from the small explicit-grant table;
+// automatic candidates come from the write-maintained visibility index
+// at the current policy version, never from scanning owners' postings.
+// Each candidate is re-authorized through CheckSharedPostingAccess before
+// it is read, and one posting lists once however many accounts, groups,
+// or reasons match. Results order by owner then posting; keyset feed
+// pagination over the index belongs to the feed consumer.
 func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPostingRef, error) {
 	if !validSharingUserID(requesterID) {
 		return nil, fmt.Errorf("%w: requester must be a user ID", store.ErrGroupInvalid)
@@ -517,33 +551,37 @@ func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPosting
 		return nil, err
 	}
 	groupRows.Close()
-	// Automatic candidates (GRP-02): owners with enabled policies in the
-	// requester's groups contribute their currently covered postings. This
-	// bounded scan is the interim discovery path; the later reference index
-	// (GRP-05) replaces it while CheckSharedPostingAccess stays the final
-	// gate below.
-	owners, err := d.automaticPolicyOwners(requesterID)
+	// Automatic candidates (GRP-05): the write-maintained reference index
+	// names covered postings per group at the current policy version, so
+	// reads never scan owners' postings. The joins pre-fence stale rows
+	// (version match, current membership both sides, non-void existence);
+	// every candidate is still re-authorized through
+	// CheckSharedPostingAccess before it is read, so a retained row can
+	// under-share but never over-share. Own rows live in the private
+	// model, never in the shared list.
+	indexRows, err := d.db.Query(`SELECT DISTINCT v.owner_user_id, v.posting_id FROM sharing_visibility v
+		JOIN group_members requester ON requester.group_id = v.group_id AND requester.user_id = ?
+		JOIN group_members owner ON owner.group_id = v.group_id AND owner.user_id = v.owner_user_id
+		JOIN sharing_policies policy ON policy.owner_user_id = v.owner_user_id AND policy.group_id = v.group_id
+			AND policy.version = v.policy_version AND policy.enabled = 1
+		JOIN postings posting ON posting.user_id = v.owner_user_id AND posting.id = v.posting_id AND posting.void = 0
+		WHERE v.owner_user_id != ? ORDER BY v.owner_user_id, v.posting_id`, requesterID, requesterID)
 	if err != nil {
 		return nil, err
 	}
-	for _, owner := range owners {
-		if owner == requesterID {
-			// Own rows live in the private model, never in the shared
-			// list: the owner reason would otherwise echo them here.
-			continue
-		}
-		policies, err := d.ownerGroupPolicies(owner, requesterID)
-		if err != nil {
+	for indexRows.Next() {
+		var owner, posting string
+		if err := indexRows.Scan(&owner, &posting); err != nil {
+			indexRows.Close()
 			return nil, err
 		}
-		ids, err := eligiblePolicyPostings(d.db, owner, policies)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range ids {
-			add(owner, id)
-		}
+		add(owner, posting)
 	}
+	if err := indexRows.Err(); err != nil {
+		indexRows.Close()
+		return nil, err
+	}
+	indexRows.Close()
 	refs := []store.SharedPostingRef{}
 	for _, key := range candidates {
 		access, err := d.CheckSharedPostingAccess(key.owner, key.posting, requesterID)
@@ -668,6 +706,9 @@ func deleteSharingForPosting(tx *userTx, postingID string) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE posting_id = ? AND owner_user_id = :user_id`, postingID); err != nil {
 		return fmt.Errorf("clear sharing grants %s: %w", postingID, err)
 	}
+	if err := deleteVisibilityForPostingTx(tx, postingID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM sharing_copies WHERE source_posting_id = ? AND source_owner_id = :user_id`, postingID); err != nil {
 		return fmt.Errorf("clear sharing copy provenance %s: %w", postingID, err)
 	}
@@ -686,6 +727,12 @@ func clearSharingForUser(tx *userTx) error {
 		return fmt.Errorf("clear sharing grants: %w", err)
 	}
 	if err := clearSharingPoliciesForUser(tx); err != nil {
+		return err
+	}
+	if err := deleteVisibilityForOwnerTx(tx); err != nil {
+		return err
+	}
+	if err := auditSharingScoped(tx, tx.userID, "policies-cleared", "", "", "", "", `{"reason":"model-rows-replaced"}`); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM sharing_copies WHERE recipient_user_id = :user_id OR source_owner_id = :user_id`); err != nil {

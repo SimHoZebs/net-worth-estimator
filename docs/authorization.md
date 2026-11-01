@@ -289,12 +289,32 @@ exclusions composition keep their FND-02 behavior alongside the
 `automatic-group` reason. Preference reads and the counts-only exposure
 preview stay owner-scoped; other members never read the preference rows.
 
-Policy contract for the server authorization path (GRP-05): consume
-`store.SharingPolicy` rows plus `store.PolicyCoversPosting` as the single
-eligibility rule, fence reference-index generations against the policy
-version, re-validate through `CheckSharedPostingAccess` on every shared
-read, and maintain the index in the same write that changes postings,
-policies, accounts, memberships, or consent. Statement caution: the SQLite
+Policy contract for the server authorization path (GRP-05): `store.SharingPolicy`
+rows plus `store.PolicyCoversPosting` stay the single eligibility rule.
+`CheckSharedPostingAccess` alone decides every shared list and detail
+read from live rows on each call — current membership both sides,
+owner consent (manual grant union automatic policy), exclusions, void
+and deleted state, and revocation — with no positive auth cache.
+`ListSharedPostings` discovers automatic candidates from the
+write-maintained `sharing_visibility` reference index (one row per
+posting plus group at the current policy version, no payload copied, one
+listing per posting however many accounts, groups, or reasons match) and
+re-authorizes each through `CheckSharedPostingAccess`, so a stale or
+missing reference under-shares a list but never over-shares a read.
+Every write that changes postings, policies, accounts, memberships, or
+consent maintains or fences the index in the same transaction: inserts,
+owner edits, bank-sync conversions and late inserts, policy sets and
+account-strip narrowing (with version bumps), membership leave and
+removal, group deletion, and model replacement; voided rows retain their
+reference while the live gate denies them, and deleted rows drop theirs.
+Policy, grant, and exclusion mutations append one `sharing_audit` row
+with actor, timestamp, and before/after coverage in the same
+transaction; idempotent retries audit nothing. Operator recovery uses
+`RebuildSharingIndex`, which re-derives one owner's slice from live rows
+in one transaction for current memberships only and never over-shares. Consumers (feed,
+consent UI): list results order by owner then posting with the existing
+transaction shape; keyset pagination over the index and any audit read
+path belong to the consumer, not this path. Statement caution: the SQLite
 driver binds arguments to placeholders sequentially by index and ignores
 `sql.Named` wrapping, so the auto-appended `:user_id` argument binds to
 whatever placeholder stands last — keep `:named` placeholders textually
