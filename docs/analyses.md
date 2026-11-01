@@ -84,6 +84,23 @@ imported transactions, create debt accounts, change account values, or change
 projection identities. A future model-editing action requires explicit review
 and save.
 
+## Transfer matching
+
+Transfer means one internal money movement observed as two opposite legs on
+different accounts. The detector pairs legs by exact absolute amount, opposite
+direction, and posting dates within a short window. A leg with exactly one
+mutual candidate produces a **strong** match; a leg with several candidates
+produces a **moderate** match that lists every candidate for review.
+
+- An unmatched leg emits no finding. Missing legs are never fabricated.
+- Same-account opposite legs are corrections or refunds, not transfers.
+- Pending, void, non-USD, zero, invalid, and undated rows never match.
+- Each leg carries its own finding, so transfer evidence coexists with BNPL
+  and other independent claims on one transaction. Dismissal survives
+  detector reruns; repeated imports refresh the same findings.
+- The match window is provisional pending the VIS-03 product decision on
+  tolerances and review UX.
+
 ## API and interface
 
 - `GET /v1/analyses` reads execution status without starting work.
