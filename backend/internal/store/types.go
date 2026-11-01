@@ -223,6 +223,54 @@ type SharedPostingRef struct {
 	Posting     types.Posting `json:"posting"`
 }
 
+// Linked-transaction representation (FND-04). A SharingLink binds one
+// source-owner posting to one recipient-owned private copy through
+// immutable identities: the source transaction ID (SourceOwnerID plus
+// SourcePostingID), the stable LinkID, the SourceRevision observed at the
+// last authorized refresh, the recipient owner (RecipientUserID plus
+// CopyPostingID), and the sharing-grant identifiers (GrantAudience,
+// GrantAudienceID, GrantReason) that authorized the link. The copy itself
+// stays an ordinary recipient-owned posting: recipient edits never
+// propagate to the source, and refresh never rewrites the copy.
+type SharingLink struct {
+	LinkID          string `json:"linkId"`
+	SourceOwnerID   string `json:"sourceOwnerId"`
+	SourcePostingID string `json:"sourcePostingId"`
+	SourceRevision  string `json:"sourceRevision"`
+	RecipientUserID string `json:"recipientUserId"`
+	CopyPostingID   string `json:"copyPostingId"`
+	GrantAudience   string `json:"grantAudienceType"`
+	GrantAudienceID string `json:"grantAudienceId"`
+	GrantReason     string `json:"grantReason"`
+	CopiedAt        int64  `json:"copiedAt"`
+	RefreshedAt     int64  `json:"refreshedAt"`
+}
+
+// Refresh outcomes for a sharing link. "current" means the recipient is
+// still authorized and the source matches the recorded revision.
+// "source-changed" means the recipient is still authorized but the source
+// content moved on: the link records the new revision while the
+// recipient's copy keeps its own edits. "unauthorized" means the grant
+// was revoked, excluded, or membership ended: the copy and its edits stay
+// intact but source changes are no longer visible. "source-gone" means
+// the source row no longer exists: the copy stays intact as an ordinary
+// row while the link keeps its last recorded revision.
+const (
+	SharingLinkCurrent      = "current"
+	SharingLinkSourceChange = "source-changed"
+	SharingLinkUnauthorized = "unauthorized"
+	SharingLinkSourceGone   = "source-gone"
+)
+
+// SharingLinkRefresh is the result of re-checking one link against live
+// authorization and source state. It never carries edited copy content:
+// callers read the copy through their own model scope.
+type SharingLinkRefresh struct {
+	Link                  SharingLink `json:"link"`
+	Status                string      `json:"status"`
+	CurrentSourceRevision string      `json:"currentSourceRevision,omitempty"`
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {
