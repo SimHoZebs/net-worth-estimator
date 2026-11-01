@@ -1615,6 +1615,352 @@
 				"required": ["model", "issues"],
 				"type": "object"
 			},
+			"FlowClassTotals": {
+				"additionalProperties": false,
+				"properties": {
+					"inflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"outflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"transfer": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["inflow", "outflow", "transfer"],
+				"type": "object"
+			},
+			"FlowCoverage": {
+				"additionalProperties": false,
+				"properties": {
+					"observedAccounts": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"unobservedAccounts": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["observedAccounts", "unobservedAccounts"],
+				"type": "object"
+			},
+			"FlowEdge": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"from": {
+						"type": "string"
+					},
+					"kind": {
+						"type": "string"
+					},
+					"movement": {
+						"type": "string"
+					},
+					"sources": {
+						"items": {
+							"$ref": "#/components/schemas/FlowSourceRecord"
+						},
+						"type": ["array", "null"]
+					},
+					"to": {
+						"type": "string"
+					}
+				},
+				"required": ["from", "to", "kind", "movement", "amount", "sources"],
+				"type": "object"
+			},
+			"FlowGraph": {
+				"additionalProperties": false,
+				"properties": {
+					"coverage": {
+						"$ref": "#/components/schemas/FlowCoverage"
+					},
+					"edges": {
+						"items": {
+							"$ref": "#/components/schemas/FlowEdge"
+						},
+						"type": ["array", "null"]
+					},
+					"endDate": {
+						"type": "string"
+					},
+					"nodes": {
+						"items": {
+							"$ref": "#/components/schemas/FlowNode"
+						},
+						"type": ["array", "null"]
+					},
+					"reconciliation": {
+						"$ref": "#/components/schemas/FlowReconciliation"
+					},
+					"startDate": {
+						"type": "string"
+					},
+					"totals": {
+						"$ref": "#/components/schemas/FlowTotals"
+					},
+					"unmatched": {
+						"items": {
+							"$ref": "#/components/schemas/FlowUnmatchedEvent"
+						},
+						"type": ["array", "null"]
+					},
+					"unobserved": {
+						"items": {
+							"$ref": "#/components/schemas/FlowUnobservedCorrection"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"startDate",
+					"endDate",
+					"nodes",
+					"edges",
+					"unmatched",
+					"unobserved",
+					"coverage",
+					"totals",
+					"reconciliation"
+				],
+				"type": "object"
+			},
+			"FlowNode": {
+				"additionalProperties": false,
+				"properties": {
+					"enabled": {
+						"type": "boolean"
+					},
+					"external": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					},
+					"inflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"name": {
+						"type": "string"
+					},
+					"outflow": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["id", "name", "external", "enabled", "inflow", "outflow"],
+				"type": "object"
+			},
+			"FlowReconciliation": {
+				"additionalProperties": false,
+				"properties": {
+					"classifiedEvents": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"correctionsCount": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"edgesInflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"edgesOutflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"edgesTransfer": {
+						"format": "double",
+						"type": "number"
+					},
+					"eventsInflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"eventsOutflow": {
+						"format": "double",
+						"type": "number"
+					},
+					"eventsTransfer": {
+						"format": "double",
+						"type": "number"
+					},
+					"reconciled": {
+						"type": "boolean"
+					},
+					"unmatchedEvents": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"unobservedSum": {
+						"format": "double",
+						"type": "number"
+					},
+					"windowEvents": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"windowEvents",
+					"classifiedEvents",
+					"unmatchedEvents",
+					"eventsInflow",
+					"eventsOutflow",
+					"eventsTransfer",
+					"edgesInflow",
+					"edgesOutflow",
+					"edgesTransfer",
+					"correctionsCount",
+					"unobservedSum",
+					"reconciled"
+				],
+				"type": "object"
+			},
+			"FlowSourceRecord": {
+				"additionalProperties": false,
+				"properties": {
+					"date": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"realizedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"requestedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"sequence": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": [
+					"postingId",
+					"date",
+					"sequence",
+					"requestedAmount",
+					"realizedAmount"
+				],
+				"type": "object"
+			},
+			"FlowTotals": {
+				"additionalProperties": false,
+				"properties": {
+					"actual": {
+						"$ref": "#/components/schemas/FlowClassTotals"
+					},
+					"projected": {
+						"$ref": "#/components/schemas/FlowClassTotals"
+					},
+					"unmatched": {
+						"format": "double",
+						"type": "number"
+					},
+					"unobserved": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": ["actual", "projected", "unmatched", "unobserved"],
+				"type": "object"
+			},
+			"FlowUnmatchedEvent": {
+				"additionalProperties": false,
+				"properties": {
+					"date": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"realizedAmount": {
+						"format": "double",
+						"type": "number"
+					},
+					"sequence": {
+						"format": "int64",
+						"type": "integer"
+					}
+				},
+				"required": ["postingId", "date", "sequence", "realizedAmount"],
+				"type": "object"
+			},
+			"FlowUnobservedCorrection": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"adjustment": {
+						"format": "double",
+						"type": "number"
+					},
+					"date": {
+						"type": "string"
+					},
+					"modeledBalance": {
+						"format": "double",
+						"type": "number"
+					},
+					"observedBalance": {
+						"format": "double",
+						"type": "number"
+					}
+				},
+				"required": [
+					"accountId",
+					"date",
+					"observedBalance",
+					"modeledBalance",
+					"adjustment"
+				],
+				"type": "object"
+			},
+			"FlowsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/FlowsOutputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"error": {
+						"type": "string"
+					},
+					"graph": {
+						"$ref": "#/components/schemas/FlowGraph"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"type": "object"
+			},
 			"Item": {
 				"additionalProperties": false,
 				"properties": {
@@ -5388,6 +5734,44 @@
 					}
 				},
 				"summary": "Load the canonical financial model with diagnostics"
+			}
+		},
+		"/v1/flows": {
+			"post": {
+				"operationId": "build-flow-graph",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ProjectionRequestBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/FlowsOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Build a time-bounded financial flow graph"
 			}
 		},
 		"/v1/payment-terms": {
