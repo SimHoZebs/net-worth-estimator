@@ -1,4 +1,5 @@
 import { waypointFetch } from "@/api/waypoint-fetch.ts";
+import { mintShareRequestId } from "@/pages/sharingApi.ts";
 
 export type FeedDirection = "in" | "out" | "transfer";
 
@@ -100,6 +101,7 @@ export async function fetchGroupFeed(
 export async function saveSharedCopy(
 	ownerUserId: string,
 	postingId: string,
+	requestId: string = mintShareRequestId(),
 ): Promise<FeedPosting> {
 	const response = await waypointFetch<{ data: { posting: FeedPosting } }>(
 		"/v1/shared/copies",
@@ -109,6 +111,7 @@ export async function saveSharedCopy(
 			body: JSON.stringify({
 				owner: ownerResource(ownerUserId),
 				postingId,
+				requestId,
 			}),
 		},
 	);

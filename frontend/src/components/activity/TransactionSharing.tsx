@@ -3,6 +3,7 @@ import { Button } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import { notifyError, notifySuccess } from "../../state/notifications.ts";
+import { mintShareRequestId } from "../../pages/sharingApi.ts";
 import {
 	useExcludeSharedPosting,
 	useGrantSharedPosting,
@@ -101,11 +102,13 @@ export function TransactionSharing({
 
 	function onShare() {
 		if (!shareTarget) return;
+		const requestId = mintShareRequestId();
 		void run(
 			() =>
 				grantMutation.mutateAsync({
 					postingId,
 					audienceId: shareTarget,
+					requestId,
 				}),
 			"Transaction shared with the group.",
 		);
@@ -114,12 +117,14 @@ export function TransactionSharing({
 	function onHide() {
 		if (!hideTarget) return;
 		const wildcard = hideTarget === "all";
+		const requestId = mintShareRequestId();
 		void run(
 			() =>
 				excludeMutation.mutateAsync({
 					postingId,
 					audienceType: wildcard ? "all" : "group",
 					audienceId: wildcard ? "" : hideTarget,
+					requestId,
 				}),
 			wildcard
 				? "Transaction hidden from everyone, including future groups."
@@ -128,24 +133,28 @@ export function TransactionSharing({
 	}
 
 	function onRevoke(audienceType: string, audienceId: string) {
+		const requestId = mintShareRequestId();
 		void run(
 			() =>
 				revokeMutation.mutateAsync({
 					postingId,
 					audienceType,
 					audienceId,
+					requestId,
 				}),
 			"Share removed.",
 		);
 	}
 
 	function onRemoveExclusion(audienceType: string, audienceId: string) {
+		const requestId = mintShareRequestId();
 		void run(
 			() =>
 				removeExclusionMutation.mutateAsync({
 					postingId,
 					audienceType,
 					audienceId,
+					requestId,
 				}),
 			"Hidden audience removed.",
 		);

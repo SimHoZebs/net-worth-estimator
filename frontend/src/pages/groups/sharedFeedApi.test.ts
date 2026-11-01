@@ -68,8 +68,47 @@ it("saves a copy through the recipient copy flow", async () => {
 	];
 	expect(url).toBe("/v1/shared/copies");
 	expect(options.method).toBe("POST");
+	const body = JSON.parse(String(options.body)) as Record<string, string>;
+	expect(body.owner).toBe("users/abc123");
+	expect(body.postingId).toBe("p1");
+	expect(body.requestId).toMatch(
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+	);
+});
+
+it("mints a fresh idempotency key per saved copy", async () => {
+	const posting = { id: "p1", name: "Groceries" };
+	const bodies: string[] = [];
+	const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {
+		bodies.push(String(options?.body));
+		return ok({ posting });
+	});
+	vi.stubGlobal("fetch", fetcher);
+	await saveSharedCopy("user:abc123", "p1");
+	await saveSharedCopy("user:abc123", "p1");
+	const keys = bodies.map(
+		(body) => (JSON.parse(body) as Record<string, string>).requestId,
+	);
+	expect(keys).toHaveLength(2);
+	expect(keys[0]).not.toBe(keys[1]);
+});
+
+it("reuses the caller's key for one share action", async () => {
+	const posting = { id: "p1", name: "Groceries" };
+	const fetcher = vi.fn(async () => ok({ posting }));
+	vi.stubGlobal("fetch", fetcher);
+	await saveSharedCopy(
+		"user:abc123",
+		"p1",
+		"11111111-2222-4333-8444-555555555555",
+	);
+	const [, options] = fetcher.mock.calls[0] as unknown as [
+		string,
+		RequestInit,
+	];
 	expect(JSON.parse(String(options.body))).toEqual({
 		owner: "users/abc123",
 		postingId: "p1",
+		requestId: "11111111-2222-4333-8444-555555555555",
 	});
 });
