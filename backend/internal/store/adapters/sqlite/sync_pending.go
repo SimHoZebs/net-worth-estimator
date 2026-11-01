@@ -279,7 +279,10 @@ func writeBankValues(tx *userTx, id string, posting types.Posting) error {
 		boolToInt(posting.Enabled), id); err != nil {
 		return err
 	}
-	return nil
+	// Settled conversions and bank refreshes reshape automatic visibility
+	// in the same write, including pending-to-posted transitions and
+	// backdated late inserts, which qualify exactly like pre-existing rows.
+	return refreshVisibilityForPostingTx(tx, id)
 }
 
 func checkBankPosting(posting types.Posting) error {
@@ -335,7 +338,10 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			// clears Enabled alongside the lifecycle flags. Core flags
 			// land in postings, enabled in the sim satellite, in the
 			// same transaction; the sim flip runs only when a pending
-			// row actually transitioned.
+			// row actually transitioned. The visibility reference is
+			// deliberately retained (lazy cleanup): every shared read
+			// re-checks void at read time, so the retained row can never
+			// serve a withdrawn posting.
 			result, err := tx.Exec(`UPDATE postings SET pending = 0, void = 1 WHERE id = ? AND source != ? AND pending = 1 AND user_id = :user_id`, directive.Void, SourceUser)
 			if err != nil {
 				return err

@@ -125,7 +125,10 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		} else if _, err := tx.Exec(`DELETE FROM posting_claims WHERE posting_id = ? AND user_id = :user_id`, posting.ID); err != nil {
 			return err
 		}
-		return nil
+		// Owner edits reshape automatic visibility in the same write:
+		// moving or re-dating a row updates its index slice on commit,
+		// and an independent manual grant is never touched by this.
+		return refreshVisibilityForPostingTx(tx, posting.ID)
 	})
 	if err != nil {
 		return types.Posting{}, err

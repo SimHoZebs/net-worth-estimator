@@ -265,7 +265,11 @@ func insertPosting(tx *userTx, position int, posting *types.Posting, source stri
 			return fmt.Errorf("insert posting claim %s: %w", posting.ID, err)
 		}
 	}
-	return nil
+	// Group-share discovery stays consistent in the same write: every
+	// insert path (owner create, rule conversion, bank sync, seed import)
+	// funnels here, so late-imported and backdated rows qualify exactly
+	// like pre-existing ones with no extra review step.
+	return refreshVisibilityForPostingTx(tx, posting.ID)
 }
 
 func insertRule(tx *userTx, position int, rule *types.RecurrenceRule) error {

@@ -30,8 +30,9 @@ func newGroupID() (string, error) {
 }
 
 // deleteGroupSharingRows drops explicit consent and preference rows naming
-// a deleted group audience. Reads already deny through missing membership;
-// this keeps owner grant and policy lists from surfacing dead audiences.
+// a deleted group audience, plus its visibility index slice. Reads already
+// deny through missing membership; this keeps owner grant and policy lists
+// from surfacing dead audiences.
 func deleteGroupSharingRows(tx *sql.Tx, groupID string) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE audience_type = 'group' AND audience_id = ?`, groupID); err != nil {
 		return fmt.Errorf("clear group sharing consent: %w", err)
@@ -39,7 +40,7 @@ func deleteGroupSharingRows(tx *sql.Tx, groupID string) error {
 	if err := deleteGroupSharingPolicies(tx, groupID); err != nil {
 		return err
 	}
-	return nil
+	return deleteVisibilityForGroupRaw(tx, groupID)
 }
 
 func newInviteCode() (string, string, error) {
@@ -392,6 +393,12 @@ func (d *Database) RemoveMember(groupID, callerID, targetID string) error {
 	if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, targetID); err != nil {
 		return err
 	}
+	// Membership end fences list discovery immediately: the removed
+	// member's index slice for this group goes in the same transaction
+	// while live reads deny through missing membership anyway.
+	if err := deleteVisibilityForOwnerGroupRaw(tx, targetID, groupID); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
@@ -434,6 +441,9 @@ func (d *Database) LeaveGroup(groupID, userID string) error {
 		}
 	}
 	if _, err := tx.Exec(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, userID); err != nil {
+		return err
+	}
+	if err := deleteVisibilityForOwnerGroupRaw(tx, userID, groupID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -605,6 +615,13 @@ func (d *Database) AcceptInvite(code, userID, displayName string) (Group, error)
 	if _, err := tx.Exec(`INSERT INTO group_members(group_id, user_id, role, joined_at, display_name) VALUES (?, ?, 'member', ?, ?)`, invite.GroupID, userID, now, strings.TrimSpace(displayName)); err != nil {
 		return Group{}, fmt.Errorf("join group: %w", err)
 	}
+	// Joining restores list discovery for the joiner's still-enabled
+	// policy in the same transaction, matching the live rule that already
+	// authorizes current members: without this the list would under-share
+	// while detail reads allow.
+	if err := rebuildVisibilityForOwnerGroupRaw(tx, userID, invite.GroupID); err != nil {
+		return Group{}, err
+	}
 	if _, err := tx.Exec(`UPDATE group_invites SET used_count = used_count + 1 WHERE id = ?`, invite.ID); err != nil {
 		return Group{}, err
 	}
@@ -678,6 +695,11 @@ func DeleteGroupMemberships(db *sql.DB, userID string) error {
 	if _, err := tx.Exec(`DELETE FROM group_members WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
+	// The removed user authorizes nothing afterwards: their whole index
+	// slice goes in the same transaction.
+	if err := deleteVisibilityForOwnerRaw(tx, userID); err != nil {
+		return err
+	}
 	if len(owned) > 0 {
 		placeholders := strings.Repeat("?,", len(owned)-1) + "?"
 		args := make([]any, 0, len(owned))
@@ -695,6 +717,9 @@ func DeleteGroupMemberships(db *sql.DB, userID string) error {
 		// remaining row so live audiences keep their grants.
 		if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE audience_type = 'group' AND audience_id IN (`+placeholders+`) AND audience_id NOT IN (SELECT id FROM user_groups)`, args...); err != nil {
 			return fmt.Errorf("clear group sharing consent: %w", err)
+		}
+		if _, err := tx.Exec(`DELETE FROM sharing_visibility WHERE group_id IN (`+placeholders+`) AND group_id NOT IN (SELECT id FROM user_groups)`, args...); err != nil {
+			return fmt.Errorf("clear sharing visibility: %w", err)
 		}
 	}
 	// Revoke, rather than delete, surviving invites the user created so
