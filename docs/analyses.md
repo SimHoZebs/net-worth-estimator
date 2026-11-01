@@ -84,6 +84,41 @@ imported transactions, create debt accounts, change account values, or change
 projection identities. A future model-editing action requires explicit review
 and save.
 
+## Recurring promotion
+
+A confirmed repeating pattern becomes planned cash flow only through
+explicit approval in two steps: preview, then approve. Observed patterns
+and forecast definitions stay different resources: findings and feedback
+remain the evidence, recurrence rules remain the forecast.
+
+- `GET /v1/analysis-findings/{id}/recurring-preview` describes the rule the
+  pattern would create (name, amount, schedule, start) plus the forecast
+  movements behind it and the recorded evidence. The plan stays visible
+  before confirmation, with approval waiting on it. Patterns that repeat
+  every two weeks stay visible with a plain-language reason: rules expand
+  weekly, monthly, quarterly, or yearly, and no biweekly schedule exists
+  yet.
+- `POST /v1/analysis-findings/{id}/recurring-promotion` creates the approved
+  rule through the ordinary finance row-write contract (validation,
+  revision, last-write-wins). It requires a confirmed finding and refuses a
+  second active rule for the same pattern with 409.
+- One active generated rule belongs to one confirmed source pattern. The
+  link lives in `analysis_promotions` beside the evidence, never inside the
+  financial rows. Disabling or deleting the rule leaves findings and
+  feedback intact; a disabled or deleted rule frees the pattern for a
+  replacement.
+- The generated rule always starts one full interval after the latest
+  recorded movement, so approval never duplicates bank facts as forecast
+  movements. Promotion reads evidence only; preview is available in
+  read-only mode while approval requires write permission.
+- Confirm and reject corrections apply to every independent claim kind.
+  Plan duration stays BNPL-specific and never corrects a recurrence claim.
+
+Setup installs `analysis_promotions` alongside the other Analysis tables;
+runtime rejects an incomplete schema. The deployment body provisions the
+link table for sources that predate it and verifies it on candidates. A
+user clear removes promotion links with the model rows they name.
+
 ## API and interface
 
 - `GET /v1/analyses` reads execution status without starting work.

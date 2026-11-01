@@ -3,12 +3,15 @@ import {
 	dismissAnalysisFinding,
 	listAnalyses,
 	listAnalysisFindings,
+	previewRecurringPromotion,
+	promoteRecurringPattern,
 	reviewAnalysisFinding,
 } from "@/api/generated/endpoints.ts";
 import type { AnalysisFeedbackInput } from "@/api/generated/model/analysisFeedbackInput.ts";
 import { ApiNetworkError } from "@/api/http.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
+import { reloadWorkspace } from "./workspaceResources.ts";
 import { serverQueryClient } from "./serverQuery.ts";
 import { useUserScope } from "./useUserScope.ts";
 
@@ -82,6 +85,52 @@ export function useDismissAnalysisFinding() {
 					await cache.invalidateQueries({
 						queryKey: analysisFindingsKey(scope),
 					});
+			},
+		},
+		cache,
+	);
+}
+
+export function useRecurringPreview(findingId: string | undefined) {
+	const scope = useUserScope();
+	return useQuery(
+		{
+			queryKey: [...analysisFindingsKey(scope), "recurring-preview", findingId ?? "none"],
+			enabled: scope.status === "ready" && !!findingId,
+			queryFn: async ({ signal }) => {
+				if (!findingId) throw new UserScopeError();
+				const result = (
+					await previewRecurringPromotion(findingId, { signal })
+				).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result.preview;
+			},
+			staleTime: 5_000,
+		},
+		serverQueryClient(),
+	);
+}
+
+export function usePromoteRecurringPattern() {
+	const scope = useUserScope();
+	const cache = serverQueryClient();
+	return useMutation(
+		{
+			mutationKey: ["analysis-promotion", scope.key],
+			retry: false,
+			mutationFn: async ({ id }: { id: string }) => {
+				if (scope !== getUserScope() || scope.status !== "ready")
+					throw new UserScopeError();
+				const result = (await promoteRecurringPattern(id)).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result;
+			},
+			onSuccess: async () => {
+				if (scope !== getUserScope()) return;
+				await cache.invalidateQueries({
+					queryKey: analysisFindingsKey(scope),
+				});
+				await reloadWorkspace();
 			},
 		},
 		cache,

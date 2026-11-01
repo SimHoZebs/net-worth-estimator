@@ -13,6 +13,7 @@ import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { Badge } from "@/components/Badge.tsx";
 import { Button } from "@/components/Button.tsx";
+import { RecurringPatterns } from "@/components/analysis/RecurringPatterns.tsx";
 import {
 	DataTable,
 	TableCell,
@@ -32,12 +33,17 @@ export function AnalysisFindings() {
 		id: item.id,
 		name: item.name,
 	}));
-	const findings = query.data?.findings ?? [];
+	const allFindings = query.data?.findings ?? [];
+	const findings = allFindings.filter((finding) => finding.kind === "bnpl");
+	const recurring = allFindings.filter(
+		(finding) => finding.kind === "recurring",
+	);
 	const names = new Map(postings.map((posting) => [posting.id, posting.name]));
 	const state = analyses.data?.analyses?.find(
 		(item) => item.type === "bnpl",
 	)?.state;
 	return (
+		<>
 		<section className="space-y-4">
 			<header className="space-y-2">
 				<h2 className="m-0 text-lg font-semibold">Detected transactions</h2>
@@ -147,5 +153,7 @@ export function AnalysisFindings() {
 				</div>
 			)}
 		</section>
+		<RecurringPatterns findings={recurring} names={names} readOnly={readOnly} />
+		</>
 	);
 }
