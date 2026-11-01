@@ -133,6 +133,19 @@ func TestReconcileSkipsRecordedCandidatesAndInsertsBesideLivePending(t *testing.
 	}
 }
 
+func TestReconcileConvertsSameKeyPendingToSettled(t *testing.T) {
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Corner Store", "prime_card", "42.10", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	sameKey := reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)
+	sameKey.TransactionID = "old-auth"
+	sameKey.ProviderAccountID = "bridge-prime_card"
+	directives := Reconcile(nil, []store.SyncPosting{sameKey}, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 1 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("same-key settle = %+v, want one upsert and no void", directives)
+	}
+}
+
 func TestReconcileIgnoresUncoveredAccounts(t *testing.T) {
 	bank := []store.BankRow{reconcileBankRow("uuid-other", "Corner Store", "other_card", "42.10", true, false,
 		pendingKey("other_card", "old-auth"))}
