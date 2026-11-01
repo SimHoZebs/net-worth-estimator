@@ -64,6 +64,47 @@ type SyncCredential struct {
 // Configured reports whether a Bridge key is connected.
 func (c SyncCredential) Configured() bool { return c.AccessURL != "" }
 
+// GmailCredential is the stored per-user Gmail OAuth state. RefreshToken
+// and AccessToken are secrets: they live only in this row and must never
+// leave the server in API payloads or logs. Message contents are never
+// stored here (INT-02 keeps connection state only); INT-03 scans through
+// short-lived access tokens without persisting message bodies.
+type GmailCredential struct {
+	RefreshToken string `json:"-"`
+	AccessToken  string `json:"-"`
+	// AccessExpiryUnix is the access token expiry as Unix seconds, 0 when
+	// no access token is held.
+	AccessExpiryUnix int64 `json:"-"`
+	// EmailAddress is the consented Google account, kept for display so
+	// the user can verify which account granted access.
+	EmailAddress string
+	// Scopes records the granted OAuth scopes for consent audit.
+	Scopes string
+	// ConnectedAt is the RFC3339 connection time, empty when disconnected.
+	ConnectedAt string
+	// PendingState is the in-flight OAuth CSRF state, empty when no
+	// authorization redirect is outstanding. Never exposed.
+	PendingState string `json:"-"`
+	// PendingAtUnix dates the outstanding authorization redirect.
+	PendingAtUnix int64 `json:"-"`
+	// LookbackDays bounds the initial scan window. Defaults to
+	// DefaultGmailLookbackDays on first read.
+	LookbackDays int
+	// LastHistoryID is the Gmail history cursor for incremental scans,
+	// empty until the first scan completes (INT-03).
+	LastHistoryID string
+	// LastScanAt is the last successful scan completion time (RFC3339
+	// UTC), empty until the first scan completes (INT-03).
+	LastScanAt string
+}
+
+// DefaultGmailLookbackDays is the initial Gmail scan lookback both when
+// no preference is stored and when the user resets it.
+const DefaultGmailLookbackDays = 90
+
+// Connected reports whether a Gmail refresh token is stored.
+func (c GmailCredential) Connected() bool { return c.RefreshToken != "" }
+
 type SyncCheckpoint struct {
 	AccountID string
 	Balance   float64
