@@ -26,7 +26,7 @@ func sharingKey(t *testing.T) string {
 
 func grantSplitAccess(t *testing.T, d *Database, owner, posting, audience string) {
 	t.Helper()
-	if _, err := d.GrantSharedPosting(owner, posting, store.SharingAudienceUser, audience); err != nil {
+	if _, err := d.GrantSharedPosting(owner, posting, store.SharingAudienceUser, audience, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }

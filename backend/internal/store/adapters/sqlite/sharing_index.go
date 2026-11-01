@@ -65,7 +65,7 @@ func sharingAuditSchemaStatements() []string {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			actor_user_id TEXT NOT NULL,
-			kind TEXT NOT NULL CHECK (kind IN ('policy-set', 'policy-strip', 'policies-cleared', 'grant', 'revoke', 'exclude', 'unexclude', 'index-rebuild', 'split-created', 'split-updated', 'split-accepted')),
+			kind TEXT NOT NULL CHECK (kind IN ('policy-set', 'policy-strip', 'policies-cleared', 'grant', 'revoke', 'exclude', 'unexclude', 'index-rebuild', 'copy-accepted', 'link-refreshed', 'split-created', 'split-updated', 'split-accepted')),
 			posting_id TEXT NOT NULL DEFAULT '',
 			audience_type TEXT NOT NULL DEFAULT '',
 			audience_id TEXT NOT NULL DEFAULT '',
@@ -78,14 +78,39 @@ func sharingAuditSchemaStatements() []string {
 }
 
 // auditSharingRaw appends one consent audit row inside a raw (Database)
-// transaction. All placeholders are positional.
-func auditSharingRaw(tx *sql.Tx, ownerID, actor, kind, postingID, audienceType, audienceID, groupID, detail string) error {
-	if _, err := tx.Exec(`INSERT INTO sharing_audit(owner_user_id, actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at)
+// transaction. All placeholders are positional. It accepts the shared
+// storage surface so social-operation audit rows commit alongside the
+// mutation whether the caller holds a transaction or the pool handle.
+func auditSharingRaw(db sharingStorage, ownerID, actor, kind, postingID, audienceType, audienceID, groupID, detail string) error {
+	if _, err := db.Exec(`INSERT INTO sharing_audit(owner_user_id, actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		ownerID, actor, kind, postingID, audienceType, audienceID, groupID, detail, time.Now().Unix()); err != nil {
 		return fmt.Errorf("audit sharing %s: %w", kind, err)
 	}
 	return nil
+}
+
+// shareAuditDetail carries the accepted-copy link, the link-refresh
+// outcome status, and the idempotency key inside the landed audit detail
+// payload. Split rows reuse the same shape for the split link, resulting
+// status, and request key. Actions that name none leave their fields
+// empty. It carries identities only, never transaction evidence.
+type shareAuditDetail struct {
+	Link      string `json:"link,omitempty"`
+	Status    string `json:"status,omitempty"`
+	RequestID string `json:"requestId,omitempty"`
+}
+
+// auditShareEvent appends one social-operation audit row through the
+// landed consent shape: actor, kind, owner-scoped target, and audience
+// columns for consent rows, with link, status, and request key inside the
+// detail payload decoded by ListSharingAudit.
+func auditShareEvent(db sharingStorage, ownerID, actor, kind, postingID, audienceType, audienceID, linkID, status, requestID string) error {
+	detail, err := json.Marshal(shareAuditDetail{Link: linkID, Status: status, RequestID: requestID})
+	if err != nil {
+		return err
+	}
+	return auditSharingRaw(db, ownerID, actor, kind, postingID, audienceType, audienceID, "", string(detail))
 }
 
 // auditSharingScoped appends one consent audit row inside a scoped

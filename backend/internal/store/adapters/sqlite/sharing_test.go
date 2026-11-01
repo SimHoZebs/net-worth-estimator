@@ -109,7 +109,7 @@ func TestSharingIsolationSameIDs(t *testing.T) {
 	if _, err := d.ReadSharedPosting(alice, sharingPostingA, bob); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("ungranted read = %v, want not-found", err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	access := checkAccess(t, d, alice, sharingPostingA, bob)
@@ -156,19 +156,19 @@ func TestSharingRevocationKeepsIndependentGrants(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); !access.Allowed || access.Reason != "manual-group" {
 		t.Fatalf("group grant did not survive user-grant revocation: %+v", access)
 	}
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group); err != nil {
+	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); access.Allowed {
@@ -181,14 +181,14 @@ func TestSharingRevocationKeepsIndependentGrants(t *testing.T) {
 		t.Fatalf("revoked list = %+v, %v, want empty", refs, err)
 	}
 	// Revoking a missing grant reports not-found, and grants are idempotent.
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); !errors.Is(err, store.ErrNotFound) {
+	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("double revoke = %v, want not-found", err)
 	}
-	first, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob)
+	first, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob)
+	second, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestSharingGroupMembershipGating(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); !access.Allowed || access.Reason != "manual-group" {
@@ -239,10 +239,10 @@ func TestSharingExclusionMatrix(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob", "carol")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); access.Allowed {
@@ -254,19 +254,19 @@ func TestSharingExclusionMatrix(t *testing.T) {
 	// A grant for an excluded audience is rejected until the exclusion is
 	// removed; an exclusion for a granted audience is rejected until the
 	// grant is revoked.
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); !errors.Is(err, store.ErrGroupInvalid) {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("grant over exclusion = %v, want invalid", err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group); !errors.Is(err, store.ErrGroupInvalid) {
+	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group, sharingKey(t)); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("exclusion over grant = %v, want invalid", err)
 	}
-	if err := d.RemoveSharedExclusion(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RemoveSharedExclusion(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); !access.Allowed {
 		t.Fatal("member denied after exclusion removal")
 	}
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceAll, ""); err != nil {
+	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceAll, "", sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); access.Allowed {
@@ -275,7 +275,7 @@ func TestSharingExclusionMatrix(t *testing.T) {
 	if access := checkAccess(t, d, alice, sharingPostingA, carol); access.Allowed {
 		t.Fatal("wildcard exclusion still authorizes other member")
 	}
-	if err := d.RemoveSharedExclusion(alice, sharingPostingA, store.SharingAudienceAll, ""); err != nil {
+	if err := d.RemoveSharedExclusion(alice, sharingPostingA, store.SharingAudienceAll, "", sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); !access.Allowed {
@@ -294,10 +294,10 @@ func TestSharingGroupExclusionEnforced(t *testing.T) {
 	friends := sharingGroup(t, d, "alice", "Friends", "bob", "carol")
 	club := sharingGroup(t, d, "alice", "Club", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, friends); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, friends, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, club); err != nil {
+	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, club, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	// Bob belongs to both: the exclusion wins over the grant.
@@ -324,10 +324,10 @@ func TestSharingUnknownAudienceNotFound(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	ghost := "user:0000000000000000000000000000000000000000000000000000000000000000"
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, ghost); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, ghost, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("grant unknown user = %v, want not-found", err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, ghost); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, ghost, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("exclude unknown user = %v, want not-found", err)
 	}
 	grants, err := d.ListSharingGrants(alice)
@@ -350,10 +350,10 @@ func TestSharingGroupDeletionPathsClearGrants(t *testing.T) {
 	solo := sharingGroup(t, d, "alice", "Solo")
 	shared := sharingGroup(t, d, "alice", "Shared", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, solo); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, solo, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, shared); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, shared, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	// Sole owner leaving deletes the group and its consent rows.
@@ -394,7 +394,7 @@ func TestSharingDeleteGroupClearsGrants(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.DeleteGroup(group, alice); err != nil {
@@ -419,10 +419,10 @@ func TestSharingRecipientDeleteDropsProvenance(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,19 +458,19 @@ func TestSharingForgedIDsFailClosed(t *testing.T) {
 			t.Fatalf("forged read = %v, want not-found", err)
 		}
 	}
-	if _, err := d.GrantSharedPosting(alice, "01900000-0000-7000-8000-0000000000ff", store.SharingAudienceUser, bob); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.GrantSharedPosting(alice, "01900000-0000-7000-8000-0000000000ff", store.SharingAudienceUser, bob, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("grant unknown posting = %v, want not-found", err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, "01900000-0000-7000-8000-0000000000ff"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, "01900000-0000-7000-8000-0000000000ff", sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("grant unknown group = %v, want not-found", err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, "friend", bob); !errors.Is(err, store.ErrGroupInvalid) {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, "friend", bob, sharingKey(t)); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("grant unknown audience = %v, want invalid", err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceAll, ""); !errors.Is(err, store.ErrGroupInvalid) {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceAll, "", sharingKey(t)); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("wildcard grant = %v, want invalid", err)
 	}
-	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceAll, "bob"); !errors.Is(err, store.ErrGroupInvalid) {
+	if _, err := d.ExcludeSharedPosting(alice, sharingPostingA, store.SharingAudienceAll, "bob", sharingKey(t)); !errors.Is(err, store.ErrGroupInvalid) {
 		t.Fatalf("wildcard with ID = %v, want invalid", err)
 	}
 }
@@ -483,10 +483,10 @@ func TestSharingCopySurvivesRevocation(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	source := sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +499,7 @@ func TestSharingCopySurvivesRevocation(t *testing.T) {
 	if copied.Claim != nil {
 		t.Fatal("copy kept the owner-scoped claim")
 	}
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if access := checkAccess(t, d, alice, sharingPostingA, bob); access.Allowed {
@@ -537,7 +537,7 @@ func TestSharingCopyClearsUnknownSourceAccount(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	bobScoped, err := d.User(bob)
@@ -547,7 +547,7 @@ func TestSharingCopyClearsUnknownSourceAccount(t *testing.T) {
 	if err := bobScoped.DeleteAccount("checking"); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,10 +565,10 @@ func TestSharingDeleteAndClearRemoveConsent(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	sharingPosting(t, storeA, sharingPostingB)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.GrantSharedPosting(alice, sharingPostingB, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingB, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if err := storeA.DeletePosting(sharingPostingA); err != nil {
@@ -608,7 +608,7 @@ func TestSharingCopyDeniedWithoutGrant(t *testing.T) {
 	alice, storeA := sharingUser(t, d, "alice")
 	bob, _ := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
-	if _, err := d.CopySharedPosting(alice, sharingPostingA, bob); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("ungranted copy = %v, want not-found", err)
 	}
 	if !strings.HasPrefix(alice, "user:") || !strings.HasPrefix(bob, "user:") {

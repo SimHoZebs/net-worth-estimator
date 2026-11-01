@@ -97,7 +97,7 @@ func feedSetup(t *testing.T) (*sharing.Handler, store.Database, string, string, 
 func TestGroupFeedEndpoint(t *testing.T) {
 	h, db, alice, group, _ := feedSetup(t)
 	for _, id := range []string{feedGroupPostingA, feedGroupPostingB, feedGroupPostingC} {
-		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group); err != nil {
+		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -133,7 +133,7 @@ func TestGroupFeedEndpoint(t *testing.T) {
 func TestGroupFeedFilters(t *testing.T) {
 	h, db, alice, group, aliceResource := feedSetup(t)
 	for _, id := range []string{feedGroupPostingA, feedGroupPostingB} {
-		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group); err != nil {
+		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -176,7 +176,7 @@ func TestGroupFeedFilters(t *testing.T) {
 // fail closed without revealing group visibility.
 func TestGroupFeedClosedToOutsiders(t *testing.T) {
 	h, db, alice, group, _ := feedSetup(t)
-	if _, err := db.GrantSharedPosting(alice, feedGroupPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := db.GrantSharedPosting(alice, feedGroupPostingA, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	mustUser(t, db, "carol")
@@ -200,11 +200,11 @@ func TestGroupFeedClosedToOutsiders(t *testing.T) {
 func TestGroupFeedExclusionsTotals(t *testing.T) {
 	h, db, alice, group, _ := feedSetup(t)
 	for _, id := range []string{feedGroupPostingA, feedGroupPostingB} {
-		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group); err != nil {
+		if _, err := db.GrantSharedPosting(alice, id, store.SharingAudienceGroup, group, testRequestKey(t)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.ExcludeSharedPosting(alice, feedGroupPostingA, store.SharingAudienceUser, mustUserID(t, db, "bob")); err != nil {
+	if _, err := db.ExcludeSharedPosting(alice, feedGroupPostingA, store.SharingAudienceUser, mustUserID(t, db, "bob"), testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	code, response := getFeed(t, h, "/v1/shared/groups/"+group+"/feed", "bob")

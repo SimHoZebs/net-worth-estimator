@@ -407,21 +407,46 @@ type InboxShareItem struct {
 	Posting           *types.Posting `json:"posting,omitempty"`
 }
 
+// Social audit actions for accepted copies and link refreshes. Consent
+// actions reuse the landed sharing_audit kinds ('grant', 'revoke',
+// 'exclude', 'unexclude'); splits reuse their own hyphenated kinds.
+const (
+	SharingAuditCopyAccepted  = "copy-accepted"
+	SharingAuditLinkRefreshed = "link-refreshed"
+)
+
 // SharingAuditEvent is one committed cross-user change: who acted, what
-// they did, which owner-scoped transaction it targets, and when. Link,
-// Status, and RequestID carry the split-audit detail (split link,
-// resulting status, idempotency key) and stay empty for consent actions.
-// The event never carries transaction evidence.
+// they did, which owner-scoped transaction it targets, and when.
+// Audience names the consent target for grant/revoke/exclude/unexclude
+// rows. Link, Status, and RequestID decode from the audit detail payload:
+// the accepted-copy link, the link-refresh outcome, and the idempotency
+// key that executed the mutation. Consent rows carry the key; split rows
+// carry link, status, and key. The event never carries transaction
+// evidence.
 type SharingAuditEvent struct {
 	Seq         int64  `json:"seq"`
 	ActorUserID string `json:"actorUserId"`
 	Action      string `json:"action"`
 	OwnerUserID string `json:"ownerUserId"`
 	PostingID   string `json:"postingId"`
+	Audience    string `json:"audienceType,omitempty"`
+	AudienceID  string `json:"audienceId,omitempty"`
 	LinkID      string `json:"linkId,omitempty"`
 	Status      string `json:"status,omitempty"`
 	RequestID   string `json:"requestId,omitempty"`
 	CreatedAt   int64  `json:"createdAt"`
+}
+
+// SharingRevocation names one removed consent row: the owner-scoped
+// transaction plus the audience it no longer covers. It is the recorded
+// outcome of a revoke or exclusion-removal request, so retries replay it.
+// It carries identities only, never transaction evidence.
+type SharingRevocation struct {
+	OwnerUserID string `json:"ownerUserId"`
+	PostingID   string `json:"postingId"`
+	Audience    string `json:"audienceType"`
+	AudienceID  string `json:"audienceId"`
+	Intent      string `json:"intent"`
 }
 
 // Feed audience types naming one path through which the viewer is

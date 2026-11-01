@@ -35,10 +35,10 @@ func TestSharingLinkIdentities(t *testing.T) {
 	bob, _ := sharingUser(t, d, "bob")
 	source := sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,14 +116,14 @@ func TestSharingCopyIdempotent(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	first, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	first, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	second, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,10 +156,10 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	refreshed, err := d.RefreshSharingLink(bob, copied.ID)
+	refreshed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 	if _, err := storeA.UpdatePosting(source); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := d.RefreshSharingLink(bob, copied.ID)
+	changed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestSharingRefreshKeepsRecipientEdits(t *testing.T) {
 	if link := sharingLink(t, d, bob, copied.ID); link.SourceRevision != changed.CurrentSourceRevision {
 		t.Fatalf("link revision = %q, want recorded %q", link.SourceRevision, changed.CurrentSourceRevision)
 	}
-	settled, err := d.RefreshSharingLink(bob, copied.ID)
+	settled, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,10 +235,10 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,10 +251,10 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RevokeSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	revoked, err := d.RefreshSharingLink(bob, copied.ID)
+	revoked, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,10 +276,10 @@ func TestSharingRefreshAcrossRevocation(t *testing.T) {
 	}
 
 	// Re-grant heals the same link: no new identity, revision current.
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	healed, err := d.RefreshSharingLink(bob, copied.ID)
+	healed, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,10 +309,10 @@ func TestSharingCopyOfBankPostingMintsNoDuplicate(t *testing.T) {
 		}
 	}
 
-	if _, err := d.GrantSharedPosting(alice, sharingBankPosting, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingBankPosting, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingBankPosting, bob)
+	copied, err := d.CopySharedPosting(alice, sharingBankPosting, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestSharingCopyOfBankPostingMintsNoDuplicate(t *testing.T) {
 	if err := d.SQL().QueryRow(`SELECT COUNT(*) FROM posting_sync_keys WHERE posting_id = ?`, copied.ID).Scan(&keys); err != nil || keys != 0 {
 		t.Fatalf("copy sync keys = %d, %v, want 0", keys, err)
 	}
-	if again, err := d.CopySharedPosting(alice, sharingBankPosting, bob); err != nil || again.ID != copied.ID {
+	if again, err := d.CopySharedPosting(alice, sharingBankPosting, bob, sharingKey(t)); err != nil || again.ID != copied.ID {
 		t.Fatalf("repeat bank accept = %q, %v, want existing %q", again.ID, err, copied.ID)
 	}
 	for name, tc := range map[string]struct {
@@ -356,10 +356,10 @@ func TestSharingLinkGroupGrantAudience(t *testing.T) {
 	sharingPosting(t, storeA, sharingPostingA)
 	groupID := sharingGroup(t, d, "alice", "roommates", "bob")
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, groupID); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceGroup, groupID, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,10 +379,10 @@ func TestSharingRefreshAfterSourceDelete(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestSharingRefreshAfterSourceDelete(t *testing.T) {
 	if _, err := d.GetSharingLink(bob, copied.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("deleted-source link lookup = %v, want not-found", err)
 	}
-	if _, err := d.RefreshSharingLink(bob, copied.ID); !errors.Is(err, store.ErrNotFound) {
+	if _, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("deleted-source refresh = %v, want not-found", err)
 	}
 }
@@ -414,10 +414,10 @@ func TestSharingRefreshSourceGoneOutOfBand(t *testing.T) {
 	bob, storeB := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, sharingPostingA)
 
-	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob); err != nil {
+	if _, err := d.GrantSharedPosting(alice, sharingPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, sharingPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func TestSharingRefreshSourceGoneOutOfBand(t *testing.T) {
 	if _, err := d.SQL().Exec(`DELETE FROM postings WHERE user_id = ? AND id = ?`, alice, sharingPostingA); err != nil {
 		t.Fatal(err)
 	}
-	gone, err := d.RefreshSharingLink(bob, copied.ID)
+	gone, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestSharingRefreshSourceGoneOutOfBand(t *testing.T) {
 	if len(model.Postings) != 1 || model.Postings[0].ID != copied.ID {
 		t.Fatalf("source loss touched the recipient copy: %+v", model.Postings)
 	}
-	again, err := d.RefreshSharingLink(bob, copied.ID)
+	again, err := d.RefreshSharingLink(bob, copied.ID, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}

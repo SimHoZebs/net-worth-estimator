@@ -646,18 +646,8 @@ func clearSplitsForUser(tx *userTx) error {
 	return nil
 }
 
-// splitAuditDetail carries the split link, resulting status, and request
-// key inside the consent audit's detail payload. Split rows reuse the
-// landed sharing_audit shape (owner scope, kind, detail JSON) instead of
-// a parallel audit table.
-type splitAuditDetail struct {
-	Link      string `json:"link"`
-	Status    string `json:"status"`
-	RequestID string `json:"requestId"`
-}
-
 func auditSplitEvent(tx *sql.Tx, actorID, ownerID, action, postingID, splitID, status, requestID string) error {
-	detail, err := json.Marshal(splitAuditDetail{Link: splitID, Status: status, RequestID: requestID})
+	detail, err := json.Marshal(shareAuditDetail{Link: splitID, Status: status, RequestID: requestID})
 	if err != nil {
 		return err
 	}
@@ -665,15 +655,17 @@ func auditSplitEvent(tx *sql.Tx, actorID, ownerID, action, postingID, splitID, s
 }
 
 // ListSharingAudit returns the committed cross-user changes for one
-// owner-scoped posting in sequence order, including split-created,
-// split-updated, and split-accepted rows. Audit reads are owner-scoped
-// like grant lists. Split link, status, and request-key fields decode
-// from the audit detail payload; other actions leave them empty.
+// owner-scoped posting in sequence order: consent rows (grant, revoke,
+// exclude, unexclude), accepted-copy and link-refresh rows, and
+// split-created, split-updated, and split-accepted rows. Audit reads are
+// owner-scoped like grant lists. Audience columns populate the consent
+// target; link, status, and request-key fields decode from the audit
+// detail payload, which other actions leave empty.
 func (d *Database) ListSharingAudit(ownerID, postingID string) ([]store.SharingAuditEvent, error) {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return nil, fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
 	}
-	rows, err := d.db.Query(`SELECT id, actor_user_id, kind, owner_user_id, posting_id, group_id, detail_json, created_at FROM sharing_audit WHERE owner_user_id = ? AND posting_id = ? ORDER BY id`,
+	rows, err := d.db.Query(`SELECT id, actor_user_id, kind, owner_user_id, posting_id, audience_type, audience_id, group_id, detail_json, created_at FROM sharing_audit WHERE owner_user_id = ? AND posting_id = ? ORDER BY id`,
 		ownerID, postingID)
 	if err != nil {
 		return nil, err
@@ -684,10 +676,10 @@ func (d *Database) ListSharingAudit(ownerID, postingID string) ([]store.SharingA
 		var event store.SharingAuditEvent
 		var groupID, detail string
 		if err := rows.Scan(&event.Seq, &event.ActorUserID, &event.Action, &event.OwnerUserID, &event.PostingID,
-			&groupID, &detail, &event.CreatedAt); err != nil {
+			&event.Audience, &event.AudienceID, &groupID, &detail, &event.CreatedAt); err != nil {
 			return nil, err
 		}
-		var decoded splitAuditDetail
+		var decoded shareAuditDetail
 		if err := json.Unmarshal([]byte(detail), &decoded); err == nil {
 			event.LinkID, event.Status, event.RequestID = decoded.Link, decoded.Status, decoded.RequestID
 		}

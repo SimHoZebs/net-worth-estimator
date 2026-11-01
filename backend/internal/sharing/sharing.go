@@ -25,6 +25,14 @@
 // and source state. Refresh records its outcome on the link row and never
 // rewrites the copy, so source changes surface only while authorized and
 // the copy survives revocation.
+//
+// Every mutating social request carries a client-generated UUID request
+// ID (`requestId` in the JSON body): retries replay the recorded outcome
+// byte-for-byte, key reuse across actions fails with 409, and failed
+// attempts never consume the key. The refresh route accepts an optional
+// `requestId` body and mints a server key when none travels. Committed
+// mutations append one identity-only audit row each, readable by the
+// source owner at GET /v1/shared/audit; there is no audience-side read.
 package sharing
 
 import (
@@ -72,6 +80,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("/v1/shared/exclusions", h.serveExclusions)
 	mux.HandleFunc("/v1/shared/copies", h.serveCopies)
 	mux.HandleFunc("/v1/shared/copies/", h.serveCopyLink)
+	mux.HandleFunc("/v1/shared/audit", h.serveAudit)
 	mux.HandleFunc("/v1/shared/postings", h.serveSharedList)
 	mux.HandleFunc("/v1/shared/postings/", h.serveSharedRead)
 	mux.HandleFunc("/v1/shared/policies/", h.servePolicies)
@@ -92,15 +101,20 @@ func writeProblem(w http.ResponseWriter, status int, detail string) {
 }
 
 // writeStoreError maps store results to the status contract. Validation
-// messages are safe to show; anything else becomes a generic 503 without
-// internals. Denied and missing reads both map to 404 upstream: the store
-// reports ErrNotFound for either so existence is not enumerable.
+// messages are safe to show; conflicts carry no identities and are safe
+// to show; anything else becomes a generic 503 without internals. Denied
+// and missing reads both map to 404 upstream: the store reports ErrNotFound
+// for either so existence is not enumerable. Conflict (409) carries no
+// problem code, so unlike RESOURCE_CHANGED it never triggers session
+// discovery.
 func writeStoreError(w http.ResponseWriter, err error, notFound string) {
 	switch {
 	case err == nil:
 		return
 	case errors.Is(err, store.ErrGroupForbidden):
 		writeProblem(w, http.StatusForbidden, "This action is not permitted for shared transactions.")
+	case errors.Is(err, store.ErrSharingConflict):
+		writeProblem(w, http.StatusConflict, err.Error())
 	case errors.Is(err, store.ErrNotFound), store.IsNotFound(err):
 		writeProblem(w, http.StatusNotFound, notFound)
 	case errors.Is(err, store.ErrGroupInvalid):
@@ -144,6 +158,7 @@ type grantInput struct {
 	PostingID    string `json:"postingId"`
 	AudienceType string `json:"audienceType"`
 	AudienceID   string `json:"audienceId"`
+	RequestID    string `json:"requestId"`
 }
 
 func decodeGrantInput(body []byte) (grantInput, error) {
@@ -154,6 +169,7 @@ func decodeGrantInput(body []byte) (grantInput, error) {
 	input.PostingID = strings.TrimSpace(input.PostingID)
 	input.AudienceType = strings.TrimSpace(input.AudienceType)
 	input.AudienceID = strings.TrimSpace(input.AudienceID)
+	input.RequestID = strings.TrimSpace(input.RequestID)
 	return input, nil
 }
 
@@ -185,7 +201,7 @@ func (h *Handler) serveGrants(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		grant, err := h.db.GrantSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID)
+		grant, err := h.db.GrantSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID)
 		if err != nil {
 			writeStoreError(w, err, "Transaction not found.")
 			return
@@ -205,7 +221,7 @@ func (h *Handler) serveGrants(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		if err := h.db.RevokeSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID); err != nil {
+		if err := h.db.RevokeSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID); err != nil {
 			writeStoreError(w, err, "Grant not found.")
 			return
 		}
@@ -237,7 +253,7 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		exclusion, err := h.db.ExcludeSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID)
+		exclusion, err := h.db.ExcludeSharedPosting(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID)
 		if err != nil {
 			writeStoreError(w, err, "Transaction not found.")
 			return
@@ -257,7 +273,7 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
 			return
 		}
-		if err := h.db.RemoveSharedExclusion(owner, input.PostingID, input.AudienceType, input.AudienceID); err != nil {
+		if err := h.db.RemoveSharedExclusion(owner, input.PostingID, input.AudienceType, input.AudienceID, input.RequestID); err != nil {
 			writeStoreError(w, err, "Exclusion not found.")
 			return
 		}
@@ -266,6 +282,35 @@ func (h *Handler) serveExclusions(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", "POST, DELETE")
 		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
 	}
+}
+
+// serveAudit returns the committed cross-user changes for one of the
+// caller's own postings in sequence order. The caller is always the
+// source owner: a cross-owner query returns an empty trace, never another
+// owner's history. Events carry actor, action, target identities, link,
+// outcome status, request key, and time only, never transaction evidence.
+func (h *Handler) serveAudit(w http.ResponseWriter, r *http.Request) {
+	owner, _, ok := h.caller(r)
+	if !ok {
+		writeProblem(w, http.StatusUnauthorized, "Sign in to view sharing history.")
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		writeProblem(w, http.StatusMethodNotAllowed, "Method not allowed.")
+		return
+	}
+	postingID := strings.TrimSpace(r.URL.Query().Get("postingId"))
+	if postingID == "" {
+		writeProblem(w, http.StatusBadRequest, "A posting ID is required to view sharing history.")
+		return
+	}
+	events, err := h.db.ListSharingAudit(owner, postingID)
+	if err != nil {
+		writeStoreError(w, err, "Sharing history not found.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"audit": events})
 }
 
 func (h *Handler) serveSharedList(w http.ResponseWriter, r *http.Request) {
@@ -444,6 +489,7 @@ func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Owner     string `json:"owner"`
 		PostingID string `json:"postingId"`
+		RequestID string `json:"requestId"`
 	}
 	if err := json.Unmarshal(body, &input); err != nil {
 		writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
@@ -461,7 +507,7 @@ func (h *Handler) serveCopies(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusServiceUnavailable, "Shared transaction storage is temporarily unavailable.")
 		return
 	}
-	copied, err := h.db.CopySharedPosting(owner, strings.TrimSpace(input.PostingID), requester)
+	copied, err := h.db.CopySharedPosting(owner, strings.TrimSpace(input.PostingID), requester, strings.TrimSpace(input.RequestID))
 	if err != nil {
 		writeStoreError(w, err, "Shared transaction not found.")
 		return
@@ -512,7 +558,28 @@ func (h *Handler) serveCopyLink(w http.ResponseWriter, r *http.Request) {
 		if h.locked(w, r) {
 			return
 		}
-		refreshed, err := h.db.RefreshSharingLink(recipient, copyID)
+		body, err := readBody(w, r, 1<<16)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
+			return
+		}
+		// Refresh accepts an optional client request ID for idempotent
+		// retry; callers without one execute under a fresh server key.
+		requestID := ""
+		if strings.TrimSpace(string(body)) != "" {
+			var input struct {
+				RequestID string `json:"requestId"`
+			}
+			if err := json.Unmarshal(body, &input); err != nil {
+				writeProblem(w, http.StatusBadRequest, "The sharing request is invalid.")
+				return
+			}
+			requestID = strings.TrimSpace(input.RequestID)
+		}
+		if requestID == "" {
+			requestID = uuid.NewString()
+		}
+		refreshed, err := h.db.RefreshSharingLink(recipient, copyID, requestID)
 		if err != nil {
 			writeStoreError(w, err, "Shared transaction link not found.")
 			return

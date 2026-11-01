@@ -317,6 +317,14 @@ CGO_ENABLED=0 go -C backend test ./internal/store/ ./internal/store/adapters/sql
 go -C backend test -race ./internal/store/adapters/sqlite/ -run 'TestSettlementConcurrent' -count=1
 ```
 
+Social-operation audit and idempotency (FND-05) live in the sharing suites,
+including the race detector over the concurrent accept storm:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/store/adapters/sqlite/ ./internal/sharing/ -run 'Sharing' -count=1
+go -C backend test -race ./internal/store/adapters/sqlite/ ./internal/sharing/ -run 'SharingDoubleAccept|SharingConcurrent' -count=1
+```
+
 `backend/scripts/verify.sh` sets `CGO_ENABLED=0` and runs:
 
 1. `gofmt` check;

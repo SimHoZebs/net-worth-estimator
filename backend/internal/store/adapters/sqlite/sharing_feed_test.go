@@ -23,7 +23,7 @@ func feedFixture(t *testing.T) (*Database, string, string, store.Store, store.St
 
 func feedGrant(t *testing.T, d *Database, owner, posting, audienceType, audienceID string) {
 	t.Helper()
-	if _, err := d.GrantSharedPosting(owner, posting, audienceType, audienceID); err != nil {
+	if _, err := d.GrantSharedPosting(owner, posting, audienceType, audienceID, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -139,7 +139,7 @@ func TestGroupFeedHonorsExclusions(t *testing.T) {
 			group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
 			sharingPosting(t, storeA, feedPostingA)
 			feedGrant(t, d, alice, feedPostingA, tc.grantType, tc.grantID(group, bob))
-			if _, err := d.ExcludeSharedPosting(alice, feedPostingA, tc.excludeType, tc.excludeID(group, bob)); err != nil {
+			if _, err := d.ExcludeSharedPosting(alice, feedPostingA, tc.excludeType, tc.excludeID(group, bob), sharingKey(t)); err != nil {
 				t.Fatal(err)
 			}
 			if items := feedItems(t, d, bob, group); len(items) != 0 {

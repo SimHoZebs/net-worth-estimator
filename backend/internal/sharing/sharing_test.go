@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
@@ -108,8 +109,26 @@ func resourceOf(user string) string {
 	return "users/" + strings.TrimPrefix(user, "user:")
 }
 
-func grantBody(postingID, audienceType, audienceID string) string {
-	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID})
+func grantBody(t *testing.T, postingID, audienceType, audienceID string) string {
+	out, _ := json.Marshal(map[string]string{"postingId": postingID, "audienceType": audienceType, "audienceId": audienceID, "requestId": testRequestKey(t)})
+	return string(out)
+}
+
+// testRequestKey mints one fresh client request ID per call. Bodies built
+// by grantBody and copyBody each carry their own key, so sequential
+// mutations execute as distinct requests; replay tests pass one key
+// twice explicitly.
+func testRequestKey(t *testing.T) string {
+	t.Helper()
+	id, err := uuid.NewV7()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id.String()
+}
+
+func copyBody(t *testing.T, owner, postingID string) string {
+	out, _ := json.Marshal(map[string]string{"owner": owner, "postingId": postingID, "requestId": testRequestKey(t)})
 	return string(out)
 }
 
@@ -123,6 +142,7 @@ func TestSharingRoutesClaimedByIdentity(t *testing.T) {
 		"/v1/shared/copies",
 		"/v1/shared/copies/" + sharedPostingID + "/link",
 		"/v1/shared/copies/" + sharedPostingID + "/refresh",
+		"/v1/shared/audit",
 		"/v1/shared/postings",
 		"/v1/shared/postings/users/abc/" + sharedPostingID,
 		"/v1/shared/policies/01900000-0000-7000-8000-0000000000c1",
@@ -154,6 +174,7 @@ func TestSharingHTTPRequiresAuthentication(t *testing.T) {
 		{"GET", "/v1/shared/postings", ""},
 		{"GET", "/v1/shared/postings/users/abc/" + sharedPostingID, ""},
 		{"POST", "/v1/shared/copies", `{"owner":"users/abc"}`},
+		{"GET", "/v1/shared/audit", ""},
 		{"GET", "/v1/shared/copies/" + sharedPostingID + "/link", ""},
 		{"POST", "/v1/shared/copies/" + sharedPostingID + "/refresh", ""},
 		{"GET", "/v1/shared/policies/01900000-0000-7000-8000-0000000000c1", ""},
@@ -176,7 +197,7 @@ func TestSharingHTTPGrantReadRevoke(t *testing.T) {
 	bob, _ := mustUser(t, db, "bob")
 	mustPosting(t, storeA, sharedPostingID)
 
-	w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", bob))
+	w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob))
 	if w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d (%s), want 201", w.Code, w.Body.String())
 	}
@@ -199,7 +220,7 @@ func TestSharingHTTPGrantReadRevoke(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), sharedPostingID) {
 		t.Fatalf("shared list = %d (%s), want entry", w.Code, w.Body.String())
 	}
-	w = do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", bob))
+	w = do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", bob))
 	if w.Code != http.StatusOK {
 		t.Fatalf("revoke = %d (%s), want 200", w.Code, w.Body.String())
 	}
@@ -225,7 +246,7 @@ func TestSharingHTTPOnlySourceOwnerGrants(t *testing.T) {
 
 	// Bob is a group member but owns no such posting: the grant fails
 	// closed and shares nothing of Alice's.
-	w := do(t, h, "POST", "/v1/shared/grants", "bob", grantBody(sharedPostingID, "group", mustGroupID(t, db, "alice")))
+	w := do(t, h, "POST", "/v1/shared/grants", "bob", grantBody(t, sharedPostingID, "group", mustGroupID(t, db, "alice")))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("admin grant for another member = %d (%s), want 404", w.Code, w.Body.String())
 	}
@@ -405,7 +426,7 @@ func TestSharingHTTPForgedAndStaleDeny(t *testing.T) {
 	mustPosting(t, storeA, sharedPostingID)
 	group := mustGroup(t, db, "alice", "bob")
 
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "group", group)); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "group", group)); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
 	valid := "/v1/shared/postings/" + resourceOf(alice) + "/" + sharedPostingID
@@ -471,7 +492,7 @@ func TestSharingHTTPDeferredSourceWrites(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	mustUser(t, db, "bob")
 	mustPosting(t, storeA, sharedPostingID)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
 	target := "/v1/shared/postings/" + resourceOf(alice) + "/" + sharedPostingID
@@ -506,7 +527,7 @@ func TestSharingHTTPReadOnlyRejectsWrites(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	mustUser(t, db, "bob")
 	mustPosting(t, storeA, sharedPostingID)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
 	ro := sharing.New(db, testIssuer, sharing.Config{ReadOnly: true})
@@ -515,9 +536,9 @@ func TestSharingHTTPReadOnlyRejectsWrites(t *testing.T) {
 		t.Fatalf("read-only read = %d, want 200", w.Code)
 	}
 	for _, route := range []struct{ method, target, body string }{
-		{"POST", "/v1/shared/grants", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))},
-		{"DELETE", "/v1/shared/grants", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))},
-		{"POST", "/v1/shared/exclusions", grantBody(sharedPostingID, "all", "")},
+		{"POST", "/v1/shared/grants", grantBody(t, sharedPostingID, "user", mustID(t, db, "bob"))},
+		{"DELETE", "/v1/shared/grants", grantBody(t, sharedPostingID, "user", mustID(t, db, "bob"))},
+		{"POST", "/v1/shared/exclusions", grantBody(t, sharedPostingID, "all", "")},
 		{"POST", "/v1/shared/copies", `{"owner":"` + resourceOf(alice) + `","postingId":"` + sharedPostingID + `"}`},
 		{"POST", "/v1/shared/copies/" + sharedPostingID + "/refresh", ""},
 	} {
@@ -534,11 +555,11 @@ func TestSharingHTTPCopyIndependent(t *testing.T) {
 	alice, storeA := mustUser(t, db, "alice")
 	_, storeB := mustUser(t, db, "bob")
 	mustPosting(t, storeA, sharedPostingID)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	copyBody, _ := json.Marshal(map[string]string{"owner": resourceOf(alice), "postingId": sharedPostingID})
-	w := do(t, h, "POST", "/v1/shared/copies", "bob", string(copyBody))
+	acceptBody := copyBody(t, resourceOf(alice), sharedPostingID)
+	w := do(t, h, "POST", "/v1/shared/copies", "bob", acceptBody)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("copy = %d (%s), want 201", w.Code, w.Body.String())
 	}
@@ -551,7 +572,7 @@ func TestSharingHTTPCopyIndependent(t *testing.T) {
 	if copied.Posting.ID == "" || copied.Posting.ID == sharedPostingID {
 		t.Fatalf("copy kept source identity %q", copied.Posting.ID)
 	}
-	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grantBody(t, sharedPostingID, "user", mustID(t, db, "bob"))); w.Code != http.StatusOK {
 		t.Fatalf("revoke = %d, want 200", w.Code)
 	}
 	model, err := storeB.LoadModel()
@@ -580,11 +601,11 @@ func TestSharingHTTPCopySeedsRecipientModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustPosting(t, storeA, sharedPostingID)
-	if _, err := db.GrantSharedPosting(alice, sharedPostingID, store.SharingAudienceUser, bob); err != nil {
+	if _, err := db.GrantSharedPosting(alice, sharedPostingID, store.SharingAudienceUser, bob, testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	copyBody, _ := json.Marshal(map[string]string{"owner": resourceOf(alice), "postingId": sharedPostingID})
-	w := do(t, h, "POST", "/v1/shared/copies", "bob", string(copyBody))
+	acceptBody := copyBody(t, resourceOf(alice), sharedPostingID)
+	w := do(t, h, "POST", "/v1/shared/copies", "bob", acceptBody)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("copy = %d (%s), want 201", w.Code, w.Body.String())
 	}
@@ -609,27 +630,27 @@ func TestSharingHTTPGrantExclusionConflicts(t *testing.T) {
 	bob := mustID(t, db, "bob")
 	mustPosting(t, storeA, sharedPostingID)
 
-	grant := grantBody(sharedPostingID, "user", bob)
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant); w.Code != http.StatusCreated {
+	grant := func() string { return grantBody(t, sharedPostingID, "user", bob) }
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant()); w.Code != http.StatusCreated {
 		t.Fatalf("grant = %d, want 201", w.Code)
 	}
-	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grant)
+	w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grant())
 	if w.Code != http.StatusBadRequest || strings.Contains(w.Body.String(), "sql:") {
 		t.Fatalf("exclusion over grant = %d (%s), want safe 400", w.Code, w.Body.String())
 	}
-	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grant); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/grants", "alice", grant()); w.Code != http.StatusOK {
 		t.Fatalf("revoke = %d, want 200", w.Code)
 	}
-	if w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grant); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/exclusions", "alice", grant()); w.Code != http.StatusCreated {
 		t.Fatalf("exclusion = %d (%s), want 201", w.Code, w.Body.String())
 	}
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant); w.Code != http.StatusBadRequest {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant()); w.Code != http.StatusBadRequest {
 		t.Fatalf("grant over exclusion = %d, want 400", w.Code)
 	}
-	if w := do(t, h, "DELETE", "/v1/shared/exclusions", "alice", grant); w.Code != http.StatusOK {
+	if w := do(t, h, "DELETE", "/v1/shared/exclusions", "alice", grant()); w.Code != http.StatusOK {
 		t.Fatalf("remove exclusion = %d, want 200", w.Code)
 	}
-	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant); w.Code != http.StatusCreated {
+	if w := do(t, h, "POST", "/v1/shared/grants", "alice", grant()); w.Code != http.StatusCreated {
 		t.Fatalf("re-grant = %d, want 201", w.Code)
 	}
 	w = do(t, h, "POST", "/v1/shared/grants", "alice", `{"postingId":`)

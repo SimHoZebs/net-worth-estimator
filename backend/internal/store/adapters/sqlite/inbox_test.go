@@ -38,7 +38,7 @@ func reopenInboxTestDB(t *testing.T, d *Database, path string) *Database {
 
 func grantToUser(t *testing.T, d *Database, owner, posting, recipient string) {
 	t.Helper()
-	if _, err := d.GrantSharedPosting(owner, posting, store.SharingAudienceUser, recipient); err != nil {
+	if _, err := d.GrantSharedPosting(owner, posting, store.SharingAudienceUser, recipient, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -156,7 +156,7 @@ func TestInboxAcceptAdoptsExistingCopy(t *testing.T) {
 	grantToUser(t, d, alice, inboxPostingA, bob)
 
 	before := len(recipientPostings(t, d, bob))
-	copied, err := d.CopySharedPosting(alice, inboxPostingA, bob)
+	copied, err := d.CopySharedPosting(alice, inboxPostingA, bob, sharingKey(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestInboxDeclineGroupShareKeepsGrant(t *testing.T) {
 	bob, _ := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, inboxPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -259,7 +259,7 @@ func TestInboxStandingGroupDeclineStaysDeclined(t *testing.T) {
 	bob, _ := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, inboxPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.DeclineInboxShare(bob, alice, inboxPostingA); err != nil {
@@ -283,7 +283,7 @@ func TestInboxFreshGroupGrantReopensDeclined(t *testing.T) {
 	bob, _ := sharingUser(t, d, "bob")
 	sharingPosting(t, storeA, inboxPostingA)
 	first := sharingGroup(t, d, "alice", "First", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, first); err != nil {
+	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, first, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.DeclineInboxShare(bob, alice, inboxPostingA); err != nil {
@@ -291,7 +291,7 @@ func TestInboxFreshGroupGrantReopensDeclined(t *testing.T) {
 	}
 	time.Sleep(1100 * time.Millisecond)
 	second := sharingGroup(t, d, "alice", "Second", "bob")
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, second); err != nil {
+	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, second, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	items, err := d.ListInboxItems(bob)
@@ -348,10 +348,10 @@ func TestInboxCanceledOnRevoke(t *testing.T) {
 	if _, err := d.ListInboxItems(bob); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(alice, inboxPostingA, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RevokeSharedPosting(alice, inboxPostingA, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.RevokeSharedPosting(carol, inboxPostingB, store.SharingAudienceUser, bob); err != nil {
+	if err := d.RevokeSharedPosting(carol, inboxPostingB, store.SharingAudienceUser, bob, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -542,7 +542,7 @@ func TestWithdrawUserGrant(t *testing.T) {
 	sharingPosting(t, storeA, inboxPostingA)
 	group := sharingGroup(t, d, "alice", "Club", "bob")
 	grantToUser(t, d, alice, inboxPostingA, bob)
-	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group); err != nil {
+	if _, err := d.GrantSharedPosting(alice, inboxPostingA, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
 		t.Fatal(err)
 	}
 

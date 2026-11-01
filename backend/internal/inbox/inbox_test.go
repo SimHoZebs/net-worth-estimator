@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
@@ -19,6 +20,15 @@ import (
 const testIssuer = "https://issuer.test"
 const inboxPostingID = "01900000-0000-7000-8000-0000000000d1"
 const inboxPostingID2 = "01900000-0000-7000-8000-0000000000d2"
+
+func testRequestKey(t *testing.T) string {
+	t.Helper()
+	id, err := uuid.NewV7()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id.String()
+}
 
 func testHandler(t *testing.T, readOnly bool) (*inbox.Handler, store.Database) {
 	t.Helper()
@@ -89,7 +99,7 @@ func shareBody(owner, postingID string) string {
 
 func grant(t *testing.T, db store.Database, owner, posting, audienceType, audienceID string) {
 	t.Helper()
-	if _, err := db.GrantSharedPosting(owner, posting, audienceType, audienceID); err != nil {
+	if _, err := db.GrantSharedPosting(owner, posting, audienceType, audienceID, testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -225,7 +235,7 @@ func TestInboxHTTPAcceptDeclineCancel(t *testing.T) {
 	}
 	// Revoking a pending share cancels it without content; accepting
 	// afterwards fails closed.
-	if err := db.RevokeSharedPosting(alice, inboxPostingID2, store.SharingAudienceUser, bob); err != nil {
+	if err := db.RevokeSharedPosting(alice, inboxPostingID2, store.SharingAudienceUser, bob, testRequestKey(t)); err != nil {
 		t.Fatal(err)
 	}
 	if code, list := getList(t, h, "/v1/inbox?status=canceled", "bob"); code != http.StatusOK || len(list.Items) != 1 || list.Items[0].PostingID != inboxPostingID2 || list.Items[0].Posting != nil {

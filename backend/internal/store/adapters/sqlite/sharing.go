@@ -166,10 +166,15 @@ func requireSharingAudienceExists(tx *sql.Tx, audienceType, audienceID string) e
 }
 
 // GrantSharedPosting records the owner's explicit share decision. The grant
-// and the conflicting-exclusion guard run in one transaction.
-func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audienceID string) (store.SharingGrant, error) {
+// and the conflicting-exclusion guard run in one transaction. requestID is
+// a client UUID: retries replay the recorded grant, and a reused key for a
+// different action fails as a conflict. Only committed grants append audit.
+func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (store.SharingGrant, error) {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return store.SharingGrant{}, fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
+	}
+	if err := checkSharingRequestID(requestID); err != nil {
+		return store.SharingGrant{}, err
 	}
 	if err := checkSharingAudience(audienceType, audienceID, false); err != nil {
 		return store.SharingGrant{}, err
@@ -179,6 +184,18 @@ func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audience
 		return store.SharingGrant{}, err
 	}
 	defer tx.Rollback()
+	if recorded, err := lookupSharingRequest(tx, ownerID, requestID); err == nil {
+		if err := matchSharingRequest(recorded, "grant", ownerID, postingID, audienceType, audienceID, ""); err != nil {
+			return store.SharingGrant{}, err
+		}
+		grant, err := decodeSharingResult[store.SharingGrant](recorded)
+		if err != nil {
+			return store.SharingGrant{}, err
+		}
+		return grant, tx.Commit()
+	} else if err != sql.ErrNoRows {
+		return store.SharingGrant{}, err
+	}
 	var users int
 	if err := tx.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, ownerID).Scan(&users); err != nil {
 		return store.SharingGrant{}, err
@@ -208,6 +225,11 @@ func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audience
 			ownerID, postingID, audienceType, audienceID).Scan(&grant.OwnerUserID, &grant.PostingID, &grant.Audience, &grant.AudienceID, &grant.Intent, &grant.CreatedAt); err != nil {
 			return store.SharingGrant{}, err
 		}
+		// No mutation happened, so no audit row: the outcome key alone
+		// records that this request completed with the existing grant.
+		if err := recordSharingRequest(tx, ownerID, requestID, "grant", ownerID, postingID, audienceType, audienceID, "", grant); err != nil {
+			return store.SharingGrant{}, err
+		}
 		return grant, tx.Commit()
 	case err != nil && !errors.Is(err, sql.ErrNoRows):
 		return store.SharingGrant{}, err
@@ -217,21 +239,30 @@ func (d *Database) GrantSharedPosting(ownerID, postingID, audienceType, audience
 		ownerID, postingID, audienceType, audienceID, now); err != nil {
 		return store.SharingGrant{}, fmt.Errorf("record sharing grant: %w", err)
 	}
-	if err := auditSharingRaw(tx, ownerID, ownerID, "grant", postingID, audienceType, audienceID, "", ""); err != nil {
+	grant := store.SharingGrant{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentShared, CreatedAt: now}
+	if err := auditShareEvent(tx, ownerID, ownerID, "grant", postingID, audienceType, audienceID, "", "", requestID); err != nil {
+		return store.SharingGrant{}, err
+	}
+	if err := recordSharingRequest(tx, ownerID, requestID, "grant", ownerID, postingID, audienceType, audienceID, "", grant); err != nil {
 		return store.SharingGrant{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return store.SharingGrant{}, err
 	}
-	return store.SharingGrant{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentShared, CreatedAt: now}, nil
+	return grant, nil
 }
 
 // RevokeSharedPosting deletes one explicit grant. Later reads deny access
 // unless another independent valid grant survives. The delete and its audit
 // row commit together; revoking an absent grant reports not-found.
-func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienceID string) error {
+// requestID carries the grant idempotency contract: a retry replays the
+// recorded revocation.
+func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) error {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
+	}
+	if err := checkSharingRequestID(requestID); err != nil {
+		return err
 	}
 	if err := checkSharingAudience(audienceType, audienceID, false); err != nil {
 		return err
@@ -241,6 +272,11 @@ func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienc
 		return err
 	}
 	defer tx.Rollback()
+	if recorded, err := lookupSharingRequest(tx, ownerID, requestID); err == nil {
+		return matchSharingRequest(recorded, "revoke", ownerID, postingID, audienceType, audienceID, "")
+	} else if err != sql.ErrNoRows {
+		return err
+	}
 	result, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = ? AND audience_id = ? AND intent = 'shared'`,
 		ownerID, postingID, audienceType, audienceID)
 	if err != nil {
@@ -250,7 +286,11 @@ func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienc
 	if n == 0 {
 		return store.ErrNotFound
 	}
-	if err := auditSharingRaw(tx, ownerID, ownerID, "revoke", postingID, audienceType, audienceID, "", ""); err != nil {
+	if err := auditShareEvent(tx, ownerID, ownerID, "revoke", postingID, audienceType, audienceID, "", "", requestID); err != nil {
+		return err
+	}
+	revoked := store.SharingRevocation{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentShared}
+	if err := recordSharingRequest(tx, ownerID, requestID, "revoke", ownerID, postingID, audienceType, audienceID, "", revoked); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -259,9 +299,13 @@ func (d *Database) RevokeSharedPosting(ownerID, postingID, audienceType, audienc
 // ExcludeSharedPosting records the owner's explicit exclusion. The guard
 // against a contradictory active grant and the insert run in one
 // transaction, so share and exclusion cannot coexist for one audience.
-func (d *Database) ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID string) (store.SharingGrant, error) {
+// requestID carries the grant idempotency contract.
+func (d *Database) ExcludeSharedPosting(ownerID, postingID, audienceType, audienceID, requestID string) (store.SharingGrant, error) {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return store.SharingGrant{}, fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
+	}
+	if err := checkSharingRequestID(requestID); err != nil {
+		return store.SharingGrant{}, err
 	}
 	if err := checkSharingAudience(audienceType, audienceID, true); err != nil {
 		return store.SharingGrant{}, err
@@ -271,6 +315,18 @@ func (d *Database) ExcludeSharedPosting(ownerID, postingID, audienceType, audien
 		return store.SharingGrant{}, err
 	}
 	defer tx.Rollback()
+	if recorded, err := lookupSharingRequest(tx, ownerID, requestID); err == nil {
+		if err := matchSharingRequest(recorded, "exclude", ownerID, postingID, audienceType, audienceID, ""); err != nil {
+			return store.SharingGrant{}, err
+		}
+		exclusion, err := decodeSharingResult[store.SharingGrant](recorded)
+		if err != nil {
+			return store.SharingGrant{}, err
+		}
+		return exclusion, tx.Commit()
+	} else if err != sql.ErrNoRows {
+		return store.SharingGrant{}, err
+	}
 	var users int
 	if err := tx.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, ownerID).Scan(&users); err != nil {
 		return store.SharingGrant{}, err
@@ -300,6 +356,11 @@ func (d *Database) ExcludeSharedPosting(ownerID, postingID, audienceType, audien
 			ownerID, postingID, audienceType, audienceID).Scan(&grant.OwnerUserID, &grant.PostingID, &grant.Audience, &grant.AudienceID, &grant.Intent, &grant.CreatedAt); err != nil {
 			return store.SharingGrant{}, err
 		}
+		// No mutation happened, so no audit row: the outcome key alone
+		// records that this request completed with the existing row.
+		if err := recordSharingRequest(tx, ownerID, requestID, "exclude", ownerID, postingID, audienceType, audienceID, "", grant); err != nil {
+			return store.SharingGrant{}, err
+		}
 		return grant, tx.Commit()
 	case err != nil && !errors.Is(err, sql.ErrNoRows):
 		return store.SharingGrant{}, err
@@ -309,20 +370,29 @@ func (d *Database) ExcludeSharedPosting(ownerID, postingID, audienceType, audien
 		ownerID, postingID, audienceType, audienceID, now); err != nil {
 		return store.SharingGrant{}, fmt.Errorf("record sharing exclusion: %w", err)
 	}
-	if err := auditSharingRaw(tx, ownerID, ownerID, "exclude", postingID, audienceType, audienceID, "", ""); err != nil {
+	exclusion := store.SharingGrant{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentExcluded, CreatedAt: now}
+	if err := auditShareEvent(tx, ownerID, ownerID, "exclude", postingID, audienceType, audienceID, "", "", requestID); err != nil {
+		return store.SharingGrant{}, err
+	}
+	if err := recordSharingRequest(tx, ownerID, requestID, "exclude", ownerID, postingID, audienceType, audienceID, "", exclusion); err != nil {
 		return store.SharingGrant{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return store.SharingGrant{}, err
 	}
-	return store.SharingGrant{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentExcluded, CreatedAt: now}, nil
+	return exclusion, nil
 }
 
 // RemoveSharedExclusion deletes one explicit exclusion. The delete and its
 // audit row commit together; removing an absent exclusion reports not-found.
-func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID string) error {
+// requestID carries the grant idempotency contract: a retry replays the
+// recorded removal.
+func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audienceID, requestID string) error {
 	if !validSharingUserID(ownerID) || !validSharingPostingID(postingID) {
 		return fmt.Errorf("%w: owner and posting must identify one transaction", store.ErrGroupInvalid)
+	}
+	if err := checkSharingRequestID(requestID); err != nil {
+		return err
 	}
 	if err := checkSharingAudience(audienceType, audienceID, true); err != nil {
 		return err
@@ -332,6 +402,11 @@ func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audie
 		return err
 	}
 	defer tx.Rollback()
+	if recorded, err := lookupSharingRequest(tx, ownerID, requestID); err == nil {
+		return matchSharingRequest(recorded, "unexclude", ownerID, postingID, audienceType, audienceID, "")
+	} else if err != sql.ErrNoRows {
+		return err
+	}
 	result, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = ? AND posting_id = ? AND audience_type = ? AND audience_id = ? AND intent = 'excluded'`,
 		ownerID, postingID, audienceType, audienceID)
 	if err != nil {
@@ -341,7 +416,11 @@ func (d *Database) RemoveSharedExclusion(ownerID, postingID, audienceType, audie
 	if n == 0 {
 		return store.ErrNotFound
 	}
-	if err := auditSharingRaw(tx, ownerID, ownerID, "unexclude", postingID, audienceType, audienceID, "", ""); err != nil {
+	if err := auditShareEvent(tx, ownerID, ownerID, "unexclude", postingID, audienceType, audienceID, "", "", requestID); err != nil {
+		return err
+	}
+	removed := store.SharingRevocation{OwnerUserID: ownerID, PostingID: postingID, Audience: audienceType, AudienceID: audienceID, Intent: store.SharingIntentExcluded}
+	if err := recordSharingRequest(tx, ownerID, requestID, "unexclude", ownerID, postingID, audienceType, audienceID, "", removed); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -603,6 +682,62 @@ func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPosting
 	return refs, nil
 }
 
+// verifySharingSourceCurrent re-reads the source posting after the copy
+// commit and compares its revision against the snapshot the copy was built
+// from. A mismatch means the owner revised the source mid-accept, so the
+// accept fails explicitly instead of recording a torn link. The re-read
+// also re-checks live authorization, preserving the fail-closed revocation
+// window: a revoked grant reports ErrNotFound here.
+func (d *Database) verifySharingSourceCurrent(ownerID, postingID, requesterID, snapshotRevision string) (types.Posting, error) {
+	current, err := d.ReadSharedPosting(ownerID, postingID, requesterID)
+	if err != nil {
+		return types.Posting{}, err
+	}
+	revision, err := store.SharingSourceRevision(current)
+	if err != nil {
+		return types.Posting{}, fmt.Errorf("verify sharing source: %w", err)
+	}
+	if revision != snapshotRevision {
+		return types.Posting{}, fmt.Errorf("%w: the shared transaction was revised during acceptance", store.ErrSharingConflict)
+	}
+	return current, nil
+}
+
+// healSharingCopyRace resolves a lost double-accept race to the winner's
+// copy. A link-identity collision means another accept committed the same
+// triple first; the loser's duplicate is already gone, so the recorded
+// copy is returned with its edits intact. No second audit row is appended:
+// the mutation happened once.
+func (d *Database) healSharingCopyRace(ownerID, postingID, requesterID, requestID, linkID string) (types.Posting, error) {
+	existing, ok, err := d.findSharingCopy(ownerID, postingID, requesterID)
+	if err != nil {
+		return types.Posting{}, err
+	}
+	if !ok {
+		return types.Posting{}, fmt.Errorf("record sharing copy: link identity collision without a recorded copy")
+	}
+	if err := recordSharingRequest(d.db, requesterID, requestID, store.SharingAuditCopyAccepted, ownerID, postingID, "", "", linkID, existing); err != nil {
+		if isUniqueViolation(err) {
+			return d.replaySharingCopy(requesterID, requestID, ownerID, postingID, linkID)
+		}
+		return types.Posting{}, err
+	}
+	return existing, nil
+}
+
+// replaySharingCopy re-reads a just-committed same-key outcome after a key
+// collision: a concurrent request with the same key committed first.
+func (d *Database) replaySharingCopy(requesterID, requestID, ownerID, postingID, linkID string) (types.Posting, error) {
+	recorded, err := lookupSharingRequest(d.db, requesterID, requestID)
+	if err != nil {
+		return types.Posting{}, err
+	}
+	if err := matchSharingRequest(recorded, store.SharingAuditCopyAccepted, ownerID, postingID, "", "", linkID); err != nil {
+		return types.Posting{}, err
+	}
+	return decodeSharingResult[types.Posting](recorded)
+}
+
 // CopySharedPosting accepts one authorized shared posting into the
 // requester's own model as an independent row. The copy keeps the stored
 // content with recipient-local adjustments the store requires: a fresh ID,
@@ -616,11 +751,33 @@ func (d *Database) ListSharedPostings(requesterID string) ([]store.SharedPosting
 // bank posting. Copies are idempotent per source-plus-recipient triple: a
 // repeat accept returns the existing recipient row, with its edits intact,
 // and resolves to the same stable link (FND-04) instead of minting a
-// duplicate.
-func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error) {
+// duplicate. requestID is a client UUID: retries with the same key replay
+// the recorded copy. A source revision landing mid-accept fails with
+// ErrSharingConflict and rolls the copy back instead of recording a torn
+// link; a concurrent accept losing the link-identity race resolves to the
+// winner's copy instead of leaking a constraint error.
+func (d *Database) CopySharedPosting(ownerID, postingID, requesterID, requestID string) (types.Posting, error) {
+	if err := checkSharingRequestID(requestID); err != nil {
+		return types.Posting{}, err
+	}
+	linkID := store.SharingLinkID(ownerID, postingID, requesterID)
+	// Retry replay: the same key returns the recorded copy without
+	// re-executing; a reused key for a different action fails as conflict.
+	if recorded, err := lookupSharingRequest(d.db, requesterID, requestID); err == nil {
+		if err := matchSharingRequest(recorded, store.SharingAuditCopyAccepted, ownerID, postingID, "", "", linkID); err != nil {
+			return types.Posting{}, err
+		}
+		return decodeSharingResult[types.Posting](recorded)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return types.Posting{}, err
+	}
 	source, err := d.ReadSharedPosting(ownerID, postingID, requesterID)
 	if err != nil {
 		return types.Posting{}, err
+	}
+	snapshotRevision, err := store.SharingSourceRevision(source)
+	if err != nil {
+		return types.Posting{}, fmt.Errorf("record sharing copy: %w", err)
 	}
 	var recipients int
 	if err := d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, requesterID).Scan(&recipients); err != nil {
@@ -632,10 +789,18 @@ func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (ty
 	recipient := &sqliteStore{db: &userDB{DB: d.db, userID: requesterID}, application: d}
 	// Idempotent accept: the stable link names one source-plus-recipient
 	// triple, so a repeat accept returns the existing recipient row with
-	// its edits intact instead of minting a duplicate.
+	// its edits intact instead of minting a duplicate. The outcome key is
+	// still recorded, but no second audit row is appended: the mutation
+	// happened once.
 	if existing, ok, err := d.findSharingCopy(ownerID, postingID, requesterID); err != nil {
 		return types.Posting{}, err
 	} else if ok {
+		if err := recordSharingRequest(d.db, requesterID, requestID, store.SharingAuditCopyAccepted, ownerID, postingID, "", "", linkID, existing); err != nil {
+			if isUniqueViolation(err) {
+				return d.replaySharingCopy(requesterID, requestID, ownerID, postingID, linkID)
+			}
+			return types.Posting{}, err
+		}
 		return existing, nil
 	}
 	copy := source
@@ -655,30 +820,21 @@ func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (ty
 		return types.Posting{}, err
 	}
 	// Re-check after the copy commits: revocation between the read above
-	// and the copy commit must not mint an unauthorized copy. This is
-	// fail-closed, not authorized-at-instant: a revocation landing in that
-	// window deletes a just-created copy even though the copy was
-	// authorized moments earlier. A copy that survives this check is
-	// unaffected by later revocation by design.
-	access, err := d.CheckSharedPostingAccess(ownerID, postingID, requesterID)
-	if err == nil && !access.Allowed {
-		err = store.ErrNotFound
-	}
-	if err != nil {
-		// Loud failure, never silent success. Both causes use %v so the
-		// result never unwraps to ErrNotFound: a leftover copy must
-		// surface as 503, not "not found".
+	// and the copy commit must not mint an unauthorized copy, and a source
+	// revision in the same window must not record a torn link. Both fail
+	// explicitly and roll the copy back; the caller retries with a fresh
+	// read and a new key. This is fail-closed, not authorized-at-instant:
+	// a revocation landing in that window deletes a just-created copy even
+	// though the copy was authorized moments earlier. A copy that survives
+	// this check is unaffected by later revocation by design.
+	if _, err := d.verifySharingSourceCurrent(ownerID, postingID, requesterID, snapshotRevision); err != nil {
+		// Loud failure, never silent success. The cleanup cause uses %v
+		// so the result never unwraps to ErrNotFound: a leftover copy
+		// must surface as 503, not "not found".
 		if derr := recipient.DeletePosting(created.ID); derr != nil {
 			return types.Posting{}, fmt.Errorf("revoke unauthorized sharing copy: %v: %v", derr, err)
 		}
 		return types.Posting{}, err
-	}
-	revision, err := store.SharingSourceRevision(source)
-	if err != nil {
-		if derr := recipient.DeletePosting(created.ID); derr != nil {
-			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
-		}
-		return types.Posting{}, fmt.Errorf("record sharing copy: %w", err)
 	}
 	audienceType, audienceID, reason, err := d.sharingLinkGrant(ownerID, postingID, requesterID)
 	if err != nil {
@@ -688,12 +844,67 @@ func (d *Database) CopySharedPosting(ownerID, postingID, requesterID string) (ty
 		return types.Posting{}, err
 	}
 	now := time.Now().Unix()
-	if _, err := d.db.Exec(`INSERT INTO sharing_copies(recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, link_id, source_revision, grant_audience_type, grant_audience_id, grant_reason, copied_at, refreshed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		requesterID, created.ID, ownerID, postingID, store.SharingLinkID(ownerID, postingID, requesterID), revision, audienceType, audienceID, reason, now, now); err != nil {
+	// Provenance, audit, and outcome key commit atomically: a crash can
+	// never leave a copy with no audit row, and a retry then converges
+	// through the existing-copy path with the key recorded and no second
+	// audit. The copy row itself commits outside (CreatePosting owns its
+	// lifecycle), so failures here still delete it explicitly.
+	tx, err := d.db.Begin()
+	if err != nil {
 		if derr := recipient.DeletePosting(created.ID); derr != nil {
 			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
 		}
+		return types.Posting{}, err
+	}
+	defer tx.Rollback()
+	// Every pre-commit failure path below rolls the transaction back
+	// before touching the pool again: the store holds one connection, so
+	// cleanup reads and writes while our transaction stands open would
+	// deadlock on our own lock. (A failed Commit releases the connection
+	// itself, so the commit-failure cleanup below needs no rollback.)
+	if _, err := tx.Exec(`INSERT INTO sharing_copies(recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, link_id, source_revision, grant_audience_type, grant_audience_id, grant_reason, copied_at, refreshed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		requesterID, created.ID, ownerID, postingID, linkID, snapshotRevision, audienceType, audienceID, reason, now, now); err != nil {
+		_ = tx.Rollback()
+		if derr := recipient.DeletePosting(created.ID); derr != nil {
+			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
+		}
+		if isUniqueViolation(err) {
+			// A concurrent accept committed this triple first: drop our
+			// duplicate copy and resolve to the winner instead of
+			// leaking a constraint error. A retry heals the same way.
+			// Nothing of ours committed, and the winner's rows are
+			// fully committed (single connection), so the heal below
+			// observes complete state.
+			return d.healSharingCopyRace(ownerID, postingID, requesterID, requestID, linkID)
+		}
 		return types.Posting{}, fmt.Errorf("record sharing copy: %w", err)
+	}
+	if err := auditShareEvent(tx, ownerID, requesterID, store.SharingAuditCopyAccepted, postingID, "", "", linkID, "", requestID); err != nil {
+		_ = tx.Rollback()
+		if derr := recipient.DeletePosting(created.ID); derr != nil {
+			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
+		}
+		return types.Posting{}, err
+	}
+	if err := recordSharingRequest(tx, requesterID, requestID, store.SharingAuditCopyAccepted, ownerID, postingID, "", "", linkID, created); err != nil {
+		_ = tx.Rollback()
+		if derr := recipient.DeletePosting(created.ID); derr != nil {
+			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
+		}
+		if isUniqueViolation(err) {
+			// A concurrent same-key accept committed first with a full
+			// outcome: our rows are rolled back above and the winner's
+			// recording replays. The rollback must precede the replay
+			// read for the single-connection reason above.
+			return d.replaySharingCopy(requesterID, requestID, ownerID, postingID, linkID)
+		}
+		return types.Posting{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		if derr := recipient.DeletePosting(created.ID); derr != nil {
+			return types.Posting{}, fmt.Errorf("record sharing copy: %v: %w", derr, err)
+		}
+		return types.Posting{}, err
 	}
 	return created, nil
 }
@@ -721,10 +932,19 @@ func deleteSharingForPosting(tx *userTx, postingID string) error {
 
 // clearSharingForUser removes consent the user issued and provenance for
 // copies they received or sourced. Copies themselves are ordinary model rows
-// and clear with the model.
+// and clear with the model. Idempotency keys the user executed and audit
+// events touching the user go too: a stale replay must never resurrect a
+// cleared grant, and a cleared scope restarts with an empty trace.
 func clearSharingForUser(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE owner_user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear sharing grants: %w", err)
+	}
+	// The cleared scope restarts with an empty trace: stale audit rows
+	// touching the user go before the replacement marker below, so the
+	// only surviving row is the policies-cleared marker itself (which
+	// names no posting and never surfaces in per-posting reads).
+	if _, err := tx.Exec(`DELETE FROM sharing_audit WHERE actor_user_id = :user_id OR owner_user_id = :user_id`); err != nil {
+		return fmt.Errorf("clear sharing audit: %w", err)
 	}
 	if err := clearSharingPoliciesForUser(tx); err != nil {
 		return err
