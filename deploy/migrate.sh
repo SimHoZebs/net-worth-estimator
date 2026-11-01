@@ -125,6 +125,22 @@ analysis_count() {
   sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback');"
 }
 
+# Friendships are provision-if-missing like the Analysis schema: absent is
+# expected on pre-friend databases, present requires the exact accepted-edge
+# shape, and anything partial fails closed.
+friendships_state() {
+  count=$(sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='friendships';") \
+    || fail "Cannot inspect friendships schema; refusing to guess."
+  case "$count" in
+    0) echo 0; return 0 ;;
+    1) ;;
+    *) fail "Partial friendships schema. Refusing automatic repair." ;;
+  esac
+  sqlite3 -readonly "$1" 'SELECT user_id, friend_user_id, display_name, created_at FROM friendships LIMIT 0;' \
+    || fail "Incomplete friendships schema. Refusing automatic repair."
+  echo 1
+}
+
 cp_cols() {
   sqlite3 -readonly "$1" "SELECT group_concat(name, ',') FROM (SELECT name FROM pragma_table_info('checkpoints') ORDER BY cid LIMIT -1);"
 }
@@ -182,6 +198,8 @@ case "$analysis" in
   0|5) ;;
   *) fail "Partial Analysis schema. Refusing automatic repair." ;;
 esac
+
+friendships=$(friendships_state "$db") || fail "Cannot inspect friendships schema; refusing to guess."
 if [ "$analysis" = 5 ]; then
   check_target "$db" || fail "Incomplete Analysis schema. Refusing automatic repair."
 fi
@@ -230,7 +248,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ]; then  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 5 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ] && [ "$friendships" = 1 ]; then  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
   exit 0
 fi
 
@@ -325,6 +343,26 @@ fi
 if [ "$analysis" = 0 ]; then
   if ! sqlite3 "$candidate" < "$script_dir/analysis-schema.sql" > "$backup/analysis.log" 2>&1; then
     fail "Candidate Analysis upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+
+# Provision the accepted-friendships table on pre-friend candidates. The
+# DDL mirrors the application schema exactly; rows are never touched, so
+# preexisting friendships verify byte-identical below.
+if [ "$friendships" = 0 ]; then
+  friendships_sql="$backup/friendships.sql"
+  cat > "$friendships_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS friendships (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  friend_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  display_name TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id, friend_user_id)
+);
+CREATE INDEX IF NOT EXISTS friendships_account ON friendships(friend_user_id, user_id);
+DDL
+  if ! sqlite3 "$candidate" < "$friendships_sql" > "$backup/friendships.log" 2>&1; then
+    fail "Candidate friendships upgrade failed. Original unchanged; backup retained at $backup."
   fi
 fi
 

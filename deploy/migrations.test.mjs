@@ -233,6 +233,63 @@ test("complete target repeats read-only and preserves owner disables byte-identi
   assert.equal(await rows(db, `SELECT enabled FROM posting_sim WHERE user_id = '${owner}' AND posting_id = 'settled-a';`), "0");
 });
 
+test("pre-friend database gains an empty friendships table with data preserved", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-friends-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  // Model a deployed database from before friendships existed.
+  await sqlite(db, `DROP TABLE friendships;`);
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+  const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+
+  assert.equal(await rows(db, "SELECT user_id, friend_user_id, display_name, created_at FROM friendships LIMIT 0;"), "");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM friendships;"), "0");
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+  assert.equal((await backups(directory)).length, 1);
+
+  // The provisioned target now repeats read-only.
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+});
+
+test("existing friendships survive migration byte-identical", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-friendrows-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  const guest = await secondUser(db);
+  await sqlite(db, `INSERT INTO friendships(user_id, friend_user_id, display_name, created_at) VALUES
+    ('${owner}', '${guest}', 'Guest', 100),
+    ('${guest}', '${owner}', 'Owner', 101);`);
+  const friendsBefore = await rows(db, "SELECT user_id, friend_user_id, display_name, created_at FROM friendships ORDER BY 1, 2;");
+
+  const result = await migrate(db);
+  assert.match(result.stdout, /verified, nothing to do/);
+  assert.equal(await rows(db, "SELECT user_id, friend_user_id, display_name, created_at FROM friendships ORDER BY 1, 2;"), friendsBefore);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("partial friendships schema fails closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-friendshape-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE friendships;
+    CREATE TABLE friendships(user_id TEXT NOT NULL, friend_user_id TEXT NOT NULL);`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  await migrateFails(db);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
 test("complete target verification leaves committed WAL data untouched", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-wal-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

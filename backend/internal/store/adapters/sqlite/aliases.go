@@ -22,6 +22,7 @@ type (
 	Group            = store.Group
 	GroupMember      = store.GroupMember
 	GroupInvite      = store.GroupInvite
+	Friend           = store.Friend
 	AccountLink      = store.AccountLink
 	EvaluationUpdate = store.EvaluationUpdate
 )

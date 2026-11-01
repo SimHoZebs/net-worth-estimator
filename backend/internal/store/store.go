@@ -133,6 +133,10 @@ type Database interface {
 	ListInvites(groupID, userID string) ([]GroupInvite, error)
 	RevokeInvite(groupID, inviteID, userID string) error
 	AcceptInvite(code, userID, displayName string) (Group, error)
+	ListFriends(userID, search string) ([]Friend, error)
+	GetFriend(userID, friendID string) (Friend, error)
+	AreFriends(userID, friendID string) (bool, error)
+	TouchFriendDisplay(userID, displayName string)
 	TouchMemberDisplay(userID, displayName string)
 	RemoveGroupMembershipsForUser(userID string) error
 	CollectBlobGarbage(ctx context.Context, limit int) error
