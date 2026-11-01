@@ -6,7 +6,7 @@
 // Status contract: unknown users and non-friends report 404
 // (store.ErrNotFound) so friendships are not enumerable. A caller's own
 // accepted list is visible only to that caller. There are no write routes
-// yet: the request lifecycle (send, accept, decline, remove, block) is
+// yet: the request lifecycle (send, accept, decline, remove) is
 // undecided product scope and must not be guessed here.
 package friends
 

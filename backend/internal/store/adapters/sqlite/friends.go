@@ -2,7 +2,7 @@
 // groups. Friendships are social only. They never gate plan reads,
 // projections, or financial writes: friendship alone grants no financial
 // data access. A later share layer must check AreFriends before sending
-// and must refuse removed or blocked recipients; that enforcement does
+// and must refuse removed recipients; that enforcement does
 // not live here.
 package sqlite
 
