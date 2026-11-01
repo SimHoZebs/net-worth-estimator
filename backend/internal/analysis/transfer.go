@@ -13,10 +13,11 @@ const TransferVersion = "transfer-v1"
 
 // transferMatchWindowDays bounds how far apart opposite legs may post.
 //
-// PROVISIONAL: the matching window is a product decision (see VIS-03). This
-// conservative default keeps cross-institution pairs from matching across
-// unrelated statement cycles. Tighten or widen it only with that decision.
-const transferMatchWindowDays = 3
+// Decided product rule (see VIS-03): both sides of a transfer between owned
+// accounts are logged as one movement, but the two records do not arrive in
+// sync, so legs can be days apart. Change this constant only with a new
+// product decision.
+const transferMatchWindowDays = 7
 
 type Transfer struct{}
 
@@ -74,7 +75,8 @@ func (Transfer) Analyze(ctx context.Context, input types.AnalysisSnapshot) ([]ty
 		} // Legs on one account are corrections or refunds, not transfers.
 		if outflow.cents != inflow.cents {
 			return false
-		}
+		} // Decided product rule: exact to the cent. Near-matches from fees
+		// or currency conversion stay unmatched by decision, not omission.
 		gap := outflow.day - inflow.day
 		return gap >= -transferMatchWindowDays && gap <= transferMatchWindowDays
 	}

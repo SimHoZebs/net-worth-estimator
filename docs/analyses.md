@@ -88,18 +88,25 @@ and save.
 
 Transfer means one internal money movement observed as two opposite legs on
 different accounts. The detector pairs legs by exact absolute amount, opposite
-direction, and posting dates within a short window. A leg with exactly one
+direction, and posting dates within 7 days. A leg with exactly one
 mutual candidate produces a **strong** match; a leg with several candidates
 produces a **moderate** match that lists every candidate for review.
 
+- The 7-day window is decided: both sides of a transfer between owned
+  accounts are logged as one movement, but the two records do not arrive in
+  sync, so legs can be days apart.
+- Amounts match exact to the cent by decision. Near-matches from fees or
+  currency conversion stay unmatched; they are never surfaced as candidates.
 - An unmatched leg emits no finding. Missing legs are never fabricated.
 - Same-account opposite legs are corrections or refunds, not transfers.
 - Pending, void, non-USD, zero, invalid, and undated rows never match.
 - Each leg carries its own finding, so transfer evidence coexists with BNPL
   and other independent claims on one transaction. Dismissal survives
   detector reruns; repeated imports refresh the same findings.
-- The match window is provisional pending the VIS-03 product decision on
-  tolerances and review UX.
+- Open: whether review stays a candidate list in the findings or becomes a
+  dedicated pair-picker, and whether same-provider legs should score
+  stronger than cross-provider pairs. Both keep current behavior for now:
+  candidates list in findings with equal scoring.
 
 ## API and interface
 

@@ -77,6 +77,30 @@ func TestTransferNeverFabricatesMissingLeg(t *testing.T) {
 	if result := analyzeTransfer(t, farApart); len(result) != 0 {
 		t.Fatalf("out-of-window pair matched: %+v", result)
 	}
+	nearMatch := []types.AnalysisTransaction{
+		transferTransaction("a", "checking-bridge", "simplefin", "TRANSFER OUT", "-100.00", 5),
+		transferTransaction("b", "savings-bridge", "simplefin", "TRANSFER IN", "99.01", 5),
+	}
+	if result := analyzeTransfer(t, nearMatch); len(result) != 0 {
+		t.Fatalf("near-match surfaced despite exact-cent rule: %+v", result)
+	}
+}
+
+func TestTransferWindowBoundary(t *testing.T) {
+	within := []types.AnalysisTransaction{
+		transferTransaction("a", "checking-bridge", "simplefin", "TRANSFER OUT", "-100.00", 1),
+		transferTransaction("b", "savings-bridge", "simplefin", "TRANSFER IN", "100.00", 8),
+	}
+	if result := analyzeTransfer(t, within); len(result) != 2 {
+		t.Fatalf("7-day pair missed: %+v", result)
+	}
+	beyond := []types.AnalysisTransaction{
+		transferTransaction("a", "checking-bridge", "simplefin", "TRANSFER OUT", "-100.00", 1),
+		transferTransaction("b", "savings-bridge", "simplefin", "TRANSFER IN", "100.00", 9),
+	}
+	if result := analyzeTransfer(t, beyond); len(result) != 0 {
+		t.Fatalf("8-day pair matched: %+v", result)
+	}
 }
 
 func TestTransferAmbiguousLegsStayForReview(t *testing.T) {
