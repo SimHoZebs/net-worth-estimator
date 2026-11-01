@@ -350,7 +350,9 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 // the last-seen snapshot. Dependent rows are validated at the API layer
 // before this runs. Composite foreign keys also reject dangling financial
 // references when a caller bypasses API validation. Stale account links are
-// deliberate metadata and have no account-row foreign key.
+// deliberate metadata and have no account-row foreign key. Sharing
+// preferences lose the deleted account in the same transaction (with a
+// version bump each), so consent never silently reattaches on ID reuse.
 func (s *sqliteStore) DeleteAccount(id string) error {
 	return withRowTx(s.db, func(tx *userTx) error {
 		result, err := tx.Exec(`DELETE FROM accounts WHERE id = ? AND user_id = :user_id`, id)
@@ -363,6 +365,9 @@ func (s *sqliteStore) DeleteAccount(id string) error {
 		}
 		if affected == 0 {
 			return NotFound(id)
+		}
+		if err := stripSharingPolicyAccount(tx, id); err != nil {
+			return err
 		}
 		return releaseRowID(tx, id)
 	})

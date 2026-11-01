@@ -9,6 +9,12 @@ import (
 // SQL statement. They never rewrite SQL or infer a tenant from request state.
 // Scope column is user_id referencing users(id); model-account
 // references use model_account_id/bridge_account_id to avoid collision.
+//
+// Placeholder order is load-bearing: the driver binds arguments to
+// placeholders sequentially by index and ignores sql.Named wrapping, so the
+// auto-appended :user_id argument binds to the LAST placeholder. Keep
+// :user_id (or any :named placeholder) textually last in every statement;
+// a ? after it silently binds the wrong values with no error.
 type userDB struct {
 	*sql.DB
 	userID string

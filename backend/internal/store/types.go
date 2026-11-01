@@ -205,11 +205,55 @@ type SharingGrant struct {
 	CreatedAt   int64  `json:"createdAt"`
 }
 
+// SharingPolicy is one member's automatic transaction-sharing preference
+// for one group (GRP-02). Absence of a row means automatic sharing is off:
+// there is no enabled-by-default state and no admin override. The member
+// alone opts in by enabling with one or more owner-held accounts and a
+// single transaction-date interval. StartDate persists as a fixed
+// YYYY-MM-DD day (defaulting to the setup day, never rolling); EndDate is
+// "" for open-ended. Version bumps on every committed change so later
+// reference indexes can fence stale generations.
+type SharingPolicy struct {
+	OwnerUserID string   `json:"ownerUserId"`
+	GroupID     string   `json:"groupId"`
+	Enabled     bool     `json:"enabled"`
+	AccountIDs  []string `json:"accountIds"`
+	StartDate   string   `json:"startDate"`
+	EndDate     string   `json:"endDate,omitempty"`
+	Version     int64    `json:"version"`
+	UpdatedAt   int64    `json:"updatedAt"`
+}
+
+// SharingPolicyInput carries one member's editable preference values.
+// StartDate "" means the setup day (today on the shared calendar);
+// EndDate "" means open-ended.
+type SharingPolicyInput struct {
+	Enabled    bool     `json:"enabled"`
+	AccountIDs []string `json:"accountIds"`
+	StartDate  string   `json:"startDate,omitempty"`
+	EndDate    string   `json:"endDate,omitempty"`
+}
+
+// SharingPolicyPreview is the counts-only exposure preview shown before
+// enabling history. It carries audience size and eligible-row counts plus
+// the interval and account coverage, never amounts, payees, or row IDs.
+type SharingPolicyPreview struct {
+	OwnerUserID      string   `json:"ownerUserId"`
+	GroupID          string   `json:"groupId"`
+	Enabled          bool     `json:"enabled"`
+	AccountIDs       []string `json:"accountIds"`
+	StartDate        string   `json:"startDate"`
+	EndDate          string   `json:"endDate,omitempty"`
+	Version          int64    `json:"version"`
+	EligiblePostings int      `json:"eligiblePostings"`
+	MemberCount      int      `json:"memberCount"`
+}
+
 // SharedPostingAccess is the result of a read-time authorization check.
 // Allowed is true only when at least one independent valid grant survives
 // current membership, exclusion, and revocation state. Reason names the
-// surviving grant kind ("manual-user" or "manual-group"); policy-derived
-// automatic reasons land with GRP-02.
+// surviving grant kind ("manual-user", "manual-group") or the
+// policy-derived automatic reason ("automatic-group", GRP-02).
 type SharedPostingAccess struct {
 	Allowed bool   `json:"allowed"`
 	Reason  string `json:"reason,omitempty"`

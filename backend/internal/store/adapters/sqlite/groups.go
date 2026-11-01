@@ -29,12 +29,15 @@ func newGroupID() (string, error) {
 	return id.String(), nil
 }
 
-// deleteGroupSharingRows drops explicit consent rows naming a deleted
-// group audience. Reads already deny through missing membership; this
-// keeps owner grant lists from surfacing dead audiences.
+// deleteGroupSharingRows drops explicit consent and preference rows naming
+// a deleted group audience. Reads already deny through missing membership;
+// this keeps owner grant and policy lists from surfacing dead audiences.
 func deleteGroupSharingRows(tx *sql.Tx, groupID string) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_grants WHERE audience_type = 'group' AND audience_id = ?`, groupID); err != nil {
 		return fmt.Errorf("clear group sharing consent: %w", err)
+	}
+	if err := deleteGroupSharingPolicies(tx, groupID); err != nil {
+		return err
 	}
 	return nil
 }

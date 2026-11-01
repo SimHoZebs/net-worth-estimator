@@ -157,9 +157,10 @@ type Database interface {
 	ListSharingGrants(ownerID string) ([]SharingGrant, error)
 	// CheckSharedPostingAccess evaluates read-time authorization for one
 	// owner-scoped posting and requester: current group and source-owner
-	// membership, owner consent (explicit grant), exclusions, and
-	// revocation state. It queries current rows on every call; there is no
-	// positive auth cache and no materialized index shortcut.
+	// membership, owner consent (explicit grant or enabled automatic-sharing
+	// policy covering the posting's current accounts and transaction date),
+	// exclusions, and revocation state. It queries current rows on every call;
+	// there is no positive auth cache and no materialized index shortcut.
 	CheckSharedPostingAccess(ownerID, postingID, requesterID string) (SharedPostingAccess, error)
 	// ReadSharedPosting returns the owner's posting in the existing
 	// transaction shape when the requester is currently authorized. Missing
@@ -176,5 +177,24 @@ type Database interface {
 	// revocation never rewrites or erases the copy. Source-original writes
 	// by another member stay deferred (no such path exists).
 	CopySharedPosting(ownerID, postingID, requesterID string) (types.Posting, error)
+	// SetSharingPolicy creates or replaces one member's automatic-sharing
+	// preference for one group (GRP-02). Only the owning member may set
+	// their own policy: callers must pass the authenticated member's own
+	// user ID, so a group administrator cannot force another member's
+	// consent. The member must currently belong to the group and every
+	// selected account must belong to the member. Enabling with zero
+	// accounts is rejected; zero accounts otherwise means no automatic
+	// eligibility. Every committed change bumps the policy version for
+	// stale-generation fencing.
+	SetSharingPolicy(ownerID, groupID string, input SharingPolicyInput) (SharingPolicy, error)
+	// GetSharingPolicy returns one member's stored preference. An absent
+	// policy reports ErrNotFound and means automatic sharing is off.
+	GetSharingPolicy(ownerID, groupID string) (SharingPolicy, error)
+	// ListSharingPolicies returns every stored preference for one member.
+	ListSharingPolicies(ownerID string) ([]SharingPolicy, error)
+	// PreviewSharingPolicy counts the currently eligible postings for one
+	// member's stored policy plus the current audience size. Counts only:
+	// no amounts, payees, or row IDs leave the owner's scope.
+	PreviewSharingPolicy(ownerID, groupID string) (SharingPolicyPreview, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

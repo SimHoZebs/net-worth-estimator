@@ -159,6 +159,36 @@ Explicit sharing rules:
 - Forged owner, posting, account, and audience IDs fail closed as
   not-found so shared data is not enumerable.
 
+## Automatic sharing policies
+
+Per-group automatic preferences (GRP-02) let each member opt their own
+postings into group visibility without per-posting grants. Absence of a
+preference row means off; administrators cannot set another member's
+preference. Enabling requires one or more owner-held accounts; an empty
+selection matches nothing. One transaction-date interval governs, with the
+start fixed at the setup day by default and an open end; both stay
+editable. Pending postings qualify exactly like posted ones; void and
+deleted rows never authorize. Eligibility always derives from the
+posting's current accounts and current transaction date, so owner edits,
+bank sync, and late imports reshape visibility without touching the
+preference. Every committed preference change bumps its version, and
+disabling or narrowing revokes automatic access on commit with no cache.
+Manual grants, exclusions, independent copies, and the union-minus-
+exclusions composition keep their FND-02 behavior alongside the
+`automatic-group` reason. Preference reads and the counts-only exposure
+preview stay owner-scoped; other members never read the preference rows.
+
+Policy contract for the server authorization path (GRP-05): consume
+`store.SharingPolicy` rows plus `store.PolicyCoversPosting` as the single
+eligibility rule, fence reference-index generations against the policy
+version, re-validate through `CheckSharedPostingAccess` on every shared
+read, and maintain the index in the same write that changes postings,
+policies, accounts, memberships, or consent. Statement caution: the SQLite
+driver binds arguments to placeholders sequentially by index and ignores
+`sql.Named` wrapping, so the auto-appended `:user_id` argument binds to
+whatever placeholder stands last — keep `:named` placeholders textually
+last or values silently misbind with no error.
+
 Casdoor's external permission API evaluates the model and stored policy rows.
 Use the model's deny rules or remove the relevant policy/binding to revoke
 access. Do not treat application-sign-in approval or UI enable flags as an
