@@ -85,6 +85,9 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("GmailCredentialRoundTripAndClear", func(t *testing.T) {
 		testGmailCredentialConformance(t, newStore)
 	})
+	t.Run("EmailReceiptRoundTripReviewAndClear", func(t *testing.T) {
+		testEmailReceiptConformance(t, newStore)
+	})
 	t.Run("AmountPresetsRoundTripAndReorder", func(t *testing.T) {
 		testAmountPresetConformanceRoundTrip(t, newStore)
 	})
@@ -192,6 +195,89 @@ func testGmailCredentialConformance(t *testing.T, newStore func(*testing.T) stor
 	after, err := database.GetGmailCredential()
 	if err != nil || after.Connected() {
 		t.Fatalf("gmail after Clear = %+v, err %v", after, err)
+	}
+}
+
+func testEmailReceiptConformance(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	database := newStore(t)
+	if scanned, err := database.IsGmailMessageScanned("msg-1"); err != nil || scanned {
+		t.Fatalf("scanned = %v, err %v, want false before triage", scanned, err)
+	}
+	amount := int64(4250)
+	confidence := 0.95
+	saved, err := database.SaveEmailReceipt(store.EmailReceipt{
+		GmailMessageID: "msg-1", ThreadID: "thread-1",
+		FromAddress: "Example Store <receipts@example.com>", Subject: "Your order confirmation",
+		MessageDate: "2026-10-20T15:04:05Z",
+		Verdict:     store.EmailReceiptVerdictReceipt,
+		Merchant:    "Example Store", ReceiptDate: "2026-10-20",
+		AmountText: "$42.50", AmountCents: &amount, Currency: "USD", Reference: "AB-12345",
+		Confidence:  &confidence,
+		Diagnostics: []string{},
+		Provenance:  store.ReceiptProvenanceForEmail(),
+		Status:      store.EmailReceiptStatusReady,
+	})
+	if err != nil || saved.ID == "" {
+		t.Fatalf("saved = %+v, err %v", saved, err)
+	}
+	if saved.Provenance.Producer == "" || saved.Provenance.Version == "" {
+		t.Fatalf("saved = %+v, want source provenance", saved)
+	}
+	if scanned, err := database.IsGmailMessageScanned("msg-1"); err != nil || !scanned {
+		t.Fatalf("scanned = %v, err %v, want true after triage", scanned, err)
+	}
+	// A repeat scan keeps the first extraction: no duplicate row.
+	weaker := confidence - 0.4
+	repeat, err := database.SaveEmailReceipt(store.EmailReceipt{
+		GmailMessageID: "msg-1", Verdict: store.EmailReceiptVerdictReceipt,
+		Merchant: "Other", Confidence: &weaker, Status: store.EmailReceiptStatusNeedsReview,
+	})
+	if err != nil || repeat.ID != saved.ID || repeat.Merchant != "Example Store" {
+		t.Fatalf("repeat = %+v, err %v, want first extraction kept", repeat, err)
+	}
+	if _, err := database.SaveEmailReceipt(store.EmailReceipt{
+		GmailMessageID: "msg-2", Verdict: store.EmailReceiptVerdictShipping,
+		Status: store.EmailReceiptStatusReady,
+	}); err != nil {
+		t.Fatalf("shipping triage: %v", err)
+	}
+	reviewed, err := database.ReviewEmailReceipt(saved.ID, &store.EmailReceiptCorrection{Reference: "AB-12345-CORRECTED"})
+	if err != nil || reviewed.Status != store.EmailReceiptStatusConfirmed {
+		t.Fatalf("reviewed = %+v, err %v, want confirmed", reviewed, err)
+	}
+	if reviewed.Correction == nil || reviewed.Correction.Reference != "AB-12345-CORRECTED" {
+		t.Fatalf("reviewed = %+v, want correction overlay", reviewed)
+	}
+	if reviewed.Reference != "AB-12345" || reviewed.Merchant != "Example Store" {
+		t.Fatalf("reviewed = %+v, want original extraction preserved", reviewed)
+	}
+	needsReview, err := database.ListEmailReceipts(store.EmailReceiptFilter{Status: []string{store.EmailReceiptStatusConfirmed}})
+	if err != nil || len(needsReview) != 1 {
+		t.Fatalf("filtered = %+v, err %v, want 1 confirmed", needsReview, err)
+	}
+	all, err := database.ListEmailReceipts(store.EmailReceiptFilter{})
+	if err != nil || len(all) != 2 {
+		t.Fatalf("all = %d, err %v, want 2 triage rows", len(all), err)
+	}
+	if _, err := database.ReviewEmailReceipt("missing", nil); err == nil {
+		t.Fatal("review of a missing receipt succeeds")
+	}
+	if _, err := database.GetEmailReceipt("missing"); err == nil {
+		t.Fatal("read of a missing receipt succeeds")
+	}
+	if _, err := database.SaveEmailReceipt(store.EmailReceipt{}); err == nil {
+		t.Fatal("save without a message ID succeeds")
+	}
+	if _, err := database.SaveEmailReceipt(store.EmailReceipt{GmailMessageID: "msg-3", Verdict: "bogus", Status: store.EmailReceiptStatusReady}); err == nil {
+		t.Fatal("save with a bogus verdict succeeds")
+	}
+	if err := database.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	after, err := database.ListEmailReceipts(store.EmailReceiptFilter{})
+	if err != nil || len(after) != 0 {
+		t.Fatalf("receipts after Clear = %d, err %v, want none", len(after), err)
 	}
 }
 

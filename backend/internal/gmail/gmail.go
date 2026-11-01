@@ -87,6 +87,10 @@ func (c Config) client() *http.Client {
 type Service struct {
 	config Config
 	oauth  oauth2.Config
+	// Fetcher is the message-access seam for receipt discovery. When
+	// nil, Scan builds the production Gmail REST fetcher from the
+	// configured HTTP client. Tests assign a fake instead.
+	Fetcher MessageFetcher
 }
 
 // New builds the service. A config without client credentials is valid:
@@ -291,31 +295,7 @@ func (s *Service) revoke(ctx context.Context, token string) error {
 // the stored one is missing or within a minute of expiry. Rotation
 // persists before return so concurrent scans share the new grant.
 func (s *Service) ValidToken(ctx context.Context, st store.Store) (string, error) {
-	if s == nil || !s.Configured() {
-		return "", ErrNotConfigured
-	}
-	credential, err := st.GetGmailCredential()
-	if err != nil {
-		return "", err
-	}
-	if !credential.Connected() {
-		return "", ErrNotConnected
-	}
-	if credential.AccessToken != "" && s.config.now().Add(time.Minute).Unix() < credential.AccessExpiryUnix {
-		return credential.AccessToken, nil
-	}
-	token, err := s.config.Exchange.Refresh(ctx, credential.RefreshToken)
-	if err != nil {
-		return "", fmt.Errorf("gmail token refresh: %w", err)
-	}
-	if token.AccessToken == "" {
-		return "", fmt.Errorf("gmail token refresh: provider returned no access token")
-	}
-	updated, err := st.UpdateGmailToken(token.AccessToken, token.Expiry.Unix(), token.RefreshToken)
-	if err != nil {
-		return "", err
-	}
-	return updated.AccessToken, nil
+	return validTokenForScan(ctx, s, st)
 }
 
 // SetLookback stores the configurable initial scan window in days.

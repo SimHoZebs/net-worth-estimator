@@ -3,9 +3,17 @@ import {
 	disconnectGmailCredential,
 	getGmailAuthUrl,
 	getGmailCredential,
+	listGmailReceipts,
+	reviewGmailReceipt,
+	scanGmailReceipts,
 	setGmailLookback,
 } from "@/api/generated/endpoints.ts";
-import type { GmailCredentialBody } from "@/api/generated/model/index.ts";
+import type {
+	EmailReceipt,
+	EmailReceiptCorrection,
+	GmailCredentialBody,
+	ScanSummary,
+} from "@/api/generated/model/index.ts";
 import {
 	getUserScope,
 	subscribeUserScope,
@@ -172,6 +180,7 @@ export function clearGmailCallbackFlag(): void {
 
 export function resetGmailClient(): void {
 	serverQueryClient().removeQueries({ queryKey: ["gmail-credential"] });
+	serverQueryClient().removeQueries({ queryKey: ["gmail-receipts"] });
 }
 
 subscribeUserScope(resetGmailClient);
@@ -182,4 +191,106 @@ export function useGmailCredential() {
 		{ ...credentialOptions(scope), enabled: scope.status === "ready" },
 		serverQueryClient(),
 	);
+}
+
+export function gmailReceiptsKey(scope = getUserScope()) {
+	return ["gmail-receipts", scope.key] as const;
+}
+
+function receiptsOptions(scope = getUserScope()) {
+	return {
+		queryKey: gmailReceiptsKey(scope),
+		staleTime: 30_000,
+		queryFn: async ({ signal }: { signal: AbortSignal }) => {
+			try {
+				const data = (
+					await listGmailReceipts({ verdict: "receipt,refund" }, { signal })
+				).data;
+				current(scope, signal);
+				dismissKey("gmail-receipts");
+				return data.receipts as EmailReceipt[];
+			} catch (error) {
+				if (scope === getUserScope() && !signal.aborted)
+					notifyError(
+						"gmail-receipts",
+						error instanceof Error
+							? error.message
+							: "The extracted receipts could not be loaded.",
+						{
+							label: "Reload receipts",
+							onAction: () => void refreshGmailReceipts(true),
+						},
+					);
+				throw error;
+			}
+		},
+	};
+}
+
+export async function refreshGmailReceipts(force = false): Promise<void> {
+	const scope = getUserScope();
+	if (scope.status === "pending") return;
+	try {
+		const options = receiptsOptions(scope);
+		if (force)
+			await serverQueryClient().invalidateQueries({
+				queryKey: options.queryKey,
+				refetchType: "none",
+			});
+		await serverQueryClient().fetchQuery(options);
+	} catch {
+		/* The query reports its current-resource failure. */
+	}
+}
+
+export function useGmailReceipts() {
+	const scope = useUserScope();
+	return useQuery(
+		{ ...receiptsOptions(scope), enabled: scope.status === "ready" },
+		serverQueryClient(),
+	);
+}
+
+// scanGmailReceiptsNow runs one receipt-discovery scan and refreshes the
+// extracted list plus the connection's last-scan time. The summary
+// returns null when the scan could not start.
+export async function scanGmailReceiptsNow(): Promise<ScanSummary | null> {
+	const scope = getUserScope();
+	const summary = await runMutation<ScanSummary>(
+		[...gmailReceiptsKey(scope), "scan"],
+		async () => (await scanGmailReceipts()).data,
+		"gmail-receipts",
+	);
+	if (!summary) return null;
+	if (scope !== getUserScope()) return null;
+	void refreshGmailReceipts(true);
+	void refreshGmailSettings(true);
+	return summary;
+}
+
+// confirmGmailReceipt confirms or corrects one extraction. The
+// correction overlays the original values; the server preserves the
+// original extraction and provenance.
+export async function confirmGmailReceipt(
+	id: string,
+	correction?: EmailReceiptCorrection,
+): Promise<EmailReceipt | null> {
+	const scope = getUserScope();
+	const updated = await runMutation<EmailReceipt>(
+		[...gmailReceiptsKey(scope), id],
+		async () =>
+			(await reviewGmailReceipt(id, correction ? { correction } : {})).data
+				.receipt as EmailReceipt,
+		"gmail-receipts",
+	);
+	if (!updated) return null;
+	if (scope !== getUserScope()) return null;
+	serverQueryClient().setQueryData<EmailReceipt[]>(
+		gmailReceiptsKey(scope),
+		(previous) =>
+			previous?.map((item) => (item.id === updated.id ? updated : item)) ?? [
+				updated,
+			],
+	);
+	return updated;
 }

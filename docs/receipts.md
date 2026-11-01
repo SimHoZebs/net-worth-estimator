@@ -209,3 +209,25 @@ NGINX_TEST_IMAGE=net-worth-frontend:main node --test scripts/nginx-receipts.test
 Use an existing local Nginx-based image for the final check. It runs an isolated,
 non-root container without network access. Do not create Docker networks during
 browser tests. The normal backend and frontend completion gates still apply.
+
+## Email receipt discovery (Gmail)
+
+Image attachments above stay manual. Gmail receipt discovery (INT-03)
+scans the connected mailbox for purchase and refund receipts through the
+INT-02 token and history cursor; see the [technical contract](../TECHNICAL_OVERVIEW.md#gmail-receipt-discovery).
+Extracted rows live in `email_receipts`, keyed by Gmail message ID for
+repeat-scan dedupe, with `gmail-receipt-email/v1` provenance, confidence,
+and a user correction overlay that never rewrites the original
+extraction. Low-confidence rows surface as needs-review in the Gmail
+panel's extracted-receipts section with confirm and correct actions.
+Message bodies are never persisted; parser errors are isolated per
+message and never touch balances. Matching extracted evidence to
+transactions is INT-04 and consumes the stored-row contract documented
+in the technical overview.
+
+```bash
+backend/scripts/verify.sh ./internal/gmail
+backend/scripts/verify.sh ./internal/store/...
+backend/scripts/verify.sh ./internal/api/...
+bun --filter ./frontend test -- src/pages/sources/GmailProviderPanel.test.tsx
+```

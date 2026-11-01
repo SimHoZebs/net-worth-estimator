@@ -1214,6 +1214,104 @@
 				"required": ["id", "dismissed"],
 				"type": "object"
 			},
+			"EmailReceipt": {
+				"additionalProperties": false,
+				"properties": {
+					"amountCents": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"amountText": {
+						"type": "string"
+					},
+					"confidence": {
+						"format": "double",
+						"type": "number"
+					},
+					"correction": {
+						"$ref": "#/components/schemas/EmailReceiptCorrection"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"diagnostics": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"fromAddress": {
+						"type": "string"
+					},
+					"gmailMessageId": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"merchant": {
+						"type": "string"
+					},
+					"messageDate": {
+						"type": "string"
+					},
+					"provenance": {
+						"$ref": "#/components/schemas/ReceiptProvenance"
+					},
+					"receiptDate": {
+						"type": "string"
+					},
+					"reference": {
+						"type": "string"
+					},
+					"scannedAt": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"subject": {
+						"type": "string"
+					},
+					"threadId": {
+						"type": "string"
+					},
+					"verdict": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"gmailMessageId",
+					"verdict",
+					"provenance",
+					"status",
+					"scannedAt"
+				],
+				"type": "object"
+			},
+			"EmailReceiptCorrection": {
+				"additionalProperties": false,
+				"properties": {
+					"amountCents": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"currency": {
+						"type": "string"
+					},
+					"merchant": {
+						"type": "string"
+					},
+					"receiptDate": {
+						"type": "string"
+					},
+					"reference": {
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
 			"ErrorDetail": {
 				"additionalProperties": false,
 				"properties": {
@@ -1980,7 +2078,6 @@
 				"required": ["url"],
 				"type": "object"
 			},
-
 			"GmailCredentialBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2016,7 +2113,6 @@
 				"required": ["connected", "lookbackDays"],
 				"type": "object"
 			},
-
 			"GmailLookbackInputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2037,7 +2133,68 @@
 				"required": ["lookbackDays"],
 				"type": "object"
 			},
-
+			"GmailReceiptOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/GmailReceiptOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"receipt": {
+						"$ref": "#/components/schemas/EmailReceipt"
+					}
+				},
+				"required": ["receipt"],
+				"type": "object"
+			},
+			"GmailReceiptsOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/GmailReceiptsOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"nextCursor": {
+						"type": "string"
+					},
+					"receipts": {
+						"items": {
+							"$ref": "#/components/schemas/EmailReceipt"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": ["receipts", "nextCursor"],
+				"type": "object"
+			},
+			"GmailReviewInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/GmailReviewInputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"correction": {
+						"$ref": "#/components/schemas/EmailReceiptCorrection"
+					}
+				},
+				"type": "object"
+			},
 			"IntegrationListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2060,7 +2217,6 @@
 				"required": ["providers"],
 				"type": "object"
 			},
-
 			"Item": {
 				"additionalProperties": false,
 				"properties": {
@@ -3207,7 +3363,6 @@
 				"required": ["id", "connected", "syncConfigured"],
 				"type": "object"
 			},
-
 			"Receipt": {
 				"additionalProperties": false,
 				"properties": {
@@ -4032,6 +4187,64 @@
 					"incomeRuleIds",
 					"transactionIds",
 					"statementDaySet"
+				],
+				"type": "object"
+			},
+			"ScanSummary": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ScanSummary.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"failed": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"incremental": {
+						"type": "boolean"
+					},
+					"listed": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"needsReview": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"receipts": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"refunds": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"skipped": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"triaged": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"truncated": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"incremental",
+					"listed",
+					"triaged",
+					"receipts",
+					"refunds",
+					"needsReview",
+					"skipped",
+					"failed",
+					"truncated"
 				],
 				"type": "object"
 			},
@@ -5928,7 +6141,6 @@
 				"summary": "List integration providers with connection and sync status"
 			}
 		},
-
 		"/v1/integrations/gmail/auth-url": {
 			"get": {
 				"operationId": "get-gmail-auth-url",
@@ -6075,7 +6287,170 @@
 				"summary": "Set the Gmail initial scan lookback in days"
 			}
 		},
-
+		"/v1/integrations/gmail/receipts": {
+			"get": {
+				"operationId": "list-gmail-receipts",
+				"parameters": [
+					{
+						"description": "Comma-separated verdicts: receipt, refund, shipping-only, ordinary, failed",
+						"explode": false,
+						"in": "query",
+						"name": "verdict",
+						"schema": {
+							"description": "Comma-separated verdicts: receipt, refund, shipping-only, ordinary, failed",
+							"maxLength": 200,
+							"type": "string"
+						}
+					},
+					{
+						"description": "Comma-separated statuses: ready, needs-review, confirmed",
+						"explode": false,
+						"in": "query",
+						"name": "status",
+						"schema": {
+							"description": "Comma-separated statuses: ready, needs-review, confirmed",
+							"maxLength": 200,
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "cursor",
+						"schema": {
+							"maxLength": 100,
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "limit",
+						"schema": {
+							"default": 50,
+							"format": "int64",
+							"maximum": 100,
+							"minimum": 1,
+							"type": "integer"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/GmailReceiptsOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Read extracted Gmail receipt evidence"
+			}
+		},
+		"/v1/integrations/gmail/receipts/{id}": {
+			"patch": {
+				"operationId": "review-gmail-receipt",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"maxLength": 100,
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/GmailReviewInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/GmailReceiptOutputBody"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Confirm or correct one extracted Gmail receipt"
+			}
+		},
+		"/v1/integrations/gmail/scan": {
+			"post": {
+				"operationId": "scan-gmail-receipts",
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ScanSummary"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Scan Gmail for purchase and refund receipts"
+			}
+		},
 		"/v1/payment-terms": {
 			"post": {
 				"operationId": "save-payment-terms",

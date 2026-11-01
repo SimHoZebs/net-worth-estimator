@@ -114,6 +114,24 @@ type Store interface {
 	// and scan cursor are forgotten. The lookback preference is kept so
 	// a reconnect resumes with the user's window.
 	ClearGmailCredential() error
+	// SaveEmailReceipt records one triaged Gmail message. The Gmail
+	// message ID dedupes repeat scans: a repeat save keeps the first
+	// extraction and any user correction, never a duplicate row. An
+	// empty ID receives a server-generated value.
+	SaveEmailReceipt(receipt EmailReceipt) (EmailReceipt, error)
+	// IsGmailMessageScanned reports whether a Gmail message already has
+	// a stored triage row, so repeat scans skip it without refetching.
+	IsGmailMessageScanned(messageID string) (bool, error)
+	// ListEmailReceipts returns stored email receipts in ID order,
+	// optionally filtered by verdict and status with cursor pagination.
+	ListEmailReceipts(filter EmailReceiptFilter) ([]EmailReceipt, error)
+	// GetEmailReceipt reads one stored email receipt by ID.
+	GetEmailReceipt(id string) (EmailReceipt, error)
+	// ReviewEmailReceipt confirms or corrects one extraction. The
+	// correction overlays the original values and marks the row
+	// confirmed; a nil correction confirms the extraction as-is. The
+	// original extraction and provenance are preserved.
+	ReviewEmailReceipt(id string, correction *EmailReceiptCorrection) (EmailReceipt, error)
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
 	ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
