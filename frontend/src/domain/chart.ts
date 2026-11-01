@@ -323,13 +323,16 @@ export function trailingDailyPoints(
 	// known balance per account, so sparse snapshot rows expand into a
 	// continuous per-account series for the contribution stack.
 	const balances: Record<string, number> = {};
+	// Both the day sequence and sorted are date-ordered: sweep once with a
+	// cursor instead of re-scanning the prefix per day.
+	let cursor = 0;
+	let current = sorted[0]!;
 	for (let offset = 0; offset < days; offset++) {
 		const date = shiftDate({ date: start, days: offset });
-		let current = sorted[0]!;
-		for (const point of sorted) {
-			if (point.date.slice(0, 10) <= date) current = point;
-			else break;
+		while (cursor + 1 < sorted.length && sorted[cursor + 1]!.date.slice(0, 10) <= date) {
+			cursor++;
 		}
+		if (sorted[cursor]!.date.slice(0, 10) <= date) current = sorted[cursor]!;
 		for (const [accountId, balance] of Object.entries(current.balances)) {
 			balances[accountId] = balance;
 		}

@@ -128,62 +128,107 @@ export function deriveFundingGaps({
 }): FundingGap[] {
 	if (!projection) return [];
 	const selectedIds = postingIds === null ? null : new Set(postingIds);
+	const current = projection;
 	// Execution order is projection.transactions order (date, sequence).
-	const failures = projection.transactions.filter(
+	const failures = current.transactions.filter(
 		(transaction) =>
 			(transaction.fulfillment?.unfulfilledAmount ?? 0) > 0 &&
 			(selectedIds === null || selectedIds.has(transaction.transactionId)),
 	);
+	if (failures.length === 0) return [];
+	// Shared indexes built once: accounts by id, projection position by
+	// (transactionId, date), and failure positions in execution order.
+	const accountById = new Map(accounts.map((account) => [account.id, account]));
+	const projectionIndex = new Map<string, number>();
+	current.transactions.forEach((transaction, index) => {
+		const key = `${transaction.transactionId}\u0000${transaction.date}`;
+		if (!projectionIndex.has(key)) projectionIndex.set(key, index);
+	});
+	const failureIndexByObject = new Map<TransactionResult, number>();
+	current.transactions.forEach((transaction, index) => {
+		// Failures are element references from the same array, so map them
+		// directly instead of indexOf per failure.
+		if ((transaction.fulfillment?.unfulfilledAmount ?? 0) > 0) {
+			failureIndexByObject.set(transaction, index);
+		}
+	});
+	// Points snapshot end-of-day balances; the opening is the latest array
+	// element strictly before the window month (same-month points already
+	// include that month's transactions). Scan once per distinct month
+	// instead of copying and reversing the array per failure.
+	const points = current.points;
+	const priorPointByWindow = new Map<string, (typeof points)[number] | undefined>();
+	const priorPoint = (windowStart: string): (typeof points)[number] | undefined => {
+		if (priorPointByWindow.has(windowStart)) return priorPointByWindow.get(windowStart);
+		let found: (typeof points)[number] | undefined;
+		for (let i = points.length - 1; i >= 0; i--) {
+			if (points[i]!.date < windowStart) {
+				found = points[i];
+				break;
+			}
+		}
+		priorPointByWindow.set(windowStart, found);
+		return found;
+	};
+	// One ledger build per funding account instead of per failure: group
+	// failures, call accountTransactions once each, then slice per failure.
+	const failuresByAccount = new Map<string, TransactionResult[]>();
+	for (const failure of failures) {
+		const accountId = failure.fromId ?? failure.toId;
+		if (!accountId) continue;
+		const group = failuresByAccount.get(accountId);
+		if (group) group.push(failure);
+		else failuresByAccount.set(accountId, [failure]);
+	}
+	const ledgerByAccount = new Map<string, ReturnType<typeof accountTransactions>>();
+	for (const accountId of failuresByAccount.keys()) {
+		ledgerByAccount.set(
+			accountId,
+			accountTransactions({
+				accountId,
+				accounts,
+				transactions,
+				startDate,
+				projection: current,
+			}),
+		);
+	}
 	return failures.flatMap((failure: TransactionResult): FundingGap[] => {
 		const accountId = failure.fromId ?? failure.toId;
 		if (!accountId) return [];
-		const account = accounts.find((item) => item.id === accountId);
+		const account = accountById.get(accountId);
 		const accountName = account?.name ?? "Unknown account";
 		const windowStart = monthStart(failure.date);
 		// Opening is the balance before the window opens: the latest point
 		// strictly before the window month. Points snapshot end-of-day
 		// balances, so a same-month point already includes that month's
 		// transactions and reusing it would double-count the ledger below.
-		const priorPoint = [...projection.points]
-			.reverse()
-			.find((point) => point.date < windowStart);
-		const opening = priorPoint?.balances[accountId] ?? account?.balance ?? 0;
+		const opening = priorPoint(windowStart)?.balances[accountId] ?? account?.balance ?? 0;
 		// Only successfully executed transactions affecting this account before
 		// the failed payment, in execution order. Exclude the failed payment
 		// itself and any later deposits.
-		const ledger = accountTransactions({
-			accountId,
-			accounts,
-			transactions,
-			startDate,
-			projection,
-		})
-			.filter(
-				(transaction) =>
-					transaction.date >= windowStart &&
-					transaction.date <= failure.date &&
-					!(
-						transaction.transactionId === failure.transactionId &&
-						transaction.date === failure.date
-					),
-			)
+		const fullLedger = ledgerByAccount.get(accountId) ?? [];
+		const failureIndex = failureIndexByObject.get(failure) ?? projectionIndex.get(`${failure.transactionId}\u0000${failure.date}`) ?? -1;
+		const orderedLedger = fullLedger.filter(
+			(transaction) =>
+				transaction.date >= windowStart &&
+				transaction.date <= failure.date &&
+				!(
+					transaction.transactionId === failure.transactionId &&
+					transaction.date === failure.date
+				) &&
+				(() => {
+					const index = projectionIndex.get(
+						`${transaction.transactionId}\u0000${transaction.date}`,
+					);
+					return index === undefined || index < failureIndex;
+				})(),
+		);
+		const entries: FundingGapTransaction[] = orderedLedger
 			.sort((a, b) =>
 				a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1,
-			);
-		// Cut off at the failure's position in execution order: projection
-		// transactions are already ordered, so keep ledger entries whose
-		// (date, transactionId) precedes the failure.
-		const failureIndex = projection.transactions.indexOf(failure);
-		const orderedLedger = ledger.filter((transaction) => {
-			const index = projection.transactions.findIndex(
-				(candidate) =>
-					candidate.transactionId === transaction.transactionId &&
-					candidate.date === transaction.date,
-			);
-			return index === -1 || index < failureIndex;
-		});
-		const entries: FundingGapTransaction[] = orderedLedger.map(
-			(transaction) => ({
+			)
+			.map((transaction) => ({
 				id: transaction.id,
 				date: transaction.date,
 				name: transaction.name,

@@ -81,11 +81,9 @@ export function accountTransactions({
 	startDate: string;
 	projection?: Projection | null;
 }): AccountTransaction[] {
-	if (
-		!accounts.some((account) => account.id === accountId && !account.archived)
-	)
-		return [];
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
+	const archived = new Map(accounts.map((account) => [account.id, account.archived]));
+	if (archived.get(accountId) !== false) return [];
 	const connection = (transaction: ConnectionTransaction) => {
 		const deltas =
 			transaction.accountDeltas.length > 0
@@ -103,10 +101,12 @@ export function accountTransactions({
 							? [{ accountId: transaction.toId, delta: transaction.realized }]
 							: []),
 					];
-		const delta = deltas.find((item) => item.accountId === accountId);
-		const destinationIds = deltas
-			.filter((item) => item.delta > 0)
-			.map((item) => item.accountId);
+		let delta: (typeof deltas)[number] | undefined;
+		const destinationIds: string[] = [];
+		for (const item of deltas) {
+			if (item.accountId === accountId && delta === undefined) delta = item;
+			if (item.delta > 0) destinationIds.push(item.accountId);
+		}
 		const direction =
 			(delta?.delta ?? 0) < 0 ? ("out" as const) : ("in" as const);
 		const category =
@@ -138,47 +138,44 @@ export function accountTransactions({
 	// Deliberate exclusion is owner-only, except that pending and void bank
 	// rows are lifecycle states, never exclusions: a settled bank row
 	// participates like a manual actual unless the owner disables it.
-	const recorded: AccountTransaction[] = transactions
-		.filter(
-			(transaction) =>
-				(isHistoricalTransaction(transaction, startDate) ||
-					isPendingTransaction(transaction)) &&
-				(transaction.fromId === accountId || transaction.toId === accountId),
-		)
-		.map((transaction) => ({
-			id: `recorded-${transaction.id}`,
-			transactionId: transaction.id,
-			date: transaction.startDate,
-			name: transaction.name,
-			source: "historical",
-			...connection({
-				fromId: transaction.fromId,
-				toId: transaction.toId,
-				accountDeltas: [],
+	// Single pass builds the recorded partition plus the pending/void sets.
+	const recorded: AccountTransaction[] = [];
+	const pendingIds = new Set<string>();
+	const voidIds = new Set<string>();
+	for (const transaction of transactions) {
+		if (isPendingTransaction(transaction)) pendingIds.add(transaction.id);
+		if (transaction.void === true) voidIds.add(transaction.id);
+		if (
+			(isHistoricalTransaction(transaction, startDate) ||
+				isPendingTransaction(transaction)) &&
+			(transaction.fromId === accountId || transaction.toId === accountId)
+		) {
+			recorded.push({
+				id: `recorded-${transaction.id}`,
+				transactionId: transaction.id,
+				date: transaction.startDate,
+				name: transaction.name,
+				source: "historical",
+				...connection({
+					fromId: transaction.fromId,
+					toId: transaction.toId,
+					accountDeltas: [],
+					requested: transaction.amount,
+					realized: transaction.amount,
+				}),
+				amount: transaction.amount,
 				requested: transaction.amount,
-				realized: transaction.amount,
-			}),
-			amount: transaction.amount,
-			requested: transaction.amount,
-			shortfall: 0,
-			constraint: null,
-			excluded:
-				!transaction.enabled &&
-				(transaction.syncOwned !== true ||
-					(!isPendingTransaction(transaction) && transaction.void !== true)),
-			pending: isPendingTransaction(transaction),
-			void: transaction.void === true,
-		}));
-	const pendingIds = new Set(
-		transactions
-			.filter(isPendingTransaction)
-			.map((transaction) => transaction.id),
-	);
-	const voidIds = new Set(
-		transactions
-			.filter((transaction) => transaction.void === true)
-			.map((transaction) => transaction.id),
-	);
+				shortfall: 0,
+				constraint: null,
+				excluded:
+					!transaction.enabled &&
+					(transaction.syncOwned !== true ||
+						(!isPendingTransaction(transaction) && transaction.void !== true)),
+				pending: isPendingTransaction(transaction),
+				void: transaction.void === true,
+			});
+		}
+	}
 	const startDateHasCheckpoint = projection?.startDateHasCheckpoint ?? true;
 	const projected: AccountTransaction[] = !projection
 		? []
@@ -196,12 +193,14 @@ export function accountTransactions({
 						transaction.requested > 0,
 				)
 				.map((transaction, index) => {
-					const selectedDelta = transaction.accountDeltas.find(
-						(delta) => delta.accountId === accountId,
-					);
-					const destinationCount = transaction.accountDeltas.filter(
-						(delta) => delta.delta > 0,
-					).length;
+					let selectedDelta: (typeof transaction.accountDeltas)[number] | undefined;
+					let destinationCount = 0;
+					for (const candidate of transaction.accountDeltas) {
+						if (candidate.accountId === accountId && selectedDelta === undefined) {
+							selectedDelta = candidate;
+						}
+						if (candidate.delta > 0) destinationCount++;
+					}
 					const accountAmount = selectedDelta
 						? Math.abs(selectedDelta.delta)
 						: transaction.realized;

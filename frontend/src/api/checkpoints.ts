@@ -24,27 +24,46 @@ export function latestCheckpoint(
 	accountId: string,
 	through: string,
 ): BackendCheckpoint | null {
-	let latest: BackendCheckpoint | null = null;
-	let latestInstant = -1;
+	return latestCheckpointsThrough(checkpoints, through).get(accountId) ?? null;
+}
+
+/**
+ * Latest saved observation per account on or before a date, in one pass.
+ * Use this instead of latestCheckpoint per card to avoid rescanning the
+ * checkpoint list once per card.
+ */
+export function latestCheckpointsThrough(
+	checkpoints: readonly BackendCheckpoint[],
+	through: string,
+): Map<string, BackendCheckpoint> {
+	const latestByAccount = new Map<string, BackendCheckpoint>();
+	const instantByAccount = new Map<string, number>();
 	for (const checkpoint of checkpoints) {
-		if (checkpoint.AccountId !== accountId) continue;
 		const instant = checkpointInstant(checkpoint);
 		const day = new Date(instant * 1000).toISOString().slice(0, 10);
 		if (day > through) continue;
-		if (latest === null || instant > latestInstant) {
-			latest = checkpoint;
-			latestInstant = instant;
+		const accountId = checkpoint.AccountId;
+		const latest = latestByAccount.get(accountId);
+		if (latest === undefined) {
+			latestByAccount.set(accountId, checkpoint);
+			instantByAccount.set(accountId, instant);
+			continue;
+		}
+		const latestInstant = instantByAccount.get(accountId)!;
+		if (instant > latestInstant) {
+			latestByAccount.set(accountId, checkpoint);
+			instantByAccount.set(accountId, instant);
 			continue;
 		}
 		if (instant === latestInstant) {
 			const owner = isOwnerCheckpoint(checkpoint);
 			const latestOwner = isOwnerCheckpoint(latest);
 			if ((owner && !latestOwner) || owner === latestOwner) {
-				latest = checkpoint;
+				latestByAccount.set(accountId, checkpoint);
 			}
 		}
 	}
-	return latest;
+	return latestByAccount;
 }
 
 export function checkpointDay(checkpoint: BackendCheckpoint): string {
