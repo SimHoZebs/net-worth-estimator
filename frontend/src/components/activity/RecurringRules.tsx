@@ -191,8 +191,12 @@ export function RecurringRules({
 		const ordered = displayedIds
 			.map((id) => byId.get(id))
 			.filter((item): item is Transaction => item !== undefined);
+		const seen = new Set(ordered.map((transaction) => transaction.id));
 		for (const transaction of rules) {
-			if (!ordered.includes(transaction)) ordered.push(transaction);
+			if (!seen.has(transaction.id)) {
+				seen.add(transaction.id);
+				ordered.push(transaction);
+			}
 		}
 		return ordered;
 	}, [rules, displayedIds]);

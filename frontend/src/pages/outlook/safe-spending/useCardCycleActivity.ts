@@ -52,6 +52,7 @@ export function useCardCycleActivity({
 			todayIso: shiftDate({ date: cycle.cycleStart, days: -1 }),
 			statementDay,
 		});
+		const cardById = new Map(cards.map((card) => [card.id, card.name]));
 		const perAccount = !projection
 			? []
 			: trackedIds.map((accountId) => {
@@ -64,8 +65,7 @@ export function useCardCycleActivity({
 					});
 					return {
 						accountId,
-						name:
-							cards.find((card) => card.id === accountId)?.name ?? accountId,
+						name: cardById.get(accountId) ?? accountId,
 						derived: cycleSpentSoFar({
 							transactions: activity,
 							cycleStart: cycle.cycleStart,

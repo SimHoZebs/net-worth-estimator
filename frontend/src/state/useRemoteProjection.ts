@@ -141,7 +141,8 @@ function evaluationProbability(
 
 function rowBalances(
 	row: ProjectionResult["timeline"]["rows"][number],
-	accountSummaries: ProjectionResult["accountSummaries"],
+	startingBalances: Record<string, number> | null,
+	endingBalances: Record<string, number> | null,
 	first: boolean,
 	last: boolean,
 ): Record<string, number> {
@@ -152,20 +153,8 @@ function rowBalances(
 				snapshot.balance,
 			]),
 		);
-	if (first)
-		return Object.fromEntries(
-			accountSummaries.map((summary) => [
-				summary.accountId,
-				summary.startingBalance,
-			]),
-		);
-	if (last)
-		return Object.fromEntries(
-			accountSummaries.map((summary) => [
-				summary.accountId,
-				summary.endingBalance,
-			]),
-		);
+	if (first && startingBalances) return startingBalances;
+	if (last && endingBalances) return endingBalances;
 	return {};
 }
 
@@ -175,13 +164,44 @@ export function projectionResultToLocal(
 	horizonYears?: number,
 ): Projection {
 	const rows = result.timeline.rows;
+	// Starting/ending balance records built at most once per mapping instead
+	// of once per timeline row.
+	let startingBalances: Record<string, number> | null = null;
+	let endingBalances: Record<string, number> | null = null;
+	const balancesFor = (kind: "starting" | "ending"): Record<string, number> => {
+		if (kind === "starting") {
+			if (!startingBalances) {
+				startingBalances = Object.fromEntries(
+					result.accountSummaries.map((summary) => [
+						summary.accountId,
+						summary.startingBalance,
+					]),
+				);
+			}
+			return startingBalances;
+		}
+		if (!endingBalances) {
+			endingBalances = Object.fromEntries(
+				result.accountSummaries.map((summary) => [
+					summary.accountId,
+					summary.endingBalance,
+				]),
+			);
+		}
+		return endingBalances;
+	};
+	const needsStarting = rows.length === 0 || rows[0]!.accountSnapshots.length === 0;
+	const needsEnding = rows.length > 0 && rows[rows.length - 1]!.accountSnapshots.length === 0;
+	const starting = needsStarting || rows.length === 0 ? balancesFor("starting") : null;
+	const ending = needsEnding ? balancesFor("ending") : null;
 	const points = rows.length
 		? rows.map((row, index) => ({
 				date: row.date,
 				total: row.netWorth,
 				balances: rowBalances(
 					row,
-					result.accountSummaries,
+					starting,
+					ending,
 					index === 0,
 					index === rows.length - 1,
 				),
@@ -190,12 +210,7 @@ export function projectionResultToLocal(
 				{
 					date: result.milestones.projectionStartDate,
 					total: result.summary.currentNetWorth,
-					balances: Object.fromEntries(
-						result.accountSummaries.map((summary) => [
-							summary.accountId,
-							summary.startingBalance,
-						]),
-					),
+					balances: { ...starting! },
 				},
 			];
 	const projectionStartDate = result.milestones.projectionStartDate;
@@ -206,7 +221,9 @@ export function projectionResultToLocal(
 				.slice(0, 10);
 			return day === projectionStartDate;
 		}) ?? false;
-	const transactions = projectionTransactions(result, model);
+	const transactions = projectionTransactions(result, model, {
+		startCheckpoint,
+	});
 	const balances = new Map(
 		result.accountSummaries.map((summary) => [summary.accountId, summary]),
 	);
@@ -218,6 +235,24 @@ export function projectionResultToLocal(
 	);
 	const balanceByID = new Map(
 		result.evaluations.accountBalance.map((evaluation) => [
+			evaluation.instanceId,
+			evaluation,
+		]),
+	);
+	const independenceByID = new Map(
+		result.evaluations.financialIndependence.map((evaluation) => [
+			evaluation.instanceId,
+			evaluation,
+		]),
+	);
+	const fulfillmentByID = new Map(
+		result.evaluations.postingFulfillment.map((evaluation) => [
+			evaluation.instanceId,
+			evaluation,
+		]),
+	);
+	const cycleByID = new Map(
+		(result.evaluations.cycleFulfillment ?? []).map((evaluation) => [
 			evaluation.instanceId,
 			evaluation,
 		]),
@@ -253,9 +288,7 @@ export function projectionResultToLocal(
 	const otherEvaluations = [
 		...(model?.evaluations.financialIndependence ?? []).map((evaluation) =>
 			OTHER_EVAL_OUTCOME_RENDERERS.financialIndependence(evaluation, {
-				envelope: result.evaluations.financialIndependence.find(
-					(item) => item.instanceId === evaluation.instanceId,
-				),
+				envelope: independenceByID.get(evaluation.instanceId),
 				postingIds: null,
 				enabled: evaluation.enabled,
 				model,
@@ -265,9 +298,7 @@ export function projectionResultToLocal(
 		),
 		...(model?.evaluations.postingFulfillment ?? []).map((evaluation) =>
 			OTHER_EVAL_OUTCOME_RENDERERS.postingFulfillment(evaluation, {
-				envelope: result.evaluations.postingFulfillment.find(
-					(item) => item.instanceId === evaluation.instanceId,
-				),
+				envelope: fulfillmentByID.get(evaluation.instanceId),
 				postingIds: Array.isArray(valueRecord(evaluation.config)?.postingIds)
 					? (valueRecord(evaluation.config)!.postingIds as string[])
 					: null,
@@ -276,9 +307,7 @@ export function projectionResultToLocal(
 		),
 		...(model?.evaluations.cycleFulfillment ?? []).map((evaluation) =>
 			OTHER_EVAL_OUTCOME_RENDERERS.cycleFulfillment(evaluation, {
-				envelope: (result.evaluations.cycleFulfillment ?? []).find(
-					(item) => item.instanceId === evaluation.instanceId,
-				),
+				envelope: cycleByID.get(evaluation.instanceId),
 				postingIds: null,
 				enabled: evaluation.enabled,
 			}),

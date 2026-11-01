@@ -33,7 +33,9 @@ export function PurchaseScheduleView({
 			waiting.push(item);
 			continue;
 		}
-		dates.set(date, [...(dates.get(date) ?? []), item]);
+		const existing = dates.get(date);
+		if (existing) existing.push(item);
+		else dates.set(date, [item]);
 	}
 	const groups: DateGroup[] = [...dates]
 		.sort(([a], [b]) => a.localeCompare(b))

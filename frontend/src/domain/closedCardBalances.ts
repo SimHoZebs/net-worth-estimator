@@ -1,4 +1,4 @@
-import { latestCheckpoint } from "../api/checkpoints.ts";
+import { latestCheckpointsThrough } from "../api/checkpoints.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { isoDateFromEpochSeconds } from "./format.ts";
 
@@ -28,8 +28,9 @@ export function closedCardBalances({
 	cards: { id: string; name: string }[];
 	cycleEnd: string;
 }): ClosedCardBalances {
+	const latestByAccount = latestCheckpointsThrough(checkpoints, cycleEnd);
 	const balances = cards.map((card) => {
-		const checkpoint = latestCheckpoint(checkpoints, card.id, cycleEnd);
+		const checkpoint = latestByAccount.get(card.id);
 		return {
 			...card,
 			amount: checkpoint ? Math.max(0, -checkpoint.Balance) : null,

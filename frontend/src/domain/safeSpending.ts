@@ -300,6 +300,7 @@ export function groupMandatorySpending({
 }): MandatorySpendingGroup[] {
 	const sources = new Set(checkingIds);
 	const groups = new Map<string, MandatorySpendingGroup>();
+	const dateSets = new Map<string, Set<string>>();
 	for (const transaction of transactions) {
 		if (transaction.fromId === null || !sources.has(transaction.fromId))
 			continue;
@@ -310,19 +311,20 @@ export function groupMandatorySpending({
 		if (existing) {
 			existing.total += transaction.requested;
 			existing.count += 1;
-			if (!existing.dates.includes(transaction.date)) {
-				existing.dates.push(transaction.date);
-				existing.dates.sort();
-			}
+			dateSets.get(key)!.add(transaction.date);
 		} else {
 			groups.set(key, {
 				transactionId: transaction.transactionId,
 				name: transaction.name || transaction.transactionId,
 				total: transaction.requested,
 				count: 1,
-				dates: [transaction.date],
+				dates: [],
 			});
+			dateSets.set(key, new Set([transaction.date]));
 		}
+	}
+	for (const [key, group] of groups) {
+		group.dates = [...dateSets.get(key)!].sort();
 	}
 	return [...groups.values()].sort(
 		(a, b) => b.total - a.total || a.name.localeCompare(b.name),

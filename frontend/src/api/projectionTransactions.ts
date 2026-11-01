@@ -63,14 +63,17 @@ function transactionConstraintLabel(type: string): string {
 export function projectionTransactions(
 	result: ProjectionResult,
 	model: FinancialModel | null,
+	options?: { startCheckpoint?: boolean },
 ): TransactionResult[] {
 	const start = result.milestones.projectionStartDate;
-	const startCheckpoint = model?.checkpoints.some((checkpoint) => {
-		const day = new Date(checkpoint.observedAt * 1000)
-			.toISOString()
-			.slice(0, 10);
-		return day === start;
-	});
+	const startCheckpoint =
+		options?.startCheckpoint ??
+		model?.checkpoints.some((checkpoint) => {
+			const day = new Date(checkpoint.observedAt * 1000)
+				.toISOString()
+				.slice(0, 10);
+			return day === start;
+		});
 	const sources = transactionSourceIndex(model);
 	return (result.transactionEvents ?? [])
 		.filter(
