@@ -126,8 +126,22 @@ type FinancialHealthExplanationOptions struct {
 }
 
 // DefaultFinancialHealthExplanationOptions returns the adjustable starting
-// points for an explanation. Like the health standards, these are
-// configured guidelines, not universal requirements.
+// points for an explanation. The 14-day recency limit is a uniform
+// guideline constant, not a requirement: like the health standards, it is
+// a configured starting point the user can change, never a universal rule.
 func DefaultFinancialHealthExplanationOptions() FinancialHealthExplanationOptions {
 	return FinancialHealthExplanationOptions{StaleAfterDays: 14}
+}
+
+// FinancialHealthEvaluationDetail is the evaluation detail model for a
+// financial-health evaluation: the FIN-03 report readers already fetch,
+// with the FIN-05 explanation wired into the same shape. Readers get the
+// explanation with the detail, never through a separate endpoint or
+// response envelope: there is deliberately no route or handler behind
+// this struct. Storage shape (per-evaluation tables, plugin storage) is
+// future work and explicitly out of scope here; this detail is a
+// read-model composition only.
+type FinancialHealthEvaluationDetail struct {
+	Report      FinancialHealthReport      `json:"report"`
+	Explanation FinancialHealthExplanation `json:"explanation"`
 }

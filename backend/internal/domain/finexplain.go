@@ -283,6 +283,22 @@ func ExplainFinancialHealth(model *types.FinancialModel, position *types.Current
 	}
 }
 
+// ComposeFinancialHealthDetail builds the evaluation detail model for one
+// health evaluation: the FIN-03 report plus the FIN-05 explanation wired
+// into the same shape.
+//
+// Reader-only: it consumes the evaluation reader path only (the saved
+// model, the current position, and the descriptive report). It never
+// invokes the simulator evaluations, never runs a projection, and never
+// writes: all three inputs are read without mutation.
+func ComposeFinancialHealthDetail(model *types.FinancialModel, position *types.CurrentPosition, standards types.FinancialHealthStandards, options types.FinancialHealthExplanationOptions) types.FinancialHealthEvaluationDetail {
+	report := EvaluateFinancialHealth(model, position, standards)
+	return types.FinancialHealthEvaluationDetail{
+		Report:      report,
+		Explanation: ExplainFinancialHealth(model, position, report, options),
+	}
+}
+
 // finExplainInsufficient reports the no-usable-state case: nothing is
 // graded, one action points at recording baseline data, and no fitness is
 // claimed.

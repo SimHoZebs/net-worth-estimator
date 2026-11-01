@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -287,5 +289,61 @@ func TestExplainFinancialHealthActionsLinkEvidenceAndTargets(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestComposeFinancialHealthDetailBundlesReportAndExplanation(t *testing.T) {
+	model, position, _ := finExplainFixture()
+	standards := types.DefaultFinancialHealthStandards()
+	options := types.DefaultFinancialHealthExplanationOptions()
+	detail := ComposeFinancialHealthDetail(model, position, standards, options)
+	wantReport := EvaluateFinancialHealth(model, position, standards)
+	if !reflect.DeepEqual(detail.Report, wantReport) {
+		t.Fatalf("detail report differs from the evaluation reader output")
+	}
+	wantExplanation := ExplainFinancialHealth(model, position, wantReport, options)
+	if !reflect.DeepEqual(detail.Explanation, wantExplanation) {
+		t.Fatalf("detail explanation differs from the direct ExplainFinancialHealth output")
+	}
+	if detail.Explanation.AsOfDate != detail.Report.AsOfDate {
+		t.Fatalf("detail cut = %q, want the report cut %q", detail.Explanation.AsOfDate, detail.Report.AsOfDate)
+	}
+}
+
+func finExplainSnapshot(t *testing.T, value any) string {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	return string(encoded)
+}
+
+// TestExplainFinancialHealthReaderOnly pins the reader-only constraint:
+// the explain path consumes the evaluation reader inputs only, mutates
+// none of them (never writes), and recomposes deterministically without
+// simulator state.
+func TestExplainFinancialHealthReaderOnly(t *testing.T) {
+	model, position, _ := finExplainFixture()
+	standards := types.DefaultFinancialHealthStandards()
+	options := types.DefaultFinancialHealthExplanationOptions()
+	report := EvaluateFinancialHealth(model, position, standards)
+	beforeModel, beforePosition, beforeReport := finExplainSnapshot(t, model), finExplainSnapshot(t, position), finExplainSnapshot(t, report)
+
+	first := ComposeFinancialHealthDetail(model, position, standards, options)
+	ExplainFinancialHealth(model, position, report, options)
+
+	if got := finExplainSnapshot(t, model); got != beforeModel {
+		t.Fatalf("explain path mutated the model")
+	}
+	if got := finExplainSnapshot(t, position); got != beforePosition {
+		t.Fatalf("explain path mutated the position")
+	}
+	if got := finExplainSnapshot(t, report); got != beforeReport {
+		t.Fatalf("explain path mutated the report")
+	}
+	second := ComposeFinancialHealthDetail(model, position, standards, options)
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("explain path is not a pure recomposition of its reader inputs")
 	}
 }
