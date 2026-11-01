@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -110,12 +111,10 @@ func main() {
 	// A reset must not interleave with an in-flight request holding the store.
 	var mu sync.Mutex
 	live := &switcher{}
-	sharingSeeded := false
 
 	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction) error {
 		mu.Lock()
 		defer mu.Unlock()
-		sharingSeeded = false
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
@@ -157,10 +156,11 @@ func main() {
 	defer stopAnalyses()
 
 	mux := http.NewServeMux()
-	// Sharing seed provisions a second user, a group with the fixture user as
-	// a member, and group-granted postings for shared-feed browser tests. It
-	// runs once per reset; repeat calls report conflict so seeds stay
-	// deterministic.
+	// Sharing seed provisions a fresh second user, a group with the fixture
+	// user as a member, and group-granted postings for shared-feed browser
+	// tests. Every call mints a new owner, so seeds never collide with state
+	// surviving the user-scoped reset; group names must be distinct per call
+	// within a run so the UI lists one matching group.
 	mux.Handle("/__fixture/sharing", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
 			writer.WriteHeader(http.StatusMethodNotAllowed)
@@ -168,11 +168,6 @@ func main() {
 		}
 		mu.Lock()
 		defer mu.Unlock()
-		if sharingSeeded {
-			writer.WriteHeader(http.StatusConflict)
-			fmt.Fprintln(writer, "sharing already seeded; reset first")
-			return
-		}
 		var body struct {
 			GroupName    string               `json:"groupName"`
 			OwnerDisplay string               `json:"ownerDisplay"`
@@ -193,7 +188,6 @@ func main() {
 			fmt.Fprintln(writer, err)
 			return
 		}
-		sharingSeeded = true
 	}))
 	mux.Handle(resetPath, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
@@ -299,12 +293,15 @@ type fixtureSeedPosting struct {
 // fixture user as a member, and one group grant per posting. Pending rows
 // flip through the same lifecycle columns bank sync writes. It answers the
 // seed request with the group ID, the owner resource, and the posting IDs.
+var fixtureSeedOwners int64
+
 func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay string, postings []fixtureSeedPosting, writer http.ResponseWriter) error {
-	ownerID, err := application.EnsureGroupUser(fixtureIssuer, "sharing-owner")
+	subject := fmt.Sprintf("sharing-owner-%d", atomic.AddInt64(&fixtureSeedOwners, 1))
+	ownerID, err := application.EnsureGroupUser(fixtureIssuer, subject)
 	if err != nil {
 		return err
 	}
-	scoped, err := application.EnsureUser(ownerID, fixtureIssuer, "sharing-owner")
+	scoped, err := application.EnsureUser(ownerID, fixtureIssuer, subject)
 	if err != nil {
 		return err
 	}

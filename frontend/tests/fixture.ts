@@ -64,3 +64,37 @@ export async function readSavedServerModel() {
 		await api.dispose();
 	}
 }
+
+export interface SharingSeedPosting {
+	name: string;
+	amount: string;
+	day?: string;
+	pending?: boolean;
+}
+
+export interface SharingSeed {
+	groupId: string;
+	owner: string;
+	postings: Array<{ id: string; name: string }>;
+}
+
+/** Seed one group with granted postings for the fixture user to view. */
+export async function seedSharingFixture(
+	groupName: string,
+	ownerDisplay: string,
+	postings: SharingSeedPosting[],
+): Promise<SharingSeed> {
+	const api = await request.newContext();
+	try {
+		const response = await api.post(`${FIXTURE_API}/__fixture/sharing`, {
+			data: { groupName, ownerDisplay, postings },
+		});
+		if (!response.ok())
+			throw new Error(
+				`sharing seed failed: ${response.status()} ${await response.text()}`,
+			);
+		return (await response.json()) as SharingSeed;
+	} finally {
+		await api.dispose();
+	}
+}
