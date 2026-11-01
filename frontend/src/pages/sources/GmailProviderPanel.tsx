@@ -15,11 +15,11 @@ import {
 	useGmailCredential,
 } from "../../state/gmail.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { GmailReceiptsSection } from "./GmailReceiptsSection.tsx";
 
 // Gmail receipt-discovery connection. The server performs OAuth with the
 // read-only scope only; tokens stay server-side and never render here.
-// Receipt detection itself ships in INT-03: this panel owns connection,
-// lookback, and disconnect.
+// Receipt discovery scans Gmail for purchase and refund receipts below.
 export function GmailProviderPanel() {
 	const credential = useGmailCredential();
 	const readOnly = useUserReadOnly();
@@ -71,9 +71,9 @@ export function GmailProviderPanel() {
 								</div>
 							</div>
 							<p className="mt-4 mb-0 text-sm leading-relaxed text-muted">
-								The server administrator has not configured Gmail
-								connection. Receipt discovery over Gmail is unavailable
-								until the server provides its OAuth credentials.
+								The server administrator has not configured Gmail connection.
+								Receipt discovery over Gmail is unavailable until the server
+								provides its OAuth credentials.
 							</p>
 						</div>
 					</div>
@@ -144,8 +144,8 @@ export function GmailProviderPanel() {
 			{readOnly && (
 				<p className="m-0 rounded-control border border-warning-border bg-warning-bg p-4 text-sm leading-relaxed text-warning-text">
 					This workspace is read-only. You can view the connection details.
-					Write access is required to connect, disconnect, or change the
-					scan window.
+					Write access is required to connect, disconnect, or change the scan
+					window.
 				</p>
 			)}
 			<p
@@ -189,14 +189,13 @@ export function GmailProviderPanel() {
 												<time dateTime={credential.data.lastScanAt}>
 													{credential.data.lastScanAt}
 												</time>
-												. Later scans resume from where the last one
-												stopped.
+												. Later scans resume from where the last one stopped.
 											</>
 										) : (
 											<>
-												The first scan looks back{" "}
-												{credential.data.lookbackDays} days. Later scans
-												resume from where the last one stopped.
+												The first scan looks back {credential.data.lookbackDays}{" "}
+												days. Later scans resume from where the last one
+												stopped.
 											</>
 										)}
 									</p>
@@ -208,14 +207,14 @@ export function GmailProviderPanel() {
 									disabled={readOnly || busy}
 									onSave={(days) => void handleLookbackSave(days)}
 								/>
+								<GmailReceiptsSection readOnly={readOnly} />
 							</div>
 							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
 								{confirmingDisconnect ? (
 									<div>
 										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
-											Disconnect Gmail? Receipt discovery stops and the
-											saved grant is revoked. Your financial records stay
-											in Waypoint.
+											Disconnect Gmail? Receipt discovery stops and the saved
+											grant is revoked. Your financial records stay in Waypoint.
 										</p>
 										<div className="flex flex-wrap gap-4">
 											<TextButton
@@ -257,10 +256,10 @@ export function GmailProviderPanel() {
 									<div className="min-w-0">
 										<h3 className="m-0 text-lg">Gmail</h3>
 										<p className="mt-2 mb-0 text-sm leading-relaxed text-muted">
-											Connect Gmail so Waypoint can find purchase receipts
-											in your mail. Google asks for read-only access to
-											messages; Waypoint cannot send, delete, or relabel
-											mail, and the grant can be revoked here at any time.
+											Connect Gmail so Waypoint can find purchase receipts in
+											your mail. Google asks for read-only access to messages;
+											Waypoint cannot send, delete, or relabel mail, and the
+											grant can be revoked here at any time.
 										</p>
 									</div>
 								</div>
@@ -298,8 +297,7 @@ function GmailLookbackEditor({
 }) {
 	const shown = draft ?? String(lookbackDays);
 	const parsed = Number.parseInt(shown, 10);
-	const valid =
-		Number.isInteger(parsed) && parsed >= 1 && parsed <= 365;
+	const valid = Number.isInteger(parsed) && parsed >= 1 && parsed <= 365;
 	return (
 		<form
 			method="post"
