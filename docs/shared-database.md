@@ -88,13 +88,41 @@ Dev setup and the isolated fixture harness also provision explicitly.
 New user signup still inserts user and default-preset rows. It does not
 create database files or change schema.
 
-## Rollback
+## Backups, rollback, and recovery
 
-Before new writes, stop the API and restore the previous images and database
-configuration. Do not silently restore an older backup over current user data.
+Every schema upgrade runs under the [migration SOP](../deploy/MIGRATIONS.md):
+stop all API writers, take a new private backup set with the SQLite backup
+API, verify `PRAGMA integrity_check` and `PRAGMA foreign_key_check` on the
+backup, and record the backup hash with the source/target SHAs and run ID in
+the release checklist. Never overwrite a backup set on retry, and never copy a
+live database file alone.
 
-After new writes, a rollback requires reconciliation or an accepted loss of those
-writes. Do not silently restore an older backup over current user data.
+```bash
+sqlite3 "$DB" ".backup '$BACKUP'"
+sqlite3 "$BACKUP" 'PRAGMA integrity_check;'
+sqlite3 "$BACKUP" 'SELECT COUNT(*) FROM pragma_foreign_key_check;'
+```
+
+Downgrade recovery restores the verified backup, never a reverse migration.
+With all API writers still stopped, verify the backup, publish it over the
+database with the backup API, and verify the restored file:
+
+```bash
+sqlite3 "$BACKUP" 'PRAGMA integrity_check;'
+sqlite3 "$BACKUP" ".backup main '$DB'"
+sqlite3 "$DB" 'PRAGMA integrity_check;'
+sqlite3 "$DB" 'SELECT COUNT(*) FROM pragma_foreign_key_check;'
+```
+
+Then confirm the restored users and financial rows match the recorded backup
+hash (`sha256sum` against the backup set's `sha256sum.txt`), restore the
+previous images, and restart the API only after the
+readiness and login checks in the SOP pass.
+
+Before new writes, this restore returns the exact pre-upgrade state. After new
+writes, a rollback requires reconciliation or an accepted loss of those writes.
+Do not silently restore an older backup over current user data. Infrastructure
+rollback alone cannot undo data changes.
 
 ## Backups and financial replacement
 
