@@ -114,7 +114,13 @@ func applyAnalysisFeedback(tx *userTx, id string, input types.AnalysisFeedbackIn
 		return feedback, err
 	}
 	if input.Action == "confirm" || input.Action == "reject" || input.Action == "set-duration" {
-		if pending || void || feedback.Prediction.Kind != "bnpl" {
+		if pending || void {
+			return feedback, store.ErrAnalysisFeedbackInvalid
+		}
+		// Owner confirm/reject corrections apply to every independent claim
+		// kind, so BNPL, recurring, transfer, and receipt evidence never
+		// compete for one verdict. Plan duration stays BNPL-specific.
+		if input.Action == "set-duration" && feedback.Prediction.Kind != "bnpl" {
 			return feedback, store.ErrAnalysisFeedbackInvalid
 		}
 	}
