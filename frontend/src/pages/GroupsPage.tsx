@@ -6,6 +6,7 @@ import { ErrorNotice } from "../components/ErrorNotice.tsx";
 import { InputField } from "../components/Field.tsx";
 import { Modal } from "../components/Modal.tsx";
 import { dialogActionsStyles } from "../components/dialogStyles.ts";
+import { GroupSharingSection } from "./GroupSharingSection.tsx";
 import {
 	useCreateGroup,
 	useCreateInvite,
@@ -271,6 +272,10 @@ export function GroupsPage() {
 									</li>
 								))}
 							</ul>
+						)}
+
+						{detail && (
+							<GroupSharingSection groupId={detail.id} />
 						)}
 
 						{detail && (

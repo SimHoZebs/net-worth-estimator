@@ -67,6 +67,7 @@ import {
 } from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
+import { TransactionSharing } from "./TransactionSharing.tsx";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
@@ -1327,6 +1328,12 @@ export function TransactionDetail({
 				)}
 				{once && (
 					<ReceiptPanel
+						postingId={savedTransaction.id}
+						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
+					/>
+				)}
+				{once && (
+					<TransactionSharing
 						postingId={savedTransaction.id}
 						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 					/>
