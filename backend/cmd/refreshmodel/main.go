@@ -25,7 +25,7 @@ var financialTables = []string{
 	"accounts", "checkpoints", "postings", "posting_sim", "posting_claims", "posting_sync_keys", "suppressed_sync_keys",
 	"planned_purchases", "recurrence_rules", "evaluations",
 	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
-	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "amount_presets", "safe_spending_settings",
+	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "gmail_credentials", "amount_presets", "safe_spending_settings",
 	"receipts",
 	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
 }
@@ -174,6 +174,12 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 				// The Bridge key never travels with a refresh or a
 				// financial-only publication: reconnect it where it will
 				// run. Card selection is safe configuration and copies through.
+				values = append(values, "''")
+			case table.name == "gmail_credentials" && (column == "refresh_token" || column == "access_token" || column == "access_expiry" || column == "pending_state" || column == "pending_at"):
+				// Gmail tokens and pending OAuth state never travel with a
+				// refresh or a financial-only publication: reconnect where
+				// it will run. Address, scopes, and lookback preference are
+				// safe configuration and copy through.
 				values = append(values, "''")
 			default:
 				values = append(values, quote(column))
