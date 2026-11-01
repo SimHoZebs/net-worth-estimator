@@ -656,11 +656,32 @@ integrations management page. A `Provider` adapter reports one user-scoped,
 display-only status snapshot (`connected`, `syncConfigured`, connection and
 last-sync times, and non-secret detail such as the Bridge host). The
 `Registry` snapshots adapters in list order, and `GET /v1/integrations`
-serves that snapshot. `NewSimpleFIN` adapts the existing Bridge sync; later
-providers register their own IDs and endpoints without changing this
-contract. Snapshots never contain credential secrets; per-user isolation is
-covered by same-database two-user tests in `internal/integrations` and the
-`list-integrations` contract test in `internal/api/integration`.
+serves that snapshot. `NewSimpleFIN` adapts the existing Bridge sync;
+`NewGmail` adapts the Gmail OAuth connection under its own ID and
+endpoints without changing this contract. Snapshots never contain
+credential secrets; per-user isolation is covered by same-database
+two-user tests in `internal/integrations` and the `list-integrations`
+contract test in `internal/api/integration`.
+
+### Gmail connection
+
+`internal/gmail` owns the Gmail read-only OAuth connection. Consent uses
+exactly the `gmail.readonly` scope with offline access and a consent
+prompt; the pending CSRF state lives on the user's row, expires after ten
+minutes, and clears on consumption. A mismatched state is rejected
+without clearing, so a forged callback cannot wipe an in-flight flow.
+Refresh and access tokens persist only in the
+per-user `gmail_credentials` row and refresh server-side on demand;
+payloads carry display-only state (account address, connection time,
+lookback, last scan). Disconnect revokes the grant at Google
+best-effort and forgets tokens, account, and cursor while keeping the
+lookback preference. The initial scan window defaults to 90 days and is
+configurable from 1 to 365 days; the first scan looks back from now and
+later scans resume from the stored history cursor (scan execution itself
+is INT-03). Fresh databases get the table from the shared schema;
+pre-existing databases gain it on first Gmail use with no row conversion.
+Production needs a verified Google OAuth client and privacy review before
+any production-facing consent flow.
 
 `internal/simplefin` is configured once in `cmd/server`:
 
