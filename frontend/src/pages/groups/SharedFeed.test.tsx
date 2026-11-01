@@ -40,7 +40,7 @@ function stubFeed(pages: Array<{ items: FeedItem[]; nextCursor?: string }>) {
 			const path = String(url);
 			requested.push(`${init?.method ?? "GET"} ${path}`);
 			if (path.startsWith("/v1/shared/groups/g1/feed")) {
-				const page = pages[Math.min(calls, pages.length - 1)];
+				const page = pages[Math.min(calls, pages.length - 1)] ?? { items: [] };
 				calls += 1;
 				const total = pages.flatMap((entry) => entry.items);
 				return ok({

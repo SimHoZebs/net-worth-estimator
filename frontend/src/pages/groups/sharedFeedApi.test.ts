@@ -51,7 +51,8 @@ it("omits empty filters from the feed request", async () => {
 	const fetcher = vi.fn(async () => ok(feedBody()));
 	vi.stubGlobal("fetch", fetcher);
 	await fetchGroupFeed("g1");
-	expect(fetcher.mock.calls[0]?.[0]).toBe("/v1/shared/groups/g1/feed");
+	const [url] = fetcher.mock.calls[0] as unknown as [string];
+	expect(url).toBe("/v1/shared/groups/g1/feed");
 });
 
 it("saves a copy through the recipient copy flow", async () => {
