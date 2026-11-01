@@ -11,7 +11,7 @@ import {
 	useSharingPolicy,
 	useSharingPreview,
 } from "../state/sharing.ts";
-import { revokeSharedPosting } from "../pages/sharingApi.ts";
+import { mintShareRequestId, revokeSharedPosting } from "../pages/sharingApi.ts";
 import type { SharingPolicyInput } from "../pages/sharingApi.ts";
 
 function todayDay(): string {
@@ -200,6 +200,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						grant.postingId,
 						grant.audienceType,
 						grant.audienceId,
+						mintShareRequestId(),
 					);
 				} catch (cause) {
 					// A grant revoked elsewhere reports 404: it is already

@@ -63,6 +63,16 @@ interface GrantResponse {
 	data: { grant: SharingGrant };
 }
 
+/**
+ * One idempotency key per user-initiated share mutation. The caller mints
+ * the key when the user acts and reuses that same key for every attempt of
+ * that action; a new user action mints a new key. The audit port replays
+ * the recorded outcome for a repeated key and rejects key-less mutations.
+ */
+export function mintShareRequestId(): string {
+	return crypto.randomUUID();
+}
+
 function policyPath(groupId: string): string {
 	return `/v1/shared/policies/${encodeURIComponent(groupId)}`;
 }
@@ -144,11 +154,12 @@ export async function grantSharedPosting(
 	postingId: string,
 	audienceType: "group",
 	audienceId: string,
+	requestId: string = mintShareRequestId(),
 ): Promise<SharingGrant> {
 	const response = await waypointFetch<GrantResponse>("/v1/shared/grants", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ postingId, audienceType, audienceId }),
+		body: JSON.stringify({ postingId, audienceType, audienceId, requestId }),
 	});
 	return response.data.grant;
 }
@@ -157,11 +168,12 @@ export async function revokeSharedPosting(
 	postingId: string,
 	audienceType: string,
 	audienceId: string,
+	requestId: string = mintShareRequestId(),
 ): Promise<void> {
 	await waypointFetch("/v1/shared/grants", {
 		method: "DELETE",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ postingId, audienceType, audienceId }),
+		body: JSON.stringify({ postingId, audienceType, audienceId, requestId }),
 	});
 }
 
@@ -169,13 +181,19 @@ export async function excludeSharedPosting(
 	postingId: string,
 	audienceType: "group" | "all",
 	audienceId: string,
+	requestId: string = mintShareRequestId(),
 ): Promise<SharingGrant> {
 	const response = await waypointFetch<GrantResponse>(
 		"/v1/shared/exclusions",
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ postingId, audienceType, audienceId }),
+			body: JSON.stringify({
+				postingId,
+				audienceType,
+				audienceId,
+				requestId,
+			}),
 		},
 	);
 	return response.data.grant;
@@ -185,10 +203,11 @@ export async function removeSharedExclusion(
 	postingId: string,
 	audienceType: string,
 	audienceId: string,
+	requestId: string = mintShareRequestId(),
 ): Promise<void> {
 	await waypointFetch("/v1/shared/exclusions", {
 		method: "DELETE",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ postingId, audienceType, audienceId }),
+		body: JSON.stringify({ postingId, audienceType, audienceId, requestId }),
 	});
 }

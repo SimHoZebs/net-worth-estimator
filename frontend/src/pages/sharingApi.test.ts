@@ -95,11 +95,15 @@ it("lists grants and shares, revokes, excludes, and removes", async () => {
 		intent: "shared",
 		createdAt: 1,
 	};
-	const calls: Array<{ url: string; method?: string }> = [];
+	const calls: Array<{ url: string; method?: string; body?: unknown }> = [];
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (url: unknown, init?: RequestInit) => {
-			calls.push({ url: String(url), method: init?.method });
+			calls.push({
+				url: String(url),
+				method: init?.method,
+				body: init?.body ? JSON.parse(String(init.body)) : undefined,
+			});
 			if (String(url) === "/v1/shared/grants" && !init?.method)
 				return ok({ grants: [grant] });
 			if (String(url) === "/v1/shared/grants") return ok({ grant });
@@ -120,4 +124,52 @@ it("lists grants and shares, revokes, excludes, and removes", async () => {
 		"POST",
 		"DELETE",
 	]);
+	// Every mutating share call carries a caller UUID idempotency key
+	// alongside its preserved fields.
+	const uuidPattern =
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	const bodies = calls.slice(1).map((call) => {
+		const body = call.body as Record<string, unknown>;
+		expect(body.requestId).toMatch(uuidPattern);
+		const { requestId: _dropped, ...rest } = body;
+		return rest;
+	});
+	expect(bodies).toEqual([
+		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
+		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
+		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
+		{ postingId: "p1", audienceType: "group", audienceId: "g1" },
+	]);
+});
+
+it("reuses one key for one share action and mints fresh keys per action", async () => {
+	const grant = {
+		ownerUserId: "user:abc",
+		postingId: "p1",
+		audienceType: "group",
+		audienceId: "g1",
+		intent: "shared",
+		createdAt: 1,
+	};
+	const keys: unknown[] = [];
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, init?: RequestInit) => {
+			keys.push(
+				(JSON.parse(String(init?.body)) as Record<string, unknown>)
+					.requestId,
+			);
+			return ok({ grant });
+		}),
+	);
+	const key = "11111111-2222-4333-8444-555555555555";
+	await grantSharedPosting("p1", "group", "g1", key);
+	await grantSharedPosting("p1", "group", "g1", key);
+	expect(keys).toEqual([key, key]);
+	await grantSharedPosting("p1", "group", "g1");
+	expect(keys).toHaveLength(3);
+	expect(keys[2]).toMatch(
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+	);
+	expect(keys[2]).not.toBe(key);
 });

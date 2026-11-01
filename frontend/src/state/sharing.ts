@@ -158,15 +158,18 @@ export function useGrantSharedPosting() {
 			mutationFn: async ({
 				postingId,
 				audienceId,
+				requestId,
 			}: {
 				postingId: string;
 				audienceId: string;
+				requestId?: string;
 			}) => {
 				currentScope(scope);
 				const result = await grantSharedPosting(
 					postingId,
 					"group",
 					audienceId,
+					requestId,
 				);
 				currentScope(scope);
 				return result;
@@ -190,13 +193,20 @@ export function useRevokeSharedPosting() {
 				postingId,
 				audienceType,
 				audienceId,
+				requestId,
 			}: {
 				postingId: string;
 				audienceType: string;
 				audienceId: string;
+				requestId?: string;
 			}) => {
 				currentScope(scope);
-				await revokeSharedPosting(postingId, audienceType, audienceId);
+				await revokeSharedPosting(
+					postingId,
+					audienceType,
+					audienceId,
+					requestId,
+				);
 				currentScope(scope);
 			},
 			onSuccess: async () => {
@@ -218,16 +228,19 @@ export function useExcludeSharedPosting() {
 				postingId,
 				audienceType,
 				audienceId,
+				requestId,
 			}: {
 				postingId: string;
 				audienceType: "group" | "all";
 				audienceId: string;
+				requestId?: string;
 			}) => {
 				currentScope(scope);
 				const result = await excludeSharedPosting(
 					postingId,
 					audienceType,
 					audienceId,
+					requestId,
 				);
 				currentScope(scope);
 				return result;
@@ -251,13 +264,20 @@ export function useRemoveSharedExclusion() {
 				postingId,
 				audienceType,
 				audienceId,
+				requestId,
 			}: {
 				postingId: string;
 				audienceType: string;
 				audienceId: string;
+				requestId?: string;
 			}) => {
 				currentScope(scope);
-				await removeSharedExclusion(postingId, audienceType, audienceId);
+				await removeSharedExclusion(
+					postingId,
+					audienceType,
+					audienceId,
+					requestId,
+				);
 				currentScope(scope);
 			},
 			onSuccess: async () => {

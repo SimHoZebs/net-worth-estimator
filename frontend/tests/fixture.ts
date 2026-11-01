@@ -98,3 +98,30 @@ export async function seedSharingFixture(
 		await api.dispose();
 	}
 }
+
+export interface InboxSeed {
+	owner: string;
+	postings: Array<{ id: string; name: string }>;
+	revoked: Array<{ id: string; name: string }>;
+}
+
+/** Seed direct shares to the fixture user. Named postings in `revoked` are
+ * taken back before the test starts, so they surface on the canceled tab. */
+export async function seedInboxFixture(
+	postings: SharingSeedPosting[],
+	revoked: string[] = [],
+): Promise<InboxSeed> {
+	const api = await request.newContext();
+	try {
+		const response = await api.post(`${FIXTURE_API}/__fixture/inbox`, {
+			data: { postings, revoked },
+		});
+		if (!response.ok())
+			throw new Error(
+				`inbox seed failed: ${response.status()} ${await response.text()}`,
+			);
+		return (await response.json()) as InboxSeed;
+	} finally {
+		await api.dispose();
+	}
+}

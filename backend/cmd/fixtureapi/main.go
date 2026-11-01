@@ -31,6 +31,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
@@ -142,6 +143,14 @@ func main() {
 		if err := application.RemoveGroupMembershipsForUser(fixtureActor); err != nil {
 			return fmt.Errorf("clear fixture groups: %w", err)
 		}
+		// Direct shares name the fixture user as audience on grants owned
+		// by seed users, so the user-scoped clear above leaves them behind
+		// and they would re-sight as new on the next inbox list. Reset
+		// drops them here; group-audience seeds go quiet on their own once
+		// the membership above is gone.
+		if _, err := application.SQL().Exec(`DELETE FROM sharing_grants WHERE audience_type = 'user' AND audience_id = ?`, fixtureActor); err != nil {
+			return fmt.Errorf("clear fixture direct shares: %w", err)
+		}
 		doc, err := csvio.ImportModel(modelPath)
 		if err != nil {
 			return fmt.Errorf("import fixture: %w", err)
@@ -177,6 +186,13 @@ func main() {
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
 		}).Routes())
+		// Inbox routes ride the same seam: the handler reads the verified
+		// principal from context, which the fixture supplies, and the
+		// read-only guard is rebuilt with every restore like the plan API.
+		inboxRoutes := withFixturePrincipal(inbox.New(application, fixtureIssuer, inbox.Config{
+			AllowedOrigins: allowedOrigins,
+			ReadOnly:       readOnly,
+		}).Routes())
 		live.set(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if identity.IsGroupRoute(r.URL.Path) {
 				groupRoutes.ServeHTTP(w, r)
@@ -184,6 +200,10 @@ func main() {
 			}
 			if identity.IsSharingRoute(r.URL.Path) {
 				sharingRoutes.ServeHTTP(w, r)
+				return
+			}
+			if identity.IsInboxRoute(r.URL.Path) {
+				inboxRoutes.ServeHTTP(w, r)
 				return
 			}
 			apiHandler.ServeHTTP(w, r)
@@ -230,6 +250,38 @@ func main() {
 			return
 		}
 		if err := seedFixtureSharing(application, body.GroupName, body.OwnerDisplay, body.Postings, writer); err != nil {
+			writer.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(writer, err)
+			return
+		}
+	}))
+	// Inbox seed provisions a fresh second user owning the requested
+	// postings and grants each one directly to the fixture user, so inbox
+	// browser tests exercise real received shares. Every call mints a new
+	// owner, so seeds never collide with state surviving the user-scoped
+	// reset; named postings revoked here surface on the canceled tab.
+	mux.Handle("/__fixture/inbox", http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			writer.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		var body struct {
+			Postings []fixtureSeedPosting `json:"postings"`
+			Revoked  []string             `json:"revoked"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(writer, "invalid inbox seed")
+			return
+		}
+		if len(body.Postings) == 0 {
+			writer.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(writer, "postings are required")
+			return
+		}
+		if err := seedFixtureInbox(application, body.Postings, body.Revoked, writer); err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintln(writer, err)
 			return
@@ -375,6 +427,91 @@ func seedFixtureSharing(application *sqlite.Database, groupName, ownerDisplay st
 		"groupId":  group.ID,
 		"owner":    "users/" + ownerID[len("user:"):],
 		"postings": seeded,
+	})
+}
+
+// seedFixtureInbox provisions the inbox browser fixture: a second user
+// owning an account and the requested postings, with one direct grant per
+// posting to the fixture user. Named postings are revoked after a sighting
+// pass so they surface on the canceled tab without content; the rest stay
+// pending. It answers the seed request with the owner resource and the
+// posting IDs.
+var fixtureInboxOwners int64
+
+func seedFixtureInbox(application *sqlite.Database, postings []fixtureSeedPosting, revoked []string, writer http.ResponseWriter) error {
+	subject := fmt.Sprintf("inbox-owner-%d", atomic.AddInt64(&fixtureInboxOwners, 1))
+	ownerID, err := application.EnsureGroupUser(fixtureIssuer, subject)
+	if err != nil {
+		return err
+	}
+	scoped, err := application.EnsureUser(ownerID, fixtureIssuer, subject)
+	if err != nil {
+		return err
+	}
+	source := "checking"
+	if _, err := scoped.CreateAccount(types.Account{ID: source, Name: "Checking", Enabled: true}); err != nil {
+		return err
+	}
+	seeded := []map[string]string{}
+	byName := map[string]string{}
+	for _, seed := range postings {
+		if seed.Name == "" || seed.Amount == "" {
+			return fmt.Errorf("seeded postings require a name and an amount")
+		}
+		if _, dup := byName[seed.Name]; dup {
+			return fmt.Errorf("seeded posting %q is not unique", seed.Name)
+		}
+		day := seed.Day
+		if day == "" {
+			day = "2026-06-15"
+		}
+		stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
+		if err != nil {
+			return fmt.Errorf("seeded day %q is not YYYY-MM-DD", seed.Day)
+		}
+		posted, err := scoped.CreatePosting(types.Posting{
+			Name: seed.Name, SourceAccountID: &source,
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": seed.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      stamp.Unix(),
+			TransactionTime: stamp.Unix(),
+			Enabled:         true,
+		})
+		if err != nil {
+			return err
+		}
+		if seed.Pending {
+			if _, err := application.SQL().Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, ownerID, posted.ID); err != nil {
+				return err
+			}
+		}
+		if _, err := application.GrantSharedPosting(ownerID, posted.ID, store.SharingAudienceUser, fixtureActor, uuid.NewString()); err != nil {
+			return err
+		}
+		seeded = append(seeded, map[string]string{"id": posted.ID, "name": seed.Name})
+		byName[seed.Name] = posted.ID
+	}
+	// Canceled shares derive from sightings that lost authorization, so
+	// record the grants before revoking: otherwise a share revoked before
+	// its first list never surfaces anywhere.
+	if _, err := application.ListInboxItems(fixtureActor); err != nil {
+		return err
+	}
+	unshared := []map[string]string{}
+	for _, name := range revoked {
+		id, ok := byName[name]
+		if !ok {
+			return fmt.Errorf("revoked posting %q is not a seeded posting", name)
+		}
+		if err := application.RevokeSharedPosting(ownerID, id, store.SharingAudienceUser, fixtureActor, uuid.NewString()); err != nil {
+			return err
+		}
+		unshared = append(unshared, map[string]string{"id": id, "name": name})
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(writer).Encode(map[string]any{
+		"owner":    "users/" + ownerID[len("user:"):],
+		"postings": seeded,
+		"revoked":  unshared,
 	})
 }
 

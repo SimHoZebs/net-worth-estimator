@@ -18,6 +18,7 @@ import {
 	type FeedDirection,
 	type FeedItem,
 } from "./sharedFeedApi.ts";
+import { mintShareRequestId } from "@/pages/sharingApi.ts";
 
 export interface FeedMember {
 	accountId: string;
@@ -101,9 +102,10 @@ export function SharedFeed({
 
 	async function onSave(item: FeedItem) {
 		const key = `${item.ownerUserId}/${item.posting.id}`;
+		const requestId = mintShareRequestId();
 		setSaving(key);
 		try {
-			await saveSharedCopy(item.ownerUserId, item.posting.id);
+			await saveSharedCopy(item.ownerUserId, item.posting.id, requestId);
 			setSaved((previous) => ({ ...previous, [key]: true }));
 			notifySuccess("groups-notice", "Saved to your transactions.");
 		} catch {
