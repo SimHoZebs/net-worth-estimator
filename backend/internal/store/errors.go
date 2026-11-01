@@ -36,6 +36,11 @@ var ErrGroupForbidden = errors.New("forbidden")
 // without leaking internals.
 var ErrGroupInvalid = errors.New("invalid group request")
 
+// ErrSettlementConflict reports a settlement write refused for retry
+// safety: a request ID reused for a different settlement, or a real
+// payment linked to more than one settlement. Handlers map it to 409.
+var ErrSettlementConflict = errors.New("settlement conflicts with a recorded settlement")
+
 var (
 	ErrReceiptNotFound   = errors.New("receipt or posting not found")
 	ErrReceiptConflict   = errors.New("receipt changed; reload before retrying")

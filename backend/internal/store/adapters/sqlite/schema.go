@@ -66,7 +66,7 @@ const suppressedSyncKeysDDL = `CREATE TABLE IF NOT EXISTS suppressed_sync_keys (
 )`
 
 func schemaStatements() []string {
-	return []string{
+	statements := []string{
 		`CREATE TABLE IF NOT EXISTS sessions (
 			token TEXT PRIMARY KEY,
 			data BLOB NOT NULL,
@@ -316,6 +316,7 @@ func schemaStatements() []string {
 			created_at INTEGER NOT NULL
 		)`,
 	}
+	return append(statements, settlementSchemaStatements()...)
 }
 
 // seedAmountPresets is the factory default recipe list. It runs once on a
@@ -435,42 +436,44 @@ func seedAmountPresets() []types.AmountPreset {
 // requiredSchemaColumns covers every application table, including identity.
 // Validation prepares read-only queries; it never executes DDL or repairs shape.
 var requiredSchemaColumns = map[string]string{
-	"transaction_source_facts": "user_id, posting_id, facts_json",
-	"analysis_inputs":          "user_id, revision",
-	"analysis_runs":            "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
-	"analysis_findings":        "user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
-	"analysis_feedback":        "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
-	"receipts":                 receiptColumns,
-	"blob_objects":             "key, state, expires_at",
-	"blob_data":                "key, data",
-	"sessions":                 "token, data, expiry",
-	"identity_grants":          "id, issuer, subject, sid, expiry, data",
-	"identity_logout_marks":    "issuer, kind, identifier, seen_at, expiry",
-	"identity_logout_tokens":   "issuer, jti, expiry",
-	"users":                    "id, issuer, subject",
-	"user_groups":              "id, name, created_by_user_id, created_at",
-	"group_members":            "group_id, user_id, role, joined_at, display_name",
-	"group_invites":            "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
-	"accounts":                 "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
-	"checkpoints":              "user_id, id, position, model_account_id, balance, source, observed_at",
-	"postings":                 "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
-	"posting_sim":              "user_id, posting_id, position, enabled, execution_order",
-	"posting_claims":           "user_id, posting_id, fulfills_rule_id, fulfills_occurrence_date",
-	"posting_sync_keys":        "user_id, provider, bridge_account_id, transaction_id, posting_id",
-	"schema_migrations":        "name",
-	"planned_purchases":        "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
-	"recurrence_rules":         "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
-	"evaluations":              "user_id, type, instance_id, position, name, enabled, config_json",
-	"projection_artifacts":     "user_id, identity, kind, created_at, payload",
-	"model_metadata":           "user_id, id, source_path, document_present",
-	"payment_terms":            "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
-	"entity_ids":               "user_id, id, kind",
-	"account_links":            "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
-	"pinned_evaluations":       "user_id, instance_id, position",
-	"safe_spending_settings":   "user_id, id, settings_json",
-	"sync_state":               "user_id, id, last_sync_at",
-	"sync_credentials":         "user_id, id, access_url, bridge_host, updated_at, cards_json",
-	"amount_presets":           "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
+	"transaction_source_facts":  "user_id, posting_id, facts_json",
+	"analysis_inputs":           "user_id, revision",
+	"analysis_runs":             "user_id, id, type, version, input_revision, state, started_at, completed_at, lease_until, problem, input_json",
+	"analysis_findings":         "user_id, id, analysis_type, posting_id, kind, detection_json, run_id, first_detected_at, last_checked_at, status, dismissed, review_json, feedback_revision",
+	"analysis_feedback":         "user_id, id, request_id, finding_id, run_id, created_at, payload_json",
+	"receipts":                  receiptColumns,
+	"blob_objects":              "key, state, expires_at",
+	"blob_data":                 "key, data",
+	"sessions":                  "token, data, expiry",
+	"identity_grants":           "id, issuer, subject, sid, expiry, data",
+	"identity_logout_marks":     "issuer, kind, identifier, seen_at, expiry",
+	"identity_logout_tokens":    "issuer, jti, expiry",
+	"users":                     "id, issuer, subject",
+	"user_groups":               "id, name, created_by_user_id, created_at",
+	"group_members":             "group_id, user_id, role, joined_at, display_name",
+	"group_invites":             "id, group_id, code_hash, created_by_user_id, expires_at, max_uses, used_count, revoked_at, created_at",
+	"split_settlements":         "settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_posting_id, actor_id, request_id, created_at",
+	"split_settlement_requests": "actor_id, request_id, settlement_id, input_hash, created_at",
+	"accounts":                  "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
+	"checkpoints":               "user_id, id, position, model_account_id, balance, source, observed_at",
+	"postings":                  "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
+	"posting_sim":               "user_id, posting_id, position, enabled, execution_order",
+	"posting_claims":            "user_id, posting_id, fulfills_rule_id, fulfills_occurrence_date",
+	"posting_sync_keys":         "user_id, provider, bridge_account_id, transaction_id, posting_id",
+	"schema_migrations":         "name",
+	"planned_purchases":         "user_id, id, position, name, funding_account_id, cost, earliest_date, priority, enabled",
+	"recurrence_rules":          "user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled",
+	"evaluations":               "user_id, type, instance_id, position, name, enabled, config_json",
+	"projection_artifacts":      "user_id, identity, kind, created_at, payload",
+	"model_metadata":            "user_id, id, source_path, document_present",
+	"payment_terms":             "user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day",
+	"entity_ids":                "user_id, id, kind",
+	"account_links":             "user_id, bridge_account_id, model_account_id, bridge_name, currency, origin, last_seen_at",
+	"pinned_evaluations":        "user_id, instance_id, position",
+	"safe_spending_settings":    "user_id, id, settings_json",
+	"sync_state":                "user_id, id, last_sync_at",
+	"sync_credentials":          "user_id, id, access_url, bridge_host, updated_at, cards_json",
+	"amount_presets":            "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
 }
 
 func validateSchemaObjects(db queryer) error {
