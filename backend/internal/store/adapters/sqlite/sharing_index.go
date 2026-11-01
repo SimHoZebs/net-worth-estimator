@@ -65,7 +65,7 @@ func sharingAuditSchemaStatements() []string {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			actor_user_id TEXT NOT NULL,
-			kind TEXT NOT NULL CHECK (kind IN ('policy-set', 'policy-strip', 'policies-cleared', 'grant', 'revoke', 'exclude', 'unexclude', 'index-rebuild')),
+			kind TEXT NOT NULL CHECK (kind IN ('policy-set', 'policy-strip', 'policies-cleared', 'grant', 'revoke', 'exclude', 'unexclude', 'index-rebuild', 'split-created', 'split-updated', 'split-accepted')),
 			posting_id TEXT NOT NULL DEFAULT '',
 			audience_type TEXT NOT NULL DEFAULT '',
 			audience_id TEXT NOT NULL DEFAULT '',

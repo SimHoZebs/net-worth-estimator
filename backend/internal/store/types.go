@@ -356,6 +356,23 @@ type InboxShareItem struct {
 	Posting           *types.Posting `json:"posting,omitempty"`
 }
 
+// SharingAuditEvent is one committed cross-user change: who acted, what
+// they did, which owner-scoped transaction it targets, and when. Link,
+// Status, and RequestID carry the split-audit detail (split link,
+// resulting status, idempotency key) and stay empty for consent actions.
+// The event never carries transaction evidence.
+type SharingAuditEvent struct {
+	Seq         int64  `json:"seq"`
+	ActorUserID string `json:"actorUserId"`
+	Action      string `json:"action"`
+	OwnerUserID string `json:"ownerUserId"`
+	PostingID   string `json:"postingId"`
+	LinkID      string `json:"linkId,omitempty"`
+	Status      string `json:"status,omitempty"`
+	RequestID   string `json:"requestId,omitempty"`
+	CreatedAt   int64  `json:"createdAt"`
+}
+
 // ModelETag returns a content identity for the canonical model.
 func ModelETag(model *types.FinancialModel) (string, error) {
 	if model == nil {

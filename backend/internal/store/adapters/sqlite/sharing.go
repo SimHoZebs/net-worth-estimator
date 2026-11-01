@@ -746,5 +746,8 @@ func clearSharingForUser(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM inbox_share_state WHERE recipient_user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear inbox state: %w", err)
 	}
+	if _, err := tx.Exec(`DELETE FROM sharing_requests WHERE actor_user_id = :user_id`); err != nil {
+		return fmt.Errorf("clear sharing requests: %w", err)
+	}
 	return nil
 }

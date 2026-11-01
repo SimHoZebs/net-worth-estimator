@@ -316,7 +316,7 @@ func schemaStatements() []string {
 			created_at INTEGER NOT NULL
 		)`,
 	}
-	return append(append(statements, sharingSchemaStatements()...), inboxSchemaStatements()...)
+	return append(append(append(append(statements, sharingSchemaStatements()...), inboxSchemaStatements()...), sharingRequestsSchemaStatements()...), splitSchemaStatements()...)
 }
 
 // seedAmountPresets is the factory default recipe list. It runs once on a
@@ -458,6 +458,9 @@ var requiredSchemaColumns = map[string]string{
 	"sharing_policies":         "owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at",
 	"sharing_visibility":       "owner_user_id, posting_id, group_id, policy_version, updated_at",
 	"sharing_audit":            "id, owner_user_id, actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at",
+	"sharing_requests":         "actor_user_id, request_id, action, owner_user_id, posting_id, audience_type, audience_id, link_id, outcome_json, created_at",
+	"splits":                   "split_id, version, source_owner_id, source_posting_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at",
+	"split_allocations":        "split_id, version, position, participant_id, amount_minor, accepted, accepted_at",
 	"accounts":                 "user_id, id, position, name, kind, min_balance, max_balance, color, enabled",
 	"checkpoints":              "user_id, id, position, model_account_id, balance, source, observed_at",
 	"postings":                 "user_id, id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void",
@@ -533,6 +536,9 @@ func expectedSchemaTables() []string {
 		"sharing_policies",
 		"sharing_visibility",
 		"sharing_audit",
+		"sharing_requests",
+		"splits",
+		"split_allocations",
 		"accounts",
 		"checkpoints",
 		"postings",

@@ -42,6 +42,7 @@ func TestDatabaseRejectedSourcesStayUnchanged(t *testing.T) {
 		{"missing-sharing-policies", `DROP TABLE sharing_policies`, ErrSetupRequired},
 		{"missing-sharing-visibility", `DROP TABLE sharing_visibility`, ErrSetupRequired},
 		{"missing-sharing-audit", `DROP TABLE sharing_audit`, ErrSetupRequired},
+		{"missing-sharing-requests", `DROP TABLE sharing_requests`, ErrSetupRequired},
 		{"missing-financial", `DROP TABLE account_links`, ErrSetupRequired},
 		{"missing-purchases", `DROP TABLE planned_purchases`, ErrSetupRequired},
 		{"missing-column", `ALTER TABLE sessions DROP COLUMN data`, ErrSetupRequired},

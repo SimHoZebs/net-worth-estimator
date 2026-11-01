@@ -49,6 +49,16 @@ func planSnapshot(t *testing.T, s *sqliteStore) map[string]string {
 			// scoped user_id column the snapshot below assumes.
 			continue
 		}
+		if table == "sharing_requests" || table == "sharing_audit" {
+			// Idempotency keys scope to the actor and audit rows name both
+			// sides of a share, not the scoped user_id column.
+			continue
+		}
+		if table == "splits" || table == "split_allocations" {
+			// Split obligations key on source owner, initiator, and
+			// participant IDs, not the scoped user_id column.
+			continue
+		}
 		if table == "sessions" || table == "identity_grants" || table == "identity_logout_marks" || table == "identity_logout_tokens" {
 			continue
 		}

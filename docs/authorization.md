@@ -206,7 +206,7 @@ intact as an ordinary row). Source-row deletion through the API drops the
 link with the source consent; recipient-side copy deletion
 drops only its own link.
 
-Dependents (SOC-02 recipient copies, SOC-04B splits, FND-05 audit) should
+Dependents (SOC-02 recipient copies, SOC-04B splits, consent audit) should
 key on `linkId` for idempotency and reference, compare `sourceRevision`
 for staleness, and re-check authorization at read time rather than
 caching link state.
@@ -319,6 +319,46 @@ driver binds arguments to placeholders sequentially by index and ignores
 `sql.Named` wrapping, so the auto-appended `:user_id` argument binds to
 whatever placeholder stands last — keep `:named` placeholders textually
 last or values silently misbind with no error.
+
+## Versioned splits (SOC-04B)
+
+A split divides one shared transaction across authorized participants as
+an obligation record stored independently of financial models
+(`splits` plus `split_allocations`, `store.Split`). Amounts are integer
+minor units computed by `domain.AllocateSplit` (SOC-04A); the store
+persists the computed shares verbatim and never invents them. Every
+revision appends a version row with status `proposed` and reset
+acceptances: accepted shares only change through an explicit new
+version, never by silent edit. Acceptance is per participant; the version
+turns `accepted` when every participant has accepted. Split writes never
+touch postings, checkpoints, accounts, or balances, so acceptance moves
+no money.
+
+Split authorization rules:
+
+- Only the initiator may create or revise their split; anyone else fails
+  closed (`ErrGroupForbidden`).
+- Every participant (initiator included) must hold current
+  shared-posting access to the source at creation and at each revision;
+  a participant without access fails the whole write as not-found, so
+  authorization never leaks who can see the source.
+- Reads are participant-scoped: the initiator or a participant of the
+  latest version may read the split and its version history; anyone else
+  receives not-found, so membership is not enumerable. Reads perform no
+  live source check: the split survives source edits, revocation, and
+  source deletion like accepted-copy provenance.
+- Revisions cannot move a split to another transaction, and participants
+  removed by a revision lose read access to the split.
+- Every mutation carries a client UUID request ID: retries replay the
+  recorded split, key reuse across split actions fails as a conflict,
+  and stale expected versions fail explicitly instead of forking
+  history. Split audit events (`split-created`, `split-updated`,
+  `split-accepted`) reuse the consent `sharing_audit` table with the
+  split link, resulting status, and request key in the detail payload,
+  and stay owner-scoped through `ListSharingAudit`, so there is no
+  audience-side split audit read.
+- Model replacement and scope clears drop splits touching the cleared
+  user, so a split never attaches to an unrelated new row.
 
 Casdoor's external permission API evaluates the model and stored policy rows.
 Use the model's deny rules or remove the relevant policy/binding to revoke
