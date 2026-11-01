@@ -27,8 +27,10 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
@@ -67,6 +69,21 @@ func fixtureHandler(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// withFixturePrincipal supplies the synthetic fixture identity to the
+// social handlers, which read the verified principal from context like the
+// production identity middleware provides. Group and sharing routes need no
+// other identity service in this harness.
+func withFixturePrincipal(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := identity.PrincipalContext(r.Context(), identity.Principal{
+			Subject:       fixtureSubject,
+			Name:          "Browser test",
+			Authenticated: true,
+		})
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -113,6 +130,14 @@ func main() {
 		if err := database.Clear(); err != nil {
 			return fmt.Errorf("clear store: %w", err)
 		}
+		// Group tables are global, not per-user, so the plan clear above
+		// leaves them behind. This harness has a single user: removing
+		// their memberships deletes groups left with no members with
+		// their invites and group-scoped consent, restoring the empty
+		// baseline between tests.
+		if err := application.RemoveGroupMembershipsForUser(fixtureActor); err != nil {
+			return fmt.Errorf("clear fixture groups: %w", err)
+		}
 		doc, err := csvio.ImportModel(modelPath)
 		if err != nil {
 			return fmt.Errorf("import fixture: %w", err)
@@ -131,11 +156,33 @@ func main() {
 			}
 		}
 		readOnly = nextReadOnly
-		live.set(api.New(database, api.Config{
+		apiHandler := api.New(database, api.Config{
 			ReceiptSource:  receiptSource,
 			AllowedOrigins: allowedOrigins,
 			ReadOnly:       readOnly,
 			ResourceID:     fixtureResourceID,
+		})
+		// Social routes ride the same fixture database as the plan API so
+		// browser tests exercise real group and sharing behavior. The
+		// read-only guard is rebuilt with every restore like the plan API.
+		groupRoutes := withFixturePrincipal(groups.New(application, fixtureIssuer, groups.Config{
+			AllowedOrigins: allowedOrigins,
+			ReadOnly:       readOnly,
+		}).Routes())
+		sharingRoutes := withFixturePrincipal(sharing.New(application, fixtureIssuer, sharing.Config{
+			AllowedOrigins: allowedOrigins,
+			ReadOnly:       readOnly,
+		}).Routes())
+		live.set(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if identity.IsGroupRoute(r.URL.Path) {
+				groupRoutes.ServeHTTP(w, r)
+				return
+			}
+			if identity.IsSharingRoute(r.URL.Path) {
+				sharingRoutes.ServeHTTP(w, r)
+				return
+			}
+			apiHandler.ServeHTTP(w, r)
 		}))
 		return nil
 	}
