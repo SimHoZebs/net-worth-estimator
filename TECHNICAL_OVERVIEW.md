@@ -710,6 +710,34 @@ pre-existing databases gain it on first Gmail use with no row conversion.
 Production needs a verified Google OAuth client and privacy review before
 any production-facing consent flow.
 
+### Gmail receipt discovery
+
+`internal/gmail` also owns receipt discovery over the same connection.
+`POST /v1/integrations/gmail/scan` refreshes the access token
+server-side, lists the initial window (`newer_than` lookback days) or the
+incremental history cursor, triages each unseen message, and advances the
+cursor. Detection is deterministic local heuristics: receipt or refund
+signals plus an amount make a receipt; shipping signals without an amount
+make a shipping-only update; everything else is ordinary mail and stays
+out of extraction. Extraction records merchant (sender display name),
+message date, amount with currency, and an order/invoice/reference
+number; anything below 0.75 confidence (or missing an amount) is stored
+as needs-review for the user to confirm or correct in the Gmail panel.
+Every scanned message keeps one `email_receipts` row keyed by Gmail
+message ID, so repeat scans dedupe without refetching; receipt-like rows
+carry extracted evidence with `gmail-receipt-email/v1` provenance while
+ordinary and shipping-only rows keep identity and verdict only. Message
+bodies and snippets are never persisted. Per-message fetch/parse
+failures are isolated as failed rows with diagnostics; the scanner holds
+no reference to postings or balances, so parser errors never mutate
+financial state. `GET /v1/integrations/gmail/receipts` lists evidence
+with verdict/status filters and `PATCH .../receipts/{id}` confirms or
+corrects one extraction, overlaying the original values without
+rewriting them. The extracted-evidence contract for INT-04 matching is
+the stored row: merchant, receipt date, amount cents plus source amount
+spelling, currency, reference, confidence, diagnostics, provenance, and
+the user correction overlay.
+
 `internal/simplefin` is configured once in `cmd/server`:
 
 - The Bridge key is connected per user through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
