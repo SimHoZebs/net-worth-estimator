@@ -5,9 +5,11 @@ import { isoDateFromEpochSeconds } from "./format.ts";
 
 const NUMERIC_EXPRESSION = /^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
 
-/** Literal figure from a stored amount, or null for calculated recipes. */
+/** Literal figure from a stored amount, or null for calculated recipes.
+ * Takes the minimal amount shape so rated lists and shared previews share
+ * one policy instead of re-declaring the expression test. */
 export function literalAmountOf(
-	amount: TransactionRow["amount"],
+	amount: { resolver?: unknown; config?: unknown; inputs?: unknown } | null | undefined,
 ): number | null {
 	const config = (amount?.config ?? {}) as Record<string, unknown>;
 	const expression = config["expression"];

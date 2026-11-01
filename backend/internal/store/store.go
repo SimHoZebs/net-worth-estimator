@@ -199,5 +199,39 @@ type Database interface {
 	// survive refresh, revocation, and source deletion alike. See
 	// SharingLinkRefresh for the status contract.
 	RefreshSharingLink(recipientID, copyPostingID string) (SharingLinkRefresh, error)
+	// WithdrawUserGrant deletes a direct user-audience grant addressed to
+	// the recipient themselves. It is the recipient's own refusal path: it
+	// never touches grants addressed to anyone else or group-audience
+	// grants (which belong to the source owner and their whole audience).
+	// Missing grants report ErrNotFound; malformed IDs report
+	// ErrGroupInvalid.
+	WithdrawUserGrant(recipientID, ownerID, postingID string) error
+	// ListInboxItems returns the recipient's received-share inbox. Entries
+	// derive from the ListSharedPostings primitive: currently authorized
+	// shares appear with their preview, previously seen shares that lost
+	// authorization appear as canceled without content, and recorded
+	// decisions (accepted/declined) survive later revocation. Sighting rows
+	// never authorize; every preview re-checks current access.
+	ListInboxItems(recipientID string) ([]InboxShareItem, error)
+	// AcceptInboxShare records acceptance and saves one personal
+	// recipient-owned copy, reusing CopySharedPosting. It is idempotent
+	// under retry: an already-accepted share returns its recorded item
+	// without minting another copy, including adoption of a copy the
+	// recipient saved through the shared-copies path first. Unauthorized
+	// shares report ErrNotFound.
+	AcceptInboxShare(recipientID, ownerID, postingID string) (InboxShareItem, error)
+	// DeclineInboxShare records the refusal and withdraws the recipient's
+	// own direct grant when one addresses them, so they leave the sender's
+	// sharing list; group-audience shares stay shared with the group and
+	// the refusal remains recipient-local. Retries return the recorded
+	// item. Unauthorized shares report ErrNotFound.
+	DeclineInboxShare(recipientID, ownerID, postingID string) (InboxShareItem, error)
+	// SetInboxShareDismissed hides (or unhides) an item without changing
+	// its decision state. Dismissed items leave the default list and
+	// return under an explicit show-dismissed request.
+	SetInboxShareDismissed(recipientID, ownerID, postingID string, dismissed bool) (InboxShareItem, error)
+	// SetInboxShareRead marks an item read or unread. Unread state only
+	// changes here: listing, viewing, and deciding never clear it.
+	SetInboxShareRead(recipientID, ownerID, postingID string, read bool) (InboxShareItem, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }

@@ -210,6 +210,48 @@ Dependents (SOC-02 recipient copies, SOC-04B splits, FND-05 audit) should
 key on `linkId` for idempotency and reference, compare `sourceRevision`
 for staleness, and re-check authorization at read time rather than
 caching link state.
+## Received-share inbox (FND-03)
+
+The inbox is the one place for transaction shares the viewer received.
+Entries derive from the ListSharedPostings primitive on every list; inbox
+rows only record the viewer's own decision, read, and dismissed state and
+never authorize. Every preview re-checks current membership, exclusion,
+and revocation state, and revoked shares surface as canceled without
+transaction content. Sighting rows are not an auth cache: a row only
+records that a share was visible at one time so a later loss of
+authorization reads as canceled.
+
+Recipient rules:
+
+- Accepting saves one personal editable copy and records acceptance.
+  Retries never mint a second copy: an already-recorded acceptance
+  returns its item, and a copy saved through the shared-copies path
+  first is adopted.
+- Declining a directly shared transaction also withdraws the viewer's own
+  grant, so they leave the sender's sharing list; there is deliberately
+  no notification beyond the updated list. Declining a group-audience
+  share keeps the owner's grant and stays viewer-local.
+- A recorded acceptance never reverts; acceptance may follow a decline
+  while the share stays authorized.
+- A fresh grant after a decline re-opens the share as pending unread;
+  standing grants never reset a recorded decline.
+- Concurrent accepts converge on one copy: the loser removes its orphan.
+  Sequential retries never mint twice.
+- Dismissing hides an item without changing its decision; unhiding
+  restores it.
+- Unread state changes only through explicit mark-read/mark-unread.
+  Listing, viewing, and deciding never clear it.
+- Clearing the viewer's model resets their inbox state; currently shared
+  postings re-sight as new on the next list.
+
+Split-request producer contract (SOC-03 assigned shares, SOC-04C split
+requests): producers persist their own request rows — split persistence
+itself belongs to SOC-04B — and surface them through the same item
+envelope with kind `split-request`, carrying sender identity, one of the
+`pending`, `accepted`, `declined`, or `canceled` statuses, and an
+authorized-only preview. Inbox mutations stay idempotent under retry, and
+creation endpoints must take idempotency keys so retries cannot create
+duplicate requests.
 
 Casdoor's external permission API evaluates the model and stored policy rows.
 Use the model's deny rules or remove the relevant policy/binding to revoke

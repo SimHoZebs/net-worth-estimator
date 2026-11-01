@@ -651,5 +651,13 @@ func clearSharingForUser(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM sharing_copies WHERE recipient_user_id = :user_id OR source_owner_id = :user_id`); err != nil {
 		return fmt.Errorf("clear sharing copies: %w", err)
 	}
+	// Inbox state is recipient-owned: clearing the model resets the
+	// recipient's decisions, read, and dismissed flags. Currently shared
+	// postings re-sight as new on the next list; rows where the user is
+	// the source owner stay for their recipients and cancel by lost
+	// authorization.
+	if _, err := tx.Exec(`DELETE FROM inbox_share_state WHERE recipient_user_id = :user_id`); err != nil {
+		return fmt.Errorf("clear inbox state: %w", err)
+	}
 	return nil
 }

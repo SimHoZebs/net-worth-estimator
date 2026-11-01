@@ -7,6 +7,7 @@ import { IconButton } from "../components/Button.tsx";
 import { Skeleton } from "../components/Skeleton.tsx";
 import { mergeStyles } from "../components/mergeStyles.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
+import { useInboxUnreadCount } from "../state/inbox.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
 import {
@@ -68,6 +69,9 @@ export function WorkspaceSidebar({
 }) {
 	// Saved data subscribes here so navigation never waits on props.
 	const status = useServerStatus().data;
+	// The inbox badge reflects persisted unread state; a failed load hides
+	// the badge instead of blocking navigation.
+	const unreadCount = useInboxUnreadCount().data ?? 0;
 	return (
 		<>
 			<div className="flex items-center justify-between px-2">
@@ -108,6 +112,14 @@ export function WorkspaceSidebar({
 												item.label
 											)}
 										</span>
+										{item.id === "inbox" && unreadCount > 0 && (
+											<span
+												aria-label={`${unreadCount} unread`}
+												className="min-w-5 rounded-control bg-active px-1 py-px text-center text-xs"
+											>
+												{unreadCount}
+											</span>
+										)}
 									</SidebarNavLink>
 								</li>
 							))}
