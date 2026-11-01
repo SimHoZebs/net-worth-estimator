@@ -121,6 +121,8 @@ func TestSharingRoutesClaimedByIdentity(t *testing.T) {
 		"/v1/shared/grants",
 		"/v1/shared/exclusions",
 		"/v1/shared/copies",
+		"/v1/shared/copies/" + sharedPostingID + "/link",
+		"/v1/shared/copies/" + sharedPostingID + "/refresh",
 		"/v1/shared/postings",
 		"/v1/shared/postings/users/abc/" + sharedPostingID,
 	} {
@@ -150,6 +152,8 @@ func TestSharingHTTPRequiresAuthentication(t *testing.T) {
 		{"GET", "/v1/shared/postings", ""},
 		{"GET", "/v1/shared/postings/users/abc/" + sharedPostingID, ""},
 		{"POST", "/v1/shared/copies", `{"owner":"users/abc"}`},
+		{"GET", "/v1/shared/copies/" + sharedPostingID + "/link", ""},
+		{"POST", "/v1/shared/copies/" + sharedPostingID + "/refresh", ""},
 	} {
 		w := do(t, h, route.method, route.target, "", route.body)
 		if w.Code != http.StatusUnauthorized {
@@ -369,6 +373,7 @@ func TestSharingHTTPReadOnlyRejectsWrites(t *testing.T) {
 		{"DELETE", "/v1/shared/grants", grantBody(sharedPostingID, "user", mustID(t, db, "bob"))},
 		{"POST", "/v1/shared/exclusions", grantBody(sharedPostingID, "all", "")},
 		{"POST", "/v1/shared/copies", `{"owner":"` + resourceOf(alice) + `","postingId":"` + sharedPostingID + `"}`},
+		{"POST", "/v1/shared/copies/" + sharedPostingID + "/refresh", ""},
 	} {
 		if w := do(t, ro, route.method, route.target, "bob", route.body); w.Code != http.StatusForbidden {
 			t.Fatalf("read-only %s %s = %d, want 403", route.method, route.target, w.Code)
