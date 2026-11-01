@@ -150,19 +150,35 @@ func (d *Database) SetSharingPolicy(ownerID, groupID string, input store.Sharing
 	}, nil
 }
 
-// GetSharingPolicy returns one member's stored preference. Absence reports
-// ErrNotFound and means automatic sharing is off.
+// GetSharingPolicy returns one member's stored preference. Absence
+// reports ErrNotFound and means automatic sharing is off. Callers who are
+// no longer members also report ErrNotFound: the row survives leaving so a
+// rejoin resumes it, but it is not readable from outside the group.
 func (d *Database) GetSharingPolicy(ownerID, groupID string) (store.SharingPolicy, error) {
 	if !validSharingUserID(ownerID) || !validSharingGroupID(groupID) {
 		return store.SharingPolicy{}, fmt.Errorf("%w: policy owner and group must identify one preference", store.ErrGroupInvalid)
 	}
-	policy, err := scanSharingPolicy(d.db.QueryRow(
+	tx, err := d.db.Begin()
+	if err != nil {
+		return store.SharingPolicy{}, err
+	}
+	defer tx.Rollback()
+	if err := requirePolicyMember(tx, groupID, ownerID); err != nil {
+		return store.SharingPolicy{}, err
+	}
+	policy, err := scanSharingPolicy(tx.QueryRow(
 		`SELECT owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at FROM sharing_policies WHERE owner_user_id = ? AND group_id = ?`,
 		ownerID, groupID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return store.SharingPolicy{}, store.ErrNotFound
 	}
-	return policy, err
+	if err != nil {
+		return store.SharingPolicy{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return store.SharingPolicy{}, err
+	}
+	return policy, nil
 }
 
 // ListSharingPolicies returns every stored preference for one member in
@@ -271,6 +287,71 @@ func (d *Database) PreviewSharingPolicy(ownerID, groupID string) (store.SharingP
 		OwnerUserID: policy.OwnerUserID, GroupID: policy.GroupID, Enabled: policy.Enabled,
 		AccountIDs: policy.AccountIDs, StartDate: policy.StartDate, EndDate: policy.EndDate,
 		Version: policy.Version, EligiblePostings: eligible, MemberCount: members,
+	}, nil
+}
+
+// PreviewSharingPolicyDraft counts the currently eligible postings for
+// unsaved preference values plus the current audience size, without
+// persisting anything. The caller must currently belong to the group;
+// anything else reports ErrNotFound so group membership is not enumerable.
+// Counts are computed as if the draft were enabled even when the submitted
+// flag is off, so the consent screen shows the exposure enabling would
+// create. Counts only: no amounts, payees, or row IDs leave this call.
+func (d *Database) PreviewSharingPolicyDraft(ownerID, groupID string, input store.SharingPolicyInput) (store.SharingPolicyPreview, error) {
+	if !validSharingUserID(ownerID) {
+		return store.SharingPolicyPreview{}, fmt.Errorf("%w: policy owner must be a user ID", store.ErrGroupInvalid)
+	}
+	if !validSharingGroupID(groupID) {
+		return store.SharingPolicyPreview{}, fmt.Errorf("%w: policy group must be a group ID", store.ErrGroupInvalid)
+	}
+	normalized, err := store.NormalizeSharingPolicyInput(input)
+	if err != nil {
+		return store.SharingPolicyPreview{}, fmt.Errorf("%w: %v", store.ErrGroupInvalid, err)
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return store.SharingPolicyPreview{}, err
+	}
+	defer tx.Rollback()
+	if err := requirePolicyMember(tx, groupID, ownerID); err != nil {
+		return store.SharingPolicyPreview{}, err
+	}
+	// Selected accounts must belong to the member, matching the write-time
+	// rule, so the preview never counts rows the policy could not cover.
+	for _, accountID := range normalized.AccountIDs {
+		var accounts int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM accounts WHERE user_id = ? AND id = ?`, ownerID, accountID).Scan(&accounts); err != nil {
+			return store.SharingPolicyPreview{}, err
+		}
+		if accounts != 1 {
+			return store.SharingPolicyPreview{}, fmt.Errorf("%w: unknown sharing account %q", store.ErrGroupInvalid, accountID)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return store.SharingPolicyPreview{}, err
+	}
+	postings, err := loadPolicyPostings(d.db, ownerID)
+	if err != nil {
+		return store.SharingPolicyPreview{}, err
+	}
+	draft := store.SharingPolicy{
+		OwnerUserID: ownerID, GroupID: groupID, Enabled: true,
+		AccountIDs: normalized.AccountIDs, StartDate: normalized.StartDate, EndDate: normalized.EndDate,
+	}
+	eligible := 0
+	for _, posting := range postings {
+		if policyPostingEligible(draft, posting) {
+			eligible++
+		}
+	}
+	var members int
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM group_members WHERE group_id = ?`, groupID).Scan(&members); err != nil {
+		return store.SharingPolicyPreview{}, err
+	}
+	return store.SharingPolicyPreview{
+		OwnerUserID: ownerID, GroupID: groupID, Enabled: normalized.Enabled,
+		AccountIDs: normalized.AccountIDs, StartDate: normalized.StartDate, EndDate: normalized.EndDate,
+		EligiblePostings: eligible, MemberCount: members,
 	}, nil
 }
 

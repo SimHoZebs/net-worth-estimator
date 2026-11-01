@@ -196,5 +196,12 @@ type Database interface {
 	// member's stored policy plus the current audience size. Counts only:
 	// no amounts, payees, or row IDs leave the owner's scope.
 	PreviewSharingPolicy(ownerID, groupID string) (SharingPolicyPreview, error)
+	// PreviewSharingPolicyDraft counts the currently eligible postings for
+	// unsaved preference values plus the current audience size, without
+	// persisting anything (GRP-04 consent preview). Counts are computed
+	// as if the draft were enabled; the echoed Enabled flag stays as
+	// submitted. Counts only: no amounts, payees, or row IDs leave the
+	// owner's scope. Non-members report ErrNotFound.
+	PreviewSharingPolicyDraft(ownerID, groupID string, input SharingPolicyInput) (SharingPolicyPreview, error)
 	CollectBlobGarbage(ctx context.Context, limit int) error
 }
