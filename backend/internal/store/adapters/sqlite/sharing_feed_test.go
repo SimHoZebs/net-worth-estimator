@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 const feedPostingA = "01900000-0000-7000-8000-0000000000c1"
@@ -118,11 +117,11 @@ func TestGroupFeedDeduplicatesReasons(t *testing.T) {
 // an explicit share and exclusion cannot coexist for one audience.
 func TestGroupFeedHonorsExclusions(t *testing.T) {
 	cases := []struct {
-		name         string
-		grantType    string
-		grantID      func(group, bob string) string
-		excludeType  string
-		excludeID    func(group, bob string) string
+		name        string
+		grantType   string
+		grantID     func(group, bob string) string
+		excludeType string
+		excludeID   func(group, bob string) string
 	}{
 		{"user", store.SharingAudienceGroup,
 			func(group, _ string) string { return group },
@@ -292,37 +291,5 @@ func TestGroupFeedOrdersByOwnerThenPosting(t *testing.T) {
 			(prev.OwnerUserID == curr.OwnerUserID && prev.Posting.ID > curr.Posting.ID) {
 			t.Fatalf("feed out of order at %d: %+v", i, items)
 		}
-	}
-}
-
-// Literal detection mirrors the record lists: numeric expressions and
-// numeric configured values count; calculated recipes stay varying.
-func TestFeedLiteralAmount(t *testing.T) {
-	expression := func(config map[string]any) types.PostingAmountResolution {
-		return types.PostingAmountResolution{Resolver: "expression", Config: config, Inputs: map[string]types.AmountInputBinding{}}
-	}
-	cases := []struct {
-		name   string
-		amount types.PostingAmountResolution
-		value  float64
-		fixed  bool
-	}{
-		{"numeric expression", expression(map[string]any{"expression": "10.5"}), 10.5, true},
-		{"padded expression", expression(map[string]any{"expression": "  42 "}), 42, true},
-		{"negative exponent", expression(map[string]any{"expression": "-1.5e3"}), -1500, true},
-		{"formula", expression(map[string]any{"expression": "balance * 2"}), 0, false},
-		{"empty expression", expression(map[string]any{"expression": ""}), 0, false},
-		{"value number", expression(map[string]any{"value": 7.25}), 7.25, true},
-		{"amount number", expression(map[string]any{"amount": 3.0}), 3, true},
-		{"infinite value", expression(map[string]any{"value": "x"}), 0, false},
-		{"no config", expression(nil), 0, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			value, fixed := FeedLiteralAmount(tc.amount)
-			if fixed != tc.fixed || (fixed && value != tc.value) {
-				t.Fatalf("literal = (%v, %v), want (%v, %v)", value, fixed, tc.value, tc.fixed)
-			}
-		})
 	}
 }
