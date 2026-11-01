@@ -14,11 +14,7 @@ import { money } from "../../domain/format.ts";
 import type { Projection } from "../../domain/result.ts";
 import { TextureSprite } from "../texture/TextureSprite.tsx";
 import "../texture/texture.css";
-import {
-	seriesTexture,
-	textureFill,
-	toneToken,
-} from "../texture/texture.ts";
+import { seriesTexture, textureFill, toneToken } from "../texture/texture.ts";
 
 /**
  * Per-account contribution to trailing net worth as a diverging stacked

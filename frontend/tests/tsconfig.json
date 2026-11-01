@@ -9,8 +9,7 @@
 		"noEmit": true,
 		"skipLibCheck": true,
 		"types": ["node"],
-		"baseUrl": ".",
-		"paths": { "@/*": ["../src/*"] }
+		"paths": { "@/*": ["./../src/*"] }
 	},
 	"include": [
 		"*.ts",

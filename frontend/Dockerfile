@@ -1,16 +1,21 @@
 FROM node:24-alpine AS build
 
-WORKDIR /build/frontend
+# Bun owns installs and script orchestration; Node stays as the runtime that
+# executes the toolchain bins (vite, orval), identical to local dev.
+COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
 
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+WORKDIR /build
 
-COPY frontend/ ./
-# `npm run build` regenerates the API client from the checked-in snapshot
-# via `prebuild`, so the image never uses a stale generated tree. Refresh
-# the snapshot itself with `npm run openapi:pull` whenever the backend API
-# changes.
-RUN npm run build
+COPY package.json bun.lock ./
+COPY frontend/package.json ./frontend/package.json
+COPY extension/package.json ./extension/package.json
+RUN bun install --frozen-lockfile --no-progress
+
+COPY frontend/ ./frontend/
+# Frontend scripts carry no pre-hooks: generate the API client explicitly so
+# the image never uses a stale generated tree. Refresh the snapshot itself
+# with `bun --filter ./frontend openapi:pull` whenever the backend API changes.
+RUN bun --filter ./frontend api:generate && bun --filter ./frontend build
 
 FROM nginx:alpine
 

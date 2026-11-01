@@ -10,12 +10,12 @@ scripts/test --integration   # playwright browser suite (fixtureapi + Vite over 
 scripts/test --all           # unit then integration
 ```
 
-Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `npm --prefix frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. Sharing one worker cut the suite from about 32s to about 6s for 121 files / 958 tests. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
 
-The purchase-capture extension adds `npm --prefix extension test` to unit and
-`npm --prefix extension run test:browser` to integration. Install its dependencies
-with `npm --prefix extension ci`. Its completion gate also includes
-`npm --prefix extension run lint` and `npm --prefix extension run build`.
+The purchase-capture extension adds `bun --filter ./extension test` to unit and
+`bun --filter ./extension test:browser` to integration. Install its dependencies
+with `bun install --frozen-lockfile`. Its completion gate also includes
+`bun --filter ./extension lint` and `bun --filter ./extension build`.
 Browser tests use a disposable Chromium profile and ephemeral local HTTP fixture.
 See [extension setup and verification](extension/README.md).
 
@@ -67,44 +67,55 @@ CGO_ENABLED=0 go -C backend test ./internal/store ./internal/types ./internal/cs
 Run from the repository root:
 
 ```bash
-npm --prefix frontend ci
-npm --prefix frontend run lint
-npm --prefix frontend run typecheck
-npm --prefix frontend test
-npm --prefix frontend run build
+bun install --frozen-lockfile
+bun --filter ./frontend lint
+bun --filter ./frontend typecheck
+bun --filter ./frontend test
+bun --filter ./frontend build
 ```
 
+Frontend scripts carry no pre-hooks. Every gate entry generates the API client
+explicitly and once; before running scripts directly, generate it yourself
+with `bun --filter ./frontend api:generate`.
+
 `typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
+It runs on `bun check` (about 0.3s for both projects against about 10s under
+`tsc`); `build` runs the same `bun check` pass before `vite build`, so the
+artifact path keeps type safety without a separate checker. Both configs avoid
+`baseUrl`, which current checkers removed. The `typescript` package remains as
+a parser library for the typography and style-scale lint scripts.
 
 Refresh the checked-in OpenAPI snapshot without a running server or financial data:
 
 ```bash
 OPENAPI_SNAPSHOT="$PWD/frontend/openapi.snapshot.json" CGO_ENABLED=0 \
   go -C backend test ./internal/api -run TestRawRoutesAppearInOpenAPI -count=1
-npm --prefix frontend run format -- openapi.snapshot.json
-npm --prefix frontend run api:generate
+(cd frontend && bunx --no-install oxfmt openapi.snapshot.json)
+bun --filter ./frontend api:generate
 ```
 
-Font roles live in `frontend/src/styles/typography.css`. `npm --prefix frontend run lint:typography` warns about font choices outside the shared owner without failing the command. The normal lint gate also runs it. Unit tests cover the lint rule's detection logic, not exact fonts, role classes, or rendered sizes.
+Font roles live in `frontend/src/styles/typography.css`. `bun --filter ./frontend lint:typography` warns about font choices outside the shared owner without failing the command. The normal lint gate also runs it. Unit tests cover the lint rule's detection logic, not exact fonts, role classes, or rendered sizes.
 
-`npm --prefix frontend run lint:styles` enforces Tailwind's spacing scale in JSX classes, typed recipes, and CSS declarations. It also rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. `npm --prefix frontend run lint:fix` normalizes literal spacing values to that scale. Runtime variables, chart geometry, native state selectors, and calculated layout constraints remain valid.
+`bun --filter ./frontend lint:styles` enforces Tailwind's spacing scale in JSX classes, typed recipes, and CSS declarations. It also rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. `bun --filter ./frontend lint:fix` normalizes literal spacing values to that scale. Runtime variables, chart geometry, native state selectors, and calculated layout constraints remain valid.
 
 ## Frontend Browser Tests
 
-The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness on port 8799, seeded from `frontend/tests/fixtures/`, and the Vite dev server on 5178 pointed at it. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
+The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness, seeded from `frontend/tests/fixtures/`, and the Vite dev server pointed at it. Each run picks random free ports and a fresh temporary database. It never attaches to a dev server, and several agents can run it at the same time. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
 
 ```bash
-npm --prefix frontend exec playwright install chromium
-npm --prefix frontend run test:browser
+(cd frontend && bunx --no-install playwright install chromium)
+bun --filter ./frontend test:browser
 ```
 
-Run it from a stopped dev server on 5178, or it will reuse yours and test the wrong backend. The suite is single-worker because it shares one seeded server.
+`test:browser` (the sharding runner) is the entry point. It runs the suite in shards. Each shard starts its own fixture API and Vite server on its own random ports. The default is half the available CPUs, at most four. Set `TEST_BROWSER_SHARDS` to change it. If a port is taken between selection and startup, the shard retries with new ports. Each invocation writes its own blobs under `test-results/run-<pid>/`, so concurrent runs never share trace files. Running `playwright test` directly skips sharding, retry, and output isolation.
 
-If another dev server uses 5178, set `TEST_FRONTEND_PORT=5179` to give the browser suite its own frontend port.
+Each shard is single-worker because it shares one seeded server. Named spec files run in one shard:
 
-If another fixture API uses 8799, set `TEST_API_PORT=18899`. The harness uses a
-port-specific database under `/tmp/opencode/`. Set `CI=1` to reject existing
-servers instead of reusing them.
+```bash
+bun --filter ./frontend test:browser -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
+```
+
+The database is fresh for every run, so a schema change never leaves a failing fixture behind.
 
 ### Finance independence
 
@@ -115,8 +126,7 @@ for explicitly requested projected activity. Existing account-activity tests
 retain projected transfers, funding gaps, edits, and keyboard navigation.
 
 ```bash
-CI=1 TEST_API_PORT=18893 TEST_FRONTEND_PORT=5183 \
-  npm --prefix frontend run test:browser -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
+bun --filter ./frontend test:browser -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
 ```
 
 Backend regressions must distinguish financial validity from forecast readiness.
@@ -137,8 +147,8 @@ Blob adapter conformance and receipt storage failure checks live under
 To exercise the production build instead of the dev server:
 
 ```bash
-npm --prefix frontend run build
-TEST_PRODUCTION=1 npm --prefix frontend run test:browser
+bun --filter ./frontend build
+TEST_PRODUCTION=1 bun --filter ./frontend test:browser
 ```
 
 ## Completion Gate
@@ -148,19 +158,38 @@ The Northflank GitHub workflow only requests a gated deployment for the pushed S
 The image publisher does not replace the local test gates either. Validate it with
 `actionlint .github/workflows/images.yml` and `node --test deploy/images.test.mjs`.
 
+Run the whole gate with one command:
+
+```bash
+scripts/test --gate
+```
+
+`scripts/test --gate` checks install drift, generates the API client up front,
+runs backend, frontend lint, typecheck, unit tests, build, and extension gates in
+parallel groups, then runs the browser suite in shards (the runner refreshes
+the client again so standalone runs never use a stale tree). Use `--no-browser` for
+a fast run and `--shards=N` to control the browser fan-out. `KEEP_GATE_LOGS=1`
+keeps the per-group logs for forensics instead of deleting them.
+
+`node scripts/check-install.mjs` compares each workspace `package.json` against
+the root `bun.lock` and the installed `node_modules`. It runs in both hooks
+and in `scripts/test --unit`. A missing or stale dependency fails here instead
+of surfacing later as a typecheck or import error. Install or refresh everything
+with `bun install` from the repository root.
+
 For a frontend change, the gate is:
 
 ```bash
-npm --prefix frontend run lint
-npm --prefix frontend run typecheck
-npm --prefix frontend test
-npm --prefix frontend run build
-npm --prefix frontend run test:browser
+bun --filter ./frontend lint
+bun --filter ./frontend typecheck
+bun --filter ./frontend test
+bun --filter ./frontend build
+bun --filter ./frontend test:browser
 ```
 
 For a backend change, it is the Go gate below.
 
-The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus whole-project `oxlint`. Remaining frontend gates (`typecheck`, `test`, `build`, `test:browser`) run only when invoked directly.
+The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus frontend `lint`, `typecheck`, and unit tests, and extension unit tests and lint. Remaining gates (`build`, `test:browser`) run in `scripts/test --gate`.
 
 ## Shared Database Isolation
 

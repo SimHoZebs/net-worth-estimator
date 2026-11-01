@@ -13,6 +13,8 @@ export function upcomingTransactions({
 	const end = shiftDate({ date: startDate, days });
 	return {
 		end,
-		events: projection.transactions.filter((transaction) => transaction.date <= end),
+		events: projection.transactions.filter(
+			(transaction) => transaction.date <= end,
+		),
 	};
 }

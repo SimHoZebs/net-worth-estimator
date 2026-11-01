@@ -2,6 +2,8 @@
 set -e
 start=$(date +%s)
 
+node scripts/check-install.mjs
+
 staged_go=$(git diff --cached --name-only --diff-filter=ACM | grep '^backend/.*\.go$' || true)
 if [ -z "$staged_go" ]; then
   echo "pre-commit: no staged backend Go files, skipping backend verify."
@@ -18,8 +20,8 @@ else
   done
 fi
 
-staged_lint=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx)$' || true)
-staged_format=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx|css|json|html)$' || true)
+staged_lint=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx)$' | sed 's|^frontend/||' || true)
+staged_format=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx|css|json|html)$' | sed 's|^frontend/||' || true)
 if [ -z "$staged_lint" ] && [ -z "$staged_format" ]; then
   echo "pre-commit: no staged frontend files, skipping frontend checks."
 else
@@ -27,11 +29,11 @@ else
   if [ -n "$staged_lint" ]; then
     # Unquoted on purpose: one repo-relative path per line, no spaces in tree.
     # shellcheck disable=SC2086
-    npm --prefix frontend exec -- oxlint $staged_lint
+    (cd frontend && bunx --no-install oxlint $staged_lint)
   fi
   if [ -n "$staged_format" ]; then
     # shellcheck disable=SC2086
-    npm --prefix frontend exec -- oxfmt --check $staged_format
+    (cd frontend && bunx --no-install oxfmt --check $staged_format)
   fi
 fi
 

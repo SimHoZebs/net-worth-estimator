@@ -24,7 +24,8 @@ export function nextProjectedPayments({
 	const next = new Map<string, ProjectedPayment>();
 	for (const transaction of transactions) {
 		const rule = known.get(transaction.transactionId);
-		if (!rule || transaction.date <= today || transaction.requested <= 0) continue;
+		if (!rule || transaction.date <= today || transaction.requested <= 0)
+			continue;
 		if (rule.endDate !== null && transaction.date > rule.endDate) continue;
 		const previous = next.get(rule.id);
 		if (!previous || transaction.date < previous.date) {

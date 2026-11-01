@@ -113,8 +113,8 @@ export function FundingGapsModal({
 			<h3 className="mt-4 mb-1 text-sm">Before the payment</h3>
 			<p className="text-sm leading-relaxed text-muted">
 				Opening balance {money(gap.openingBalance)} on{" "}
-				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length} transactions
-				in execution order · Later deposits excluded
+				{dateLabel(gap.windowStartDate, true)} · {summary.rows.length}{" "}
+				transactions in execution order · Later deposits excluded
 			</p>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled grid lists. */}
 			<ul className="mt-3 mb-0 grid list-none p-0" role="list">

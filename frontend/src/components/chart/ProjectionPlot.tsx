@@ -76,7 +76,9 @@ export function ProjectionPlot({
 			}}
 			onPointerLeave={() => onInspect(null)}
 			onClick={(event) => {
-				onPin(pointAt(event.clientX, event.currentTarget.getBoundingClientRect()));
+				onPin(
+					pointAt(event.clientX, event.currentTarget.getBoundingClientRect()),
+				);
 			}}
 		>
 			<desc id={`${id}-description`}>

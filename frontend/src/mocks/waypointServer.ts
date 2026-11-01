@@ -313,8 +313,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 						// seeds refresh in place and voids convert. Settled
 						// bank rows are write-stable after import.
 						readOnly:
-							syncOwned &&
-							(posting.pending === true || posting.void === true),
+							syncOwned && (posting.pending === true || posting.void === true),
 					});
 				}
 			}

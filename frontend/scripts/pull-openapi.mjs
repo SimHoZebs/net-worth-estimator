@@ -1,5 +1,5 @@
 // Refresh the checked-in OpenAPI snapshot from a running backend, then
-// regenerate with `npm run api:generate`. The snapshot keeps builds offline
+// regenerate with `bun --filter ./frontend api:generate`. The snapshot keeps builds offline
 // and diffs reviewable; the backend remains the source of truth.
 // Uses WAYPOINT_API_URL rather than NET_WORTH_ESTIMATOR_BACKEND on purpose:
 // pull needs the host-reachable backend debug port serving /openapi.json,

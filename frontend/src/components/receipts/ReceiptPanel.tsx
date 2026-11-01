@@ -2,10 +2,7 @@ import { Camera, ImageUp, Paperclip, ReceiptText } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { receiptReviewLabel } from "@/domain/receipt.ts";
 import { useServerModel, useServerStatus } from "@/state/workspaceResources.ts";
-import {
-	useReceiptActions,
-	useReceipts,
-} from "@/state/receipts.ts";
+import { useReceiptActions, useReceipts } from "@/state/receipts.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";

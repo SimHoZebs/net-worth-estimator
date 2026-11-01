@@ -365,9 +365,7 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 		name: "Remove Bistro?",
 	});
 	expect(confirm.textContent).toContain("Bistro dinner");
-	fireEvent.click(
-		within(confirm).getByRole("button", { name: "Remove hold" }),
-	);
+	fireEvent.click(within(confirm).getByRole("button", { name: "Remove hold" }));
 	await waitFor(() =>
 		expect(
 			server.calls.some(
