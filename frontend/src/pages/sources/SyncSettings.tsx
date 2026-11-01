@@ -1,24 +1,24 @@
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
-import { useSyncCredential } from "../../state/syncSettings.ts";
-import { SyncProviderPanel } from "./SyncProviderPanel.tsx";
+import { useIntegrations } from "../../state/integrations.ts";
+import { IntegrationsList } from "./IntegrationsList.tsx";
 
 export function SyncSettings() {
-	const credential = useSyncCredential();
+	const providers = useIntegrations();
 
-	if (credential.isPending || credential.isError) {
+	if (providers.isPending || providers.isError) {
 		return (
 			<section
 				aria-label="Bank sync"
 				className="rounded-control border border-line bg-surface p-4"
 			>
-				{credential.isPending ? (
+				{providers.isPending ? (
 					<Skeleton className="h-10 w-full" />
 				) : (
 					<ErrorNotice
 						message="The sync connection could not be loaded."
 						action="Retry"
-						onAction={() => void credential.refetch()}
+						onAction={() => void providers.refetch()}
 					/>
 				)}
 			</section>
@@ -27,7 +27,7 @@ export function SyncSettings() {
 
 	return (
 		<section aria-label="Bank sync">
-			<SyncProviderPanel />
+			<IntegrationsList providers={providers.data ?? []} />
 		</section>
 	);
 }

@@ -17,6 +17,7 @@ import {
 } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
+import { integrationsKey } from "@/state/integrations.ts";
 import { refreshWorkspaceAfterSync } from "@/state/syncWorkspaceRefresh.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import { userResourceKey } from "@/state/workspaceResources.ts";
@@ -107,6 +108,10 @@ async function refreshSyncData(scope: UserScope) {
 	if (scope.status === "pending" || scope !== getUserScope()) return;
 	await serverQueryClient().invalidateQueries({
 		queryKey: syncLinksKey(scope),
+		refetchType: "active",
+	});
+	await serverQueryClient().invalidateQueries({
+		queryKey: integrationsKey(scope),
 		refetchType: "active",
 	});
 	await refreshStatus(scope);
@@ -238,6 +243,7 @@ export async function triggerSyncNow(): Promise<boolean> {
 export function resetSyncSettingsClient(): void {
 	serverQueryClient().removeQueries({ queryKey: ["sync-credential"] });
 	serverQueryClient().removeQueries({ queryKey: ["sync-links"] });
+	serverQueryClient().removeQueries({ queryKey: ["integrations"] });
 }
 
 subscribeUserScope(resetSyncSettingsClient);

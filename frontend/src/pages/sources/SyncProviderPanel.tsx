@@ -1,10 +1,11 @@
 import { Check, ExternalLink, Landmark, RefreshCw } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { buttonStyles } from "../../components/buttonStyles.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { Skeleton } from "../../components/Skeleton.tsx";
 import {
 	disconnectSyncKey,
 	triggerSyncNow,
@@ -13,6 +14,7 @@ import {
 import { useServerStatus } from "../../state/workspaceResources.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncConnectedAccounts } from "./SyncConnectedAccounts.tsx";
+import { SyncConnectForm } from "./SyncConnectForm.tsx";
 import { SyncHelp } from "./SyncHelp.tsx";
 import { SyncOnboarding } from "./SyncOnboarding.tsx";
 import { simplefinLinks } from "./simplefinLinks.ts";
@@ -41,6 +43,22 @@ export function SyncProviderPanel() {
 	const [error, setError] = useState<string | null>(null);
 	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+	const [reconnecting, setReconnecting] = useState(false);
+	const reconnectInputRef = useRef<HTMLInputElement>(null);
+	const reconnectButtonRef = useRef<HTMLButtonElement>(null);
+	const wasReconnecting = useRef(false);
+	// Reconnect opens and closes on explicit actions only. Opening moves
+	// focus into the revealed token field; closing returns focus to the
+	// Reconnect button. Initial mount never moves focus.
+	useEffect(() => {
+		if (reconnecting) {
+			wasReconnecting.current = true;
+			reconnectInputRef.current?.focus();
+		} else if (wasReconnecting.current) {
+			wasReconnecting.current = false;
+			reconnectButtonRef.current?.focus();
+		}
+	}, [reconnecting]);
 	// One-time focus owned by the explicit successful connect/disconnect
 	// actions. The credential cache updates before the form reports success,
 	// so the target heading may mount before or after the action arms focus:
@@ -85,6 +103,28 @@ export function SyncProviderPanel() {
 			? quotaLimit - status.data.syncQuotaUsed
 			: null;
 
+	// The page gates on the provider list; this panel still resolves its own
+	// credential query. Never render the disconnected onboarding from a
+	// pending read, and never mask a credential failure as disconnected.
+	if (credential.isPending) {
+		return (
+			<div className="grid gap-6">
+				<Skeleton className="h-40 w-full" />
+			</div>
+		);
+	}
+	if (credential.isError) {
+		return (
+			<div className="grid gap-6">
+				<ErrorNotice
+					message="The sync connection could not be loaded."
+					action="Retry"
+					onAction={() => void credential.refetch()}
+				/>
+			</div>
+		);
+	}
+
 	async function handleSyncNow() {
 		setSyncing(true);
 		setError(null);
@@ -111,6 +151,12 @@ export function SyncProviderPanel() {
 				"SimpleFIN disconnected. Your accounts and imported history are kept.",
 			);
 		} else setError("Could not disconnect. Try again.");
+	}
+
+	function handleReconnected() {
+		setReconnecting(false);
+		setError(null);
+		setMessage("SimpleFIN reconnected.");
 	}
 
 	return (
@@ -226,7 +272,27 @@ export function SyncProviderPanel() {
 							</div>
 							<SyncConnectedAccounts />
 							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
-								{confirmingDisconnect ? (
+								{reconnecting ? (
+									<div>
+										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
+											Paste a new setup token to replace the saved
+											connection. Your accounts and imported history stay
+											in Waypoint.
+										</p>
+										<SyncConnectForm
+											onConnected={handleReconnected}
+											inputRef={reconnectInputRef}
+										/>
+										<div className="mt-3">
+											<TextButton
+												className="min-h-6"
+												onClick={() => setReconnecting(false)}
+											>
+												Cancel reconnect
+											</TextButton>
+										</div>
+									</div>
+								) : confirmingDisconnect ? (
 									<div>
 										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
 											Disconnect SimpleFIN? Future imports will stop. Your
@@ -251,14 +317,27 @@ export function SyncProviderPanel() {
 										</div>
 									</div>
 								) : (
-									<TextButton
-										tone="danger"
-										className="min-h-6"
-										disabled={readOnly || busy || syncing}
-										onClick={() => setConfirmingDisconnect(true)}
-									>
-										Disconnect
-									</TextButton>
+									<div className="flex flex-wrap items-center gap-4">
+										<TextButton
+											tone="danger"
+											className="min-h-6"
+											disabled={readOnly || busy || syncing}
+											onClick={() => setConfirmingDisconnect(true)}
+										>
+											Disconnect
+										</TextButton>
+										<TextButton
+											ref={reconnectButtonRef}
+											className="min-h-6"
+											disabled={readOnly || busy || syncing}
+											onClick={() => {
+												setConfirmingDisconnect(false);
+												setReconnecting(true);
+											}}
+										>
+											Reconnect
+										</TextButton>
+									</div>
 								)}
 							</div>
 						</div>

@@ -11,10 +11,12 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/analyses"
+	integrationshttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/model"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/projections"
 	receipthttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/receipts"
 	synchttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/sync"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
@@ -60,6 +62,9 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	analyses.Register(api, st, serverConfig.CanWrite, serverConfig.Actor)
 	model.Register(api, st, receiptService, serverConfig.ReadOnly)
 	synchttp.Register(api, st, serverConfig.SyncRunner)
+	integrationshttp.Register(api, integrations.NewRegistry(
+		integrations.NewSimpleFIN(st, serverConfig.SyncRunner),
+	))
 	compute := huma.NewGroup(api)
 	compute.UseSimpleModifier(func(op *huma.Operation) {
 		if op.Metadata == nil {
