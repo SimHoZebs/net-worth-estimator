@@ -42,4 +42,17 @@ func modelRawRoutes(api huma.API) {
 		}
 		spec.AddOperation(op)
 	}
+	// The Gmail OAuth callback runs outside Huma (a browser GET that 302s
+	// to the frontend with the connection outcome). Describe it here so
+	// the generated client and the snapshot cover every request.
+	spec.AddOperation(&huma.Operation{
+		OperationID: "gmail-oauth-callback",
+		Method:      "GET",
+		Path:        "/v1/integrations/gmail/callback",
+		Parameters: []*huma.Param{
+			{Name: "code", In: "query", Required: false, Schema: &huma.Schema{Type: "string"}},
+			{Name: "state", In: "query", Required: false, Schema: &huma.Schema{Type: "string"}},
+		},
+		Responses: map[string]*huma.Response{"302": {Description: "Redirect to the frontend with gmail=connected or gmail=error"}},
+	})
 }

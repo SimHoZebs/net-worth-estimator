@@ -23,8 +23,9 @@ import (
 //   - A fresh backend reports ModelExists() == false. InitializeModel
 //     activates an empty model without replacing existing data.
 //   - Clear resets this user's model, sync state (including the Bridge key
-//     and card selection), settings, and artifacts. It preserves amount
-//     presets, other users, and identity state. Use
+//     and card selection), Gmail OAuth state (tokens, account, cursor),
+//     settings, and artifacts. It preserves amount presets, other users,
+//     and identity state. Use
 //     ClearSyncCredential to disconnect the key while keeping cards.
 //   - Missing rows report ErrNotFound (or IsNotFound). Backends must not
 //     leak sql.ErrNoRows, missing files, or other mechanism errors.
@@ -88,6 +89,31 @@ type Store interface {
 	SetSyncCards(cards []string) ([]string, error)
 	GetLastSyncTime() (string, error)
 	SetLastSyncTime(completedAt string) error
+	// GetGmailCredential reports the stored Gmail OAuth state, or a
+	// disconnected credential with DefaultGmailLookbackDays when no
+	// connection has been stored. Secrets stay in the row.
+	GetGmailCredential() (GmailCredential, error)
+	// ConnectGmail stores a Gmail OAuth grant: refresh and access
+	// tokens, the consented account, and the granted scopes. It stamps
+	// the connection time and clears any pending authorization state.
+	ConnectGmail(grant GmailCredential) (GmailCredential, error)
+	// UpdateGmailToken replaces the stored access token after a
+	// server-side refresh. A non-empty refresh token rotates the stored
+	// grant; an empty one keeps the existing refresh token.
+	UpdateGmailToken(accessToken string, accessExpiryUnix int64, refreshToken string) (GmailCredential, error)
+	// SetGmailLookback stores the configurable initial scan lookback in
+	// days. Callers validate the range; the store persists it.
+	SetGmailLookback(days int) (GmailCredential, error)
+	// SetGmailScanCursor records the incremental scan cursor after a
+	// completed scan (INT-03). History ID and completion time persist
+	// together so a scan never resumes from a half-written cursor.
+	SetGmailScanCursor(historyID, scannedAt string) (GmailCredential, error)
+	// SetGmailPendingState records the in-flight OAuth CSRF state.
+	SetGmailPendingState(state string, pendingAtUnix int64) error
+	// ClearGmailCredential disconnects Gmail: tokens, account display,
+	// and scan cursor are forgotten. The lookback preference is kept so
+	// a reconnect resumes with the user's window.
+	ClearGmailCredential() error
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
 	ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)

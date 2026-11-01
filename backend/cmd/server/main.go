@@ -104,10 +104,12 @@ func main() {
 	defer syncStop()
 
 	apiConfig := api.Config{
-		ReceiptSource:  receiptSource,
-		AllowedOrigins: allowedOrigins,
-		ReadOnly:       readOnly,
-		SyncRunner:     syncRunner,
+		ReceiptSource:        receiptSource,
+		AllowedOrigins:       allowedOrigins,
+		ReadOnly:             readOnly,
+		SyncRunner:           syncRunner,
+		GmailService:         configureGmail(),
+		GmailFrontendBaseURL: strings.TrimRight(os.Getenv("NET_WORTH_ESTIMATOR_PUBLIC_URL"), "/"),
 	}
 	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig)
 	if err != nil {

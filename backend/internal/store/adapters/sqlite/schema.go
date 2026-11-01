@@ -272,6 +272,7 @@ func schemaStatements() []string {
 			cards_json TEXT NOT NULL DEFAULT '[]',
 			PRIMARY KEY(user_id, id)
 		)`,
+		gmailCredentialsDDL,
 		`CREATE TABLE IF NOT EXISTS amount_presets (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,

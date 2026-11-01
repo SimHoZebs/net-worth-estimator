@@ -82,6 +82,9 @@ func Run(t *testing.T, newStore func(*testing.T) store.Store) {
 	t.Run("SyncCredentialRoundTripAndClear", func(t *testing.T) {
 		testSyncCredentialConformance(t, newStore)
 	})
+	t.Run("GmailCredentialRoundTripAndClear", func(t *testing.T) {
+		testGmailCredentialConformance(t, newStore)
+	})
 	t.Run("AmountPresetsRoundTripAndReorder", func(t *testing.T) {
 		testAmountPresetConformanceRoundTrip(t, newStore)
 	})
@@ -126,6 +129,69 @@ func testSyncCredentialConformance(t *testing.T, newStore func(*testing.T) store
 	}
 	if cards, err := database.GetSyncCards(); err != nil || len(cards) != 0 {
 		t.Fatalf("cards after Clear = %+v, err %v, want forgotten", cards, err)
+	}
+}
+
+func testGmailCredentialConformance(t *testing.T, newStore func(*testing.T) store.Store) {
+	t.Helper()
+	database := newStore(t)
+	credential, err := database.GetGmailCredential()
+	if err != nil || credential.Connected() {
+		t.Fatalf("default gmail credential = %+v, err %v", credential, err)
+	}
+	if credential.LookbackDays != store.DefaultGmailLookbackDays {
+		t.Fatalf("default lookback = %d, want %d", credential.LookbackDays, store.DefaultGmailLookbackDays)
+	}
+	if _, err := database.SetGmailLookback(30); err != nil {
+		t.Fatalf("set lookback: %v", err)
+	}
+	connected, err := database.ConnectGmail(store.GmailCredential{
+		RefreshToken: "refresh-alice", AccessToken: "access-alice",
+		AccessExpiryUnix: 2_000_000_000, EmailAddress: "alice@example.com",
+		Scopes: "gmail.readonly",
+	})
+	if err != nil || !connected.Connected() {
+		t.Fatalf("connected = %+v, err %v", connected, err)
+	}
+	if connected.EmailAddress != "alice@example.com" || connected.ConnectedAt == "" {
+		t.Fatalf("connected = %+v, want account display and connection time", connected)
+	}
+	if connected.LookbackDays != 30 {
+		t.Fatalf("lookback after connect = %d, want kept 30", connected.LookbackDays)
+	}
+	if connected.PendingState != "" {
+		t.Fatalf("pending state after connect = %q, want cleared", connected.PendingState)
+	}
+	rotated, err := database.UpdateGmailToken("access-alice-2", 2_000_003_600, "")
+	if err != nil || rotated.AccessToken != "access-alice-2" || rotated.RefreshToken != "refresh-alice" {
+		t.Fatalf("rotated = %+v, err %v, want new access with kept refresh", rotated, err)
+	}
+	if _, err := database.SetGmailScanCursor("history-9", "2026-10-26T00:00:00Z"); err != nil {
+		t.Fatalf("set cursor: %v", err)
+	}
+	cursor, err := database.GetGmailCredential()
+	if err != nil || cursor.LastHistoryID != "history-9" || cursor.LastScanAt != "2026-10-26T00:00:00Z" {
+		t.Fatalf("cursor = %+v, err %v", cursor, err)
+	}
+	if err := database.ClearGmailCredential(); err != nil {
+		t.Fatalf("clear gmail: %v", err)
+	}
+	cleared, err := database.GetGmailCredential()
+	if err != nil || cleared.Connected() || cleared.EmailAddress != "" || cleared.LastHistoryID != "" {
+		t.Fatalf("cleared = %+v, err %v, want disconnected without account or cursor", cleared, err)
+	}
+	if cleared.LookbackDays != 30 {
+		t.Fatalf("lookback after disconnect = %d, want kept 30", cleared.LookbackDays)
+	}
+	if _, err := database.ConnectGmail(store.GmailCredential{RefreshToken: "refresh-alice-2"}); err != nil {
+		t.Fatalf("reconnect: %v", err)
+	}
+	if err := database.Clear(); err != nil {
+		t.Fatalf("clear: %v", err)
+	}
+	after, err := database.GetGmailCredential()
+	if err != nil || after.Connected() {
+		t.Fatalf("gmail after Clear = %+v, err %v", after, err)
 	}
 }
 

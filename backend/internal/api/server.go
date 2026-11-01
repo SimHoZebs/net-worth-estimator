@@ -11,11 +11,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/analyses"
+	gmailhttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/gmail"
 	integrationshttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/model"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/projections"
 	receipthttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/receipts"
 	synchttp "github.com/simhozebs/net-worth-estimator/backend/internal/api/sync"
+	gmailservice "github.com/simhozebs/net-worth-estimator/backend/internal/gmail"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/integrations"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/receipts"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
@@ -35,6 +37,14 @@ type Config struct {
 	// probes, non-owner scopes, tests) or unconfigured (no Bridge credential);
 	// triggers then return 503.
 	SyncRunner *simplefin.Runner
+	// GmailService owns the Gmail OAuth connection. It may be nil
+	// (tests, scopes without Gmail); Gmail endpoints then report the
+	// connection state from the store but consent, disconnect, and
+	// lookback return 503.
+	GmailService *gmailservice.Service
+	// GmailFrontendBaseURL receives the OAuth post-callback redirect with
+	// the connection outcome as query parameters.
+	GmailFrontendBaseURL string
 }
 
 // New builds the chi router with all routes.
@@ -62,8 +72,10 @@ func New(st store.Store, serverConfig Config) http.Handler {
 	analyses.Register(api, st, serverConfig.CanWrite, serverConfig.Actor)
 	model.Register(api, st, receiptService, serverConfig.ReadOnly)
 	synchttp.Register(api, st, serverConfig.SyncRunner)
+	gmailhttp.Register(api, st, serverConfig.GmailService, serverConfig.ReadOnly)
 	integrationshttp.Register(api, integrations.NewRegistry(
 		integrations.NewSimpleFIN(st, serverConfig.SyncRunner),
+		integrations.NewGmail(st, serverConfig.GmailService),
 	))
 	compute := huma.NewGroup(api)
 	compute.UseSimpleModifier(func(op *huma.Operation) {
@@ -79,6 +91,11 @@ func New(st store.Store, serverConfig Config) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	// The Google OAuth redirect is a plain browser GET (code and state
+	// arrive as query parameters) that must 302 back to the frontend, so
+	// it runs outside Huma next to the health probe. Its contract is
+	// described in modelRawRoutes for the generated client.
+	router.Get("/v1/integrations/gmail/callback", gmailhttp.CallbackHandler(serverConfig.GmailService, st, serverConfig.GmailFrontendBaseURL, serverConfig.ReadOnly).ServeHTTP)
 
 	return router
 }

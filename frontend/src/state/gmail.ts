@@ -1,0 +1,185 @@
+import { useQuery } from "@tanstack/react-query";
+import {
+	disconnectGmailCredential,
+	getGmailAuthUrl,
+	getGmailCredential,
+	setGmailLookback,
+} from "@/api/generated/endpoints.ts";
+import type { GmailCredentialBody } from "@/api/generated/model/index.ts";
+import {
+	getUserScope,
+	subscribeUserScope,
+	type UserScope,
+} from "@/auth/resourceScope.ts";
+import { dismissKey, notifyError } from "@/state/notifications.ts";
+import { serverQueryClient } from "@/state/serverQuery.ts";
+import { refreshIntegrations } from "@/state/integrations.ts";
+import { useUserScope } from "@/state/useUserScope.ts";
+
+export function gmailCredentialKey(scope = getUserScope()) {
+	return ["gmail-credential", scope.key] as const;
+}
+
+function current(scope: UserScope, signal?: AbortSignal) {
+	if (scope !== getUserScope() || scope.status !== "ready" || signal?.aborted)
+		throw new Error("The active resource changed or the request was canceled.");
+}
+
+function credentialOptions(scope = getUserScope()) {
+	return {
+		queryKey: gmailCredentialKey(scope),
+		staleTime: 30_000,
+		queryFn: async ({ signal }: { signal: AbortSignal }) => {
+			try {
+				const data: GmailCredentialBody = (await getGmailCredential({ signal }))
+					.data;
+				current(scope, signal);
+				dismissKey("gmail-credential");
+				return data;
+			} catch (error) {
+				if (scope === getUserScope() && !signal.aborted)
+					notifyError(
+						"gmail-credential",
+						error instanceof Error
+							? error.message
+							: "The Gmail connection could not be loaded.",
+						{
+							label: "Reload Gmail",
+							onAction: () => void refreshGmailSettings(true),
+						},
+					);
+				throw error;
+			}
+		},
+	};
+}
+
+export async function refreshGmailSettings(force = false): Promise<void> {
+	const scope = getUserScope();
+	if (scope.status === "pending") return;
+	try {
+		const options = credentialOptions(scope);
+		if (force)
+			await serverQueryClient().invalidateQueries({
+				queryKey: options.queryKey,
+				refetchType: "none",
+			});
+		await serverQueryClient().fetchQuery(options);
+	} catch {
+		/* The query reports its current-resource failure. */
+	}
+	void refreshIntegrations(true);
+}
+
+async function runMutation<T>(
+	key: readonly unknown[],
+	mutationFn: () => Promise<T>,
+	notice: string,
+): Promise<T | null> {
+	const scope = getUserScope();
+	if (scope.status === "pending") return null;
+	const cache = serverQueryClient();
+	const mutation = cache.getMutationCache().build(cache, {
+		mutationKey: key,
+		scope: { id: JSON.stringify(key) },
+		mutationFn: async () => {
+			if (scope !== getUserScope())
+				throw new Error("The active resource changed.");
+			return mutationFn();
+		},
+	});
+	try {
+		const result = await mutation.execute(undefined);
+		if (scope !== getUserScope()) return null;
+		return result as T;
+	} catch (error) {
+		if (scope === getUserScope())
+			notifyError(
+				notice,
+				error instanceof Error ? error.message : "The Gmail request failed.",
+			);
+		return null;
+	}
+}
+
+// startGmailConsent fetches the server-built consent URL (read-only scope,
+// offline access, consent prompt) and navigates the browser to Google. The
+// URL is never rendered: it carries single-use CSRF state.
+export async function startGmailConsent(): Promise<boolean> {
+	const scope = getUserScope();
+	if (scope.status === "pending") return false;
+	const response = await runMutation<{ url: string }>(
+		[...gmailCredentialKey(scope), "auth-url"],
+		async () => (await getGmailAuthUrl()).data,
+		"gmail-credential",
+	);
+	if (!response?.url) return false;
+	window.location.assign(response.url);
+	return true;
+}
+
+export async function disconnectGmail(): Promise<boolean> {
+	const scope = getUserScope();
+	const updated = await runMutation<GmailCredentialBody>(
+		gmailCredentialKey(scope),
+		async () => (await disconnectGmailCredential()).data,
+		"gmail-credential",
+	);
+	if (!updated) return false;
+	serverQueryClient().setQueryData(gmailCredentialKey(scope), updated);
+	void refreshIntegrations(true);
+	dismissKey("gmail-credential");
+	return true;
+}
+
+export async function setGmailLookbackDays(
+	lookbackDays: number,
+): Promise<boolean> {
+	const scope = getUserScope();
+	const updated = await runMutation<GmailCredentialBody>(
+		gmailCredentialKey(scope),
+		async () => (await setGmailLookback({ lookbackDays })).data,
+		"gmail-credential",
+	);
+	if (!updated) return false;
+	serverQueryClient().setQueryData(gmailCredentialKey(scope), updated);
+	void refreshIntegrations(true);
+	dismissKey("gmail-credential");
+	return true;
+}
+
+// readGmailCallbackOutcome peeks at the post-OAuth redirect flag
+// (?gmail=connected or ?gmail=error) without side effects, so panels can
+// derive their initial notice during render.
+export function readGmailCallbackOutcome(): "connected" | "error" | null {
+	if (typeof window === "undefined") return null;
+	const outcome = new URLSearchParams(window.location.search).get("gmail");
+	if (outcome !== "connected" && outcome !== "error") return null;
+	return outcome;
+}
+
+// clearGmailCallbackFlag removes the consumed OAuth flag from the address
+// bar and refreshes Gmail state. It touches external systems only.
+export function clearGmailCallbackFlag(): void {
+	if (typeof window === "undefined") return;
+	const params = new URLSearchParams(window.location.search);
+	if (!params.has("gmail")) return;
+	params.delete("gmail");
+	const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}${window.location.hash}`;
+	window.history.replaceState(null, "", next);
+	void refreshGmailSettings(true);
+}
+
+export function resetGmailClient(): void {
+	serverQueryClient().removeQueries({ queryKey: ["gmail-credential"] });
+}
+
+subscribeUserScope(resetGmailClient);
+
+export function useGmailCredential() {
+	const scope = useUserScope();
+	return useQuery(
+		{ ...credentialOptions(scope), enabled: scope.status === "ready" },
+		serverQueryClient(),
+	);
+}

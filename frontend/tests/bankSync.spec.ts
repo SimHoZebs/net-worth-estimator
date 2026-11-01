@@ -130,8 +130,12 @@ for (const width of [1440, 390, 320]) {
 			name: "Bank sync",
 			exact: true,
 		});
+		const simplefin = bankSync.getByRole("region", {
+			name: "SimpleFIN",
+			exact: true,
+		});
 		await expect(
-			bankSync
+			simplefin
 				.getByRole("list", { name: "SimpleFIN setup steps" })
 				.getByRole("listitem"),
 		).toHaveCount(3);
@@ -157,7 +161,7 @@ for (const width of [1440, 390, 320]) {
 		await token.press("Enter");
 		await expect(token).toBeFocused();
 		await expect(
-			bankSync.getByText("Not connected", { exact: true }),
+			simplefin.getByText("Not connected", { exact: true }),
 		).toBeVisible();
 		await bankSync.getByRole("button", { name: "Show token" }).click();
 		await expect(token).toHaveAttribute("type", "text");
@@ -190,6 +194,7 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 	const provider = await stubSimplefin(page, { holdConnect: true });
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
+	const simplefin = bankSync.getByRole("region", { name: "SimpleFIN", exact: true });
 	await bankSync.getByLabel("Setup token", { exact: true }).fill(" dG9rZW4= ");
 	await bankSync.getByLabel("Setup token", { exact: true }).press("Enter");
 	await expect(
@@ -204,7 +209,7 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 	provider.releaseConnect();
 	await expect(bankSync.getByText("Connected", { exact: true })).toBeVisible();
 	await expect(
-		bankSync.getByRole("heading", { name: "SimpleFIN" }),
+		simplefin.getByRole("heading", { name: "SimpleFIN Connected" }),
 	).toBeFocused();
 	await expect(
 		bankSync.getByRole("list", { name: "Synced accounts" }),
@@ -219,7 +224,7 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 		.click();
 	await expect(bankSync.getByText(/Future imports will stop/)).toBeVisible();
 	await bankSync.getByRole("button", { name: "Confirm disconnect" }).click();
-	await expect(bankSync.getByRole("status")).toContainText(
+	await expect(simplefin.getByRole("status")).toContainText(
 		"Your accounts and imported history are kept",
 	);
 	await expect(bankSync.getByLabel("Setup token", { exact: true })).toHaveValue(
@@ -290,12 +295,13 @@ test("explains sync limits without retrying the provider automatically", async (
 	});
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
+	const simplefin = bankSync.getByRole("region", { name: "SimpleFIN", exact: true });
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
 	await expect(bankSync.getByRole("alert")).toContainText(
 		"wait before you try again",
 	);
 	expect(provider.syncCalls()).toBe(1);
-	await expect(bankSync.getByRole("status")).not.toContainText("Sync complete");
+	await expect(simplefin.getByRole("status")).not.toContainText("Sync complete");
 });
 
 test("connected accounts and sync feedback stay accessible in dark mode on mobile", async ({
@@ -306,12 +312,13 @@ test("connected accounts and sync feedback stay accessible in dark mode on mobil
 	await page.setViewportSize({ width: 390, height: 900 });
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
+	const simplefin = bankSync.getByRole("region", { name: "SimpleFIN", exact: true });
 	await expect(
 		bankSync.getByRole("list", { name: "Synced accounts" }),
 	).toContainText("Everyday checking");
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
-	await expect(bankSync.getByRole("status")).toContainText("Sync complete");
+	await expect(simplefin.getByRole("status")).toContainText("Sync complete");
 	expect(
 		await page.evaluate(
 			() => document.documentElement.scrollWidth <= window.innerWidth,
