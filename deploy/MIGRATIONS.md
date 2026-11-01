@@ -63,7 +63,7 @@ not the deployment migration hook. Keep the two separate.
 | Other container hosts | Explicit stopped-API maintenance operation | Run the same image command with the real disk attached. A job without that disk does not migrate production. |
 
 Vercel contains no financial database and needs no database migration hook.
-Render disks are unavailable to pre-deploy jobs. Use [explicit disk maintenance](README.md#explicit-disk-maintenance-on-render).
+Render disks are unavailable to pre-deploy jobs. Use [explicit disk maintenance](render.md#explicit-disk-maintenance-on-render).
 A new host is covered only after its adapter passes failure and storage checks.
 Do not infer coverage from a successful build.
 

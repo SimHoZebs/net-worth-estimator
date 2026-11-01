@@ -80,145 +80,12 @@ Vercel's external proxy permits 120 seconds before the first byte and between
 subsequent data. This is an inactivity limit, not a two-minute total duration.
 Verify actual provider behavior after deployment.
 
-## GHCR container images
+## Deployment guides
 
-`.github/workflows/images.yml` builds each `main` commit once on GitHub Actions.
-It publishes Linux AMD64 images with `sha-<full commit>` tags and OCI source/revision
-labels. The workflow uses its short-lived `GITHUB_TOKEN`, not a personal token.
-Every action is pinned to a commit. No deployment credentials enter the build.
-
-| Image | Runtime |
-| --- | --- |
-| `ghcr.io/simhozebs/net-worth-estimator-backend` | API and maintenance binaries |
-| `ghcr.io/simhozebs/net-worth-estimator-frontend` | Nginx frontend and same-origin proxy |
-| `ghcr.io/simhozebs/net-worth-estimator-casdoor-upstream` | Pinned Casdoor runtime for the home stack |
-
-The Casdoor mirror preserves the upstream command and files. The default
-`auth/casdoor/Dockerfile` target still provides the separate environment-rendered
-Northflank wrapper. Builds can pull upstream base images from Docker Hub. Home
-deployments pull the completed GHCR images instead of building from source.
-
-New GHCR packages start private. Set these three packages to public once in
-GitHub package settings before anonymous hosts pull them. Do not use an expiring
-workflow token as a production registry credential. Production pins resolved
-image digests, and only advances after the complete publishing workflow succeeds.
-Keep the previous digest references for rollback. Databases and runtime secrets
-remain on the existing hosts. Vercel and Northflank retain their current pipelines.
-
-Validate the publisher with `actionlint .github/workflows/images.yml` and
-`node --test deploy/images.test.mjs`. The first successful Actions run verifies
-the actual registry upload. Verify anonymous manifest access before cutover.
-
-## Vercel frontend
-
-Use the repository root as the project directory and Node.js 24 or newer.
-The root `vercel.mjs` exports programmatic configuration. It reads deployment
-settings before the build and uses direct external rewrites, not Functions.
-
-Set these variables in Vercel's Environment Variables settings:
-
-| Variable | Example |
-| --- | --- |
-| `BACKEND_URL` | `https://your-api.onrender.com` |
-| `NET_WORTH_ESTIMATOR_PUBLIC_URL` | `https://app.example.com` |
-| `NET_WORTH_ESTIMATOR_PROXY_SECRET` | The same private secret as the API |
-| `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | The Casdoor issuer origin |
-| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID` | The registered application client ID |
-| `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET` | The registered application client secret |
-| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | The verified owner OIDC subject |
-| `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | The provisioned guest OIDC subject (anonymous traffic resolves to it) |
-| `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Optional; defaults to `waypoint` |
-
-Both URLs must be HTTPS origins without paths or credentials. Configuration
-fails on missing settings or unsafe secrets.
-The upstream URL stays in routing configuration, outside the frontend bundle.
-The secret uses a deployment environment reference, not a literal config value.
-
-Only the configured frontend hostname matches the API proxy route. Alternate
-Vercel hostnames serve static files but do not proxy API requests. Give previews
-their own exact hostname, isolated backend, identity client, database, and secret.
-Never give untrusted preview code production access. Register each callback and
-post-logout URL in Casdoor explicitly.
-
-Static files retain normal static-host behavior. Unknown paths return the
-bundled 404 page. Fragment navigation requires no SPA catch-all rewrite.
-
-## API on Render or another container host
-
-The same image works on any host that meets the runtime contract. On Render:
-
-| Setting | Value |
-| --- | --- |
-| Dockerfile | `backend/Dockerfile` |
-| Build context | Repository root |
-| Compute | Paid always-on service, one instance |
-| Persistent disk | `/data` |
-| Health-check path | `/readyz` |
-| Normal Docker Command | Leave empty to use `/app/server` |
-
-Set `HOST=0.0.0.0`, the provider's `PORT`, and
-`NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`. Supply Casdoor settings
-from [the authentication guide](../docs/authentication.md). Set
-`NET_WORTH_ESTIMATOR_PUBLIC_URL` to the frontend origin, not the API hostname.
-For Vercel, also set the shared `NET_WORTH_ESTIMATOR_PROXY_SECRET`. Keep identity
-and database credentials only on the API. Casdoor needs browser and API access.
-
-The image runs as UID/GID `10001`. Its data mount must support that identity.
-If permissions differ, ask the platform administrator to prepare disk ownership.
-Do not run the API as root. A non-root shell and private SSH directory support
-provider maintenance access.
-
-### Explicit disk maintenance on Render
-
-Render disks are unavailable during builds, pre-deploy commands, and one-off
-jobs. Each disk belongs to one running instance. Disk-backed deployments have
-downtime. Do not put SQLite setup in a pre-deploy command.
-
-For initial setup or a schema upgrade, deploy an explicit maintenance process
-instead of the API. Use this temporary Docker Command:
-
-```sh
-/bin/sh -c 'mkdir -p /tmp/maintenance; printf "maintenance\n" > /tmp/maintenance/readyz; exec busybox-extras httpd -f -p "$PORT" -h /tmp/maintenance'
-```
-
-This process serves only the maintenance directory and health-check file. It
-runs no API, sessions, or scheduler. Use the service's normal non-ephemeral
-Shell/SSH session, which has the attached disk. For a fresh database, execute:
-
-```sh
-/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB"
-```
-
-Before guest-data publication, provision the destination row with the issuer
-and guest subject from private `bootstrap.json` (`issuer` and `guest_subject`).
-Otherwise, the first authorized access creates its empty workspace through the
-same path as other users. The provider's viewer group limits guest access.
-Repeat setup preserves existing database and user rows:
-
-```sh
-/app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer "$ISSUER" --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
-```
-
-Hosts configured to use `/app/render-free-boot.sh` run schema setup only before
-the server. That wrapper never provisions guest or other user workspaces.
-Casdoor's initial deployment seed still creates the guest identity.
-
-For existing data, restore a verified current-schema SQLite-safe backup or run a
-separate one-time operator upgrade. `setupdb` only validates an existing schema,
-and rejects older or incomplete ones. See the
-[database maintenance contract](../docs/shared-database.md). Back up before schema
-changes. Keep the API stopped. Ephemeral shells do not share the disk.
-
-The pending [shared migration](MIGRATIONS.md) runs `/app/migrate.sh` from the
-target image before API startup. It converts legacy checkpoint dates to UTC
-day-close instants. It also enables settled bank rows and aligns their event
-times with posting times. Manual, pending, and void rows stay unchanged.
-Legacy API-set exclusions are indistinguishable from the old import default,
-so this one-time conversion enables those settled rows too. Final-schema
-retries only verify and preserve later exclusions. Use the stopped-API
-adapter with the original mount. Do not run a separate host-side converter.
-After validation, clear the temporary Docker Command and redeploy. Normal API
-startup never provisions storage. Repeat maintenance only for explicit operations.
+- [Vercel frontend](vercel.md) — project settings, env vars, preview isolation.
+- [API on Render or another container host](render.md) — service settings, disk maintenance, setupdb usage.
+- [GHCR container images](images.md) — published images, digest pins, publisher checks.
+- [Shared migration SOP](MIGRATIONS.md) — one-time `/app/migrate.sh` contract every adapter runs.
 
 ## Switch hosts without application changes
 
@@ -261,12 +128,3 @@ Casdoor login/logout, user isolation, private writes, passkeys, signed logout
 delivery, incremental streaming, and restarts with disposable users. Never use
 production financial data as a fixture. The published `source_path` value
 `sample` is a content-only label; it implies no permissions.
-
-## Provider references
-
-- [Vercel programmatic configuration](https://vercel.com/docs/project-configuration/vercel-ts)
-- [Vercel external rewrites and secret headers](https://vercel.com/docs/routing/rewrites)
-- [Vercel external-proxy inactivity timeout](https://vercel.com/changelog/cdn-origin-timeout-increased-to-two-minutes)
-- [Render Docker command overrides](https://render.com/docs/docker)
-- [Render persistent-disk restrictions](https://render.com/docs/disks)
-- [Render maintenance shell access](https://render.com/docs/ssh)

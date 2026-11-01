@@ -281,8 +281,8 @@ These checks use disposable state, not the dev stack or production database.
 They cover authenticated and Host-preserving HTTP proxies, real API writes,
 CSRF denial, incremental streaming, persistent sessions and artifacts, public
 probes, command overrides, and a provider-assigned API port. Run the image checks
-locally before completion. See [the operator contract](deploy/README.md) for the
-Vercel/Render settings and the separate actual-provider checklist.
+locally before completion. See [the Vercel guide](deploy/vercel.md) and [the Render/container-host guide](deploy/render.md) for the
+Vercel/Render settings, and [the deployment index](deploy/README.md) for the separate actual-provider checklist.
 
 Migration changes also require the [shared SOP](deploy/MIGRATIONS.md) gate on
 every supported target. Check actual volume access, nonzero exit propagation,
