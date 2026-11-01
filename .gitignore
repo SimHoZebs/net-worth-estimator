@@ -3,8 +3,8 @@ core
 core.*
 uploads/
 tmp/
-.env.dev
-.env.dev.*
+.env*
+!.env.example
 /tasks/to-groom/long-chaining/
 /node_modules/
 /.vercel/
