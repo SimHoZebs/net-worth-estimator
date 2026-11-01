@@ -213,6 +213,7 @@ type tableShape struct {
 // scoped table still fails closed.
 var identityTables = map[string]bool{
 	"group_members": true,
+	"friendships":   true,
 }
 
 // lazyTables are allowlisted tables that may be absent from either side:

@@ -185,10 +185,10 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		if r.URL.Path == "/v1" || strings.HasPrefix(r.URL.Path, "/v1/") {
-			if (isGroupRoute(r.URL.Path) || IsSharingRoute(r.URL.Path) || IsInboxRoute(r.URL.Path)) && r.Method == http.MethodOptions {
-				// The groups/sharing/inbox CORS wrappers answer preflight without a session.
+			if (isGroupRoute(r.URL.Path) || IsSharingRoute(r.URL.Path) || IsInboxRoute(r.URL.Path) || IsFriendRoute(r.URL.Path)) && r.Method == http.MethodOptions {
+				// The groups/sharing/inbox/friends CORS wrappers answer preflight without a session.
 				// Data calls use the common permission boundary below, then
-				// the group/sharing/inbox handler checks membership.
+				// the group/sharing/inbox/friends handler checks membership.
 				w.Header().Set("Cache-Control", "no-store")
 				next.ServeHTTP(w, r)
 				return

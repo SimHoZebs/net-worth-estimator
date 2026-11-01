@@ -72,6 +72,22 @@ removes private projection history, Bridge links, sync timestamps, and the sourc
 filesystem path from the copy. Later private edits do not change the published guest data.
 Replacing that data requires another explicit publication.
 
+## Friend relationships
+
+Accepted friendships live in the `friendships` table, keyed by stable
+issuer/subject user IDs in both directions. Discovery searches the
+caller's own accepted list by display-name substring; names are
+non-unique and carry no identity meaning. Unknown users and non-friends
+read 404 so friendships are not enumerable.
+
+Friendship is social only. It never grants financial data access: the
+friends handler touches no financial table, and every friend read passes
+the same own-user permission boundary as all other user routes. A later
+share layer must refuse new friend-only shares to removed
+recipients through the friendship predicate; that enforcement does not
+exist yet, and neither do the request lifecycle writes (send, accept,
+decline, remove).
+
 ## Browser isolation
 
 `GET /v1/auth/session` returns the selected resource ID and capabilities,
