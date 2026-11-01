@@ -41,6 +41,10 @@ function stubApi(state: {
 	links?: { modelAccountId: string; bridgeName: string }[];
 	failConnect?: boolean;
 	failLinks?: boolean;
+	failCredential?: boolean;
+	failIntegrations?: boolean;
+	emptyProviders?: boolean;
+	extraProviders?: { id: string }[];
 	throttled?: boolean;
 	lastSyncAt?: string;
 	syncEnabled?: boolean;
@@ -58,7 +62,44 @@ function stubApi(state: {
 		const path = raw.slice(raw.indexOf("/v1/"));
 		const method = init?.method ?? "GET";
 		const record = (body?: unknown) => requests.push({ method, path, body });
+		if (path === "/v1/integrations") {
+			record();
+			if (state.failIntegrations)
+				return new Response(JSON.stringify({ detail: "boom" }), {
+					status: 500,
+					headers: jsonHeaders(),
+				});
+			return new Response(
+				JSON.stringify({
+					providers:
+						state.emptyProviders === true
+							? []
+							: [
+									{
+										id: "simplefin",
+										connected: state.configured,
+										syncConfigured: state.configured
+											? (state.syncEnabled ?? true)
+											: false,
+										...(state.configured
+											? {
+													connectedAt: "2026-10-26T00:00:00Z",
+													detail: "bridge.example",
+												}
+											: {}),
+									},
+									...(state.extraProviders ?? []),
+								],
+				}),
+				{ headers: jsonHeaders() },
+			);
+		}
 		if (path === "/v1/sync/simplefin/credential") {
+			if (state.failCredential)
+				return new Response(JSON.stringify({ detail: "boom" }), {
+					status: 500,
+					headers: jsonHeaders(),
+				});
 			if (method === "POST") {
 				const body = JSON.parse(String(init?.body)) as Record<string, string>;
 				record(body);
@@ -287,6 +328,110 @@ afterEach(() => {
 	vi.restoreAllMocks();
 });
 
+it("renders the registered provider from the integrations list", async () => {
+	const requests = stubApi({ configured: true, links: [] });
+	render(<SyncSettings />);
+	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
+	expect(
+		requests.some(
+			(request) => request.method === "GET" && request.path === "/v1/integrations",
+		),
+	).toBe(true);
+});
+
+it("falls back to the SimpleFIN section for an empty provider list", async () => {
+	stubApi({ configured: false, emptyProviders: true });
+	render(<SyncSettings />);
+	expect(await screen.findByText("Not connected")).toBeTruthy();
+	expect(
+		screen.getByRole("heading", { name: "Connect bank accounts" }),
+	).toBeTruthy();
+});
+
+it("shows an error instead of onboarding when the credential fails", async () => {
+	const state = { configured: true, failCredential: true };
+	stubApi(state);
+	render(<SyncSettings />);
+	expect(
+		await screen.findByText("The sync connection could not be loaded."),
+	).toBeTruthy();
+	expect(screen.queryByText("Not connected")).toBeNull();
+	state.failCredential = false;
+	fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+	expect(await screen.findByText(/Connected since/)).toBeTruthy();
+});
+
+it("ignores unregistered provider IDs without extra sections", async () => {
+	stubApi({
+		configured: true,
+		links: [],
+		extraProviders: [{ id: "gmail" }],
+	});
+	render(<SyncSettings />);
+	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
+	expect(screen.queryByText("gmail")).toBeNull();
+});
+
+it("shows an error when the provider list fails to load", async () => {
+	const state = { configured: true, failIntegrations: true };
+	stubApi(state);
+	render(<SyncSettings />);
+	expect(
+		await screen.findByText("The sync connection could not be loaded."),
+	).toBeTruthy();
+	expect(screen.queryByText("SimpleFIN")).toBeNull();
+	state.failIntegrations = false;
+	fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
+});
+
+it("reconnects with a replacement token without disconnecting first", async () => {
+	const requests = stubApi({ configured: true, links: [] });
+	render(<SyncSettings />);
+	await screen.findByText(/Connected since/);
+	fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
+	const token = await screen.findByPlaceholderText("Paste your setup token");
+	expect(document.activeElement).toBe(token);
+	fireEvent.change(token, { target: { value: "bmV3LXRva2Vu" } });
+	fireEvent.click(screen.getByRole("button", { name: "Connect SimpleFIN" }));
+	await waitFor(() => {
+		expect(screen.getByText("SimpleFIN reconnected.")).toBeTruthy();
+	});
+	expect(screen.queryByPlaceholderText("Paste your setup token")).toBeNull();
+	expect(
+		requests.some(
+			(request) =>
+				request.method === "POST" &&
+				request.path === "/v1/sync/simplefin/credential" &&
+				(request.body as Record<string, string>).setupToken === "bmV3LXRva2Vu",
+		),
+	).toBe(true);
+	// Rotation keeps the connection: no disconnect request was made.
+	expect(
+		requests.some((request) => request.method === "DELETE"),
+	).toBe(false);
+});
+
+it("cancels reconnect and keeps the saved connection", async () => {
+	const requests = stubApi({ configured: true, links: [] });
+	render(<SyncSettings />);
+	await screen.findByText(/Connected since/);
+	fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
+	await screen.findByPlaceholderText("Paste your setup token");
+	fireEvent.click(screen.getByRole("button", { name: "Cancel reconnect" }));
+	expect(screen.queryByPlaceholderText("Paste your setup token")).toBeNull();
+	expect(document.activeElement).toBe(
+		screen.getByRole("button", { name: "Reconnect" }),
+	);
+	expect(
+		requests.some(
+			(request) =>
+				request.method === "POST" &&
+				request.path === "/v1/sync/simplefin/credential",
+		),
+	).toBe(false);
+});
+
 it("shows a complete setup guide without a prerequisite click", async () => {
 	const requests = stubApi({ configured: false });
 	render(<SyncSettings />);
@@ -510,6 +655,10 @@ it("disables writes when read-only", async () => {
 	).toBeNull();
 	expect(
 		(screen.getByRole("button", { name: "Disconnect" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(true);
+	expect(
+		(screen.getByRole("button", { name: "Reconnect" }) as HTMLButtonElement)
 			.disabled,
 	).toBe(true);
 });
