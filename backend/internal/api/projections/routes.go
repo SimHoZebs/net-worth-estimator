@@ -27,6 +27,12 @@ func Register(api huma.API, st store.Store, resourceID string) {
 		Summary:     "Resolve current balances without a forecast",
 	}, s.currentPosition)
 	huma.Register(compute, huma.Operation{
+		OperationID: "build-flow-graph",
+		Method:      "POST",
+		Path:        "/flows",
+		Summary:     "Build a time-bounded financial flow graph",
+	}, s.flowGraph)
+	huma.Register(compute, huma.Operation{
 		OperationID: "project-stochastic",
 		Method:      "POST",
 		Path:        "/projections/stochastic",
