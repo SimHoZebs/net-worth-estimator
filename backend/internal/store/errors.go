@@ -35,6 +35,18 @@ var ErrRecurringPromotionInvalid = errors.New("recurring pattern cannot become a
 // it to 409 and may show its message.
 var ErrRecurringPromotionConflict = errors.New("recurring pattern changed or already has a forecast rule")
 
+// ErrRecurringLinkInvalid reports a link request that cannot be honored:
+// a non-recurring finding, incoherent evidence, a missing rule, or a claim
+// update naming no posting, rule, or date. Handlers map it to 422 and may
+// show its message. Disabled rules, routing mismatches, and off-schedule
+// patterns instead preview as Linkable=false with a plain-language reason.
+var ErrRecurringLinkInvalid = errors.New("recurring pattern cannot claim that forecast rule")
+
+// ErrRecurringLinkConflict reports a pattern whose state changed since
+// confirmation, or whose occurrences are already claimed elsewhere.
+// Handlers map it to 409 and may show its message.
+var ErrRecurringLinkConflict = errors.New("recurring pattern changed or already claimed")
+
 // ErrGroupForbidden reports a group action the caller's role may not perform.
 // It distinguishes denial (403) from unknown groups or members (404,
 // ErrNotFound).

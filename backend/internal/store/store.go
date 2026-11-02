@@ -47,6 +47,11 @@ type Store interface {
 	UpdateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error)
 	CreatePosting(posting types.Posting) (types.Posting, error)
 	UpdatePosting(posting types.Posting) (types.Posting, error)
+	// SetPostingClaims replaces occurrence claims for the named postings in
+	// one transaction. It touches only posting_claims (plus pending clearing
+	// when a pending bank row becomes a claimed occurrence) so concurrent
+	// name or amount edits never lose data.
+	SetPostingClaims(claims []types.PostingClaimUpdate) ([]types.Posting, error)
 	DeletePosting(id string) error
 	MovePosting(id, beforeID string) error
 	CreatePlannedPurchase(purchase types.PlannedPurchase) (types.PlannedPurchase, error)

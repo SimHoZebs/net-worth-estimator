@@ -18,6 +18,7 @@ type AnalysisStore interface {
 	FindRecurringPromotion(patternKey string) (types.RecurringPromotion, error)
 	RecordRecurringPromotion(link types.RecurringPromotion) error
 	RemoveRecurringPromotion(patternKey, ruleID string) error
+	PreviewRecurringLink(findingID, ruleID string) (types.RecurringLinkPreview, error)
 }
 
 // BankObservation refreshes evidence for an already mapped bank transaction.
