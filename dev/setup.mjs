@@ -34,6 +34,8 @@ export function parseSetupArgs(args) {
 export function validateSetup(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   const slot = slotFromOptions(values);
+  if (values.bulk !== undefined || values.clear !== undefined)
+    throw new Error("--bulk and --clear apply only to seed.");
   if (values.user)
     throw new Error(
       "--user applies only to refresh-db; setup binds a user to its verified dev identity",

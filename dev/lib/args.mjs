@@ -6,6 +6,8 @@ export const devOptions = {
   from: { type: "string" },
   user: { type: "string" },
   "source-user": { type: "string" },
+  bulk: { type: "string" },
+  clear: { type: "boolean" },
   slot: { type: "string" },
   "app-port": { type: "string" },
   "casdoor-port": { type: "string" },

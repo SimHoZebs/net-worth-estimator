@@ -4,6 +4,8 @@ import { validateSetup } from "./setup.mjs";
 
 test("setup binds a user to its verified identity and keeps canonical ports fixed", () => {
   assert.throws(() => validateSetup({ user: "users/private" }), /only to refresh-db/);
+  assert.throws(() => validateSetup({ bulk: "20x200" }), /only to seed/);
+  assert.throws(() => validateSetup({ clear: true }), /only to seed/);
   assert.doesNotThrow(() =>
     validateSetup({ from: "shared.db", "source-user": "users/reviewed-owner" }),
   );

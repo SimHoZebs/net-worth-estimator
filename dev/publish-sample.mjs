@@ -13,6 +13,8 @@ export function parsePublishArgs(args) {
 export function validatePublish(values, positionals = []) {
   if (positionals.length > 0) throw new Error("Unexpected dev arguments. Use scripts/dev --help.");
   slotFromOptions(values);
+  if (values.bulk !== undefined || values.clear !== undefined)
+    throw new Error("--bulk and --clear apply only to seed.");
   if (values.tailnet) throw new Error("--tailnet applies only to setup");
   if (
     values["app-port"] !== undefined ||
