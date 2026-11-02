@@ -18,15 +18,14 @@ import {
 	monthDay,
 } from "../../domain/format.ts";
 import type { Projection } from "../../domain/result.ts";
-
-/** Every series shares one ink; the dash pattern carries the identity. */
-const INK = "var(--primary)";
+import { seriesTexture, toneToken } from "../texture/texture.ts";
 
 /**
- * Per-account balances as monochrome lines on one shared scale: every
- * account shares the zero baseline, so slopes and crossings compare
- * directly and debts plot below zero. Series differ by dash pattern only,
- * never by color. The rows come from the same forward-filled window as
+ * Per-account balances as colored lines on one shared scale: every account
+ * shares the zero baseline, so slopes and crossings compare directly and
+ * debts plot below zero. Series pair their tone with a dash pattern, and
+ * the key below shows the actual line for each, so identity never rides
+ * on color alone. The rows come from the same forward-filled window as
  * the total line, so both views agree on every day.
  */
 export function AccountLinesPlot({
@@ -47,10 +46,10 @@ export function AccountLinesPlot({
 	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const styles = useMemo(() => {
 		const dashes = assignAccountDashes(series);
-		return series.map((entry, index) => ({
-			entry,
-			dash: dashes[index],
-		}));
+		return series.map((entry, index) => {
+			const { tone } = seriesTexture(entry.colorIndex);
+			return { entry, color: toneToken(tone), dash: dashes[index] };
+		});
 	}, [series]);
 	const { low, high, showZero } = useMemo(() => {
 		const { low, high } = netWorthDomain(rows.map((row) => row.balance));
@@ -63,7 +62,7 @@ export function AccountLinesPlot({
 		const dashById = new Map(styles.map((style) => [style.entry.id, style]));
 		// One line mark per series: strokeDasharray is whole-mark, so
 		// per-series dashes need per-series marks. The shared color channel
-		// keeps grouping and grouped focus working; paint is one ink.
+		// keeps grouping and grouped focus working.
 		const lines = series.map((entry) => {
 			const style = dashById.get(entry.id)!;
 			return lineY(
@@ -72,7 +71,7 @@ export function AccountLinesPlot({
 					x: "date",
 					y: "balance",
 					color: "account",
-					stroke: INK,
+					stroke: style.color,
 					strokeWidth: 2.25,
 					lineCap: "round",
 					...(style.dash ? { strokeDasharray: style.dash } : {}),
@@ -120,9 +119,7 @@ export function AccountLinesPlot({
 			},
 			color: {
 				domain: names,
-				// One ink for every series: the range never renders as paint
-				// (strokes are explicit) but keeps the scale resolved.
-				range: [INK],
+				range: styles.map(({ color }) => color),
 			},
 			focus: "group-x",
 			maxFocusDistance: Number.POSITIVE_INFINITY,
@@ -165,7 +162,7 @@ export function AccountLinesPlot({
 				aria-label="Accounts"
 				className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"
 			>
-				{styles.map(({ entry, dash }) => (
+				{styles.map(({ entry, color, dash }) => (
 					<li key={entry.id} className="flex items-center gap-2">
 						<svg
 							width="28"
@@ -180,7 +177,7 @@ export function AccountLinesPlot({
 								y1="6"
 								x2="28"
 								y2="6"
-								stroke={INK}
+								stroke={color}
 								strokeWidth="2.25"
 								strokeLinecap="round"
 								{...(dash ? { strokeDasharray: dash } : {})}
