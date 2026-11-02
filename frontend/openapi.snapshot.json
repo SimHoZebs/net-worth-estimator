@@ -2247,6 +2247,73 @@
 				"required": ["accountId", "delta"],
 				"type": "object"
 			},
+			"Link-recurring-patternRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Link-recurring-patternRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"ruleId": {
+						"maxLength": 100,
+						"type": "string"
+					}
+				},
+				"required": ["ruleId"],
+				"type": "object"
+			},
+			"Link-recurring-patternResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Link-recurring-patternResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"patternKey": {
+						"type": "string"
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"rows": {
+						"items": {
+							"$ref": "#/components/schemas/Posting"
+						},
+						"type": ["array", "null"]
+					},
+					"ruleId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"rows",
+					"issues",
+					"persisted",
+					"revision",
+					"patternKey",
+					"ruleId"
+				],
+				"type": "object"
+			},
 			"LinkListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2987,6 +3054,25 @@
 				"required": ["row", "issues", "persisted"],
 				"type": "object"
 			},
+			"Preview-recurring-linkResponse": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Preview-recurring-linkResponse.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"preview": {
+						"$ref": "#/components/schemas/RecurringLinkPreview"
+					}
+				},
+				"required": ["preview"],
+				"type": "object"
+			},
 			"Preview-recurring-promotionResponse": {
 				"additionalProperties": false,
 				"properties": {
@@ -3664,6 +3750,71 @@
 					"annualCap",
 					"priority",
 					"enabled"
+				],
+				"type": "object"
+			},
+			"RecurringLinkAssignment": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"type": "string"
+					},
+					"date": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					}
+				},
+				"required": ["postingId", "date", "amount"],
+				"type": "object"
+			},
+			"RecurringLinkPreview": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"assignments": {
+						"items": {
+							"$ref": "#/components/schemas/RecurringLinkAssignment"
+						},
+						"type": ["array", "null"]
+					},
+					"cadence": {
+						"type": "string"
+					},
+					"findingId": {
+						"type": "string"
+					},
+					"linkable": {
+						"type": "boolean"
+					},
+					"merchant": {
+						"type": "string"
+					},
+					"patternKey": {
+						"type": "string"
+					},
+					"reason": {
+						"type": "string"
+					},
+					"ruleId": {
+						"type": "string"
+					},
+					"ruleName": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"findingId",
+					"patternKey",
+					"ruleId",
+					"ruleName",
+					"merchant",
+					"cadence",
+					"accountId",
+					"linkable"
 				],
 				"type": "object"
 			},
@@ -5488,6 +5639,108 @@
 					}
 				},
 				"summary": "Confirm or reject a finding and record plan duration"
+			}
+		},
+		"/v1/analysis-findings/{id}/recurring-link": {
+			"post": {
+				"operationId": "link-recurring-pattern",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Link-recurring-patternRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Link-recurring-patternResponse"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Claim a confirmed pattern's payments against an existing forecast rule"
+			}
+		},
+		"/v1/analysis-findings/{id}/recurring-link-preview": {
+			"get": {
+				"operationId": "preview-recurring-link",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"explode": false,
+						"in": "query",
+						"name": "ruleId",
+						"schema": {
+							"maxLength": 100,
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Preview-recurring-linkResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Preview claiming a confirmed pattern's payments against an existing forecast rule"
 			}
 		},
 		"/v1/analysis-findings/{id}/recurring-preview": {

@@ -34,6 +34,8 @@ func Register(api huma.API, st store.Store, canWrite func(context.Context) bool,
 	huma.Register(api, huma.Operation{OperationID: "review-analysis-finding", Method: "POST", Path: "/v1/analysis-findings/{id}/feedback", Summary: "Confirm or reject a finding and record plan duration"}, s.reviewAnalysisFinding)
 	huma.Register(api, huma.Operation{OperationID: "preview-recurring-promotion", Method: "GET", Path: "/v1/analysis-findings/{id}/recurring-preview", Summary: "Preview the forecast rule a confirmed repeating pattern would create"}, s.previewRecurringPromotion)
 	huma.Register(api, huma.Operation{OperationID: "promote-recurring-pattern", Method: "POST", Path: "/v1/analysis-findings/{id}/recurring-promotion", Summary: "Create the approved forecast rule for a confirmed repeating pattern"}, s.promoteRecurringPattern)
+	huma.Register(api, huma.Operation{OperationID: "preview-recurring-link", Method: "GET", Path: "/v1/analysis-findings/{id}/recurring-link-preview", Summary: "Preview claiming a confirmed pattern's payments against an existing forecast rule"}, s.previewRecurringLink)
+	huma.Register(api, huma.Operation{OperationID: "link-recurring-pattern", Method: "POST", Path: "/v1/analysis-findings/{id}/recurring-link", Summary: "Claim a confirmed pattern's payments against an existing forecast rule"}, s.linkRecurringPattern)
 	huma.Register(api, huma.Operation{OperationID: "list-analysis-feedback", Method: "GET", Path: "/v1/analysis-feedback", Summary: "Read private labeled feedback with prediction provenance"}, s.listAnalysisFeedback)
 }
 
