@@ -51,7 +51,12 @@ export function NetWorthTrendPlot({
 				marks: [
 					areaY(rows, {
 						x: "date",
-						y: "total",
+						// Explicit interval, not the implicit zero baseline: the
+						// fill runs from the domain floor to the line in both
+						// signs. An all-debt window would otherwise fill upward
+						// from the line toward an out-of-domain zero.
+						y1: low,
+						y2: "total",
 						fill: "var(--chart-band)",
 						fillOpacity: 0.35,
 					}),

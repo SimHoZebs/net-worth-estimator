@@ -11,12 +11,13 @@ const transactionCurrency = new Intl.NumberFormat("en-US", {
 });
 export const money = (value: number) => currency.format(value);
 export const exactMoney = (value: number) => transactionCurrency.format(value);
-export const compactMoney = (value: number) =>
-	Math.abs(value) >= 1e6
-		? `$${(value / 1e6).toFixed(2)}M`
-		: Math.abs(value) >= 1000
-			? `$${(value / 1000).toFixed(0)}k`
-			: money(value);
+export const compactMoney = (value: number) => {
+	const sign = value < 0 ? "-" : "";
+	const magnitude = Math.abs(value);
+	if (magnitude >= 1e6) return `${sign}$${(magnitude / 1e6).toFixed(2)}M`;
+	if (magnitude >= 1000) return `${sign}$${(magnitude / 1000).toFixed(0)}k`;
+	return money(value);
+};
 export const dateLabel = (value: string, full = false) =>
 	new Intl.DateTimeFormat("en-US", {
 		month: "short",
