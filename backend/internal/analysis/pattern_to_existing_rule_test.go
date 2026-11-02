@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func linkTestRule() types.RecurrenceRule {
+func existingRuleTestRule() types.RecurrenceRule {
 	account := "checking"
 	return types.RecurrenceRule{
 		ID:              "rent",
@@ -21,7 +21,7 @@ func linkTestRule() types.RecurrenceRule {
 	}
 }
 
-func linkTestPostings() []types.Posting {
+func existingRuleTestPostings() []types.Posting {
 	account := "checking"
 	amount := func(value string) types.PostingAmountResolution {
 		return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": value}, Inputs: map[string]types.AmountInputBinding{}}
@@ -33,7 +33,7 @@ func linkTestPostings() []types.Posting {
 	}
 }
 
-func linkTestFinding() types.AnalysisFinding {
+func existingRuleTestFinding() types.AnalysisFinding {
 	return types.AnalysisFinding{
 		AnalysisDetection: types.AnalysisDetection{
 			PostingID: "p1", Kind: "recurring", Provider: "rent", Product: "monthly",
@@ -46,13 +46,13 @@ func linkTestFinding() types.AnalysisFinding {
 	}
 }
 
-func TestBuildRecurringLinkMapsToSchedule(t *testing.T) {
-	assignments, err := BuildRecurringLink(RecurringLinkInput{
-		Anchor: linkTestFinding(), Postings: linkTestPostings(), Facts: map[string]types.TransactionFacts{
+func TestBuildPatternToExistingRuleMapsToSchedule(t *testing.T) {
+	assignments, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+		Anchor: existingRuleTestFinding(), Postings: existingRuleTestPostings(), Facts: map[string]types.TransactionFacts{
 			"p1": {Amount: "-1200.00", Currency: "USD"},
 			"p2": {Amount: "-1200.00", Currency: "USD"},
 			"p3": {Amount: "-1200.00", Currency: "USD"},
-		}, Rule: linkTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
+		}, Rule: existingRuleTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -68,29 +68,29 @@ func TestBuildRecurringLinkMapsToSchedule(t *testing.T) {
 	}
 }
 
-func TestBuildRecurringLinkRejectsRoutingMismatch(t *testing.T) {
-	rule := linkTestRule()
+func TestBuildPatternToExistingRuleRejectsRoutingMismatch(t *testing.T) {
+	rule := existingRuleTestRule()
 	other := "savings"
 	rule.SourceAccountID = &other
-	if _, err := BuildRecurringLink(RecurringLinkInput{
-		Anchor: linkTestFinding(), Postings: linkTestPostings(), Rule: rule, OccurrenceIDs: []string{"p1", "p2", "p3"},
+	if _, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+		Anchor: existingRuleTestFinding(), Postings: existingRuleTestPostings(), Rule: rule, OccurrenceIDs: []string{"p1", "p2", "p3"},
 	}); err == nil {
 		t.Fatal("expected routing mismatch")
 	}
 }
 
-func TestBuildRecurringLinkRejectsDisabledRule(t *testing.T) {
-	rule := linkTestRule()
+func TestBuildPatternToExistingRuleRejectsDisabledRule(t *testing.T) {
+	rule := existingRuleTestRule()
 	rule.Enabled = false
-	if _, err := BuildRecurringLink(RecurringLinkInput{
-		Anchor: linkTestFinding(), Postings: linkTestPostings(), Rule: rule, OccurrenceIDs: []string{"p1", "p2", "p3"},
+	if _, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+		Anchor: existingRuleTestFinding(), Postings: existingRuleTestPostings(), Rule: rule, OccurrenceIDs: []string{"p1", "p2", "p3"},
 	}); err == nil {
 		t.Fatal("expected disabled rule")
 	}
 }
 
-func TestBuildRecurringLinkIgnoresDisabledTakers(t *testing.T) {
-	postings := linkTestPostings()
+func TestBuildPatternToExistingRuleIgnoresDisabledTakers(t *testing.T) {
+	postings := existingRuleTestPostings()
 	// A disabled outsider claims 2026-02-01, but projections ignore disabled
 	// claims, so the pattern may still take that date.
 	outsider := postings[0]
@@ -98,12 +98,12 @@ func TestBuildRecurringLinkIgnoresDisabledTakers(t *testing.T) {
 	outsider.Enabled = false
 	outsider.Claim = &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"}
 	postings = append(postings, outsider)
-	assignments, err := BuildRecurringLink(RecurringLinkInput{
-		Anchor: linkTestFinding(), Postings: postings, Facts: map[string]types.TransactionFacts{
+	assignments, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+		Anchor: existingRuleTestFinding(), Postings: postings, Facts: map[string]types.TransactionFacts{
 			"p1": {Amount: "-1200.00", Currency: "USD"},
 			"p2": {Amount: "-1200.00", Currency: "USD"},
 			"p3": {Amount: "-1200.00", Currency: "USD"},
-		}, Rule: linkTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
+		}, Rule: existingRuleTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -115,11 +115,11 @@ func TestBuildRecurringLinkIgnoresDisabledTakers(t *testing.T) {
 	}
 }
 
-func TestBuildRecurringLinkKeepsCorrectClaims(t *testing.T) {
-	postings := linkTestPostings()
+func TestBuildPatternToExistingRuleKeepsCorrectClaims(t *testing.T) {
+	postings := existingRuleTestPostings()
 	postings[0].Claim = &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-01-01"}
-	assignments, err := BuildRecurringLink(RecurringLinkInput{
-		Anchor: linkTestFinding(), Postings: postings, Rule: linkTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
+	assignments, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+		Anchor: existingRuleTestFinding(), Postings: postings, Rule: existingRuleTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
 	})
 	if err != nil {
 		t.Fatal(err)

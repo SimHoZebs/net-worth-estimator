@@ -12,12 +12,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// PreviewRecurringPromotion describes the forecast rule one confirmed
+// PreviewPatternToNewRule describes the forecast rule one confirmed
 // recurring pattern would create. It reads evidence, findings, and saved
 // rows only; it never writes. The active generated rule for the pattern, if
 // one still exists and is enabled, is reported so approval stays singular.
-func (s *sqliteStore) PreviewRecurringPromotion(findingID string) (types.RecurringPromotionPreview, error) {
-	var preview types.RecurringPromotionPreview
+func (s *sqliteStore) PreviewPatternToNewRule(findingID string) (types.PatternToNewRulePreview, error) {
+	var preview types.PatternToNewRulePreview
 	var anchor types.AnalysisFinding
 	var detectionJSON, reviewJSON string
 	err := s.db.QueryRow(`SELECT f.id, f.analysis_type, f.detection_json, f.run_id, r.version, r.input_revision,
@@ -40,7 +40,7 @@ func (s *sqliteStore) PreviewRecurringPromotion(findingID string) (types.Recurri
 		return preview, err
 	}
 	if anchor.Kind != "recurring" {
-		return preview, fmt.Errorf("%w: finding is %s", store.ErrRecurringPromotionInvalid, anchor.Kind)
+		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToNewRuleInvalid, anchor.Kind)
 	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
@@ -52,10 +52,10 @@ func (s *sqliteStore) PreviewRecurringPromotion(findingID string) (types.Recurri
 		return preview, err
 	}
 	existingRuleID := ""
-	if link, err := s.FindRecurringPromotion(patternKey); err == nil {
+	if record, err := s.FindPatternToNewRule(patternKey); err == nil {
 		for _, rule := range model.RecurrenceRules {
-			if rule.ID == link.RuleID && rule.Enabled {
-				existingRuleID = link.RuleID
+			if rule.ID == record.RuleID && rule.Enabled {
+				existingRuleID = record.RuleID
 				break
 			}
 		}
@@ -93,7 +93,7 @@ func (s *sqliteStore) PreviewRecurringPromotion(findingID string) (types.Recurri
 			return preview, err
 		}
 	}
-	preview, err = analysis.BuildRecurringPreview(analysis.RecurringPatternInput{
+	preview, err = analysis.BuildPatternToNewRulePreview(analysis.PatternToNewRuleInput{
 		Anchor:   anchor,
 		Postings: model.Postings,
 		Facts:    facts,
@@ -109,46 +109,46 @@ func (s *sqliteStore) PreviewRecurringPromotion(findingID string) (types.Recurri
 	if err != nil {
 		switch {
 		case errors.Is(err, analysis.ErrPatternStale):
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringPromotionConflict, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToNewRuleConflict, err)
 		default:
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringPromotionInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToNewRuleInvalid, err)
 		}
 	}
 	return preview, nil
 }
 
-// FindRecurringPromotion returns the recorded pattern-to-rule link.
-// A missing link reports ErrNotFound; a link whose rule was deleted or
+// FindPatternToNewRule returns the recorded pattern-to-rule entry.
+// A missing record reports ErrNotFound; a record whose rule was deleted or
 // disabled is still returned so callers can decide what active means.
-func (s *sqliteStore) FindRecurringPromotion(patternKey string) (types.RecurringPromotion, error) {
-	var link types.RecurringPromotion
-	err := s.db.QueryRow(`SELECT pattern_key, rule_id, created_at FROM analysis_promotions WHERE pattern_key = ? AND user_id = :user_id`, patternKey).Scan(&link.PatternKey, &link.RuleID, &link.CreatedAt)
+func (s *sqliteStore) FindPatternToNewRule(patternKey string) (types.PatternToNewRule, error) {
+	var record types.PatternToNewRule
+	err := s.db.QueryRow(`SELECT pattern_key, rule_id, created_at FROM analysis_promotions WHERE pattern_key = ? AND user_id = :user_id`, patternKey).Scan(&record.PatternKey, &record.RuleID, &record.CreatedAt)
 	if err == sql.ErrNoRows {
-		return link, store.ErrNotFound
+		return record, store.ErrNotFound
 	}
-	return link, err
+	return record, err
 }
 
-// RecordRecurringPromotion saves the pattern-to-rule link, replacing any
-// previous link for the same pattern. Recording happens before the rule
-// row is created: a link without a rule reads as inactive, so a retry
+// RecordPatternToNewRule saves the pattern-to-rule record, replacing any
+// previous record for the same pattern. Recording happens before the rule
+// row is created: a record without a rule reads as inactive, so a retry
 // replaces it instead of creating a second rule.
-func (s *sqliteStore) RecordRecurringPromotion(link types.RecurringPromotion) error {
-	if link.PatternKey == "" || link.RuleID == "" {
-		return fmt.Errorf("%w: pattern and rule are required", store.ErrRecurringPromotionInvalid)
+func (s *sqliteStore) RecordPatternToNewRule(record types.PatternToNewRule) error {
+	if record.PatternKey == "" || record.RuleID == "" {
+		return fmt.Errorf("%w: pattern and rule are required", store.ErrPatternToNewRuleInvalid)
 	}
-	created := link.CreatedAt
+	created := record.CreatedAt
 	if created <= 0 {
 		created = time.Now().Unix()
 	}
 	_, err := s.db.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, user_id) VALUES (?, ?, ?, :user_id)
-		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at`, link.PatternKey, link.RuleID, created)
+		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at`, record.PatternKey, record.RuleID, created)
 	return err
 }
 
-// RemoveRecurringPromotion clears the link only when it still names the
+// RemovePatternToNewRule clears the record only when it still names the
 // given rule, so a failed approval never removes a concurrent winner.
-func (s *sqliteStore) RemoveRecurringPromotion(patternKey, ruleID string) error {
+func (s *sqliteStore) RemovePatternToNewRule(patternKey, ruleID string) error {
 	_, err := s.db.Exec(`DELETE FROM analysis_promotions WHERE pattern_key = ? AND rule_id = ? AND user_id = :user_id`, patternKey, ruleID)
 	return err
 }

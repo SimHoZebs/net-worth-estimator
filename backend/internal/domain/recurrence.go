@@ -118,7 +118,7 @@ func FrequencyDivisor(frequency types.RecurrenceFrequency) int {
 }
 
 // AdvanceRuleDate moves a calendar day forward by whole schedule periods.
-// Promotion uses it to start a generated rule one full interval after the
+// Pattern-to-new-rule creation uses it to start a generated rule one full interval after the
 // latest recorded movement.
 func AdvanceRuleDate(date string, frequency types.RecurrenceFrequency, periodCount int) string {
 	return advanceDate(date, frequency, periodCount)

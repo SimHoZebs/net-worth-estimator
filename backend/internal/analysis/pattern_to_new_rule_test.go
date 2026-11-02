@@ -7,7 +7,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func promotionTestFinding() types.AnalysisFinding {
+func newRuleTestFinding() types.AnalysisFinding {
 	return types.AnalysisFinding{
 		AnalysisDetection: types.AnalysisDetection{
 			PostingID: "p1", Kind: "recurring", Provider: "grocer", Product: "monthly",
@@ -19,7 +19,7 @@ func promotionTestFinding() types.AnalysisFinding {
 	}
 }
 
-func promotionTestPostings() []types.Posting {
+func newRuleTestPostings() []types.Posting {
 	account := "checking"
 	amount := func(value string) types.PostingAmountResolution {
 		return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": value}, Inputs: map[string]types.AmountInputBinding{}}
@@ -30,45 +30,45 @@ func promotionTestPostings() []types.Posting {
 	}
 }
 
-func promotionTestFacts() map[string]types.TransactionFacts {
+func newRuleTestFacts() map[string]types.TransactionFacts {
 	return map[string]types.TransactionFacts{
 		"p1": {Description: "GROCER", Amount: "-30.00", Currency: "USD", OccurredAt: 1768478400},
 		"p2": {Description: "GROCER", Amount: "-30.00", Currency: "USD", OccurredAt: 1771156800},
 	}
 }
 
-func promotionTestInput() RecurringPatternInput {
-	return RecurringPatternInput{Anchor: promotionTestFinding(), Postings: promotionTestPostings(), Facts: promotionTestFacts(), AccountIDs: []string{"checking"}}
+func newRuleTestInput() PatternToNewRuleInput {
+	return PatternToNewRuleInput{Anchor: newRuleTestFinding(), Postings: newRuleTestPostings(), Facts: newRuleTestFacts(), AccountIDs: []string{"checking"}}
 }
 
-func TestBuildRecurringPreviewRejectsNonRecurring(t *testing.T) {
-	finding := promotionTestFinding()
+func TestBuildPatternToNewRulePreviewRejectsNonRecurring(t *testing.T) {
+	finding := newRuleTestFinding()
 	finding.Kind = "bnpl"
-	input := promotionTestInput()
+	input := newRuleTestInput()
 	input.Anchor = finding
-	if _, err := BuildRecurringPreview(input); !errors.Is(err, ErrNotRecurring) {
+	if _, err := BuildPatternToNewRulePreview(input); !errors.Is(err, ErrNotRecurring) {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-func TestBuildRecurringPreviewRejectsSplitEvidence(t *testing.T) {
-	input := promotionTestInput()
+func TestBuildPatternToNewRulePreviewRejectsSplitEvidence(t *testing.T) {
+	input := newRuleTestInput()
 	other := "savings"
 	input.Postings[1].SourceAccountID = &other
-	if _, err := BuildRecurringPreview(input); !errors.Is(err, ErrPatternIncoherent) {
+	if _, err := BuildPatternToNewRulePreview(input); !errors.Is(err, ErrPatternIncoherent) {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-func TestBuildRecurringPreviewRejectsMissingAccount(t *testing.T) {
-	input := promotionTestInput()
+func TestBuildPatternToNewRulePreviewRejectsMissingAccount(t *testing.T) {
+	input := newRuleTestInput()
 	input.AccountIDs = []string{"savings"}
-	if _, err := BuildRecurringPreview(input); !errors.Is(err, ErrPatternStale) {
+	if _, err := BuildPatternToNewRulePreview(input); !errors.Is(err, ErrPatternStale) {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-func TestBuildRecurringPreviewClampsMonthEnds(t *testing.T) {
+func TestBuildPatternToNewRulePreviewClampsMonthEnds(t *testing.T) {
 	account := "checking"
 	amount := func(value string) types.PostingAmountResolution {
 		return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": value}, Inputs: map[string]types.AmountInputBinding{}}
@@ -77,9 +77,9 @@ func TestBuildRecurringPreviewClampsMonthEnds(t *testing.T) {
 		{ID: "p1", Name: "Rent", SourceAccountID: &account, Amount: amount("1200.00"), TransactionTime: 1769899200, Enabled: true},
 		{ID: "p2", Name: "Rent", SourceAccountID: &account, Amount: amount("1200.00"), TransactionTime: 1772280000, Enabled: true},
 	}
-	finding := promotionTestFinding()
+	finding := newRuleTestFinding()
 	finding.Evidence = []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test", PostingIDs: []string{"p1", "p2"}}}
-	preview, err := BuildRecurringPreview(RecurringPatternInput{
+	preview, err := BuildPatternToNewRulePreview(PatternToNewRuleInput{
 		Anchor: finding, Postings: postings, AccountIDs: []string{"checking"},
 		Facts: map[string]types.TransactionFacts{
 			"p1": {Description: "RENT", Amount: "-1200.00", Currency: "USD", OccurredAt: 1769899200},
@@ -90,7 +90,7 @@ func TestBuildRecurringPreviewClampsMonthEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 2026-01-31 and 2026-02-28 evidence produce a clamped 2026-03-28 start.
-	if !preview.Promotable || preview.Rule == nil || preview.Rule.StartDate != "2026-03-28" {
+	if !preview.Creatable || preview.Rule == nil || preview.Rule.StartDate != "2026-03-28" {
 		t.Fatalf("preview=%+v", preview)
 	}
 	if len(preview.Upcoming) == 0 || preview.Upcoming[0].Date != "2026-03-28" {
@@ -98,12 +98,12 @@ func TestBuildRecurringPreviewClampsMonthEnds(t *testing.T) {
 	}
 }
 
-func TestBuildRecurringPreviewStartsAfterLatestEvidence(t *testing.T) {
-	preview, err := BuildRecurringPreview(promotionTestInput())
+func TestBuildPatternToNewRulePreviewStartsAfterLatestEvidence(t *testing.T) {
+	preview, err := BuildPatternToNewRulePreview(newRuleTestInput())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Promotable || preview.Rule == nil {
+	if !preview.Creatable || preview.Rule == nil {
 		t.Fatalf("preview=%+v", preview)
 	}
 	// 2026-01-15 and 2026-02-15 evidence produce a 2026-03-15 monthly start.

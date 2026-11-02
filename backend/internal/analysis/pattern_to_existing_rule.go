@@ -12,9 +12,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Link errors classify why a pattern cannot claim an existing rule's
-// occurrences. The persistence layer maps them to its invalid/conflict
-// contract.
+// Pattern-to-existing-rule errors classify why a pattern cannot claim an
+// existing rule's occurrences. The persistence layer maps them to its
+// invalid/conflict contract.
 var (
 	ErrRuleNotFound    = errors.New("forecast rule not found")
 	ErrRuleDisabled    = errors.New("forecast rule is disabled")
@@ -22,9 +22,9 @@ var (
 	ErrNoScheduleMatch = errors.New("no scheduled occurrence matches a recorded movement")
 )
 
-// linkIntervalDays converts a rule frequency to nominal days for drift
+// existingRuleIntervalDays converts a rule frequency to nominal days for drift
 // tolerance. It mirrors the detector cadences plus daily.
-func linkIntervalDays(frequency types.RecurrenceFrequency) (float64, bool) {
+func existingRuleIntervalDays(frequency types.RecurrenceFrequency) (float64, bool) {
 	switch frequency {
 	case types.FrequencyDaily:
 		return 1, true
@@ -41,10 +41,10 @@ func linkIntervalDays(frequency types.RecurrenceFrequency) (float64, bool) {
 	}
 }
 
-// RecurringLinkInput carries everything linking needs: the confirmed anchor
+// PatternToExistingRuleInput carries everything adding needs: the confirmed anchor
 // finding, all saved postings (for routing, taken dates, and validation),
 // the immutable source facts for display amounts, and the target rule.
-type RecurringLinkInput struct {
+type PatternToExistingRuleInput struct {
 	Anchor        types.AnalysisFinding
 	Postings      []types.Posting
 	Facts         map[string]types.TransactionFacts
@@ -52,9 +52,9 @@ type RecurringLinkInput struct {
 	OccurrenceIDs []string
 }
 
-// linkPostingDay derives the UTC calendar day for one posting, using
+// existingRulePostingDay derives the UTC calendar day for one posting, using
 // transaction time with posted time as fallback.
-func linkPostingDay(posting types.Posting) (string, int64, error) {
+func existingRulePostingDay(posting types.Posting) (string, int64, error) {
 	stamp := posting.TransactionTime
 	if stamp <= 0 {
 		stamp = posting.PostedTime
@@ -65,8 +65,8 @@ func linkPostingDay(posting types.Posting) (string, int64, error) {
 	return time.Unix(stamp, 0).UTC().Format("2006-01-02"), stamp, nil
 }
 
-// parseLinkAmount formats a source decimal spelling as absolute dollars.
-func parseLinkAmount(raw string) (string, error) {
+// parsePatternAmount formats a source decimal spelling as absolute dollars.
+func parsePatternAmount(raw string) (string, error) {
 	amount, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
 		return "", err
@@ -80,7 +80,7 @@ func parseLinkAmount(raw string) (string, error) {
 	return strconv.FormatFloat(math.Round(amount*100)/100, 'f', 2, 64), nil
 }
 
-func linkRuleMatchesPosting(rule types.RecurrenceRule, posting types.Posting) bool {
+func existingRuleMatchesPosting(rule types.RecurrenceRule, posting types.Posting) bool {
 	if (rule.SourceAccountID == nil) != (posting.SourceAccountID == nil) {
 		return false
 	}
@@ -98,11 +98,11 @@ func linkRuleMatchesPosting(rule types.RecurrenceRule, posting types.Posting) bo
 	return true
 }
 
-// BuildRecurringLink maps each recorded movement in a confirmed recurring
+// BuildPatternToExistingRule maps each recorded movement in a confirmed recurring
 // pattern onto one unused scheduled occurrence of an existing rule. It never
 // writes; callers validate the candidate model and persist claims through
 // the ordinary finance boundary.
-func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignment, error) {
+func BuildPatternToExistingRule(input PatternToExistingRuleInput) ([]types.PatternOccurrence, error) {
 	anchor := input.Anchor
 	if anchor.Kind != "recurring" {
 		return nil, ErrNotRecurring
@@ -123,7 +123,7 @@ func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignme
 	if !rule.Enabled {
 		return nil, ErrRuleDisabled
 	}
-	interval, ok := linkIntervalDays(rule.Frequency)
+	interval, ok := existingRuleIntervalDays(rule.Frequency)
 	if !ok {
 		return nil, fmt.Errorf("%w: rule schedule is unknown", ErrNoScheduleMatch)
 	}
@@ -148,7 +148,7 @@ func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignme
 		if !posting.Enabled {
 			return nil, fmt.Errorf("%w: a recorded movement is disabled", ErrPatternStale)
 		}
-		day, stamp, err := linkPostingDay(posting)
+		day, stamp, err := existingRulePostingDay(posting)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignme
 		}
 	}
 	for _, item := range occurrences {
-		if !linkRuleMatchesPosting(rule, byID[item.id]) {
+		if !existingRuleMatchesPosting(rule, byID[item.id]) {
 			return nil, ErrRoutingMismatch
 		}
 	}
@@ -205,17 +205,17 @@ func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignme
 	if tolerance < 1 {
 		tolerance = 1
 	}
-	assignments := make([]types.RecurringLinkAssignment, 0, len(occurrences))
+	assignments := make([]types.PatternOccurrence, 0, len(occurrences))
 	amountOf := func(postingID string) string {
 		if facts, ok := input.Facts[postingID]; ok {
-			if parsed, err := parseLinkAmount(facts.Amount); err == nil {
+			if parsed, err := parsePatternAmount(facts.Amount); err == nil {
 				return parsed
 			}
 		}
 		if posting, ok := byID[postingID]; ok {
 			if expr, ok := posting.Amount.Config["expression"]; ok {
 				if s, ok := expr.(string); ok {
-					if parsed, err := parseLinkAmount(s); err == nil {
+					if parsed, err := parsePatternAmount(s); err == nil {
 						return parsed
 					}
 				}
@@ -249,7 +249,7 @@ func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignme
 			}
 			if kept {
 				used[current.Claim.OccurrenceDate] = true
-				assignments = append(assignments, types.RecurringLinkAssignment{PostingID: item.id, Date: current.Claim.OccurrenceDate, Amount: amountOf(item.id)})
+				assignments = append(assignments, types.PatternOccurrence{PostingID: item.id, Date: current.Claim.OccurrenceDate, Amount: amountOf(item.id)})
 				continue
 			}
 		}
@@ -274,7 +274,7 @@ func BuildRecurringLink(input RecurringLinkInput) ([]types.RecurringLinkAssignme
 			return nil, fmt.Errorf("%w: %s is %d days from its nearest free occurrence", ErrNoScheduleMatch, item.day, bestDiff)
 		}
 		used[best] = true
-		assignments = append(assignments, types.RecurringLinkAssignment{PostingID: item.id, Date: best, Amount: amountOf(item.id)})
+		assignments = append(assignments, types.PatternOccurrence{PostingID: item.id, Date: best, Amount: amountOf(item.id)})
 	}
 	sort.Slice(assignments, func(i, j int) bool { return assignments[i].PostingID < assignments[j].PostingID })
 	return assignments, nil

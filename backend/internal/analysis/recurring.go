@@ -17,7 +17,7 @@ const RecurringVersion = "recurring-v1"
 // Recurring detects repeated payments and deposits from saved bank evidence.
 // It is a second independent producer on the shared Analysis lifecycle: one
 // transaction may hold both a BNPL claim and a recurring claim without the
-// producers competing. Findings only annotate transactions; promoting a
+// producers competing. Findings only annotate transactions; creating a
 // confirmed pattern into a forecast rule is a separate explicit action.
 type Recurring struct{}
 

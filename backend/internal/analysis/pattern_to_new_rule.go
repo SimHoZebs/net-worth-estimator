@@ -13,7 +13,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Promotion errors classify why a pattern cannot become a forecast rule.
+// Pattern-to-new-rule errors classify why a pattern cannot become a forecast rule.
 // The persistence layer maps them to its invalid/conflict contract.
 var (
 	ErrNotRecurring      = errors.New("finding is not a recurring pattern")
@@ -23,7 +23,7 @@ var (
 
 // recurringCadenceFrequencies maps detected cadences onto forecast rule
 // schedules. Biweekly has no rule schedule: rules expand weekly, monthly,
-// quarterly, or longer, so biweekly patterns stay visible without promotion
+// quarterly, or longer, so biweekly patterns stay visible without creation
 // until the product decides how they should repeat.
 func recurringCadenceFrequency(cadence string) (types.RecurrenceFrequency, bool) {
 	switch cadence {
@@ -62,11 +62,11 @@ func formatCents(value float64) string {
 	return strconv.FormatFloat(math.Round(value*100)/100, 'f', 2, 64)
 }
 
-// RecurringPatternInput carries everything promotion needs: the confirmed
+// PatternToNewRuleInput carries everything creation needs: the confirmed
 // anchor finding, the saved model rows behind its evidence, the immutable
 // source facts for those rows, the known model account IDs, and the active
 // generated rule for the pattern when one already exists.
-type RecurringPatternInput struct {
+type PatternToNewRuleInput struct {
 	Anchor         types.AnalysisFinding
 	Postings       []types.Posting
 	Facts          map[string]types.TransactionFacts
@@ -74,19 +74,19 @@ type RecurringPatternInput struct {
 	ExistingRuleID string
 }
 
-// BuildRecurringPreview derives the forecast rule one confirmed recurring
+// BuildPatternToNewRulePreview derives the forecast rule one confirmed recurring
 // pattern would create, plus the forecast movements behind it. The proposed
 // rule always starts one full interval after the latest recorded movement,
 // so approving never duplicates bank facts as forecast movements.
 // Biweekly and unknown cadences return a visible preview with
-// Promotable=false instead of an error, so the interface can explain why.
-func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotionPreview, error) {
+// Creatable=false instead of an error, so the interface can explain why.
+func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToNewRulePreview, error) {
 	anchor := input.Anchor
 	if anchor.Kind != "recurring" {
-		return types.RecurringPromotionPreview{}, ErrNotRecurring
+		return types.PatternToNewRulePreview{}, ErrNotRecurring
 	}
 	if anchor.Status != "active" {
-		return types.RecurringPromotionPreview{}, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
+		return types.PatternToNewRulePreview{}, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
 	}
 	confirmed := anchor.Review != nil && anchor.Review.Decision == "confirmed"
 	occurrenceIDs := []string{}
@@ -104,7 +104,7 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 	}
 	occurrenceIDs = ordered
 	if len(occurrenceIDs) == 0 {
-		return types.RecurringPromotionPreview{}, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
+		return types.PatternToNewRulePreview{}, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
 	}
 	byID := make(map[string]types.Posting, len(input.Postings))
 	for _, posting := range input.Postings {
@@ -114,22 +114,22 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 	for _, id := range occurrenceIDs {
 		posting, ok := byID[id]
 		if !ok || posting.Pending || posting.Void {
-			return types.RecurringPromotionPreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		facts, ok := input.Facts[id]
 		if !ok {
-			return types.RecurringPromotionPreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		amount, err := strconv.ParseFloat(facts.Amount, 64)
 		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 {
-			return types.RecurringPromotionPreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		stamp := posting.TransactionTime
 		if stamp <= 0 {
 			stamp = posting.PostedTime
 		}
 		if stamp <= 0 {
-			return types.RecurringPromotionPreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		occurrences = append(occurrences, recurringOccurrence{id: id, day: time.Unix(stamp, 0).UTC().Format("2006-01-02"), stamp: stamp, amount: amount})
 	}
@@ -137,7 +137,7 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 	for _, item := range occurrences {
 		posting := byID[item.id]
 		if !equalRouting(posting, first) {
-			return types.RecurringPromotionPreview{}, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
+			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
 		}
 	}
 	account := accountOf(first)
@@ -149,7 +149,7 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 		}
 	}
 	if !known {
-		return types.RecurringPromotionPreview{}, fmt.Errorf("%w: the pattern account is gone", ErrPatternStale)
+		return types.PatternToNewRulePreview{}, fmt.Errorf("%w: the pattern account is gone", ErrPatternStale)
 	}
 	magnitudes := make([]float64, 0, len(occurrences))
 	for _, item := range occurrences {
@@ -159,7 +159,7 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].stamp < occurrences[j].stamp })
 	lastDay := occurrences[len(occurrences)-1].day
 	cadence := anchor.Product
-	preview := types.RecurringPromotionPreview{
+	preview := types.PatternToNewRulePreview{
 		FindingID:      anchor.ID,
 		PatternKey:     RecurringPatternKey(anchor.Kind, cadence, occurrenceIDs),
 		Merchant:       anchor.Provider,
@@ -175,11 +175,11 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 		preview.Direction = "outflow"
 	}
 	for _, item := range occurrences {
-		preview.Occurrences = append(preview.Occurrences, types.RecurringPromotionOccurrence{PostingID: item.id, Date: item.day, Amount: formatCents(math.Abs(item.amount))})
+		preview.Occurrences = append(preview.Occurrences, types.PatternOccurrence{PostingID: item.id, Date: item.day, Amount: formatCents(math.Abs(item.amount))})
 	}
 	frequency, ok := recurringCadenceFrequency(cadence)
 	if !ok {
-		preview.Promotable = false
+		preview.Creatable = false
 		preview.Reason = fmt.Sprintf("Patterns that repeat %s cannot become forecast rules yet. The evidence stays saved for review.", cadenceLabel(cadence))
 		return preview, nil
 	}
@@ -192,20 +192,20 @@ func BuildRecurringPreview(input RecurringPatternInput) (types.RecurringPromotio
 		StartDate:       domain.AdvanceRuleDate(lastDay, frequency, 1),
 		Enabled:         true,
 	}
-	preview.Promotable = true
-	preview.Rule = &types.ProposedRecurringRule{
+	preview.Creatable = true
+	preview.Rule = &types.ProposedNewRule{
 		Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations,
 		Amount: formatCents(typical), Frequency: frequency, StartDate: rule.StartDate, Enabled: true,
 	}
 	for _, date := range domain.RuleScheduleDates(rule, domain.AdvanceRuleDate(rule.StartDate, frequency, 5)) {
-		preview.Upcoming = append(preview.Upcoming, types.UpcomingRecurringOccurrence{Date: date, Amount: formatCents(typical)})
+		preview.Upcoming = append(preview.Upcoming, types.UpcomingNewRuleOccurrence{Date: date, Amount: formatCents(typical)})
 	}
 	if !confirmed {
-		preview.Promotable = false
+		preview.Creatable = false
 		preview.Reason = "Confirm this repeating pattern before creating its forecast rule."
 	}
 	if input.ExistingRuleID != "" {
-		preview.Promotable = false
+		preview.Creatable = false
 		preview.Reason = "This pattern already has an active forecast rule. Disable or delete that rule to create a replacement."
 	}
 	return preview, nil

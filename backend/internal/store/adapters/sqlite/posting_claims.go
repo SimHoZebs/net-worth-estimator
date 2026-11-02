@@ -22,7 +22,7 @@ func (s *sqliteStore) SetPostingClaims(claims []types.PostingClaimUpdate) ([]typ
 				return store.InvalidID(item.PostingID)
 			}
 			if item.Claim.RuleID == "" || item.Claim.OccurrenceDate == "" {
-				return fmt.Errorf("%w: posting claim requires a rule and date", store.ErrRecurringLinkInvalid)
+				return fmt.Errorf("%w: posting claim requires a rule and date", store.ErrPatternToExistingRuleInvalid)
 			}
 			lifecycle, err := postingLifecycleOf(tx, item.PostingID)
 			if err != nil {

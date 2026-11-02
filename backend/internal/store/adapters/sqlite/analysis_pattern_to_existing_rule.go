@@ -11,11 +11,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// PreviewRecurringLink describes how one confirmed recurring pattern would
+// PreviewPatternToExistingRule describes how one confirmed recurring pattern would
 // claim occurrences of one existing rule. It reads evidence, findings, and
 // saved rows only; it never writes.
-func (s *sqliteStore) PreviewRecurringLink(findingID, ruleID string) (types.RecurringLinkPreview, error) {
-	var preview types.RecurringLinkPreview
+func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (types.PatternToExistingRulePreview, error) {
+	var preview types.PatternToExistingRulePreview
 	var anchor types.AnalysisFinding
 	var detectionJSON, reviewJSON string
 	err := s.db.QueryRow(`SELECT f.id, f.analysis_type, f.detection_json, f.run_id, r.version, r.input_revision,
@@ -38,7 +38,7 @@ func (s *sqliteStore) PreviewRecurringLink(findingID, ruleID string) (types.Recu
 		return preview, err
 	}
 	if anchor.Kind != "recurring" {
-		return preview, fmt.Errorf("%w: finding is %s", store.ErrRecurringLinkInvalid, anchor.Kind)
+		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToExistingRuleInvalid, anchor.Kind)
 	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
@@ -66,7 +66,7 @@ func (s *sqliteStore) PreviewRecurringLink(findingID, ruleID string) (types.Recu
 		}
 	}
 	if rule == nil {
-		return preview, fmt.Errorf("%w: rule %s not found", store.ErrRecurringLinkInvalid, ruleID)
+		return preview, fmt.Errorf("%w: rule %s not found", store.ErrPatternToExistingRuleInvalid, ruleID)
 	}
 	facts := map[string]types.TransactionFacts{}
 	if len(occurrenceIDs) > 0 {
@@ -99,56 +99,56 @@ func (s *sqliteStore) PreviewRecurringLink(findingID, ruleID string) (types.Recu
 			return preview, err
 		}
 	}
-	preview = types.RecurringLinkPreview{
+	preview = types.PatternToExistingRulePreview{
 		FindingID:  anchor.ID,
 		PatternKey: analysis.RecurringPatternKey(anchor.Kind, anchor.Product, occurrenceIDs),
 		RuleID:     rule.ID,
 		RuleName:   rule.Name,
 		Merchant:   anchor.Provider,
 		Cadence:    anchor.Product,
-		AccountID:  accountOfLink(model.Postings, occurrenceIDs),
+		AccountID:  accountOfPattern(model.Postings, occurrenceIDs),
 	}
 	if anchor.Status != "active" {
-		preview.Linkable = false
+		preview.Claimable = false
 		preview.Reason = "This pattern changed since confirmation. Review it again."
 		return preview, nil
 	}
 	if anchor.Review == nil || anchor.Review.Decision != "confirmed" {
-		preview.Linkable = false
-		preview.Reason = "Confirm this repeating pattern before linking its payments to a forecast rule."
+		preview.Claimable = false
+		preview.Reason = "Confirm this repeating pattern before adding its payments to a forecast rule."
 		return preview, nil
 	}
-	assignments, err := analysis.BuildRecurringLink(analysis.RecurringLinkInput{
+	assignments, err := analysis.BuildPatternToExistingRule(analysis.PatternToExistingRuleInput{
 		Anchor: anchor, Postings: model.Postings, Facts: facts, Rule: *rule, OccurrenceIDs: occurrenceIDs,
 	})
 	if err != nil {
-		preview.Linkable = false
+		preview.Claimable = false
 		switch {
 		case errors.Is(err, analysis.ErrRuleDisabled):
-			preview.Reason = "That forecast rule is disabled. Enable it before linking."
+			preview.Reason = "That forecast rule is disabled. Enable it before adding payments to it."
 		case errors.Is(err, analysis.ErrRoutingMismatch):
 			preview.Reason = "The recorded payments use different accounts than that forecast rule."
 		case errors.Is(err, analysis.ErrNoScheduleMatch):
 			preview.Reason = "The recorded payments do not fall on that rule's schedule: " + err.Error()
 		case errors.Is(err, analysis.ErrRuleNotFound):
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringLinkInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
 		case errors.Is(err, analysis.ErrPatternStale):
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringLinkConflict, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleConflict, err)
 		case errors.Is(err, analysis.ErrPatternIncoherent):
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringLinkInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
 		case errors.Is(err, analysis.ErrNotRecurring):
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringLinkInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
 		default:
-			return preview, fmt.Errorf("%w: %v", store.ErrRecurringLinkInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
 		}
 		return preview, nil
 	}
 	preview.Assignments = assignments
-	preview.Linkable = true
+	preview.Claimable = true
 	return preview, nil
 }
 
-func accountOfLink(postings []types.Posting, ids []string) string {
+func accountOfPattern(postings []types.Posting, ids []string) string {
 	for _, posting := range postings {
 		for _, id := range ids {
 			if posting.ID == id {

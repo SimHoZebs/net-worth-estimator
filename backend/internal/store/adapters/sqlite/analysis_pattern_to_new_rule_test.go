@@ -37,7 +37,7 @@ func seedRecurringEvidence(t *testing.T, s *sqliteStore) []string {
 	return ids
 }
 
-func completeRecurringPromotionAnalysis(t *testing.T, s *sqliteStore, ids []string, cadence string) []types.AnalysisFinding {
+func completePatternAnalysis(t *testing.T, s *sqliteStore, ids []string, cadence string) []types.AnalysisFinding {
 	t.Helper()
 	run, _, claimed, err := s.ClaimAnalysis("recurring", "recurring-test-v1")
 	if err != nil || !claimed {
@@ -79,16 +79,16 @@ func confirmFinding(t *testing.T, s *sqliteStore, finding types.AnalysisFinding)
 	return types.AnalysisFinding{}
 }
 
-func TestRecurringPromotionPreviewDerivesRuleAfterEvidence(t *testing.T) {
+func TestPatternToNewRulePreviewDerivesRuleAfterEvidence(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
-	findings := completeRecurringPromotionAnalysis(t, s, ids, "monthly")
+	findings := completePatternAnalysis(t, s, ids, "monthly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewRecurringPromotion(anchor.ID)
+	preview, err := s.PreviewPatternToNewRule(anchor.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Promotable || preview.Reason != "" || preview.Rule == nil {
+	if !preview.Creatable || preview.Reason != "" || preview.Rule == nil {
 		t.Fatalf("preview=%+v", preview)
 	}
 	if preview.Cadence != "monthly" || preview.Direction != "outflow" || preview.AccountID != "checking" || preview.TypicalAmount != "30.00" || preview.Currency != "USD" {
@@ -115,13 +115,13 @@ func TestRecurringPromotionPreviewDerivesRuleAfterEvidence(t *testing.T) {
 	}
 }
 
-func TestRecurringPromotionPreviewGuards(t *testing.T) {
+func TestPatternToNewRulePreviewGuards(t *testing.T) {
 	s := openSQLiteStore(t)
-	if _, err := s.PreviewRecurringPromotion("missing"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.PreviewPatternToNewRule("missing"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("missing=%v", err)
 	}
 	ids := seedRecurringEvidence(t, s)
-	findings := completeRecurringPromotionAnalysis(t, s, ids, "monthly")
+	findings := completePatternAnalysis(t, s, ids, "monthly")
 	run, _, claimed, err := s.ClaimAnalysis("bnpl", "v1")
 	if err != nil || !claimed {
 		t.Fatalf("claim=%v err=%v", claimed, err)
@@ -135,37 +135,37 @@ func TestRecurringPromotionPreviewGuards(t *testing.T) {
 	}
 	for _, item := range bnpl {
 		if item.Kind == "bnpl" {
-			if _, err := s.PreviewRecurringPromotion(item.ID); !errors.Is(err, store.ErrRecurringPromotionInvalid) {
+			if _, err := s.PreviewPatternToNewRule(item.ID); !errors.Is(err, store.ErrPatternToNewRuleInvalid) {
 				t.Fatalf("bnpl=%v", err)
 			}
 		}
 	}
-	unconfirmed, err := s.PreviewRecurringPromotion(findings[0].ID)
+	unconfirmed, err := s.PreviewPatternToNewRule(findings[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if unconfirmed.Promotable || unconfirmed.Rule == nil || unconfirmed.Reason == "" {
+	if unconfirmed.Creatable || unconfirmed.Rule == nil || unconfirmed.Reason == "" {
 		t.Fatalf("unconfirmed=%+v", unconfirmed)
 	}
 	anchor := confirmFinding(t, s, findings[0])
 	if _, err := s.db.Exec(`UPDATE postings SET void=1 WHERE id=? AND user_id=:user_id`, ids[0]); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.PreviewRecurringPromotion(anchor.ID); !errors.Is(err, store.ErrRecurringPromotionConflict) {
+	if _, err := s.PreviewPatternToNewRule(anchor.ID); !errors.Is(err, store.ErrPatternToNewRuleConflict) {
 		t.Fatalf("voided=%v", err)
 	}
 }
 
-func TestRecurringPromotionPreviewLeavesBiweeklyVisible(t *testing.T) {
+func TestPatternToNewRulePreviewLeavesBiweeklyVisible(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
-	findings := completeRecurringPromotionAnalysis(t, s, ids, "biweekly")
+	findings := completePatternAnalysis(t, s, ids, "biweekly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewRecurringPromotion(anchor.ID)
+	preview, err := s.PreviewPatternToNewRule(anchor.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preview.Promotable || preview.Rule != nil || len(preview.Upcoming) != 0 || preview.Reason == "" {
+	if preview.Creatable || preview.Rule != nil || len(preview.Upcoming) != 0 || preview.Reason == "" {
 		t.Fatalf("preview=%+v", preview)
 	}
 	if len(preview.Occurrences) != 3 {
@@ -173,78 +173,78 @@ func TestRecurringPromotionPreviewLeavesBiweeklyVisible(t *testing.T) {
 	}
 }
 
-func TestRecurringPromotionLinkTracksOneActiveRule(t *testing.T) {
+func TestPatternToNewRuleTracksOneActiveRule(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
-	findings := completeRecurringPromotionAnalysis(t, s, ids, "monthly")
+	findings := completePatternAnalysis(t, s, ids, "monthly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewRecurringPromotion(anchor.ID)
-	if err != nil || !preview.Promotable {
+	preview, err := s.PreviewPatternToNewRule(anchor.ID)
+	if err != nil || !preview.Creatable {
 		t.Fatalf("preview=%+v err=%v", preview, err)
 	}
-	if _, err := s.FindRecurringPromotion(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("link=%v", err)
+	if _, err := s.FindPatternToNewRule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("record=%v", err)
 	}
 	rule, err := s.CreateRule(types.RecurrenceRule{Name: "Grocer", SourceAccountID: &[]string{"checking"}[0], Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RecordRecurringPromotion(types.RecurringPromotion{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
+	if err := s.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
 		t.Fatal(err)
 	}
-	blocked, err := s.PreviewRecurringPromotion(anchor.ID)
-	if err != nil || blocked.Promotable || blocked.ExistingRuleID != rule.ID || blocked.Reason == "" {
+	blocked, err := s.PreviewPatternToNewRule(anchor.ID)
+	if err != nil || blocked.Creatable || blocked.ExistingRuleID != rule.ID || blocked.Reason == "" {
 		t.Fatalf("blocked=%+v err=%v", blocked, err)
 	}
 	rule.Enabled = false
 	if _, err := s.UpdateRule(rule); err != nil {
 		t.Fatal(err)
 	}
-	freed, err := s.PreviewRecurringPromotion(anchor.ID)
-	if err != nil || !freed.Promotable || freed.ExistingRuleID != "" {
+	freed, err := s.PreviewPatternToNewRule(anchor.ID)
+	if err != nil || !freed.Creatable || freed.ExistingRuleID != "" {
 		t.Fatalf("freed=%+v err=%v", freed, err)
 	}
-	if err := s.RemoveRecurringPromotion(preview.PatternKey, "other-rule"); err != nil {
+	if err := s.RemovePatternToNewRule(preview.PatternKey, "other-rule"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindRecurringPromotion(preview.PatternKey); err != nil {
-		t.Fatalf("conditional remove cleared a live link: %v", err)
+	if _, err := s.FindPatternToNewRule(preview.PatternKey); err != nil {
+		t.Fatalf("conditional remove cleared a live record: %v", err)
 	}
-	if err := s.RemoveRecurringPromotion(preview.PatternKey, rule.ID); err != nil {
+	if err := s.RemovePatternToNewRule(preview.PatternKey, rule.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindRecurringPromotion(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("link=%v", err)
+	if _, err := s.FindPatternToNewRule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("record=%v", err)
 	}
 	if err := s.DeleteRule(rule.ID); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestRecurringPromotionClearRemovesLinks(t *testing.T) {
+func TestPatternToNewRuleClearRemovesLinks(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
-	findings := completeRecurringPromotionAnalysis(t, s, ids, "monthly")
+	findings := completePatternAnalysis(t, s, ids, "monthly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewRecurringPromotion(anchor.ID)
+	preview, err := s.PreviewPatternToNewRule(anchor.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RecordRecurringPromotion(types.RecurringPromotion{PatternKey: preview.PatternKey, RuleID: "rule-1"}); err != nil {
+	if err := s.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: "rule-1"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindRecurringPromotion(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("link=%v", err)
+	if _, err := s.FindPatternToNewRule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("record=%v", err)
 	}
 }
 
-func TestRecurringClaimConfirmRejectGeneralizes(t *testing.T) {
+func TestPatternClaimConfirmRejectGeneralizes(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
-	findings := completeRecurringPromotionAnalysis(t, s, ids, "monthly")
+	findings := completePatternAnalysis(t, s, ids, "monthly")
 	confirmed := confirmFinding(t, s, findings[0])
 	if confirmed.Review.Decision != "confirmed" {
 		t.Fatalf("review=%+v", confirmed.Review)
