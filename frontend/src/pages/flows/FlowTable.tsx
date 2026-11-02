@@ -1,13 +1,9 @@
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
-import {
-	DataTable,
-	TableCell,
-	TableRow,
-} from "../../components/DataTable.tsx";
+import { DataTable, TableCell, TableRow } from "../../components/DataTable.tsx";
 import {
 	describeFlowEdge,
-	diagramEdgeId,
+	sankeyLaneId,
 	type AggregatedEdge,
 } from "../../domain/flowDiagram.ts";
 import { dateLabel, money } from "../../domain/format.ts";
@@ -36,7 +32,7 @@ export function FlowTable({
 				]}
 			>
 				{visible.map((item, index) => (
-					<TableRow key={diagramEdgeId(item, index)}>
+					<TableRow key={sankeyLaneId(item, index)}>
 						<TableCell>
 							{describeFlowEdge(item.edge, nameOf, money)}
 							{item.aggregated
@@ -74,8 +70,8 @@ export function FlowTable({
 			<ul className="flex flex-col gap-1 text-xs text-muted">
 				{totals.unmatched !== 0 && (
 					<li>
-						{money(Math.abs(totals.unmatched))} moved without a recorded
-						path ({graph.reconciliation.unmatchedEvents}{" "}
+						{money(Math.abs(totals.unmatched))} moved without a recorded path (
+						{graph.reconciliation.unmatchedEvents}{" "}
 						{graph.reconciliation.unmatchedEvents === 1
 							? "transaction"
 							: "transactions"}
@@ -84,9 +80,8 @@ export function FlowTable({
 				)}
 				{totals.unobserved !== 0 && (
 					<li>
-						{money(Math.abs(totals.unobserved))} asserted by balance
-						checks with no contributing transaction (
-						{graph.reconciliation.correctionsCount}{" "}
+						{money(Math.abs(totals.unobserved))} asserted by balance checks with
+						no contributing transaction ({graph.reconciliation.correctionsCount}{" "}
 						{graph.reconciliation.correctionsCount === 1
 							? "correction"
 							: "corrections"}
@@ -107,8 +102,8 @@ export function FlowTable({
 					</li>
 				)}
 				<li>
-					Window {dateLabel(graph.startDate)} through{" "}
-					{dateLabel(graph.endDate)}:{" "}
+					Window {dateLabel(graph.startDate)} through {dateLabel(graph.endDate)}
+					:{" "}
 					{graph.reconciliation.reconciled
 						? "edge totals reconcile with their source records."
 						: "edge totals do not fully reconcile with their source records."}

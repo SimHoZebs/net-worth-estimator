@@ -8,76 +8,80 @@ test.beforeEach(async () => {
 
 async function openFlows(page: Page) {
 	await page.goto("/#flows");
-	// The graph loads from the real /v1/flows engine over real HTTP.
+	// The diagram loads from the real /v1/flows engine over real HTTP and
+	// renders on the shared chart setup.
 	await expect(
-		page.getByRole("group", { name: /Money-flow diagram/ }),
+		page.getByRole("img", { name: /Money-flow diagram/ }),
 	).toBeVisible();
 }
 
-test("money flows render nodes with directional edges scaled by amount", async ({
+test("money flows render labeled nodes with width-encoded flows", async ({
 	page,
 }) => {
 	await openFlows(page);
-	const diagram = page.getByRole("group", { name: /Money-flow diagram/ });
-	// Nodes: outside accounts plus the fixture accounts.
-	await expect(
-		diagram.getByText("Everyday checking", { exact: true }),
-	).toBeVisible();
-	// Edges are keyboard-operable with plain-language names carrying kind
-	// and movement, so color never works alone.
-	const edges = diagram.getByRole("button", { name: /Activate to inspect/ });
-	expect(await edges.count()).toBeGreaterThan(0);
-	// The fixture window holds planned payroll inflows and account
-	// transfers; kind and movement ride in the name, never color alone.
-	await expect(
-		diagram.getByRole("button", { name: /Money in of .*\(planned\)/ }),
-	).not.toHaveCount(0);
-	await expect(
-		diagram.getByRole("button", { name: /Transfer of / }),
-	).not.toHaveCount(0);
+	const diagram = page.getByRole("img", { name: /Money-flow diagram/ });
+	// Nodes label in plain words: outside accounts plus the fixture accounts.
+	await expect(diagram.getByText("Everyday checking")).toBeVisible();
+	await expect(diagram.getByText("Outside accounts").first()).toBeVisible();
 });
 
-test("selecting an edge reveals its source transactions", async ({ page }) => {
+test("selecting a flow reveals its source transactions", async ({ page }) => {
 	await openFlows(page);
-	const diagram = page.getByRole("group", { name: /Money-flow diagram/ });
-	// Edges activate by keyboard: SVG path centers often miss the stroke,
-	// so a pointer click is the wrong tool here.
-	const edge = diagram
-		.getByRole("button", { name: /Money in of .*\(planned\)/ })
-		.first();
-	await edge.focus();
-	await page.keyboard.press("Enter");
+	const diagram = page.getByRole("img", { name: /Money-flow diagram/ });
+	// Keyboard flow: tab into the chart and walk lanes with the arrow keys,
+	// activating each stop until a flow (not a node) selects. The chart
+	// announces each focused flow through its description.
+	await diagram.focus();
 	const panel = page.getByRole("region", { name: "Selected money flow" });
+	for (let step = 0; step < 12; step++) {
+		await page.keyboard.press("ArrowRight");
+		await page.keyboard.press("Enter");
+		if ((await panel.count()) > 0) break;
+	}
+	await expect(diagram.locator("desc")).toContainText(
+		/Money in of|Money out of|Transfer of/,
+	);
 	await expect(panel).toBeVisible();
 	await expect(
-		panel.getByRole("table", { name: "Transactions behind the selected flow." }),
+		panel.getByRole("table", {
+			name: "Transactions behind the selected flow.",
+		}),
 	).toBeVisible();
+	await expect(panel).toContainText(/Money in of|Money out of|Transfer of/);
+	// Activating the same lane again clears the selection.
+	await page.keyboard.press("Enter");
+	await expect(panel).toHaveCount(0);
 });
 
 test("date and account filters re-render the graph", async ({ page }) => {
 	await openFlows(page);
-	const diagram = page.getByRole("group", { name: /Money-flow diagram/ });
 	const status = page.getByRole("status");
 	// Shortening the window refetches from the engine.
 	await page.getByLabel("Through date", { exact: true }).fill("2026-02-28");
 	await expect(status).toContainText(/through 2026-02-28/);
 	await page.getByLabel("Through date", { exact: true }).fill("2026-11-01");
 	await expect(status).toContainText(/through 2026-11-01/);
-	// Narrowing to recorded money drops the planned edges.
+	// Narrowing to recorded money drops the planned lanes: the table view
+	// carries the exact per-lane evidence.
 	await page
 		.getByRole("group", { name: "Recorded or planned money" })
 		.getByRole("button", { name: "Recorded" })
 		.click();
-	await expect(diagram.getByRole("button", { name: /\(planned\)/ })).toHaveCount(
-		0,
-	);
+	await page
+		.getByRole("group", { name: "Diagram or table view" })
+		.getByRole("button", { name: "Table" })
+		.click();
+	const table = page.getByRole("table", { name: /Money flows from/ });
+	await expect(table).toBeVisible();
+	await expect(table).not.toContainText("(planned)");
 	await page
 		.getByRole("group", { name: "Recorded or planned money" })
 		.getByRole("button", { name: "All" })
 		.click();
-	await expect(
-		diagram.getByRole("button", { name: /\(planned\)/ }),
-	).not.toHaveCount(0);
+	await page
+		.getByRole("group", { name: "Diagram or table view" })
+		.getByRole("button", { name: "Diagram" })
+		.click();
 	// Focusing one account keeps only its touching flows; totals still
 	// describe the whole window.
 	await page

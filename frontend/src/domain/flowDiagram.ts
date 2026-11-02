@@ -95,230 +95,146 @@ export function aggregateFlowEdges(edges: FlowEdge[]): AggregatedEdge[] {
 	return [...large, ...grouped];
 }
 
-export interface DiagramNode {
-	id: string;
-	name: string;
-	external: boolean;
-	/** Column: 0 = money sources, 1 = accounts, 2 = money destinations. */
-	column: 0 | 1 | 2;
-	x: number;
-	y: number;
-	width: number;
-	height: number;
+/** Lane identity shared by the layout input, selection state, and the
+ * table: route plus position, so a large lane and its same-route
+ * small-flow group never share a key. Rebuild the input (and re-resolve
+ * selection) whenever the visible lanes change. */
+export function sankeyLaneId(
+	item: Pick<AggregatedEdge, "edge" | "aggregated">,
+	index: number,
+): string {
+	const edge = item.edge;
+	return `${edge.from}|${edge.to}|${edge.kind}|${edge.movement}|${item.aggregated ? "grouped" : "single"}|${index}`;
 }
 
-export interface DiagramEdge {
+export interface SankeyFlowNode {
+	id: string;
+	label: string;
+	external: boolean;
+}
+
+export interface SankeyFlowLane {
+	/** Unique lane identity within one built input: route plus the lane
+	 * position, so a large edge and its same-route small-flow group never
+	 * share a key. Rebuild the input (and re-resolve selection) whenever
+	 * the visible lanes change. */
+	laneId: string;
+	source: string;
+	target: string;
+	/** Signed realized amount. The layout weighs the absolute value;
+	 * labels, the table, and selection keep the sign. */
+	amount: number;
 	edge: FlowEdge;
 	aggregated: boolean;
 	members: FlowEdge[];
-	path: string;
-	thickness: number;
-	fromNode: string;
-	toNode: string;
 }
 
-export interface FlowDiagram {
-	nodes: DiagramNode[];
-	edges: DiagramEdge[];
-	width: number;
-	height: number;
+export interface SankeyFlowInput {
+	nodes: SankeyFlowNode[];
+	lanes: SankeyFlowLane[];
 }
 
-export interface FlowLayoutOptions {
-	width?: number;
-	rowHeight?: number;
-	nodeWidth?: number;
-	maxThickness?: number;
-	minThickness?: number;
+const EXTERNAL_IN = `${FLOW_NODE_ID_EXTERNAL}:in`;
+const EXTERNAL_OUT = `${FLOW_NODE_ID_EXTERNAL}:out`;
+
+function sankeyEndpoint(id: string, side: "source" | "target"): string {
+	if (id !== FLOW_NODE_ID_EXTERNAL) return id;
+	return side === "source" ? EXTERNAL_IN : EXTERNAL_OUT;
 }
 
-const DEFAULT_WIDTH = 720;
-const DEFAULT_ROW_HEIGHT = 44;
-const DEFAULT_NODE_WIDTH = 132;
-const DEFAULT_MAX_THICKNESS = 26;
-const DEFAULT_MIN_THICKNESS = 2;
-
-function edgePath(
-	fromX: number,
-	fromY: number,
-	toX: number,
-	toY: number,
-	bow = 0,
-): string {
-	const controlX = Math.max((fromX + toX) / 2, fromX + bow, toX + bow);
-	return `M ${fromX} ${fromY} C ${controlX} ${fromY}, ${controlX} ${toY}, ${toX} ${toY}`;
-}
-
-/** Sankey-style layout derived only from the graph contract: no renderer
- * state enters this module, so the SVG view and the text/table alternative
- * describe the same edges. The external counterparty renders twice — once
- * as the left-hand source of inflows and once as the right-hand
- * destination of outflows — while transfers route between account rows in
- * the middle column. */
-export function layoutFlowDiagram(
+/** Semantic rows for the chart library's flow layout: no renderer state
+ * enters this module, so the diagram and the text/table alternative
+ * describe the same lanes. The external counterparty splits into a source
+ * row and a destination row so one-way money never reads as a loop, and
+ * lanes keep their signed amounts while the layout weighs absolute flow.
+ * Lanes with non-finite amounts stay out of the layout; the table still
+ * lists them exactly. */
+export function buildSankeyInput(
 	graph: FlowGraph,
 	visible: AggregatedEdge[],
-	options: FlowLayoutOptions = {},
-): FlowDiagram {
-	const width = options.width ?? DEFAULT_WIDTH;
-	const rowHeight = options.rowHeight ?? DEFAULT_ROW_HEIGHT;
-	const nodeWidth = options.nodeWidth ?? DEFAULT_NODE_WIDTH;
-	const maxThickness = options.maxThickness ?? DEFAULT_MAX_THICKNESS;
-	const minThickness = options.minThickness ?? DEFAULT_MIN_THICKNESS;
-
+): SankeyFlowInput {
+	const nodes: SankeyFlowNode[] = [];
+	const seen = new Set<string>();
 	const nameOf = (id: string): string => {
 		if (id === FLOW_NODE_ID_EXTERNAL) return FLOW_EXTERNAL_LABEL;
-		return (
-			graph.nodes.find((node) => node.id === id)?.name || id
-		);
+		return graph.nodes.find((node) => node.id === id)?.name || id;
 	};
-	const accountIds = Array.from(
-		new Set(visible.flatMap((item) => [item.edge.from, item.edge.to])),
-	).filter((id) => id !== FLOW_NODE_ID_EXTERNAL);
-	const accountTotals = new Map<string, number>();
-	for (const id of accountIds) accountTotals.set(id, 0);
-	for (const item of visible) {
-		const amount = Math.abs(item.edge.amount);
-		if (item.edge.from !== FLOW_NODE_ID_EXTERNAL) {
-			accountTotals.set(
-				item.edge.from,
-				(accountTotals.get(item.edge.from) ?? 0) + amount,
-			);
-		}
-		if (item.edge.to !== FLOW_NODE_ID_EXTERNAL) {
-			accountTotals.set(
-				item.edge.to,
-				(accountTotals.get(item.edge.to) ?? 0) + amount,
-			);
-		}
-	}
-	accountIds.sort(
-		(a, b) => (accountTotals.get(b) ?? 0) - (accountTotals.get(a) ?? 0),
-	);
-
-	const hasInflow = visible.some(
-		(item) => item.edge.from === FLOW_NODE_ID_EXTERNAL,
-	);
-	const hasOutflow = visible.some(
-		(item) => item.edge.to === FLOW_NODE_ID_EXTERNAL,
-	);
-	const rows = Math.max(accountIds.length, 1);
-	const height = rows * rowHeight + rowHeight;
-	const middleX = (width - nodeWidth) / 2;
-	const nodeY = (index: number) => rowHeight / 2 + index * rowHeight;
-
-	const nodes: DiagramNode[] = [];
-	if (hasInflow) {
-		nodes.push({
-			id: `${FLOW_NODE_ID_EXTERNAL}:in`,
-			name: FLOW_EXTERNAL_LABEL,
-			external: true,
-			column: 0,
-			x: 0,
-			y: nodeY(0),
-			width: nodeWidth,
-			height: rowHeight - 12,
-		});
-	}
-	accountIds.forEach((id, index) => {
+	const useNode = (id: string) => {
+		if (seen.has(id)) return;
+		seen.add(id);
 		nodes.push({
 			id,
-			name: nameOf(id),
-			external: false,
-			column: 1,
-			x: middleX,
-			y: nodeY(index),
-			width: nodeWidth,
-			height: rowHeight - 12,
+			label:
+				id === EXTERNAL_IN || id === EXTERNAL_OUT
+					? FLOW_EXTERNAL_LABEL
+					: nameOf(id),
+			external: id === EXTERNAL_IN || id === EXTERNAL_OUT,
 		});
-	});
-	if (hasOutflow) {
-		nodes.push({
-			id: `${FLOW_NODE_ID_EXTERNAL}:out`,
-			name: FLOW_EXTERNAL_LABEL,
-			external: true,
-			column: 2,
-			x: width - nodeWidth,
-			y: nodeY(0),
-			width: nodeWidth,
-			height: rowHeight - 12,
-		});
-	}
-
-	const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
-	const resolveNode = (id: string, side: "from" | "to"): number => {
-		if (id !== FLOW_NODE_ID_EXTERNAL) return nodeIndex.get(id) ?? -1;
-		const key =
-			side === "from"
-				? `${FLOW_NODE_ID_EXTERNAL}:in`
-				: `${FLOW_NODE_ID_EXTERNAL}:out`;
-		if (nodeIndex.has(key)) return nodeIndex.get(key)!;
-		// An external leg without its column (filtered away) anchors to the
-		// nearest account row instead of vanishing.
-		return side === "from" ? 0 : nodes.length - 1;
 	};
-
-	const peak = visible.reduce(
-		(peak, item) => Math.max(peak, Math.abs(item.edge.amount)),
-		0,
-	);
-	const thicknessOf = (amount: number): number => {
-		if (peak <= 0) return minThickness;
-		const share = Math.abs(amount) / peak;
-		return minThickness + share * (maxThickness - minThickness);
-	};
-
-	const laneCursor = new Map<number, number>();
-	const laneY = (nodePosition: number): number => {
-		const node = nodes[nodePosition];
-		if (!node) return 0;
-		const used = laneCursor.get(nodePosition) ?? 0;
-		laneCursor.set(nodePosition, used + 1);
-		// Spread edge lanes across the node face so parallel edges read as
-		// separate flows instead of one painted band.
-		const lanes = Math.max(
-			visible.filter(
-				(item) =>
-					resolveNode(item.edge.from, "from") === nodePosition ||
-					resolveNode(item.edge.to, "to") === nodePosition,
-			).length,
-			1,
-		);
-		const slot = node.height / (lanes + 1);
-		return node.y + slot * (used + 1);
-	};
-
-	const edges: DiagramEdge[] = visible.map((item) => {
-		const fromPosition = resolveNode(item.edge.from, "from");
-		const toPosition = resolveNode(item.edge.to, "to");
-		const fromNode = nodes[fromPosition];
-		const toNode = nodes[toPosition];
-		const fromX = fromNode ? fromNode.x + fromNode.width : 0;
-		// Account-to-account transfers arc along the right side of the
-		// middle column so they never cross the inflow/outflow bands.
-		const sameColumn =
-			fromNode?.column === 1 && toNode?.column === 1;
-		const toX = toNode ? (sameColumn ? toNode.x + toNode.width + 8 : toNode.x) : width;
-		const fromY = laneY(fromPosition);
-		const toY = laneY(toPosition);
-		// Same-column transfers bow rightward proportionally to the row
-		// gap so parallel transfers read as separate arcs, not one line.
-		const bow = sameColumn
-			? Math.min(Math.max(Math.abs(toY - fromY) * 0.75, 24), 120)
-			: 0;
-		const path = edgePath(fromX, fromY, toX, toY, bow);
-		return {
+	const lanes: SankeyFlowLane[] = [];
+	visible.forEach((item, index) => {
+		if (!Number.isFinite(item.edge.amount)) return;
+		const source = sankeyEndpoint(item.edge.from, "source");
+		const target = sankeyEndpoint(item.edge.to, "target");
+		if (source === target) return;
+		useNode(source);
+		useNode(target);
+		lanes.push({
+			laneId: sankeyLaneId(item, index),
+			source,
+			target,
+			amount: item.edge.amount,
 			edge: item.edge,
 			aggregated: item.aggregated,
 			members: item.members,
-			path,
-			thickness: thicknessOf(item.edge.amount),
-			fromNode: fromNode?.id ?? item.edge.from,
-			toNode: toNode?.id ?? item.edge.to,
-		};
+		});
 	});
+	return { nodes, lanes };
+}
 
-	return { nodes, edges, width, height };
+/** True when the lanes loop back on themselves (A→B and B→A in one
+ * window, or a longer chain, possibly fed by other lanes). A one-way flow
+ * layout cannot draw a loop, so the page falls back to the table for
+ * cyclic windows. Standard three-color depth-first search: fully explored
+ * nodes stay marked across start points because a cycle through them
+ * would already have been found. */
+export function hasFlowCycle(
+	lanes: Pick<SankeyFlowLane, "source" | "target">[],
+): boolean {
+	const outgoing = new Map<string, Set<string>>();
+	for (const lane of lanes) {
+		if (!outgoing.has(lane.source)) outgoing.set(lane.source, new Set());
+		outgoing.get(lane.source)!.add(lane.target);
+		if (!outgoing.has(lane.target)) outgoing.set(lane.target, new Set());
+	}
+	const IN_STACK = 1;
+	const DONE = 2;
+	const state = new Map<string, number>();
+	const reachesBack = (start: string): boolean => {
+		const pending: [string, Iterator<string>][] = [
+			[start, outgoing.get(start)!.values()],
+		];
+		state.set(start, IN_STACK);
+		while (pending.length > 0) {
+			const [node, edges] = pending[pending.length - 1]!;
+			const next = edges.next();
+			if (next.done) {
+				state.set(node, DONE);
+				pending.pop();
+				continue;
+			}
+			if (state.get(next.value) === IN_STACK) return true;
+			if (!state.has(next.value)) {
+				state.set(next.value, IN_STACK);
+				pending.push([next.value, outgoing.get(next.value)!.values()]);
+			}
+		}
+		return false;
+	};
+	for (const node of outgoing.keys()) {
+		if (!state.has(node) && reachesBack(node)) return true;
+	}
+	return false;
 }
 
 /** Human sentence for an edge, shared by the diagram label and the table. */
@@ -338,15 +254,3 @@ export function describeFlowEdge(
 }
 
 export type { FlowKind };
-
-/** Stable identity for one rendered edge lane. Route alone is not unique:
- * a large edge and a grouped small-flow edge can share from/to/kind/
- * movement, so the lane index within the sorted visible list disambiguates.
- * The diagram, the selection state, and the table must all use this. */
-export function diagramEdgeId(
-	item: Pick<AggregatedEdge, "edge" | "aggregated">,
-	index: number,
-): string {
-	const edge = item.edge;
-	return `${edge.from} ${edge.to} ${edge.kind} ${edge.movement} ${item.aggregated ? "grouped" : "single"} ${index}`;
-}

@@ -2,14 +2,16 @@ import { describe, expect, it } from "vitest";
 import { FLOW_NODE_ID_EXTERNAL, type FlowEdge } from "../api/flows.ts";
 import {
 	aggregateFlowEdges,
+	buildSankeyInput,
 	describeFlowEdge,
-	diagramEdgeId,
 	filterFlowEdges,
-	layoutFlowDiagram,
+	hasFlowCycle,
 } from "./flowDiagram.ts";
 import { graphFixture } from "./flowDiagramFixture.ts";
 
-function edge(overrides: Partial<FlowEdge> & { from: string; to: string }): FlowEdge {
+function edge(
+	overrides: Partial<FlowEdge> & { from: string; to: string },
+): FlowEdge {
 	return {
 		kind: "transfer",
 		movement: "actual",
@@ -106,7 +108,7 @@ describe("aggregateFlowEdges", () => {
 		expect(result).toHaveLength(2);
 		expect(result.every((item) => !item.aggregated)).toBe(true);
 	});
-	it("gives a large edge and its same-route group distinct identities", () => {
+	it("gives a large edge and its same-route group distinct lane ids", () => {
 		const graph = graphFixture();
 		const visible = aggregateFlowEdges(graph.edges);
 		// The checking→savings route holds both a large transfer and a
@@ -116,47 +118,96 @@ describe("aggregateFlowEdges", () => {
 				(item) => item.edge.from === "checking" && item.edge.to === "savings",
 			).length,
 		).toBe(2);
-		const ids = visible.map((item, index) => diagramEdgeId(item, index));
+		const input = buildSankeyInput(graph, visible);
+		const ids = input.lanes.map((lane) => lane.laneId);
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 });
 
-describe("layoutFlowDiagram", () => {
-	it("places inflows left, accounts middle, outflows right", () => {
+describe("buildSankeyInput", () => {
+	it("splits the external counterparty into source and destination rows", () => {
 		const graph = graphFixture();
-		const diagram = layoutFlowDiagram(
-			graph,
-			aggregateFlowEdges(graph.edges),
-		);
-		const columns = new Map(diagram.nodes.map((node) => [node.id, node.column]));
-		expect(columns.get(`${FLOW_NODE_ID_EXTERNAL}:in`)).toBe(0);
-		expect(columns.get(`${FLOW_NODE_ID_EXTERNAL}:out`)).toBe(2);
-		expect(columns.get("checking")).toBe(1);
-		// Six contract edges collapse to five diagram edges: the two dust
-		// transfers fold into one grouped edge with a drilldown.
-		expect(diagram.edges.length).toBe(5);
-		expect(diagram.edges.some((item) => item.aggregated)).toBe(true);
-		for (const item of diagram.edges) {
-			expect(item.path).toMatch(/^M /);
-			expect(item.thickness).toBeGreaterThan(0);
-		}
+		const input = buildSankeyInput(graph, aggregateFlowEdges(graph.edges));
+		const ids = input.nodes.map((node) => node.id);
+		expect(ids).toContain("external:in");
+		expect(ids).toContain("external:out");
+		expect(ids).not.toContain(FLOW_NODE_ID_EXTERNAL);
+		expect(ids).toContain("checking");
+		// Six contract edges collapse to five lanes: the two dust
+		// transfers fold into one grouped lane with a drilldown.
+		expect(input.lanes).toHaveLength(5);
+		const grouped = input.lanes.find((lane) => lane.aggregated);
+		expect(grouped?.members).toHaveLength(2);
 	});
-	it("scales thickness with the amount", () => {
+	it("keeps signed amounts while endpoints stay structural", () => {
 		const graph = graphFixture();
-		const diagram = layoutFlowDiagram(
-			graph,
-			aggregateFlowEdges(graph.edges),
-			{ minThickness: 2, maxThickness: 20 },
+		const [first] = aggregateFlowEdges([
+			{
+				from: "checking",
+				to: FLOW_NODE_ID_EXTERNAL,
+				kind: "outflow",
+				movement: "actual",
+				amount: -300,
+				sources: [],
+			},
+		]);
+		const input = buildSankeyInput(graph, first ? [first] : []);
+		expect(input.lanes[0]?.amount).toBe(-300);
+		expect(input.lanes[0]?.source).toBe("checking");
+		expect(input.lanes[0]?.target).toBe("external:out");
+	});
+	it("drops non-finite amounts from the layout input", () => {
+		const graph = graphFixture();
+		const [first] = aggregateFlowEdges([
+			{
+				from: "a",
+				to: "b",
+				kind: "transfer",
+				movement: "actual",
+				amount: Number.NaN,
+				sources: [],
+			},
+		]);
+		const input = buildSankeyInput(graph, first ? [first] : []);
+		expect(input.lanes).toHaveLength(0);
+		expect(input.nodes).toHaveLength(0);
+	});
+});
+
+describe("hasFlowCycle", () => {
+	const lane = (source: string, target: string) => ({ source, target });
+	it("passes the acyclic fixture", () => {
+		const graph = graphFixture();
+		const input = buildSankeyInput(graph, aggregateFlowEdges(graph.edges));
+		expect(hasFlowCycle(input.lanes)).toBe(false);
+	});
+	it("catches opposite transfers between two accounts", () => {
+		expect(hasFlowCycle([lane("a", "b"), lane("b", "a")])).toBe(true);
+	});
+	it("catches longer loops", () => {
+		expect(hasFlowCycle([lane("a", "b"), lane("b", "c"), lane("c", "a")])).toBe(
+			true,
 		);
-		const thickest = diagram.edges.reduce((a, b) =>
-			Math.abs(a.edge.amount) >= Math.abs(b.edge.amount) ? a : b,
-		);
-		const thinnest = diagram.edges.reduce((a, b) =>
-			Math.abs(a.edge.amount) <= Math.abs(b.edge.amount) ? a : b,
-		);
-		expect(thickest.thickness).toBeGreaterThanOrEqual(thinnest.thickness);
-		expect(thickest.thickness).toBeLessThanOrEqual(20);
-		expect(thinnest.thickness).toBeGreaterThanOrEqual(2);
+	});
+	it("catches a loop fed by an outside lane", () => {
+		expect(
+			hasFlowCycle([
+				lane("feed", "a"),
+				lane("a", "b"),
+				lane("b", "c"),
+				lane("c", "a"),
+			]),
+		).toBe(true);
+	});
+	it("passes chains and diamonds", () => {
+		expect(
+			hasFlowCycle([
+				lane("in", "a"),
+				lane("in", "b"),
+				lane("a", "out"),
+				lane("b", "out"),
+			]),
+		).toBe(false);
 	});
 });
 
