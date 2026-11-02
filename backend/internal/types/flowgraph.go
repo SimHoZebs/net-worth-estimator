@@ -6,7 +6,9 @@ package types
 //
 // Movement separation is structural, never inferred:
 //   - actual: transaction events whose origin is a manual posting, including
-//     bank-settled rows and claimed actuals. Recorded money.
+//     bank-settled rows and claimed actuals, plus settled postings dated
+//     inside the window that the projection never replays as events
+//     (history before its start date). Recorded money.
 //   - projected: events whose origin is a recurrence-rule instance.
 //     Planned money.
 // IDs share one namespace across postings and rules, so an origin is
@@ -125,9 +127,10 @@ type FlowTotals struct {
 }
 
 // FlowReconciliation lets a renderer verify edge totals against the source
-// records they claim to summarize. Event-side sums come from transaction
-// events; edge-side sums come from aggregated edges. Reconciled is true
-// only when every class agrees exactly.
+// records they claim to summarize. Event-side sums come from in-window
+// transaction events plus replayed settled postings; edge-side sums come
+// from aggregated edges. Reconciled is true only when every class agrees
+// exactly.
 type FlowReconciliation struct {
 	WindowEvents     int     `json:"windowEvents"`
 	ClassifiedEvents int     `json:"classifiedEvents"`

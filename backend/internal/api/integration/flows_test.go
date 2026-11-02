@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -124,5 +125,82 @@ func TestFlowsRequiresRange(t *testing.T) {
 	response := flowsRequest(t, handler, raw)
 	if response.Code != http.StatusUnprocessableEntity {
 		t.Errorf("flows without range status = %d, want 422", response.Code)
+	}
+}
+
+// Settled history must surface as recorded money through the endpoint:
+// rows dated before the projection start emit no transaction events, so
+// only the settled replay can draw their edges. Each posting appears
+// exactly once and the transfer counts once with its full amount.
+func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	checking := "checking"
+	stamp := func(month time.Month, day int) int64 {
+		return time.Date(2025, month, day, 12, 0, 0, 0, time.UTC).Unix()
+	}
+	expression := func(value string) types.PostingAmountResolution {
+		return types.PostingAmountResolution{
+			Resolver: "expression",
+			Config:   map[string]any{"expression": value},
+			Inputs:   map[string]types.AmountInputBinding{},
+		}
+	}
+	salaryAt, groceriesAt, saveAt := stamp(time.September, 15), stamp(time.September, 16), stamp(time.September, 17)
+	model := &types.FinancialModel{
+		Accounts: []types.Account{
+			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
+			{ID: "savings", Name: "Savings", Kind: types.AccountKindCash, Enabled: true},
+		},
+		Postings: []types.Posting{
+			{
+				ID: "salary", Name: "Salary", Destinations: []string{"checking"},
+				Amount: expression("3000"), PostedTime: salaryAt, TransactionTime: salaryAt,
+				Enabled: true, Source: "simplefin",
+			},
+			{
+				ID: "groceries", Name: "Groceries", SourceAccountID: &checking,
+				Amount: expression("120"), PostedTime: groceriesAt, TransactionTime: groceriesAt,
+				Enabled: true, Source: "simplefin",
+			},
+			{
+				ID: "save", Name: "Save", SourceAccountID: &checking, Destinations: []string{"savings"},
+				Amount: expression("500"), PostedTime: saveAt, TransactionTime: saveAt,
+				Enabled: true, Source: "simplefin",
+			},
+		},
+	}
+	settings := types.ProjectionRuntimeSettings{
+		FallbackProjectionStartDate: "2026-01-01",
+		HorizonYears:                1,
+	}
+	raw, err := json.Marshal(projectionRequestBody{
+		Model:    model,
+		Settings: settings,
+		Range:    &projectionRange{StartDate: "2025-09-01", EndDate: "2025-09-30"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph := decodeFlowGraph(t, flowsRequest(t, handler, raw))
+	if graph.Totals.Actual.Inflow != 3000 || graph.Totals.Actual.Outflow != 120 || graph.Totals.Actual.Transfer != 500 {
+		t.Errorf("actual totals = %+v, want inflow 3000 outflow 120 transfer 500", graph.Totals.Actual)
+	}
+	seen := map[string]int{}
+	for _, edge := range graph.Edges {
+		for _, source := range edge.Sources {
+			seen[source.PostingID]++
+		}
+	}
+	for _, id := range []string{"salary", "groceries", "save"} {
+		if seen[id] != 1 {
+			t.Errorf("posting %s appears in %d edge sources, want exactly once", id, seen[id])
+		}
+	}
+	if !graph.Reconciliation.Reconciled {
+		t.Errorf("reconciliation = %+v, want reconciled", graph.Reconciliation)
+	}
+	if graph.Reconciliation.WindowEvents != 3 || graph.Reconciliation.ClassifiedEvents != 3 {
+		t.Errorf("reconciliation = %+v, want 3 window and classified movements", graph.Reconciliation)
 	}
 }

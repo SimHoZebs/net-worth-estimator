@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -21,11 +22,97 @@ type flowEdgeKey struct {
 	movement string
 }
 
-// BuildFlowGraph aggregates in-window transaction events into directed
-// account/counterparty edges. events and rows must already be clipped to
-// [startDate, endDate]; the builder trusts that clip and reports the window
-// it was given. model is the effective model the events were simulated
-// from: routes, account names, and checkpoints all come from it.
+// settledHistoryEvents replays in-window settled postings as actual
+// movements. The projection emits transaction events only for occurrences
+// after its start date, so settled history would otherwise never reach
+// the graph: the replay moves balances but records no events. Each
+// settled posting becomes one synthetic event carrying its resolved
+// amount with no account deltas, so the classification below routes it
+// through the same structural paths as event-driven actuals (external to
+// first destination for inflows, source to external for outflows, source
+// to first destination for transfers: one listing per posting however
+// many accounts it names).
+//
+// Membership mirrors execution: enabled rows only. An enabled pending row
+// counts like a posted one; the Pending flag itself is never a filter.
+// Void rows are excluded, deleted rows are absent from the model, and
+// zero or unresolvable amounts are skipped. Postings that already
+// produced an in-window event (dated after the projection start) are
+// skipped by (posting, date) so they count exactly once. Rule templates
+// in the resolved listing stay event-driven: only manual postings
+// synthesize.
+func settledHistoryEvents(model *types.FinancialModel, transactions []types.Posting, ruleIDs map[string]bool, events []types.TransactionEvent, rows []types.ProjectionRow, startDate, endDate string) []types.TransactionEvent {
+	covered := make(map[string]bool, len(events))
+	nextSequence := 0
+	for _, event := range events {
+		covered[event.Origin.PostingID+"\x00"+string(event.Date)] = true
+		if event.Sequence >= nextSequence {
+			nextSequence = event.Sequence + 1
+		}
+	}
+	balancesByDate := map[string]map[string]float64{}
+	for _, row := range rows {
+		day := string(row.Date)
+		if CompareIsoDates(day, startDate) < 0 || CompareIsoDates(day, endDate) > 0 {
+			continue
+		}
+		if _, ok := balancesByDate[day]; ok {
+			continue
+		}
+		balances := make(map[string]float64, len(row.AccountSnapshots))
+		for _, snapshot := range row.AccountSnapshots {
+			balances[snapshot.AccountID] = snapshot.Balance
+		}
+		balancesByDate[day] = balances
+	}
+	terms := PaymentTermsByAccount(model)
+	synthesized := []types.TransactionEvent{}
+	for index := range transactions {
+		posting := &transactions[index]
+		if ruleIDs[posting.ID] {
+			continue
+		}
+		if !posting.Enabled || posting.Void {
+			continue
+		}
+		day := postingDay(posting)
+		if day == "" || CompareIsoDates(day, startDate) < 0 || CompareIsoDates(day, endDate) > 0 {
+			continue
+		}
+		if covered[posting.ID+"\x00"+day] {
+			continue
+		}
+		amount, err := ComputeRequestedAmount(
+			DatedPostingOccurrence{Posting: posting, Index: index},
+			day, map[string]float64{}, map[string]string{}, map[string]map[string]float64{},
+			balancesByDate[day], terms, nil,
+		)
+		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) {
+			continue
+		}
+		realized := roundCurrency(amount)
+		if realized == 0 {
+			continue
+		}
+		synthesized = append(synthesized, types.TransactionEvent{
+			Date:            types.IsoDate(day),
+			Sequence:        nextSequence,
+			Origin:          types.TransactionOrigin{Type: "posting", PostingID: posting.ID},
+			RequestedAmount: realized,
+			RealizedAmount:  realized,
+		})
+		nextSequence++
+	}
+	return synthesized
+}
+
+// BuildFlowGraph aggregates in-window transaction events plus settled
+// postings replayed as actual movements (see settledHistoryEvents) into
+// directed account/counterparty edges. events and rows must already be
+// clipped to [startDate, endDate]; the builder trusts that clip and
+// reports the window it was given. model is the effective model the
+// events were simulated from: routes, account names, and checkpoints all
+// come from it.
 //
 // Unmatched events (origin unknown to the model) leave the edge set and
 // land in Unmatched. Corrections on the given rows land in Unobserved.
@@ -103,7 +190,13 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 
 	reconciliation := types.FlowReconciliation{}
 	totals := types.FlowTotals{}
-	for _, event := range events {
+	// Settled history replays through the same classification below, so
+	// window totals, edges, and reconciliation agree by construction. The
+	// copy keeps the caller's slices untouched.
+	movements := make([]types.TransactionEvent, 0, len(events))
+	movements = append(movements, events...)
+	movements = append(movements, settledHistoryEvents(model, transactions, ruleIDs, events, rows, startDate, endDate)...)
+	for _, event := range movements {
 		if CompareIsoDates(string(event.Date), startDate) < 0 || CompareIsoDates(string(event.Date), endDate) > 0 {
 			continue
 		}
