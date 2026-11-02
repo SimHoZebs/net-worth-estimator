@@ -6,6 +6,7 @@ import { scalePoint } from "@tanstack/charts/scales/point";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { useMemo } from "react";
 import { accountTrendRows, netWorthDomain } from "../../domain/chart.ts";
+import { useMediaQuery, viewportQueries } from "../../state/useMediaQuery.ts";
 import {
 	compactMoney,
 	dateLabel,
@@ -43,6 +44,9 @@ export function AccountLinesPlot({
 		() => accountTrendRows({ points, accounts }),
 		[points, accounts],
 	);
+	// The rotated axis title costs ~25px of plot width; drop it where the
+	// viewport is narrow and let the compact tick labels carry the units.
+	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const paints = useMemo(
 		() =>
 			series.map((entry) => {
@@ -115,7 +119,7 @@ export function AccountLinesPlot({
 					scale: scaleLinear().domain([low, high]),
 					grid: true,
 					axis: {
-						label: "Balance (USD)",
+						...(narrow ? {} : { label: "Balance (USD)" }),
 						ticks: { format: (value: number) => compactMoney(value) },
 					},
 				},
@@ -146,7 +150,7 @@ export function AccountLinesPlot({
 				},
 			},
 		});
-	}, [rows, series, paints, low, high, showZero]);
+	}, [rows, series, paints, low, high, showZero, narrow]);
 	if (!series.length || !rows.length) {
 		return (
 			<p className="m-0 text-sm text-muted">
