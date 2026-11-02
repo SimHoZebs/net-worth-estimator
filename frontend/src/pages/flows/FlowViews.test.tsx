@@ -30,7 +30,7 @@ describe("FlowSankey", () => {
 				ariaLabel="Money-flow diagram from 2026-01-01 through 2026-12-31"
 				ariaDescription="5 money flows."
 				onSelectLane={onSelectLane}
-				onFocusLane={() => {}}
+				nameOf={(id) => id}
 			/>,
 		);
 		expect(

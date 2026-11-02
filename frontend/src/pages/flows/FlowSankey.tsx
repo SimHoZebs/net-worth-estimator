@@ -10,12 +10,16 @@ import {
 	keyedSelection,
 	type KeyedSelectionChange,
 } from "@tanstack/charts/selection";
+import { tooltip } from "@tanstack/charts/tooltip";
 import { useMemo } from "react";
 import { toneToken } from "../../components/texture/texture.ts";
-import type {
-	SankeyFlowLane,
-	SankeyFlowNode,
+import {
+	describeLaneTooltip,
+	describeNodeTooltip,
+	type SankeyFlowLane,
+	type SankeyFlowNode,
 } from "../../domain/flowDiagram.ts";
+import { dateLabel, money } from "../../domain/format.ts";
 
 type FlowSankeyLink = SankeyLink<SankeyFlowNode, SankeyFlowLane, string>;
 type FlowSankeyRow =
@@ -49,8 +53,8 @@ export function FlowSankey({
 	selectedLaneId,
 	ariaLabel,
 	ariaDescription,
+	nameOf,
 	onSelectLane,
-	onFocusLane,
 }: {
 	nodes: SankeyFlowNode[];
 	lanes: SankeyFlowLane[];
@@ -58,8 +62,8 @@ export function FlowSankey({
 	selectedLaneId: string | null;
 	ariaLabel: string;
 	ariaDescription: string;
+	nameOf: (id: string) => string;
 	onSelectLane: (laneId: string | null) => void;
-	onFocusLane: (laneId: string | null) => void;
 }) {
 	const definition = useMemo(() => {
 		const selection = keyedSelection<FlowSankeyLink, string>({
@@ -137,20 +141,36 @@ export function FlowSankey({
 				guides: false,
 				margin: 0,
 				selection,
+				tooltip: {
+					use: tooltip,
+					format: (point) => {
+						const datum = point.datum as FlowSankeyRow;
+						if (datum.kind === "link") {
+							return describeLaneTooltip(
+								datum.data.edge,
+								nameOf,
+								money,
+								dateLabel,
+							);
+						}
+						return describeNodeTooltip(
+							datum.data.label,
+							datum.incomingLinks.map((item) => item.data.amount),
+							datum.outgoingLinks.map((item) => item.data.amount),
+							money,
+						);
+					},
+				},
 			},
 			{ keyboard: true },
 		);
-	}, [nodes, lanes, selectedLaneId, onSelectLane]);
+	}, [nodes, lanes, selectedLaneId, nameOf, onSelectLane]);
 	return (
 		<Chart
 			definition={definition}
 			ariaLabel={ariaLabel}
 			ariaDescription={ariaDescription}
 			height={height}
-			onFocusChange={(point) => {
-				const datum = point?.datum as FlowSankeyRow | undefined;
-				onFocusLane(datum && datum.kind === "link" ? datum.data.laneId : null);
-			}}
 		/>
 	);
 }

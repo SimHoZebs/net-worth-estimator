@@ -10,7 +10,6 @@ import { Skeleton } from "../../components/Skeleton.tsx";
 import {
 	aggregateFlowEdges,
 	buildSankeyInput,
-	describeFlowEdge,
 	filterFlowEdges,
 	hasFlowCycle,
 	type AggregatedEdge,
@@ -97,7 +96,6 @@ export function FlowsPage() {
 		key: string | null;
 	}>({ owner: null, key: null });
 	const [expanded, setExpanded] = useState(false);
-	const [focusedLaneId, setFocusedLaneId] = useState<string | null>(null);
 
 	const query = useFlowGraph(window);
 	const graph = query.data ?? null;
@@ -151,15 +149,11 @@ export function FlowsPage() {
 		},
 		[graph],
 	);
-	const focusLane = useCallback((_laneId: string | null) => {
-		setFocusedLaneId(_laneId);
-	}, []);
-	const focusedLane =
-		input?.lanes.find((lane) => lane.laneId === focusedLaneId) ?? null;
-	const chartDescription =
-		focusedLane && graph
-			? `${describeFlowEdge(focusedLane.edge, (id) => flowNodeName(graph, id), money)}. Arrow keys move between flows; Enter inspects the focused flow's transactions.`
-			: `${input?.lanes.length ?? 0} money flows. Arrow keys move between flows; Enter inspects the focused flow's transactions.`;
+	const nameOf = useCallback(
+		(id: string) => (graph ? flowNodeName(graph, id) : id),
+		[graph],
+	);
+	const chartDescription = `${input?.lanes.length ?? 0} money flows. Arrow keys move between flows; Enter inspects the focused flow's transactions. The focused flow is also announced directly.`;
 	const changeFilters = (
 		change: Partial<Omit<FlowFilterState, "startDate" | "endDate">>,
 	) => {
@@ -267,8 +261,8 @@ export function FlowsPage() {
 								selectedLaneId={selectedKey}
 								ariaLabel={`Money-flow diagram from ${graph.startDate} through ${graph.endDate}`}
 								ariaDescription={chartDescription}
+								nameOf={nameOf}
 								onSelectLane={selectLane}
-								onFocusLane={focusLane}
 							/>
 							{selected && (
 								<FlowEdgePanel

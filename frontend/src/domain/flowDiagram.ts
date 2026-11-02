@@ -253,4 +253,64 @@ export function describeFlowEdge(
 	return `${kind} of ${money(Math.abs(edge.amount))} from ${nameOf(edge.from)} to ${nameOf(edge.to)} (${movement})`;
 }
 
+// PROVISIONAL summary cap: a flow tooltip names at most this many source
+// transactions, then points at the edge inspector for the rest.
+export const TOOLTIP_SOURCE_CAP = 3;
+
+/** Largest source transactions first, capped for compact summaries. */
+export function topLaneSources(
+	edge: Pick<FlowEdge, "sources">,
+	cap: number = TOOLTIP_SOURCE_CAP,
+): FlowEdge["sources"] {
+	return [...edge.sources]
+		.sort(
+			(left, right) =>
+				Math.abs(right.realizedAmount) - Math.abs(left.realizedAmount),
+		)
+		.slice(0, Math.max(0, cap));
+}
+
+function flowCountLabel(count: number): string {
+	return count === 1 ? "1 flow" : `${count} flows`;
+}
+
+/** Node hover and focus text: inflow/outflow totals with contributing
+ * flow counts. Amounts arrive signed; totals weigh absolute flow. */
+export function describeNodeTooltip(
+	label: string,
+	incomingAmounts: number[],
+	outgoingAmounts: number[],
+	money: (value: number) => string,
+): string {
+	const total = (amounts: number[]): number =>
+		amounts.reduce((sum, amount) => sum + Math.abs(amount), 0);
+	return (
+		`${label}: ${money(total(incomingAmounts))} in across ` +
+		`${flowCountLabel(incomingAmounts.length)}, ` +
+		`${money(total(outgoingAmounts))} out across ` +
+		flowCountLabel(outgoingAmounts.length)
+	);
+}
+
+/** Link hover and focus text: amount and direction plus a compact source
+ * summary. Longer lists name the largest transactions, then point at the
+ * edge inspector — selecting the flow opens it — for the rest. */
+export function describeLaneTooltip(
+	edge: FlowEdge,
+	nameOf: (id: string) => string,
+	money: (value: number) => string,
+	date: (value: string) => string,
+): string {
+	const base = describeFlowEdge(edge, nameOf, money);
+	const top = topLaneSources(edge);
+	if (top.length === 0) return base;
+	const items = top
+		.map((source) => `${date(source.date)} ${money(source.realizedAmount)}`)
+		.join(" · ");
+	const rest = edge.sources.length - top.length;
+	return rest > 0
+		? `${base} Top transactions: ${items} · +${rest} more — select this flow to inspect all ${edge.sources.length}.`
+		: `${base} Transactions: ${items}.`;
+}
+
 export type { FlowKind };
