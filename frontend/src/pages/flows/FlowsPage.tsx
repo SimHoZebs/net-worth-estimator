@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Waves } from "lucide-react";
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
@@ -9,17 +9,17 @@ import { SegmentedControl } from "../../components/SegmentedControl.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import {
 	aggregateFlowEdges,
-	diagramEdgeId,
+	buildSankeyInput,
+	describeFlowEdge,
 	filterFlowEdges,
-	layoutFlowDiagram,
+	hasFlowCycle,
 	type AggregatedEdge,
-	type DiagramEdge,
 } from "../../domain/flowDiagram.ts";
 import { money, shiftDate, todayIso } from "../../domain/format.ts";
 import { useFlowGraph } from "../../state/useFlowGraph.ts";
-import { FlowDiagram } from "./FlowDiagram.tsx";
 import { FlowEdgePanel } from "./FlowEdgePanel.tsx";
 import { FlowFilters, type FlowFilterState } from "./FlowFilters.tsx";
+import { FlowSankey } from "./FlowSankey.tsx";
 import { FlowTable } from "./FlowTable.tsx";
 
 type FlowView = "diagram" | "table";
@@ -29,10 +29,6 @@ type FlowView = "diagram" | "table";
 function defaultWindow(): { startDate: string; endDate: string } {
 	const endDate = todayIso();
 	return { startDate: shiftDate({ date: endDate, days: -365 }), endDate };
-}
-
-function edgeIdentity(edge: DiagramEdge, index: number): string {
-	return diagramEdgeId(edge, index);
 }
 
 function TotalsSummary({ graph }: { graph: FlowGraph }) {
@@ -45,28 +41,24 @@ function TotalsSummary({ graph }: { graph: FlowGraph }) {
 				recorded in,{" "}
 				<span className="font-bold">{money(totals.actual.outflow)}</span>{" "}
 				recorded out
-				{(totals.projected.inflow !== 0 ||
-					totals.projected.outflow !== 0) && (
+				{(totals.projected.inflow !== 0 || totals.projected.outflow !== 0) && (
 					<>
-						{" "}·{" "}
+						{" "}
+						·{" "}
 						<span className="font-bold">
 							{money(totals.projected.inflow)}
 						</span>{" "}
 						planned in,{" "}
-						<span className="font-bold">
-							{money(totals.projected.outflow)}
-						</span>{" "}
+						<span className="font-bold">{money(totals.projected.outflow)}</span>{" "}
 						planned out
 					</>
 				)}
-				{(totals.actual.transfer !== 0 ||
-					totals.projected.transfer !== 0) && (
+				{(totals.actual.transfer !== 0 || totals.projected.transfer !== 0) && (
 					<>
-						{" "}·{" "}
+						{" "}
+						·{" "}
 						<span className="font-bold">
-							{money(
-								totals.actual.transfer + totals.projected.transfer,
-							)}
+							{money(totals.actual.transfer + totals.projected.transfer)}
 						</span>{" "}
 						moved between accounts (counted once)
 					</>
@@ -75,8 +67,8 @@ function TotalsSummary({ graph }: { graph: FlowGraph }) {
 			</p>
 			{!graph.reconciliation.reconciled && (
 				<Notice tone="warning">
-					Edge totals do not fully reconcile with their source records;
-					the table below carries the exact figures.
+					Edge totals do not fully reconcile with their source records; the
+					table below carries the exact figures.
 				</Notice>
 			)}
 			{unobserved.length > 0 && (
@@ -105,6 +97,7 @@ export function FlowsPage() {
 		key: string | null;
 	}>({ owner: null, key: null });
 	const [expanded, setExpanded] = useState(false);
+	const [focusedLaneId, setFocusedLaneId] = useState<string | null>(null);
 
 	const query = useFlowGraph(window);
 	const graph = query.data ?? null;
@@ -125,16 +118,23 @@ export function FlowsPage() {
 				: [],
 		[graph, filters.movement, filters.accountId],
 	);
-	const diagram = useMemo(
-		() => (graph ? layoutFlowDiagram(graph, visible) : null),
+	const input = useMemo(
+		() => (graph ? buildSankeyInput(graph, visible) : null),
 		[graph, visible],
 	);
+	// A one-way flow layout cannot draw a loop, and it weighs only
+	// positive flow: cyclic or all-zero windows fall back to the table,
+	// which still lists every lane exactly.
+	const cyclic = input ? hasFlowCycle(input.lanes) : false;
+	const measurable = input
+		? input.lanes.some((lane) => Math.abs(lane.amount) > 0)
+		: false;
+	const sankeyHeight = input
+		? Math.max(240, input.nodes.length * 44 + 96)
+		: 240;
 	const selected = useMemo<AggregatedEdge | null>(() => {
-		if (!selectedKey || !diagram) return null;
-		const position = diagram.edges.findIndex(
-			(item, index) => edgeIdentity(item, index) === selectedKey,
-		);
-		const found = position >= 0 ? diagram.edges[position] : undefined;
+		if (!selectedKey || !input) return null;
+		const found = input.lanes.find((lane) => lane.laneId === selectedKey);
 		return found
 			? {
 					edge: found.edge,
@@ -142,20 +142,24 @@ export function FlowsPage() {
 					members: found.members,
 				}
 			: null;
-	}, [diagram, selectedKey]);
+	}, [input, selectedKey]);
 
-	const select = (item: DiagramEdge | null) => {
-		if (!item || !diagram) {
-			setSelection({ owner: graph, key: null });
-		} else {
-			const position = diagram.edges.indexOf(item);
-			setSelection({
-				owner: graph,
-				key: position >= 0 ? edgeIdentity(item, position) : null,
-			});
-		}
-		setExpanded(false);
-	};
+	const selectLane = useCallback(
+		(laneId: string | null) => {
+			setSelection({ owner: graph, key: laneId });
+			setExpanded(false);
+		},
+		[graph],
+	);
+	const focusLane = useCallback((_laneId: string | null) => {
+		setFocusedLaneId(_laneId);
+	}, []);
+	const focusedLane =
+		input?.lanes.find((lane) => lane.laneId === focusedLaneId) ?? null;
+	const chartDescription =
+		focusedLane && graph
+			? `${describeFlowEdge(focusedLane.edge, (id) => flowNodeName(graph, id), money)}. Arrow keys move between flows; Enter inspects the focused flow's transactions.`
+			: `${input?.lanes.length ?? 0} money flows. Arrow keys move between flows; Enter inspects the focused flow's transactions.`;
 	const changeFilters = (
 		change: Partial<Omit<FlowFilterState, "startDate" | "endDate">>,
 	) => {
@@ -180,9 +184,7 @@ export function FlowsPage() {
 	};
 
 	const focusName =
-		filters.accountId && graph
-			? flowNodeName(graph, filters.accountId)
-			: null;
+		filters.accountId && graph ? flowNodeName(graph, filters.accountId) : null;
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -239,19 +241,34 @@ export function FlowsPage() {
 							]}
 						/>
 					</div>
-					{visible.length === 0 ? (
+					{visible.length === 0 || !input ? (
 						<EmptyState
 							icon={Waves}
 							title="No money movement in this view"
 							description="Widen the dates or clear the account and money filters."
 						/>
-					) : view === "diagram" && diagram ? (
+					) : view === "table" ? (
+						<FlowTable graph={graph} visible={visible} />
+					) : cyclic || !measurable ? (
 						<>
-							<FlowDiagram
-								graph={graph}
-								diagram={diagram}
-								selectedKey={selectedKey}
-								onSelect={select}
+							<Notice tone="warning">
+								{cyclic
+									? "These flows loop back on each other, so they cannot be drawn as a one-way diagram. The table below lists every flow with exact amounts."
+									: "Every flow in this view is exactly zero, so widths cannot show them. The table below lists every flow with exact amounts."}
+							</Notice>
+							<FlowTable graph={graph} visible={visible} />
+						</>
+					) : (
+						<>
+							<FlowSankey
+								nodes={input.nodes}
+								lanes={input.lanes}
+								height={sankeyHeight}
+								selectedLaneId={selectedKey}
+								ariaLabel={`Money-flow diagram from ${graph.startDate} through ${graph.endDate}`}
+								ariaDescription={chartDescription}
+								onSelectLane={selectLane}
+								onFocusLane={focusLane}
 							/>
 							{selected && (
 								<FlowEdgePanel
@@ -262,8 +279,6 @@ export function FlowsPage() {
 								/>
 							)}
 						</>
-					) : (
-						<FlowTable graph={graph} visible={visible} />
 					)}
 				</>
 			)}
