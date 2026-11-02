@@ -11,6 +11,8 @@
 // provider requires uniqueness per attempt (idempotency keys); no assertion
 // depends on them.
 import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -65,6 +67,53 @@ export function requestId() {
   return randomUUID();
 }
 
+// Every journey context records a trace. The orchestrator keeps the archives
+// only for failing steps, so a green run pays the recording cost and nothing
+// else, and a red run leaves clickable timelines instead of bare messages.
+// Shared contexts keep recording across saves so a second red step later in
+// the run still leaves an archive.
+const tracedContexts = [];
+let traceSaves = 0;
+const TRACE_OPTIONS = { screenshots: true, snapshots: true, sources: true };
+
+export async function newTracedContext(browser, options) {
+  const context = await browser.newContext(options);
+  if (process.env.E2E_TRACE_DIR) {
+    await context.tracing.start(TRACE_OPTIONS);
+    tracedContexts.push(context);
+  }
+  return context;
+}
+
+export async function saveTraces(label) {
+  const directory = process.env.E2E_TRACE_DIR;
+  if (!directory || tracedContexts.length === 0) return [];
+  mkdirSync(directory, { recursive: true });
+  traceSaves += 1;
+  const written = [];
+  const failures = [];
+  let index = 0;
+  for (const context of tracedContexts) {
+    index += 1;
+    const path = join(directory, `${label}-${traceSaves}-${index}.zip`);
+    try {
+      await context.tracing.stop({ path });
+      written.push(path);
+    } catch (error) {
+      failures.push(`trace stop failed: ${error?.message ?? error}`);
+    }
+    try {
+      await context.tracing.start(TRACE_OPTIONS);
+    } catch (error) {
+      failures.push(`trace restart failed: ${error?.message ?? error}`);
+    }
+  }
+  if (written.length > 0)
+    console.log(`e2e: trace saved to ${directory} (${label})`);
+  for (const failure of failures) console.error(`e2e: ${failure}`);
+  return written;
+}
+
 async function signInPage(context, origin, { username, password, signup }) {
   const page = await context.newPage();
   await withTransport(() => page.goto(`${origin}/v1/auth/login`), "login redirect");
@@ -90,7 +139,7 @@ async function signInPage(context, origin, { username, password, signup }) {
 // Returns the owner context, page, session scope, and captured cookie.
 export async function ownerSignIn(ctx) {
   const { origin, browser, ownerName, ownerPass, issuer, ownerSubject } = ctx;
-  const owner = await browser.newContext();
+  const owner = await newTracedContext(browser);
   const page = await signInPage(owner, origin, { username: ownerName, password: ownerPass });
   const own = await session(owner, origin);
   const ownResource = actorResource(issuer, ownerSubject);
@@ -128,7 +177,7 @@ export async function guestReads(ctx, ownerBundle) {
   const { origin, browser, issuer, guestSubject } = ctx;
   const { owner, own } = ownerBundle;
   const guestResource = actorResource(issuer, guestSubject);
-  const guest = await browser.newContext();
+  const guest = await newTracedContext(browser);
   const published = await session(guest, origin);
   assert.equal(published.authenticated, false);
   assert.equal(published.allowed, true);
@@ -237,7 +286,7 @@ export async function guestGrantRevoke(ctx, guestBundle) {
 // persistence across a real stack restart.
 export async function secondUserSignup(ctx, hooks) {
   const { origin, browser, issuer, ownerSubject, guestSubject, secondName, secondPass } = ctx;
-  const second = await browser.newContext();
+  const second = await newTracedContext(browser);
   const page = await signInPage(second, origin, { username: secondName, password: secondPass, signup: true });
   const other = await session(second, origin);
   assert.equal(other.allowed, true);

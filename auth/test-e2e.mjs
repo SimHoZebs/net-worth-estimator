@@ -57,6 +57,7 @@ import {
   ownerLogout,
   ownerSignIn,
   receiptUpload,
+  saveTraces,
   secondUserSignup,
   seedExtraData,
   sharedDatabaseIsolation,
@@ -97,6 +98,9 @@ const casdoorDir = resolve(workRoot, "casdoor");
 const dataDir = resolve(workRoot, "appdata");
 const logDir = resolve(workRoot, "logs");
 const primaryDB = resolve(dataDir, "net-worth-estimator.db");
+// Traces outlive the disposable root so a red run stays inspectable after
+// teardown. The directory sits with the browser suite's other artifacts.
+process.env.E2E_TRACE_DIR ??= resolve(root, "frontend/test-results/e2e", runId);
 const apiTag = `nwe-e2e-api:${runId}`;
 const frontTag = `nwe-e2e-front:${runId}`;
 
@@ -398,6 +402,7 @@ try {
       record(step, isQuarantined(step) ? "QUARANTINED-PASS" : "PASS", "", (Date.now() - t) / 1000);
       return result;
     } catch (error) {
+      await saveTraces(step);
       if (isQuarantined(step)) {
         record(step, "QUARANTINED-FAIL", String(error.message).slice(0, 300), (Date.now() - t) / 1000);
         return null;
