@@ -253,19 +253,81 @@ func TestGroupFeedShowsDirectSharesFromMembers(t *testing.T) {
 	}
 }
 
-// The viewer's own rows never appear in their own group feed, even when
-// granted to the group; other members still see them.
-func TestGroupFeedExcludesOwnRows(t *testing.T) {
+// The viewer reviews what the group sees from them: own rows shared
+// with the group list in the viewer's own feed, attributed like anyone
+// else's. Other members still see them.
+func TestGroupFeedListsOwnRows(t *testing.T) {
 	d, alice, bob, _, storeB := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
-	sharingPosting(t, storeB, feedPostingC)
+	posting := sharingPosting(t, storeB, feedPostingC)
 	feedGrant(t, d, bob, feedPostingC, store.SharingAudienceGroup, group)
 
-	if items := feedItems(t, d, bob, group); len(items) != 0 {
-		t.Fatalf("own feed = %d, want 0", len(items))
+	items := feedItems(t, d, bob, group)
+	if len(items) != 1 {
+		t.Fatalf("own feed = %d, want 1", len(items))
+	}
+	item := items[0]
+	if item.OwnerUserID != bob || item.Posting.ID != posting.ID {
+		t.Fatalf("own feed item = %+v, want bob posting", item)
+	}
+	if len(item.Audiences) != 1 || item.Audiences[0].Type != store.FeedAudienceGroup ||
+		item.Audiences[0].ID != group {
+		t.Fatalf("own audiences = %+v, want one group audience", item.Audiences)
 	}
 	if items := feedItems(t, d, alice, group); len(items) != 1 {
 		t.Fatalf("member feed = %d, want 1", len(items))
+	}
+}
+
+// Own rows shared through an enabled policy list in the viewer's own
+// feed exactly like granted ones.
+func TestGroupFeedListsOwnPolicyRows(t *testing.T) {
+	d, _, bob, _, storeB := feedFixture(t)
+	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
+	sharingPosting(t, storeB, feedPostingC)
+	feedPolicy(t, d, bob, group)
+
+	if items := feedItems(t, d, bob, group); len(items) != 1 {
+		t.Fatalf("own policy feed = %d, want 1", len(items))
+	}
+}
+
+// A group or wildcard exclusion keeps an own row out of that group's
+// feed; an exclusion naming another viewer does not hide it from its
+// owner.
+func TestGroupFeedOwnRowsHonorExclusions(t *testing.T) {
+	cases := []struct {
+		name        string
+		excludeType string
+		excludeID   func(group, bob string) string
+		wantItems   int
+	}{
+		{"group", store.SharingAudienceGroup, func(group, _ string) string { return group }, 0},
+		{"wildcard", store.SharingAudienceAll, func(_, _ string) string { return "" }, 0},
+		{"other-viewer", store.SharingAudienceUser, func(_, bob string) string { return bob }, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d, alice, bob, _, storeB := feedFixture(t)
+			group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
+			sharingPosting(t, storeB, feedPostingC)
+			feedPolicy(t, d, bob, group)
+			feedGrant(t, d, bob, feedPostingC, store.SharingAudienceGroup, group)
+			if tc.excludeType == store.SharingAudienceGroup {
+				// Exactly one intent per audience: revoke the grant
+				// before excluding the same group. The policy keeps the
+				// row a candidate, so the exclusion does the hiding.
+				if err := d.RevokeSharedPosting(bob, feedPostingC, store.SharingAudienceGroup, group, sharingKey(t)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := d.ExcludeSharedPosting(bob, feedPostingC, tc.excludeType, tc.excludeID(group, alice), sharingKey(t)); err != nil {
+				t.Fatal(err)
+			}
+			if items := feedItems(t, d, bob, group); len(items) != tc.wantItems {
+				t.Fatalf("own excluded feed = %d, want %d", len(items), tc.wantItems)
+			}
+		})
 	}
 }
 
