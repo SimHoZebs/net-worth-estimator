@@ -1,11 +1,16 @@
 # AGENTS.md - Net Worth Estimator
 
+## Communication style
+
+- Do not state file name or line number unless it's absolutely necessary to communicate the idea.
+- Use established terminologies in the project instead of inventing a synonym.
+- Prefer to use full sentences with minimal punctuations that breaks it.
+
 ## Subagent model
 
-- Set `model: "opencode-go/muse-spark-1.3-contributor"` explicitly on every subagent call, including exploration, implementation, and review.
+- Set `model: "opencode-go/muse-spark-1.3-contributor"` explicitly on every subagent call.
 - Never rely on model inheritance or the default model.
 - Verify each child with `opencode api get /api/session/SESSION_ID` before using its work. Check `data.model.providerID` and `data.model.id`.
-- If Muse Spark 1.3 Contributor is unavailable, stop delegation and report the blocker. Never silently substitute GPT or another model.
 
 ## Latest state only
 
@@ -17,9 +22,9 @@
 
 ## Parallel work
 
-- Default is one agent per worktree plus one private branch. Git blocks two worktrees on one branch, and detached HEAD loses commits. Several agents may share one worktree and one branch only under a single orchestrator that owns the branch, assigns non-overlapping scopes, and serializes edits, commits, and verification.
-- Never commit, merge, push, clean up, or otherwise touch another session's branches, worktrees, or dirty files.
+- Before you begin new work, ensure you are working on the latest commit of origin/main. This does not apply if your work is explicitly regarding existing work in your tree.
 - Run parallel dev work in an isolated slot (`scripts/dev setup --slot NAME`, `scripts/dev ps-all`). Never stop the canonical stack or steal its ports to free your own.
+- Several agents may share one worktree and one branch under a single orchestrator that owns the branch.
 - The host's tailnet Serve routes and the canonical identity issuer are shared. Never change them.
 - Cut a feature branch for your work. Any agent whose branch passes `TESTING.md` may ship it without waiting for the user: fetch, squash with semantic text, push fast-forward. If the push loses a race, refetch and retry. Never rebase pushed commits, never force-push, never amend commits you do not own.
 - Land to main by rebasing your private commits onto the tip and fast-forwarding main (rebase-merge, linear history, no merge bubbles); delete the landed branch after. If main moved, refetch and rebase again. This never force-pushes: the rebase touches only your own commits and main moves fast-forward.
@@ -34,6 +39,7 @@
 ## Start and verify
 
 - Dev stack: `dev/README.md`. Verification gate: `TESTING.md`.
+- If your work impacts the frontend interactions or visuals in any way, take screenshots and/or gifs of the workflow you touched and share in chat.
 
 ## Landing visualization (viz/)
 
