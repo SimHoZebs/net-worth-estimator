@@ -16,13 +16,14 @@ the manual tier below.
   Entry points: `scripts/test --integration` (browser suite),
   `backend/scripts/verify.sh` (backend suites, including the edge-case
   suite), and `scripts/test --matrix` (the dataset × identity matrix).
-- End-to-end: the manual credential-gated tier only — real identity
-  provider, real images, disposable-but-real state. Automated suites must
-  never claim end-to-end. Manual checklists: the [Casdoor test
-  guide](../auth/casdoor/README.md#verification), the [physical device and
-  recovery checklist](authentication.md#manual-physical-device-and-recovery-checklist),
-  the [deployment index](../deploy/README.md) actual-provider checklist,
-  and section 3 of the release gates.
+- End-to-end: the disposable automated gate with a real provider, real
+  images, and a real browser over disposable state (entry point
+  `scripts/test --e2e`; see [the e2e gate](e2e-gate.md)). The edge-case
+  suite stays one tier below it on purpose: no provider round trip, so it
+  runs in seconds without Docker or credentials. Whatever the e2e gate
+  cannot cover stays manual: physical passkeys and phone recovery (the
+  [manual checklist](authentication.md#manual-physical-device-and-recovery-checklist)),
+  live external delivery, and any production mutation.
 
 ## Fixture packs
 

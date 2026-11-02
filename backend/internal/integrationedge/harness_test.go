@@ -7,13 +7,12 @@
 // routers (sharing, groups, inbox) over real HTTP through httptest. The
 // only stand-in is identity itself: tests inject the verified principal
 // through the same principal-in-context seam the production middleware
-// provides, with no OIDC round trip. Each test name states the real
-// boundary crossed. This suite is integration-tier, not end-to-end:
-// end-to-end names the manual credential-gated tier (real identity
-// provider, real images, disposable-but-real state). Real Casdoor login,
-// real bank sync, and receipt OCR stay out of scope and are listed as
-// uncovered in the companion integration-gates document, never faked
-// green.
+// provides, with no provider round trip. Each test name states the real
+// boundary crossed. This suite is integration-tier, one below the
+// disposable provider-backed e2e gate: no Docker, no credentials, seconds
+// per run. Real Casdoor login, real bank sync, and receipt OCR stay out of
+// scope and are listed as uncovered in the companion integration-gates
+// document, never faked green.
 //
 // Storm suites loop their attacks several times inside the test and are
 // built for repeated full runs (go test -count=N -race): a green run means
