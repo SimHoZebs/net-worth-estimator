@@ -28,7 +28,9 @@ export function IndependenceTimeline({
 		const row = analysis.candidates.find((item) => item.date === date);
 		return row?.coverage !== null && row?.coverage !== undefined ? (
 			<circle
-				key={date}
+				// Both milestones can fall on the same date, so the kind is part
+				// of the key. A bare date collides and React reuses one circle.
+				key={`${solid ? "self-sustaining" : "first-coverage"}-${date}`}
 				cx={x(row.date)}
 				cy={y(Math.max(0, row.coverage))}
 				r={solid ? 6 : 5}
