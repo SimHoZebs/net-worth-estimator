@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -142,7 +143,7 @@ func main() {
 	var mu sync.Mutex
 	live := &switcher{}
 
-	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction) error {
+	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction, bulkOverride *string) error {
 		mu.Lock()
 		defer mu.Unlock()
 		if err := database.Clear(); err != nil {
@@ -170,6 +171,22 @@ func main() {
 		}
 		if _, err := database.ImportModel(doc); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
+		}
+		// Bulk seed is additive on top of the pack or CSV baseline. The
+		// reset body may override the INTEGRATION_BULK environment so one
+		// spec can request bulk without restarting the harness.
+		bulkRaw := os.Getenv("INTEGRATION_BULK")
+		if bulkOverride != nil {
+			bulkRaw = *bulkOverride
+		}
+		if strings.TrimSpace(bulkRaw) != "" {
+			spec, err := integrationfixtures.ParseBulkSpec(bulkRaw)
+			if err != nil {
+				return fmt.Errorf("bulk seed: %w", err)
+			}
+			if _, err := integrationfixtures.InjectBulk(database, spec); err != nil {
+				return fmt.Errorf("bulk seed: %w", err)
+			}
 		}
 		if len(bankTransactions) > 0 {
 			set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "fixture-bank", Currency: "USD", Balance: "0", Transactions: bankTransactions}}}
@@ -224,7 +241,7 @@ func main() {
 		return nil
 	}
 
-	if err := restore(readOnly, nil); err != nil {
+	if err := restore(readOnly, nil, nil); err != nil {
 		log.Fatalf("seed fixture: %v", err)
 	}
 	analysisRunner, err := analysis.NewRunner(application, analysis.Definitions()...)
@@ -308,6 +325,7 @@ func main() {
 		var body struct {
 			ReadOnly         *bool                   `json:"readOnly"`
 			BankTransactions []simplefin.Transaction `json:"bankTransactions"`
+			Bulk             *string                 `json:"bulk"`
 		}
 		if request.Body != nil {
 			// An empty body is valid and keeps the current guard setting.
@@ -317,7 +335,7 @@ func main() {
 		if body.ReadOnly != nil {
 			next = *body.ReadOnly
 		}
-		if err := restore(next, body.BankTransactions); err != nil {
+		if err := restore(next, body.BankTransactions, body.Bulk); err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintln(writer, err)
 			return

@@ -10,6 +10,7 @@ export async function resetFixture(
 	options: {
 		readOnly?: boolean;
 		pinnedEvaluationIds?: string[];
+		bulk?: string;
 		bankTransactions?: {
 			id: string;
 			description: string;
@@ -25,6 +26,7 @@ export async function resetFixture(
 			data: {
 				readOnly: options.readOnly ?? false,
 				bankTransactions: options.bankTransactions,
+				bulk: options.bulk,
 			},
 		});
 		if (!response.ok())

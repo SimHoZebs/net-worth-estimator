@@ -86,8 +86,10 @@ export default defineConfig({
 				// fixture pack instead of the CSV model, so the matrix
 				// runner can drive these specs against any edge dataset.
 				// Empty keeps the default fixture; see
-				// docs/integration-edge-gates.md.
+				// docs/integration-edge-gates.md. INTEGRATION_BULK adds
+				// tagged synthetic accounts on top of that baseline.
 				INTEGRATION_PACK: process.env.INTEGRATION_PACK ?? "",
+				INTEGRATION_BULK: process.env.INTEGRATION_BULK ?? "",
 			},
 			url: `${apiOrigin}/healthz`,
 			reuseExistingServer: false,
