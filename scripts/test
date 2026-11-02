@@ -2,19 +2,30 @@
 # Unified test dispatcher: documents the unit vs integration split in one place.
 # Unit needs no servers, Docker daemon, or credentials.
 # Integration boots servers, Docker images, or a real provider.
-# Usage: scripts/test [--unit|--integration|--all|--gate [--no-browser] [--shards=N]|--help]
+# Usage: scripts/test [--unit|--integration|--all|--e2e [--skip-build|--cold-build] [--step=name] [--timeout=N] [--clean]|--gate [--no-browser] [--shards=N]|--help]
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'EOF'
-Usage: scripts/test [--unit|--integration|--all|--gate [--no-browser] [--shards=N]|--help]
+Usage: scripts/test [--unit|--integration|--all|--e2e [--skip-build|--cold-build] [--step=name] [--timeout=N] [--clean]|--gate [--no-browser] [--shards=N]|--help]
 
   --unit         go test + vitest + config contract tests (no servers/daemon/credentials)
   --integration  playwright browser suite (fixtureapi + Vite over real HTTP)
   --all          --unit then --integration (tests only; not the completion gate:
                lint, typecheck, and build still run separately per TESTING.md)
+  --e2e          disposable end-to-end gate: real provider, real images, real
+               browser (needs E2E_TEST_MUTATIONS=1, Docker, ~30 min budget;
+               pre-release/nightly cadence, not per push). See docs/e2e-gate.md.
+  --skip-build   with --e2e: reuse previously built e2e images (warm rerun;
+               images only — each run still mints a fresh fixture and ports)
+  --cold-build   with --e2e: rebuild images with --no-cache (true cold build)
+  --step=name    with --e2e: run one journey step only (fixture/images/stack
+               still run; dependent journeys need the full run)
+  --timeout=N    with --e2e: wall-clock budget in seconds (default 1800)
+  --clean        with --e2e: remove the disposable root even on failure
+               (removed on success, kept on failure by default)
   --gate         full completion gate: install check, one API generation, then
                backend, frontend, and extension gates in parallel groups,
                then the sharded browser suite
@@ -27,13 +38,17 @@ Matrix:
                bun --filter ./frontend test (vitest: src/** and scripts/**, jsdom)
                bun --filter ./extension test (node:test, no external APIs)
                node --test dev/*.test.mjs auth/casdoor/*.test.mjs (Compose CLI, no daemon)
+               node --test auth/e2e-gate.test.mjs (e2e budget/flake/fixture contract)
   integration  bun --filter ./frontend test:browser (tests/*.spec.ts, sharded)
                bun --filter ./extension test:browser (disposable browser profile)
+  e2e          E2E_TEST_MUTATIONS=1 node auth/test-e2e.mjs (disposable provider,
+               real images, real browser; covers the manual credential-gated
+               regressions: auth/test-integration.mjs journeys, smoke scripts,
+               proxy-header and deployment-image checks,
+               migration-on-image verification)
                Manual, credential-gated (not in this dispatcher):
-                 auth/test-integration.mjs (CASDOOR_TEST_MUTATIONS=1, disposable tmp/)
-                 scripts/smoke-backend.sh / smoke-compose.sh (running stack + cookie jar)
-                 NGINX_TEST_IMAGE=... node --test scripts/nginx-provider.test.mjs
-                 DEPLOYMENT_TEST_IMAGE=... node --test deploy/container.test.mjs
+                 physical passkeys and phone recovery (docs/authentication.md
+                 checklist); any production mutation (never gated, never run)
 EOF
 }
 
@@ -46,11 +61,18 @@ run_unit() {
   bun --filter ./extension test
   # shellcheck disable=SC2086
   node --test dev/*.test.mjs auth/casdoor/*.test.mjs
+  node --test auth/e2e-gate.test.mjs
 }
 
 run_integration() {
   bun --filter ./frontend test:browser
   bun --filter ./extension test:browser
+}
+
+run_e2e() {
+  # shellcheck disable=SC2086
+  : "${E2E_TEST_MUTATIONS:?Set E2E_TEST_MUTATIONS=1 to confirm the disposable-only run}"
+  node auth/test-e2e.mjs $e2e_args
 }
 
 # Full completion gate. Frontend gates run in sequence because they share
@@ -139,14 +161,21 @@ run_gate() {
 mode=""
 run_browser=1
 shards=""
+e2e_args=""
 for argument in "$@"; do
   case "$argument" in
-    --unit|--integration|--all|--gate|--help|-h)
+    --unit|--integration|--all|--e2e|--gate|--help|-h)
       if [ -n "$mode" ]; then
         echo "error: only one mode flag (use --help)" >&2
         exit 2
       fi
       mode="$argument"
+      ;;
+    --skip-build|--clean|--cold-build)
+      e2e_args="$e2e_args $argument"
+      ;;
+    --step=*|--timeout=*)
+      e2e_args="$e2e_args $argument"
       ;;
     --no-browser) run_browser=0 ;;
     --shards=*) shards="${argument#--shards=}" ;;
@@ -156,9 +185,15 @@ done
 
 case "${mode:---help}" in
   --gate|--help|-h) ;;
-  *)
+  --e2e)
     if [ "$run_browser" -eq 0 ] || [ -n "$shards" ]; then
       echo "error: --no-browser and --shards need --gate (use --help)" >&2
+      exit 2
+    fi
+    ;;
+  *)
+    if [ "$run_browser" -eq 0 ] || [ -n "$shards" ] || [ -n "$e2e_args" ]; then
+      echo "error: --no-browser/--shards need --gate, --skip-build/--step/--timeout/--clean/--cold-build need --e2e (use --help)" >&2
       exit 2
     fi
     ;;
@@ -169,6 +204,7 @@ case "${mode:---help}" in
   --unit) run_unit ;;
   --integration) run_integration ;;
   --all) run_unit; run_integration ;;
+  --e2e) run_e2e ;;
   --gate)
     if [ -n "$shards" ] && ! [[ "$shards" =~ ^[1-9][0-9]*$ ]]; then
       echo "error: --shards needs a positive integer" >&2

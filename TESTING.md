@@ -8,9 +8,10 @@ Use `./scripts/test` as the single entry point:
 scripts/test --unit          # no servers, Docker daemon, or credentials
 scripts/test --integration   # playwright browser suite (fixtureapi + Vite over real HTTP)
 scripts/test --all           # unit then integration
+E2E_TEST_MUTATIONS=1 scripts/test --e2e  # disposable end-to-end gate (see below)
 ```
 
-Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test` (vitest over `src/**` and `scripts/**`, jsdom), and `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images; credential-gated checks (`auth/test-integration.mjs`, `smoke-*.sh`, `NGINX_TEST_IMAGE`, `DEPLOYMENT_TEST_IMAGE`) stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test` (vitest over `src/**` and `scripts/**`, jsdom), `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon), and `node --test auth/e2e-gate.test.mjs` (e2e budget/flake/fixture contract, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images. The end-to-end gate covers the previously manual credential-gated tier (real-provider journeys, smoke scripts, proxy-header and deployment-image regressions, migration-on-image verification) against a disposable environment; physical passkeys, phone recovery, live external delivery, and any production mutation stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
 
 The purchase-capture extension adds `bun --filter ./extension test` to unit and
 `bun --filter ./extension test:browser` to integration. Install its dependencies
@@ -260,6 +261,9 @@ approval or import, first-account editing, page reload, and saved restart persis
 The provider gate also checks creation-time member/viewer assignment,
 application-credential UUID lookup, provider-granted anonymous writes, and
 immediate revocation. Unit checks also cover the same path for group-data routes.
+`E2E_TEST_MUTATIONS=1 scripts/test --e2e` automates this tier end to end
+(disposable provider, real images, real browser, plus share/inbox, group
+feed, receipt, migration, and proxy legs). See [the e2e gate](docs/e2e-gate.md).
 
 ---
 
