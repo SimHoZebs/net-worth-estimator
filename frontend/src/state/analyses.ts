@@ -1,12 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+	addPatternToExistingRule,
+	createPatternToNewRule,
 	dismissAnalysisFinding,
-	linkRecurringPattern,
 	listAnalyses,
 	listAnalysisFindings,
-	previewRecurringLink,
-	previewRecurringPromotion,
-	promoteRecurringPattern,
+	previewPatternToExistingRule,
+	previewPatternToNewRule,
 	reviewAnalysisFinding,
 } from "@/api/generated/endpoints.ts";
 import type { AnalysisFeedbackInput } from "@/api/generated/model/analysisFeedbackInput.ts";
@@ -93,19 +93,19 @@ export function useDismissAnalysisFinding() {
 	);
 }
 
-export function useRecurringPreview(findingId: string | undefined) {
+export function usePatternToNewRulePreview(findingId: string | undefined) {
 	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: [
 				...analysisFindingsKey(scope),
-				"recurring-preview",
+				"pattern-to-new-rule-preview",
 				findingId ?? "none",
 			],
 			enabled: scope.status === "ready" && !!findingId,
 			queryFn: async ({ signal }) => {
 				if (!findingId) throw new UserScopeError();
-				const result = (await previewRecurringPromotion(findingId, { signal }))
+				const result = (await previewPatternToNewRule(findingId, { signal }))
 					.data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result.preview;
@@ -116,17 +116,17 @@ export function useRecurringPreview(findingId: string | undefined) {
 	);
 }
 
-export function usePromoteRecurringPattern() {
+export function useCreatePatternToNewRule() {
 	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
-			mutationKey: ["analysis-promotion", scope.key],
+			mutationKey: ["pattern-to-new-rule", scope.key],
 			retry: false,
 			mutationFn: async ({ id }: { id: string }) => {
 				if (scope !== getUserScope() || scope.status !== "ready")
 					throw new UserScopeError();
-				const result = (await promoteRecurringPattern(id)).data;
+				const result = (await createPatternToNewRule(id)).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},
@@ -142,7 +142,7 @@ export function usePromoteRecurringPattern() {
 	);
 }
 
-export function useRecurringLinkPreview(
+export function usePatternToExistingRulePreview(
 	findingId: string | undefined,
 	ruleId: string | undefined,
 ) {
@@ -151,7 +151,7 @@ export function useRecurringLinkPreview(
 		{
 			queryKey: [
 				...analysisFindingsKey(scope),
-				"recurring-link-preview",
+				"pattern-to-existing-rule-preview",
 				findingId ?? "none",
 				ruleId ?? "none",
 			],
@@ -159,7 +159,7 @@ export function useRecurringLinkPreview(
 			queryFn: async ({ signal }) => {
 				if (!findingId || !ruleId) throw new UserScopeError();
 				const result = (
-					await previewRecurringLink(findingId, { ruleId }, { signal })
+					await previewPatternToExistingRule(findingId, { ruleId }, { signal })
 				).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result.preview;
@@ -170,17 +170,17 @@ export function useRecurringLinkPreview(
 	);
 }
 
-export function useLinkRecurringPattern() {
+export function useAddPatternToExistingRule() {
 	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
-			mutationKey: ["analysis-link", scope.key],
+			mutationKey: ["pattern-to-existing-rule", scope.key],
 			retry: false,
 			mutationFn: async ({ id, ruleId }: { id: string; ruleId: string }) => {
 				if (scope !== getUserScope() || scope.status !== "ready")
 					throw new UserScopeError();
-				const result = (await linkRecurringPattern(id, { ruleId })).data;
+				const result = (await addPatternToExistingRule(id, { ruleId })).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},

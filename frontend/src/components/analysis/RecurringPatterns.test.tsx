@@ -1,21 +1,21 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import type { RecurringLinkPreview } from "@/api/generated/model/recurringLinkPreview.ts";
-import type { RecurringPromotionPreview } from "@/api/generated/model/recurringPromotionPreview.ts";
+import type { PatternToExistingRulePreview } from "@/api/generated/model/patternToExistingRulePreview.ts";
+import type { PatternToNewRulePreview } from "@/api/generated/model/patternToNewRulePreview.ts";
 import { RecurringPatterns } from "./RecurringPatterns.tsx";
 
 const reviewMutate = vi.hoisted(() => vi.fn());
 const dismissMutate = vi.hoisted(() => vi.fn());
-const promoteMutate = vi.hoisted(() => vi.fn());
-const linkMutate = vi.hoisted(() => vi.fn());
+const createMutate = vi.hoisted(() => vi.fn());
+const addMutate = vi.hoisted(() => vi.fn());
 const previewState = vi.hoisted(() => ({
-	data: undefined as RecurringPromotionPreview | undefined,
+	data: undefined as PatternToNewRulePreview | undefined,
 	isPending: false,
 	isError: false,
 }));
-const linkPreviewState = vi.hoisted(() => ({
-	data: undefined as RecurringLinkPreview | undefined,
+const existingRulePreviewState = vi.hoisted(() => ({
+	data: undefined as PatternToExistingRulePreview | undefined,
 	isPending: false,
 	isError: false,
 }));
@@ -31,14 +31,14 @@ vi.mock("@/state/analyses.ts", () => ({
 		isPending: false,
 		isError: false,
 	}),
-	useRecurringPreview: () => previewState,
-	usePromoteRecurringPattern: () => ({
-		mutate: promoteMutate,
+	usePatternToNewRulePreview: () => previewState,
+	useCreatePatternToNewRule: () => ({
+		mutate: createMutate,
 		isPending: false,
 	}),
-	useRecurringLinkPreview: () => linkPreviewState,
-	useLinkRecurringPattern: () => ({
-		mutate: linkMutate,
+	usePatternToExistingRulePreview: () => existingRulePreviewState,
+	useAddPatternToExistingRule: () => ({
+		mutate: addMutate,
 		isPending: false,
 	}),
 }));
@@ -73,7 +73,7 @@ function recurringFinding(id: string, postingId: string): AnalysisFinding {
 	} as AnalysisFinding;
 }
 
-function promotablePreview(): RecurringPromotionPreview {
+function creatablePreview(): PatternToNewRulePreview {
 	return {
 		findingId: "one",
 		patternKey: "key",
@@ -87,7 +87,7 @@ function promotablePreview(): RecurringPromotionPreview {
 		currency: "USD",
 		direction: "outflow",
 		accountId: "checking",
-		promotable: true,
+		creatable: true,
 		reason: "",
 		rule: {
 			name: "Grocer",
@@ -102,7 +102,7 @@ function promotablePreview(): RecurringPromotionPreview {
 			{ date: "2026-03-15", amount: "30.00" },
 			{ date: "2026-04-15", amount: "30.00" },
 		],
-	} as RecurringPromotionPreview;
+	} as PatternToNewRulePreview;
 }
 
 const names = new Map([
@@ -124,9 +124,9 @@ beforeEach(() => {
 	previewState.data = undefined;
 	previewState.isPending = false;
 	previewState.isError = false;
-	linkPreviewState.data = undefined;
-	linkPreviewState.isPending = false;
-	linkPreviewState.isError = false;
+	existingRulePreviewState.data = undefined;
+	existingRulePreviewState.isPending = false;
+	existingRulePreviewState.isError = false;
 	vi.clearAllMocks();
 });
 
@@ -156,7 +156,7 @@ describe("repeating-payment patterns", () => {
 		);
 	});
 	it("approves the reviewed plan explicitly", () => {
-		previewState.data = promotablePreview();
+		previewState.data = creatablePreview();
 		render(
 			<RecurringPatterns
 				findings={[recurringFinding("one", "a"), recurringFinding("two", "b")]}
@@ -173,7 +173,7 @@ describe("repeating-payment patterns", () => {
 				"2 recorded payments · 30.00 USD typical · 2026-01-15 to 2026-02-15",
 			),
 		).toBeDefined();
-		promoteMutate.mockImplementation(
+		createMutate.mockImplementation(
 			(
 				_args: unknown,
 				options?: { onSuccess?: (result: { row: { name: string } }) => void },
@@ -184,7 +184,7 @@ describe("repeating-payment patterns", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Approve and create rule" }),
 		);
-		expect(promoteMutate).toHaveBeenCalledWith(
+		expect(createMutate).toHaveBeenCalledWith(
 			{ id: "one" },
 			expect.objectContaining({}),
 		);
@@ -192,8 +192,8 @@ describe("repeating-payment patterns", () => {
 	});
 	it("explains plans that cannot become rules yet", () => {
 		previewState.data = {
-			...promotablePreview(),
-			promotable: false,
+			...creatablePreview(),
+			creatable: false,
 			rule: undefined,
 			upcoming: [],
 			reason:
@@ -227,8 +227,8 @@ describe("repeating-payment patterns", () => {
 			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
 		).toBeDefined();
 	});
-	it("links confirmed payments to an existing rule", () => {
-		linkPreviewState.data = {
+	it("adds confirmed payments to an existing rule", () => {
+		existingRulePreviewState.data = {
 			findingId: "one",
 			patternKey: "key",
 			ruleId: "rent",
@@ -236,7 +236,7 @@ describe("repeating-payment patterns", () => {
 			merchant: "grocer",
 			cadence: "monthly",
 			accountId: "checking",
-			linkable: true,
+			claimable: true,
 			reason: "",
 			assignments: [
 				{ postingId: "a", date: "2026-01-15", amount: "30.00" },
@@ -256,7 +256,7 @@ describe("repeating-payment patterns", () => {
 			}),
 		);
 		expect(screen.getByText("Matched occurrences")).toBeDefined();
-		linkMutate.mockImplementation(
+		addMutate.mockImplementation(
 			(
 				_args: unknown,
 				options?: { onSuccess?: (result: { rows: unknown[] }) => void },
@@ -267,14 +267,14 @@ describe("repeating-payment patterns", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Link payments to rule" }),
 		);
-		expect(linkMutate).toHaveBeenCalledWith(
+		expect(addMutate).toHaveBeenCalledWith(
 			expect.objectContaining({ ruleId: "rent" }),
 			expect.objectContaining({}),
 		);
 		expect(screen.getAllByText(/an occurrence/).length).toBeGreaterThan(0);
 	});
 	it("hides the link action in a read-only dialog", () => {
-		linkPreviewState.data = {
+		existingRulePreviewState.data = {
 			findingId: "one",
 			patternKey: "key",
 			ruleId: "rent",
@@ -282,7 +282,7 @@ describe("repeating-payment patterns", () => {
 			merchant: "grocer",
 			cadence: "monthly",
 			accountId: "checking",
-			linkable: true,
+			claimable: true,
 			reason: "",
 			assignments: [{ postingId: "a", date: "2026-01-15", amount: "30.00" }],
 		};

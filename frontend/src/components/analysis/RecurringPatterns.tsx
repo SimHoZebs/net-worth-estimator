@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import type { RecurringPromotionPreview } from "@/api/generated/model/recurringPromotionPreview.ts";
+import type { PatternToNewRulePreview } from "@/api/generated/model/patternToNewRulePreview.ts";
 import {
 	cadenceLabel,
 	directionLabel,
@@ -11,11 +11,11 @@ import {
 	type RecurringPattern,
 } from "@/domain/recurringPatterns.ts";
 import {
+	useAddPatternToExistingRule,
+	useCreatePatternToNewRule,
 	useDismissAnalysisFinding,
-	useLinkRecurringPattern,
-	usePromoteRecurringPattern,
-	useRecurringLinkPreview,
-	useRecurringPreview,
+	usePatternToExistingRulePreview,
+	usePatternToNewRulePreview,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
 import { useSavedAccounts } from "@/state/savedRows.ts";
@@ -39,7 +39,7 @@ function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	};
 }
 
-function RecurringPlanDialog({
+function NewRuleDialog({
 	findingId,
 	title,
 	readOnly,
@@ -50,8 +50,8 @@ function RecurringPlanDialog({
 	readOnly: boolean;
 	onClose: () => void;
 }) {
-	const preview = useRecurringPreview(findingId);
-	const promote = usePromoteRecurringPattern();
+	const preview = usePatternToNewRulePreview(findingId);
+	const create = useCreatePatternToNewRule();
 	const accounts = useSavedAccounts();
 	const [created, setCreated] = useState<string | null>(null);
 	const [failed, setFailed] = useState(false);
@@ -121,7 +121,7 @@ function RecurringPlanDialog({
 							{evidenceSummary(plan)}
 						</p>
 					</div>
-					{!plan.promotable && (
+					{!plan.creatable && (
 						<p className="m-0 text-sm text-muted">{plan.reason}</p>
 					)}
 					{failed && (
@@ -131,13 +131,13 @@ function RecurringPlanDialog({
 						<Button type="button" variant="secondary" onClick={onClose}>
 							Cancel
 						</Button>
-						{plan.promotable && !readOnly && (
+						{plan.creatable && !readOnly && (
 							<Button
 								type="button"
 								variant="primary"
-								disabled={promote.isPending}
+								disabled={create.isPending}
 								onClick={() =>
-									promote.mutate(
+									create.mutate(
 										{ id: findingId },
 										{
 											onSuccess: (result) => {
@@ -149,7 +149,7 @@ function RecurringPlanDialog({
 									)
 								}
 							>
-								{promote.isPending ? "Creating…" : "Approve and create rule"}
+								{create.isPending ? "Creating…" : "Approve and create rule"}
 							</Button>
 						)}
 					</div>
@@ -159,7 +159,7 @@ function RecurringPlanDialog({
 	);
 }
 
-function evidenceSummary(plan: RecurringPromotionPreview): string {
+function evidenceSummary(plan: PatternToNewRulePreview): string {
 	const occurrences = plan.occurrences ?? [];
 	const dates = occurrences.map((item) => item.date).sort();
 	const range =
@@ -169,7 +169,7 @@ function evidenceSummary(plan: RecurringPromotionPreview): string {
 	return `${occurrences.length} recorded ${occurrences.length === 1 ? "payment" : "payments"} · ${plan.typicalAmount} ${plan.currency} typical · ${range}`;
 }
 
-function RecurringLinkDialog({
+function ExistingRuleDialog({
 	findingId,
 	title,
 	names,
@@ -188,13 +188,13 @@ function RecurringLinkDialog({
 	);
 	const [ruleId, setRuleId] = useState("");
 	const selected = ruleId || rules[0]?.id || "";
-	const preview = useRecurringLinkPreview(
+	const preview = usePatternToExistingRulePreview(
 		findingId,
 		selected ? selected : undefined,
 	);
-	const link = useLinkRecurringPattern();
-	const [linked, setLinked] = useState<number | null>(null);
-	const [linkedRule, setLinkedRule] = useState<string | null>(null);
+	const add = useAddPatternToExistingRule();
+	const [added, setAdded] = useState<number | null>(null);
+	const [addedRule, setAddedRule] = useState<string | null>(null);
 	const [failed, setFailed] = useState(false);
 	const plan = preview.data;
 	return (
@@ -209,8 +209,8 @@ function RecurringLinkDialog({
 					value={selected}
 					onChange={(event) => {
 						setRuleId(event.target.value);
-						setLinked(null);
-						setLinkedRule(null);
+						setAdded(null);
+						setAddedRule(null);
 						setFailed(false);
 					}}
 				>
@@ -229,13 +229,12 @@ function RecurringLinkDialog({
 					<p className="text-sm text-muted">Checking the rule schedule…</p>
 				) : preview.isError || !plan ? (
 					<ErrorNotice message="The link preview could not be loaded. Try again." />
-				) : linked !== null ? (
+				) : added !== null ? (
 					<div className="space-y-3">
 						<p className="m-0 text-sm">
-							{linked} recorded {linked === 1 ? "payment" : "payments"} now{" "}
-							{linked === 1 ? "records" : "record"} an occurrence of “
-							{linkedRule ?? plan.ruleName}”. Future movements stay on that
-							rule.
+							{added} recorded {added === 1 ? "payment" : "payments"} now{" "}
+							{added === 1 ? "records" : "record"} an occurrence of “
+							{addedRule ?? plan.ruleName}”. Future movements stay on that rule.
 						</p>
 						<Button type="button" variant="secondary" onClick={onClose}>
 							Close
@@ -257,36 +256,36 @@ function RecurringLinkDialog({
 								</ul>
 							</div>
 						)}
-						{!plan.linkable && (
+						{!plan.claimable && (
 							<p className="m-0 text-sm text-muted">{plan.reason}</p>
 						)}
 						{failed && (
-							<ErrorNotice message="The payments could not be linked. The preview above is current; review it and try again." />
+							<ErrorNotice message="The payments could not be added. The preview above is current; review it and try again." />
 						)}
 						<div className="flex gap-2">
 							<Button type="button" variant="secondary" onClick={onClose}>
 								Cancel
 							</Button>
-							{plan.linkable && !readOnly && (
+							{plan.claimable && !readOnly && (
 								<Button
 									type="button"
 									variant="primary"
-									disabled={link.isPending}
+									disabled={add.isPending}
 									onClick={() =>
-										link.mutate(
+										add.mutate(
 											{ id: findingId, ruleId: plan.ruleId },
 											{
 												onSuccess: (result) => {
 													setFailed(false);
-													setLinked((result.rows ?? []).length);
-													setLinkedRule(plan.ruleName);
+													setAdded((result.rows ?? []).length);
+													setAddedRule(plan.ruleName);
 												},
 												onError: () => setFailed(true),
 											},
 										)
 									}
 								>
-									{link.isPending ? "Linking…" : "Link payments to rule"}
+									{add.isPending ? "Linking…" : "Link payments to rule"}
 								</Button>
 							)}
 						</div>
@@ -391,7 +390,7 @@ function PatternCard({
 				</Button>
 			</div>
 			{planOpen && (
-				<RecurringPlanDialog
+				<NewRuleDialog
 					findingId={actionable.id}
 					title={title}
 					readOnly={readOnly}
@@ -399,7 +398,7 @@ function PatternCard({
 				/>
 			)}
 			{linkOpen && (
-				<RecurringLinkDialog
+				<ExistingRuleDialog
 					findingId={actionable.id}
 					title={title}
 					names={names}
