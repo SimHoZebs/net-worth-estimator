@@ -110,6 +110,8 @@ bun --filter ./frontend test:browser
 
 `test:browser` (the sharding runner) is the entry point. It runs the suite in shards. Each shard starts its own fixture API and Vite server on its own random ports. The default is half the available CPUs, at most four. Set `TEST_BROWSER_SHARDS` to change it. If a port is taken between selection and startup, the shard retries with new ports. Each invocation writes its own blobs under `test-results/run-<pid>/`, so concurrent runs never share trace files. Running `playwright test` directly skips sharding, retry, and output isolation.
 
+Each run merges the per-shard blobs into one HTML report at `test-results/run-<pid>/html/index.html` with the failing traces, plus per-shard machine-readable `results.json` at `test-results/run-<pid>/shard-N/results.json`. Open the HTML report to inspect a failure; parse the shard JSON for the exact locator and line. The suite fixes `locale: en-US` and `timezoneId: America/Los_Angeles`.
+
 Each shard is single-worker because it shares one seeded server. Named spec files run in one shard:
 
 ```bash

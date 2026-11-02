@@ -4,8 +4,15 @@
 // Several agents may run this suite at the same time on one machine, so no
 // fixed port is safe. Each shard asks the OS for a free port, and a shard that
 // still loses a race gets new ports and retries.
-import { spawn } from "node:child_process";
-import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	rmSync,
+	statSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { availableParallelism, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -17,6 +24,9 @@ const resultsRoot = join(frontendDirectory, "test-results");
 // Unique per invocation: concurrent runs in one worktree must never share
 // trace and screenshot blobs, not even for single-shard runs.
 const runTag = `run-${process.pid}`;
+const runRoot = join("test-results", runTag);
+const blobRoot = join(runRoot, "blobs");
+const htmlRoot = join(runRoot, "html");
 const conflictPattern =
 	/EADDRINUSE|address already in use|Port \d+ is already in use/;
 const attempts = 3;
@@ -103,7 +113,7 @@ function forward(stream, prefix) {
 function runShard({ index, shards, frontendPort, apiPort, passthrough }) {
 	return new Promise((resolve) => {
 		const label = shards === 1 ? "[browser]" : `[browser ${index}/${shards}]`;
-		const outputDir = join("test-results", runTag, `shard-${index}`);
+		const outputDir = join(runRoot, `shard-${index}`);
 		const argumentsList = [
 			"--no-install",
 			"playwright",
@@ -124,6 +134,10 @@ function runShard({ index, shards, frontendPort, apiPort, passthrough }) {
 			CI: "1",
 			TEST_FRONTEND_PORT: String(frontendPort),
 			TEST_API_PORT: String(apiPort),
+			// Each shard writes its own blob and JSON. The blobs are collected
+			// into one directory afterwards and merged into a single report.
+			PLAYWRIGHT_BLOB_OUTPUT_DIR: join(outputDir, "blobs"),
+			PLAYWRIGHT_JSON_OUTPUT_FILE: join(outputDir, "results.json"),
 		};
 		delete env.FIXTURE_API_ORIGIN;
 		const child = spawn("bunx", argumentsList, {
@@ -158,6 +172,54 @@ async function runWithRetry(shard) {
 		);
 	}
 	return last;
+}
+
+// merge-reports reads one flat directory of blob archives, so the per-shard
+// blobs are copied into the run's blob directory under unique names.
+function collectBlobs(shards) {
+	const target = join(frontendDirectory, blobRoot);
+	mkdirSync(target, { recursive: true });
+	for (let index = 1; index <= shards; index += 1) {
+		const source = join(frontendDirectory, runRoot, `shard-${index}`, "blobs");
+		if (!existsSync(source)) continue;
+		for (const file of readdirSync(source)) {
+			if (!file.endsWith(".zip")) continue;
+			copyFileSync(join(source, file), join(target, `shard-${index}-${file}`));
+		}
+	}
+}
+
+// A merged report is the only way to read a trace after a shard has exited.
+// A merge failure must not change the suite result, so it is reported only.
+function mergeReports(shards) {
+	collectBlobs(shards);
+	const result = spawnSync(
+		"bunx",
+		[
+			"--no-install",
+			"playwright",
+			"merge-reports",
+			"--reporter=html",
+			blobRoot,
+		],
+		{
+			cwd: frontendDirectory,
+			env: {
+				...process.env,
+				PLAYWRIGHT_HTML_OUTPUT_DIR: htmlRoot,
+				PLAYWRIGHT_HTML_OPEN: "never",
+			},
+			encoding: "utf8",
+		},
+	);
+	if (result.status !== 0) {
+		console.log(
+			`[browser] could not merge reports: ${(result.stderr || result.stdout || "").trim()}`,
+		);
+		return;
+	}
+	console.log(`[browser] html report: ${htmlRoot}/index.html`);
+	console.log(`[browser] json results: ${runRoot}/shard-N/results.json`);
 }
 
 function generateClient() {
@@ -202,6 +264,7 @@ async function main() {
 
 	const failed = results.filter((result) => result.code !== 0).length;
 	const passed = results.length - failed;
+	mergeReports(shards);
 	console.log(
 		`[browser] ${passed} shard${passed === 1 ? "" : "s"} passed, ${failed} failed`,
 	);

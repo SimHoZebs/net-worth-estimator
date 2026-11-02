@@ -2,7 +2,11 @@ import { randomInt } from "node:crypto";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defineConfig, devices } from "@playwright/test";
+import {
+	defineConfig,
+	devices,
+	type ReporterDescription,
+} from "@playwright/test";
 
 const production = process.env.TEST_PRODUCTION === "1";
 
@@ -35,6 +39,14 @@ process.on("exit", () => {
 const apiOrigin =
 	process.env.FIXTURE_API_ORIGIN ?? `http://127.0.0.1:${apiPort}`;
 
+// The runner sets both paths per shard. A bare `playwright test` keeps the
+// list reporter only, so local iteration stays quiet.
+const blobDirectory = process.env.PLAYWRIGHT_BLOB_OUTPUT_DIR;
+const jsonOutput = process.env.PLAYWRIGHT_JSON_OUTPUT_FILE;
+const reporters: ReporterDescription[] = [["list"]];
+if (blobDirectory) reporters.push(["blob", { outputDir: blobDirectory }]);
+if (jsonOutput) reporters.push(["json", { outputFile: jsonOutput }]);
+
 console.log(`browser tests: ui=${baseURL} api=${apiOrigin} db=${databasePath}`);
 
 export default defineConfig({
@@ -47,9 +59,13 @@ export default defineConfig({
 	workers: 1,
 	timeout: 45_000,
 	expect: { timeout: 10_000 },
-	reporter: "list",
+	reporter: reporters,
 	use: {
 		baseURL,
+		// Fix the browser environment so currency, dates, and sort order never
+		// depend on the host that runs the suite.
+		locale: "en-US",
+		timezoneId: "America/Los_Angeles",
 		trace: "retain-on-failure",
 		screenshot: "only-on-failure",
 		// Reduced motion makes the modal/drawer enter animations resolve
