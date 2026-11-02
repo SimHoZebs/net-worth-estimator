@@ -1,12 +1,24 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Users } from "lucide-react";
+import {
+	ArrowDownLeft,
+	ArrowRightLeft,
+	ArrowUpRight,
+	Users,
+} from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
+import { Badge } from "../../components/Badge.tsx";
 import { Button } from "../../components/Button.tsx";
 import { EmptyState } from "../../components/EmptyState.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { InputField, SelectField } from "../../components/Field.tsx";
+import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
+import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
+import {
+	transactionAmountStyles,
+	transactionBadgeStyles,
+} from "../../components/activity/activityStyles.ts";
 import { dateLabel, exactMoney, isoDateFromEpochSeconds } from "@/domain/format.ts";
 import { literalAmountOf } from "@/domain/transactionRows.ts";
 import { notifyError, notifySuccess } from "../../state/notifications.ts";
@@ -116,7 +128,7 @@ export function SharedFeed({
 	}
 
 	return (
-		<section aria-label="Shared transactions" className="grid gap-4">
+		<section aria-label="Shared feed" className="grid gap-4">
 			<div>
 				<h3 className="m-0 text-base">Shared transactions</h3>
 				{totals && (
@@ -194,49 +206,99 @@ export function SharedFeed({
 			)}
 
 			{items.length > 0 && (
-				<ul className="grid list-none gap-2 p-0">
+				<TransactionTable caption="Shared transactions">
 					{items.map((item) => {
 						const key = `${item.ownerUserId}/${item.posting.id}`;
 						const literal = literalAmountOf(item.posting.amount);
 						const day = isoDateFromEpochSeconds(
 							item.posting.transactionTime,
 						);
+						const from = item.posting.sourceAccountId;
+						const to = item.posting.destinations;
+						const tone = from
+							? to.length > 0
+								? ("transfer" as const)
+								: ("outflow" as const)
+							: ("inflow" as const);
+						const DirectionIcon =
+							tone === "transfer"
+								? ArrowRightLeft
+								: tone === "inflow"
+									? ArrowDownLeft
+									: ArrowUpRight;
+						const isSaved = saved[key] === true;
+						const busy = saving === key;
 						return (
-							<li
+							<TransactionItemRow
 								key={key}
-								className="grid gap-1 rounded-control border border-solid border-line px-3 py-2 text-sm"
-							>
-								<span className="flex items-center justify-between gap-3">
-									<strong>{item.posting.name}</strong>
-									<span>{literal === null ? "Varies" : exactMoney(literal)}</span>
-								</span>
-								<span className="text-muted">
-									Shared by {item.sourceDisplayName} ·{" "}
-									{audienceLabel(item)} · {dateLabel(day, true)}
-									{item.posting.pending ? " · Pending" : ""}
-								</span>
-								<span>
-									{saved[key] ? (
-										<span className="text-muted" role="status">
-											Saved to your transactions
+								date={
+									<time dateTime={day}>{dateLabel(day, true)}</time>
+								}
+								icon={<DirectionIcon size={16} aria-hidden="true" />}
+								tone={tone}
+								title={item.posting.name}
+								slots={{
+									subtitle: (
+										<span>
+											Shared by {item.sourceDisplayName} ·{" "}
+											{audienceLabel(item)}
 										</span>
-									) : (
-										<Button
-											variant="ghost"
-											size="sm"
-											disabled={saving === key}
-											onClick={() => void onSave(item)}
+									),
+									mobile: (
+										<time dateTime={day}>
+											{dateLabel(day, true)}
+										</time>
+									),
+									badges: (item.posting.pending || isSaved) && (
+										<>
+											{item.posting.pending && (
+												<Badge
+													tone="neutral"
+													className={transactionBadgeStyles()}
+												>
+													Pending
+												</Badge>
+											)}
+											{isSaved && (
+												<Badge
+													tone="neutral"
+													className={transactionBadgeStyles()}
+												>
+													Saved
+												</Badge>
+											)}
+										</>
+									),
+								}}
+								amount={
+									literal === null ? (
+										<strong
+											className={transactionAmountStyles()}
+											title="Shared amount is calculated"
 										>
-											{saving === key
-												? "Saving…"
-												: `Save a copy of ${item.posting.name}`}
-										</Button>
-									)}
-								</span>
-							</li>
-						);
-					})}
-				</ul>
+											Varies
+										</strong>
+									) : (
+										<strong
+											className={transactionAmountStyles({
+												positive: tone === "inflow",
+											})}
+										>
+											{tone === "inflow"
+												? `+${exactMoney(literal)}`
+												: tone === "outflow"
+													? `−${exactMoney(literal)}`
+													: exactMoney(literal)}
+										</strong>
+										)
+									}
+									actionLabel={`Save a copy of ${item.posting.name} on ${dateLabel(day, true)}${item.posting.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
+									onSelect={() => void onSave(item)}
+									selectDisabled={isSaved || busy}
+								/>
+							);
+						})}
+				</TransactionTable>
 			)}
 
 			{feedQuery.hasNextPage && (

@@ -25,6 +25,8 @@ export interface FeedPostingAmount {
 export interface FeedPosting {
 	id: string;
 	name: string;
+	sourceAccountId: string | null;
+	destinations: string[];
 	transactionTime: number;
 	pending?: boolean;
 	amount: FeedPostingAmount;
@@ -87,7 +89,14 @@ export async function fetchGroupFeed(
 	const body = response.data;
 	return {
 		groupId: body.groupId,
-		items: body.items ?? [],
+		items: (body.items ?? []).map((item) => ({
+			...item,
+			posting: {
+				...item.posting,
+				sourceAccountId: item.posting.sourceAccountId ?? null,
+				destinations: item.posting.destinations ?? [],
+			},
+		})),
 		totals: body.totals ?? {
 			count: 0,
 			totalAmount: 0,

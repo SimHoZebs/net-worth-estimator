@@ -22,7 +22,7 @@ async function openSeededGroup(page: Page, groupName: string) {
 		.getByRole("button", { name: "Open" })
 		.click();
 	await expect(page.getByRole("heading", { name: groupName })).toBeVisible();
-	return page.getByRole("region", { name: "Shared transactions" });
+	return page.getByRole("region", { name: "Shared feed" });
 }
 
 test("group feed lists shared transactions with viewer totals", async ({
@@ -46,7 +46,8 @@ test("group feed lists shared transactions with viewer totals", async ({
 	).toBeVisible();
 	// Source member, authorized amounts, pending marker, calculated recipe.
 	await expect(feed.getByText(/Shared by Dana/)).toHaveCount(4);
-	await expect(feed.getByText("$42.50")).toBeVisible();
+	await expect(feed.getByText("Jun 15, 2026").first()).toBeVisible();
+	await expect(feed.getByText("−$42.50")).toBeVisible();
 	await expect(feed.getByText("Varies", { exact: true })).toBeVisible();
 	await expect(feed.getByText(/Pending/)).toBeVisible();
 	// Viewer-specific totals describe the whole filtered set.
@@ -102,9 +103,10 @@ test("group feed saves an independent copy to the viewer model", async ({
 	).toBeVisible();
 
 	await feed
-		.getByRole("button", { name: "Save a copy of Cabin groceries" })
+		.getByRole("button", { name: /Save a copy of Cabin groceries/ })
 		.click();
-	await expect(feed.getByText("Saved to your transactions")).toBeVisible();
+	await expect(feed.getByText("Saved", { exact: true })).toBeVisible();
+	await expect(page.getByText("Saved to your transactions")).toBeVisible();
 
 	// The copy is an ordinary row in the viewer's own model.
 	const model = await readSavedServerModel();
