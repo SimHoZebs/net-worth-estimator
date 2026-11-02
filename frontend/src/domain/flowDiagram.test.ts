@@ -4,8 +4,11 @@ import {
 	aggregateFlowEdges,
 	buildSankeyInput,
 	describeFlowEdge,
+	describeLaneTooltip,
+	describeNodeTooltip,
 	filterFlowEdges,
 	hasFlowCycle,
+	topLaneSources,
 } from "./flowDiagram.ts";
 import { graphFixture } from "./flowDiagramFixture.ts";
 
@@ -208,6 +211,70 @@ describe("hasFlowCycle", () => {
 				lane("b", "out"),
 			]),
 		).toBe(false);
+	});
+});
+
+describe("describeNodeTooltip", () => {
+	it("names inflow and outflow totals with flow counts", () => {
+		expect(
+			describeNodeTooltip("Everyday checking", [5000, 200], [300], (v) => `$${v}`),
+		).toBe("Everyday checking: $5200 in across 2 flows, $300 out across 1 flow");
+	});
+	it("weighs absolute flow and reads empty sides as zero", () => {
+		expect(describeNodeTooltip("Outside accounts", [], [-50], (v) => `$${v}`)).toBe(
+			"Outside accounts: $0 in across 0 flows, $50 out across 1 flow",
+		);
+	});
+});
+
+describe("describeLaneTooltip", () => {
+	const short = edge({
+		from: FLOW_NODE_ID_EXTERNAL,
+		to: "checking",
+		kind: "inflow",
+		movement: "actual",
+		amount: 300,
+		sources: [
+			{ postingId: "a", date: "2026-01-05", sequence: 0, requestedAmount: 100, realizedAmount: 100 },
+			{ postingId: "b", date: "2026-02-05", sequence: 0, requestedAmount: 200, realizedAmount: 200 },
+		],
+	});
+	it("lists every source transaction on short lists", () => {
+		expect(
+			describeLaneTooltip(short, (id) => id, (v) => `$${v}`, (d) => d),
+		).toBe(
+			"Money in of $300 from external to checking (recorded) Transactions: 2026-02-05 $200 · 2026-01-05 $100.",
+		);
+	});
+	it("caps long lists at the largest transactions and points at the inspector", () => {
+		const long = edge({
+			...short,
+			amount: 1000,
+			sources: [1, 2, 3, 4, 5].map((n) => ({
+				postingId: `p${n}`,
+				date: `2026-0${n}-01`,
+				sequence: 0,
+				requestedAmount: n * 100,
+				realizedAmount: n * 100,
+			})),
+		});
+		expect(topLaneSources(long)).toHaveLength(3);
+		expect(topLaneSources(long)[0]?.postingId).toBe("p5");
+		expect(
+			describeLaneTooltip(long, (id) => id, (v) => `$${v}`, (d) => d),
+		).toBe(
+			"Money in of $1000 from external to checking (recorded) Top transactions: 2026-05-01 $500 · 2026-04-01 $400 · 2026-03-01 $300 · +2 more — select this flow to inspect all 5.",
+		);
+	});
+	it("falls back to the bare sentence without sources", () => {
+		expect(
+			describeLaneTooltip(
+				edge({ from: "a", to: "b", amount: 50, sources: [] }),
+				(id) => id,
+				(v) => `$${v}`,
+				(d) => d,
+			),
+		).toBe("Transfer of $50 from a to b (recorded)");
 	});
 });
 
