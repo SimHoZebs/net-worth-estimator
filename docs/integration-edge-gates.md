@@ -63,6 +63,11 @@ Loading per harness:
   fixtureapi harness seeds the pack instead of the CSV model on its own
   isolated ports and throwaway database; the Playwright config forwards the
   variable explicitly. Empty keeps the default fixture.
+- Bulk rows: `INTEGRATION_BULK=<NxM[:seed]>` in the environment, or `bulk`
+  on one reset call. The harness injects tagged synthetic accounts beside
+  the pack or CSV baseline through the same additive builder the Go leg
+  uses (`InjectBulk`); reset clears them with the baseline. Per-call
+  overrides beat the environment; empty disables bulk.
 
 ## Edge-case suite
 
@@ -104,10 +109,11 @@ scripts/test --matrix --packs=base,unicode,timezones --identities=full,duo --rep
 scripts/test --matrix --packs=all --identities=full
 scripts/test --matrix --packs=unicode --browser
 scripts/test --matrix --packs=unicode --browser --specs=groupSharing.spec.ts
+scripts/test --matrix --packs=unicode --bulk=20x200:7
 ```
 
 Defaults: packs `base,unicode` (base is the suite default seed),
-identities `full,duo,solo`, repeat 1. Identity sets: solo (owner only),
+identities `full,duo,solo`, repeat 1, no bulk. Identity sets: solo (owner only),
 duo (owner plus second user), full (owner, second user, provisioned guest,
 removed ex-member). All identities are synthetic per-run subjects on
 throwaway databases, never reused across runs.

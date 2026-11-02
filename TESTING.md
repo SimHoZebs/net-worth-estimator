@@ -8,7 +8,7 @@ Use `./scripts/test` as the single entry point:
 scripts/test --unit          # no servers, Docker daemon, or credentials
 scripts/test --integration   # playwright browser suite (fixtureapi + Vite over real HTTP)
 scripts/test --all           # unit then integration
-scripts/test --matrix        # integration edge-case suite per dataset-pack x identity-set (see docs/integration-edge-gates.md)
+scripts/test --matrix        # integration edge-case suite per dataset-pack x identity-set, optional --bulk NxM[:seed] (see docs/integration-edge-gates.md)
 E2E_TEST_MUTATIONS=1 scripts/test --e2e  # disposable end-to-end gate (see below)
 ```
 

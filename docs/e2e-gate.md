@@ -109,4 +109,16 @@ reuses images only, never state. At least one cold run (full image builds)
 is required before landing gate changes; warm reruns exist for triage
 iteration only.
 
+## Extra data for edge exploration
+
+```bash
+E2E_TEST_MUTATIONS=1 scripts/test --e2e --seed-pack=unicode --seed-bulk=5x20:7
+```
+
+After the isolation leg passes its exact guest and blank-workspace checks,
+the gate seeds one fixture pack plus tagged bulk rows into the owner
+through the production API. Later journeys scope their own rows, so the
+extra data rides along without changing their assertions. The flags are
+opt-in: default runs seed nothing and assert the same shapes as before.
+
 Per-step logs and image build logs live under the disposable root's `logs/`.

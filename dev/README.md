@@ -93,12 +93,20 @@ is the production container: stop it first so the file copies cleanly.
 ./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER"
 ./scripts/dev refresh-db --user "$TARGET_USER" --source-user "$SOURCE_USER" --from /absolute/path/backup.db
 ./scripts/dev publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
+./scripts/dev seed --bulk 20x200:7
+./scripts/dev seed --clear
 ```
 
 `refresh-db` backs up the shared application database under `tmp/dev/backups/`.
 It replaces only the explicitly selected private user. It preserves identities,
 passkeys, application sessions, grants, logout records, and other users.
 `--from` selects a source for that operation. Plain Compose startup never refreshes data.
+
+`seed` injects tagged synthetic accounts beside the existing dev data
+(`--bulk NxM[:seed]`, for example `20x200:7`) and `seed --clear` removes
+only those tagged rows. Real rows stay untouched; the prior database is
+backed up under `tmp/dev/backups/` first. The default target is the
+bootstrap dev owner; pass `--user users/<64hex>` for another scope.
 
 `publish-sample` keeps its name but publishes into the provisioned guest scope
 (`--user users/<guest-hash>`, never a sample wire). Without `--from`, it reads
