@@ -158,6 +158,12 @@ export function AccountLinesPlot({
 		(debt ? " Debts plot below zero." : "");
 	return (
 		<div className="grid gap-2">
+			<Chart
+				definition={definition}
+				ariaLabel="Net worth by account over the trailing window"
+				ariaDescription={description}
+				height={height ?? 280}
+			/>
 			<ul
 				aria-label="Accounts"
 				className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted"
@@ -187,12 +193,6 @@ export function AccountLinesPlot({
 					</li>
 				))}
 			</ul>
-			<Chart
-				definition={definition}
-				ariaLabel="Net worth by account over the trailing window"
-				ariaDescription={description}
-				height={height ?? 280}
-			/>
 		</div>
 	);
 }
