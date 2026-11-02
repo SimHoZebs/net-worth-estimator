@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../api/http.ts";
+import { AccountToggle } from "../components/AccountToggle.tsx";
 import { Button } from "../components/Button.tsx";
 import { ErrorNotice } from "../components/ErrorNotice.tsx";
 import { InputField } from "../components/Field.tsx";
@@ -48,7 +49,18 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 	// Editing starts from the stored preference when one exists, otherwise
 	// from the setup-day default: today, open-ended, nothing selected.
-	const draftAccounts = accountIds ?? policy?.accountIds ?? [];
+	// Selected accounts that no longer exist match nothing and the server
+	// rejects them on save, so they drop out of the draft once the owned
+	// list has loaded. The drift stays visible in the note below.
+	const ownedIds = useMemo(
+		() => new Set((accounts ?? []).map((account) => account.id)),
+		[accounts],
+	);
+	const draftAccounts = useMemo(() => {
+		const base = accountIds ?? policy?.accountIds ?? [];
+		if (accounts === null) return base;
+		return base.filter((id) => ownedIds.has(id));
+	}, [accountIds, policy, accounts, ownedIds]);
 	const draftStart = startDate ?? policy?.startDate ?? todayDay();
 	const draftEnd = endDate ?? policy?.endDate ?? "";
 
@@ -89,10 +101,6 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 	// Selected accounts that no longer exist match nothing on the server
 	// (account deletion strips them); surface the drift instead of hiding it.
-	const ownedIds = useMemo(
-		() => new Set((accounts ?? []).map((account) => account.id)),
-		[accounts],
-	);
 	const staleSelections = useMemo(
 		() =>
 			(policy?.accountIds ?? []).filter(
@@ -109,10 +117,18 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 		[grantsQuery.data],
 	);
 
+	// Dirty compares against the persisted selection minus deleted ids, so
+	// the drift note alone never reads as an unsaved edit.
+	const persistedAccounts = useMemo(() => {
+		const base = policy?.accountIds ?? [];
+		if (accounts === null) return base;
+		return base.filter((id) => ownedIds.has(id));
+	}, [policy, accounts, ownedIds]);
+
 	function toggleAccount(id: string) {
 		setFormError(null);
 		setAccountIds((current) => {
-			const base = current ?? policy?.accountIds ?? [];
+			const base = current ?? draftAccounts;
 			return base.includes(id)
 				? base.filter((entry) => entry !== id)
 				: [...base, id];
@@ -257,7 +273,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 		endDate !== null ||
 		(policy !== null &&
 			(policy.enabled ||
-				policy.accountIds.join(",") !== draftAccounts.join(",") ||
+				persistedAccounts.join(",") !== draftAccounts.join(",") ||
 				policy.startDate !== draftStart ||
 				(policy.endDate ?? "") !== draftEnd));
 
@@ -287,20 +303,17 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						No accounts yet. Add an account before sharing.
 					</p>
 				) : (
-					<ul className="grid list-none gap-2 p-0">
+					<div className="flex flex-wrap gap-2">
 						{accounts.map((account) => (
-							<li key={account.id} className="text-sm">
-								<label className="flex items-center gap-2">
-									<input
-										type="checkbox"
-										checked={draftAccounts.includes(account.id)}
-										onChange={() => toggleAccount(account.id)}
-									/>
-									{account.name}
-								</label>
-							</li>
+							<AccountToggle
+								key={account.id}
+								account={account}
+								checked={draftAccounts.includes(account.id)}
+								disabled={saving || stopping}
+								onToggle={() => toggleAccount(account.id)}
+							/>
 						))}
-					</ul>
+					</div>
 				)}
 			</fieldset>
 
@@ -308,8 +321,8 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				<p className="m-0 text-sm text-muted" role="note">
 					{staleSelections.length} previously selected{" "}
 					{staleSelections.length === 1 ? "account no longer" : "accounts no longer"}{" "}
-					exist, so {staleSelections.length === 1 ? "it shares" : "they share"} nothing.
-					Remove {staleSelections.length === 1 ? "it" : "them"} by saving new selections.
+					exist, so {staleSelections.length === 1 ? "it was" : "they were"} removed
+					from the selection. Saving keeps it that way.
 				</p>
 			)}
 

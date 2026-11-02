@@ -136,7 +136,7 @@ it("previews counts with the historical warning before enabling", async () => {
 	stubSharing();
 	render(<GroupSharingSection groupId="g1" />, { wrapper });
 	await screen.findByText("Checking");
-	fireEvent.click(screen.getByLabelText("Checking"));
+	fireEvent.click(screen.getByRole("button", { name: /Checking/ }));
 	expect(
 		await screen.findByText(/later bank imports can add older matching/),
 	).toBeTruthy();
@@ -154,6 +154,48 @@ it("previews counts with the historical warning before enabling", async () => {
 	);
 });
 
+it("drops deleted accounts from the draft but shows them", async () => {
+	const { requested } = stubSharing({
+		policy: {
+			ownerUserId: "user:test",
+			groupId: "g1",
+			enabled: false,
+			accountIds: ["checking", "gone"],
+			startDate: "2026-01-01",
+			endDate: "",
+			version: 1,
+			updatedAt: 1,
+		},
+	});
+	render(<GroupSharingSection groupId="g1" />, { wrapper });
+	expect(
+		await screen.findByText(/1 previously selected account no longer/),
+	).toBeTruthy();
+	expect(
+		screen.getByRole("button", { name: /Checking/ }),
+	).toHaveProperty("ariaPressed", "true");
+	// The preview and any save carry only owned accounts: the server
+	// would reject the deleted one.
+	await waitFor(() =>
+		expect(
+			requested.some(
+				(entry) =>
+					entry.path === "/v1/shared/policies/g1/preview" &&
+					Array.isArray(
+						(entry.body as Record<string, unknown>).accountIds,
+					) &&
+					(
+						(entry.body as Record<string, unknown>)
+							.accountIds as Array<string>
+					).join(",") === "checking",
+			),
+		).toBe(true),
+	);
+	// Drift alone is not an edit: no unsaved-changes note appears until
+	// the member toggles something.
+	expect(screen.queryByText(/Unsaved changes/)).toBeNull();
+});
+
 it("rejects enabling with no accounts selected", async () => {
 	stubSharing();
 	render(<GroupSharingSection groupId="g1" />, { wrapper });
@@ -168,7 +210,7 @@ it("shows a preview failure without blocking the form", async () => {
 	stubSharing({ failPreview: true });
 	render(<GroupSharingSection groupId="g1" />, { wrapper });
 	await screen.findByText("Checking");
-	fireEvent.click(screen.getByLabelText("Checking"));
+	fireEvent.click(screen.getByRole("button", { name: /Checking/ }));
 	expect(await screen.findByText(/Preview unavailable/)).toBeTruthy();
 	expect(screen.getByText("Turn on sharing")).toHaveProperty(
 		"disabled",
