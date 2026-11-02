@@ -111,65 +111,66 @@ cadence. Merchant identity, cadence evidence, and forecast rules remain distinct
   or rejecting one producer's claim never disturbs the independent claim.
 
 Like BNPL, recurring findings never create recurrence rules or change the
-financial model. Promoting a confirmed pattern into a forecast rule is a
+financial model. Creating a forecast rule from a confirmed pattern is a
 separate explicit action with its own review.
-## Recurring promotion
+
+## Pattern to new rule
 
 A confirmed repeating pattern becomes planned cash flow only through
 explicit approval in two steps: preview, then approve. Observed patterns
 and forecast definitions stay different resources: findings and feedback
 remain the evidence, recurrence rules remain the forecast.
 
-- `GET /v1/analysis-findings/{id}/recurring-preview` describes the rule the
+- `GET /v1/analysis-findings/{id}/pattern-to-new-rule-preview` describes the rule the
   pattern would create (name, amount, schedule, start) plus the forecast
   movements behind it and the recorded evidence. The plan stays visible
   before confirmation, with approval waiting on it. Patterns that repeat
   every two weeks stay visible with a plain-language reason: rules expand
   weekly, monthly, quarterly, or yearly, and no biweekly schedule exists
   yet.
-- `POST /v1/analysis-findings/{id}/recurring-promotion` creates the approved
+- `POST /v1/analysis-findings/{id}/pattern-to-new-rule` creates the approved
   rule through the ordinary finance row-write contract (validation,
   revision, last-write-wins). It requires a confirmed finding and refuses a
   second active rule for the same pattern with 409.
 - One active generated rule belongs to one confirmed source pattern. The
-  link lives in `analysis_promotions` beside the evidence, never inside the
+  record lives in `analysis_promotions` beside the evidence, never inside the
   financial rows. Disabling or deleting the rule leaves findings and
   feedback intact; a disabled or deleted rule frees the pattern for a
   replacement.
 - The generated rule always starts one full interval after the latest
   recorded movement, so approval never duplicates bank facts as forecast
-  movements. Promotion reads evidence only; preview is available in
+  movements. Creation reads evidence only; preview is available in
   read-only mode while approval requires write permission.
 - Confirm and reject corrections apply to every independent claim kind.
   Plan duration stays BNPL-specific and never corrects a recurrence claim.
 
 Setup installs `analysis_promotions` alongside the other Analysis tables;
 runtime rejects an incomplete schema. The deployment body provisions the
-link table for sources that predate it and verifies it on candidates. A
-user clear removes promotion links with the model rows they name.
+record table for sources that predate it and verifies it on candidates. A
+user clear removes pattern-to-new-rule records with the model rows they name.
 
-## Recurring link to an existing rule
+## Pattern to existing rule
 
 A confirmed pattern can also claim an existing rule's occurrences instead
 of creating a new rule. Each recorded movement becomes a manual
 `PostingClaim` against its nearest free scheduled occurrence, so the
 projection stops double-counting and the recorded rows stay intact.
 
-- `GET /v1/analysis-findings/{id}/recurring-link-preview?ruleId=...`
+- `GET /v1/analysis-findings/{id}/pattern-to-existing-rule-preview?ruleId=...`
   maps every occurrence to its nearest unused scheduled date (oldest
   first, skipped months stay skipped) with a plain-language reason when
   the rule is disabled, routing differs, or no date falls within
   tolerance (15% of the nominal interval, at least one day). Preview is
-  available in read-only mode, like promotion preview.
-- `POST /v1/analysis-findings/{id}/recurring-link` with `{ruleId}`
+  available in read-only mode, like new-rule preview.
+- `POST /v1/analysis-findings/{id}/pattern-to-existing-rule` with `{ruleId}`
   requires a confirmed finding and applies all claims through the
   ordinary finance validation boundary in one atomic store write
-  (concurrent links serialize on a process-wide mutex). Already-correct
+  (concurrent additions serialize on a process-wide mutex). Already-correct
   claims stay put; other enabled postings' claims on the same dates are
   never reused (disabled rows claim nothing, so their dates stay free).
   Success returns the claimed rows, finance warnings, and the
   model revision. Retries are idempotent.
-- Linking never creates rules or rewrites amounts, names, or dates. It
+- Adding never creates rules or rewrites amounts, names, or dates. It
   only sets `claim.ruleId` plus `claim.occurrenceDate`, exactly as the
   manual TransactionEditor link does, but for the whole pattern at once
   with schedule guidance. Clearing a claim stays a manual single-row
