@@ -147,6 +147,34 @@ Setup installs `analysis_promotions` alongside the other Analysis tables;
 runtime rejects an incomplete schema. The deployment body provisions the
 link table for sources that predate it and verifies it on candidates. A
 user clear removes promotion links with the model rows they name.
+
+## Recurring link to an existing rule
+
+A confirmed pattern can also claim an existing rule's occurrences instead
+of creating a new rule. Each recorded movement becomes a manual
+`PostingClaim` against its nearest free scheduled occurrence, so the
+projection stops double-counting and the recorded rows stay intact.
+
+- `GET /v1/analysis-findings/{id}/recurring-link-preview?ruleId=...`
+  maps every occurrence to its nearest unused scheduled date (oldest
+  first, skipped months stay skipped) with a plain-language reason when
+  the rule is disabled, routing differs, or no date falls within
+  tolerance (15% of the nominal interval, at least one day). Preview is
+  available in read-only mode, like promotion preview.
+- `POST /v1/analysis-findings/{id}/recurring-link` with `{ruleId}`
+  requires a confirmed finding and applies all claims through the
+  ordinary finance validation boundary in one atomic store write
+  (concurrent links serialize on a process-wide mutex). Already-correct
+  claims stay put; other enabled postings' claims on the same dates are
+  never reused (disabled rows claim nothing, so their dates stay free).
+  Success returns the claimed rows, finance warnings, and the
+  model revision. Retries are idempotent.
+- Linking never creates rules or rewrites amounts, names, or dates. It
+  only sets `claim.ruleId` plus `claim.occurrenceDate`, exactly as the
+  manual TransactionEditor link does, but for the whole pattern at once
+  with schedule guidance. Clearing a claim stays a manual single-row
+  edit.
+
 ## Transfer matching
 
 Transfer means one internal money movement observed as two opposite legs on
