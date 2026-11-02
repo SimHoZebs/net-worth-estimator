@@ -145,7 +145,7 @@ func TestGuestComputeAndFutureWriteBoundary(t *testing.T) {
 	}{
 		{"GET", "/v1/accounts", 204}, {"HEAD", "/v1/financial-model", 204},
 		{"POST", "/v1/projections/deterministic", 204}, {"POST", "/v1/projections/stochastic", 204},
-		{"POST", "/v1/position", 204},
+		{"POST", "/v1/position", 204}, {"POST", "/v1/flows", 204},
 		{"GET", "/v1/analyses", 204}, {"GET", "/v1/analysis-findings", 204},
 		{"PATCH", "/v1/analysis-findings/a", 401},
 		{"POST", "/v1/future-write", 401}, {"PATCH", "/v1/accounts/a", 401},

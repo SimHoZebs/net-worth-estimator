@@ -53,9 +53,12 @@ func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization
 }
 
 // Every unknown state-changing route requires write permission by default.
+// Read-only-safe compute (position, projections, and the flow graph, which
+// aggregates the same projection without storing anything) requires only
+// the project permission, so guests and read-only contexts can load it.
 // Action strings are user:* under the Casdoor model waypoint/user-access.
 func requestAction(r *http.Request) string {
-	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic") {
+	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic" || r.URL.Path == "/v1/flows") {
 		return "user:project"
 	}
 	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
