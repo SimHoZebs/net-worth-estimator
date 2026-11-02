@@ -50,7 +50,7 @@ test("group sharing consent stays off until the member opts in", async ({
 
 	// Selecting an owned account and a start date counts the live exposure
 	// on the server and warns about historical disclosure before enabling.
-	await sharing.getByLabel("Everyday checking").check();
+	await sharing.getByRole("button", { name: "Everyday checking" }).click();
 	await sharing.getByLabel("Share from").fill("2026-01-01");
 	await expect(sharing).toContainText(
 		/later bank imports can add older matching/,
