@@ -32,6 +32,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/integrationfixtures"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
@@ -90,6 +91,18 @@ func withFixturePrincipal(next http.Handler) http.Handler {
 		})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// loadFixtureModel seeds the harness baseline. INTEGRATION_PACK names one
+// integration fixture pack (backend/testdata/integration/v1) to seed
+// instead of the CSV model, so the browser suite can run its journeys
+// against any edge-case dataset on its own isolated ports and throwaway
+// database. Empty selects the default CSV fixture.
+func loadFixtureModel(modelPath string) (*types.FinancialModel, error) {
+	if pack := envOr("INTEGRATION_PACK", ""); pack != "" {
+		return integrationfixtures.Model(pack)
+	}
+	return csvio.ImportModel(modelPath)
 }
 
 func main() {
@@ -151,7 +164,7 @@ func main() {
 		if _, err := application.SQL().Exec(`DELETE FROM sharing_grants WHERE audience_type = 'user' AND audience_id = ?`, fixtureActor); err != nil {
 			return fmt.Errorf("clear fixture direct shares: %w", err)
 		}
-		doc, err := csvio.ImportModel(modelPath)
+		doc, err := loadFixtureModel(modelPath)
 		if err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}

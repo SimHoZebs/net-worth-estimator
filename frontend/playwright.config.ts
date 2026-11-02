@@ -82,6 +82,12 @@ export default defineConfig({
 				// A purpose-built fixture keeps assertions stable and keeps a
 				// real household's details out of the suite.
 				NET_WORTH_ESTIMATOR_MODEL_PATH: "../frontend/tests/fixtures/model",
+				// INTEGRATION_PACK seeds the harness from an integration
+				// fixture pack instead of the CSV model, so the matrix
+				// runner can drive these specs against any edge dataset.
+				// Empty keeps the default fixture; see
+				// docs/integration-edge-gates.md.
+				INTEGRATION_PACK: process.env.INTEGRATION_PACK ?? "",
 			},
 			url: `${apiOrigin}/healthz`,
 			reuseExistingServer: false,

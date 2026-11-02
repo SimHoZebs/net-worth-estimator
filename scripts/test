@@ -2,14 +2,14 @@
 # Unified test dispatcher: documents the unit vs integration split in one place.
 # Unit needs no servers, Docker daemon, or credentials.
 # Integration boots servers, Docker images, or a real provider.
-# Usage: scripts/test [--unit|--integration|--all|--e2e [--skip-build|--cold-build] [--step=name] [--timeout=N] [--clean]|--gate [--no-browser] [--shards=N]|--help]
+# Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matrix opts]|--gate [--no-browser] [--shards=N]|--help]
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'EOF'
-Usage: scripts/test [--unit|--integration|--all|--e2e [--skip-build|--cold-build] [--step=name] [--timeout=N] [--clean]|--gate [--no-browser] [--shards=N]|--help]
+Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matrix opts]|--gate [--no-browser] [--shards=N]|--help]
 
   --unit         go test + vitest + config contract tests (no servers/daemon/credentials)
   --integration  playwright browser suite (fixtureapi + Vite over real HTTP)
@@ -26,6 +26,18 @@ Usage: scripts/test [--unit|--integration|--all|--e2e [--skip-build|--cold-build
   --timeout=N    with --e2e: wall-clock budget in seconds (default 1800)
   --clean        with --e2e: remove the disposable root even on failure
                (removed on success, kept on failure by default)
+  --matrix       integration edge-case matrix: the Go edge-case suite once per
+               dataset-pack x identity-set combination, then teardown to
+               nothing (see docs/integration-edge-gates.md)
+  --browser      with --matrix: also run the sharing browser specs per pack
+               (fixture user only; duo/full/group journeys stay in Go)
+  --packs=A,B    with --matrix: fixture packs (default: base,unicode;
+               base means the suite default seed, all means every pack file)
+  --identities=A,B
+               with --matrix: solo, duo, full (default: full,duo,solo)
+  --repeat=N     with --matrix: go test -count for storm repetition (default 1)
+  --specs=A,B    with --matrix --browser: browser specs (default: the three
+               sharing specs)
   --gate         full completion gate: install check, one API generation, then
                backend, frontend, and extension gates in parallel groups,
                then the sharded browser suite
@@ -46,6 +58,11 @@ Matrix:
                regressions: auth/test-integration.mjs journeys, smoke scripts,
                proxy-header and deployment-image checks,
                migration-on-image verification)
+               INTEGRATION_PACK=<pack> seeds the fixture harness from
+                 backend/testdata/integration/v1 for any browser run
+  edge-matrix  scripts/test --matrix: INTEGRATION_PACK x
+               INTEGRATION_IDENTITY_SET over backend/internal/integrationedge
+               (throwaway SQLite per test, httptest HTTP, teardown to nothing)
                Manual, credential-gated (not in this dispatcher):
                  physical passkeys and phone recovery (docs/authentication.md
                  checklist); any production mutation (never gated, never run)
@@ -74,6 +91,61 @@ run_e2e() {
   : "${E2E_TEST_MUTATIONS:?Set E2E_TEST_MUTATIONS=1 to confirm the disposable-only run}"
   node auth/test-e2e.mjs $e2e_args
 }
+# Integration edge-case matrix: one Go suite run per dataset-pack x
+# identity-set combination. Each run uses throwaway SQLite databases and
+# httptest HTTP only: no canonical stack, no fixed ports, nothing to tear
+# down beyond the test temp dirs. With --browser, the sharing specs also run
+# per pack against the pack-seeded fixture harness (fresh temp database and
+# random free ports per run, pruned on exit by the browser config).
+run_matrix() {
+  local packs="$1" identities="$2" repeat="$3" browser="$4" specs="$5"
+  local failed=0 total=0
+  local pack identity
+  local old_ifs="$IFS"
+  IFS=,
+  # shellcheck disable=SC2162
+  for pack in $packs; do
+    for identity in $identities; do
+      total=$((total + 1))
+      echo "matrix: pack=${pack} identities=${identity} repeat=${repeat}"
+      if [ "$pack" = "base" ]; then
+        unset INTEGRATION_PACK
+      else
+        INTEGRATION_PACK="$pack"
+        export INTEGRATION_PACK
+      fi
+      export INTEGRATION_IDENTITY_SET="$identity"
+      if CGO_ENABLED=0 go -C backend test ./internal/integrationedge/ ./internal/integrationfixtures/ -count="$repeat"; then
+        echo "matrix: ok pack=${pack} identities=${identity}"
+      else
+        echo "matrix: FAIL pack=${pack} identities=${identity}"
+        failed=$((failed + 1))
+      fi
+      if [ "$browser" -eq 1 ]; then
+        if [ "$pack" = "base" ]; then
+          unset INTEGRATION_PACK
+        else
+          INTEGRATION_PACK="$pack"
+          export INTEGRATION_PACK
+        fi
+        # shellcheck disable=SC2086
+        if bun --filter ./frontend test:browser -- $specs; then
+          echo "matrix: ok browser pack=${pack}"
+        else
+          echo "matrix: FAIL browser pack=${pack}"
+          failed=$((failed + 1))
+        fi
+      fi
+    done
+  done
+  IFS="$old_ifs"
+  unset INTEGRATION_PACK INTEGRATION_IDENTITY_SET
+  echo "matrix: ${total} combination(s), ${failed} failure(s)"
+  if [ "$failed" -ne 0 ]; then
+    exit 1
+  fi
+}
+
 
 # Full completion gate. Frontend gates run in sequence because they share
 # generated API files. The backend, extension, and frontend groups run at the
@@ -162,9 +234,15 @@ mode=""
 run_browser=1
 shards=""
 e2e_args=""
+matrix_browser=0
+matrix_packs="base,unicode"
+matrix_identities="full,duo,solo"
+matrix_repeat=1
+matrix_specs="groupSharing.spec.ts sharedFeed.spec.ts inbox.spec.ts"
+matrix_only_opt=0
 for argument in "$@"; do
   case "$argument" in
-    --unit|--integration|--all|--e2e|--gate|--help|-h)
+    --unit|--integration|--all|--e2e|--gate|--matrix|--help|-h)
       if [ -n "$mode" ]; then
         echo "error: only one mode flag (use --help)" >&2
         exit 2
@@ -179,21 +257,26 @@ for argument in "$@"; do
       ;;
     --no-browser) run_browser=0 ;;
     --shards=*) shards="${argument#--shards=}" ;;
+    --browser) matrix_browser=1; matrix_only_opt=1 ;;
+    --packs=*) matrix_packs="${argument#--packs=}"; matrix_only_opt=1 ;;
+    --identities=*) matrix_identities="${argument#--identities=}"; matrix_only_opt=1 ;;
+    --repeat=*) matrix_repeat="${argument#--repeat=}"; matrix_only_opt=1 ;;
+    --specs=*) matrix_specs="${argument#--specs=}"; matrix_only_opt=1 ;;
     *) echo "error: unknown argument '$argument' (use --help)" >&2; exit 2 ;;
   esac
 done
 
 case "${mode:---help}" in
-  --gate|--help|-h) ;;
+  --gate|--help|-h|--matrix) ;;
   --e2e)
-    if [ "$run_browser" -eq 0 ] || [ -n "$shards" ]; then
+    if [ "$run_browser" -eq 0 ] || [ -n "$shards" ] || [ "$matrix_only_opt" -eq 1 ]; then
       echo "error: --no-browser and --shards need --gate (use --help)" >&2
       exit 2
     fi
     ;;
   *)
-    if [ "$run_browser" -eq 0 ] || [ -n "$shards" ] || [ -n "$e2e_args" ]; then
-      echo "error: --no-browser/--shards need --gate, --skip-build/--step/--timeout/--clean/--cold-build need --e2e (use --help)" >&2
+    if [ "$run_browser" -eq 0 ] || [ -n "$shards" ] || [ -n "$e2e_args" ] || [ "$matrix_only_opt" -eq 1 ]; then
+      echo "error: --no-browser/--shards need --gate, --skip-build/--step/--timeout/--clean/--cold-build need --e2e, --browser/--packs/--identities/--repeat/--specs need --matrix (use --help)" >&2
       exit 2
     fi
     ;;
@@ -211,6 +294,32 @@ case "${mode:---help}" in
       exit 2
     fi
     run_gate "$run_browser" "$shards"
+    ;;
+  --matrix)
+    if ! [[ "$matrix_repeat" =~ ^[1-9][0-9]*$ ]]; then
+      echo "error: --repeat needs a positive integer" >&2
+      exit 2
+    fi
+    if [ "$matrix_packs" = "all" ]; then
+      matrix_packs="$(ls backend/testdata/integration/v1/*.json | xargs -n1 basename | sed 's/\.json$//' | paste -sd, -)"
+    fi
+    if [ -z "$matrix_packs" ] || [ -z "$matrix_identities" ]; then
+      echo "error: --packs and --identities need values (use --help)" >&2
+      exit 2
+    fi
+    case ",$matrix_identities," in
+      *,,*|*[!a-z,]*)
+        echo "error: --identities names solo, duo, full separated by commas" >&2
+        exit 2
+        ;;
+    esac
+    for identity in ${matrix_identities//,/ }; do
+      case "$identity" in
+        solo|duo|full) ;;
+        *) echo "error: unknown identity set '$identity' (solo, duo, full)" >&2; exit 2 ;;
+      esac
+    done
+    run_matrix "$matrix_packs" "$matrix_identities" "$matrix_repeat" "$matrix_browser" "$matrix_specs"
     ;;
   *) echo "error: unknown mode '$mode' (use --help)" >&2; exit 2 ;;
 esac
