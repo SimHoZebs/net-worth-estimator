@@ -1,5 +1,5 @@
 {
-  "pack": "underwater",
+  "pack": "negative-net-worth",
   "version": 1,
   "concern": "Sustained negative net worth with volatile debt-driven swings: every plotted day sits below zero while individual accounts move sharply in both directions.",
   "breaksIfMishandled": "Charts or domains that assume a $0 floor fill the wrong side of the line, hide the zero rule, or print compact signs backwards ($-50k); views that drop negative layers misstate debt; tooltips and crosshairs that cannot format sub-zero values hide the recovery path.",
