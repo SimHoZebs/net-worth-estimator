@@ -310,6 +310,84 @@ test("existing friendships survive migration byte-identical", async (t) => {
   assert.deepEqual(await backups(directory), []);
 });
 
+test("pre-sharing database gains empty sharing tracks, validates, and serves sharing flows", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sharing-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  const guest = await secondUser(db);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO friendships(user_id, friend_user_id, display_name, created_at) VALUES
+    ('${owner}', '${guest}', 'Guest', 100);`);
+  // Model a deployed database from before the sharing tracks existed.
+  const sharingTables = ["sharing_grants", "sharing_copies", "inbox_share_state", "sharing_policies",
+    "sharing_visibility", "sharing_audit", "sharing_requests", "splits",
+    "split_allocations", "split_settlements", "split_settlement_requests"];
+  await sqlite(db, sharingTables.map((table) => `DROP TABLE ${table};`).join("\n"));
+  const usersBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;");
+  const friendsBefore = await rows(db, "SELECT user_id, friend_user_id, display_name, created_at FROM friendships ORDER BY 1, 2;");
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+
+  for (const table of sharingTables) {
+    assert.equal(await rows(db, `SELECT COUNT(*) FROM ${table};`), "0");
+  }
+  assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id;"), usersBefore);
+  assert.equal(await rows(db, "SELECT user_id, friend_user_id, display_name, created_at FROM friendships ORDER BY 1, 2;"), friendsBefore);
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+
+  // Schema setup validates the migrated database without changing it.
+  const setupHashBefore = await sha256File(db);
+  await run(join(tools, "setupdb"), ["--db", db]);
+  assert.equal(await sha256File(db), setupHashBefore);
+
+  // Every sharing track serves its flow against the migrated schema.
+  await run("go", ["test", "./internal/store/adapters/sqlite/", "-run", "TestSharingMigratedDatabaseFlows", "-count=1"], {
+    cwd: new URL("../backend/", import.meta.url).pathname,
+    env: { ...process.env, CGO_ENABLED: "0", WAYPOINT_MIGRATED_DB: db },
+  });
+
+  const names = await backups(directory);
+  assert.equal(names.length, 1);
+
+  // The provisioned target now repeats read-only with sharing rows intact.
+  const hashAfter = await sha256File(db);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+  assert.deepEqual(await backups(directory), names);
+});
+
+test("partial sharing schema fails closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sharingshape-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE splits;`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr, /Partial sharing schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
+test("incomplete sharing columns fail closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-sharingcolumns-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db } = await fullBase(directory);
+  await sqlite(db, `DROP TABLE sharing_grants;
+    CREATE TABLE sharing_grants(owner_user_id TEXT NOT NULL, posting_id TEXT NOT NULL);`);
+  const expected = (await sqlite(db, ".dump")).stdout;
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr, /Incomplete sharing schema/);
+  assert.equal((await sqlite(db, ".dump")).stdout, expected);
+  assert.deepEqual(await backups(directory), []);
+});
+
 test("partial friendships schema fails closed with the original unchanged", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-friendshape-"));
   t.after(() => rm(directory, { recursive: true, force: true }));

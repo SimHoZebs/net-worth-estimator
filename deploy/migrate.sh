@@ -133,6 +133,30 @@ analysis_count() {
   sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions');"
 }
 
+# Sharing tracks provision-if-missing like friendships: absent is expected
+# on pre-sharing databases, present requires the exact current shape, and
+# anything partial fails closed. Mail credential and receipt-discovery
+# tables stay out: they self-heal at first use, so this body never touches
+# those working paths.
+check_sharing() {
+  sqlite3 -readonly "$1" '
+    SELECT owner_user_id, posting_id, audience_type, audience_id, intent, created_at FROM sharing_grants LIMIT 0;
+    SELECT recipient_user_id, copy_posting_id, source_owner_id, source_posting_id, link_id, source_revision, grant_audience_type, grant_audience_id, grant_reason, copied_at, refreshed_at FROM sharing_copies LIMIT 0;
+    SELECT recipient_user_id, owner_user_id, posting_id, status, unread, dismissed, received_at, decided_at, copy_posting_id FROM inbox_share_state LIMIT 0;
+    SELECT owner_user_id, group_id, enabled, account_ids_json, start_date, end_date, version, updated_at FROM sharing_policies LIMIT 0;
+    SELECT owner_user_id, posting_id, group_id, policy_version, updated_at FROM sharing_visibility LIMIT 0;
+    SELECT id, owner_user_id, actor_user_id, kind, posting_id, audience_type, audience_id, group_id, detail_json, created_at FROM sharing_audit LIMIT 0;
+    SELECT actor_user_id, request_id, action, owner_user_id, posting_id, audience_type, audience_id, link_id, outcome_json, created_at FROM sharing_requests LIMIT 0;
+    SELECT split_id, version, source_owner_id, source_posting_id, source_revision, initiator_id, currency, total_minor, status, created_at, updated_at FROM splits LIMIT 0;
+    SELECT split_id, version, position, participant_id, amount_minor, accepted, accepted_at FROM split_allocations LIMIT 0;
+    SELECT settlement_id, split_id, participant_id, amount_minor, linked_owner_id, linked_posting_id, actor_id, request_id, created_at FROM split_settlements LIMIT 0;
+    SELECT actor_id, request_id, settlement_id, input_hash, created_at FROM split_settlement_requests LIMIT 0;' || return 1
+}
+
+sharing_count() {
+  sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('sharing_grants','sharing_copies','inbox_share_state','sharing_policies','sharing_visibility','sharing_audit','sharing_requests','splits','split_allocations','split_settlements','split_settlement_requests');"
+}
+
 # Friendships are provision-if-missing like the Analysis schema: absent is
 # expected on pre-friend databases, present requires the exact accepted-edge
 # shape, and anything partial fails closed.
@@ -213,6 +237,14 @@ fi
 if [ "$analysis" = 6 ]; then
   check_promotions "$db" || fail "Incomplete promotion schema. Refusing automatic repair."
 fi
+sharing=$(sharing_count "$db") || fail "Cannot inspect sharing schema; refusing to guess."
+case "$sharing" in
+  0|11) ;;
+  *) fail "Partial sharing schema. Refusing automatic repair." ;;
+esac
+if [ "$sharing" = 11 ]; then
+  check_sharing "$db" || fail "Incomplete sharing schema. Refusing automatic repair."
+fi
 posting_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='posting_id_migrations';") \
   || fail "Cannot inspect posting-ID audit table."
 postings_split=0
@@ -258,7 +290,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ] && [ "$friendships" = 1 ]; then  info "Checkpoints already carry observation instants with complete Analysis schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ] && [ "$friendships" = 1 ] && [ "$sharing" = 11 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
   exit 0
 fi
 
@@ -387,12 +419,161 @@ DDL
   fi
 fi
 
+# Provision the sharing tracks on pre-sharing candidates. The DDL mirrors
+# the application schema exactly; rows are never touched, so preexisting
+# sharing rows verify byte-identical below.
+if [ "$sharing" = 0 ]; then
+  sharing_sql="$backup/sharing.sql"
+  cat > "$sharing_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS sharing_grants (
+  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  posting_id TEXT NOT NULL,
+  audience_type TEXT NOT NULL CHECK (audience_type IN ('user', 'group', 'all')),
+  audience_id TEXT NOT NULL DEFAULT '',
+  intent TEXT NOT NULL CHECK (intent IN ('shared', 'excluded')),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (owner_user_id, posting_id, audience_type, audience_id),
+  CHECK ((audience_type = 'all' AND audience_id = '' AND intent = 'excluded') OR (audience_type IN ('user', 'group') AND audience_id <> ''))
+);
+CREATE INDEX IF NOT EXISTS sharing_grants_grantee ON sharing_grants(audience_type, audience_id, intent);
+CREATE TABLE IF NOT EXISTS sharing_copies (
+  recipient_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  copy_posting_id TEXT NOT NULL,
+  source_owner_id TEXT NOT NULL,
+  source_posting_id TEXT NOT NULL,
+  link_id TEXT NOT NULL,
+  source_revision TEXT NOT NULL DEFAULT '',
+  grant_audience_type TEXT NOT NULL DEFAULT '',
+  grant_audience_id TEXT NOT NULL DEFAULT '',
+  grant_reason TEXT NOT NULL DEFAULT '',
+  copied_at INTEGER NOT NULL,
+  refreshed_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (recipient_user_id, copy_posting_id),
+  UNIQUE (link_id)
+);
+CREATE INDEX IF NOT EXISTS sharing_copies_source ON sharing_copies(source_owner_id, source_posting_id);
+CREATE TABLE IF NOT EXISTS inbox_share_state (
+  recipient_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  owner_user_id TEXT NOT NULL,
+  posting_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  unread INTEGER NOT NULL DEFAULT 1 CHECK (unread IN (0, 1)),
+  dismissed INTEGER NOT NULL DEFAULT 0 CHECK (dismissed IN (0, 1)),
+  received_at INTEGER NOT NULL,
+  decided_at INTEGER NOT NULL DEFAULT 0,
+  copy_posting_id TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (recipient_user_id, owner_user_id, posting_id)
+);
+CREATE INDEX IF NOT EXISTS inbox_share_state_recipient ON inbox_share_state(recipient_user_id, unread, dismissed);
+CREATE TABLE IF NOT EXISTS sharing_policies (
+  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+  account_ids_json TEXT NOT NULL DEFAULT '[]',
+  start_date TEXT NOT NULL DEFAULT '',
+  end_date TEXT NOT NULL DEFAULT '',
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (owner_user_id, group_id)
+);
+CREATE INDEX IF NOT EXISTS sharing_policies_group ON sharing_policies(group_id, enabled);
+CREATE TABLE IF NOT EXISTS sharing_visibility (
+  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  posting_id TEXT NOT NULL,
+  group_id TEXT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+  policy_version INTEGER NOT NULL CHECK (policy_version >= 1),
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (owner_user_id, posting_id, group_id)
+);
+CREATE INDEX IF NOT EXISTS sharing_visibility_group ON sharing_visibility(group_id, owner_user_id, posting_id);
+CREATE TABLE IF NOT EXISTS sharing_audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  actor_user_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('policy-set', 'policy-strip', 'policies-cleared', 'grant', 'revoke', 'exclude', 'unexclude', 'index-rebuild', 'copy-accepted', 'link-refreshed', 'split-created', 'split-updated', 'split-accepted')),
+  posting_id TEXT NOT NULL DEFAULT '',
+  audience_type TEXT NOT NULL DEFAULT '',
+  audience_id TEXT NOT NULL DEFAULT '',
+  group_id TEXT NOT NULL DEFAULT '',
+  detail_json TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sharing_audit_owner ON sharing_audit(owner_user_id, created_at);
+CREATE TABLE IF NOT EXISTS sharing_requests (
+  actor_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  request_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  owner_user_id TEXT NOT NULL,
+  posting_id TEXT NOT NULL,
+  audience_type TEXT NOT NULL DEFAULT '',
+  audience_id TEXT NOT NULL DEFAULT '',
+  link_id TEXT NOT NULL DEFAULT '',
+  outcome_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (actor_user_id, request_id)
+);
+CREATE TABLE IF NOT EXISTS splits (
+  split_id TEXT NOT NULL,
+  version INTEGER NOT NULL CHECK (version >= 1),
+  source_owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_posting_id TEXT NOT NULL,
+  source_revision TEXT NOT NULL DEFAULT '',
+  initiator_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  currency TEXT NOT NULL,
+  total_minor INTEGER NOT NULL CHECK (total_minor >= 0),
+  status TEXT NOT NULL CHECK (status IN ('proposed', 'accepted')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (split_id, version)
+);
+CREATE INDEX IF NOT EXISTS splits_source ON splits(source_owner_id, source_posting_id);
+CREATE TABLE IF NOT EXISTS split_allocations (
+  split_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  participant_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+  accepted INTEGER NOT NULL DEFAULT 0 CHECK (accepted IN (0, 1)),
+  accepted_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (split_id, version, participant_id),
+  FOREIGN KEY (split_id, version) REFERENCES splits(split_id, version) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS split_allocations_participant ON split_allocations(participant_id);
+CREATE TABLE IF NOT EXISTS split_settlements (
+  settlement_id TEXT PRIMARY KEY,
+  split_id TEXT NOT NULL,
+  participant_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+  linked_owner_id TEXT REFERENCES users(id),
+  linked_posting_id TEXT,
+  actor_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  request_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  CHECK ((linked_owner_id IS NULL) = (linked_posting_id IS NULL))
+);
+CREATE INDEX IF NOT EXISTS split_settlements_split ON split_settlements(split_id, created_at, settlement_id);
+CREATE UNIQUE INDEX IF NOT EXISTS split_settlements_link ON split_settlements(linked_owner_id, linked_posting_id);
+CREATE TABLE IF NOT EXISTS split_settlement_requests (
+  actor_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  request_id TEXT NOT NULL,
+  settlement_id TEXT NOT NULL REFERENCES split_settlements(settlement_id) ON DELETE CASCADE,
+  input_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (actor_id, request_id)
+);
+DDL
+  if ! sqlite3 "$candidate" < "$sharing_sql" > "$backup/sharing.log" 2>&1; then
+    fail "Candidate sharing upgrade failed. Original unchanged; backup retained at $backup."
+  fi
+fi
+
 # Verify the full candidate before publication: target schema, integrity,
 # foreign keys, and every preserved table against the backup. Only the
 # checkpoint date-to-instant conversion and the settled-bank repair may
 # differ; Analysis rows for preexisting Analysis must be byte-identical.
 check_target "$candidate" || fail "Candidate Analysis verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_promotions "$candidate" || fail "Candidate promotion verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+check_sharing "$candidate" || fail "Candidate sharing verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_integrity "$candidate" || fail "Candidate integrity check failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 test "$(cp_cols "$candidate")" = "$FINAL_COLS" &&
   test "$(scoped_pk "$candidate")" = 1 &&
@@ -466,6 +647,11 @@ else
   empty=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM transaction_source_facts) + (SELECT COUNT(*) FROM analysis_inputs) + (SELECT COUNT(*) FROM analysis_runs) + (SELECT COUNT(*) FROM analysis_findings) + (SELECT COUNT(*) FROM analysis_feedback) + (SELECT COUNT(*) FROM analysis_promotions);") \
     || fail "Cannot verify provisioned Analysis tables; refusing to publish."
   test "$empty" = 0 || fail "Provisioned Analysis tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+if [ "$sharing" = 0 ]; then
+  empty_sharing=$(sqlite3 -readonly "$candidate" "SELECT (SELECT COUNT(*) FROM sharing_grants) + (SELECT COUNT(*) FROM sharing_copies) + (SELECT COUNT(*) FROM inbox_share_state) + (SELECT COUNT(*) FROM sharing_policies) + (SELECT COUNT(*) FROM sharing_visibility) + (SELECT COUNT(*) FROM sharing_audit) + (SELECT COUNT(*) FROM sharing_requests) + (SELECT COUNT(*) FROM splits) + (SELECT COUNT(*) FROM split_allocations) + (SELECT COUNT(*) FROM split_settlements) + (SELECT COUNT(*) FROM split_settlement_requests);") \
+    || fail "Cannot verify provisioned sharing tables; refusing to publish."
+  test "$empty_sharing" = 0 || fail "Provisioned sharing tables are not empty. Original unchanged; backup retained at $backup. Keep the API stopped."
 fi
 markers_kept=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (SELECT name FROM before.schema_migrations EXCEPT SELECT name FROM main.schema_migrations);") \
   || fail "Cannot verify schema markers; refusing to publish."
