@@ -121,6 +121,12 @@ or manual grant: signups join the members group at creation, and the
 provisioned guest resolves anonymous traffic through the viewers group.
 Account controls appear above sidebar navigation.
 
+Stable interactive login: the bootstrap owner signs in with its Casdoor
+username and the password recorded in `tmp/dev/config.json`
+(`CASDOOR_USER_PASSWORD`, file mode `0600`). Setup preserves that
+password across re-runs — it is the reusable dev credential, never
+committed anywhere.
+
 One shared application database holds every private user, the published guest
 scope, and application sessions. The verified `ownerSubject` in
 `tmp/dev/config.json` selects the user for server-level Bridge credentials,
