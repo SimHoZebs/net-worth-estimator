@@ -52,6 +52,7 @@ v2 alongside — loaders never migrate old packs in place.
 | invites | Expired, exhausted, and fresh single-use codes | Expired/used codes admit members without consent |
 | exclusions | Wildcard (audience all) exclusion before later rows arrive | Exclusions evaluated at write time leak rows to later audiences |
 | ledger | Fixed household ledger with hand-computed sums for completeness journeys: every surface must show the seed's known rows | Dropped, duplicated, or miscounted seed rows; merged lookalikes; resurrected phantoms; leaked revocations |
+| underwater | Sustained negative net worth with volatile debt-driven swings below zero | Charts or domains assuming a $0 floor; backwards compact signs; dropped negative layers or unformattable sub-zero tooltips |
 
 Loading per harness:
 

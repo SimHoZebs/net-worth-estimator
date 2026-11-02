@@ -41,6 +41,7 @@ const (
 	PackInvites     = "invites"
 	PackExclusions  = "exclusions"
 	PackLedger      = "ledger"
+	PackUnderwater  = "underwater"
 )
 
 // PackVersion is the only fixture format this loader reads. A format change
