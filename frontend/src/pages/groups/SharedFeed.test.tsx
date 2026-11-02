@@ -24,6 +24,8 @@ function feedItem(overrides: Partial<FeedItem> = {}): FeedItem {
 		posting: {
 			id: "p1",
 			name: "Groceries",
+			sourceAccountId: "checking",
+			destinations: [],
 			transactionTime: 1781472000,
 			amount: { resolver: "expression", config: { expression: "42.5" }, inputs: {} },
 		},
@@ -85,6 +87,8 @@ it("lists shared transactions with source, totals, and pending marker", async ()
 					posting: {
 						id: "p2",
 						name: "Dinner",
+						sourceAccountId: "checking",
+						destinations: [],
 						transactionTime: 1781472000,
 						pending: true,
 						amount: {
@@ -99,9 +103,9 @@ it("lists shared transactions with source, totals, and pending marker", async ()
 	]);
 	render(<SharedFeed groupId="g1" members={MEMBERS} />, { wrapper });
 	await waitFor(() => expect(screen.getByText("Groceries")).toBeTruthy());
-	expect(screen.getByText("Shared by Dana · Cabin · Jun 14, 2026")).toBeTruthy();
-	expect(screen.getByText("$42.50")).toBeTruthy();
-	expect(screen.getByText("Shared by Alex · Direct share · Jun 14, 2026 · Pending")).toBeTruthy();
+	expect(screen.getByText("Shared by Dana · Cabin")).toBeTruthy();
+	expect(screen.getByText("−$42.50")).toBeTruthy();
+	expect(screen.getByText("Shared by Alex · Direct share")).toBeTruthy();
 	expect(screen.getByText("Varies")).toBeTruthy();
 	expect(
 		screen.getByText("2 transactions · $60.50 shared · 1 calculated amount not summed · 1 pending"),
@@ -111,7 +115,7 @@ it("lists shared transactions with source, totals, and pending marker", async ()
 it("pages through the feed without repeating items", async () => {
 	stubFeed([
 		{ items: [feedItem()], nextCursor: "cursor-1" },
-		{ items: [feedItem({ posting: { id: "p3", name: "Fuel", transactionTime: 1781472000, amount: { resolver: "expression", config: { expression: "18" }, inputs: {} } } })] },
+		{ items: [feedItem({ posting: { id: "p3", name: "Fuel", sourceAccountId: "checking", destinations: [], transactionTime: 1781472000, amount: { resolver: "expression", config: { expression: "18" }, inputs: {} } } })] },
 	]);
 	render(<SharedFeed groupId="g1" members={MEMBERS} />, { wrapper });
 	await waitFor(() => expect(screen.getByText("Groceries")).toBeTruthy());
@@ -138,10 +142,14 @@ it("saves an independent copy from a feed row", async () => {
 	stubFeed([{ items: [feedItem()] }]);
 	render(<SharedFeed groupId="g1" members={MEMBERS} />, { wrapper });
 	await waitFor(() => expect(screen.getByText("Groceries")).toBeTruthy());
-	fireEvent.click(screen.getByText("Save a copy of Groceries"));
-	await waitFor(() =>
-		expect(screen.getByText("Saved to your transactions")).toBeTruthy(),
+	const saveButton = screen.getByRole("button", {
+		name: /Save a copy of Groceries/,
+	});
+	fireEvent.click(saveButton);
+	await waitFor(
+		() => expect((saveButton as HTMLButtonElement).disabled).toBe(true),
 	);
+	expect(screen.getByText("Saved")).toBeTruthy();
 });
 
 it("shows the empty state when nothing matches", async () => {
