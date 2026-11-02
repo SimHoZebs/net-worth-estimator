@@ -295,17 +295,9 @@ test("standalone purchase CRUD and priority survive reload without posting write
 	expect(postingWrites).toEqual([]);
 });
 
-// QUARANTINED: the purchase-dates assertions below read the funding schedule
-// from the planned-purchases overlay projection, which intermittently fails
-// server-side with `reader evaluation "postingFulfillment" must not rerun the
-// base simulation via simulatePurchases`
-// (backend/internal/domain/evaluation_runtime.go). The base and overlay
-// projections race inside one fixtureapi process; the identical request
-// succeeds in isolation and the same test fails on unmodified main (2/3 runs
-// observed). This is a backend reader/simulator guard race owned by the
-// evaluation-plugins workstream, not the row-first workspace refactor. Re-enable
-// once the guard is per-request instead of process-global.
-test.skip("purchase priorities persist and purchases protect all established payments", async ({
+// The schedule view groups dated purchases under the Purchase schedule
+// region with one time element per date group.
+test("purchase priorities persist and purchases protect all established payments", async ({
 	page,
 	request,
 }) => {
@@ -323,10 +315,9 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	).toHaveText("Chair is now priority 1.");
 	await page.getByRole("tab", { name: "Schedule" }).click();
 	await expect(
-		page.getByRole("list", { name: "Purchase dates" }).locator("time"),
-	).toHaveCount(2);
-	await page.getByRole("button", { name: "Save changes", exact: true }).click();
-	await expect(page.getByText("Changes saved.")).toBeVisible();
+		page.getByRole("region", { name: "Purchase schedule" }).locator("time"),
+	).toHaveCount(2, { timeout: 30_000 });
+	// Priority moves persist immediately, so reload proves the order stuck.
 	await page.reload();
 	await expect(queue.locator("li").first()).toContainText("Chair");
 	const response = await request.get(`${FIXTURE_API}/v1/financial-model`);
@@ -420,11 +411,7 @@ test.skip("purchase priorities persist and purchases protect all established pay
 	expect(errors).toEqual([]);
 });
 
-// QUARANTINED: same backend reader/simulator guard race as above. The funding
-// text comes from the planned-purchases overlay envelope, which intermittently
-// errors server-side even for byte-identical requests (verified by replay).
-// Re-enable with the test above once the guard race is fixed.
-test.skip("unfunded purchases hold lower priorities and the page remains accessible on mobile", async ({
+test("unfunded purchases hold lower priorities and the page remains accessible on mobile", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
