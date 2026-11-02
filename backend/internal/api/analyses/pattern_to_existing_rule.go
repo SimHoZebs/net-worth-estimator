@@ -12,56 +12,56 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// linkMu serializes recurring-link writes within one server instance.
+// patternToExistingRuleMu serializes additions within one server instance.
 // Preview plus claim updates are separate store calls; without this, two
-// concurrent links for one pattern could both pass preview and each claim
-// overlapping occurrences.
-var linkMu sync.Mutex
+// concurrent additions for one pattern could both pass preview and each
+// claim overlapping occurrences.
+var patternToExistingRuleMu sync.Mutex
 
-func linkError(err error) error {
-	return linkErrorAs(err, "The forecast link preview is temporarily unavailable")
+func patternToExistingRuleError(err error) error {
+	return patternToExistingRuleErrorAs(err, "The forecast preview is temporarily unavailable")
 }
 
-func linkErrorAs(err error, unavailable string) error {
+func patternToExistingRuleErrorAs(err error, unavailable string) error {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return huma.Error404NotFound("Finding not found")
-	case errors.Is(err, store.ErrRecurringLinkInvalid):
+	case errors.Is(err, store.ErrPatternToExistingRuleInvalid):
 		return huma.Error422UnprocessableEntity(err.Error())
-	case errors.Is(err, store.ErrRecurringLinkConflict):
+	case errors.Is(err, store.ErrPatternToExistingRuleConflict):
 		return huma.Error409Conflict(err.Error())
 	default:
 		return huma.Error500InternalServerError(unavailable)
 	}
 }
 
-func (s *handler) previewRecurringLink(_ context.Context, input *struct {
+func (s *handler) previewPatternToExistingRule(_ context.Context, input *struct {
 	ID     string `path:"id"`
 	RuleID string `query:"ruleId" maxLength:"100"`
 }) (*struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
-		Preview types.RecurringLinkPreview `json:"preview"`
+		Preview types.PatternToExistingRulePreview `json:"preview"`
 	}
 }, error) {
 	if input.RuleID == "" {
 		return nil, huma.Error422UnprocessableEntity("ruleId is required")
 	}
-	preview, err := s.store.PreviewRecurringLink(input.ID, input.RuleID)
+	preview, err := s.store.PreviewPatternToExistingRule(input.ID, input.RuleID)
 	if err != nil {
-		return nil, linkError(err)
+		return nil, patternToExistingRuleError(err)
 	}
 	output := &struct {
 		CacheControl string `header:"Cache-Control"`
 		Body         struct {
-			Preview types.RecurringLinkPreview `json:"preview"`
+			Preview types.PatternToExistingRulePreview `json:"preview"`
 		}
 	}{CacheControl: "private, no-store"}
 	output.Body.Preview = preview
 	return output, nil
 }
 
-func (s *handler) linkRecurringPattern(ctx context.Context, input *struct {
+func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 	ID   string `path:"id"`
 	Body struct {
 		RuleID string `json:"ruleId" maxLength:"100"`
@@ -82,19 +82,19 @@ func (s *handler) linkRecurringPattern(ctx context.Context, input *struct {
 	if input.Body.RuleID == "" {
 		return nil, huma.Error422UnprocessableEntity("ruleId is required")
 	}
-	linkMu.Lock()
-	defer linkMu.Unlock()
-	preview, err := s.store.PreviewRecurringLink(input.ID, input.Body.RuleID)
+	patternToExistingRuleMu.Lock()
+	defer patternToExistingRuleMu.Unlock()
+	preview, err := s.store.PreviewPatternToExistingRule(input.ID, input.Body.RuleID)
 	if err != nil {
-		return nil, linkErrorAs(err, "The forecast link could not be saved.")
+		return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
 	}
-	if !preview.Linkable {
-		// The adapter returns no assignments on any Linkable=false path, so
-		// every not-linkable preview is an invalid request: unconfirmed
+	if !preview.Claimable {
+		// The adapter returns no assignments on any Claimable=false path, so
+		// every not-claimable preview is an invalid request: unconfirmed
 		// patterns wait on review, disabled rules need enabling, and
 		// mismatched schedules need a different rule.
 		if preview.Reason == "" {
-			return nil, huma.Error422UnprocessableEntity("This pattern cannot be linked yet.")
+			return nil, huma.Error422UnprocessableEntity("This pattern cannot be added yet.")
 		}
 		return nil, huma.Error422UnprocessableEntity(preview.Reason)
 	}
@@ -105,11 +105,11 @@ func (s *handler) linkRecurringPattern(ctx context.Context, input *struct {
 	// finance boundary before persisting.
 	model, err := s.store.LoadModel()
 	if err != nil {
-		return nil, huma.Error500InternalServerError("The forecast link could not be saved.")
+		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
 	}
-	// Re-check the rule is still enabled: rule writes do not take linkMu, so
+	// Re-check the rule is still enabled: rule writes do not take patternToExistingRuleMu, so
 	// a disable landing between preview and persist must not mint claims the
-	// preview calls un-linkable. A deleted rule falls through to finance
+	// preview calls un-claimable. A deleted rule falls through to finance
 	// validation, which reports the missing rule as 422.
 	ruleFound, ruleEnabled := false, false
 	for i := range model.RecurrenceRules {
@@ -119,7 +119,7 @@ func (s *handler) linkRecurringPattern(ctx context.Context, input *struct {
 		}
 	}
 	if ruleFound && !ruleEnabled {
-		return nil, huma.Error422UnprocessableEntity("That forecast rule is disabled. Enable it before linking.")
+		return nil, huma.Error422UnprocessableEntity("That forecast rule is disabled. Enable it before adding payments to it.")
 	}
 	baseline := domain.EvaluationReferenceIssues(model)
 	candidate := *model
@@ -145,14 +145,14 @@ func (s *handler) linkRecurringPattern(ctx context.Context, input *struct {
 	}
 	rows, err := s.store.SetPostingClaims(claims)
 	if err != nil {
-		if errors.Is(err, store.ErrRecurringLinkInvalid) {
-			return nil, linkErrorAs(err, "The forecast link could not be saved.")
+		if errors.Is(err, store.ErrPatternToExistingRuleInvalid) {
+			return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
 		}
 		return nil, modelstate.WriteError(err)
 	}
 	stored, err := s.store.LoadModel()
 	if err != nil {
-		return nil, huma.Error500InternalServerError("The forecast link could not be saved.")
+		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
 	}
 	warnings := domain.ValidateFinanceModel(stored)
 	if warnings == nil {
@@ -160,7 +160,7 @@ func (s *handler) linkRecurringPattern(ctx context.Context, input *struct {
 	}
 	revision, err := store.ModelETag(stored)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("The forecast link could not be saved.")
+		return nil, huma.Error500InternalServerError("The forecast addition could not be saved.")
 	}
 	output := &struct {
 		Body struct {

@@ -15,7 +15,7 @@ import (
 //
 // The bank rows enter through the real sync reconcile, the detection lands
 // through the real analysis persistence path, and every step after that —
-// confirm, promotion preview, approval, the deterministic forecast, and the
+// confirm, new-rule preview, approval, the deterministic forecast, and the
 // rule edit — runs over production HTTP against the stored model. The only
 // shortcut is invoking the analysis claim directly instead of waiting for
 // the background runner tick; the claim and completion calls are the same
@@ -74,23 +74,23 @@ func qa03RuleEvents(result *types.ProjectionResult) []types.TransactionEvent {
 	return matched
 }
 
-func TestQA03RecurringDetectionPromotesIntoForecastAndDisablesCleanly(t *testing.T) {
+func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
 	handler := New(scoped, Config{})
-	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/recurring-preview"
-	promotePath := "/v1/analysis-findings/" + findings[0].ID + "/recurring-promotion"
+	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule-preview"
+	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule"
 
 	var preview struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}
 	if res := callAPI(t, handler, "GET", previewPath, ""); res.Code != 200 {
 		t.Fatalf("preview = %d %s", res.Code, res.Body.String())
 	} else if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Promotable {
-		t.Fatal("unconfirmed pattern previews as promotable")
+	if preview.Preview.Creatable {
+		t.Fatal("unconfirmed pattern previews as creatable")
 	}
 
 	confirmAPIFinding(t, handler, findings[0])
@@ -100,22 +100,22 @@ func TestQA03RecurringDetectionPromotesIntoForecastAndDisablesCleanly(t *testing
 	} else if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Preview.Promotable || preview.Preview.Rule == nil {
-		t.Fatalf("preview = %+v, want a promotable rule", preview.Preview)
+	if !preview.Preview.Creatable || preview.Preview.Rule == nil {
+		t.Fatalf("preview = %+v, want a creatable rule", preview.Preview)
 	}
 
-	var promoted struct {
+	var created struct {
 		Row        types.RecurrenceRule `json:"row"`
 		Persisted  bool                 `json:"persisted"`
 		PatternKey string               `json:"patternKey"`
 	}
-	if res := callAPI(t, handler, "POST", promotePath, ""); res.Code != 200 {
-		t.Fatalf("promote = %d %s", res.Code, res.Body.String())
-	} else if err := json.Unmarshal(res.Body.Bytes(), &promoted); err != nil {
+	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 200 {
+		t.Fatalf("create = %d %s", res.Code, res.Body.String())
+	} else if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if !promoted.Persisted || promoted.PatternKey == "" {
-		t.Fatalf("promoted = %+v", promoted)
+	if !created.Persisted || created.PatternKey == "" {
+		t.Fatalf("created = %+v", created)
 	}
 
 	// The generated rule appears in the stored-model forecast as monthly
@@ -140,8 +140,8 @@ func TestQA03RecurringDetectionPromotesIntoForecastAndDisablesCleanly(t *testing
 	}
 
 	// A duplicate approval is rejected and creates no second rule.
-	if res := callAPI(t, handler, "POST", promotePath, ""); res.Code != 409 {
-		t.Fatalf("second promote = %d %s, want 409", res.Code, res.Body.String())
+	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
+		t.Fatalf("second create = %d %s, want 409", res.Code, res.Body.String())
 	}
 	if model, err := scoped.LoadModel(); err != nil || len(model.RecurrenceRules) != 1 {
 		t.Fatalf("rules = %+v err = %v, want exactly one", model, err)
@@ -150,10 +150,10 @@ func TestQA03RecurringDetectionPromotesIntoForecastAndDisablesCleanly(t *testing
 	// Disabling the rule drops it from the forecast but leaves the
 	// detection evidence — findings and confirmation — intact.
 	disable, _ := json.Marshal(map[string]any{
-		"name": promoted.Row.Name, "sourceAccountId": "checking", "amount": promoted.Row.Amount,
-		"frequency": promoted.Row.Frequency, "startDate": promoted.Row.StartDate, "enabled": false,
+		"name": created.Row.Name, "sourceAccountId": "checking", "amount": created.Row.Amount,
+		"frequency": created.Row.Frequency, "startDate": created.Row.StartDate, "enabled": false,
 	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+promoted.Row.ID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Row.ID, string(disable)); res.Code != 200 {
 		t.Fatalf("disable = %d %s", res.Code, res.Body.String())
 	}
 	clean := qa03StoredProjection(t, handler)

@@ -79,15 +79,15 @@ func callAPI(t *testing.T, handler http.Handler, method, path, body string) *htt
 	return res
 }
 
-func TestRecurringPromotionHTTPContract(t *testing.T) {
+func TestPatternToNewRuleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
 	handler := New(scoped, Config{})
-	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/recurring-preview"
-	promotePath := "/v1/analysis-findings/" + findings[0].ID + "/recurring-promotion"
+	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule-preview"
+	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule"
 
 	var preview struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}
 	res := callAPI(t, handler, "GET", previewPath, "")
 	if res.Code != 200 || res.Header().Get("Cache-Control") != "private, no-store" {
@@ -96,11 +96,11 @@ func TestRecurringPromotionHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Promotable {
-		t.Fatal("unconfirmed pattern previews as promotable")
+	if preview.Preview.Creatable {
+		t.Fatal("unconfirmed pattern previews as creatable")
 	}
-	if res := callAPI(t, handler, "POST", promotePath, ""); res.Code != 409 {
-		t.Fatalf("unconfirmed promote=%d %s", res.Code, res.Body.String())
+	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
+		t.Fatalf("unconfirmed create=%d %s", res.Code, res.Body.String())
 	}
 	confirmAPIFinding(t, handler, findings[0])
 	res = callAPI(t, handler, "GET", previewPath, "")
@@ -108,12 +108,12 @@ func TestRecurringPromotionHTTPContract(t *testing.T) {
 		t.Fatalf("preview=%d %s", res.Code, res.Body.String())
 	}
 	preview = struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}{}
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Preview.Promotable || preview.Preview.Rule == nil || preview.Preview.Rule.Frequency != types.FrequencyMonthly || preview.Preview.Rule.StartDate != "2026-04-15" {
+	if !preview.Preview.Creatable || preview.Preview.Rule == nil || preview.Preview.Rule.Frequency != types.FrequencyMonthly || preview.Preview.Rule.StartDate != "2026-04-15" {
 		t.Fatalf("preview=%+v", preview.Preview)
 	}
 	if len(preview.Preview.Upcoming) != 6 || preview.Preview.Upcoming[0].Date != "2026-04-15" {
@@ -124,22 +124,22 @@ func TestRecurringPromotionHTTPContract(t *testing.T) {
 			t.Fatalf("forecast duplicates recorded movement: %+v", preview.Preview.Upcoming)
 		}
 	}
-	var promoted struct {
+	var created struct {
 		Row        types.RecurrenceRule         `json:"row"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
 		Persisted  bool                         `json:"persisted"`
 		Revision   string                       `json:"revision"`
 		PatternKey string                       `json:"patternKey"`
 	}
-	res = callAPI(t, handler, "POST", promotePath, "")
+	res = callAPI(t, handler, "POST", createPath, "")
 	if res.Code != 200 {
-		t.Fatalf("promote=%d %s", res.Code, res.Body.String())
+		t.Fatalf("create=%d %s", res.Code, res.Body.String())
 	}
-	if err := json.Unmarshal(res.Body.Bytes(), &promoted); err != nil {
+	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if !promoted.Persisted || promoted.Row.Frequency != types.FrequencyMonthly || promoted.Row.StartDate != "2026-04-15" || !promoted.Row.Enabled || promoted.PatternKey == "" {
-		t.Fatalf("promoted=%+v", promoted)
+	if !created.Persisted || created.Row.Frequency != types.FrequencyMonthly || created.Row.StartDate != "2026-04-15" || !created.Row.Enabled || created.PatternKey == "" {
+		t.Fatalf("created=%+v", created)
 	}
 	model, err := scoped.LoadModel()
 	if err != nil || len(model.RecurrenceRules) != 1 {
@@ -147,27 +147,27 @@ func TestRecurringPromotionHTTPContract(t *testing.T) {
 	}
 	res = callAPI(t, handler, "GET", previewPath, "")
 	preview = struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}{}
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Promotable || preview.Preview.ExistingRuleID != promoted.Row.ID {
+	if preview.Preview.Creatable || preview.Preview.ExistingRuleID != created.Row.ID {
 		t.Fatalf("second preview=%+v", preview.Preview)
 	}
-	if res := callAPI(t, handler, "POST", promotePath, ""); res.Code != 409 {
-		t.Fatalf("second promote=%d %s", res.Code, res.Body.String())
+	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
+		t.Fatalf("second create=%d %s", res.Code, res.Body.String())
 	}
 	disable, _ := json.Marshal(map[string]any{
-		"name": promoted.Row.Name, "sourceAccountId": "checking", "amount": promoted.Row.Amount,
-		"frequency": promoted.Row.Frequency, "startDate": promoted.Row.StartDate, "enabled": false,
+		"name": created.Row.Name, "sourceAccountId": "checking", "amount": created.Row.Amount,
+		"frequency": created.Row.Frequency, "startDate": created.Row.StartDate, "enabled": false,
 	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+promoted.Row.ID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Row.ID, string(disable)); res.Code != 200 {
 		t.Fatalf("disable=%d %s", res.Code, res.Body.String())
 	}
-	res = callAPI(t, handler, "POST", promotePath, "")
+	res = callAPI(t, handler, "POST", createPath, "")
 	if res.Code != 200 {
-		t.Fatalf("repromote=%d %s", res.Code, res.Body.String())
+		t.Fatalf("recreate=%d %s", res.Code, res.Body.String())
 	}
 	var second struct {
 		Row       types.RecurrenceRule `json:"row"`
@@ -176,8 +176,8 @@ func TestRecurringPromotionHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &second); err != nil {
 		t.Fatal(err)
 	}
-	if !second.Persisted || second.Row.ID == promoted.Row.ID {
-		t.Fatalf("repromote=%+v", second)
+	if !second.Persisted || second.Row.ID == created.Row.ID {
+		t.Fatalf("recreate=%+v", second)
 	}
 	if res := callAPI(t, handler, "DELETE", "/v1/recurrence-rules/"+second.Row.ID, ""); res.Code != 200 {
 		t.Fatalf("delete=%d %s", res.Code, res.Body.String())
@@ -191,38 +191,38 @@ func TestRecurringPromotionHTTPContract(t *testing.T) {
 		t.Fatalf("feedback=%+v err=%v", feedback, err)
 	}
 	for _, config := range []Config{{ReadOnly: true}, {CanWrite: func(context.Context) bool { return false }}} {
-		if res := callAPI(t, New(scoped, config), "POST", promotePath, ""); res.Code != 403 {
+		if res := callAPI(t, New(scoped, config), "POST", createPath, ""); res.Code != 403 {
 			t.Fatalf("guard=%d %s", res.Code, res.Body.String())
 		}
 		if res := callAPI(t, New(scoped, config), "GET", previewPath, ""); res.Code != 200 {
 			t.Fatalf("read-only preview=%d %s", res.Code, res.Body.String())
 		}
 	}
-	if res := callAPI(t, handler, "GET", "/v1/analysis-findings/missing/recurring-preview", ""); res.Code != 404 {
+	if res := callAPI(t, handler, "GET", "/v1/analysis-findings/missing/pattern-to-new-rule-preview", ""); res.Code != 404 {
 		t.Fatalf("missing=%d %s", res.Code, res.Body.String())
 	}
 }
 
-func TestRecurringPromotionRejectsBiweekly(t *testing.T) {
+func TestPatternToNewRuleRejectsBiweekly(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "biweekly")
 	handler := New(scoped, Config{})
 	confirmAPIFinding(t, handler, findings[0])
-	res := callAPI(t, handler, "GET", "/v1/analysis-findings/"+findings[0].ID+"/recurring-preview", "")
+	res := callAPI(t, handler, "GET", "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule-preview", "")
 	if res.Code != 200 {
 		t.Fatalf("preview=%d %s", res.Code, res.Body.String())
 	}
 	var preview struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Promotable || preview.Preview.Reason == "" {
+	if preview.Preview.Creatable || preview.Preview.Reason == "" {
 		t.Fatalf("preview=%+v", preview.Preview)
 	}
-	if res := callAPI(t, handler, "POST", "/v1/analysis-findings/"+findings[0].ID+"/recurring-promotion", ""); res.Code != 422 {
-		t.Fatalf("promote=%d %s", res.Code, res.Body.String())
+	if res := callAPI(t, handler, "POST", "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule", ""); res.Code != 422 {
+		t.Fatalf("create=%d %s", res.Code, res.Body.String())
 	}
 	model, err := scoped.LoadModel()
 	if err != nil || len(model.RecurrenceRules) != 0 {

@@ -12,53 +12,53 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// promoteMu serializes approvals within one server instance. Preview, link
+// patternToNewRuleMu serializes creations within one server instance. Preview,
 // record, and rule creation are separate store calls; without this, two
-// concurrent approvals for one pattern could both pass preview and each
+// concurrent creations for one pattern could both pass preview and each
 // create their own rule. The store contract already assumes one server and
 // one instance, so a process-wide mutex matches the deployment.
-var promoteMu sync.Mutex
+var patternToNewRuleMu sync.Mutex
 
-func promotionError(err error) error {
-	return promotionErrorAs(err, "The forecast preview is temporarily unavailable")
+func patternToNewRuleError(err error) error {
+	return patternToNewRuleErrorAs(err, "The forecast preview is temporarily unavailable")
 }
 
-func promotionErrorAs(err error, unavailable string) error {
+func patternToNewRuleErrorAs(err error, unavailable string) error {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return huma.Error404NotFound("Finding not found")
-	case errors.Is(err, store.ErrRecurringPromotionInvalid):
+	case errors.Is(err, store.ErrPatternToNewRuleInvalid):
 		return huma.Error422UnprocessableEntity(err.Error())
-	case errors.Is(err, store.ErrRecurringPromotionConflict):
+	case errors.Is(err, store.ErrPatternToNewRuleConflict):
 		return huma.Error409Conflict(err.Error())
 	default:
 		return huma.Error500InternalServerError(unavailable)
 	}
 }
 
-func (s *handler) previewRecurringPromotion(_ context.Context, input *struct {
+func (s *handler) previewPatternToNewRule(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}
 }, error) {
-	preview, err := s.store.PreviewRecurringPromotion(input.ID)
+	preview, err := s.store.PreviewPatternToNewRule(input.ID)
 	if err != nil {
-		return nil, promotionError(err)
+		return nil, patternToNewRuleError(err)
 	}
 	output := &struct {
 		CacheControl string `header:"Cache-Control"`
 		Body         struct {
-			Preview types.RecurringPromotionPreview `json:"preview"`
+			Preview types.PatternToNewRulePreview `json:"preview"`
 		}
 	}{CacheControl: "private, no-store"}
 	output.Body.Preview = preview
 	return output, nil
 }
 
-func (s *handler) promoteRecurringPattern(ctx context.Context, input *struct {
+func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	ID string `path:"id"`
 }) (*struct {
 	Body struct {
@@ -72,13 +72,13 @@ func (s *handler) promoteRecurringPattern(ctx context.Context, input *struct {
 	if s.canWrite != nil && !s.canWrite(ctx) {
 		return nil, huma.Error403Forbidden("Write permission is required")
 	}
-	promoteMu.Lock()
-	defer promoteMu.Unlock()
-	preview, err := s.store.PreviewRecurringPromotion(input.ID)
+	patternToNewRuleMu.Lock()
+	defer patternToNewRuleMu.Unlock()
+	preview, err := s.store.PreviewPatternToNewRule(input.ID)
 	if err != nil {
-		return nil, promotionErrorAs(err, "The forecast rule could not be saved.")
+		return nil, patternToNewRuleErrorAs(err, "The forecast rule could not be saved.")
 	}
-	if !preview.Promotable {
+	if !preview.Creatable {
 		// A visible plan without a rule cannot become one yet. A visible
 		// plan with a rule waits on approval state: confirmation first,
 		// then at most one active rule per pattern.
@@ -104,13 +104,13 @@ func (s *handler) promoteRecurringPattern(ctx context.Context, input *struct {
 	// Record the pattern-to-rule link before creating the rule row. A link
 	// without a rule reads as inactive, so a retry after an interrupted
 	// approval replaces the link instead of creating a second rule.
-	if err := s.store.RecordRecurringPromotion(types.RecurringPromotion{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
+	if err := s.store.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
 		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
 	}
 	row, issues, persisted, revision, err := model.PersistFinanceRule(s.store, rule)
 	if err != nil || !persisted {
 		// Leave a concurrent winner's link alone: remove only our own.
-		_ = s.store.RemoveRecurringPromotion(preview.PatternKey, rule.ID)
+		_ = s.store.RemovePatternToNewRule(preview.PatternKey, rule.ID)
 		if err != nil {
 			return nil, err
 		}

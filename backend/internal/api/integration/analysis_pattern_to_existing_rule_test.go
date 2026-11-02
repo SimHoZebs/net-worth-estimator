@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestRecurringLinkHTTPContract(t *testing.T) {
+func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
 	handler := New(scoped, Config{})
@@ -29,11 +29,11 @@ func TestRecurringLinkHTTPContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	ruleID := created.Row.ID
-	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/recurring-link-preview?ruleId=" + ruleID
-	linkPath := "/v1/analysis-findings/" + findings[0].ID + "/recurring-link"
+	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-rule-preview?ruleId=" + ruleID
+	addPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-rule"
 
 	var preview struct {
-		Preview types.RecurringLinkPreview `json:"preview"`
+		Preview types.PatternToExistingRulePreview `json:"preview"`
 	}
 	res = callAPI(t, handler, "GET", previewPath, "")
 	if res.Code != 200 {
@@ -42,20 +42,20 @@ func TestRecurringLinkHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Linkable {
-		t.Fatalf("unconfirmed preview linkable=%+v", preview.Preview)
+	if preview.Preview.Claimable {
+		t.Fatalf("unconfirmed preview claimable=%+v", preview.Preview)
 	}
-	linkBody, _ := json.Marshal(map[string]any{"ruleId": ruleID})
-	// Linking before confirmation is rejected without touching the model.
-	if res := callAPI(t, handler, "POST", linkPath, string(linkBody)); res.Code != 422 {
-		t.Fatalf("unconfirmed link=%d %s", res.Code, res.Body.String())
+	addBody, _ := json.Marshal(map[string]any{"ruleId": ruleID})
+	// Adding before confirmation is rejected without touching the model.
+	if res := callAPI(t, handler, "POST", addPath, string(addBody)); res.Code != 422 {
+		t.Fatalf("unconfirmed add=%d %s", res.Code, res.Body.String())
 	}
 	confirmAPIFinding(t, handler, findings[0])
 	res = callAPI(t, handler, "GET", previewPath, "")
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Preview.Linkable || len(preview.Preview.Assignments) != 3 {
+	if !preview.Preview.Claimable || len(preview.Preview.Assignments) != 3 {
 		t.Fatalf("preview=%+v", preview.Preview)
 	}
 	want := map[string]string{}
@@ -65,12 +65,12 @@ func TestRecurringLinkHTTPContract(t *testing.T) {
 	if len(want) != 3 {
 		t.Fatalf("assignments=%+v", preview.Preview.Assignments)
 	}
-	linkBody, _ = json.Marshal(map[string]any{"ruleId": ruleID})
-	res = callAPI(t, handler, "POST", linkPath, string(linkBody))
+	addBody, _ = json.Marshal(map[string]any{"ruleId": ruleID})
+	res = callAPI(t, handler, "POST", addPath, string(addBody))
 	if res.Code != 200 {
-		t.Fatalf("link=%d %s", res.Code, res.Body.String())
+		t.Fatalf("add=%d %s", res.Code, res.Body.String())
 	}
-	var linked struct {
+	var added struct {
 		Rows       []types.Posting              `json:"rows"`
 		Persisted  bool                         `json:"persisted"`
 		PatternKey string                       `json:"patternKey"`
@@ -78,11 +78,11 @@ func TestRecurringLinkHTTPContract(t *testing.T) {
 		Revision   string                       `json:"revision"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
 	}
-	if err := json.Unmarshal(res.Body.Bytes(), &linked); err != nil {
+	if err := json.Unmarshal(res.Body.Bytes(), &added); err != nil {
 		t.Fatal(err)
 	}
-	if !linked.Persisted || len(linked.Rows) != 3 || linked.RuleID != ruleID {
-		t.Fatalf("linked=%+v", linked)
+	if !added.Persisted || len(added.Rows) != 3 || added.RuleID != ruleID {
+		t.Fatalf("added=%+v", added)
 	}
 	model, err := scoped.LoadModel()
 	if err != nil {
@@ -98,16 +98,16 @@ func TestRecurringLinkHTTPContract(t *testing.T) {
 		t.Fatalf("claimed=%d model=%+v", claimed, model.Postings)
 	}
 	// Idempotent retry keeps the same claims.
-	res = callAPI(t, handler, "POST", linkPath, string(linkBody))
+	res = callAPI(t, handler, "POST", addPath, string(addBody))
 	if res.Code != 200 {
-		t.Fatalf("relink=%d %s", res.Code, res.Body.String())
+		t.Fatalf("readd=%d %s", res.Code, res.Body.String())
 	}
 	// Unknown rule is invalid.
 	badBody, _ := json.Marshal(map[string]any{"ruleId": "missing-rule"})
-	if res := callAPI(t, handler, "POST", linkPath, string(badBody)); res.Code != 422 {
+	if res := callAPI(t, handler, "POST", addPath, string(badBody)); res.Code != 422 {
 		t.Fatalf("bad rule=%d %s", res.Code, res.Body.String())
 	}
-	// A disabled rule refuses new links.
+	// A disabled rule refuses new additions.
 	disable, _ := json.Marshal(map[string]any{
 		"name": "Grocer", "sourceAccountId": "checking",
 		"amount":    map[string]any{"resolver": "expression", "config": map[string]any{"expression": "30.00"}, "inputs": map[string]any{}},
@@ -116,12 +116,12 @@ func TestRecurringLinkHTTPContract(t *testing.T) {
 	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+ruleID, string(disable)); res.Code != 200 {
 		t.Fatalf("disable=%d %s", res.Code, res.Body.String())
 	}
-	if res := callAPI(t, handler, "POST", linkPath, string(linkBody)); res.Code != 422 {
-		t.Fatalf("disabled link=%d %s", res.Code, res.Body.String())
+	if res := callAPI(t, handler, "POST", addPath, string(addBody)); res.Code != 422 {
+		t.Fatalf("disabled add=%d %s", res.Code, res.Body.String())
 	}
-	// Read-only and write-denied callers cannot link but can preview.
+	// Read-only and write-denied callers cannot add but can preview.
 	for _, config := range []Config{{ReadOnly: true}, {CanWrite: func(context.Context) bool { return false }}} {
-		if res := callAPI(t, New(scoped, config), "POST", linkPath, string(linkBody)); res.Code != 403 {
+		if res := callAPI(t, New(scoped, config), "POST", addPath, string(addBody)); res.Code != 403 {
 			t.Fatalf("guard=%d %s", res.Code, res.Body.String())
 		}
 		if res := callAPI(t, New(scoped, config), "GET", previewPath, ""); res.Code != 200 {

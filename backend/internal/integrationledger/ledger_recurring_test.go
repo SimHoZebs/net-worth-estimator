@@ -18,7 +18,7 @@ import (
 // amount at other merchants, near-duplicate merchant spellings, pending,
 // void, and deleted rows — never join it. Detection runs the real
 // detector over the real claimed snapshot; confirmation, preview, and
-// promotion run over production HTTP; the rule lands in the forecast.
+// new-rule creation run over production HTTP; the rule lands in the forecast.
 
 func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	world := ledgerSetup(t, nil)
@@ -63,7 +63,7 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 		t.Fatalf("findings = %d, want exactly the %d grocery rows", len(findings), want.DetectCount)
 	}
 
-	// Confirm, preview, and promote through production HTTP; the rule's
+	// Confirm, preview, and create through production HTTP; the rule's
 	// monthly amount lands in the stored-model forecast. The confirm
 	// quotes the finding's own revision, the same optimistic lock the
 	// review screen sends.
@@ -90,30 +90,30 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	if confirmResp.Code != http.StatusOK {
 		t.Fatalf("confirm = %d %s", confirmResp.Code, confirmResp.Body.String())
 	}
-	previewReq := httptest.NewRequest(http.MethodGet, "/v1/analysis-findings/"+findings[0].ID+"/recurring-preview", nil)
+	previewReq := httptest.NewRequest(http.MethodGet, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule-preview", nil)
 	previewResp := httptest.NewRecorder()
 	world.plan.ServeHTTP(previewResp, previewReq)
 	var preview struct {
-		Preview types.RecurringPromotionPreview `json:"preview"`
+		Preview types.PatternToNewRulePreview `json:"preview"`
 	}
-	if err := json.Unmarshal(previewResp.Body.Bytes(), &preview); err != nil || !preview.Preview.Promotable || preview.Preview.Rule == nil {
-		t.Fatalf("preview = %d %+v, want a promotable rule", previewResp.Code, preview)
+	if err := json.Unmarshal(previewResp.Body.Bytes(), &preview); err != nil || !preview.Preview.Creatable || preview.Preview.Rule == nil {
+		t.Fatalf("preview = %d %+v, want a creatable rule", previewResp.Code, preview)
 	}
 	if math.Abs(ledgerParseAmount(preview.Preview.Rule.Amount)-want.DetectAmount) > 0.001 || preview.Preview.Rule.Frequency != types.FrequencyMonthly {
 		t.Fatalf("preview rule = %+v, want monthly %v from the seed charge", preview.Preview.Rule, want.DetectAmount)
 	}
-	promoteReq := httptest.NewRequest(http.MethodPost, "/v1/analysis-findings/"+findings[0].ID+"/recurring-promotion", nil)
-	promoteResp := httptest.NewRecorder()
-	world.plan.ServeHTTP(promoteResp, promoteReq)
-	if promoteResp.Code != http.StatusOK {
-		t.Fatalf("promote = %d %s", promoteResp.Code, promoteResp.Body.String())
+	createReq := httptest.NewRequest(http.MethodPost, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule", nil)
+	createResp := httptest.NewRecorder()
+	world.plan.ServeHTTP(createResp, createReq)
+	if createResp.Code != http.StatusOK {
+		t.Fatalf("create = %d %s", createResp.Code, createResp.Body.String())
 	}
 	model, err := world.ownerSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(model.RecurrenceRules) != 1 {
-		t.Fatalf("rules = %d, want the single promoted rule", len(model.RecurrenceRules))
+		t.Fatalf("rules = %d, want the single created rule", len(model.RecurrenceRules))
 	}
 }
 

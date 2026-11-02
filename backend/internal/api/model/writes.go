@@ -57,8 +57,9 @@ func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialMod
 }
 
 // PersistFinanceRule validates and persists one generated recurrence rule
-// through the ordinary finance write boundary, so pattern promotion shares
-// the manual row-write contract: validation, revision, and last-write-wins.
+// through the ordinary finance write boundary, so pattern-to-new-rule
+// creation shares the manual row-write contract: validation, revision, and
+// last-write-wins.
 // Generated rules append after the current maximum priority.
 func PersistFinanceRule(st store.Store, rule types.RecurrenceRule) (types.RecurrenceRule, []types.ModelValidationIssue, bool, string, error) {
 	resolved := rule
@@ -77,7 +78,7 @@ func PersistFinanceRule(st store.Store, rule types.RecurrenceRule) (types.Recurr
 }
 
 // runFinanceRowWriteWithStore is runFinanceRowWrite over an explicit store
-// so analysis promotion reuses the finance boundary without duplicating it.
+// so pattern creation reuses the finance boundary without duplicating it.
 func runFinanceRowWriteWithStore[T any](st store.Store, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
 	var baseline []types.ModelValidationIssue
 	return runRowWriteWithValidator(st, func(model *types.FinancialModel) {
