@@ -40,9 +40,6 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 	seen := map[candidate]bool{}
 	var candidates []candidate
 	add := func(owner, posting string) {
-		if owner == requesterID {
-			return
-		}
 		key := candidate{owner, posting}
 		if !seen[key] {
 			seen[key] = true
@@ -82,7 +79,7 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 		JOIN sharing_policies policy ON policy.owner_user_id = v.owner_user_id AND policy.group_id = v.group_id
 			AND policy.version = v.policy_version AND policy.enabled = 1
 		JOIN postings posting ON posting.user_id = v.owner_user_id AND posting.id = v.posting_id AND posting.void = 0
-		WHERE v.group_id = ? AND v.owner_user_id != ? ORDER BY v.owner_user_id, v.posting_id`, requesterID, groupID, requesterID)
+		WHERE v.group_id = ? ORDER BY v.owner_user_id, v.posting_id`, requesterID, groupID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +129,19 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 		if !access.Allowed {
 			continue
 		}
+		// The read gate always allows the source owner, so exclusions are
+		// enforced here for own rows: a group exclusion or a wildcard
+		// exclusion keeps the row out of that group's feed. Exclusions
+		// naming other viewers do not hide a row from its owner.
+		if key.owner == requesterID {
+			excluded, err := d.selfPostingExcludedFromGroup(key.owner, key.posting, groupID)
+			if err != nil {
+				return nil, err
+			}
+			if excluded {
+				continue
+			}
+		}
 		posting, err := d.ReadSharedPosting(key.owner, key.posting, requesterID)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
@@ -156,6 +166,21 @@ func (d *Database) ListGroupSharedFeed(requesterID, groupID string) ([]store.Gro
 		})
 	}
 	return items, nil
+}
+
+// selfPostingExcludedFromGroup reports whether the owner's own posting is
+// hidden from one group's feed by a group exclusion naming that group or
+// by a wildcard exclusion. It applies only to own rows: anyone else's
+// exclusions are evaluated per viewer by the read gate instead.
+func (d *Database) selfPostingExcludedFromGroup(ownerID, postingID, groupID string) (bool, error) {
+	var excluded int
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM sharing_grants
+		WHERE owner_user_id = ? AND posting_id = ? AND intent = 'excluded'
+		AND (audience_type = 'all' OR (audience_type = 'group' AND audience_id = ?))`,
+		ownerID, postingID, groupID).Scan(&excluded); err != nil {
+		return false, err
+	}
+	return excluded > 0, nil
 }
 
 // feedAudiences attributes the viewer's authorizing paths for one gated

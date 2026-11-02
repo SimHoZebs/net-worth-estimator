@@ -35,6 +35,29 @@ test("fixture reset clears groups between tests", async ({ page }) => {
 	await expect(page.getByText("No groups yet")).toBeVisible();
 });
 
+test("enabling policy lists own rows in the group feed", async ({
+	page,
+}) => {
+	const errors: string[] = [];
+	page.on("pageerror", (error) => errors.push(error.message));
+	await createGroup(page);
+
+	const feed = page.getByRole("region", { name: "Shared feed" });
+	await expect(feed).toContainText("No shared transactions");
+
+	// Enabling automatic sharing refreshes the feed above the consent
+	// section with no manual reload: the owner's newly shared rows list.
+	const sharing = page.getByRole("region", { name: "My sharing" });
+	await sharing.getByRole("button", { name: /Everyday checking/ }).click();
+	await sharing.getByLabel("Share from").fill("2026-01-01");
+	await sharing.getByRole("button", { name: "Turn on sharing" }).click();
+	await expect(sharing).toContainText(
+		"Automatic sharing is on for this group.",
+	);
+	await expect(feed).toContainText(/4 transactions/);
+	expect(errors).toEqual([]);
+});
+
 test("group sharing consent stays off until the member opts in", async ({
 	page,
 }) => {

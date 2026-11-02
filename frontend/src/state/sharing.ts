@@ -106,12 +106,15 @@ export function useSharingGrants() {
 
 function invalidatePolicy(
 	scope: ReturnType<typeof getUserScope>,
-	groupId: string,
+	groupId?: string,
 ) {
 	const cache = serverQueryClient();
 	if (scope !== getUserScope()) return Promise.resolve();
 	return cache.invalidateQueries({
-		queryKey: sharingPolicyKey(groupId, scope),
+		queryKey:
+			groupId == null
+				? (["user-resources", scope.key, "sharing-policy"] as const)
+				: sharingPolicyKey(groupId, scope),
 	});
 }
 
@@ -119,6 +122,50 @@ function invalidateGrants(scope: ReturnType<typeof getUserScope>) {
 	const cache = serverQueryClient();
 	if (scope !== getUserScope()) return Promise.resolve();
 	return cache.invalidateQueries({ queryKey: sharingGrantsKey(scope) });
+}
+
+function invalidateFeed(
+	scope: ReturnType<typeof getUserScope>,
+	groupId?: string,
+) {
+	const cache = serverQueryClient();
+	if (scope !== getUserScope()) return Promise.resolve();
+	const base = ["user-resources", scope.key, "group-feed"] as const;
+	return cache.invalidateQueries({
+		queryKey: groupId == null ? base : ([...base, groupId] as const),
+	});
+}
+
+function invalidatePreview(scope: ReturnType<typeof getUserScope>) {
+	const cache = serverQueryClient();
+	if (scope !== getUserScope()) return Promise.resolve();
+	return cache.invalidateQueries({
+		queryKey: ["user-resources", scope.key, "sharing-preview"] as const,
+	});
+}
+
+/**
+ * Post-commit refresh for every mutation that can change what the group
+ * views show: policy saves, grant/exclusion changes, and membership
+ * transitions. Feed, preview, totals, and counts derive from the same
+ * gated reads, so one refresh leaves them all showing post-commit truth
+ * with no manual reload.
+ */
+export function refreshSharingViews(
+	scope: ReturnType<typeof getUserScope>,
+	groupId?: string,
+) {
+	return Promise.all([
+		invalidatePolicy(scope, groupId),
+		invalidateGrants(scope),
+		invalidateFeed(scope, groupId),
+		invalidatePreview(scope),
+	]).then(() => undefined);
+}
+
+/** Current-scope refresh for call sites outside mutation hooks. */
+export function refreshSharingViewsFor(groupId?: string) {
+	return refreshSharingViews(getUserScope(), groupId);
 }
 
 export function useSetSharingPolicy() {
@@ -141,7 +188,7 @@ export function useSetSharingPolicy() {
 				return { groupId, policy: result };
 			},
 			onSuccess: async ({ groupId }) => {
-				await invalidatePolicy(scope, groupId);
+				await refreshSharingViews(scope, groupId);
 			},
 		},
 		cache,
@@ -175,7 +222,7 @@ export function useGrantSharedPosting() {
 				return result;
 			},
 			onSuccess: async () => {
-				await invalidateGrants(scope);
+				await refreshSharingViews(scope);
 			},
 		},
 		cache,
@@ -210,7 +257,7 @@ export function useRevokeSharedPosting() {
 				currentScope(scope);
 			},
 			onSuccess: async () => {
-				await invalidateGrants(scope);
+				await refreshSharingViews(scope);
 			},
 		},
 		cache,
@@ -246,7 +293,7 @@ export function useExcludeSharedPosting() {
 				return result;
 			},
 			onSuccess: async () => {
-				await invalidateGrants(scope);
+				await refreshSharingViews(scope);
 			},
 		},
 		cache,
@@ -281,7 +328,7 @@ export function useRemoveSharedExclusion() {
 				currentScope(scope);
 			},
 			onSuccess: async () => {
-				await invalidateGrants(scope);
+				await refreshSharingViews(scope);
 			},
 		},
 		cache,

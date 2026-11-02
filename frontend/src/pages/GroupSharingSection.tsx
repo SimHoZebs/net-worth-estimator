@@ -7,6 +7,7 @@ import { InputField } from "../components/Field.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
 import { useSavedAccounts } from "../state/savedRows.ts";
 import {
+	refreshSharingViewsFor,
 	useSetSharingPolicy,
 	useSharingGrants,
 	useSharingPolicy,
@@ -227,17 +228,16 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					throw cause;
 				}
 			}
-			void grantsQuery.refetch();
+			void refreshSharingViewsFor(groupId);
 			setAccountIds(null);
 			setStartDate(null);
 			setEndDate(null);
 			setConfirmStop(false);
 			notifySuccess("groups-notice", "Stopped sharing with everyone.");
 		} catch (cause) {
-			// Refresh both caches so the visible state matches the server
-			// and a retry replays from live rows, never a stale list.
-			void policyQuery.refetch();
-			void grantsQuery.refetch();
+			// Refresh every sharing view so the visible state matches the
+			// server and a retry replays from live rows, never a stale list.
+			void refreshSharingViewsFor(groupId);
 			const message = serverMessage(
 				cause,
 				"Sharing could not be stopped.",

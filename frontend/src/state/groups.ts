@@ -17,6 +17,7 @@ import {
 	type GroupRole,
 } from "@/pages/groupsApi.ts";
 import { serverQueryClient } from "./serverQuery.ts";
+import { refreshSharingViews, sharingPolicyKey } from "./sharing.ts";
 
 /**
  * Group queries keyed by user scope and selected group. Each selected group
@@ -156,8 +157,9 @@ export function useJoinGroup() {
 				currentScope(scope);
 				return result;
 			},
-			onSuccess: async () => {
+			onSuccess: async (group) => {
 				await invalidateGroups(scope);
+				await refreshSharingViews(scope, group.id);
 			},
 		},
 		cache,
@@ -181,7 +183,9 @@ export function useLeaveGroup() {
 				if (scope !== getUserScope()) return;
 				cache.removeQueries({ queryKey: groupDetailKey(groupId, scope) });
 				cache.removeQueries({ queryKey: groupInvitesKey(groupId, scope) });
+				cache.removeQueries({ queryKey: sharingPolicyKey(groupId, scope) });
 				await invalidateGroups(scope);
+				await refreshSharingViews(scope, groupId);
 			},
 		},
 		cache,
@@ -205,7 +209,9 @@ export function useDeleteGroup() {
 				if (scope !== getUserScope()) return;
 				cache.removeQueries({ queryKey: groupDetailKey(groupId, scope) });
 				cache.removeQueries({ queryKey: groupInvitesKey(groupId, scope) });
+				cache.removeQueries({ queryKey: sharingPolicyKey(groupId, scope) });
 				await invalidateGroups(scope);
+				await refreshSharingViews(scope, groupId);
 			},
 		},
 		cache,
@@ -236,6 +242,7 @@ export function useUpdateMemberRole() {
 			onSuccess: async (groupId) => {
 				await invalidateGroup(scope, groupId);
 				await invalidateGroups(scope);
+				await refreshSharingViews(scope, groupId);
 			},
 		},
 		cache,
@@ -264,6 +271,7 @@ export function useRemoveMember() {
 			onSuccess: async (groupId) => {
 				await invalidateGroup(scope, groupId);
 				await invalidateGroups(scope);
+				await refreshSharingViews(scope, groupId);
 			},
 		},
 		cache,
