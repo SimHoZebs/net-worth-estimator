@@ -104,6 +104,8 @@ it("lists shared transactions with source, totals, and pending marker", async ()
 	render(<SharedFeed groupId="g1" members={MEMBERS} />, { wrapper });
 	await waitFor(() => expect(screen.getByText("Groceries")).toBeTruthy());
 	expect(screen.getByText("Shared by Dana · Cabin")).toBeTruthy();
+	// Date column plus mobile slot render one date per row.
+	expect(screen.getAllByText("Jun 14, 2026")).toHaveLength(4);
 	expect(screen.getByText("−$42.50")).toBeTruthy();
 	expect(screen.getByText("Shared by Alex · Direct share")).toBeTruthy();
 	expect(screen.getByText("Varies")).toBeTruthy();

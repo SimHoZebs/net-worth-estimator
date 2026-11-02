@@ -292,7 +292,7 @@ export function SharedFeed({
 										</strong>
 										)
 									}
-									actionLabel={`Save a copy of ${item.posting.name} on ${dateLabel(day, true)}${item.posting.pending ? "; pending" : ""}`}
+									actionLabel={`Save a copy of ${item.posting.name} on ${dateLabel(day, true)}${item.posting.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
 									onSelect={() => void onSave(item)}
 									selectDisabled={isSaved || busy}
 								/>
