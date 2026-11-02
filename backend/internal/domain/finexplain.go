@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -503,9 +504,17 @@ func finExplainActions(model *types.FinancialModel, report types.FinancialHealth
 		targets := finExplainCopyTargets(check.Threshold)
 		detail := check.Summary
 		if len(targets) > 0 {
+			// Map order is randomized per iteration, so sort the keys:
+			// the rendered guideline sentence must read identically on
+			// every composition.
+			keys := make([]string, 0, len(targets))
+			for key := range targets {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
 			pairs := make([]string, 0, len(targets))
-			for key, value := range targets {
-				pairs = append(pairs, fmt.Sprintf("%s %g", key, value))
+			for _, key := range keys {
+				pairs = append(pairs, fmt.Sprintf("%s %g", key, targets[key]))
 			}
 			detail = fmt.Sprintf("%s The applied guideline is %s; adjust it openly if the household's situation differs.", detail, strings.Join(pairs, ", "))
 		}
