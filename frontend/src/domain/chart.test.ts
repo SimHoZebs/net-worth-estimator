@@ -3,102 +3,17 @@ import { projectionFixture } from "../mocks/projection.ts";
 import { compactMoney } from "./format.ts";
 import type { FundingGap } from "./fundingGaps.ts";
 import {
+	accountTrendRows,
 	fundingGapChartModel,
 	lineChartModel,
-	nearestPointIndex,
-	projectionChartModel,
-	projectionCsv,
-	stackedAccountRows,
+	netWorthDomain,
 	trailingDailyPoints,
 	TRAILING_NET_WORTH_DAYS,
 } from "./chart.ts";
 
 const projection = projectionFixture();
-const options = {
-	projection,
-	range: null,
-	inflation: 5,
-	realTerms: false,
-	narrow: false,
-};
 
 describe("chart presentation data", () => {
-	it("uses identical values for annual rows and CSV", () => {
-		const model = projectionChartModel(options);
-		if (!model) throw new Error("Expected chart");
-		const csv = projectionCsv(model.rows).split("\n");
-		expect(csv).toHaveLength(model.rows.length + 1);
-		for (const [index, row] of model.rows.entries()) {
-			const cells = csv[index + 1]?.split(",") ?? [];
-			expect(cells[0]).toBe(row.date);
-			expect(Number(cells[1])).toBeCloseTo(row.total, 2);
-		}
-	});
-	it("adjusts bands and projection by the same inflation factor", () => {
-		const range = {
-			points: projection.points.map((point) => ({
-				date: point.date,
-				lower: point.total * 0.9,
-				median: point.total,
-				upper: point.total * 1.1,
-			})),
-			count: 10,
-			evaluationSuccess: {},
-			failureShare: 0,
-		};
-		const model = projectionChartModel({ ...options, range, realTerms: true });
-		if (!model) throw new Error("Expected chart");
-		for (const row of model.rows) {
-			expect(row.band?.median).toBe(row.total);
-			expect(row.band?.lower).toBeCloseTo(row.total * 0.9);
-		}
-		expect(model.rows.at(-1)?.total).toBeLessThan(
-			projection.points.at(-1)?.total ?? 0,
-		);
-	});
-	it("keeps pointer selection in bounds and handles one-point geometry", () => {
-		const single = { ...projection, points: projection.points.slice(0, 1) };
-		const model = projectionChartModel({ ...options, projection: single });
-		if (!model) throw new Error("Expected chart");
-		expect(model.indexAt(-1)).toBe(0);
-		expect(model.indexAt(2)).toBe(0);
-		expect(model.basePath).not.toMatch(/NaN|Infinity/);
-		expect(
-			projectionChartModel({
-				...options,
-				projection: { ...projection, points: [] },
-			}),
-		).toBeNull();
-	});
-	it.each([false, true])(
-		"prepares every plotted path in realTerms=%s",
-		(realTerms) => {
-			const range = {
-				points: projection.points.map((point) => ({
-					date: point.date,
-					lower: point.total * 0.9,
-					median: point.total,
-					upper: point.total * 1.1,
-				})),
-				count: 10,
-				evaluationSuccess: {},
-				failureShare: 0,
-			};
-			const model = projectionChartModel({ ...options, range, realTerms });
-			if (!model) throw new Error("Expected chart");
-			expect(model.medianPath).toBe(model.basePath);
-			expect(model.filledBasePath.startsWith(model.basePath)).toBe(true);
-			for (const path of [
-				model.basePath,
-				model.filledBasePath,
-				model.medianPath,
-				model.area,
-			]) {
-				expect(path).toMatch(/^M/);
-				expect(path).not.toMatch(/NaN|Infinity/);
-			}
-		},
-	);
 	describe("shared line geometry", () => {
 		const gap: FundingGap = {
 			id: "rent",
@@ -223,7 +138,7 @@ describe("chart presentation data", () => {
 			});
 		});
 	});
-	describe("stackedAccountRows", () => {
+	describe("accountTrendRows", () => {
 		const today = "2026-07-01";
 		const accounts = [
 			{ id: "checking", name: "Everyday checking" },
@@ -242,7 +157,7 @@ describe("chart presentation data", () => {
 				],
 				today,
 			);
-			const { rows, series } = stackedAccountRows({ points: daily, accounts });
+			const { rows, series } = accountTrendRows({ points: daily, accounts });
 			expect(rows).toHaveLength(daily.length * 2);
 			expect(series.map((entry) => entry.id)).toEqual(["checking", "savings"]);
 			expect(series.map((entry) => entry.name)).toEqual([
@@ -251,11 +166,11 @@ describe("chart presentation data", () => {
 			]);
 			expect(series.map((entry) => entry.endBalance)).toEqual([600, 400]);
 			for (const row of rows) {
-				expect(row.day).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/);
+				expect(row.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 			}
 		});
 		it("omits accounts with no presence in the window", () => {
-			const { series } = stackedAccountRows({
+			const { series } = accountTrendRows({
 				points: trailingDailyPoints(
 					[{ date: "2027-01-01", total: 1800, balances: {} }],
 					today,
@@ -276,7 +191,7 @@ describe("chart presentation data", () => {
 				],
 				today,
 			);
-			const { rows, series } = stackedAccountRows({
+			const { rows, series } = accountTrendRows({
 				points: daily,
 				accounts: [...accounts, { id: "mortgage", name: "Home mortgage" }],
 			});
@@ -284,12 +199,12 @@ describe("chart presentation data", () => {
 			expect(series.map((entry) => entry.endBalance)).toEqual([1000, -400]);
 			expect(
 				rows.find(
-					(row) => row.account === "Home mortgage" && row.day === "Jul 1",
+					(row) => row.account === "Home mortgage" && row.date === "2026-07-01",
 				)?.balance,
 			).toBe(-400);
 		});
 		it("assigns colors by full account order across windows", () => {
-			const narrow = stackedAccountRows({
+			const narrow = accountTrendRows({
 				points: trailingDailyPoints(
 					[
 						{
@@ -303,7 +218,7 @@ describe("chart presentation data", () => {
 				),
 				accounts,
 			});
-			const wide = stackedAccountRows({
+			const wide = accountTrendRows({
 				points: trailingDailyPoints(
 					[
 						{
@@ -328,106 +243,33 @@ describe("chart presentation data", () => {
 			expect(colorOf(wide.series, "archived")).toBe(2);
 		});
 	});
-	describe("adaptive domain", () => {
+	describe("netWorthDomain", () => {
 		it("keeps the $0 floor and 8% headroom for positive wealth", () => {
-			const model = projectionChartModel(options);
-			if (!model) throw new Error("Expected chart");
-			expect(model.low).toBe(0);
-			expect(model.high).toBeCloseTo(1800 * 1.08, 6);
+			const { low, high } = netWorthDomain([1000, 1400, 1800]);
+			expect(low).toBe(0);
+			expect(high).toBeCloseTo(1800 * 1.08, 6);
 		});
 		it("pins an all-debt window near the data instead of the $0 ceiling", () => {
-			const debt = {
-				...projection,
-				points: [
-					{ date: "2026-06-02", total: -66200, balances: {} },
-					{ date: "2026-07-01", total: -65800, balances: {} },
-				],
-			};
-			const model = projectionChartModel({ ...options, projection: debt });
-			if (!model) throw new Error("Expected chart");
+			const { low, high } = netWorthDomain([-66200, -65800]);
 			// Span 400, but the 1% minimum zoom sets padding 662.
-			expect(model.high).toBeLessThan(0);
-			expect(model.high).toBeCloseTo(-65138, 6);
-			expect(model.low).toBeCloseTo(-66862, 6);
+			expect(high).toBeLessThan(0);
+			expect(high).toBeCloseTo(-65138, 6);
+			expect(low).toBeCloseTo(-66862, 6);
 		});
 		it("keeps a flat all-debt window legible", () => {
-			const flat = {
-				...projection,
-				points: [
-					{ date: "2026-06-02", total: -66000, balances: {} },
-					{ date: "2026-07-01", total: -66000, balances: {} },
-				],
-			};
-			const model = projectionChartModel({ ...options, projection: flat });
-			if (!model) throw new Error("Expected chart");
-			expect(model.high).toBeCloseTo(-65340, 6);
-			expect(model.low).toBeCloseTo(-66660, 6);
-			expect(model.high - model.low).toBeGreaterThanOrEqual(1000);
-			const labels = new Set(model.grid.map((value) => compactMoney(value)));
+			const { low, high } = netWorthDomain([-66000, -66000]);
+			expect(high).toBeCloseTo(-65340, 6);
+			expect(low).toBeCloseTo(-66660, 6);
+			expect(high - low).toBeGreaterThanOrEqual(1000);
+			const labels = new Set(
+				[low, (low + high) / 2, high].map((value) => compactMoney(value)),
+			);
 			expect(labels.size).toBeGreaterThan(1);
 		});
 		it("pads below a window that straddles $0", () => {
-			const crossing = {
-				...projection,
-				points: [
-					{ date: "2026-06-02", total: -100, balances: {} },
-					{ date: "2026-07-01", total: 200, balances: {} },
-				],
-			};
-			const model = projectionChartModel({
-				...options,
-				projection: crossing,
-			});
-			if (!model) throw new Error("Expected chart");
-			expect(model.high).toBeCloseTo(200 * 1.08, 6);
-			expect(model.low).toBeCloseTo(-124, 6);
-		});
-		it("honors measured width and height overrides", () => {
-			const model = projectionChartModel({
-				...options,
-				width: 10,
-				height: 10,
-			});
-			if (!model) throw new Error("Expected chart");
-			// Clamps tiny measurements to the documented floors.
-			expect(model.width).toBe(280);
-			expect(model.height).toBe(200);
-		});
-		it("honors large measured overrides", () => {
-			const model = projectionChartModel({
-				...options,
-				width: 1200,
-				height: 400,
-			});
-			if (!model) throw new Error("Expected chart");
-			expect(model.width).toBe(1200);
-			expect(model.height).toBe(400);
-		});
-	});
-	describe("nearestPointIndex", () => {
-		const points = [
-			{ date: "2026-01-01" },
-			{ date: "2026-07-01" },
-			{ date: "2027-01-01" },
-		];
-		it("returns the exact match when today is a plotted date", () => {
-			expect(nearestPointIndex(points, "2026-07-01")).toBe(1);
-		});
-		it("returns the nearest point when today falls between dates", () => {
-			expect(nearestPointIndex(points, "2026-08-15")).toBe(1);
-			expect(nearestPointIndex(points, "2026-11-15")).toBe(2);
-		});
-		it("prefers the earlier point on a tie", () => {
-			const even = [{ date: "2026-01-01" }, { date: "2026-01-03" }];
-			expect(nearestPointIndex(even, "2026-01-02")).toBe(0);
-		});
-		it("clamps today outside the projection to the nearest end", () => {
-			expect(nearestPointIndex(points, "2020-05-05")).toBe(0);
-			expect(nearestPointIndex(points, "2035-05-05")).toBe(2);
-		});
-		it("handles a single point and an empty list", () => {
-			expect(nearestPointIndex([{ date: "2026-01-01" }], "2030-01-01")).toBe(0);
-			expect(nearestPointIndex([], "2026-01-01")).toBe(0);
+			const { low, high } = netWorthDomain([-100, 200]);
+			expect(high).toBeCloseTo(200 * 1.08, 6);
+			expect(low).toBeCloseTo(-124, 6);
 		});
 	});
 });

@@ -49,7 +49,7 @@ test("Outlook compares the latest balance with the first synced balance", async 
 	).toBeVisible();
 	await page.getByRole("button", { name: "90 days" }).click();
 	await expect(page.getByText("+$2,000 (+0.6%)")).toBeVisible();
-	await page.getByRole("slider", { name: "Inspect net worth date" }).focus();
+	await page.getByRole("img", { name: /Net worth over the trailing/ }).focus();
 	await page.keyboard.press("Home");
 	await expect(page.getByText("+$2,000 (+0.6%)")).toBeVisible();
 	await page.setViewportSize({ width: 390, height: 844 });
@@ -71,7 +71,7 @@ test("manual observations do not claim a bank-sync comparison", async ({
 }) => {
 	await page.goto("/");
 	await expect(
-		page.getByRole("slider", { name: "Inspect net worth date" }),
+		page.getByRole("img", { name: /Net worth over the trailing/ }),
 	).toBeVisible();
 	await expect(page.getByText(/since first sync/)).toHaveCount(0);
 });

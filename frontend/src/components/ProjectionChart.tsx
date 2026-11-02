@@ -1,22 +1,18 @@
 import { CircleHelp } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-	nearestPointIndex,
-	projectionChartModel,
 	TRAILING_NET_WORTH_DAYS,
 	trailingDailyPoints,
 } from "../domain/chart.ts";
-import { dateLabel, money, todayIso } from "../domain/format.ts";
+import { todayIso } from "../domain/format.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { useCheckpoints } from "../state/workspaceResources.ts";
 import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
-import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
-import { useElementWidth } from "../state/useElementWidth.ts";
 import { useSavedAccounts } from "../state/savedRows.ts";
 import { visibleAccounts } from "../domain/model.ts";
 import { IconButton, TextButton } from "./Button.tsx";
-import { ProjectionPlot } from "./chart/ProjectionPlot.tsx";
-import { ContributionStackPlot } from "./chart/ContributionStackPlot.tsx";
+import { NetWorthTrendPlot } from "./chart/NetWorthTrendPlot.tsx";
+import { AccountLinesPlot } from "./chart/AccountLinesPlot.tsx";
 import { NetWorthSummary } from "./chart/NetWorthSummary.tsx";
 import { Notice } from "./Notice.tsx";
 import { ProjectionUpdating } from "./ProjectionUpdating.tsx";
@@ -26,32 +22,11 @@ import { SegmentedControl } from "./SegmentedControl.tsx";
 const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 
 export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
-	const [inspected, setInspected] = useState<number | null>(null);
-	const [pinned, setPinned] = useState<number | null>(null);
 	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
 	const [view, setView] = useState<"total" | "accounts">("total");
-	const narrow = useMediaQuery(viewportQueries.belowSm);
-	const id = useId().replaceAll(":", "");
-	const [plotWrapRef, plotWrapWidth] = useElementWidth<HTMLDivElement>();
-	// Render the viewBox at the container's native pixel width so desktop does
-	// not just stretch the mobile artwork: one viewBox unit stays close to one
-	// CSS pixel and strokes keep their weight. Falls back to the
-	// narrow/desktop defaults before the first measurement.
-	const measuredWidth =
-		plotWrapWidth === null
-			? null
-			: Math.max(280, Math.round(plotWrapWidth - 16));
-	const measuredHeight =
-		measuredWidth === null
-			? null
-			: measuredWidth < 480
-				? 260
-				: measuredWidth < 760
-					? 300
-					: 340;
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const savedAccounts = useSavedAccounts();
-	const stackAccounts = useMemo(
+	const trendAccounts = useMemo(
 		() =>
 			visibleAccounts(savedAccounts ?? [])
 				.filter((account) => account.enabled)
@@ -75,33 +50,12 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	// rows expand into one daily point per day via latest-known fill. The
 	// past already happened, so there is one observed line and no scenarios.
 	const today = todayIso();
-	const model = useMemo(
+	const daily = useMemo(
 		() =>
-			projection
-				? projectionChartModel({
-						projection: {
-							...projection,
-							points: trailingDailyPoints(projection.points, today, days),
-						},
-						range: null,
-						inflation: 0,
-						realTerms: false,
-						narrow,
-						...(measuredWidth === null ? {} : { width: measuredWidth }),
-						...(measuredHeight === null ? {} : { height: measuredHeight }),
-					})
-				: null,
-		[projection, narrow, today, days, measuredWidth, measuredHeight],
+			projection ? trailingDailyPoints(projection.points, today, days) : null,
+		[projection, today, days],
 	);
-	const defaultIndex = useMemo(
-		() => (model ? nearestPointIndex(model.points, today) : 0),
-		[model, today],
-	);
-	const selectedIndex = model
-		? Math.min(inspected ?? pinned ?? defaultIndex, model.points.length - 1)
-		: 0;
-	const point = model?.points[selectedIndex] ?? model?.last;
-	if (!model || !point) {
+	if (!daily || !projection) {
 		// Only data slots skeletonize, and only while data is absent.
 		if (!pending)
 			return status === "error" ? (
@@ -125,8 +79,6 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 						value={String(days)}
 						onChange={(v) => {
 							setDays(Number(v));
-							setInspected(null);
-							setPinned(null);
 						}}
 						items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
 							value: String(d),
@@ -181,8 +133,6 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 									value={String(days)}
 									onChange={(v) => {
 										setDays(Number(v));
-										setInspected(null);
-										setPinned(null);
 									}}
 									items={[TRAILING_NET_WORTH_DAYS, 90].map((d) => ({
 										value: String(d),
@@ -211,31 +161,8 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 					/>
 				)}
 				{view === "total" ? (
-					<div
-						ref={plotWrapRef}
-						className="relative grid grid-cols-[--spacing(12)_minmax(0,1fr)_--spacing(4)] px-2"
-					>
-						<ProjectionPlot
-							model={model}
-							id={id}
-							inspected={inspected ?? pinned}
-							selectedIndex={selectedIndex}
-							onInspect={setInspected}
-							onPin={(index) =>
-								setPinned((previous) => (previous === index ? null : index))
-							}
-						/>
-						<input
-							className="relative col-start-2 row-start-1 h-3 w-full min-w-0 self-end cursor-ew-resize accent-primary opacity-0 focus-visible:opacity-100 print:hidden"
-							type="range"
-							min="0"
-							max={model.points.length - 1}
-							value={selectedIndex}
-							aria-label="Inspect net worth date"
-							aria-valuetext={`${dateLabel(point.date)}: ${money(model.adjust(point.total, point.date))}`}
-							onChange={(event) => setInspected(Number(event.target.value))}
-							onBlur={() => setInspected(null)}
-						/>
+					<div className="px-2 pb-2">
+						<NetWorthTrendPlot points={daily} days={days} height={300} />
 					</div>
 				) : (
 					<div className="px-5 pt-2 pb-5">
@@ -244,10 +171,10 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 								<Skeleton className="h-56 w-full" />
 							</div>
 						) : (
-							<ContributionStackPlot
-								points={model.points}
-								accounts={stackAccounts}
-								height={measuredHeight ?? undefined}
+							<AccountLinesPlot
+								points={daily}
+								accounts={trendAccounts}
+								height={300}
 							/>
 						)}
 					</div>

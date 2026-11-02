@@ -3,8 +3,8 @@
  * Every series pairs a tone (color) with a pattern (texture) so filled
  * areas stay distinguishable without color vision. HTML bars consume the
  * pairing through `data-tone`/`data-pattern` attributes (texture.css);
- * SVG charts consume it through `textureFill` plus pattern definitions
- * from TextureDefs or TextureSprite.
+ * charts that need patterned SVG areas pair `seriesTexture` with pattern
+ * definitions from TextureDefs.
  */
 
 export const TEXTURE_PATTERNS = ["solid", "stripes", "dots", "hatch"] as const;
@@ -50,23 +50,4 @@ export function seriesTexture(index: number): {
 					TEXTURE_PATTERNS.length
 			]!,
 	};
-}
-
-/** Stable document-wide pattern id for a tone-plus-pattern pair. */
-export function textureId(tone: TextureTone, pattern: TexturePattern): string {
-	return `wp-tex-${tone}-${pattern}`;
-}
-
-/**
- * SVG fill for a tone-plus-pattern pair. Solid resolves to the tone token
- * directly; every other pattern resolves to its shared definition, which
- * must be present in the document (TextureSprite or TextureDefs).
- */
-export function textureFill(
-	tone: TextureTone,
-	pattern: TexturePattern,
-): string {
-	return pattern === "solid"
-		? toneToken(tone)
-		: `url(#${textureId(tone, pattern)})`;
 }

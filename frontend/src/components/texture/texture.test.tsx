@@ -1,11 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { TextureDefs } from "./TextureDefs.tsx";
-import { TextureSprite } from "./TextureSprite.tsx";
 import {
 	seriesTexture,
-	textureFill,
-	textureId,
 	toneToken,
 	TEXTURE_PATTERNS,
 	TEXTURE_TONES,
@@ -38,11 +35,6 @@ describe("texture contract", () => {
 		expect(new Set(combos).size).toBe(16);
 		expect(seriesTexture(4)).toEqual({ tone: "sage", pattern: "stripes" });
 		expect(seriesTexture(5)).toEqual({ tone: "tan", pattern: "dots" });
-	});
-	it("resolves solid fills to tokens and textures to shared ids", () => {
-		expect(textureFill("sage", "solid")).toBe("var(--chart-series-1)");
-		expect(textureFill("tan", "hatch")).toBe("url(#wp-tex-tan-hatch)");
-		expect(textureId("plum", "dots")).toBe("wp-tex-plum-dots");
 	});
 });
 
@@ -77,20 +69,5 @@ describe("texture defs", () => {
 		expect(tail?.querySelector("rect")).toBeNull();
 		expect(withdrawals?.querySelector("rect")).toBeTruthy();
 		expect(withdrawals?.querySelector("circle")).toBeTruthy();
-	});
-	it("sprites every tone-plus-pattern pair the stack can reference", () => {
-		const { container } = render(<TextureSprite />);
-		const patterns = container.querySelectorAll("pattern");
-		expect(patterns).toHaveLength(12);
-		for (const tone of TEXTURE_TONES) {
-			for (const pattern of TEXTURE_PATTERNS) {
-				if (pattern === "solid") continue;
-				expect(
-					container.querySelector(`#wp-tex-${tone}-${pattern}`),
-					`${tone}:${pattern}`,
-				).toBeTruthy();
-			}
-		}
-		expect(screen.queryByRole("img")).toBeNull();
 	});
 });

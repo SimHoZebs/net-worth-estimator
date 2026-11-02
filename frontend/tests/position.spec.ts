@@ -17,7 +17,7 @@ test("evidence loads before the forecast", async ({ page }) => {
 		// The history graph stays empty while the forecast is gated, but the
 		// evidence action does not depend on it.
 		await expect(
-			page.getByRole("slider", { name: "Inspect net worth date" }),
+			page.getByRole("img", { name: /Net worth over the trailing/ }),
 		).toHaveCount(0);
 		const evidence = page.getByRole("button", {
 			name: "Inspect current net worth evidence",
@@ -34,7 +34,7 @@ test("evidence loads before the forecast", async ({ page }) => {
 		release();
 	}
 	await expect(
-		page.getByRole("slider", { name: "Inspect net worth date" }),
+		page.getByRole("img", { name: /Net worth over the trailing/ }),
 	).toBeVisible();
 });
 
@@ -63,7 +63,7 @@ test("forecast failure supports retry", async ({ page }) => {
 		.getByRole("button", { name: "Retry forecast", exact: true })
 		.click();
 	await expect(
-		page.getByRole("slider", { name: "Inspect net worth date" }),
+		page.getByRole("img", { name: /Net worth over the trailing/ }),
 	).toBeVisible();
 	await expect(
 		page.getByText("Could not calculate forecast.", { exact: false }),
@@ -87,7 +87,7 @@ test("position failure does not block the forecast", async ({ page }) => {
 	// The forecast graph loads from the deterministic projection, independent
 	// of the failed position request.
 	await expect(
-		page.getByRole("slider", { name: "Inspect net worth date" }),
+		page.getByRole("img", { name: /Net worth over the trailing/ }),
 	).toBeVisible();
 	// The evidence dialog owns the position request, so its error and retry
 	// live there too.

@@ -38,7 +38,9 @@ test("outlook renders real calculations and evidence", async ({ page }) => {
 	).not.toBeVisible();
 	// Values come from the Go engine over HTTP, not a client-side projection.
 	// The trailing graph draws the last 30 days of that same calculation.
-	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
+	await page
+		.getByRole("img", { name: /Net worth over the trailing/ })
+		.waitFor();
 	await page.getByRole("button", { name: "Inspect cash flow" }).click();
 	await expect(page.getByRole("dialog")).toContainText("$2,650 short");
 	await expect(page.getByRole("dialog")).toContainText("Mar 6, 2026");
@@ -368,7 +370,9 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 	expect(issues(results.violations)).toEqual([]);
 	await page.keyboard.press("Escape");
 	await page.goto("/");
-	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
+	await page
+		.getByRole("img", { name: /Net worth over the trailing/ })
+		.waitFor();
 	await page.screenshot({
 		path: "test-results/waypoint-mobile.png",
 		fullPage: true,
@@ -377,7 +381,9 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 
 test("capture the completed desktop outlook", async ({ page }) => {
 	await page.goto("/");
-	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
+	await page
+		.getByRole("img", { name: /Net worth over the trailing/ })
+		.waitFor();
 	await page.screenshot({
 		path: "test-results/waypoint-desktop.png",
 		fullPage: true,
@@ -395,7 +401,9 @@ test("skips the scenario calculation without pinned threshold evaluations", asyn
 		await route.continue();
 	});
 	await page.goto("/");
-	await page.getByRole("slider", { name: "Inspect net worth date" }).waitFor();
+	await page
+		.getByRole("img", { name: /Net worth over the trailing/ })
+		.waitFor();
 	// The default posting-fulfillment pin renders its card, proving pins
 	// resolved: a null pins response alone would also skip the fetch.
 	await page.getByRole("button", { name: "Inspect cash flow" }).waitFor();

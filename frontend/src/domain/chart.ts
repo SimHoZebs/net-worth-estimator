@@ -1,7 +1,7 @@
 import type { FundingGap } from "./fundingGaps.ts";
 import { summarizeFundingGap } from "./fundingGaps.ts";
-import { monthDay, shiftDate } from "./format.ts";
-import type { Projection, RangeResult } from "./result.ts";
+import { shiftDate } from "./format.ts";
+import type { Projection } from "./result.ts";
 
 export interface LineChartGeometry {
 	width: number;
@@ -83,142 +83,6 @@ export function lineChartModel({
 			),
 	};
 }
-
-export function projectionChartModel({
-	projection,
-	range,
-	inflation,
-	realTerms,
-	narrow,
-	width,
-	height,
-}: {
-	projection: Projection;
-	range: RangeResult | null;
-	inflation: number;
-	realTerms: boolean;
-	narrow: boolean;
-	/** Measured plot width in CSS pixels. Overrides the narrow/desktop default so one viewBox unit maps to one rendered pixel. */
-	width?: number;
-	/** Measured plot height in CSS pixels. Overrides the narrow/desktop default. */
-	height?: number;
-}) {
-	const { points } = projection;
-	const start = points[0];
-	const last = points.at(-1);
-	if (!start || !last) return null;
-	const adjust = (value: number, date: string) =>
-		realTerms
-			? value /
-				(1 + inflation / 100) **
-					((Date.parse(date) - Date.parse(start.date)) / (365.25 * 86400000))
-			: value;
-	const values = points.map((point) => adjust(point.total, point.date));
-	const upper =
-		range?.points.map((point) => adjust(point.upper, point.date)) ?? values;
-	const lower =
-		range?.points.map((point) => adjust(point.lower, point.date)) ?? values;
-	// The domain adapts to the data's sign. Positive wealth keeps the $0
-	// floor and 8% headroom; all-debt windows pin both bounds near the data
-	// instead of wasting the chart on the unreachable $0 ceiling.
-	const peak = Math.max(...upper, ...values);
-	const trough = Math.min(...lower, ...values);
-	const span = Math.max(1, peak - trough);
-	// Minimum zoom: a dormant window would otherwise collapse to a pennies
-	// domain with five identical gridlines.
-	const pad = Math.max(
-		span * 0.08,
-		Math.abs(peak) * 0.01,
-		Math.abs(trough) * 0.01,
-	);
-	const high = peak >= 0 ? Math.max(...upper, ...values, 1) * 1.08 : peak + pad;
-	const low = trough >= 0 ? Math.min(0, ...lower, ...values) : trough - pad;
-	// Prefer a measured container width so desktop renders at native scale
-	// instead of stretching the 820-unit desktop viewBox. The narrow/desktop
-	// defaults remain as the pre-measure fallback and for tests.
-	const resolvedWidth = Math.max(
-		280,
-		Math.round(width ?? (narrow ? 440 : 820)),
-	);
-	const resolvedHeight = Math.max(
-		200,
-		Math.round(height ?? (narrow ? 260 : 280)),
-	);
-	const left = 63,
-		right = 24,
-		top = 15,
-		bottom = 35;
-	const geometry = lineChartModel({
-		xMax: points.length - 1,
-		low,
-		high,
-		width: resolvedWidth,
-		height: resolvedHeight,
-		left,
-		right,
-		top,
-		bottom,
-	});
-	const { x, y, line, grid, indexAt } = geometry;
-	const basePath = line(values);
-	const filledBasePath = `${basePath} L${x(points.length - 1)},${y(low)} L${left},${y(low)} Z`;
-	const medianPath = range
-		? line(range.points.map((point) => adjust(point.median, point.date)))
-		: null;
-	const bands = new Map(range?.points.map((band) => [band.date, band]));
-	const rows = points
-		.filter(
-			(point, index) =>
-				index === 0 ||
-				index === points.length - 1 ||
-				point.date.slice(5, 10) === "12-31",
-		)
-		.map((point) => {
-			const band = bands.get(point.date);
-			return {
-				date: point.date,
-				total: adjust(point.total, point.date),
-				band: band
-					? {
-							lower: adjust(band.lower, point.date),
-							median: adjust(band.median, point.date),
-							upper: adjust(band.upper, point.date),
-						}
-					: null,
-			};
-		});
-	return {
-		points,
-		start,
-		last,
-		adjust,
-		values,
-		high,
-		low,
-		width: resolvedWidth,
-		height: resolvedHeight,
-		left,
-		right,
-		top,
-		bottom,
-		x,
-		y,
-		line,
-		grid,
-		basePath,
-		filledBasePath,
-		medianPath,
-		hasRange: range !== null,
-		rows,
-		area: `${line(upper)} ${lower
-			.map((value, index) => `L${x(index)},${y(value)}`)
-			.reverse()
-			.join(" ")} Z`,
-		indexAt,
-	};
-}
-
-export type ChartModel = NonNullable<ReturnType<typeof projectionChartModel>>;
 
 /**
  * Balance-path model for one funding gap, built on lineChartModel. The
@@ -321,7 +185,7 @@ export function trailingDailyPoints(
 	const result: Projection["points"] = [];
 	// Balances forward-fill alongside totals: each day carries the latest
 	// known balance per account, so sparse snapshot rows expand into a
-	// continuous per-account series for the contribution stack.
+	// continuous per-account series for the accounts trend view.
 	const balances: Record<string, number> = {};
 	// Both the day sequence and sorted are date-ordered: sweep once with a
 	// cursor instead of re-scanning the prefix per day.
@@ -329,7 +193,10 @@ export function trailingDailyPoints(
 	let current = sorted[0]!;
 	for (let offset = 0; offset < days; offset++) {
 		const date = shiftDate({ date: start, days: offset });
-		while (cursor + 1 < sorted.length && sorted[cursor + 1]!.date.slice(0, 10) <= date) {
+		while (
+			cursor + 1 < sorted.length &&
+			sorted[cursor + 1]!.date.slice(0, 10) <= date
+		) {
 			cursor++;
 		}
 		if (sorted[cursor]!.date.slice(0, 10) <= date) current = sorted[cursor]!;
@@ -342,38 +209,37 @@ export function trailingDailyPoints(
 }
 
 /**
- * Index of the plotted point at or nearest `today` (a YYYY-MM-DD date).
- * The result is always a valid index: today before the first point yields 0
- * and today after the last point yields the last index. Ties prefer the
- * earlier point so the default never jumps into the future on a coin flip.
+ * Y domain for the trailing net-worth line. Positive wealth keeps the $0
+ * floor and 8% headroom; all-debt windows pin both bounds near the data
+ * instead of wasting the chart on the unreachable $0 ceiling.
  */
-export function nearestPointIndex(
-	points: ReadonlyArray<{ date: string }>,
-	today: string,
-): number {
-	let best = 0;
-	let bestDistance = Number.POSITIVE_INFINITY;
-	const target = Date.parse(today);
-	for (const [index, point] of points.entries()) {
-		const time = Date.parse(point.date.slice(0, 10));
-		const distance =
-			Number.isNaN(time) || Number.isNaN(target)
-				? Number.POSITIVE_INFINITY
-				: Math.abs(time - target);
-		if (distance < bestDistance) {
-			best = index;
-			bestDistance = distance;
-		}
-	}
-	return best;
+export function netWorthDomain(totals: ReadonlyArray<number>): {
+	low: number;
+	high: number;
+} {
+	const actualPeak = totals.length ? Math.max(...totals) : 0;
+	const actualTrough = totals.length ? Math.min(...totals) : 0;
+	const span = Math.max(1, actualPeak - actualTrough);
+	// Minimum zoom: a dormant window would otherwise collapse to a pennies
+	// domain with identical gridlines.
+	const pad = Math.max(
+		span * 0.08,
+		Math.abs(actualPeak) * 0.01,
+		Math.abs(actualTrough) * 0.01,
+	);
+	const high =
+		actualPeak >= 0 ? Math.max(...totals, 1) * 1.08 : actualPeak + pad;
+	const low = actualTrough >= 0 ? Math.min(0, ...totals) : actualTrough - pad;
+	return { low, high };
 }
-export interface StackedAccountPoint {
-	day: string;
+
+export interface AccountTrendPoint {
+	date: string;
 	account: string;
 	balance: number;
 }
 
-export interface StackedAccountSeries {
+export interface AccountTrendSeries {
 	id: string;
 	name: string;
 	endBalance: number;
@@ -382,18 +248,18 @@ export interface StackedAccountSeries {
 }
 
 /**
- * Long-form per-account rows for the contribution stack, plus one series
- * entry per account with a nonzero presence in the window. Days keep full
- * labels; the chart axis thins them. The stack mirrors the line plot's
- * window: every account series shares the same daily domain.
+ * Long-form per-account rows for the accounts view, plus one series entry
+ * per account with a nonzero presence in the window. Dates stay as ISO
+ * days; the chart axis formats and thins them. The rows mirror the total
+ * line's window: every account series shares the same daily domain.
  */
-export function stackedAccountRows({
+export function accountTrendRows({
 	points,
 	accounts,
 }: {
 	points: ReadonlyArray<Projection["points"][number]>;
 	accounts: ReadonlyArray<{ id: string; name: string }>;
-}): { rows: StackedAccountPoint[]; series: StackedAccountSeries[] } {
+}): { rows: AccountTrendPoint[]; series: AccountTrendSeries[] } {
 	const present = new Set<string>();
 	for (const point of points) {
 		for (const [accountId, balance] of Object.entries(point.balances)) {
@@ -405,12 +271,12 @@ export function stackedAccountRows({
 	const index = new Map(
 		accounts.map((account, position) => [account.id, position]),
 	);
-	const rows: StackedAccountPoint[] = [];
+	const rows: AccountTrendPoint[] = [];
 	for (const point of points) {
-		const day = monthDay(point.date);
+		const date = point.date.slice(0, 10);
 		for (const account of ordered) {
 			rows.push({
-				day,
+				date,
 				account: names.get(account.id) ?? account.id,
 				balance: point.balances[account.id] ?? 0,
 			});
@@ -424,19 +290,4 @@ export function stackedAccountRows({
 		colorIndex: index.get(account.id) ?? 0,
 	}));
 	return { rows, series };
-}
-
-export function projectionCsv(rows: ChartModel["rows"]) {
-	return [
-		"Date,Projection,10th percentile,Median,90th percentile",
-		...rows.map((point) =>
-			[
-				point.date,
-				point.total.toFixed(2),
-				...[point.band?.lower, point.band?.median, point.band?.upper].map(
-					(value) => (value === undefined ? "" : value.toFixed(2)),
-				),
-			].join(","),
-		),
-	].join("\n");
 }

@@ -86,8 +86,15 @@ function show() {
 	return { onEvidence };
 }
 
+function totalDescription(): string {
+	const chart = screen.getByRole("img", {
+		name: "Net worth over the trailing 30 days",
+	});
+	return chart.querySelector("desc")?.textContent ?? "";
+}
+
 describe("projection chart inspection", () => {
-	it("keeps the first-sync delta fixed across window changes and inspection", () => {
+	it("keeps the first-sync delta fixed across window changes", () => {
 		mockChart(
 			projectionFixture({
 				currentNetWorth: 1800,
@@ -117,7 +124,6 @@ describe("projection chart inspection", () => {
 		expect(screen.getByText("+$800 (+80%)")).toBeTruthy();
 		expect(screen.getByText("since first sync · Feb 1, 2026")).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "90 days" }));
-		fireEvent.change(screen.getByRole("slider"), { target: { value: "0" } });
 		expect(screen.getByText("+$800 (+80%)")).toBeTruthy();
 		expect(screen.getByText("As of Jul 1, 2026")).toBeTruthy();
 	});
@@ -146,88 +152,17 @@ describe("projection chart inspection", () => {
 		expect(screen.queryByText(/since first sync/)).toBeNull();
 	});
 
-	it("keeps keyboard inspection values and resets on blur", () => {
+	it("renders the trailing window as an accessible TanStack chart", () => {
 		show();
-		const slider = screen.getByRole("slider", {
-			name: "Inspect net worth date",
+		const chart = screen.getByRole("img", {
+			name: "Net worth over the trailing 30 days",
 		});
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
-		fireEvent.change(slider, { target: { value: "0" } });
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
-		fireEvent.change(slider, { target: { value: "18" } });
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,400");
-		fireEvent.blur(slider);
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
-	});
-
-	it("keeps pointer inspection", () => {
-		show();
-		const plot = screen.getByRole("img");
-		vi.spyOn(plot, "getBoundingClientRect").mockReturnValue(
-			new DOMRect(0, 0, 100, 100),
+		expect(chart.getAttribute("tabindex")).toBe("0");
+		expect(totalDescription()).toContain(
+			"Trailing 30-day net worth ends at $1,800 on Jul 1, 2026",
 		);
-		fireEvent(
-			plot,
-			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
-		);
-		const slider = screen.getByRole("slider");
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
-		fireEvent.pointerLeave(plot);
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
-	});
-
-	it("follows the dot with a badge and crosshair lines", () => {
-		show();
-		const plot = screen.getByRole("img");
-		vi.spyOn(plot, "getBoundingClientRect").mockReturnValue(
-			new DOMRect(0, 0, 100, 100),
-		);
-		// No badge or crosshair before inspection.
-		expect(screen.queryByText("Jun 2, 2026")).toBeNull();
-		expect(plot.querySelectorAll('line[stroke-dasharray="4 4"]').length).toBe(
-			0,
-		);
-		fireEvent(
-			plot,
-			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
-		);
-		// Badge tracks the inspected dot with the full date and value.
-		expect(screen.getByText("Jun 2, 2026")).toBeTruthy();
-		expect(screen.getAllByText("$1,000").length).toBeGreaterThanOrEqual(1);
-		// Dotted guides run across both axes through the dot.
-		expect(plot.querySelectorAll('line[stroke-dasharray="4 4"]').length).toBe(
-			2,
-		);
-	});
-
-	it("persists the dot on click and toggles off on a second click", () => {
-		show();
-		const plot = screen.getByRole("img");
-		vi.spyOn(plot, "getBoundingClientRect").mockReturnValue(
-			new DOMRect(0, 0, 100, 100),
-		);
-		fireEvent(
-			plot,
-			new MouseEvent("pointermove", { bubbles: true, clientX: 0 }),
-		);
-		fireEvent(plot, new MouseEvent("click", { bubbles: true, clientX: 0 }));
-		// Leaving keeps the pinned dot, badge, and readout in place.
-		fireEvent.pointerLeave(plot);
-		const slider = screen.getByRole("slider");
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jun 2026: $1,000");
-		expect(screen.getByText("Jun 2, 2026")).toBeTruthy();
-		expect(plot.querySelectorAll('line[stroke-dasharray="4 4"]').length).toBe(
-			2,
-		);
-		// Clicking the pinned spot again releases it.
-		fireEvent(plot, new MouseEvent("click", { bubbles: true, clientX: 0 }));
-		fireEvent(
-			plot,
-			new MouseEvent("pointermove", { bubbles: true, clientX: 99 }),
-		);
-		fireEvent.pointerLeave(plot);
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
-		expect(screen.queryByText("Jun 2, 2026")).toBeNull();
+		expect(totalDescription()).toContain("starting at $1,000 on Jun 2, 2026");
+		expect(totalDescription()).toContain("The solid $0 line marks no debt.");
 	});
 
 	it("opens the evidence action from the graph", () => {
@@ -242,18 +177,29 @@ describe("projection chart inspection", () => {
 
 	it("switches between 30-day and 90-day windows", () => {
 		show();
-		const slider = screen.getByRole("slider", {
-			name: "Inspect net worth date",
-		});
-		expect(slider.getAttribute("max")).toBe("29");
+		expect(
+			screen.getByRole("img", {
+				name: "Net worth over the trailing 30 days",
+			}),
+		).toBeTruthy();
+		expect(totalDescription()).toContain("Trailing 30-day net worth");
 		fireEvent.click(screen.getByRole("button", { name: "90 days" }));
-		expect(slider.getAttribute("max")).toBe("89");
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
-		fireEvent.change(slider, { target: { value: "0" } });
-		expect(slider.getAttribute("aria-valuetext")).toBe("Apr 2026: $1,000");
+		expect(
+			screen.getByRole("img", {
+				name: "Net worth over the trailing 90 days",
+			}),
+		).toBeTruthy();
+		const long = screen
+			.getByRole("img", { name: "Net worth over the trailing 90 days" })
+			.querySelector("desc")?.textContent;
+		expect(long).toContain("Trailing 90-day net worth");
+		expect(long).toContain("starting at $1,000 on Apr 3, 2026");
 		fireEvent.click(screen.getByRole("button", { name: "30 days" }));
-		expect(slider.getAttribute("max")).toBe("29");
-		expect(slider.getAttribute("aria-valuetext")).toBe("Jul 2026: $1,800");
+		expect(
+			screen.getByRole("img", {
+				name: "Net worth over the trailing 30 days",
+			}),
+		).toBeTruthy();
 	});
 
 	it("hides the $0 line for an all-debt window", () => {
@@ -265,13 +211,13 @@ describe("projection chart inspection", () => {
 				],
 			}),
 		);
-		render(<ProjectionChart onEvidence={vi.fn()} />);
-		expect(screen.queryByText(/No debt/)).toBeNull();
-		expect(
-			screen
-				.getByRole("slider", { name: "Inspect net worth date" })
-				.getAttribute("aria-valuetext"),
-		).toBe("Jul 2026: -$65,800");
+		const { container } = render(<ProjectionChart onEvidence={vi.fn()} />);
+		const desc =
+			container.querySelector("svg.ts-chart desc")?.textContent ?? "";
+		// The accessible description carries the zero-line decision, so the
+		// assertion stays on project-owned text, not chart internals.
+		expect(desc).not.toContain("$0 line");
+		expect(desc).toContain("-$65,800");
 	});
 
 	it("toggles between the total line and the account stack", () => {
@@ -293,14 +239,18 @@ describe("projection chart inspection", () => {
 			}),
 		);
 		render(<ProjectionChart onEvidence={vi.fn()} />);
-		// The total line renders first with its inspection slider.
+		// The total line renders first as a TanStack chart.
 		expect(
-			screen.getByRole("slider", { name: "Inspect net worth date" }),
+			screen.getByRole("img", {
+				name: "Net worth over the trailing 30 days",
+			}),
 		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Accounts" }));
-		// The stack replaces the line and slider, with ending balances as text.
+		// The stack replaces the line with its own accessible chart.
 		expect(
-			screen.queryByRole("slider", { name: "Inspect net worth date" }),
+			screen.queryByRole("img", {
+				name: "Net worth over the trailing 30 days",
+			}),
 		).toBeNull();
 		expect(
 			screen.getByRole("img", {
@@ -309,7 +259,9 @@ describe("projection chart inspection", () => {
 		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: "Total" }));
 		expect(
-			screen.getByRole("slider", { name: "Inspect net worth date" }),
+			screen.getByRole("img", {
+				name: "Net worth over the trailing 30 days",
+			}),
 		).toBeTruthy();
 	});
 

@@ -28,7 +28,7 @@ test("navigation remains usable after a phone-to-desktop resize", async ({
 	await expect(
 		page.getByRole("dialog", { name: "Workspace navigation" }),
 	).toHaveCount(0);
-	await page.getByRole("slider", { name: "Inspect net worth date" }).hover();
+	await page.getByRole("img", { name: /Net worth over the trailing/ }).hover();
 	const initialScroll = await page.evaluate(() => window.scrollY);
 	await page.mouse.wheel(0, 400);
 	await expect
@@ -44,25 +44,25 @@ test("projection inspection remains keyboard-accessible after resize", async ({
 	page,
 }) => {
 	await page.goto("/");
-	const slider = page.getByRole("slider", { name: "Inspect net worth date" });
-	await expect(slider).toBeAttached();
+	const chart = page.getByRole("img", {
+		name: /Net worth over the trailing/,
+	});
+	await expect(chart).toBeAttached();
 	for (const width of [320, 1440]) {
 		await page.setViewportSize({ width, height: 900 });
-		const initialValue = await slider.getAttribute("aria-valuetext");
-		const maximum = await slider.getAttribute("max");
-		const minimum = await slider.getAttribute("min");
-		expect(initialValue).not.toBeNull();
-		expect(maximum).not.toBeNull();
-		expect(minimum).not.toBeNull();
-		await slider.focus();
-		// The trailing graph defaults to today, the last point, so keyboard
-		// inspection moves toward the start of the window.
-		await expect(slider).toHaveValue(maximum!);
-		await slider.press("Home");
-		await expect(slider).toHaveValue(minimum!);
-		await expect(slider).not.toHaveAttribute("aria-valuetext", initialValue!);
-		await slider.press("Tab");
-		await expect(slider).not.toBeFocused();
+		await expect(chart).toHaveAttribute("tabindex", "0");
+		await chart.focus();
+		await expect(chart).toBeFocused();
+		// TanStack owns keyboard traversal: Home and End jump to the ends of
+		// the trailing window without leaving the chart surface.
+		await page.keyboard.press("Home");
+		await expect(chart).toBeFocused();
+		await page.keyboard.press("End");
+		await expect(chart).toBeFocused();
+		await page.keyboard.press("ArrowLeft");
+		await expect(chart).toBeFocused();
+		await page.keyboard.press("Tab");
+		await expect(chart).not.toBeFocused();
 	}
 });
 
