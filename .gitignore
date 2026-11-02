@@ -5,6 +5,7 @@ uploads/
 tmp/
 .env*
 !.env.example
+/viz/
 /tasks/to-groom/long-chaining/
 /node_modules/
 /.vercel/

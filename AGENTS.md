@@ -34,6 +34,13 @@
 
 - Dev stack: `dev/README.md`. Verification gate: `TESTING.md`.
 
+## Landing visualization (viz/)
+
+- `viz/` holds the backlog landing map (`nwe-landing-map.html`, Mermaid diagrams) and `viz/captures/` (Playwright screenshots/clips). Gitignored; never commit.
+- Serve from `viz/`: `python3 -m http.server 8123 --bind 127.0.0.1` (LAN: `--bind 0.0.0.0`). Map at `/nwe-landing-map.html`, captures at `/captures/<area>/<file>`.
+- Capture against TESTING.md browser harnesses on isolated ports; place media under `viz/captures/<area>/` with descriptive names.
+- Keep worktrees out of `/tmp` (tmpfs pressure, reboot loss). Use the standard worktree dir; relocate with remove plus re-add at the same ref when a move must cross devices.
+
 ## Production deployment
 
 - Frontend is Vercel project `simhozebs-projects/net-worth-estimator` (`https://net-worth-estimator.vercel.app`). The CLI evaluates root `vercel.mjs` with local shell env, so export `BACKEND_URL`, `NET_WORTH_ESTIMATOR_PUBLIC_URL`, and the proxy secret for CLI runs. `.vercelignore` patterns are root-anchored.
