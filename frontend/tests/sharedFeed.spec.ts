@@ -46,7 +46,7 @@ test("group feed lists shared transactions with viewer totals", async ({
 	).toBeVisible();
 	// Source member, authorized amounts, pending marker, calculated recipe.
 	await expect(feed.getByText(/Shared by Dana/)).toHaveCount(4);
-	await expect(feed.getByText("Jun 15, 2026")).toBeVisible();
+	await expect(feed.getByText("Jun 15, 2026").first()).toBeVisible();
 	await expect(feed.getByText("−$42.50")).toBeVisible();
 	await expect(feed.getByText("Varies", { exact: true })).toBeVisible();
 	await expect(feed.getByText(/Pending/)).toBeVisible();
