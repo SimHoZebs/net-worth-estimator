@@ -118,7 +118,7 @@ func qa03SocialSetup(t *testing.T) *qa03Social {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := scoped.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
+		if _, err := scoped.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
 			t.Fatal(err)
 		}
 		if subject == "qa03-owner" {
