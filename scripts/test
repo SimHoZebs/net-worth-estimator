@@ -26,6 +26,9 @@ Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matri
   --timeout=N    with --e2e: wall-clock budget in seconds (default 1800)
   --clean        with --e2e: remove the disposable root even on failure
                (removed on success, kept on failure by default)
+  --seed-pack=p  with --e2e: seed one fixture pack into the owner after
+               isolation (exact guest and blank checks run first)
+  --seed-bulk=s  with --e2e: tagged bulk rows NxM[:seed] beside the owner
   --matrix       integration edge-case matrix: the Go edge-case suite once per
                dataset-pack x identity-set combination, then teardown to
                nothing (see docs/integration-edge-gates.md)
@@ -38,6 +41,8 @@ Usage: scripts/test [--unit|--integration|--all|--e2e [e2e opts]|--matrix [matri
   --repeat=N     with --matrix: go test -count for storm repetition (default 1)
   --specs=A,B    with --matrix --browser: browser specs (default: the three
                sharing specs)
+  --bulk=NxM[:s] with --matrix: tagged bulk accounts on top of each pack
+               (default: none; for example 20x200:7)
   --gate         full completion gate: install check, one API generation, then
                backend, frontend, and extension gates in parallel groups,
                then the sharded browser suite
@@ -98,7 +103,7 @@ run_e2e() {
 # per pack against the pack-seeded fixture harness (fresh temp database and
 # random free ports per run, pruned on exit by the browser config).
 run_matrix() {
-  local packs="$1" identities="$2" repeat="$3" browser="$4" specs="$5"
+  local packs="$1" identities="$2" repeat="$3" browser="$4" specs="$5" bulk="$6"
   local failed=0 total=0
   local pack identity
   local old_ifs="$IFS"
@@ -107,7 +112,7 @@ run_matrix() {
   for pack in $packs; do
     for identity in $identities; do
       total=$((total + 1))
-      echo "matrix: pack=${pack} identities=${identity} repeat=${repeat}"
+      echo "matrix: pack=${pack} identities=${identity} repeat=${repeat} bulk=${bulk:-none}"
       if [ "$pack" = "base" ]; then
         unset INTEGRATION_PACK
       else
@@ -115,6 +120,12 @@ run_matrix() {
         export INTEGRATION_PACK
       fi
       export INTEGRATION_IDENTITY_SET="$identity"
+      if [ -n "$bulk" ]; then
+        INTEGRATION_BULK="$bulk"
+        export INTEGRATION_BULK
+      else
+        unset INTEGRATION_BULK
+      fi
       if CGO_ENABLED=0 go -C backend test ./internal/integrationedge/ ./internal/integrationfixtures/ -count="$repeat"; then
         echo "matrix: ok pack=${pack} identities=${identity}"
       else
@@ -128,6 +139,12 @@ run_matrix() {
           INTEGRATION_PACK="$pack"
           export INTEGRATION_PACK
         fi
+        if [ -n "$bulk" ]; then
+          INTEGRATION_BULK="$bulk"
+          export INTEGRATION_BULK
+        else
+          unset INTEGRATION_BULK
+        fi
         # shellcheck disable=SC2086
         if bun --filter ./frontend test:browser -- $specs; then
           echo "matrix: ok browser pack=${pack}"
@@ -139,7 +156,7 @@ run_matrix() {
     done
   done
   IFS="$old_ifs"
-  unset INTEGRATION_PACK INTEGRATION_IDENTITY_SET
+  unset INTEGRATION_PACK INTEGRATION_IDENTITY_SET INTEGRATION_BULK
   echo "matrix: ${total} combination(s), ${failed} failure(s)"
   if [ "$failed" -ne 0 ]; then
     exit 1
@@ -239,6 +256,7 @@ matrix_packs="base,unicode"
 matrix_identities="full,duo,solo"
 matrix_repeat=1
 matrix_specs="groupSharing.spec.ts sharedFeed.spec.ts inbox.spec.ts"
+matrix_bulk=""
 matrix_only_opt=0
 for argument in "$@"; do
   case "$argument" in
@@ -252,7 +270,7 @@ for argument in "$@"; do
     --skip-build|--clean|--cold-build)
       e2e_args="$e2e_args $argument"
       ;;
-    --step=*|--timeout=*)
+    --step=*|--timeout=*|--seed-pack=*|--seed-bulk=*)
       e2e_args="$e2e_args $argument"
       ;;
     --no-browser) run_browser=0 ;;
@@ -262,6 +280,7 @@ for argument in "$@"; do
     --identities=*) matrix_identities="${argument#--identities=}"; matrix_only_opt=1 ;;
     --repeat=*) matrix_repeat="${argument#--repeat=}"; matrix_only_opt=1 ;;
     --specs=*) matrix_specs="${argument#--specs=}"; matrix_only_opt=1 ;;
+    --bulk=*) matrix_bulk="${argument#--bulk=}"; matrix_only_opt=1 ;;
     *) echo "error: unknown argument '$argument' (use --help)" >&2; exit 2 ;;
   esac
 done
@@ -276,7 +295,7 @@ case "${mode:---help}" in
     ;;
   *)
     if [ "$run_browser" -eq 0 ] || [ -n "$shards" ] || [ -n "$e2e_args" ] || [ "$matrix_only_opt" -eq 1 ]; then
-      echo "error: --no-browser/--shards need --gate, --skip-build/--step/--timeout/--clean/--cold-build need --e2e, --browser/--packs/--identities/--repeat/--specs need --matrix (use --help)" >&2
+      echo "error: --no-browser/--shards need --gate, --skip-build/--step/--timeout/--clean/--cold-build/--seed-pack/--seed-bulk need --e2e, --browser/--packs/--identities/--repeat/--specs/--bulk need --matrix (use --help)" >&2
       exit 2
     fi
     ;;
@@ -319,7 +338,7 @@ case "${mode:---help}" in
         *) echo "error: unknown identity set '$identity' (solo, duo, full)" >&2; exit 2 ;;
       esac
     done
-    run_matrix "$matrix_packs" "$matrix_identities" "$matrix_repeat" "$matrix_browser" "$matrix_specs"
+    run_matrix "$matrix_packs" "$matrix_identities" "$matrix_repeat" "$matrix_browser" "$matrix_specs" "$matrix_bulk"
     ;;
   *) echo "error: unknown mode '$mode' (use --help)" >&2; exit 2 ;;
 esac

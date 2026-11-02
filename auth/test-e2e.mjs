@@ -17,6 +17,9 @@
 //   --timeout=s   wall-clock budget in seconds (default E2E_BUDGET_SECONDS)
 //   --clean       remove the disposable root even on failure (it is removed
 //                 on success and kept on failure by default)
+//   --seed-pack=p seed one fixture pack into the owner after isolation
+//                 (exact guest and blank-workspace checks run first)
+//   --seed-bulk=s seed tagged bulk rows NxM[:seed] beside the owner model
 //
 // Test-only credentials are generated per run and marked in fixture.json.
 // Nothing under tmp/dev, shared volumes, or production is ever touched.
@@ -55,6 +58,7 @@ import {
   ownerSignIn,
   receiptUpload,
   secondUserSignup,
+  seedExtraData,
   sharedDatabaseIsolation,
 } from "./e2e-journeys.mjs";
 
@@ -432,6 +436,10 @@ try {
     await compose({}, "start", "backend");
     await waitFor(`${appOrigin}/healthz`, { label: "API after restart" });
   }
+  const seedPack = typeof args["seed-pack"] === "string" ? args["seed-pack"] : null;
+  const seedBulk = typeof args["seed-bulk"] === "string" ? args["seed-bulk"] : null;
+  if (args["seed-pack"] === true || args["seed-pack"] === "" || args["seed-bulk"] === true || args["seed-bulk"] === "")
+    throw new Error("--seed-pack and --seed-bulk need values (for example --seed-pack=unicode --seed-bulk=5x20:7)");
   const secondBundle = await journey("isolation", () => secondUserSignup(journeyCtx, { restartStack }));
   if (secondBundle) {
     await journey("isolation", async () => {
@@ -451,6 +459,10 @@ try {
       issuer,
       guestResourceId: guestResource,
     }));
+  }
+
+  if ((seedPack || seedBulk) && ownerBundle) {
+    await journey("isolation", () => seedExtraData(journeyCtx, ownerBundle, { pack: seedPack, bulk: seedBulk }));
   }
 
   await journey("direct-share", () => directShareCycle(journeyCtx, ownerBundle, secondBundle));

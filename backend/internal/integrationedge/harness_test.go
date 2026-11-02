@@ -66,6 +66,21 @@ func advPack() string {
 	return strings.TrimSpace(os.Getenv("INTEGRATION_PACK"))
 }
 
+// advBulkSpec parses the optional additive bulk spec the matrix runner
+// passes. Empty means the pack or default seed runs alone.
+func advBulkSpec(t *testing.T) integrationfixtures.BulkSpec {
+	t.Helper()
+	raw := strings.TrimSpace(os.Getenv("INTEGRATION_BULK"))
+	if raw == "" {
+		return integrationfixtures.BulkSpec{}
+	}
+	spec, err := integrationfixtures.ParseBulkSpec(raw)
+	if err != nil {
+		t.Fatalf("integration bulk %q: %v", raw, err)
+	}
+	return spec
+}
+
 // advWorld is one throwaway backend with synthetic users.
 type advWorld struct {
 	db      *sqlite.Database
@@ -244,6 +259,11 @@ func advSetup(t *testing.T) *advWorld {
 			if _, err := world.ownerSC.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
 				t.Fatalf("ensure checking for pack %q: %v", pack, err)
 			}
+		}
+	}
+	if bulk := advBulkSpec(t); bulk.Accounts > 0 {
+		if _, err := integrationfixtures.InjectBulk(world.ownerSC, bulk); err != nil {
+			t.Fatalf("seed bulk: %v", err)
 		}
 	}
 

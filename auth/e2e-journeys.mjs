@@ -12,6 +12,9 @@
 // depends on them.
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect } from "../frontend/node_modules/@playwright/test/index.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { E2E_SEED, E2E_TRANSPORT_ATTEMPTS } from "./e2e-lib.mjs";
@@ -550,4 +553,218 @@ export async function ownerLogout(ctx, ownerBundle) {
   assert.equal(loggedOut.authenticated, false);
   assert.equal(loggedOut.resource.id, actorResource(ctx.issuer, ctx.guestSubject));
   console.log("e2e: logout and captured-cookie rejection PASS");
+}
+
+// Extra deterministic data for edge exploration: one fixture pack plus
+// tagged bulk rows, seeded into the owner after the isolation assertions.
+// The exact guest and blank-workspace checks run before this step, so they
+// stay byte-identical. Later journeys scope their own rows, so the extra
+// data rides along without changing their assertions.
+export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
+  const { origin } = ctx;
+  const { owner, own } = ownerBundle;
+  const packDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "backend", "testdata", "integration", "v1");
+
+  const before = (await (await api(owner, origin, own, "GET", "/v1/financial-model")).json()).model;
+  const haveAccounts = new Set(before.accounts.map((item) => item.id));
+  let addedAccounts = 0;
+  let addedPostings = 0;
+  let addedRules = 0;
+
+  async function createAccount(row) {
+    if (haveAccounts.has(row.id)) return;
+    const response = await api(owner, origin, own, "POST", "/v1/accounts", {
+      id: row.id,
+      name: row.name,
+      kind: row.kind ?? "cash",
+      enabled: row.enabled ?? true,
+    });
+    assert.equal(response.status(), 200, `seed account ${row.id}: ${await response.text()}`);
+    assert.equal((await response.json()).persisted, true);
+    haveAccounts.add(row.id);
+    addedAccounts += 1;
+  }
+
+  // The API path reproduces pack rows, so it passes the pack's own
+  // resolver through instead of forcing one.
+  function expressionAmount(amount) {
+    return {
+      resolver: amount?.resolver ?? "expression",
+      config: amount?.config ?? { expression: "25.00" },
+      inputs: amount?.inputs ?? {},
+    };
+  }
+
+  // Deterministic version-5 UUID over one bulk coordinate, mirroring the
+  // Go bulk builder's namespace-and-name scheme.
+  function bulkPostingId(seed, account, index) {
+    const namespace = Buffer.from("6ba7b8119dad11d180b400c04fd430c8", "hex");
+    const digest = createHash("sha1")
+      .update(namespace)
+      .update(`seed-bulk-${seed}-${account}-${index}`, "utf8")
+      .digest();
+    digest[6] = (digest[6] & 0x0f) | 0x50;
+    digest[8] = (digest[8] & 0x3f) | 0x80;
+    const hex = digest.subarray(0, 16).toString("hex");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  // Deterministic spread matching the Go bulk day shapes: UTC midnight,
+  // month edges, a leap day, and plain mid-month days.
+  function bulkDay(next, index) {
+    const day = 86400;
+    switch (index % 8) {
+      case 0:
+        return Date.UTC(2026, 0, 1, 0, 0, 0) / 1000;
+      case 1:
+        return Date.UTC(2026, 0, 31, 23, 59, 59) / 1000;
+      case 2:
+        return Date.UTC(2024, 1, 29, 12, 0, 0) / 1000;
+      case 3:
+        return Date.UTC(2026, 11, 31, 23, 59, 59) / 1000;
+      default:
+        return Date.UTC(2026, 0, 1, 12, 0, 0) / 1000 + Math.floor(next() * 330) * day;
+    }
+  }
+
+  // Seeded unit-interval stream, so bulk stays reproducible per seed.
+  function seededStream(seed) {
+    let state = Number(seed) | 0;
+    if (state <= 0) state = -state + 1;
+    return () => {
+      state = (state * 1103515245 + 12345) & 0x7fffffff;
+      return state / 0x7fffffff;
+    };
+  }
+
+  async function createPosting(row) {
+    const response = await api(owner, origin, own, "POST", "/v1/postings", {
+      id: row.id,
+      name: row.name,
+      sourceAccountId: row.sourceAccountId ?? null,
+      destinations: row.destinations ?? [],
+      amount: expressionAmount(row.amount),
+      postedTime: row.postedTime,
+      transactionTime: row.transactionTime ?? row.postedTime,
+      enabled: row.enabled ?? true,
+    });
+    assert.equal(response.status(), 200, `seed posting ${row.id}: ${await response.text()}`);
+    assert.equal((await response.json()).persisted, true);
+    addedPostings += 1;
+  }
+
+  async function createRule(row) {
+    const response = await api(owner, origin, own, "POST", "/v1/recurrence-rules", {
+      id: row.id,
+      name: row.name,
+      sourceAccountId: row.sourceAccountId ?? null,
+      destinations: row.destinations ?? [],
+      amount: expressionAmount(row.amount),
+      frequency: row.frequency ?? "monthly",
+      startDate: row.startDate ?? "2026-01-01",
+      enabled: row.enabled ?? true,
+    });
+    assert.equal(response.status(), 200, `seed rule ${row.id}: ${await response.text()}`);
+    addedRules += 1;
+  }
+
+  if (pack) {
+    const raw = await readFile(resolve(packDir, `${pack}.json`), "utf8").catch(() => {
+      throw new Error(`unknown seed pack ${pack}`);
+    });
+    const model = JSON.parse(raw).model ?? {};
+    // The API path covers accounts, checkpoints, postings, and rules. A
+    // pack carrying evaluations, payment terms, or planned purchases needs
+    // the Go import path instead, so fail loudly instead of half-seeding.
+    const evaluations = model.evaluations ?? {};
+    const hasEvaluations = Object.values(evaluations).some((rows) => (rows ?? []).length > 0);
+    if (hasEvaluations || (model.paymentTerms ?? []).length > 0 || (model.plannedPurchases ?? []).length > 0) {
+      throw new Error(`seed pack ${pack} needs the Go import path (unsupported sections present)`);
+    }
+    for (const account of model.accounts ?? []) await createAccount(account);
+    for (const checkpoint of model.checkpoints ?? []) {
+      const response = await api(owner, origin, own, "POST", "/v1/checkpoints", {
+        accountId: checkpoint.AccountId ?? checkpoint.accountId,
+        balance: checkpoint.Balance ?? checkpoint.balance,
+        observedAt: checkpoint.observedAt,
+      });
+      assert.equal(response.status(), 200, `seed checkpoint: ${await response.text()}`);
+    }
+    for (const posting of model.postings ?? []) await createPosting(posting);
+    for (const rule of model.recurrenceRules ?? []) await createRule(rule);
+  }
+
+  if (bulk) {
+    const match = /^(\d+)x(\d+)(?::(-?\d+))?$/.exec(bulk.trim());
+    assert.ok(match, `seed bulk ${bulk} wants NxM[:seed] like 20x200:7`);
+    const accounts = Number(match[1]);
+    const perAccount = Number(match[2]);
+    const seed = Number(match[3] ?? 7);
+    assert.ok(accounts >= 1 && accounts <= 100, "seed bulk accounts wants 1-100");
+    assert.ok(perAccount >= 0 && perAccount <= 1000, "seed bulk postings wants 0-1000");
+    assert.ok(accounts * perAccount <= 20000, "seed bulk exceeds 20000 postings");
+    // Bulk tables mirror the Go bulk builder: the same amount and name
+    // traits (including unicode, right-to-left, combining, and overlong
+    // rows), the same day shapes, and the same account and rule ID scheme.
+    // Limits mirror the Go caps; the Go builder owns them.
+    const amounts = ["0.01", "0.005", "1500", "2.345", "19.99", "250.00", "42.50", "0.00"];
+    const names = [
+      "Seed coffee",
+      "Caf\u00e9 \u2615 groceries",
+      "Tokyo\u51fa\u5f35 lunch",
+      "e\u0301 combining market",
+      "\u0639\u0634\u0627\u0621 RTL dinner",
+      "Seed fuel",
+      "Seed rent",
+      "Seed refund",
+    ];
+    const next = seededStream(seed);
+    const day = 86400;
+    for (let i = 0; i < accounts; i++) {
+      const accountId = `seed-acct-${seed}-${String(i).padStart(4, "0")}`;
+      let accountName = `${names[i % names.length]} ${String(i).padStart(2, "0")}`;
+      if (i % 8 === 7) accountName = `${accountName} ${"\u00e9".repeat(40)}`;
+      await createAccount({ id: accountId, name: accountName, kind: "cash", enabled: true });
+      await api(owner, origin, own, "POST", "/v1/checkpoints", {
+        accountId,
+        balance: 1000 + Math.floor(next() * 9000),
+        observedAt: Date.UTC(2026, 0, 1, 12, 0, 0) / 1000 + i * day,
+      }).then(async (response) => {
+        assert.equal(response.status(), 200, `seed checkpoint ${accountId}: ${await response.text()}`);
+      });
+      for (let j = 0; j < perAccount; j++) {
+        const stamp = bulkDay(next, i + j);
+        await createPosting({
+          id: bulkPostingId(seed, i, j),
+          name: `${names[(i + j) % names.length]} ${String(i).padStart(2, "0")}`,
+          sourceAccountId: accountId,
+          destinations: [],
+          amount: { config: { expression: amounts[(i + j) % amounts.length] } },
+          postedTime: stamp,
+          transactionTime: stamp,
+          enabled: true,
+        });
+      }
+      if (i % 4 === 0) {
+        await createRule({
+          id: `seed-rule-${seed}-${String(i).padStart(4, "0")}`,
+          name: `Seed rule ${String(i).padStart(2, "0")}`,
+          sourceAccountId: accountId,
+          destinations: [],
+          amount: { config: { expression: "250.00" } },
+          frequency: "monthly",
+          startDate: "2026-01-01",
+          enabled: true,
+        });
+      }
+    }
+  }
+
+  const after = (await (await api(owner, origin, own, "GET", "/v1/financial-model")).json()).model;
+  assert.equal(after.accounts.length - before.accounts.length, addedAccounts);
+  assert.equal(after.postings.length - before.postings.length, addedPostings);
+  console.log(
+    `e2e: extra data seed pack=${pack ?? "none"} bulk=${bulk ?? "none"} ` +
+      `(+${addedAccounts} accounts, +${addedPostings} postings, +${addedRules} rules) PASS`,
+  );
 }
