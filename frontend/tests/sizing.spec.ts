@@ -66,6 +66,38 @@ test("projection inspection remains keyboard-accessible after resize", async ({
 	}
 });
 
+test("outlook summary keeps full width on a narrow phone", async ({ page }) => {
+	// Below sm the summary stacks above its controls; side by side the
+	// flex-1 summary can collapse to leftover width beside them and the
+	// anywhere-wrapping value breaks character by character.
+	// 320px documents the phone; 480px pins the crush equilibrium, where the
+	// old side-by-side header left the value leftover width.
+	for (const width of [320, 480]) {
+		await page.setViewportSize({ width, height: 900 });
+		await page.goto("/");
+		const region = page.getByRole("region", {
+			name: /Net worth over the trailing/,
+		});
+		const header = region.locator(":scope > div > div").first();
+		const columns = header.locator(":scope > div");
+		await expect(columns.first()).toBeVisible();
+		await expect(columns.nth(1)).toBeVisible();
+		const summaryBox = await columns.first().boundingBox();
+		const actionsBox = await columns.nth(1).boundingBox();
+		expect(summaryBox).not.toBeNull();
+		expect(actionsBox).not.toBeNull();
+		expect(actionsBox!.y).toBeGreaterThanOrEqual(
+			summaryBox!.y + summaryBox!.height - 2,
+		);
+		const value = columns.first().locator("strong").first();
+		const valueBox = await value.boundingBox();
+		expect(valueBox).not.toBeNull();
+		// A crushed value measured ~60px wide with one digit per line;
+		// healthy text-3xl digits need ~130px. Above that rules out the squish.
+		expect(valueBox!.width).toBeGreaterThan(110);
+	}
+});
+
 test("account sheet controls remain usable across responsive resizes", async ({
 	page,
 }) => {

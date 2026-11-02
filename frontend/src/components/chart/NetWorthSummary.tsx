@@ -30,7 +30,11 @@ export function NetWorthSummary({
 		);
 	return (
 		<div className="px-5 pt-5">
-			<div className="flex flex-wrap items-start justify-between gap-3">
+			{/* Stacked below sm: side-by-side the summary can collapse to
+			leftover width beside the controls (a few px of font metrics
+			decide wrap vs. crush), and overflow-wrap:anywhere then breaks
+			the big value character by character. */}
+			<div className="flex flex-wrap items-start justify-between gap-3 max-sm:flex-col">
 				<div className="min-w-0 flex-1">
 					<h2 className="text-sm text-muted">Net worth</h2>
 					<div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -58,7 +62,7 @@ export function NetWorthSummary({
 					)}
 				</div>
 				{actions && (
-					<div className="flex flex-wrap items-center justify-end gap-2">
+					<div className="flex flex-wrap items-center justify-end gap-2 max-sm:justify-start">
 						{actions}
 					</div>
 				)}
