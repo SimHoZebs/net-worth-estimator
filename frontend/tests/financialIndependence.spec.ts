@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type APIRequestContext, test } from "@playwright/test";
+import { expect, type APIRequestContext, test } from "./base.ts";
 import type {
 	FinancialModelResponse,
 	JsonValue,

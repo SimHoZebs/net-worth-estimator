@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./base.ts";
 import type { BackendCheckpoint } from "../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 

@@ -1,7 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./base.ts";
 import { resetFixture } from "./fixture.ts";
-
-test.use({ locale: "en-US", timezoneId: "America/Los_Angeles" });
 
 test.beforeEach(async () => {
 	await resetFixture({ readOnly: true });

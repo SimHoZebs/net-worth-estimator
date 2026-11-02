@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./base.ts";
 import { fileURLToPath } from "node:url";
 import { resetFixture } from "./fixture.ts";
 

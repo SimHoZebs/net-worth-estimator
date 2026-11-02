@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "./base.ts";
 import { resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {

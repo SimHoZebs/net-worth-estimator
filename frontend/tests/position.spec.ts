@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./base.ts";
 import { resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());

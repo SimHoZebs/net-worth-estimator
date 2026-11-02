@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, test, trackBrowserErrors } from "./base.ts";
 import { resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {
@@ -125,6 +125,7 @@ test("touch tap selects a flow through the same inspector", async ({
 		viewport: { width: 1440, height: 1080 },
 		hasTouch: true,
 	});
+	const reportTouchErrors = trackBrowserErrors(context);
 	const page = await context.newPage();
 	try {
 		await page.goto("/#flows");
@@ -146,6 +147,7 @@ test("touch tap selects a flow through the same inspector", async ({
 		await expect(panel).toContainText(
 			/Money in of|Money out of|Transfer of/,
 		);
+		reportTouchErrors();
 	} finally {
 		await context.close();
 	}

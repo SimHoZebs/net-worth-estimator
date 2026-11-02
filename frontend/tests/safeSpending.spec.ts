@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, trackBrowserErrors } from "./base.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 import { SAFE_SPENDING_LABELS as labels } from "../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
@@ -46,6 +46,7 @@ test("Configure settings survive in a fresh browser context", async ({
 	);
 	expect((await settings.json()).settings.reserve).toBe(321);
 	const fresh = await browser.newContext();
+	const reportFreshErrors = trackBrowserErrors(fresh);
 	try {
 		const otherPage = await fresh.newPage();
 		await otherPage.goto(page.url());
@@ -57,6 +58,7 @@ test("Configure settings survive in a fresh browser context", async ({
 				.getByRole("dialog", { name: "Safe card spending" })
 				.getByRole("heading", { name: "Safe card spending" }),
 		).toBeVisible();
+		reportFreshErrors();
 	} finally {
 		await fresh.close();
 	}

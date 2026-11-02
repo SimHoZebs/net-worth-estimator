@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "./base.ts";
 import type { FinancialModel } from "../src/api/contracts.ts";
 import { FIXTURE_API, readSavedServerModel, resetFixture } from "./fixture.ts";
 

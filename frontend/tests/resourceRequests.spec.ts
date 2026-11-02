@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "./base.ts";
 import { readSavedServerModel, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());

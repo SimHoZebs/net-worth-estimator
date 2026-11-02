@@ -1,4 +1,4 @@
-import { expect, request, test } from "@playwright/test";
+import { expect, request, test } from "./base.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 
 // Ledger completeness in a real browser: the money diagram and the
