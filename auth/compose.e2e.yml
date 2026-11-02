@@ -1,0 +1,34 @@
+# Disposable end-to-end overlay only. Merge last, after the base, Casdoor,
+# and test files. The e2e gate (auth/test-e2e.mjs) selects every value below
+# from verified-free loopback ports and a private root under repository tmp/.
+# It never touches the canonical stack, its ports, or its named volumes.
+services:
+  backend:
+    image: ${E2E_API_IMAGE:?Set the disposable API image tag}
+    # Same image as production; the runtime uid override only keeps the
+    # disposable bind mount writable without host chmod games.
+    user: "${E2E_UID:-1000}:${E2E_GID:-1000}"
+    ports: !override
+      - "127.0.0.1:${E2E_BACKEND_PORT:?Set the disposable backend port}:8787"
+    volumes: !override
+      - ${E2E_DATA_DIR:?Set the disposable app-data directory}:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://casdoor:8000
+      NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
+      NET_WORTH_ESTIMATOR_READ_ONLY: ""
+      NET_WORTH_ESTIMATOR_RECEIPT_SOURCE: disabled
+      NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL: 2s
+
+  frontend:
+    image: ${E2E_FRONT_IMAGE:?Set the disposable frontend image tag}
+    ports: !override
+      - "127.0.0.1:${E2E_APP_PORT:?Set the disposable app port}:80"
+      - "127.0.0.1:${E2E_GATEWAY_PORT:?Set the disposable gateway port}:81"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  casdoor:
+    ports: !override
+      - "127.0.0.1:${E2E_CASDOOR_PORT:?Set the disposable provider port}:8000"
