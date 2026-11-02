@@ -248,6 +248,42 @@ export interface AccountTrendSeries {
 }
 
 /**
+ * Dash patterns for the monochrome accounts view, in ascending visual
+ * weight. Keyed by nothing: callers assign them through
+ * assignAccountDashes.
+ */
+export const ACCOUNT_LINE_DASHES: ReadonlyArray<string | undefined> = [
+	undefined, // solid
+	"6 3", // dash
+	"1.5 3", // dots
+	"8 3 2 3", // dash-dot
+	"12 4 2 4", // long dash plus short dash
+	"3 2 8 2", // dot plus dash
+];
+
+/**
+ * One dash per visible series, aligned with the input order. The global
+ * account order seeds the choice so an account keeps its pattern across
+ * window changes; a series that would collide with an earlier visible one
+ * takes the next free pattern, so the visible set is always distinct
+ * (until more series than patterns, where the extras fall back to solid).
+ */
+export function assignAccountDashes(
+	series: ReadonlyArray<{ colorIndex: number }>,
+): (string | undefined)[] {
+	const used = new Set<string | undefined>();
+	return series.map((entry) => {
+		let dash =
+			ACCOUNT_LINE_DASHES[entry.colorIndex % ACCOUNT_LINE_DASHES.length];
+		if (used.has(dash)) {
+			dash = ACCOUNT_LINE_DASHES.find((candidate) => !used.has(candidate));
+		}
+		used.add(dash);
+		return dash;
+	});
+}
+
+/**
  * Long-form per-account rows for the accounts view, plus one series entry
  * per account with a nonzero presence in the window. Dates stay as ISO
  * days; the chart axis formats and thins them. The rows mirror the total

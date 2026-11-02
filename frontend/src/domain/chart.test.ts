@@ -4,6 +4,7 @@ import { compactMoney } from "./format.ts";
 import type { FundingGap } from "./fundingGaps.ts";
 import {
 	accountTrendRows,
+	assignAccountDashes,
 	fundingGapChartModel,
 	lineChartModel,
 	netWorthDomain,
@@ -241,6 +242,34 @@ describe("chart presentation data", () => {
 			expect(colorOf(wide.series, "checking")).toBe(0);
 			expect(colorOf(wide.series, "savings")).toBe(1);
 			expect(colorOf(wide.series, "archived")).toBe(2);
+		});
+	});
+	describe("assignAccountDashes", () => {
+		it("keeps an account on its global pattern across windows", () => {
+			const first = assignAccountDashes([{ colorIndex: 1 }, { colorIndex: 3 }]);
+			const second = assignAccountDashes([
+				{ colorIndex: 0 },
+				{ colorIndex: 1 },
+				{ colorIndex: 3 },
+			]);
+			expect(first).toEqual([second[1], second[2]]);
+		});
+		it("bumps a sparse-window collision to the next free pattern", () => {
+			// Accounts 0 and 6 share a global pattern; with only those two
+			// visible the second must not repeat the first.
+			const [only, other] = assignAccountDashes([
+				{ colorIndex: 0 },
+				{ colorIndex: 6 },
+			]);
+			expect(only).toBeUndefined();
+			expect(other).toBeDefined();
+			expect(other).not.toBe(only);
+		});
+		it("keeps every visible dash distinct until patterns run out", () => {
+			const dashes = assignAccountDashes(
+				[0, 1, 2, 3, 4, 5].map((colorIndex) => ({ colorIndex })),
+			);
+			expect(new Set(dashes).size).toBe(6);
 		});
 	});
 	describe("netWorthDomain", () => {
