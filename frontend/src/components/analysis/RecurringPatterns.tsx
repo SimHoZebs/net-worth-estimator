@@ -12,15 +12,19 @@ import {
 } from "@/domain/recurringPatterns.ts";
 import {
 	useDismissAnalysisFinding,
+	useLinkRecurringPattern,
 	usePromoteRecurringPattern,
+	useRecurringLinkPreview,
 	useRecurringPreview,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
 import { useSavedAccounts } from "@/state/savedRows.ts";
+import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
 import { DetailRow } from "../DetailRow.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
+import { SelectField } from "../Field.tsx";
 import { Modal } from "../Modal.tsx";
 
 function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
@@ -69,9 +73,10 @@ function RecurringPlanDialog({
 			) : created ? (
 				<div className="space-y-3">
 					<p className="m-0 text-sm">
-						Forecast rule “{created}” created. Future {plan.rule ? frequencyLabel(plan.rule.frequency).toLowerCase() : ""} movements
-						will appear in projections. The recorded payments below stay
-						unchanged.
+						Forecast rule “{created}” created. Future{" "}
+						{plan.rule ? frequencyLabel(plan.rule.frequency).toLowerCase() : ""}{" "}
+						movements will appear in projections. The recorded payments below
+						stay unchanged.
 					</p>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Close
@@ -80,7 +85,9 @@ function RecurringPlanDialog({
 			) : (
 				<div className="space-y-4">
 					<dl className="m-0 space-y-2">
-						<DetailRow label="Suggested rule">{plan.rule?.name ?? title}</DetailRow>
+						<DetailRow label="Suggested rule">
+							{plan.rule?.name ?? title}
+						</DetailRow>
 						<DetailRow label="Amount">
 							{plan.rule
 								? `${plan.rule.amount} ${plan.currency}`
@@ -162,6 +169,134 @@ function evidenceSummary(plan: RecurringPromotionPreview): string {
 	return `${occurrences.length} recorded ${occurrences.length === 1 ? "payment" : "payments"} · ${plan.typicalAmount} ${plan.currency} typical · ${range}`;
 }
 
+function RecurringLinkDialog({
+	findingId,
+	title,
+	names,
+	readOnly,
+	onClose,
+}: {
+	findingId: string;
+	title: string;
+	names: Map<string, string>;
+	readOnly: boolean;
+	onClose: () => void;
+}) {
+	const catalog = useTransactionCatalog();
+	const rules = (catalog.data?.items ?? []).filter(
+		(item) => item.kind === "rule",
+	);
+	const [ruleId, setRuleId] = useState("");
+	const selected = ruleId || rules[0]?.id || "";
+	const preview = useRecurringLinkPreview(
+		findingId,
+		selected ? selected : undefined,
+	);
+	const link = useLinkRecurringPattern();
+	const [linked, setLinked] = useState<number | null>(null);
+	const [linkedRule, setLinkedRule] = useState<string | null>(null);
+	const [failed, setFailed] = useState(false);
+	const plan = preview.data;
+	return (
+		<Modal
+			title={`Link repeating payments to a rule`}
+			eyebrow={title}
+			onClose={onClose}
+		>
+			<div className="space-y-4">
+				<SelectField
+					label="Existing forecast rule"
+					value={selected}
+					onChange={(event) => {
+						setRuleId(event.target.value);
+						setLinked(null);
+						setLinkedRule(null);
+						setFailed(false);
+					}}
+				>
+					<option value="">Choose a rule…</option>
+					{rules.map((rule) => (
+						<option key={rule.id} value={rule.id}>
+							{rule.name}
+						</option>
+					))}
+				</SelectField>
+				{!selected ? (
+					<p className="m-0 text-sm text-muted">
+						Choose the forecast rule these recorded payments belong to.
+					</p>
+				) : preview.isPending ? (
+					<p className="text-sm text-muted">Checking the rule schedule…</p>
+				) : preview.isError || !plan ? (
+					<ErrorNotice message="The link preview could not be loaded. Try again." />
+				) : linked !== null ? (
+					<div className="space-y-3">
+						<p className="m-0 text-sm">
+							{linked} recorded {linked === 1 ? "payment" : "payments"} now{" "}
+							{linked === 1 ? "records" : "record"} an occurrence of “
+							{linkedRule ?? plan.ruleName}”. Future movements stay on that
+							rule.
+						</p>
+						<Button type="button" variant="secondary" onClick={onClose}>
+							Close
+						</Button>
+					</div>
+				) : (
+					<>
+						{plan.assignments && plan.assignments.length > 0 && (
+							<div>
+								<h3 className="text-sm font-semibold">Matched occurrences</h3>
+								<ul className="mb-0 mt-1 space-y-1 pl-4 text-sm text-muted">
+									{plan.assignments.map((item) => (
+										<li key={item.postingId}>
+											{names.get(item.postingId) ?? item.postingId} ·{" "}
+											{item.date}
+											{item.amount ? ` · ${item.amount}` : ""}
+										</li>
+									))}
+								</ul>
+							</div>
+						)}
+						{!plan.linkable && (
+							<p className="m-0 text-sm text-muted">{plan.reason}</p>
+						)}
+						{failed && (
+							<ErrorNotice message="The payments could not be linked. The preview above is current; review it and try again." />
+						)}
+						<div className="flex gap-2">
+							<Button type="button" variant="secondary" onClick={onClose}>
+								Cancel
+							</Button>
+							{plan.linkable && !readOnly && (
+								<Button
+									type="button"
+									variant="primary"
+									disabled={link.isPending}
+									onClick={() =>
+										link.mutate(
+											{ id: findingId, ruleId: plan.ruleId },
+											{
+												onSuccess: (result) => {
+													setFailed(false);
+													setLinked((result.rows ?? []).length);
+													setLinkedRule(plan.ruleName);
+												},
+												onError: () => setFailed(true),
+											},
+										)
+									}
+								>
+									{link.isPending ? "Linking…" : "Link payments to rule"}
+								</Button>
+							)}
+						</div>
+					</>
+				)}
+			</div>
+		</Modal>
+	);
+}
+
 function PatternCard({
 	pattern,
 	names,
@@ -174,6 +309,7 @@ function PatternCard({
 	const feedback = useReviewAnalysisFinding();
 	const dismiss = useDismissAnalysisFinding();
 	const [planOpen, setPlanOpen] = useState(false);
+	const [linkOpen, setLinkOpen] = useState(false);
 	const title = patternTitle(pattern, names);
 	const confirmed = pattern.confirmed;
 	const rejected = pattern.anchor.review?.decision === "rejected";
@@ -187,8 +323,8 @@ function PatternCard({
 				</Badge>
 			</div>
 			<p className="m-0 text-xs text-muted">
-				{cadenceLabel(pattern.cadence)} · {directionLabel(pattern.anchor.role)} ·{" "}
-				{pattern.findings.length} recorded
+				{cadenceLabel(pattern.cadence)} · {directionLabel(pattern.anchor.role)}{" "}
+				· {pattern.findings.length} recorded
 			</p>
 			{(feedback.isError || dismiss.isError) && (
 				<ErrorNotice message="The answer could not be saved. Try again." />
@@ -244,6 +380,15 @@ function PatternCard({
 				>
 					Review forecast plan
 				</Button>
+				<Button
+					type="button"
+					size="sm"
+					variant="secondary"
+					aria-label={`Link repeating pattern for ${title} to an existing rule`}
+					onClick={() => setLinkOpen(true)}
+				>
+					Link to existing rule
+				</Button>
 			</div>
 			{planOpen && (
 				<RecurringPlanDialog
@@ -251,6 +396,15 @@ function PatternCard({
 					title={title}
 					readOnly={readOnly}
 					onClose={() => setPlanOpen(false)}
+				/>
+			)}
+			{linkOpen && (
+				<RecurringLinkDialog
+					findingId={actionable.id}
+					title={title}
+					names={names}
+					readOnly={readOnly}
+					onClose={() => setLinkOpen(false)}
 				/>
 			)}
 		</article>
@@ -273,10 +427,11 @@ export function RecurringPatterns({
 			<header className="space-y-2">
 				<h2 className="m-0 text-lg font-semibold">Repeating payments</h2>
 				<p className="m-0 text-sm text-muted">
-					Analysis groups saved bank records that repeat on a steady
-					rhythm. Confirm a pattern, then review its forecast plan: the
-					plan starts after the last recorded payment, so recorded
-					history is never duplicated.
+					Analysis groups saved bank records that repeat on a steady rhythm.
+					Confirm a pattern, then create its forecast rule or link its payments
+					to an existing rule. Created plans start after the last recorded
+					payment; linked payments record an occurrence, so history is never
+					duplicated.
 				</p>
 			</header>
 			{patterns.map((pattern) => (

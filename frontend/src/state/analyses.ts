@@ -1,8 +1,10 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
 	dismissAnalysisFinding,
+	linkRecurringPattern,
 	listAnalyses,
 	listAnalysisFindings,
+	previewRecurringLink,
 	previewRecurringPromotion,
 	promoteRecurringPattern,
 	reviewAnalysisFinding,
@@ -95,13 +97,16 @@ export function useRecurringPreview(findingId: string | undefined) {
 	const scope = useUserScope();
 	return useQuery(
 		{
-			queryKey: [...analysisFindingsKey(scope), "recurring-preview", findingId ?? "none"],
+			queryKey: [
+				...analysisFindingsKey(scope),
+				"recurring-preview",
+				findingId ?? "none",
+			],
 			enabled: scope.status === "ready" && !!findingId,
 			queryFn: async ({ signal }) => {
 				if (!findingId) throw new UserScopeError();
-				const result = (
-					await previewRecurringPromotion(findingId, { signal })
-				).data;
+				const result = (await previewRecurringPromotion(findingId, { signal }))
+					.data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result.preview;
 			},
@@ -122,6 +127,60 @@ export function usePromoteRecurringPattern() {
 				if (scope !== getUserScope() || scope.status !== "ready")
 					throw new UserScopeError();
 				const result = (await promoteRecurringPattern(id)).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result;
+			},
+			onSuccess: async () => {
+				if (scope !== getUserScope()) return;
+				await cache.invalidateQueries({
+					queryKey: analysisFindingsKey(scope),
+				});
+				await reloadWorkspace();
+			},
+		},
+		cache,
+	);
+}
+
+export function useRecurringLinkPreview(
+	findingId: string | undefined,
+	ruleId: string | undefined,
+) {
+	const scope = useUserScope();
+	return useQuery(
+		{
+			queryKey: [
+				...analysisFindingsKey(scope),
+				"recurring-link-preview",
+				findingId ?? "none",
+				ruleId ?? "none",
+			],
+			enabled: scope.status === "ready" && !!findingId && !!ruleId,
+			queryFn: async ({ signal }) => {
+				if (!findingId || !ruleId) throw new UserScopeError();
+				const result = (
+					await previewRecurringLink(findingId, { ruleId }, { signal })
+				).data;
+				if (scope !== getUserScope()) throw new UserScopeError();
+				return result.preview;
+			},
+			staleTime: 5_000,
+		},
+		serverQueryClient(),
+	);
+}
+
+export function useLinkRecurringPattern() {
+	const scope = useUserScope();
+	const cache = serverQueryClient();
+	return useMutation(
+		{
+			mutationKey: ["analysis-link", scope.key],
+			retry: false,
+			mutationFn: async ({ id, ruleId }: { id: string; ruleId: string }) => {
+				if (scope !== getUserScope() || scope.status !== "ready")
+					throw new UserScopeError();
+				const result = (await linkRecurringPattern(id, { ruleId })).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},

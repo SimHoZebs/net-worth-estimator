@@ -1,14 +1,21 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import type { RecurringLinkPreview } from "@/api/generated/model/recurringLinkPreview.ts";
 import type { RecurringPromotionPreview } from "@/api/generated/model/recurringPromotionPreview.ts";
 import { RecurringPatterns } from "./RecurringPatterns.tsx";
 
 const reviewMutate = vi.hoisted(() => vi.fn());
 const dismissMutate = vi.hoisted(() => vi.fn());
 const promoteMutate = vi.hoisted(() => vi.fn());
+const linkMutate = vi.hoisted(() => vi.fn());
 const previewState = vi.hoisted(() => ({
 	data: undefined as RecurringPromotionPreview | undefined,
+	isPending: false,
+	isError: false,
+}));
+const linkPreviewState = vi.hoisted(() => ({
+	data: undefined as RecurringLinkPreview | undefined,
 	isPending: false,
 	isError: false,
 }));
@@ -28,6 +35,17 @@ vi.mock("@/state/analyses.ts", () => ({
 	usePromoteRecurringPattern: () => ({
 		mutate: promoteMutate,
 		isPending: false,
+	}),
+	useRecurringLinkPreview: () => linkPreviewState,
+	useLinkRecurringPattern: () => ({
+		mutate: linkMutate,
+		isPending: false,
+	}),
+}));
+
+vi.mock("@/state/workspaceResources.ts", () => ({
+	useTransactionCatalog: () => ({
+		data: { items: [{ id: "rent", kind: "rule", name: "Rent" }] },
 	}),
 }));
 
@@ -106,6 +124,9 @@ beforeEach(() => {
 	previewState.data = undefined;
 	previewState.isPending = false;
 	previewState.isError = false;
+	linkPreviewState.data = undefined;
+	linkPreviewState.isPending = false;
+	linkPreviewState.isError = false;
 	vi.clearAllMocks();
 });
 
@@ -146,11 +167,11 @@ describe("repeating-payment patterns", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
 		);
+		expect(screen.getByText("2026-03-15 · 30.00 USD")).toBeDefined();
 		expect(
-			screen.getByText("2026-03-15 · 30.00 USD"),
-		).toBeDefined();
-		expect(
-			screen.getByText("2 recorded payments · 30.00 USD typical · 2026-01-15 to 2026-02-15"),
+			screen.getByText(
+				"2 recorded payments · 30.00 USD typical · 2026-01-15 to 2026-02-15",
+			),
 		).toBeDefined();
 		promoteMutate.mockImplementation(
 			(
@@ -175,7 +196,8 @@ describe("repeating-payment patterns", () => {
 			promotable: false,
 			rule: undefined,
 			upcoming: [],
-			reason: "Patterns that repeat every 2 weeks cannot become forecast rules yet.",
+			reason:
+				"Patterns that repeat every 2 weeks cannot become forecast rules yet.",
 		};
 		render(
 			<RecurringPatterns
@@ -187,9 +209,7 @@ describe("repeating-payment patterns", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
 		);
-		expect(
-			screen.getByText(/cannot become forecast rules yet/),
-		).toBeDefined();
+		expect(screen.getByText(/cannot become forecast rules yet/)).toBeDefined();
 		expect(
 			screen.queryByRole("button", { name: "Approve and create rule" }),
 		).toBeNull();
@@ -206,5 +226,81 @@ describe("repeating-payment patterns", () => {
 		expect(
 			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
 		).toBeDefined();
+	});
+	it("links confirmed payments to an existing rule", () => {
+		linkPreviewState.data = {
+			findingId: "one",
+			patternKey: "key",
+			ruleId: "rent",
+			ruleName: "Rent",
+			merchant: "grocer",
+			cadence: "monthly",
+			accountId: "checking",
+			linkable: true,
+			reason: "",
+			assignments: [
+				{ postingId: "a", date: "2026-01-15", amount: "30.00" },
+				{ postingId: "b", date: "2026-02-15", amount: "30.00" },
+			],
+		};
+		render(
+			<RecurringPatterns
+				findings={[recurringFinding("one", "a"), recurringFinding("two", "b")]}
+				names={names}
+				readOnly={false}
+			/>,
+		);
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Link repeating pattern for Grocer to an existing rule",
+			}),
+		);
+		expect(screen.getByText("Matched occurrences")).toBeDefined();
+		linkMutate.mockImplementation(
+			(
+				_args: unknown,
+				options?: { onSuccess?: (result: { rows: unknown[] }) => void },
+			) => {
+				options?.onSuccess?.({ rows: [{}, {}] });
+			},
+		);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Link payments to rule" }),
+		);
+		expect(linkMutate).toHaveBeenCalledWith(
+			expect.objectContaining({ ruleId: "rent" }),
+			expect.objectContaining({}),
+		);
+		expect(screen.getAllByText(/an occurrence/).length).toBeGreaterThan(0);
+	});
+	it("hides the link action in a read-only dialog", () => {
+		linkPreviewState.data = {
+			findingId: "one",
+			patternKey: "key",
+			ruleId: "rent",
+			ruleName: "Rent",
+			merchant: "grocer",
+			cadence: "monthly",
+			accountId: "checking",
+			linkable: true,
+			reason: "",
+			assignments: [{ postingId: "a", date: "2026-01-15", amount: "30.00" }],
+		};
+		render(
+			<RecurringPatterns
+				findings={[recurringFinding("one", "a"), recurringFinding("two", "b")]}
+				names={names}
+				readOnly
+			/>,
+		);
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Link repeating pattern for Grocer to an existing rule",
+			}),
+		);
+		expect(screen.getByText("Matched occurrences")).toBeDefined();
+		expect(
+			screen.queryByRole("button", { name: "Link payments to rule" }),
+		).toBeNull();
 	});
 });
