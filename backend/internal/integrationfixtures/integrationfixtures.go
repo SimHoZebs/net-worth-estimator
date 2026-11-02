@@ -40,6 +40,7 @@ const (
 	PackRevocation  = "revocation"
 	PackInvites     = "invites"
 	PackExclusions  = "exclusions"
+	PackLedger      = "ledger"
 )
 
 // PackVersion is the only fixture format this loader reads. A format change
@@ -65,10 +66,20 @@ type PackExtras struct {
 	SharingScript []SharingStep `json:"sharingScript"`
 	InviteScript  []InviteStep  `json:"inviteScript"`
 	SplitProbes   []SplitProbe  `json:"splitProbes"`
+	// BankFeeds is an ordered run of bank states for the completeness
+	// ledger: each feed applies through the real sync reconcile in order,
+	// so rows can settle, stay pending, vanish into voids, and re-sync
+	// as a no-op. Only the ledger pack uses it.
+	BankFeeds [][]BankRowSeed `json:"bankFeeds,omitempty"`
+	// LedgerExpected records the hand-computed numbers every completeness
+	// spec asserts against the ledger seed. Only the ledger pack sets it.
+	LedgerExpected *LedgerExpected `json:"ledgerExpected,omitempty"`
 }
 
 // SyncLifecycle describes bank rows applied through the real sync apply
 // path: pending inserts first, then settled conversions and void flips.
+// It has no consumers: packs needing ordered multi-feed runs (settle,
+// pending holds, vanish-to-void, no-op re-sync) use BankFeeds instead.
 type SyncLifecycle struct {
 	Pending []BankRowSeed `json:"pending"`
 	Settle  []BankRowSeed `json:"settle"`
@@ -81,6 +92,66 @@ type BankRowSeed struct {
 	Description string `json:"description"`
 	Amount      string `json:"amount"`
 	Posted      int64  `json:"posted"`
+	// Pending marks authorizations that have not posted. Absent means
+	// settled. Only the ledger pack's bank feeds use it.
+	Pending bool `json:"pending,omitempty"`
+	// TransactedAt carries the bridge purchase timestamp for pending
+	// rows; without it the event times at arrival. Only the ledger pack
+	// uses it.
+	TransactedAt *int64 `json:"transactedAt,omitempty"`
+}
+
+// LedgerExpected records the hand-computed numbers every completeness
+// spec asserts against the ledger seed: window sums over settled rows,
+// the rows each surface must show, the detection the ledger must
+// propose, and the exact shares the currency probes must allocate.
+// Seed rows beside them (see the ledger pack): paycheck 3000 x4 plus
+// refund 45.50 in; rent 1200 x4, groceries 150 x4, bookshop 42.50,
+// fuel/outlet/corner 150 x3, cafe 75, clothes 125 out; payoff 500 x4 as
+// transfers counted once. Pending, void, and deleted rows move nothing
+// and stay out of the diagram.
+// Two engine rules shape the diagram sums, verified by probe: the engine
+// rounds every event to whole dollars (bookshop 42.50 counts 43, refund
+// 45.50 counts 46), and rows dated exactly on the projection start fall
+// into history instead of events — so specs project from ProjectionStart
+// (strictly before every seed row) and the list (exact expressions) and
+// the diagram (rounded) assert their own true numbers side by side.
+type LedgerExpected struct {
+	WindowStart string `json:"windowStart"`
+	WindowEnd   string `json:"windowEnd"`
+	// ProjectionStart is the forecast start every diagram spec uses: the
+	// checkpoint day, strictly before the first seed row.
+	ProjectionStart string `json:"projectionStart"`
+	// Full-window sums over settled non-void rows.
+	InflowTotal   float64 `json:"inflowTotal"`
+	OutflowTotal  float64 `json:"outflowTotal"`
+	TransferTotal float64 `json:"transferTotal"`
+	// Settled edge rows in the full window: 4 paycheck, 1 refund, 4 rent,
+	// 4 groceries, 1 bookshop, 1 fuel, 1 outlet, 1 corner, 1 cafe,
+	// 1 clothes, 4 payoff.
+	EdgeRows int `json:"edgeRows"`
+	// Listed postings after the phantom deletion: 16 seeded plus 9 bank
+	// rows present (4 groceries, fuel, outlet, corner, pending eats,
+	// voided mart).
+	ListedPostings int `json:"listedPostings"`
+	// Narrowed-window (January through March) drops April: paycheck, rent,
+	// groceries, corner, clothes, and payoff rows with their sums.
+	NarrowStart string  `json:"narrowStart"`
+	NarrowEnd   string  `json:"narrowEnd"`
+	NarrowIn    float64 `json:"narrowIn"`
+	NarrowOut   float64 `json:"narrowOut"`
+	NarrowXfer  float64 `json:"narrowXfer"`
+	// Detection the ledger must propose: merchant key, cadence, amount,
+	// and occurrence count over the four grocery rows.
+	DetectMerchant string  `json:"detectMerchant"`
+	DetectCadence  string  `json:"detectCadence"`
+	DetectAmount   float64 `json:"detectAmount"`
+	DetectCount    int     `json:"detectCount"`
+	// Exact shares the yen probe must allocate: 1000 minor over 3 with
+	// the remainder to the initiator.
+	JPYTotal  int64   `json:"jpyTotal"`
+	JPYParts  int     `json:"jpyParts"`
+	JPYShares []int64 `json:"jpyShares"`
 }
 
 // SyncState pins the sync cursors to stale positions.

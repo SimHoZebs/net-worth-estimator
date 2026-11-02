@@ -51,6 +51,7 @@ v2 alongside — loaders never migrate old packs in place.
 | revocation | Shared, revoked, then re-shared rows | Revoked rows stay visible (consent leak) or re-grants stay dead |
 | invites | Expired, exhausted, and fresh single-use codes | Expired/used codes admit members without consent |
 | exclusions | Wildcard (audience all) exclusion before later rows arrive | Exclusions evaluated at write time leak rows to later audiences |
+| ledger | Fixed household ledger with hand-computed sums for completeness journeys: every surface must show the seed's known rows | Dropped, duplicated, or miscounted seed rows; merged lookalikes; resurrected phantoms; leaked revocations |
 
 Loading per harness:
 

@@ -19,7 +19,7 @@ func TestPackEnvelopes(t *testing.T) {
 		PackPennyZero, PackCurrencies, PackDuplicates, PackLifecycle,
 		PackTimezones, PackUnicode, PackOverlong, PackRecurring,
 		PackTransfers, PackBackdated, PackCursors, PackMissingData,
-		PackRevocation, PackInvites, PackExclusions,
+		PackRevocation, PackInvites, PackExclusions, PackLedger,
 	}
 	if len(names) != len(want) {
 		t.Fatalf("packs = %v, want %v", names, want)

@@ -73,6 +73,17 @@ code paths and temporary databases:
 CGO_ENABLED=0 go -C backend test ./internal/api/integration/ -run 'TestQA03' -count=3
 ```
 
+Completeness journeys join them: one fixed synthetic ledger
+(`backend/testdata/integration/v1/ledger.json`, hand-computed numbers
+in its extras) proved present on every surface — diagram, list,
+recurring proposal, receipts, sharing, inbox, splits, health checks —
+with bank re-syncs adding nothing:
+
+```bash
+CGO_ENABLED=0 go -C backend test ./internal/integrationledger/ -count=3
+INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:browser -- ledgerCompleteness.spec.ts
+```
+
 A green suite with mocked cores is a failing result: anything that
 cannot run against the real backend must be listed as uncovered with
 its reason, never faked green. The current journey coverage, the
@@ -131,3 +142,7 @@ A release notes each outcome; a skip names its reason.
 - Image extraction adapter: the local mock stands in for OCR; journeys
   say so in their names and cover the real upload, storage, review,
   and link paths around it.
+- Posting-level currency: amounts are bare expressions with no currency
+  field. Zero-decimal coverage lives in the split probes (JPY 1000 over
+  3 allocates exactly 334/333/333); a yen-denominated posting row is not
+  expressible and stays uncovered.

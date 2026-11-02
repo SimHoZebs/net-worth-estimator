@@ -1,0 +1,505 @@
+{
+  "breaksIfMishandled": "Any surface that drops, duplicates, or miscounts a seed row corrupts money the owner already has: missing edges hide spending, merged lookalikes corrupt forecasts, resurrected phantoms double-charge, leaked revocations break consent.",
+  "concern": "Fixed deterministic household ledger for completeness journeys: every feature must show the seed's known rows and sums. Four monthly paychecks in; rent, groceries, card spending, and a bookshop order out; a monthly card-payoff transfer; one refund; bank rows covering detection, lookalikes, pending, void, and a deleted phantom.",
+  "extras": {
+    "bankFeeds": [
+      [
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-jan",
+          "posted": 1768046400
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-feb",
+          "posted": 1770724800
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-mar",
+          "posted": 1773144000
+        },
+        {
+          "amount": "-150.00",
+          "description": "FUEL STOP",
+          "id": "ledger-bank-fuel",
+          "posted": 1770897600
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCERY OUTLET",
+          "id": "ledger-bank-outlet",
+          "posted": 1773316800
+        },
+        {
+          "amount": "-25.00",
+          "description": "PENDING EATS",
+          "id": "ledger-bank-eats",
+          "pending": true,
+          "posted": 1777377600,
+          "transactedAt": 1777377600
+        },
+        {
+          "amount": "-99.99",
+          "description": "VOIDED MART",
+          "id": "ledger-bank-mart",
+          "pending": true,
+          "posted": 1773576000
+        },
+        {
+          "amount": "-9.99",
+          "description": "PHANTOM",
+          "id": "ledger-bank-phantom",
+          "posted": 1771588800
+        }
+      ],
+      [
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-jan",
+          "posted": 1768046400
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-feb",
+          "posted": 1770724800
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-mar",
+          "posted": 1773144000
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-apr",
+          "posted": 1775822400
+        },
+        {
+          "amount": "-150.00",
+          "description": "FUEL STOP",
+          "id": "ledger-bank-fuel",
+          "posted": 1770897600
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCERY OUTLET",
+          "id": "ledger-bank-outlet",
+          "posted": 1773316800
+        },
+        {
+          "amount": "-150.00",
+          "description": "CORNER GROCER",
+          "id": "ledger-bank-corner",
+          "posted": 1775995200
+        },
+        {
+          "amount": "-25.00",
+          "description": "PENDING EATS",
+          "id": "ledger-bank-eats",
+          "pending": true,
+          "posted": 1777377600,
+          "transactedAt": 1777377600
+        },
+        {
+          "amount": "-9.99",
+          "description": "PHANTOM",
+          "id": "ledger-bank-phantom",
+          "posted": 1771588800
+        }
+      ],
+      [
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-jan",
+          "posted": 1768046400
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-feb",
+          "posted": 1770724800
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-mar",
+          "posted": 1773144000
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCER 123",
+          "id": "ledger-bank-gro-apr",
+          "posted": 1775822400
+        },
+        {
+          "amount": "-150.00",
+          "description": "FUEL STOP",
+          "id": "ledger-bank-fuel",
+          "posted": 1770897600
+        },
+        {
+          "amount": "-150.00",
+          "description": "GROCERY OUTLET",
+          "id": "ledger-bank-outlet",
+          "posted": 1773316800
+        },
+        {
+          "amount": "-150.00",
+          "description": "CORNER GROCER",
+          "id": "ledger-bank-corner",
+          "posted": 1775995200
+        },
+        {
+          "amount": "-25.00",
+          "description": "PENDING EATS",
+          "id": "ledger-bank-eats",
+          "pending": true,
+          "posted": 1777377600,
+          "transactedAt": 1777377600
+        },
+        {
+          "amount": "-9.99",
+          "description": "PHANTOM",
+          "id": "ledger-bank-phantom",
+          "posted": 1771588800
+        }
+      ]
+    ],
+    "ledgerExpected": {
+      "detectAmount": 150.0,
+      "detectCadence": "monthly",
+      "detectCount": 4,
+      "detectMerchant": "grocer",
+      "edgeRows": 23,
+      "inflowTotal": 12046,
+      "jpyParts": 3,
+      "jpyShares": [
+        334,
+        333,
+        333
+      ],
+      "jpyTotal": 1000,
+      "listedPostings": 25,
+      "narrowEnd": "2026-03-31",
+      "narrowIn": 9046,
+      "narrowOut": 4468,
+      "narrowStart": "2026-01-01",
+      "narrowXfer": 1500,
+      "outflowTotal": 6093,
+      "projectionStart": "2025-12-31",
+      "transferTotal": 2000,
+      "windowEnd": "2026-04-30",
+      "windowStart": "2026-01-01"
+    },
+    "splitProbes": [
+      {
+        "currency": "JPY",
+        "participants": 3,
+        "totalMinor": 1000
+      }
+    ]
+  },
+  "model": {
+    "accounts": [
+      {
+        "enabled": true,
+        "id": "checking",
+        "kind": "cash",
+        "name": "Checking"
+      },
+      {
+        "enabled": true,
+        "id": "card",
+        "kind": "cash",
+        "name": "Card"
+      }
+    ],
+    "checkpoints": [
+      {
+        "AccountId": "checking",
+        "Balance": 20000,
+        "observedAt": 1767139200
+      }
+    ],
+    "evaluations": {
+      "accountBalance": [],
+      "cycleFulfillment": [],
+      "financialIndependence": [],
+      "netWorthThreshold": [],
+      "plannedPurchases": [],
+      "postingFulfillment": [],
+      "whatIf": []
+    },
+    "postings": [
+      {
+        "amount": {
+          "config": {
+            "expression": "3000"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "checking"
+        ],
+        "enabled": true,
+        "id": "a1a1a1a1-1111-4111-8111-000000000001",
+        "name": "Paycheck January",
+        "postedTime": 1768478400,
+        "sourceAccountId": null,
+        "transactionTime": 1768478400
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "3000"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "checking"
+        ],
+        "enabled": true,
+        "id": "a1a1a1a1-1111-4111-8111-000000000002",
+        "name": "Paycheck February",
+        "postedTime": 1771156800,
+        "sourceAccountId": null,
+        "transactionTime": 1771156800
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "3000"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "checking"
+        ],
+        "enabled": true,
+        "id": "a1a1a1a1-1111-4111-8111-000000000003",
+        "name": "Paycheck March",
+        "postedTime": 1773576000,
+        "sourceAccountId": null,
+        "transactionTime": 1773576000
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "3000"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "checking"
+        ],
+        "enabled": true,
+        "id": "a1a1a1a1-1111-4111-8111-000000000004",
+        "name": "Paycheck April",
+        "postedTime": 1776254400,
+        "sourceAccountId": null,
+        "transactionTime": 1776254400
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "1200"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "b2b2b2b2-2222-4222-8222-000000000001",
+        "name": "Rent January",
+        "postedTime": 1767268800,
+        "sourceAccountId": "checking",
+        "transactionTime": 1767268800
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "1200"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "b2b2b2b2-2222-4222-8222-000000000002",
+        "name": "Rent February",
+        "postedTime": 1769947200,
+        "sourceAccountId": "checking",
+        "transactionTime": 1769947200
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "1200"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "b2b2b2b2-2222-4222-8222-000000000003",
+        "name": "Rent March",
+        "postedTime": 1772366400,
+        "sourceAccountId": "checking",
+        "transactionTime": 1772366400
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "1200"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "b2b2b2b2-2222-4222-8222-000000000004",
+        "name": "Rent April",
+        "postedTime": 1775044800,
+        "sourceAccountId": "checking",
+        "transactionTime": 1775044800
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "42.50"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "c3c3c3c3-3333-4333-8333-000000000001",
+        "name": "Bookshop order",
+        "postedTime": 1768910400,
+        "sourceAccountId": "checking",
+        "transactionTime": 1768910400
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "45.50"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "checking"
+        ],
+        "enabled": true,
+        "id": "c3c3c3c3-3333-4333-8333-000000000002",
+        "name": "Refund desk",
+        "postedTime": 1774008000,
+        "sourceAccountId": null,
+        "transactionTime": 1774008000
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "75"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "d4d4d4d4-4444-4444-8444-000000000001",
+        "name": "Cafe",
+        "postedTime": 1772712000,
+        "sourceAccountId": "card",
+        "transactionTime": 1772712000
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "125"
+          },
+          "resolver": "expression"
+        },
+        "destinations": null,
+        "enabled": true,
+        "id": "d4d4d4d4-4444-4444-8444-000000000002",
+        "name": "Clothes",
+        "postedTime": 1775649600,
+        "sourceAccountId": "card",
+        "transactionTime": 1775649600
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "500"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "card"
+        ],
+        "enabled": true,
+        "id": "e5e5e5e5-5555-4555-8555-000000000001",
+        "name": "Card payoff January",
+        "postedTime": 1769860800,
+        "sourceAccountId": "checking",
+        "transactionTime": 1769860800
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "500"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "card"
+        ],
+        "enabled": true,
+        "id": "e5e5e5e5-5555-4555-8555-000000000002",
+        "name": "Card payoff February",
+        "postedTime": 1772280000,
+        "sourceAccountId": "checking",
+        "transactionTime": 1772280000
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "500"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "card"
+        ],
+        "enabled": true,
+        "id": "e5e5e5e5-5555-4555-8555-000000000003",
+        "name": "Card payoff March",
+        "postedTime": 1774958400,
+        "sourceAccountId": "checking",
+        "transactionTime": 1774958400
+      },
+      {
+        "amount": {
+          "config": {
+            "expression": "500"
+          },
+          "resolver": "expression"
+        },
+        "destinations": [
+          "card"
+        ],
+        "enabled": true,
+        "id": "e5e5e5e5-5555-4555-8555-000000000004",
+        "name": "Card payoff April",
+        "postedTime": 1777550400,
+        "sourceAccountId": "checking",
+        "transactionTime": 1777550400
+      }
+    ],
+    "recurrenceRules": []
+  },
+  "pack": "ledger",
+  "version": 1
+}
