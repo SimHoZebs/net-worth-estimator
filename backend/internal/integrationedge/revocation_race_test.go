@@ -37,6 +37,8 @@ func TestIntegrationEdgeRevocationMidPagination_RealSQLite_RealHTTP(t *testing.T
 	if cursor == "" {
 		t.Fatalf("first page = %+v, want a next cursor", first)
 	}
+	fullBefore := advFeedList(t, world, world.secondSubject)
+	beforeCount := len(fullBefore["items"].([]any))
 	// Owner revokes the row the next page would carry, mid-pagination.
 	if err := world.db.RevokeSharedPosting(world.owner, pageRows["c"], "group", world.groupID, advRequestID(t)); err != nil {
 		t.Fatal(err)
@@ -49,13 +51,11 @@ func TestIntegrationEdgeRevocationMidPagination_RealSQLite_RealHTTP(t *testing.T
 			t.Fatal("revoked row still pages after mid-pagination revocation: leak")
 		}
 	}
-	full := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, "/v1/shared/groups/"+world.groupID+"/feed", world.secondSubject, ""), http.StatusOK)
+	full := advFeedList(t, world, world.secondSubject)
+	advFeedTotalsAgreement(t, full)
 	totals, _ := full["totals"].(map[string]any)
-	if totals["count"] != float64(2) {
-		t.Fatalf("feed totals = %+v, want count 2 after revocation", totals)
-	}
-	if len(full["items"].([]any)) != 2 {
-		t.Fatalf("feed items disagree with totals after revocation: %+v", full)
+	if totals["count"] != float64(beforeCount-1) {
+		t.Fatalf("feed totals = %+v, want exactly the revoked row withdrawn", totals)
 	}
 }
 
@@ -71,9 +71,8 @@ func TestIntegrationEdgeRevocationMidCopySave_RealSQLite_RealHTTP(t *testing.T) 
 		t.Fatal(err)
 	}
 	// The recipient sees the row, then the owner revokes before the save.
-	feed := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, "/v1/shared/groups/"+world.groupID+"/feed", world.secondSubject, ""), http.StatusOK)
-	if len(feed["items"].([]any)) != 1 {
-		t.Fatalf("feed = %+v, want the granted row visible first", feed)
+	if !advFeedIDs(t, world, world.secondSubject)[revokeCopyRow] {
+		t.Fatal("granted row not visible before the revocation")
 	}
 	if err := world.db.RevokeSharedPosting(world.owner, revokeCopyRow, "group", world.groupID, advRequestID(t)); err != nil {
 		t.Fatal(err)

@@ -15,6 +15,10 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 	if world.groupID == "" {
 		t.Skip("needs the group identity set")
 	}
+	policyTarget := "/v1/shared/policies/" + world.groupID
+	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
+		`{"enabled":true,"accountIds":["checking"],"startDate":"2026-01-01","endDate":"2026-12-31"}`), http.StatusOK)
+	base := advFeedIDs(t, world, world.secondSubject)
 	rows := []struct {
 		label  string
 		amount string
@@ -31,11 +35,9 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 	for _, row := range rows {
 		ids[row.label] = advMustPosting(t, world.ownerSC, "Time edge "+row.label, row.amount, row.posted)
 	}
-	policyTarget := "/v1/shared/policies/" + world.groupID
-	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
-		`{"enabled":true,"accountIds":["checking"],"startDate":"2026-01-01","endDate":"2026-12-31"}`), http.StatusOK)
 	feedTarget := "/v1/shared/groups/" + world.groupID + "/feed"
-	feed := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
+	feed := advFeedList(t, world, world.secondSubject)
+	advFeedTotalsAgreement(t, feed)
 	seen := map[string]bool{}
 	for _, raw := range feed["items"].([]any) {
 		item, _ := raw.(map[string]any)
@@ -51,14 +53,32 @@ func TestIntegrationEdgeTimeEdgeIntervals_RealSQLite_RealHTTP(t *testing.T) {
 		}
 	}
 	totals, _ := feed["totals"].(map[string]any)
-	if totals["count"] != float64(3) {
-		t.Fatalf("totals = %+v, want count 3 over the in-interval set", totals)
+	inInterval := 0
+	for _, row := range rows {
+		if row.wantIn {
+			inInterval++
+		}
+	}
+	if totals["count"] != float64(len(base)+inInterval) {
+		t.Fatalf("totals = %+v, want the background set plus the %d in-interval rows", totals, inInterval)
 	}
 	// Feed date filters agree with the policy interval day for day.
 	filtered := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet,
 		feedTarget+"?startDate=2026-01-01&endDate=2026-01-01", world.secondSubject, ""), http.StatusOK)
-	if len(filtered["items"].([]any)) != 2 {
-		t.Fatalf("new-year-day filter items = %+v, want the two midnight rows", filtered)
+	dayIDs := map[string]bool{}
+	for _, raw := range filtered["items"].([]any) {
+		item, _ := raw.(map[string]any)
+		posting, _ := item["posting"].(map[string]any)
+		id, _ := posting["id"].(string)
+		dayIDs[id] = true
+	}
+	for _, label := range []string{"midnight", "plus1"} {
+		if !dayIDs[ids[label]] {
+			t.Fatalf("new-year-day filter misses %q: %+v", label, dayIDs)
+		}
+	}
+	if dayIDs[ids["nye-minus1"]] {
+		t.Fatal("new-year-day filter lists the pre-interval row: off-by-one")
 	}
 	// Leap-day rows behave like any other day under a covering interval.
 	leapRow := advMustPosting(t, world.ownerSC, "Leap lunch", "29.00", 1709208000)

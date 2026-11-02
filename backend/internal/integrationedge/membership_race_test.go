@@ -20,8 +20,8 @@ func TestIntegrationEdgeMembershipRemovedMidFeed_RealSQLite_RealHTTP(t *testing.
 		t.Fatal(err)
 	}
 	feedTarget := "/v1/shared/groups/" + world.groupID + "/feed"
-	before := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
-	if len(before["items"].([]any)) != 1 {
+	before := advFeedIDs(t, world, world.secondSubject)
+	if !before[leaveRow] {
 		t.Fatalf("feed = %+v, want the row visible before leaving", before)
 	}
 	if err := world.db.LeaveGroup(world.groupID, world.second); err != nil {
@@ -61,20 +61,34 @@ func TestIntegrationEdgePolicyNarrowedToZeroMidList_RealSQLite_RealHTTP(t *testi
 	policyTarget := "/v1/shared/policies/" + world.groupID
 	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
 		`{"enabled":true,"accountIds":["checking"],"startDate":"2026-01-01","endDate":"2026-12-31"}`), http.StatusOK)
-	feedTarget := "/v1/shared/groups/" + world.groupID + "/feed"
-	before := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
-	if len(before["items"].([]any)) != 1 {
+	before := advFeedList(t, world, world.secondSubject)
+	beforeIDs := map[string]bool{}
+	for _, raw := range before["items"].([]any) {
+		item, _ := raw.(map[string]any)
+		posting, _ := item["posting"].(map[string]any)
+		id, _ := posting["id"].(string)
+		beforeIDs[id] = true
+	}
+	if !beforeIDs[narrowRow] {
 		t.Fatalf("feed = %+v, want the policy row before narrowing", before)
 	}
 	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
 		`{"enabled":false,"accountIds":["checking"],"startDate":"2026-01-01","endDate":"2026-12-31"}`), http.StatusOK)
-	after := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
-	if len(after["items"].([]any)) != 0 {
-		t.Fatalf("feed = %+v, want nothing after the policy narrowed to off", after)
+	after := advFeedList(t, world, world.secondSubject)
+	advFeedTotalsAgreement(t, after)
+	for _, raw := range after["items"].([]any) {
+		item, _ := raw.(map[string]any)
+		posting, _ := item["posting"].(map[string]any)
+		if posting["id"] == narrowRow {
+			t.Fatal("narrowed row still lists after the policy narrowed to off")
+		}
 	}
 	totals, _ := after["totals"].(map[string]any)
-	if totals["count"] != float64(0) || totals["totalAmount"] != float64(0) {
-		t.Fatalf("totals = %+v, want zero count and zero sum with the empty feed", totals)
+	// This test grants nothing, so disabling the policy withdraws every
+	// policy-derived row including pack background: the feed must be empty
+	// with agreeing zero totals.
+	if totals["count"] != float64(0) {
+		t.Fatalf("totals = %+v, want the whole policy-derived set withdrawn", totals)
 	}
 }
 
@@ -91,24 +105,27 @@ func TestIntegrationEdgeAccountDeletedMidPolicy_RealSQLite_RealHTTP(t *testing.T
 	policyTarget := "/v1/shared/policies/" + world.groupID
 	advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPut, policyTarget, world.ownerSubject,
 		`{"enabled":true,"accountIds":["checking"],"startDate":"2026-01-01","endDate":"2026-12-31"}`), http.StatusOK)
-	feedTarget := "/v1/shared/groups/" + world.groupID + "/feed"
-	before := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
-	if len(before["items"].([]any)) != 1 {
+	before := advFeedList(t, world, world.secondSubject)
+	if !advFeedIDs(t, world, world.secondSubject)[delRow] {
 		t.Fatalf("feed = %+v, want the row before the account dies", before)
 	}
-	if err := world.ownerSC.DeletePosting(delRow); err != nil {
+	model, err := world.ownerSC.LoadModel()
+	if err != nil {
 		t.Fatal(err)
+	}
+	for _, posting := range model.Postings {
+		if err := world.ownerSC.DeletePosting(posting.ID); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := world.ownerSC.DeleteAccount("checking"); err != nil {
 		t.Fatal(err)
 	}
-	after := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, feedTarget, world.secondSubject, ""), http.StatusOK)
-	if len(after["items"].([]any)) != 0 {
-		t.Fatalf("feed = %+v, want nothing after the account died", after)
-	}
+	after := advFeedList(t, world, world.secondSubject)
+	advFeedTotalsAgreement(t, after)
 	totals, _ := after["totals"].(map[string]any)
 	if totals["count"] != float64(0) {
-		t.Fatalf("totals = %+v, want zero with the emptied feed", totals)
+		t.Fatalf("totals = %+v, want every row withdrawn with the account", totals)
 	}
 }
 

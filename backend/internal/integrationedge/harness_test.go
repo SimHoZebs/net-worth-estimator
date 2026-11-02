@@ -276,6 +276,52 @@ func advSetup(t *testing.T) *advWorld {
 	return world
 }
 
+// advFeedList returns the full decoded group feed for one subject.
+func advFeedList(t *testing.T, world *advWorld, subject string) map[string]any {
+	t.Helper()
+	return advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, "/v1/shared/groups/"+world.groupID+"/feed", subject, ""), http.StatusOK)
+}
+
+// advFeedIDs returns the posting IDs in the full feed.
+func advFeedIDs(t *testing.T, world *advWorld, subject string) map[string]bool {
+	t.Helper()
+	ids := map[string]bool{}
+	for _, raw := range advFeedList(t, world, subject)["items"].([]any) {
+		item, _ := raw.(map[string]any)
+		posting, _ := item["posting"].(map[string]any)
+		id, _ := posting["id"].(string)
+		ids[id] = true
+	}
+	return ids
+}
+
+// advFeedTotalsAgreement asserts the totals in one feed response describe
+// exactly its listed set, whatever background the fixture pack seeded.
+func advFeedTotalsAgreement(t *testing.T, decoded map[string]any) {
+	t.Helper()
+	totals, _ := decoded["totals"].(map[string]any)
+	items, _ := decoded["items"].([]any)
+	if totals["count"] != float64(len(items)) {
+		t.Fatalf("feed totals = %+v over %d listed items: totals disagree with the listed set", totals, len(items))
+	}
+}
+
+// advEnsurePostingID creates one row under a caller-chosen valid ID unless
+// the fixture pack already seeded it, and fails the test otherwise.
+func advEnsurePostingID(t *testing.T, scoped store.Store, id, name, amount string, day int64) {
+	t.Helper()
+	model, err := scoped.LoadModel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, posting := range model.Postings {
+		if posting.ID == id {
+			return
+		}
+	}
+	advMustPostingID(t, scoped, id, name, amount, day)
+}
+
 // advStorm runs workers concurrently and collects each result.
 func advStorm(workers int, attack func(i int) any) []any {
 	results := make([]any, workers)
