@@ -28,6 +28,15 @@ type Config struct {
 	RecheckInterval       time.Duration
 	ResolveAccess         func(context.Context, string) (authorization.Scope, error)
 	RequireResourceHeader bool
+	// Impersonate, when non-nil, names an optional admin observation branch.
+	// It receives the verified principal and the raw Waypoint-Resource
+	// header; returning handled with an error rejects the request, and
+	// returning handled with a synthesized principal and scope makes the
+	// rest of the boundary treat the caller as that scope's user. Returning
+	// handled=false falls through to the standard own-resource resolution.
+	// Unset disables the branch entirely; the composition root sets it only
+	// when NET_WORTH_ESTIMATOR_ADMIN_SUBJECT is configured.
+	Impersonate func(ctx context.Context, p Principal, resourceHeader string) (Principal, authorization.Scope, bool, error)
 	// AllowPrivateHTTP opts into plain-HTTP app and issuer origins. The
 	// operator owns the network boundary and must expose plain HTTP only on
 	// a trusted LAN.

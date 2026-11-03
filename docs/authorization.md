@@ -437,6 +437,95 @@ Resource-scoped query keys prevent accidental cross-user data reuse. Browser
 storage remains local to the same browser profile, not an encrypted user vault.
 People who share a browser profile can inspect that profile's local data.
 
+## Development admin observation branch
+
+`NET_WORTH_ESTIMATOR_ADMIN_SUBJECT` names one verified Casdoor subject allowed
+to observe and act on every user resource. Unset (the default) disables the
+branch; the boundary then behaves as if the code were absent. Never set the
+variable in production without completing the SOP at the end of this section.
+
+The branch exists so a debugging agent can reproduce what the user sees. It is
+not a backdoor credential: requests still authenticate through Casdoor
+(browser session or device flow) as the dedicated admin account, and every
+request carries the usual `Waypoint-Resource: users/<64hex>` header.
+
+Semantics:
+
+- The admin account is an ordinary Casdoor user. It receives no policy grant
+  of its own in Casdoor; the backend env var names which verified subject the
+  branch applies to.
+- When the verified principal matches the configured subject, the boundary
+  looks up the target resource in `users` (never provisions it), asks
+  Casdoor's permission API for `user:read`, `user:project`, and `user:write`
+  on the target resource as the target's identity, and grants exactly the
+  actions the target's own grants allow. A member target yields all three
+  actions; a viewer guest target yields read and project only.
+- The synthesized principal is the target, so every handler serves the
+  target's own partition; resource headers, model ownership, and SimpleFIN
+  credential attachment all follow the target.
+- Every impersonated request logs one structured line:
+  `admin impersonated scope` with `request_id`, `method`, `path`,
+  `admin_actor` (ActorKey hash of the admin subject) and `target_resource`.
+  Rejections log `admin impersonation rejected` with the reason.
+- Read-only mode, the resource header check, and per-route action mapping are
+  unchanged. The guest path is unchanged.
+
+Tooling for agents, for the two access shapes:
+
+- HTTP as the admin: complete the device flow as the dedicated admin account,
+  then call any `/v1` route with `Authorization: Bearer <token>` and the
+  target `Waypoint-Resource` header, e.g.
+  `curl -s -H "Authorization: Bearer $NWE_ADMIN_TOKEN" -H "Waypoint-Resource: users/<64hex>" "$API/v1/status"`.
+- Raw data: the read-only CLIs in `backend/cmd` (for example `syncaudit`)
+  read a database file directly and work unchanged.
+
+Structured logging (the debugging surface this shares with the branch): the
+server emits single-line JSON to stdout via slog. One line per request:
+`request_id`, `method`, `path` (no query string), `status`, `dur_ms`, and the
+`Waypoint-Resource` response header as `user_resource` when set. Boundary
+denials log the reason (`unauthenticated`, `missing_action`,
+`resource assertion mismatch`). Boot failures, sync summaries, and unplanned
+panics log structured lines as well. Secrets never enter these lines. Browser
+unhandled errors arrive at `POST /v1/client-errors` (user:read, so guests can
+report) and log `browser error` with `message`, `stack` (bounded), `source`,
+`path`, and `request_id`. sendBeacon cannot carry the Waypoint-Resource
+header, so that one route is exempt from the resource assertion (it keeps
+every other boundary check); the beacon lines therefore carry no
+`user_resource`, and identity for a report is not established. Correlation:
+the `browser error` line and the request log line for the same beacon share
+one `request_id`. Logs live only in the container stdout; keep them out of
+files with private data on shared hosts.
+
+Production enablement SOP (do not skip):
+
+1. Decide with the operator; this is a product decision, not a config tweak.
+2. Create the dedicated admin account in hosted Casdoor; complete device flow
+   as it from a trusted machine; confirm it resolves to the expected verified
+   subject (issue a `/v1/status` call with and without the target header).
+3. Patch the Northflank service env to set `NET_WORTH_ESTIMATOR_ADMIN_SUBJECT`.
+   Northflank env PATCH replaces all variables, so re-supply the complete set
+   from the recorded variable list; never paste secrets into shell history.
+4. Verify `admin impersonated scope` lines appear on a targeted request and
+   that a non-admin caller cannot impersonate (expect `resource assertion
+   mismatch` / fall-through behavior). Confirm `/readyz` and a real user
+   journey still work.
+5. Record removal: to disable, remove the variable and redeploy; delete the
+   admin account or revoke its sessions in Casdoor; confirm with a non-admin
+   probe.
+
+Literal every-action-on-every-resource semantics (including writes with a
+viewer guest target) is not available today: the Casdoor matcher confines each
+request to the caller's own resource, and changing the model text is a manual
+one-time replacement of the five-field model (the same class of operation as
+the five-field migration). If ever approved, do it as
+its own reviewed migration with a backup first, then re-verify guest and
+member isolation end to end. The branch above never borrows that guarantee;
+it only ever yields what the target itself holds.
+
+Removing the branch entirely: unset `NET_WORTH_ESTIMATOR_ADMIN_SUBJECT`,
+redeploy, optionally delete the admin account; the code path is inert without
+the variable. No data migration is involved.
+
 Controlling sources:
 
 - [Casdoor permission API](https://casdoor.ai/docs/permission/exposed-casbin-apis/)

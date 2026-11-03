@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -70,6 +71,13 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	loginConfig.Store = database
 	loginConfig.ResolveAccess = userAccessResolver(database, loginConfig.Issuer, permissions.Resolve)
 	loginConfig.RequireResourceHeader = true
+	admin, err := adminImpersonator(database, permissions.Check, os.Getenv)
+	if err != nil {
+		return nil, nil, err
+	}
+	if admin != nil {
+		loginConfig.Impersonate = admin
+	}
 	login, err := identity.New(ctx, loginConfig)
 	if err != nil {
 		router.Close()

@@ -142,6 +142,19 @@ func (d *Database) HasUser(userID string) (bool, error) {
 	return count == 1, err
 }
 
+// LookupUser returns the issuer and verified subject for a user ID. It is a
+// read-only lookup for the admin observation branch; it never provisions.
+func (d *Database) LookupUser(userID string) (issuer, subject string, found bool, err error) {
+	err = d.db.QueryRow(`SELECT issuer, subject FROM users WHERE id = ?`, userID).Scan(&issuer, &subject)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	return issuer, subject, true, nil
+}
+
 func (d *Database) User(userID string) (store.Store, error) {
 	exists, err := d.HasUser(userID)
 	if err != nil {
