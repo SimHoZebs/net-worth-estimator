@@ -197,52 +197,58 @@ function MoreOptions({
 	const claimOccurrenceId = `${id}-claim-occurrence`;
 	const rowLabel = "w-36 flex-none text-sm font-semibold text-muted";
 	return (
-		<section aria-label="Schedule options" className="mt-4 border-t border-line pt-4">
+		<section
+			aria-label="Schedule options"
+			className="mt-4 border-t border-line pt-4"
+		>
 			<div className="flex flex-col">
 				{savedTransaction.frequency !== "once" && (
 					<>
-									<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-										<label htmlFor={frequencyId} className={rowLabel}>
-											Frequency
-										</label>
-										<Select
-											id={frequencyId}
-											name="frequency"
-											disabled={locked}
-											value={frequency}
-											onChange={(event) => {
-												const next = parseUnion(event.target.value, [
-													"monthly",
-													"yearly",
-													"once",
-												] as const);
-												if (next) onFrequency(next);
-											}}
-											className="min-w-0 flex-1"
-										>
-											<FrequencyOptions />
-										</Select>
-									</div>
-									<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-										<label htmlFor={annualIncreaseId} className={rowLabel}>
-											Annual amount increase (%)
-										</label>
-										<Input
-											id={annualIncreaseId}
-											name="annualIncrease"
-											type="number"
-											required
-											disabled={locked}
-											min="-50"
-											max="50"
-											step="0.1"
-											value={draft.annualIncrease}
-											onChange={(event) =>
-												updateDraft({ annualIncrease: event.target.value }, "schedule")
-											}
-											className="min-w-0 flex-1"
-										/>
-									</div>
+						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+							<label htmlFor={frequencyId} className={rowLabel}>
+								Frequency
+							</label>
+							<Select
+								id={frequencyId}
+								name="frequency"
+								disabled={locked}
+								value={frequency}
+								onChange={(event) => {
+									const next = parseUnion(event.target.value, [
+										"monthly",
+										"yearly",
+										"once",
+									] as const);
+									if (next) onFrequency(next);
+								}}
+								className="min-w-0 flex-1"
+							>
+								<FrequencyOptions />
+							</Select>
+						</div>
+						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+							<label htmlFor={annualIncreaseId} className={rowLabel}>
+								Annual amount increase (%)
+							</label>
+							<Input
+								id={annualIncreaseId}
+								name="annualIncrease"
+								type="number"
+								required
+								disabled={locked}
+								min="-50"
+								max="50"
+								step="0.1"
+								value={draft.annualIncrease}
+								onChange={(event) =>
+									updateDraft(
+										{ annualIncrease: event.target.value },
+										"schedule",
+									)
+								}
+								className="min-w-0 flex-1"
+							/>
+						</div>
 					</>
 				)}
 				{frequency === "once" && (
@@ -482,7 +488,7 @@ function readOnlyReasonFor(savedTransaction: Transaction): string | undefined {
  * clicking a value makes only that value editable and reveals Save/Discard
  * in the header; every other block keeps rendering exactly as in read mode.
  * The dialog shell never unmounts, and closing with unsaved changes asks
- * for confirmation instead of navigating away.
+ * for confirmation before the exit animation starts.
  */
 type EditField = "name" | "amount" | "from" | "to" | "schedule" | "posted";
 
@@ -594,9 +600,15 @@ function useTransactionEdit({
 		// the value that was being edited.
 		if (field) document.getElementById(`${formId}-${field}`)?.focus();
 	};
-	const close = () => {
-		if (activeField && touched) setConfirmCancel(true);
-		else onClose();
+	// Close requests run before the dialog exit animation. Every request on a
+	// touched edit keeps the prompt visible; only its Discard button closes.
+	// The modal's onClose only unmounts after an accepted close.
+	const requestClose = () => {
+		if (activeField && touched) {
+			setConfirmCancel(true);
+			return false;
+		}
+		return true;
 	};
 	const discardAndClose = () => {
 		exitEdit();
@@ -605,9 +617,7 @@ function useTransactionEdit({
 	const submit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const claimOnlySave =
-			Boolean(readOnlyReason) &&
-			claimEditable &&
-			activeField === "schedule";
+			Boolean(readOnlyReason) && claimEditable && activeField === "schedule";
 		if ((readOnlyReason && !claimOnlySave) || saving) return;
 		if (edit.conflict) {
 			setError(
@@ -695,8 +705,7 @@ function useTransactionEdit({
 	// Pending claimable rows save schedule-claim edits while locked.
 	const saveBlocked =
 		saving ||
-		(Boolean(readOnlyReason) &&
-			!(claimEditable && activeField === "schedule"));
+		(Boolean(readOnlyReason) && !(claimEditable && activeField === "schedule"));
 	const actions =
 		activeField === null ? undefined : (
 			<>
@@ -723,7 +732,7 @@ function useTransactionEdit({
 		error,
 		formId,
 		actions,
-		close,
+		requestClose,
 		submit,
 		exitEdit,
 		readOnlyReason,
@@ -878,7 +887,7 @@ function DiscardConfirm({
 	onDiscard: () => void;
 }) {
 	return (
-		<Notice tone="danger" className="mt-6 block" role="alert">
+		<Notice tone="danger" className="block w-full" role="alert">
 			<p className="mb-3 text-sm text-danger-text">
 				Discard the changes in this form?
 			</p>
@@ -1119,7 +1128,7 @@ export function TransactionDetail({
 						closeMenu(true);
 						return false;
 					}
-					return true;
+					return edit.requestClose();
 				}}
 				actions={
 					<>
@@ -1153,9 +1162,12 @@ export function TransactionDetail({
 													type="button"
 													role="menuitemcheckbox"
 													aria-checked={edit.draft.enabled}
-														onClick={() => {
-															edit.updateDraft({ enabled: !edit.draft.enabled }, "schedule");
-															closeMenu(true);
+													onClick={() => {
+														edit.updateDraft(
+															{ enabled: !edit.draft.enabled },
+															"schedule",
+														);
+														closeMenu(true);
 													}}
 													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover"
 												>
@@ -1166,10 +1178,10 @@ export function TransactionDetail({
 													)}
 													<span>
 														{edit.draft.enabled
-														? "Exclude from projections"
-														: "Include in projections"}
-												</span>
-											</button>
+															? "Exclude from projections"
+															: "Include in projections"}
+													</span>
+												</button>
 											)}
 											{subscription.available && (
 												<button
@@ -1184,7 +1196,9 @@ export function TransactionDetail({
 												>
 													<Repeat size={14} aria-hidden="true" />
 													<span>
-														{subscription.marking ? "Marking…" : "Mark as subscription"}
+														{subscription.marking
+															? "Marking…"
+															: "Mark as subscription"}
 													</span>
 												</button>
 											)}
@@ -1205,13 +1219,13 @@ export function TransactionDetail({
 											)}
 										</div>
 									</>
-									)}
+								)}
 							</span>
 						)}
 						{edit.actions}
 					</>
 				}
-				onClose={edit.close}
+				onClose={onClose}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
@@ -1454,21 +1468,21 @@ export function TransactionDetail({
 						</div>
 					)}
 					<div id={`${edit.formId}-schedule-section`} className="scroll-mt-4">
-					<ScheduleCapsule
-						savedTransaction={savedTransaction}
-						draft={edit.draft}
-						updateDraft={edit.updateDraft}
-						claimRuleName={
-							savedTransaction.claimRuleId
-								? (allTransactions.find(
-										(item) => item.id === savedTransaction.claimRuleId,
-									)?.name ?? claimRuleName)
-								: null
-						}
-						editing={edit.activeField === "schedule"}
-						locked={!canEdit}
-						scheduleControlId={`${edit.formId}-schedule`}
-					/>
+						<ScheduleCapsule
+							savedTransaction={savedTransaction}
+							draft={edit.draft}
+							updateDraft={edit.updateDraft}
+							claimRuleName={
+								savedTransaction.claimRuleId
+									? (allTransactions.find(
+											(item) => item.id === savedTransaction.claimRuleId,
+										)?.name ?? claimRuleName)
+									: null
+							}
+							editing={edit.activeField === "schedule"}
+							locked={!canEdit}
+							scheduleControlId={`${edit.formId}-schedule`}
+						/>
 					</div>
 					<MoreOptions
 						savedTransaction={savedTransaction}
@@ -1513,12 +1527,6 @@ export function TransactionDetail({
 							Saving…
 						</p>
 					)}
-					{edit.confirmCancel && (
-						<DiscardConfirm
-							onContinue={() => edit.setConfirmCancel(false)}
-							onDiscard={edit.discardAndClose}
-						/>
-					)}
 					<ReadOnlyNotice
 						savedTransaction={savedTransaction}
 						appReadOnly={readOnly}
@@ -1539,46 +1547,57 @@ export function TransactionDetail({
 					</div>
 				)}
 				<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5">
-					<div className="flex flex-wrap items-center gap-4">
-						{once && (
-							<TextButton
-								type="button"
-								tone="default"
-								onClick={() => setSharingOpen(true)}
-								aria-label={`Sharing status: ${sharingLabel}. Open sharing settings`}
-								aria-haspopup="dialog"
-							>
-								{sharedCount > 0 ? (
-									<UsersRound size={14} aria-hidden="true" />
-								) : (
-									<LockKeyhole size={14} aria-hidden="true" />
-									)}
-								<span>{sharingLabel}</span>
-							</TextButton>
-						)}
-						{savedTransaction.frequency !== "once" && (
-							<TextButton
-								type="button"
-								tone="default"
-								onClick={() => {
-									scrollToSection(`${edit.formId}-schedule-section`);
-									document.getElementById(`${edit.formId}-schedule`)?.focus();
-								}}
-								aria-label={`Recurring rule: ${frequencyLabel(savedTransaction.frequency)}. Go to schedule`}
-							>
-								<Repeat size={14} aria-hidden="true" />
-								<span>{frequencyLabel(savedTransaction.frequency)}</span>
-							</TextButton>
-						)}
-					</div>
-					<div className="flex flex-wrap items-center gap-4">
-						{once && (
-							<TransactionInsightsTrigger
-								count={insightSuggestions.length}
-								onClick={() => setInsightsOpen(true)}
-							/>
-						)}
-					</div>
+					{edit.confirmCancel ? (
+						<DiscardConfirm
+							onContinue={() => edit.setConfirmCancel(false)}
+							onDiscard={edit.discardAndClose}
+						/>
+					) : (
+						<>
+							<div className="flex flex-wrap items-center gap-4">
+								{once && (
+									<TextButton
+										type="button"
+										tone="default"
+										onClick={() => setSharingOpen(true)}
+										aria-label={`Sharing status: ${sharingLabel}. Open sharing settings`}
+										aria-haspopup="dialog"
+									>
+										{sharedCount > 0 ? (
+											<UsersRound size={14} aria-hidden="true" />
+										) : (
+											<LockKeyhole size={14} aria-hidden="true" />
+										)}
+										<span>{sharingLabel}</span>
+									</TextButton>
+								)}
+								{savedTransaction.frequency !== "once" && (
+									<TextButton
+										type="button"
+										tone="default"
+										onClick={() => {
+											scrollToSection(`${edit.formId}-schedule-section`);
+											document
+												.getElementById(`${edit.formId}-schedule`)
+												?.focus();
+										}}
+										aria-label={`Recurring rule: ${frequencyLabel(savedTransaction.frequency)}. Go to schedule`}
+									>
+										<Repeat size={14} aria-hidden="true" />
+										<span>{frequencyLabel(savedTransaction.frequency)}</span>
+									</TextButton>
+								)}
+							</div>
+							<div className="flex flex-wrap items-center gap-4">
+								{once && (
+									<TransactionInsightsTrigger
+										count={insightSuggestions.length}
+										onClick={() => setInsightsOpen(true)}
+									/>
+								)}
+							</div>
+						</>
+					)}
 				</div>
 			</Modal>
 			{once && insightsOpen && (

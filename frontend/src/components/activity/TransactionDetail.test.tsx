@@ -56,6 +56,17 @@ beforeEach(() => {
 	acceptTestResource();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();
+	// Collapse exit animations so any stray close settles inside the test
+	// that starts it instead of firing into the next file.
+	vi.stubGlobal("matchMedia", (query: string) => ({
+		matches: /prefers-reduced-motion:\s*reduce/.test(query),
+		media: query,
+		addEventListener: () => {},
+		removeEventListener: () => {},
+		addListener: () => {},
+		removeListener: () => {},
+		dispatchEvent: () => false,
+	}));
 });
 
 afterEach(() => {
@@ -360,6 +371,93 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 	).toBe(false);
 });
 
+it("asks before closing a touched edit and keeps the dialog responsive", async () => {
+	stubTestServer();
+	const savedTransaction = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.change(screen.getByLabelText("Transaction name"), {
+		target: { value: "Home renovation updated" },
+	});
+	const panel = screen.getByRole("dialog").firstElementChild as HTMLElement;
+	await waitFor(() => expect(panel.style.opacity).toBe("1"));
+	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	const prompt = screen
+		.getByText("Discard the changes in this form?")
+		.closest("[role='alert']") as HTMLElement;
+	expect(prompt).toBeTruthy();
+	expect(onClose).not.toHaveBeenCalled();
+	// The veto runs before the exit animation, so the prompt stays visible.
+	expect(panel.style.opacity).not.toBe("0");
+	// Continue clears the prompt; the next close asks again instead of
+	// being latched off by the first request.
+	fireEvent.click(within(prompt).getByRole("button", { name: "Continue" }));
+	await waitFor(() =>
+		expect(screen.queryByText("Discard the changes in this form?")).toBeNull(),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	const secondPrompt = await screen.findByText(
+		"Discard the changes in this form?",
+	);
+	expect(onClose).not.toHaveBeenCalled();
+	fireEvent.click(
+		within(secondPrompt.closest("[role='alert']") as HTMLElement).getByRole(
+			"button",
+			{ name: "Discard changes" },
+		),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+});
+
+it("keeps the discard confirmation after a failed occurrence claim", async () => {
+	stubTestServer();
+	const savedTransaction = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={onClose}
+		/>,
+	);
+	await screen.findByRole("option", { name: "Salary" });
+	fireEvent.change(screen.getByLabelText("Records an occurrence of"), {
+		target: { value: "salary" },
+	});
+	fireEvent.click(await screen.findByRole("button", { name: "Save changes" }));
+	await screen.findByText("Choose which occurrence this replaces.");
+	const panel = screen.getByRole("dialog").firstElementChild as HTMLElement;
+	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	await screen.findByText("Discard the changes in this form?");
+	expect(onClose).not.toHaveBeenCalled();
+	// A failed save must not make closing fade the panel and strand the user.
+	expect(panel.style.opacity).not.toBe("0");
+	// Close requests keep the prompt visible; only its Discard button closes.
+	fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+	expect(onClose).not.toHaveBeenCalled();
+	const prompt = screen
+		.getByText("Discard the changes in this form?")
+		.closest("[role='alert']") as HTMLElement;
+	fireEvent.click(
+		within(prompt).getByRole("button", { name: "Discard changes" }),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+});
+
 it("opens sharing in its own sheet from the footer status", async () => {
 	stubTestServer();
 	const savedTransaction = {
@@ -383,9 +481,7 @@ it("opens sharing in its own sheet from the footer status", async () => {
 		screen.getByRole("button", { name: /Sharing status: Private/ }),
 	);
 	const sheet = await screen.findByRole("dialog", { name: "Sharing" });
-	expect(
-		within(sheet).getByRole("heading", { name: "Sharing" }),
-	).toBeTruthy();
+	expect(within(sheet).getByRole("heading", { name: "Sharing" })).toBeTruthy();
 });
 
 it("lets the owner pick the posted charge and remove the vanished hold", async () => {
@@ -540,7 +636,9 @@ it("converts a subscription through row endpoints and preserves the source posti
 		/>,
 	);
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
-	fireEvent.click(screen.getByRole("menuitem", { name: "Mark as subscription" }));
+	fireEvent.click(
+		screen.getByRole("menuitem", { name: "Mark as subscription" }),
+	);
 	await waitFor(() =>
 		expect(
 			server.calls.some(
@@ -608,7 +706,9 @@ it("retries a rejected claim without creating a second rule", async () => {
 		/>,
 	);
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
-	fireEvent.click(screen.getByRole("menuitem", { name: "Mark as subscription" }));
+	fireEvent.click(
+		screen.getByRole("menuitem", { name: "Mark as subscription" }),
+	);
 	await waitFor(() =>
 		expect(screen.getByText(/could not be claimed/)).toBeTruthy(),
 	);
@@ -620,7 +720,9 @@ it("retries a rejected claim without creating a second rule", async () => {
 	expect(ruleCreates()).toHaveLength(1);
 	// Retry: the existing rule is reused, only the claim runs again.
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
-	fireEvent.click(screen.getByRole("menuitem", { name: "Mark as subscription" }));
+	fireEvent.click(
+		screen.getByRole("menuitem", { name: "Mark as subscription" }),
+	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	expect(ruleCreates()).toHaveLength(1);
 	const claims = server.calls.filter(
@@ -655,9 +757,7 @@ it("keeps frequency controls on recurrence rules, never on postings", () => {
 	// increase belong to recurrence rules, not to the posting itself.
 	expect(screen.queryByLabelText("Frequency")).toBeNull();
 	expect(screen.queryByLabelText("Annual amount increase (%)")).toBeNull();
-	expect(
-		screen.getByLabelText("Records an occurrence of"),
-	).toBeTruthy();
+	expect(screen.getByLabelText("Records an occurrence of")).toBeTruthy();
 	cleanup();
 	const rule = {
 		...posting,
