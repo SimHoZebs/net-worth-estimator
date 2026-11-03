@@ -1,6 +1,6 @@
 # Projection: share one in-flight computation
 
-Status: approved (ready to schedule).
+Status: SUPERSEDED. Content-hash caches are removed. Direct computation replaced the base-path cache. Slice persistence owns future cross-request reuse. The in-process shared-run registry still dedupes concurrent identical seeded stochastic runs.
 
 ## Goal
 

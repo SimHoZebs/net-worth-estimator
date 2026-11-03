@@ -1,0 +1,19 @@
+erDiagram
+    MONTE_CARLO_STATISTIC {
+        uuid id PK
+        uuid projection_slice_id FK
+        uuid account_id FK
+        timestamptz as_of_at
+        int sample_count
+        decimal mean
+        decimal median
+        decimal p10
+        decimal p25
+        decimal p50
+        decimal p75
+        decimal p90
+        decimal std_dev
+        decimal probability_below_zero
+    }
+
+    style MONTE_CARLO_STATISTIC fill:#4a3800,stroke:#ffb300

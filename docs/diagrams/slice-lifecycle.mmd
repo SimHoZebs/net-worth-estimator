@@ -1,0 +1,11 @@
+flowchart LR
+    WRITE["Model write"] --> DIRTY["Mark dirty_from plus revision"]
+    DIRTY --> FIND{"Find first invalid slice"}
+    FIND -->|"No invalid slice and outputs current"| SERVE["Serve from slices"]
+    FIND -->|"Suffix invalid"| DELETE["Delete suffix rows"]
+    DELETE --> BUILD["Compute full window"]
+    BUILD --> WRITEOUT["Write suffix slices plus outputs"]
+    WRITEOUT --> ADOPT["Adopt prefix slices"]
+    ADOPT --> PUBLISH["Publish revision"]
+    PUBLISH --> SERVE
+    SERVE --> READOUT[("Timeline plus events plus evaluations")]

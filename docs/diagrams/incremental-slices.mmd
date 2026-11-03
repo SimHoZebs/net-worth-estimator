@@ -1,0 +1,114 @@
+erDiagram
+    PROJECTION_STATE ||--o{ PROJECTION_SLICE : divides_into
+    PROJECTION_SLICE ||--o{ TRANSACTION : generates
+    PROJECTION_SLICE ||--o{ MONTE_CARLO_STATISTIC : generates
+    PROJECTION_STATE ||--o{ NET_WORTH_THRESHOLD_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ ACCOUNT_BALANCE_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ POSTING_FULFILLMENT_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ CYCLE_FULFILLMENT_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ PLANNED_PURCHASES_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ FINANCIAL_INDEPENDENCE_OUTPUT : publishes
+    PROJECTION_STATE ||--o{ WHATIF_OUTPUT : publishes
+
+    PROJECTION_STATE {
+        uuid id PK
+        uuid scope_id
+        bigint revision
+        bigint published_revision
+        int dirty_from
+        timestamptz projection_start
+        timestamptz horizon_end
+        string calendar_timezone
+        string engine_version
+        int trial_count
+        bigint stochastic_seed
+        json det_evaluations_json
+        json stoch_evaluations_json
+    }
+    PROJECTION_SLICE {
+        uuid id PK
+        uuid projection_state_id FK
+        int from_at
+        int to_at
+        bigint built_revision
+        string status
+    }
+    NET_WORTH_THRESHOLD_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        bool reached
+        date first_reached_date
+        decimal prob_probability
+        date prob_p10_date
+        date prob_median_date
+        date prob_p90_date
+    }
+    ACCOUNT_BALANCE_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        bool reached
+        date first_reached_date
+        decimal prob_probability
+        date prob_p10_date
+        date prob_median_date
+        date prob_p90_date
+    }
+    POSTING_FULFILLMENT_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        decimal requested_amount
+        decimal realized_amount
+        decimal unfulfilled_amount
+        date first_underfulfilled_date
+        json events_json
+        decimal prob_full_probability
+        json prob_unfulfilled_pXX
+    }
+    CYCLE_FULFILLMENT_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        decimal budget
+        date cycle_start
+        date cycle_end
+        bool within_budget
+        decimal shortfall
+        decimal prob_within_probability
+        json prob_spent_pXX
+    }
+    PLANNED_PURCHASES_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        bool all_funded
+        date first_reached_date
+        json purchases_json
+        decimal prob_probability
+    }
+    FINANCIAL_INDEPENDENCE_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        date first_coverage_date
+        json detail_json
+        decimal prob_success
+    }
+    WHATIF_OUTPUT {
+        uuid projection_state_id FK
+        string kind
+        uuid instance_id PK
+        string status
+        decimal final_net_worth
+        date first_unfulfilled_date
+        bool all_funded
+        decimal prob_full_probability
+    }

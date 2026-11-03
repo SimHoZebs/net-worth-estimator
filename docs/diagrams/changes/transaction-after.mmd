@@ -1,0 +1,16 @@
+erDiagram
+    TRANSACTION {
+        uuid id PK
+        uuid source_account_id FK
+        uuid dest_account_ids FK
+        int posted_time
+        int transaction_time
+        json amount_resolution
+        string source_type
+        uuid projection_slice_id FK
+        json event_json
+        decimal applied_amount
+        string outcome
+    }
+
+    style TRANSACTION fill:#4a3800,stroke:#ffb300

@@ -25,7 +25,7 @@ Casdoor's built-in Casbin system grants actions on user resources. The guest
 is a provisioned user with viewer-group membership assigned at creation.
 Normal signup assigns member-group membership without a role-selection step.
 Both use the same authorization and user-scoped storage path. User data,
-artifacts, and sync state remain isolated. Unsubmitted
+projection caches, and sync state remain isolated. Unsubmitted
 fields stay local to their mounted form.
 See [user-scoped authorization](authorization.md) for the resource and migration
 contract. The global read-only switch still rejects editor writes.

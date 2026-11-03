@@ -202,3 +202,24 @@ The ordinary-guest cutover predates this shared contract. Its script remains
 in infrastructure commit `592e6b8`. Northflank was initialized with the current
 user-scoped model. Never replay that host-specific script against Northflank's
 independent issuer or Postgres database.
+
+## Unified projection schema (unreleased branch)
+
+The unified-projection branch adds tables and columns with no data conversion:
+`provider_connections`, `projection_states` (plus `det_evaluations_json` and
+`stoch_evaluations_json`), `projection_slices`, `projection_rows`,
+`monte_carlo_statistics` (plus `p25`, `p50`, `p75`), one typed output table
+per evaluation (`net_worth_threshold_outputs`, `account_balance_outputs`,
+`posting_fulfillment_outputs`, `cycle_fulfillment_outputs`,
+`planned_purchases_outputs`, `financial_independence_outputs`,
+`whatif_outputs`),
+`checkpoints.provider`, and on `postings`
+`projection_slice_id`, `event_json`, `applied_amount`, plus `outcome`.
+Source values unify to `user`, `banksync`, and `projected`; previously stored
+`simplefin` row sources have no reader fallback.
+
+Before this branch deploys, the offline body must create the new tables and
+add the new columns with `ALTER TABLE ... ADD COLUMN` on a verified backup
+candidate, then `setupdb` must validate the complete schema. Fresh databases
+need no body work: `SetupDatabase` creates the complete schema. There is no
+runtime conversion and no legacy alias anywhere in the server path.

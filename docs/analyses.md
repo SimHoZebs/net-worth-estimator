@@ -251,7 +251,7 @@ routes live in `backend/internal/api/analyses`, under the shared Huma write poli
 Tests cover source retention, known-key backfill, independent execution,
 restart recovery, leases, stale publication, withdrawal, dismissal, isolation,
 import/clear behavior, explicit setup, passive reads, and unchanged deterministic
-and seeded stochastic artifacts. Feedback tests cover immutable history, retries,
+and seeded stochastic runs. Feedback tests cover immutable history, retries,
 revision conflicts, user isolation, schema upgrades, restart, and retained evidence.
 Browser tests cover Yes/No, duration edits, lost-response retries, read-only access,
 keyboard focus, and accessibility. They use synthetic bank records

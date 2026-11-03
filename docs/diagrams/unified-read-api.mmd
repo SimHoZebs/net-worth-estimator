@@ -1,0 +1,24 @@
+flowchart LR
+    subgraph SOURCES["Stored and live inputs"]
+        TX[("Transactions")]
+        CP[("Checkpoints")]
+        STATS[("Monte Carlo Statistics")]
+        SLICES[("Projection Slices / Manifest")]
+        MODEL[("Saved model plus history replay")]
+    end
+    subgraph READER["ProjectionReader"]
+        CANON{"Canonical request?"}
+        ASSEMBLE["Assemble from slices"]
+        COMPUTE["Compute directly"]
+    end
+    TX --> ASSEMBLE
+    CP --> ASSEMBLE
+    STATS --> ASSEMBLE
+    SLICES --> ASSEMBLE
+    MODEL --> ASSEMBLE
+    MODEL --> COMPUTE
+    CANON -->|"Stored model, matching settings, no overrides, no cut"| ASSEMBLE
+    CANON -->|"Request model, overrides, cut, or mismatch"| COMPUTE
+    ASSEMBLE --> OUT[("Timeline plus events plus evaluations")]
+    COMPUTE --> OUT
+    OUT --> UI["Frontend"]

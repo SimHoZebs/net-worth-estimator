@@ -974,7 +974,7 @@ Release-level acceptance with story-specific tests added during implementation.
 - [ ] Test warm stable reads, frequent small writes, bank-sync bursts, evaluation-only changes, concurrent requests, cold starts and restarts.
 - [ ] Separately measure serialization/hash generation, revision reads/writes, event publication/fanout, cache lookup, full projection/reader/simulator computations.
 - [ ] Record p50/p95/p99 latency, CPU, allocations, SQLite lock time, cache hit/miss and total operations; estimate break-even read/write ratios.
-- [ ] Identify duplicated BaseModelHash calls in a projection execution; benchmark passing the already calculated key versus recalculating it.
+- [ ] Measure direct computation as the baseline before slice persistence lands.
 - [ ] Validate no stale current results after concurrent writes and no weakened group-sharing revocation under every design.
 - [ ] Produce reproducible harness, results, decision write-up; do not select a broker before evidence exists.
 

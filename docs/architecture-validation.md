@@ -8,9 +8,9 @@ Is repeated full-model JSON serialization + hashing cheaper overall than transac
 
 ## Observed current code
 
-- `backend/internal/domain/basepath_cache.go::BaseModelHash` marshals all projection-relevant model inputs plus projection settings to JSON, then SHA-256 hashes them. It excludes evaluation configuration.
-- `backend/internal/domain/project.go::ProjectFinancialModel` calls `projectBaseWithCache()` which calculates `BaseModelHash`; afterward it calculates `BaseModelHash` **again** to key reader and simulator evaluations. Target this duplicate first.
-- `backend/internal/domain/eval_cache.go` caches reader evaluations by base key + reader subset, and simulator evaluations by base key + simulator subset + detail, with `singleflight` for expensive duplicate requests.
+- Content-hash caches are removed. `backend/internal/domain/project.go::ProjectFinancialModel` prepares, simulates, and evaluates directly on every call. No `BaseModelHash`, no `EvaluationsHash`, no base-path cache, no evaluation caches, no `singleflight`.
+- `backend/internal/store` owns `projection_states` plus `projection_slices` plus `monte_carlo_statistics` plus `provider_connections`. One `default` state per user carries revision, published revision, `dirty_from`, projection start, horizon end, timezone, engine version, trial count, and seed.
+- `backend/internal/domain/projection_reader.go` finds the first invalid slice for a `dirty_from` date. Suffix rebuild is the invalidation strategy.
 - `backend/internal/store/types.go::ModelETag` separately marshals/hashes canonical model, while frontend `frontend/src/state/remoteStorage.ts::serverModelFingerprint` canonicalizes and hashes a semantic model.
 - `docs/analyses.md` describes an evidence-revision polling worker, not a dependent forecast simulation.
 - `backend/scripts/bench-sim.sh` and `backend/internal/domain/bench_sim_test.go` provide an existing reproducible Go benchmark harness.
@@ -36,7 +36,7 @@ Is repeated full-model JSON serialization + hashing cheaper overall than transac
 
 ## Low-risk first experiment
 
-Benchmark once **before and after** passing the already-generated `BaseModelHash` from the base-path lookup to its evaluation consumers. This should avoid a repeated full-model JSON marshal+hash per projection call, without altering cache semantics. Record both hit and miss workloads; confirm no changes to result identity or output.
+Benchmark direct computation against revision-keyed slice reuse on the matrix below. Record warm stable reads, frequent small edits, bank-sync bursts, evaluation-only changes, concurrent requests, and cold restarts. Confirm identical outputs before adopting slice persistence.
 
 ## Deliverables and decision gate
 

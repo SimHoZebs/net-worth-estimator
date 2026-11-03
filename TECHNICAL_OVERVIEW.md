@@ -1,5 +1,7 @@
 # Technical Overview: Net Worth Estimator Backend
 
+Rendered architecture visuals live in `docs/diagrams/` (Mermaid sources plus Pele-generated SVGs, combined in `docs/diagrams/index.html`).
+
 The backend owns financial records, validation, persistence, historical current position, evidence Analysis, and optional deterministic and stochastic simulation with configured evaluations. It exposes one HTTP/SSE contract. One shared SQLite application database holds user-scoped financial data and application identity state.
 
 `PRODUCT_INTENT.md` defines the product experience. This document defines the current Go contracts and domain behavior.
@@ -20,7 +22,7 @@ Store interface backed by SQLite
 
 - `internal/api` parses HTTP configuration, resolves stored or request-scoped inputs, applies access policy, and serializes results.
 - `internal/domain` validates the model, prepares history, executes posting transitions, and runs evaluations.
-- `internal/store` owns transactions, ordering, schema migration, row ownership, and artifact eviction.
+- `internal/store` owns transactions, ordering, schema migration, row ownership, and projection caches.
 - `internal/types` defines the JSON and domain values shared across those layers.
 
 The model aggregate is `types.FinancialModel`. Payroll is modeled as ordinary recurrence rules chained by priority and model-value references: gross pay, pre-tax contributions, employer match, and progressive-bracket tax are separate rules, not a separate income pipeline.
@@ -72,7 +74,7 @@ access. `users` identifies users by immutable issuer and subject. Financial
 Every financial table includes `user_id`. Entity IDs and unique names can repeat
 between users. Relational references use composite user/entity keys. JSON model
 references validate against the scoped model. Imports, deletes, ordering,
-sync state, default presets, and artifact eviction operate within one user.
+sync state, default presets, and projection caches operate within one user.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
@@ -85,7 +87,7 @@ read-only and origin policy, and server status. The `model`,
 `receipts`, `projections`, and `sync` subpackages register operations through
 explicit dependencies. They do not import the composition root or each other.
 `api/internal/modelstate` owns the revision and storage-error HTTP contracts
-shared by model writes and account links. Projection state and SSE recovery
+shared by model writes and account links. Projection state and SSE fan-out
 stay within `projections`, with the shared-run registry separate from transport.
 Whole-router HTTP contracts live in `api/integration`; private helper tests
 stay with their feature package.
@@ -168,13 +170,13 @@ Resolution rules:
 - A supplied model affects only that request and exists for tests, fixtures, and offline tooling.
 - `overrides` are applied by `types.ApplyModelOverrides` to a new model value; stored state is unchanged.
 - What-if scenarios do not use base overrides. They run as `whatIf` simulator evaluations with inline added, disabled, and modified copies.
-- `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. The API stores the complete result before response filtering and excludes the range from artifact identity, so requests for different intervals reuse the same artifact.
-- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the calendar-day end cut at the end of the start day. It participates in artifact identity through the settings.
+- `range` selects response dates inclusively and is required: a missing range fails request validation (422), and an empty, malformed, or inverted range returns 400. Either bound may be omitted for an open end. Only timeline rows and transaction events are filtered. Evaluations, totals, summary, milestones, and account summaries retain complete-result values, even for history-only or empty intervals. The simulation receives no response range. Every request computes the complete result directly; the range only filters the response.
+- `settings.asOfInstant` is an optional exact cut (Unix seconds) refining the start date: history replays through the instant, the start day's afternoon events simulate, and replayed morning occurrences are suppressed by identity so nothing executes twice. It must fall on the start date; omitted means the calendar-day end cut at the end of the start day.
 - `POST /v1/position` and `GET /v1/accounts/balances` accept the same cut as an `asOfDate` date or RFC 3339 instant (`asOf` query); all three agree at an identical cut because they share one chronological replay.
 
-A successful response has `result` and `Projection-Source: stored|computed`. `stored` means the backend retrieved the identified simulation result. `computed` means this request took the simulation execution path. The header does not guarantee successful completion or storage; preparation and execution errors also report `computed`.
+A successful response has `result` and `Projection-Source: computed`. Canonical requests assemble from stored rows when the state is clean and the settings plus evaluation tables match the built state; otherwise the request builds once and assembles, or computes directly for non-canonical inputs. The header does not guarantee successful completion; preparation and execution errors also report `computed`.
 
-A `domain.SimulationPreparationError`, including model validation failure, returns HTTP 200 with `issues`. An unexpected execution error returns HTTP 500 with `error`. Result-storage read and write failures do not prevent computation.
+A `domain.SimulationPreparationError`, including model validation failure, returns HTTP 200 with `issues`. An unexpected execution error returns HTTP 500 with `error`.
 
 ### Stochastic projection and SSE
 
@@ -206,17 +208,16 @@ A `partial` result is a cumulative snapshot. A slow attached stream may skip int
 
 `Projection-Source` identifies where the result originates:
 
-| Value      | Meaning                                                                           |
-| ---------- | --------------------------------------------------------------------------------- |
-| `stored`   | completed seeded result retrieved from SQLite; stream contains one `result` event |
-| `computed` | this request owns a new seeded run or an unseeded request-bound run               |
-| `shared`   | this request attaches to an identical seeded run in the shared-run registry       |
+| Value      | Meaning                                                                     |
+| ---------- | --------------------------------------------------------------------------- |
+| `computed` | this request owns a new seeded run or an unseeded request-bound run         |
+| `shared`   | this request attaches to an identical seeded run in the shared-run registry |
 
-`computed` and `shared` streams may end with an `error` event. These values describe execution origin, not successful completion or storage. `Projection-Source` replaces the former `Cache-Status` header for both projection endpoints.
+`computed` and `shared` streams may end with an `error` event. These values describe execution origin, not successful completion. `Projection-Source` replaces the former `Cache-Status` header for both projection endpoints.
 
-An attached seeded request receives the latest cumulative snapshot, if one exists, and then remaining events. A stream disconnect detaches only that stream. The shared seeded computation continues. Completed seeded runs leave the in-process registry; later reconnects retrieve the identified result from SQLite when available.
+Canonical seeded requests assemble from stored statistics when the state is clean and the run count, frozen seed, and evaluation tables match. A miss builds once per user: trials run with the frozen seed, statistics and outputs persist, then the stream serves one `result` event. A stream disconnect detaches only that stream. Completed seeded builds leave the in-process registry; later identical requests assemble from stored rows. Result durability across restarts arrives with slice persistence.
 
-An unseeded run does not use the shared registry or result storage. Its context follows the request, so disconnect cancels computation and no result is persisted.
+An unseeded run never uses stored rows. Its context follows the request, so disconnect cancels computation.
 
 ### SimpleFIN trigger
 
@@ -249,13 +250,13 @@ The kill switch rejects writes with 403 without a separate endpoint list. The pr
 
 - canonical model load (writes go through row create/update/delete/move);
 - row writes with server-generated UUIDv7 IDs and a shared cross-table ID registry;
+- projection state, slices, rows, generated facts, statistics, and evaluation outputs;
 - bridge-to-model account links;
 - CSV replacement import;
-- artifact get/put;
 - transactional SimpleFIN application with provisioning;
 - test/import clear and close.
 
-`Database.User` returns the scoped interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, import rollback, and artifact first-write behavior. `store.Open` remains an isolated fixture helper, not the runtime constructor.
+`Database.User` returns the scoped interface, not the SQLite implementation. `RunConformance` exercises that interface for row round trips, ID-registry conflicts, ownership, link behavior, sync provisioning, and import rollback. `store.Open` remains an isolated fixture helper, not the runtime constructor.
 
 ### SQLite setup
 
@@ -324,6 +325,12 @@ The current schema stores:
 | `pinned_evaluations`     | ordered pinned evaluation instance IDs                                                                        |
 | `safe_spending_settings` | user-scoped safe-spending preferences                                                                         |
 | `sync_state`             | last successful sync completion time                                                                          |
+| `provider_connections`     | one bank provider connection per scope with cursor and sync time       |
+| `projection_states`        | one canonical build state per user with revision and Unix dirty instant        |
+| `projection_slices`        | contiguous yearly build ranges with built revision and status           |
+| `projection_rows`          | one persisted timeline row payload per slice date                      |
+| `monte_carlo_statistics`   | portfolio net worth bands plus moments per slice date                  |
+| `net_worth_threshold_outputs`, `account_balance_outputs`, `posting_fulfillment_outputs`, `cycle_fulfillment_outputs`, `planned_purchases_outputs`, `financial_independence_outputs`, `whatif_outputs` | one typed result row per state, kind, and instance |
 | `sync_credentials`         | per-user bank bridge address and selected cards for safe-spending math                                        |
 | `user_groups`              | named member groups                                                                                           |
 | `group_members`            | group membership with owner, admin, or member role                                                             |
@@ -333,7 +340,6 @@ The current schema stores:
 | `analysis_runs`            | execution records with producer version, input revision, and reproducible input snapshot                       |
 | `analysis_findings`        | one current finding per analysis, transaction, and finding kind                                                |
 | `analysis_feedback`        | append-only answer history with actor, prediction, detector version, and review                                |
-| `projection_artifacts`   | versioned content identity, kind, creation time, and JSON payload                                             |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 | `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
 | `schema_migrations`      | compatibility markers and historical upgrade records |
@@ -349,7 +355,7 @@ The authenticated user router initializes a blank private workspace on first aut
 
 ### Row writes and ownership
 
-Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path.
+Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, conversions, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
@@ -368,13 +374,9 @@ caller supplies none. Sources with non-UUID posting IDs are unsupported. Exact u
 lives in `posting_sync_keys`, separate from local posting IDs (see
 `postingSyncKey` in `backend/internal/store/sync_pending.go`).
 
-### Artifact durability
+### Result durability
 
-Completed deterministic results and completed seeded stochastic results are stored in `projection_artifacts`. Each user retains at most 256 rows across both kinds. Insertion evicts only that user's oldest rows.
-
-Result writes are best-effort. A malformed stored payload is unavailable for retrieval. A storage failure does not prevent the requested simulation from execution.
-
-Stored simulation results are durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits and results on replacement.
+No simulation results persist. Canonical edits are durable only when the SQLite file is durable. A container or service without persistent storage for its database loses canonical edits on replacement. Slice persistence restores result durability without content hashes.
 
 ### Split settlements
 
@@ -440,27 +442,16 @@ with request IDs and fail concurrent revisions explicitly, and
 concurrency coverage (QA-02) asserts idempotent replay through these
 endpoints plus share/revoke ordering at the store boundary.
 
-## 4. Artifact Identity
+## 4. Result Identity
 
-`api.artifactKey` hashes a versioned descriptor with SHA-256. The identity format is `<kind>:<artifactIdentityVersion>:<digest>`. The serialized envelope field is `artifactIdentityVersion` with a version bump; it does not promise preservation of previous hash values.
-
-Deterministic identity includes:
-
-- the resolved model;
-- request overrides;
-- fallback projection start date and horizon;
-- every enabled settings evaluation instance ID and config, excluding settings evaluation labels. The complete model also contributes its evaluation tables.
-
-Seeded stochastic identity adds the requested run count and the exact seed.
+No stored result identity exists. Every projection request prepares, simulates, and evaluates directly from the resolved model plus request overrides plus projection settings plus run configuration. Repeat requests recompute; identical inputs produce identical outputs because the kernels are deterministic for a fixed seed.
 
 Consequences:
 
-- omitting the model body still tracks saved model changes because the handler hashes the resolved stored snapshot;
-- disabled settings evaluation configs do not affect result identity, but model-model changes still do;
-- settings evaluation label-only changes do not change result identity, but model-model renames do;
-- a seed is part of stochastic identity;
-- unseeded stochastic runs are not content-addressed;
-- result identities are backend-owned and have no cross-runtime compatibility requirement.
+- omitting the model body uses the stored snapshot, so saved model changes alter the next result;
+- disabled settings evaluation configs still skip their evaluations, but every call re-evaluates what is enabled;
+- seeded stochastic runs with equal run count and seed draw the same sequence;
+- unseeded stochastic runs draw fresh samples per call;
 - projection payloads keep dates as strings, `projectionStartPostingState` as a plain JSON object, and evaluation `deterministic`/`probabilistic` values as arbitrary JSON.
 
 ## 5. Model Semantics
@@ -524,7 +515,7 @@ Current general resolvers:
 
 `expression` amounts carry rate behavior in their inputs: the `occurrence-rate` provider resolves the annual rate (sampled per projection year when volatile) divided by the frequency divisor, and the `growth-factor` provider resolves the compounding factor from the rule start date. One-time and recurring transactions resolve through the same path. Posting references (`model-value`) may name posting or rule IDs; a rule reference resolves to its latest realized occurrence. Payroll chains rules by priority and `model-value`: gross pay, pre-tax contributions, employer match, and a `progressive-bracket` tax rule compose take-home pay from ordinary transactions.
 
-Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets and they never affect artifact identity. The wire shape is unchanged; presets only author it.
+Layman discovery: `GET /v1/amount-resolvers` returns `resolvers` and `providers` as wiring only (entry names, technical descriptions, field keys, field kinds, required flags, and provider volatility). All human words live in the frontend. Reusable recipes persist as rows: `GET /v1/amount-presets` lists them, `POST`/`PATCH`/`DELETE /v1/amount-presets` and `POST /v1/amount-presets/reorder` manage them. A preset is an authoring macro only — applying it copies its amount descriptor into a posting or rule, so simulation never reads presets. The wire shape is unchanged; presets only author it.
 
 ### Constraints and transaction records
 
@@ -610,12 +601,13 @@ Each historical correction records observed balance, modeled balance, and adjust
 The kernel:
 
 1. creates a `TransitionRuntime` from the prepared model, state, date, and optional sampled rates;
-2. expands enabled occurrences through the projection window;
+2. expands enabled occurrences through the projection window via the preprocessor (`ExpandProjectionSchedule`; history, candidates, and branch windows keep their own local expansion);
 3. sorts dates and same-date occurrences, skipping occurrences named in `SuppressedIdentities` (exact-cut history already replayed them);
-4. executes each occurrence through the shared transition path;
-5. records every requested/realized transaction and ordered account deltas;
-6. snapshots balances after each event date;
-7. returns exact initial state, final state, snapshots, transactions, and sample metadata.
+4. prepares each occurrence amount from snapshots without touching runtime state (`PreparePostingExecution`: scheduled, sampled, and model-value inputs resolve here);
+5. applies each prepared request through the shared transition path (`ApplyPreparedExecution`: constraint clamping, balance mutation, and ledger recording live here — the only place impossible states are handled);
+6. records every requested/realized transaction and ordered account deltas;
+7. snapshots balances after each event date;
+8. returns exact initial state, final state, snapshots, transactions, and sample metadata.
 
 `BuildProjectionPath` adapts exact results for evaluators. `AdaptSimulationRun` then creates the public `ProjectionResult` by:
 
@@ -690,7 +682,7 @@ A residual below 0.5 is not reportable. Deterministic output includes first unde
 
 ## 10. Stochastic Kernel
 
-`StochasticProjection` creates one `stochasticSession` and one prepared baseline request. The session then:
+`StochasticProjection` creates one `stochasticSession` and one prepared baseline request. When no enabled rule or posting carries a volatile amount, Monte Carlo stays fully opt-in: the session simulates once and folds that path into every trial, which is bit-identical to N identical trials at ~1/N the cost. Otherwise the session then:
 
 1. prepares and runs the deterministic baseline;
 2. evaluates deterministic baseline evaluations in summary mode;
@@ -705,7 +697,7 @@ A residual below 0.5 is not reportable. Deterministic output includes first unde
 
 Samples are created sequentially from one sampler. Worker completion order does not change accumulation order. Percentiles require all configured runs; an interrupted run is not a successful partial result.
 
-The seed controls the state sequence. Run-count normalization and seed-null behavior are part of the artifact and sharing contract.
+The seed controls the state sequence. Run-count normalization and seed-null behavior are part of the sharing contract.
 
 ### Numeric precision
 
@@ -787,9 +779,9 @@ the user correction overlay.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` delegates to the ingest orchestrator with the SimpleFIN adapter. The orchestrator requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior. Settled bank posts are normal participants at posting time: the translation emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual postings. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior, then marks the projection dirty from the earliest applied Unix instant. Settled bank posts are normal participants at posting time: the translation emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual postings. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
 
 One-off legacy interpretation, stated plainly: in databases written
 before this change, a disabled settled bank row does not distinguish the
@@ -820,7 +812,7 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/api/model/`                       | canonical model queries, row writes, and settings         |
 | `backend/internal/api/receipts/`                    | receipt HTTP operations and upload boundaries            |
 | `backend/internal/api/sync/`                        | SimpleFIN configuration, triggers, and account links      |
-| `backend/internal/api/projections/`                 | position, projections, result identity, and SSE           |
+| `backend/internal/api/projections/`                 | position, projections, and SSE                            |
 | `backend/internal/api/projections/runs.go`           | shared seeded computation and subscriber state           |
 | `backend/internal/api/internal/modelstate/`          | shared model revision and storage-error HTTP contracts    |
 | `backend/internal/sharing/`                       | cross-user grant/exclusion/copy/audit HTTP operations     |
@@ -829,8 +821,11 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/store/store.go`, `database.go`    | scoped `Store`, shared `Database`, schema lifecycle     |
 | `backend/internal/store/model.go`                   | seed/import replacement and ordered reload              |
 | `backend/internal/store/rows.go`                    | row CRUD, ID registry, links, provisioning              |
+| `backend/internal/store/adapters/sqlite/projection_unified.go` | unified state, slices, rows, generated facts, statistics, outputs |
+| `backend/internal/store/adapters/sqlite/projection_dirty.go` | dirty-date mapping for every model write                  |
+| `backend/internal/ingest/ingest.go`                 | provider-neutral sync orchestration                           |
+| `backend/internal/api/projections/builder.go`       | canonical builds, slice persistence, unified reads       |
 | `backend/internal/store/sync.go`                    | sync application and bank directives                      |
-| `backend/internal/store/artifacts.go`               | bounded artifact storage                                |
 | `backend/internal/store/settlement.go`, `adapters/sqlite/settlements.go` | split settlement ledger, derived states  |
 | `backend/internal/csvio/import.go`                  | canonical model CSV parsing                             |
 | `backend/internal/domain/validation.go`             | authoritative model validation                          |
@@ -842,6 +837,10 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/domain/evaluation_fi.go`          | financial-independence branch evaluation                |
 | `backend/internal/domain/evaluation_threshold.go`   | net-worth threshold evaluation                          |
 | `backend/internal/domain/evaluation_fulfillment.go` | posting fulfillment evaluation                          |
+| `backend/internal/domain/project.go`                 | direct prepare, simulate, and evaluate orchestration    |
+| `backend/internal/domain/projection_pipeline.go`    | baseline engine and Monte Carlo runner wrappers         |
+| `backend/internal/domain/projection_reader.go`      | slice invalidation helpers                             |
+| `backend/internal/domain/recurrence_preprocessor.go` | deterministic versus stochastic rule classification    |
 | `backend/internal/domain/stochastic.go`             | worker execution and progress                           |
 | `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators            |
 | `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers                  |

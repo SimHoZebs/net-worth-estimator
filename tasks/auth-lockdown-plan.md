@@ -31,7 +31,7 @@ Incoming checkpoint and posting `source` values are ignored. The store recompute
 
 ### Projection computation
 
-Projection routes are intentionally unauthenticated. A successful deterministic or seeded stochastic request may write a best-effort `projection_artifacts` row. This cache write is derived data, not a canonical model mutation.
+Projection routes are intentionally unauthenticated. Projection requests compute directly and write no rows. The shared-run registry is in-process only.
 
 Rate limiting and resource limits for expensive stochastic requests belong at the deployment ingress or API boundary. Access-control documentation must not describe cache writes as owner-only canonical writes.
 
@@ -50,7 +50,7 @@ Guarded endpoints require encrypted transport. A bearer token exposed over clear
 - Schema changes are forward-only, transactional, and data-preserving. Add one migration per schema step and a package test proving upgrade, rollback, and preserved data.
 - Do not couple access-control rollout to an unrelated schema change. Deploy schema compatibility first, verify it, then change runtime policy.
 - Canonical replacement is an explicit operator action through `backend/cmd/importcsv`; the HTTP API has no replacement route.
-- Artifact eviction and schema migrations must not delete canonical or sync-owned rows.
+- Projection caches and schema migrations must not delete canonical or sync-owned rows.
 
 ## Rollout Plan
 

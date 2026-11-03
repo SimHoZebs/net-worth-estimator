@@ -14,7 +14,7 @@ The range API plus gzip already covers slow links. Measured 2026-10-24 on produc
 
 - Kernel progress hook in `backend/internal/domain/simulate.go`: flush cumulative row snapshots every N event dates (about 5 flushes per run, never per date; explicitly exclude nested FI branch evaluations). Guard throughput with `backend/scripts/bench-sim.sh`.
 - New SSE endpoint beside `POST /v1/projections/deterministic` (which stays, unchanged). Event shapes deliberately differ from the stochastic contract: stochastic emits `progress`/`partial`/`result` as run-count snapshots (`backend/internal/api/stochastic_sse.go`), while this stream emits `history` (historical rows, current net worth, starting balances — no stochastic analogue), `partial` (cumulative date-chunked rows), and `result` (today's exact full shape, evaluations included). Clients handle two first-event shapes.
-- The stream takes the same required `range` as the plain endpoint (missing fails validation, empty/malformed/inverted fail before work). Range stays out of the artifact key; date filtering mirrors `clipProjectionRange` and affects only timeline rows and transaction events. Evaluations, totals, summary, milestones, and account summaries keep complete-result values in every event, including history-only or empty intervals.
+- The stream takes the same required `range` as the plain endpoint (missing fails validation, empty/malformed/inverted fail before work). Range filters the response only and stays out of stored identity; date filtering mirrors `clipProjectionRange` and affects only timeline rows and transaction events. Evaluations, totals, summary, milestones, and account summaries keep complete-result values in every event, including history-only or empty intervals.
 - Reuse the genuinely shared SSE helpers (`writeSSEPreamble`, `newSSEEventWriter`, `startSSEHeartbeat`) plus result lookup/storage and `Projection-Source: stored|computed` semantics (CORS already exposes `Projection-Source`). Do not reuse the shared-run registry: it is seeded-stochastic-only, and overlapping deterministic requests are already correct without run ownership.
 - Frontend generic series type plus adapters: the plot consumes `{date, value}` points with optional bands and an append interface. `projectionChartModel` (`frontend/src/domain/chart.ts`) becomes one adapter; shared chart ownership today is geometry-only (`lineChartModel`). Appending chunks touches the whole-model memo, `ProjectionPlot`, and inspector index logic.
 - Evaluations gate on `result`: they need the full path (first-crossing scans, FI branch runs, fulfillment over all events) and cannot stream early.
@@ -24,12 +24,12 @@ The range API plus gzip already covers slow links. Measured 2026-10-24 on produc
 - First paint renders from the `history` event alone.
 - Chunks append without render storms (bounded flush count) and without changing final pixels versus the plain endpoint.
 - Evaluations in the streamed `result` equal the plain-endpoint result exactly.
-- Disconnect mid-stream resumes via re-request (artifact replay) or falls back to the plain endpoint with identical output.
+- Disconnect mid-stream resumes via re-request (identical inputs recompute identically) or falls back to the plain endpoint with identical output.
 - `backend/scripts/bench-sim.sh deterministic` shows no kernel regression.
 
 ## Non-goals
 
 - No stochastic changes; seeded sharing and run-count partials stay as they are.
 - No kernel math changes; only observation points outside branch evaluations.
-- No cache identity changes; the stored artifact stays the full result.
+- No stored-result identity changes; stored rows stay the full result.
 - No new evaluation detail; fulfillment keeps the trimmed scalar-only envelope (per-event evidence stays on `transactionEvents`).

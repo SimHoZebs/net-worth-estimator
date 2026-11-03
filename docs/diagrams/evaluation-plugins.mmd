@@ -1,0 +1,10 @@
+flowchart TB
+    READ["ProjectionReader
+    stored rows plus live history"] --> READER["Evaluation Reader
+    thresholds plus balances plus fulfillment"]
+    READ --> SIM["Evaluation Simulator
+    independence plus what-if"]
+    SIM -.->|"Isolated what-if inputs"| PRE["Shared Projection Pipeline"]
+    READER --> UI["Frontend"]
+    SIM --> UI
+    READ --> UI

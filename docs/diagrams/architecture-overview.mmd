@@ -1,0 +1,73 @@
+flowchart TB
+    subgraph ING["1. Data Ingestion"]
+        PROVIDERS["SimpleFIN / CSV / Bank"]
+        ADAPTER["Ingest orchestrator + SimpleFIN adapter"]
+        MANUAL["Manual Entry"]
+        PROVIDERS --> ADAPTER
+    end
+
+    subgraph DB["2. Unified Data Model"]
+        ACC[("Accounts")]
+        TX[("Transactions")]
+        RULE[("Recurrence Rules")]
+        CP[("Checkpoints")]
+        STATS[("Monte Carlo Statistics")]
+    end
+
+    ADAPTER --> TX
+    MANUAL --> TX
+
+    subgraph PROJECTION["3. Shared Projection Pipeline"]
+        PRE["Preprocessor
+        Generate and order events"]
+        ENGINE["Projection Engine
+        Apply events and constraints"]
+        MC["Monte Carlo Orchestrator
+        Sample stochastic rules"]
+        PRE --> ENGINE
+        MC -->|"Sampled events per trial"| ENGINE
+    end
+
+    ACC --> PRE
+    TX -->|"Actual transactions"| PRE
+    RULE --> PRE
+    RULE -->|"Stochastic configuration"| MC
+
+    ENGINE -->|"Timeline rows + generated transactions"| TX
+    ENGINE -->|"Statistics"| STATS
+
+    subgraph CACHE["4. Incremental Cache Control"]
+        JOURNAL[("dirty_from date")]
+        SLICES[("Projection Slices / Manifest")]
+        INVALID["Find first invalid slice
+        Recompute suffix"]
+        JOURNAL --> INVALID
+        SLICES --> INVALID
+    end
+
+    ACC --> JOURNAL
+    TX -->|"Actual changes"| JOURNAL
+    RULE --> JOURNAL
+    INVALID --> PRE
+    ENGINE --> SLICES
+
+    subgraph EVALUATION["5. Evaluation Plugins"]
+        READER["Evaluation Reader"]
+        SIM["Evaluation Simulator"]
+    end
+
+    subgraph ACCESS["6. Unified Read API"]
+        READ["ProjectionReader"]
+    end
+
+    TX --> READ
+    CP --> READ
+    STATS --> READ
+    SLICES --> READ
+
+    READ --> READER
+    READ --> SIM
+    SIM -.->|"Isolated what-if inputs"| PRE
+    READ --> UI["Frontend"]
+    READER --> UI
+    SIM --> UI

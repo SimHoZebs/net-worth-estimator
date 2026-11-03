@@ -1,0 +1,107 @@
+flowchart TB
+    subgraph ING["1. Data Ingestion"]
+        PROVIDERS["SimpleFIN / CSV / Bank
+        no Plaid, no MX"]
+        ADAPTER["TransactionProvider + ingest orchestrator"]
+        MANUAL["Manual Entry"]
+        PROVIDERS --> ADAPTER
+    end
+
+    subgraph DB["2. Unified Data Model"]
+        ACC[("Accounts")]
+        TX[("Transactions
+        source plus destination keys")]
+        RULE[("Recurrence Rules
+        source plus destination keys")]
+        CP[("Checkpoints
+        plus provider column")]
+        STATS[("Monte Carlo Statistics
+        portfolio bands only")]
+    end
+
+    ADAPTER --> TX
+    MANUAL --> TX
+
+    subgraph PROJECTION["3. Shared Projection Pipeline"]
+        PRE["Preprocessor
+        Generate and order events"]
+        ENGINE["Projection Engine
+        Computes full window, writes suffix"]
+        MC["Monte Carlo Orchestrator
+        Frozen seed, statistics only"]
+        PRE --> ENGINE
+        MC -->|"Sampled events per trial"| ENGINE
+    end
+
+    ACC --> PRE
+    TX -->|"Actual transactions"| PRE
+    RULE --> PRE
+    RULE -->|"Stochastic configuration"| MC
+
+    ENGINE -->|"Generated transactions"| TX
+    ENGINE -->|"Baseline balances"| CP
+    ENGINE -->|"Bands plus moments"| STATS
+    ENGINE -->|"Per-instance envelopes"| EVALOUT[("Stored evaluation outputs")]
+    ENGINE -->|"Timeline rows per date"| ROWS[("Stored projection rows")]
+
+    subgraph CACHE["4. Incremental Cache Control"]
+        DIRTY[("Single dirty_from date")]
+        SLICES[("Projection Slices / Manifest
+        adopted or rebuilt")]
+        INVALID["Find first invalid slice
+        Recompute suffix"]
+        DIRTY --> INVALID
+        SLICES --> INVALID
+    end
+
+    ACC -->|"Row writes dirty"| DIRTY
+    TX -->|"Actual changes"| DIRTY
+    RULE --> DIRTY
+    INVALID --> PRE
+    ENGINE --> SLICES
+
+    subgraph EVALUATION["5. Evaluation Plugins"]
+        READER["Evaluation Reader
+        Assembles stored rows"]
+        SIM["Evaluation Simulator"]
+    end
+
+    subgraph ACCESS["6. Unified Read API"]
+        READ["ProjectionReader
+        Canonical assemble, else compute"]
+    end
+
+    TX --> READ
+    CP --> READ
+    STATS --> READ
+    SLICES --> READ
+    EVALOUT --> READ
+    ROWS --> READ
+
+    READ --> READER
+    READ --> SIM
+    SIM -.->|"Isolated what-if inputs"| PRE
+    READ --> UI["Frontend"]
+    READER --> UI
+    SIM --> UI
+
+    style PROVIDERS fill:#4a3800,stroke:#ffb300
+    style ADAPTER fill:#4a3800,stroke:#ffb300
+    style TX fill:#4a3800,stroke:#ffb300
+    style RULE fill:#4a3800,stroke:#ffb300
+    style CP fill:#4a3800,stroke:#ffb300
+    style STATS fill:#4a3800,stroke:#ffb300
+    style ENGINE fill:#4a3800,stroke:#ffb300
+    style MC fill:#4a3800,stroke:#ffb300
+    style DIRTY fill:#0d2f4f,stroke:#42a5f5
+    style SLICES fill:#4a3800,stroke:#ffb300
+    style INVALID fill:#4a3800,stroke:#ffb300
+    style EVALOUT fill:#0d2f4f,stroke:#42a5f5
+    style ROWS fill:#0d2f4f,stroke:#42a5f5
+    style READER fill:#4a3800,stroke:#ffb300
+    style READ fill:#4a3800,stroke:#ffb300
+    style ACC fill:#1d3a24,stroke:#4caf50
+    style PRE fill:#1d3a24,stroke:#4caf50
+    style MANUAL fill:#1d3a24,stroke:#4caf50
+    style SIM fill:#1d3a24,stroke:#4caf50
+    style UI fill:#1d3a24,stroke:#4caf50

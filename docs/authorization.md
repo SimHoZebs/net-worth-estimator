@@ -8,7 +8,7 @@ not embed a second Casbin engine or evaluate a custom policy language.
 
 A user is the permission boundary. Its model accounts, postings, recurrence rules,
 checkpoints, evaluations, presets, pinned results, sync links, and projection
-artifacts stay inside that boundary.
+projection caches stay inside that boundary.
 
 | Principal             | Resource                       | Default capabilities                            |
 | --------------------- | ------------------------------ | ----------------------------------------------- |
@@ -49,7 +49,7 @@ records verified issuer/subject identities. Financial `accounts` are separate
 model entities inside each user scope.
 
 Every financial table carries `user_id`. Keys, uniqueness rules, foreign keys,
-ordering, bulk replacement, sync, and artifact retention stay inside that user.
+ordering, bulk replacement, sync, and projection caches stay inside that user.
 The database owns the connection. A scoped store holds one immutable user ID.
 No scope-facing operation has an unscoped fallback.
 
@@ -60,7 +60,7 @@ can change through the same provider policy mechanism as any user's grants.
 Private data never becomes a fallback guest workspace.
 
 All API operations receive the store for the authorized resource. A guessed row
-ID in another user's data cannot select another user. Projection artifact identities
+ID in another user's data cannot select another user. Projection state rows
 and seeded in-flight runs also include the resource ID. Server-level SimpleFIN
 credentials remain attached only to the explicitly assigned primary owner.
 Other users never inherit that integration.

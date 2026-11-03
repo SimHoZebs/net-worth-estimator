@@ -1,0 +1,19 @@
+flowchart TB
+    R[("Recurrence Rules")]
+    R --> PRE["Recurrence Preprocessor"]
+    PRE --> TYPE{"Rule behavior"}
+
+    TYPE -->|"Deterministic"| FIX["Fixed or calculated amount"]
+    TYPE -->|"Stochastic"| SAMPLE["Sample variable amount
+    using stochastic model"]
+
+    FIX --> BASE["Baseline Projection Engine"]
+    SAMPLE --> MC["Monte Carlo Runner
+    1,000 trials"]
+
+    BASE --> BC[("Baseline timeline rows")]
+    MC --> AC[("Stochastic timeline rows
+    and statistics")]
+
+    BC --> READ["Unified Projection Reader"]
+    AC --> READ

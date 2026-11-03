@@ -1,6 +1,6 @@
 # Stored results: qualify rename invariance
 
-Status: addressed. The overview distinguishes settings-only omissions from complete-model identity inputs and uses the versioned result identity format. The original finding follows.
+Status: addressed, then SUPERSEDED. The versioned result identity system is removed. Every request computes directly with no stored identity. The overview distinguishes settings-only omissions from complete-model identity inputs and uses the versioned result identity format. The original finding follows.
 
 Renaming `Reach $1,000,000 net worth` inside the model changes completed-result identity because the full model enters that identity. Only the separate settings description strips evaluation names and disabled configurations. The overview incorrectly applies that property to the entire request.
 

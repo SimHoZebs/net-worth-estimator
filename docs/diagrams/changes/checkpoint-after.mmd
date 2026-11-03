@@ -1,0 +1,11 @@
+erDiagram
+    CHECKPOINT {
+        uuid id PK
+        uuid account_id FK
+        timestamptz as_of_at
+        decimal balance
+        string source_type
+        string provider
+    }
+
+    style CHECKPOINT fill:#4a3800,stroke:#ffb300

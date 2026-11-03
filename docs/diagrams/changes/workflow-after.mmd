@@ -1,0 +1,30 @@
+flowchart TB
+    R[("Recurrence Rules")]
+    R --> PRE["Recurrence Preprocessor
+    registry volatility check"]
+    PRE --> TYPE{"Rule behavior"}
+    TYPE -->|"Deterministic"| FIX["Fixed or calculated amount"]
+    TYPE -->|"Stochastic"| SAMPLE["Sample variable amount
+    frozen seed"]
+    FIX --> BASE["Baseline Projection Engine
+    full window, suffix persisted"]
+    SAMPLE --> MC["Monte Carlo Runner
+    1,000 trials, stats only"]
+    BASE --> BC[("Baseline Checkpoints
+    per event date per account")]
+    MC --> AC[("Portfolio statistics
+    no trial rows")]
+    BC --> READ["Unified Projection Reader
+    assembles stored plus live history"]
+    AC --> READ
+
+    style PRE fill:#4a3800,stroke:#ffb300
+    style BASE fill:#4a3800,stroke:#ffb300
+    style MC fill:#4a3800,stroke:#ffb300
+    style BC fill:#4a3800,stroke:#ffb300
+    style AC fill:#4a3800,stroke:#ffb300
+    style READ fill:#4a3800,stroke:#ffb300
+    style R fill:#1d3a24,stroke:#4caf50
+    style TYPE fill:#1d3a24,stroke:#4caf50
+    style FIX fill:#1d3a24,stroke:#4caf50
+    style SAMPLE fill:#1d3a24,stroke:#4caf50

@@ -1,0 +1,26 @@
+erDiagram
+    ACCOUNT ||--o{ RECURRENCE_RULE : schedules
+    ACCOUNT {
+        uuid id PK
+        string name
+        string kind
+        decimal min_balance
+        decimal max_balance
+        string color
+        bool enabled
+    }
+    RECURRENCE_RULE {
+        uuid id PK
+        uuid source_account_id FK
+        uuid dest_account_ids FK
+        json schedule
+        int execution_order
+        int priority
+        json amount_resolver
+        decimal annual_cap
+        date start_date
+        date end_date
+    }
+
+    style ACCOUNT fill:#4a3800,stroke:#ffb300
+    style RECURRENCE_RULE fill:#4a3800,stroke:#ffb300

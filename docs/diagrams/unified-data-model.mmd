@@ -1,0 +1,65 @@
+erDiagram
+    ACCOUNT ||--o{ TRANSACTION : owns
+    ACCOUNT ||--o{ RECURRENCE_RULE : schedules
+    ACCOUNT ||--o{ CHECKPOINT : has
+    ACCOUNT ||--o{ MONTE_CARLO_STATISTIC : summarized_by
+    RECURRENCE_RULE |o--o{ TRANSACTION : generates
+
+    ACCOUNT {
+        uuid id PK
+        string name
+        string kind
+        decimal min_balance
+        decimal max_balance
+        string color
+        bool enabled
+    }
+    TRANSACTION {
+        uuid id PK
+        uuid source_account_id FK
+        uuid dest_account_id FK
+        int posted_time
+        int transaction_time
+        json amount_resolution
+        string source_type
+        uuid projection_slice_id FK
+        json event_json
+        decimal applied_amount
+        string outcome
+    }
+    RECURRENCE_RULE {
+        uuid id PK
+        uuid source_account_id FK
+        uuid dest_account_id FK
+        json schedule
+        int execution_order
+        int priority
+        json amount_resolver
+        decimal annual_cap
+        date start_date
+        date end_date
+    }
+    CHECKPOINT {
+        uuid id PK
+        uuid account_id FK
+        timestamptz as_of_at
+        decimal balance
+        string source_type
+        string provider
+    }
+    MONTE_CARLO_STATISTIC {
+        uuid id PK
+        uuid projection_slice_id FK
+        uuid account_id FK
+        timestamptz as_of_at
+        int sample_count
+        decimal mean
+        decimal median
+        decimal p10
+        decimal p25
+        decimal p50
+        decimal p75
+        decimal p90
+        decimal std_dev
+        decimal probability_below_zero
+    }

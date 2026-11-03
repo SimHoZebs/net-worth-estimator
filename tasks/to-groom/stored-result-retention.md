@@ -1,6 +1,6 @@
 # Stored results: a bound per kind, subscribed at use site
 
-Status: approved (ready to schedule).
+Status: SUPERSEDED. No stored results exist. Every request computes directly. Slice persistence owns future durability.
 
 ## Goal
 
@@ -11,19 +11,19 @@ Completed deterministic results and completed seeded range results share one per
 - Ownership: the projection chart, the pinned evaluation cards, and the safe-spending preview each declare their own projection subscription where they use the data. The outlook page stops subscribing and passing the result down. Every subscription must reuse the same horizon and range inputs so the shared query cache still issues one fetch for the identical request.
   - Current page-level subscription and fan-out: `frontend/src/pages/Outlook.tsx:81-99` subscribes and derives the projection result; `frontend/src/pages/Outlook.tsx:132-165` hands it to the chart, the pinned cards, and the safe-spending preview. The page documents the pattern at `frontend/src/pages/Outlook.tsx:46-47,68-70`.
   - Shared-fetch precedent: `frontend/src/state/serverQuery.ts:6-20` (identical concurrent requests attach to one in-flight fetch).
-- Retention: give deterministic and stochastic artifacts each their own bound (or a reserved floor for deterministic entries) instead of the shared bound in `backend/internal/store/adapters/sqlite/artifacts.go:8-44`.
-- Lookup-before-compute stays: `backend/internal/api/projections/deterministic.go:76-89` keeps serving the stored result first.
+- Retention: removed with the artifact store. Bounds move to slice persistence when it lands.
+- Lookup-before-compute is removed: deterministic requests compute directly.
 
 ## Acceptance criteria
 
 - Opening the outlook issues one projection fetch shared by all three subscribing components; the request inputs are identical so the cache key matches.
-- Storing a full bound of range results leaves the stored projection retrievable; the next visit reuses it with no recalculation.
+- Repeat requests recompute; identical inputs produce identical outputs.
 - Outlook workspace behavior and remote-hook tests stay green, including the empty-workspace, loading, error-retry, and placeholder paths.
 
 ## Non-goals
 
 - No change to the evaluations page subscription or the other projection consumers in this change.
-- No cache identity changes; the stored result stays the full result.
+- No stored results remain.
 - No per-user scoping changes.
 - No code identifier renames; storage and wire names stay as they are.
 

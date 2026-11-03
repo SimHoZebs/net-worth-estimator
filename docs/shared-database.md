@@ -22,7 +22,7 @@ one immutable user ID. The authenticated router resolves access before it create
 that scope. An empty or missing scope never selects a default private user.
 
 Schema migration records are global. Model metadata, sync state, settings,
-ordering, presets, identity registries, and artifact retention are user-scoped.
+ordering, presets, identity registries, and projection caches are user-scoped.
 Application sessions, provider grants, and logout replay records remain global
 identity tables. Financial clear, CSV import, refresh, and guest publication
 never replace those identity tables.
@@ -150,8 +150,8 @@ node --test dev/*.test.mjs auth/casdoor/*.test.mjs
 ```
 
 Use identical entity IDs, preset names, sync identities, and projection inputs
-in two users. Exercise imports, clears, deletes, reorders, sync, and artifact
-eviction. Every result must remain within the selected user.
+in two users. Exercise imports, clears, deletes, reorders, sync, and projection cache
+invalidation. Every result must remain within the selected user.
 
 The current deployment keeps one API instance and one SQLite writer.
 
@@ -170,7 +170,7 @@ CGO_ENABLED=0 go -C backend run ./cmd/refreshmodel \
 Use the normal guest `--user` destination with `--financial-only` for approved
 guest publication. The flag removes private attachments and sync state from
 the copy; it does not change the destination's permissions. Replacement
-discards derived projection artifacts. It preserves destination ownership and
+discards derived projection caches. It preserves destination ownership and
 every application identity record. Dev wrappers create a recovery backup first.
 Direct command users must take that backup themselves.
 

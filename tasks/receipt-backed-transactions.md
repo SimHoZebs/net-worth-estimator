@@ -112,7 +112,7 @@ keeps images in the existing database backup. Inject storage through
 types or paths in receipt logic. Keep byte reads out of model loads and receipt
 lists. See `backend/internal/blobstore` and `backend/internal/store/blob_storage.go`.
 
-Add receipt tables with composite plan/entity keys. Reference postings with `(plan_id, posting_id)`. Do not extend `FinancialModel` or store receipts in the evictable `projection_artifacts` table.
+Add receipt tables with composite plan/entity keys. Reference postings with `(plan_id, posting_id)`. Do not extend `FinancialModel`. No evictable artifact table exists.
 
 **Requested ownership normalization:** derive receipt ownership from its posting
 and remove the duplicate `plan_id`. The existing posting key permits identical
@@ -225,7 +225,7 @@ A receipt inbox with suggested bank matches remains a later feature. Complete ba
 - Change producer identity/version and verify that a new extraction uses a separate cache identity. Preserve previous provenance and user corrections.
 - Check that adapter imports, fixture lookup, and source selection stay outside handlers, generated client code, frontend hooks, and receipt components.
 - Verify persisted review drafts survive reload. Reject stale corrections and protect confirmed values during re-extraction.
-- Verify receipt upload, review, extraction, and deletion leave the financial-model revision, deterministic result, seeded stochastic result, and projection artifact identity unchanged.
+- Verify receipt upload, review, extraction, and deletion leave the financial-model revision, deterministic result, and seeded stochastic result unchanged.
 - Browser-test file selection, camera fallback, preview, manual mode, extraction failure/retry, save/discard, scope changes, read-only behavior, keyboard focus, error announcements, and narrow screens.
 - Test image responses through the generated binary transport. Test allowed and oversized uploads through production Nginx on disposable data.
 

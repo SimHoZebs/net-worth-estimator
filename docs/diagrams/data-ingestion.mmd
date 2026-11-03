@@ -1,0 +1,25 @@
+erDiagram
+    PROVIDER_CONNECTION ||--o{ TRANSACTION : supplies
+    ACCOUNT ||--o{ TRANSACTION : owns
+
+    PROVIDER_CONNECTION {
+        uuid id PK
+        string provider_key
+        string status
+        string sync_cursor
+        string last_synced_at
+    }
+
+    TRANSACTION {
+        uuid id PK
+        uuid source_account_id FK
+        uuid dest_account_id FK
+        int posted_time
+        int transaction_time
+        json amount_resolution
+        string source_type
+        uuid projection_slice_id FK
+        json event_json
+        decimal applied_amount
+        string outcome
+    }

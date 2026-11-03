@@ -2,7 +2,7 @@
 
 The smoke script expects `/settings` to serve the app and every range response to contain progress. The deployment uses fragment navigation and explicit 404 pages. A cached range can legitimately send only its final result, so healthy deployments fail these assertions.
 
-Assert the bundled `404` response for `/settings` and successful final-result completion for the seeded range request. Remove curl-failure suppression. These are smoke-test corrections, not reasons to change routing or require progress when the backend retrieves a stored result.
+Assert the bundled `404` response for `/settings` and successful final-result completion for the seeded range request. Remove curl-failure suppression. These are smoke-test corrections, not reasons to change routing or require progress reporting.
 
 - Stale assertions: `scripts/smoke-compose.sh:7-17`.
 - Missing-page/fragment behavior: `frontend/nginx.conf.template:22-26`, `frontend/RUNNING.md:52`.
