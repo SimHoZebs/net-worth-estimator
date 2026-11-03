@@ -129,6 +129,40 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 	}
 }
 
+func TestClaimPendingPromotesPostedTime(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	// Pending seeds carry no posted time; the bank only stamps the
+	// authorization instant.
+	seed := bankSeedPosting("Bistro", "prime_card", "50.00", true)
+	seed.PostedTime = 0
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, SourceSimpleFIN, "bridge-prime", "pend1")})
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	if _, err := database.CreateRule(testRuleFixture("dining")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	claimed := loaded.Postings[0]
+	claimed.Claim = &types.PostingClaim{RuleID: "dining", OccurrenceDate: "2026-08-02"}
+	updated, err := database.UpdatePosting(claimed)
+	if err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	if updated.Pending || !updated.Enabled {
+		t.Fatalf("claimed row = %+v", updated)
+	}
+	// The promotion takes the bank's transaction instant so the recorded
+	// occurrence carries a positive posted time.
+	if updated.PostedTime != updated.TransactionTime || updated.PostedTime <= 0 {
+		t.Fatalf("posted time not promoted: %+v", updated)
+	}
+	if updated.Claim == nil || updated.Claim.RuleID != "dining" {
+		t.Fatalf("claim lost: %+v", updated)
+	}
+}
+
 func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")

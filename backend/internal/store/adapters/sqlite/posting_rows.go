@@ -96,6 +96,12 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 			posting.Pending = false
 		} else if claiming {
 			posting.Pending, posting.Enabled = false, true
+			// Pending seeds carry no posted time. A recorded occurrence
+			// needs one, so the promotion takes the bank's transaction
+			// instant, matching the subscription claim body.
+			if posting.PostedTime <= 0 {
+				posting.PostedTime = posting.TransactionTime
+			}
 		} else {
 			posting.Pending = lifecycle.pending
 		}
