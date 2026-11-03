@@ -32,7 +32,19 @@ const KIND_STROKE: Record<SankeyFlowLane["edge"]["kind"], string> = {
 	transfer: toneToken("blue"),
 };
 
-const LABEL_LIMIT = 18;
+const KIND_LABEL: Record<SankeyFlowLane["edge"]["kind"], string> = {
+	inflow: "Money in",
+	outflow: "Money out",
+	transfer: "Transfer",
+};
+
+// Links stay slightly translucent so ribbons do not glare; the key swatches
+// share the same default paint. Selected links go opaque.
+const UNSELECTED_FLOW_OPACITY = 0.86;
+
+const LABEL_LIMIT = 30;
+const LABEL_CHAR_WIDTH = 6.8;
+const LABEL_BACKGROUND_HEIGHT = 20;
 
 function truncateLabel(label: string): string {
 	return label.length > LABEL_LIMIT
@@ -40,12 +52,24 @@ function truncateLabel(label: string): string {
 		: label;
 }
 
+function labelX(node: SankeyNode<SankeyFlowNode, SankeyFlowLane, string>): number {
+	return node.depth === 0 ? node.x0 - 8 : node.x1 + 8;
+}
+
+function labelWidth(label: string): number {
+	return Math.ceil(truncateLabel(label).length * LABEL_CHAR_WIDTH) + 12;
+}
+
 /** Money-flow diagram on the shared chart setup: the library owns the
  * flow layout, link geometry, keyboard navigation, focus ring, and
  * selection, while the page owns filters, totals, and the inspector. Link
  * width encodes the absolute amount; kind rides in the stroke tone and in
  * the inspector and focused-flow announcements, never color alone. Nodes
- * paint as plain layers beside the selectable flows. */
+ * paint as plain layers beside the selectable flows, and each label rides
+ * on a paper halo that shares its node row: hovering the halo shows the
+ * same node totals as the bar or the label, while lane hover and selection
+ * still resolve in the band middle. A decorative wrapper cannot carry the
+ * halo here because Sankey child marks reject post-domain filtering. */
 export function FlowSankey({
 	nodes,
 	lanes,
@@ -75,6 +99,11 @@ export function FlowSankey({
 			}),
 			key: (datum) => datum.data.laneId,
 		});
+		const widestLabel = nodes.reduce(
+			(widest, node) => Math.max(widest, truncateLabel(node.label).length),
+			0,
+		);
+		const labelRoom = Math.ceil(widestLabel * LABEL_CHAR_WIDTH) + 34;
 		return defineChart(
 			{
 				marks: [
@@ -92,7 +121,9 @@ export function FlowSankey({
 						nodeWidth: ({ width }) => Math.max(10, Math.min(20, width * 0.028)),
 						nodePadding: 12,
 						inset: ({ width }) => {
-							const side = Math.min(132, Math.max(72, width * 0.18));
+							const room = Math.max(84, labelRoom);
+							const maxSide = Math.max(72, Math.floor((width - 120) / 2));
+							const side = Math.min(room, maxSide);
 							return { left: side, right: side, top: 10, bottom: 10 };
 						},
 						marks: ({ nodes: layoutNodes, links: layoutLinks }) =>
@@ -105,10 +136,11 @@ export function FlowSankey({
 									key: "key",
 									stroke: (flow) => KIND_STROKE[flow.data.edge.kind],
 									strokeOpacity: (flow) =>
-										selectedLaneId === null ||
-										flow.data.laneId === selectedLaneId
-											? 1
-											: 0.35,
+										selectedLaneId === null
+											? UNSELECTED_FLOW_OPACITY
+											: flow.data.laneId === selectedLaneId
+												? 1
+												: 0.35,
 									strokeWidth: (flow) => Math.max(2, flow.width),
 									lineCap: "butt",
 								}),
@@ -121,8 +153,18 @@ export function FlowSankey({
 									fill: "var(--ink)",
 									inset: 0,
 								}),
+								rect(layoutNodes, {
+									x1: (node) => labelX(node) - (node.depth === 0 ? labelWidth(node.data.label) : 6),
+									x2: (node) => labelX(node) + (node.depth === 0 ? 6 : labelWidth(node.data.label)),
+									y1: (node) => node.y - LABEL_BACKGROUND_HEIGHT / 2,
+									y2: (node) => node.y + LABEL_BACKGROUND_HEIGHT / 2,
+									key: (node) => `${node.key}-label`,
+									fill: "var(--paper)",
+									fillOpacity: 0.9,
+									inset: 0,
+								}),
 								text(layoutNodes, {
-									x: (node) => (node.depth === 0 ? node.x0 - 8 : node.x1 + 8),
+									x: labelX,
 									y: (node) => node.y,
 									text: (node) => truncateLabel(node.data.label),
 									key: "key",
@@ -166,11 +208,48 @@ export function FlowSankey({
 		);
 	}, [nodes, lanes, selectedLaneId, nameOf, onSelectLane]);
 	return (
-		<Chart
-			definition={definition}
-			ariaLabel={ariaLabel}
-			ariaDescription={ariaDescription}
-			height={height}
-		/>
+		<div className="grid gap-2">
+			<Chart
+				definition={definition}
+				ariaLabel={ariaLabel}
+				ariaDescription={ariaDescription}
+				height={height}
+			/>
+			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists. */}
+			<ul
+				className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-xs text-muted"
+				role="list"
+				aria-label="Flow key"
+			>
+				{(Object.keys(KIND_STROKE) as Array<keyof typeof KIND_STROKE>).map(
+					(kind) => (
+						<li key={kind} className="flex items-center gap-2">
+							<svg
+								width="28"
+								height="12"
+								viewBox="0 0 28 12"
+								aria-hidden="true"
+								focusable="false"
+								className="block"
+							>
+								<line
+									x1="0"
+									y1="6"
+									x2="28"
+									y2="6"
+									stroke={KIND_STROKE[kind]}
+									strokeOpacity={UNSELECTED_FLOW_OPACITY}
+									strokeWidth="4"
+									strokeLinecap="butt"
+								/>
+							</svg>
+							{KIND_LABEL[kind]}
+						</li>
+					),
+				)}
+				<li>Width shows the absolute amount.</li>
+			</ul>
+			{/* oxlint-enable jsx-a11y/no-redundant-roles */}
+		</div>
 	);
 }

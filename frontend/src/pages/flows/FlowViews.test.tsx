@@ -38,6 +38,11 @@ describe("FlowSankey", () => {
 				name: "Money-flow diagram from 2026-01-01 through 2026-12-31",
 			}),
 		).toBeTruthy();
+		expect(screen.getByRole("list", { name: "Flow key" })).toBeTruthy();
+		expect(screen.getByText("Money in")).toBeTruthy();
+		expect(screen.getByText("Money out")).toBeTruthy();
+		expect(screen.getByText("Transfer")).toBeTruthy();
+		expect(screen.getByText("Width shows the absolute amount.")).toBeTruthy();
 	});
 });
 
