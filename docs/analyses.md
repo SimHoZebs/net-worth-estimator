@@ -172,9 +172,9 @@ projection stops double-counting and the recorded rows stay intact.
   model revision. Retries are idempotent.
 - Adding never creates rules or rewrites amounts, names, or dates. It
   only sets `claim.ruleId` plus `claim.occurrenceDate`, exactly as the
-  manual TransactionEditor link does, but for the whole pattern at once
-  with schedule guidance. Clearing a claim stays a manual single-row
-  edit.
+  manual occurrence link in TransactionDetail does, but for the whole
+  pattern at once with schedule guidance. Clearing a claim stays a manual
+  single-row edit.
 
 ## Transfer matching
 

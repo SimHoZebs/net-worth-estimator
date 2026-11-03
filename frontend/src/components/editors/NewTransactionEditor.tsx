@@ -1,18 +1,11 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
-import {
-	convertTransaction,
-	createPosting,
-	createRule,
-	updatePosting,
-	updateRule,
-} from "@/api/generated/endpoints.ts";
+import { createPosting, createRule } from "@/api/generated/endpoints.ts";
 import { type Transaction, visibleAccounts } from "../../domain/model.ts";
 import { todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
-	getServerModel,
 	refreshTransactions,
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
@@ -20,28 +13,25 @@ import { useSavedAccounts, useSavedStartDate } from "../../state/savedRows.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import {
 	combineDayTime,
-	timeOfDay,
 	postingBody,
-	postingUpdateBody,
 	ruleBody,
-	ruleUpdateBody,
 	validateTransactionValues,
 	type TransactionFormValues,
 } from "./transactionBodies.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
-import { Notice } from "../Notice.tsx";
 import { Button } from "../Button.tsx";
 import { dialogActionsStyles } from "../dialogStyles.ts";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 
-/** Transaction editor. Saves straight to the server; no draft involved. */
-export function TransactionEditor({
-	item,
+/**
+ * Create-only transaction form. Existing rows edit through the shared
+ * TransactionDetail so there is one implementation of row editing.
+ */
+export function NewTransactionEditor({
 	onSaved,
 	onClose,
 }: {
-	item: Transaction | null;
 	onSaved: () => void;
 	onClose: () => void;
 }) {
@@ -56,69 +46,50 @@ export function TransactionEditor({
 	const fallbackStart = savedStartDate ?? todayIso();
 	const catalog = useTransactionCatalog();
 	const claimRules = useMemo(
-		() =>
-			(catalog.data?.items ?? []).filter(
-				(rule) => rule.kind === "rule" && rule.id !== item?.id,
-			),
-		[catalog.data, item],
+		() => (catalog.data?.items ?? []).filter((rule) => rule.kind === "rule"),
+		[catalog.data],
 	);
-	const [name, setName] = useState(item?.name ?? "");
-	const [amount, setAmount] = useState(
-		item?.amountKnown === false ? "" : String(item?.amount ?? 500),
-	);
-	const [amountKind, setAmountKind] = useState<"fixed" | "growth">(
-		(item?.annualIncrease ?? 0) !== 0 ? "growth" : "fixed",
-	);
-	const [annualIncrease, setAnnualIncrease] = useState(
-		String(item?.annualIncrease ?? 3),
-	);
-	const [frequency, setFrequency] = useState<Transaction["frequency"]>(
-		item?.frequency ?? "monthly",
-	);
-	const [fromId, setFromId] = useState(item?.fromId ?? "");
-	const [toId, setToId] = useState(item?.toId ?? "");
-	const [startDate, setStartDate] = useState(item?.startDate ?? fallbackStart);
-	const [noEndDate, setNoEndDate] = useState(item?.endDate == null);
-	const [endDate, setEndDate] = useState(item?.endDate ?? "");
-	const [enabled, setEnabled] = useState(item?.enabled ?? true);
-	const [claimRuleId, setClaimRuleId] = useState(item?.claimRuleId ?? "");
-	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState(
-		item?.claimOccurrenceDate ?? "",
-	);
+	const [name, setName] = useState("");
+	const [amount, setAmount] = useState("500");
+	const [amountKind, setAmountKind] = useState<"fixed" | "growth">("fixed");
+	const [annualIncrease, setAnnualIncrease] = useState("3");
+	const [frequency, setFrequency] =
+		useState<Transaction["frequency"]>("monthly");
+	const [fromId, setFromId] = useState("");
+	const [toId, setToId] = useState("");
+	const [startDate, setStartDate] = useState(fallbackStart);
+	const [noEndDate, setNoEndDate] = useState(true);
+	const [endDate, setEndDate] = useState("");
+	const [enabled, setEnabled] = useState(true);
+	const [claimRuleId, setClaimRuleId] = useState("");
+	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState("");
 	const [saving, setSaving] = useState(false);
-	const [transactionTime, setTransactionTime] = useState(
-		timeOfDay(item?.transactionTime),
-	);
+	const [transactionTime, setTransactionTime] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const enabledId = useId();
 	const noEndDateId = useId();
 
 	const isOnce = frequency === "once";
-	const calculated = item !== null && item.amountKnown === false;
-	const readOnly = item?.readOnly ?? false;
-	const blocked = readOnly || calculated;
-
 	const dirty =
-		name !== (item?.name ?? "") ||
-		amount !==
-			(item?.amountKnown === false ? "" : String(item?.amount ?? 500)) ||
-		amountKind !== ((item?.annualIncrease ?? 0) !== 0 ? "growth" : "fixed") ||
-		annualIncrease !== String(item?.annualIncrease ?? 3) ||
-		frequency !== (item?.frequency ?? "monthly") ||
-		fromId !== (item?.fromId ?? "") ||
-		toId !== (item?.toId ?? "") ||
-		startDate !== (item?.startDate ?? fallbackStart) ||
-		noEndDate !== (item?.endDate == null) ||
-		endDate !== (item?.endDate ?? "") ||
-		enabled !== (item?.enabled ?? true) ||
-		claimRuleId !== (item?.claimRuleId ?? "") ||
-		claimOccurrenceDate !== (item?.claimOccurrenceDate ?? "") ||
-		transactionTime !== timeOfDay(item?.transactionTime);
+		name !== "" ||
+		amount !== "500" ||
+		amountKind !== "fixed" ||
+		annualIncrease !== "3" ||
+		frequency !== "monthly" ||
+		fromId !== "" ||
+		toId !== "" ||
+		startDate !== fallbackStart ||
+		!noEndDate ||
+		endDate !== "" ||
+		!enabled ||
+		claimRuleId !== "" ||
+		claimOccurrenceDate !== "" ||
+		transactionTime !== "";
 	useBeforeUnload(dirty && !saving);
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
-		if (blocked || saving) return;
+		if (saving) return;
 		const trimmedName = name.trim();
 		const parsedAmount = parseDisplayNumber(amount);
 		if (parsedAmount === null) {
@@ -138,13 +109,9 @@ export function TransactionEditor({
 			frequency,
 			startDate,
 			endDate: !isOnce && !noEndDate && endDate ? endDate : null,
-			postedDate: item?.postedDate ?? null,
+			postedDate: null,
 			transactionTime: isOnce
-				? item &&
-					startDate === item.startDate &&
-					transactionTime === timeOfDay(item.transactionTime)
-					? item.transactionTime
-					: combineDayTime(startDate, transactionTime)
+				? combineDayTime(startDate, transactionTime)
 				: null,
 			enabled,
 			claimRuleId: isOnce && claimRuleId ? claimRuleId : null,
@@ -164,63 +131,18 @@ export function TransactionEditor({
 		}
 		setSaving(true);
 		setError(null);
-		const wasOnce = item?.frequency === "once";
-		const nowOnce = values.frequency === "once";
-		// Kind changes state explicit new bodies; same-kind updates carry
-		// unedited fields over from the canonical raw row.
-		const raw =
-			item && wasOnce === nowOnce
-				? nowOnce
-					? getServerModel()?.model?.postings.find((row) => row.id === item.id)
-					: getServerModel()?.model?.recurrenceRules.find(
-							(row) => row.id === item.id,
-						)
-				: undefined;
-		if (item && wasOnce === nowOnce && !raw) {
-			setSaving(false);
-			setError(
-				"The saved transaction could not be loaded. Close and try again.",
-			);
-			return;
-		}
-		const ok = item
-			? await performSave({
-					call: () => {
-						if (wasOnce !== nowOnce)
-							return convertTransaction(item.id, {
-								kind: nowOnce ? "posting" : "rule",
-								...(nowOnce
-									? { posting: postingBody(values) }
-									: { rule: ruleBody(values) }),
-							});
-						if (!raw)
-							throw new Error("The saved transaction could not be loaded.");
-						return "postedTime" in raw
-							? updatePosting(
-									item.id,
-									postingUpdateBody({ baseline: item, raw, values }),
-								)
-							: updateRule(
-									item.id,
-									ruleUpdateBody({ baseline: item, raw, values }),
-								);
-					},
-					refresh: refreshTransactions,
-					failureMessage: "The transaction could not be saved.",
-				})
-			: await performSave({
-					call: () =>
-						values.frequency === "once"
-							? createPosting({
-									...postingBody(values),
-									id: crypto.randomUUID(),
-								})
-							: createRule({ ...ruleBody(values), id: crypto.randomUUID() }),
-					refresh: refreshTransactions,
-					failureMessage: "The transaction could not be saved.",
-				});
+		const ok = await performSave({
+			call: () =>
+				values.frequency === "once"
+					? createPosting({
+							...postingBody(values),
+							id: crypto.randomUUID(),
+						})
+					: createRule({ ...ruleBody(values), id: crypto.randomUUID() }),
+			refresh: refreshTransactions,
+			failureMessage: "The transaction could not be saved.",
+		});
 		setSaving(false);
-		// Keep failed form values; close only after confirmed save.
 		if (ok) onSaved();
 		else
 			setError(
@@ -229,23 +151,14 @@ export function TransactionEditor({
 	};
 
 	return (
-		<Modal
-			title={`${item ? "Edit" : "Add"} planned transaction`}
-			onClose={onClose}
-		>
-			{calculated && (
-				<Notice>
-					This amount is calculated each occurrence. Calculated transactions
-					cannot be edited here; they stay as Varies.
-				</Notice>
-			)}
+		<Modal title="Add planned transaction" onClose={onClose}>
 			{error && <ErrorNotice message={error} />}
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}
 			>
 				<fieldset
-					disabled={blocked || saving}
+					disabled={saving}
 					className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
 				>
 					<InputField
@@ -409,8 +322,8 @@ export function TransactionEditor({
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel
 					</Button>
-					<Button type="submit" disabled={blocked || saving || !dirty}>
-						{saving ? "Saving…" : item ? "Save transaction" : "Add transaction"}
+					<Button type="submit" disabled={saving || !dirty}>
+						{saving ? "Saving…" : "Add transaction"}
 					</Button>
 				</div>
 			</form>

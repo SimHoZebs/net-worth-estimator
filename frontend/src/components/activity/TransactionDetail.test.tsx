@@ -782,7 +782,7 @@ it("retries a rejected claim without creating a second rule", async () => {
 	});
 });
 
-it("keeps frequency controls on recurrence rules, never on postings", () => {
+it("offers frequency conversion and keeps growth on recurrence rules", () => {
 	const posting = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
@@ -795,11 +795,17 @@ it("keeps frequency controls on recurrence rules, never on postings", () => {
 			onClose={() => {}}
 		/>,
 	);
-	// A posting records a single occurrence: frequency and the annual
-	// increase belong to recurrence rules, not to the posting itself.
-	expect(screen.queryByLabelText("Frequency")).toBeNull();
+	// A posting can become a rule through Frequency. Growth applies only
+	// once the draft is recurring; the claim controls stay on one-time rows.
+	expect(screen.getByLabelText("Frequency")).toBeTruthy();
 	expect(screen.queryByLabelText("Annual amount increase (%)")).toBeNull();
 	expect(screen.getByLabelText("Records an occurrence of")).toBeTruthy();
+	fireEvent.change(screen.getByLabelText("Frequency"), {
+		target: { value: "monthly" },
+	});
+	expect(screen.getByLabelText("Annual amount increase (%)")).toBeTruthy();
+	expect(screen.queryByLabelText("Records an occurrence of")).toBeNull();
+	expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
 	cleanup();
 	const rule = {
 		...posting,

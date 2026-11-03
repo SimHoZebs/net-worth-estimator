@@ -202,54 +202,49 @@ function MoreOptions({
 			className="mt-4 border-t border-line pt-4"
 		>
 			<div className="flex flex-col">
-				{savedTransaction.frequency !== "once" && (
-					<>
-						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-							<label htmlFor={frequencyId} className={rowLabel}>
-								Frequency
-							</label>
-							<Select
-								id={frequencyId}
-								name="frequency"
-								disabled={locked}
-								value={frequency}
-								onChange={(event) => {
-									const next = parseUnion(event.target.value, [
-										"monthly",
-										"yearly",
-										"once",
-									] as const);
-									if (next) onFrequency(next);
-								}}
-								className="min-w-0 flex-1"
-							>
-								<FrequencyOptions />
-							</Select>
-						</div>
-						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-							<label htmlFor={annualIncreaseId} className={rowLabel}>
-								Annual amount increase (%)
-							</label>
-							<Input
-								id={annualIncreaseId}
-								name="annualIncrease"
-								type="number"
-								required
-								disabled={locked}
-								min="-50"
-								max="50"
-								step="0.1"
-								value={draft.annualIncrease}
-								onChange={(event) =>
-									updateDraft(
-										{ annualIncrease: event.target.value },
-										"schedule",
-									)
-								}
-								className="min-w-0 flex-1"
-							/>
-						</div>
-					</>
+				<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+					<label htmlFor={frequencyId} className={rowLabel}>
+						Frequency
+					</label>
+					<Select
+						id={frequencyId}
+						name="frequency"
+						disabled={locked}
+						value={frequency}
+						onChange={(event) => {
+							const next = parseUnion(event.target.value, [
+								"monthly",
+								"yearly",
+								"once",
+							] as const);
+							if (next) onFrequency(next);
+						}}
+						className="min-w-0 flex-1"
+					>
+						<FrequencyOptions />
+					</Select>
+				</div>
+				{frequency !== "once" && (
+					<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+						<label htmlFor={annualIncreaseId} className={rowLabel}>
+							Annual amount increase (%)
+						</label>
+						<Input
+							id={annualIncreaseId}
+							name="annualIncrease"
+							type="number"
+							required
+							disabled={locked}
+							min="-50"
+							max="50"
+							step="0.1"
+							value={draft.annualIncrease}
+							onChange={(event) =>
+								updateDraft({ annualIncrease: event.target.value }, "schedule")
+							}
+							className="min-w-0 flex-1"
+						/>
+					</div>
 				)}
 				{frequency === "once" && (
 					<>

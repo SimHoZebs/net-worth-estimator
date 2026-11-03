@@ -7,8 +7,8 @@ test.beforeEach(async () => {
 	await resetFixture({ pinnedEvaluationIds: ["posting-fulfillment"] });
 });
 
-/** Open the transaction editor for the fixture's investing transfer. */
-async function openInvestingTransactionEditor(page: Page) {
+/** Open the transaction detail for the fixture's investing transfer. */
+async function openInvestingTransactionDetail(page: Page) {
 	await page.getByRole("link", { name: "Transactions", exact: true }).click();
 	await page.getByRole("tab", { name: /Recurring/ }).click();
 	await page.getByRole("button", { name: "Monthly investing" }).click();
@@ -109,7 +109,7 @@ test("saved target pins control Outlook without an evidence dialog", async ({
 
 test("edits save immediately and survive a reload", async ({ page }) => {
 	await page.goto("/");
-	await openInvestingTransactionEditor(page);
+	await openInvestingTransactionDetail(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	await page.getByRole("button", { name: "Save changes" }).click();
 	// The save lands async after the editor closes; poll the server for it.
@@ -131,7 +131,7 @@ test("edits save immediately and survive a reload", async ({ page }) => {
 
 test("discard is explicit and restores the editor value", async ({ page }) => {
 	await page.goto("/");
-	await openInvestingTransactionEditor(page);
+	await openInvestingTransactionDetail(page);
 	await page.getByLabel("Amount (USD)").fill("999");
 	// Closing a dirty edit asks first instead of dropping it silently.
 	await page.getByRole("button", { name: "Close dialog" }).click();
@@ -156,12 +156,12 @@ test("a transaction converts across once and recurring in one save each way", as
 	page,
 }) => {
 	await page.goto("/#transactions/invest/edit");
-	const editor = page.getByRole("dialog", { name: "Edit planned transaction" });
+	const editor = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(editor.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
 	);
 	await editor.getByLabel("Frequency").selectOption("once");
-	await editor.getByRole("button", { name: "Save transaction" }).click();
+	await editor.getByRole("button", { name: "Save changes" }).click();
 	await expect(editor).not.toBeVisible();
 	const once = await readSavedServerModel();
 	expect(
@@ -169,12 +169,12 @@ test("a transaction converts across once and recurring in one save each way", as
 	).toBe(true);
 	expect(once.recurrenceRules.some((rule) => rule.id === "invest")).toBe(false);
 	await page.goto("/#transactions/invest/edit");
-	const again = page.getByRole("dialog", { name: "Edit planned transaction" });
+	const again = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(again.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
 	);
 	await again.getByLabel("Frequency").selectOption("monthly");
-	await again.getByRole("button", { name: "Save transaction" }).click();
+	await again.getByRole("button", { name: "Save changes" }).click();
 	await expect(again).not.toBeVisible();
 	const recurring = await readSavedServerModel();
 	expect(recurring.recurrenceRules.some((rule) => rule.id === "invest")).toBe(
@@ -227,7 +227,7 @@ test("account, transaction and evaluation maintenance plus search work", async (
 
 test("failed saves retain the intended edit", async ({ page }) => {
 	await page.goto("/#sources");
-	await openInvestingTransactionEditor(page);
+	await openInvestingTransactionDetail(page);
 	await page.getByLabel("Amount (USD)").fill("900");
 	// The editor saves immediately, so the failure injection must be armed
 	// before pressing Save. The server rejects the write, and the unsaved
@@ -283,7 +283,7 @@ test("desktop pages and edit dialogs meet automated accessibility checks", async
 		expect(issues(results.violations), path).toEqual([]);
 	}
 	await page.goto("/");
-	await openInvestingTransactionEditor(page);
+	await openInvestingTransactionDetail(page);
 	const results = await new AxeBuilder({ page })
 		.withTags(["wcag2a", "wcag2aa", "wcag21aa"])
 		.analyze();
@@ -467,7 +467,7 @@ test("read-only models can be explored but not saved", async ({ page }) => {
 	await expect(
 		page.getByRole("button", { name: "Connect SimpleFIN" }),
 	).toBeDisabled();
-	await openInvestingTransactionEditor(page);
+	await openInvestingTransactionDetail(page);
 	// Read-only users can inspect the saved row, but no edit or save starts.
 	await expect(page.getByLabel("Amount (USD)")).toHaveAttribute("readonly", "");
 	await expect(page.getByLabel("Amount (USD)")).toHaveValue("600");
@@ -488,7 +488,7 @@ test("tabs save independently with last write winning", async ({
 	await page.goto("/");
 	const other = await context.newPage();
 	await other.goto("/");
-	await openInvestingTransactionEditor(other);
+	await openInvestingTransactionDetail(other);
 	await other.getByLabel("Amount (USD)").fill("1200");
 	await other.getByRole("button", { name: "Save changes" }).click();
 	// The other tab's save lands first; last write wins below.
@@ -499,7 +499,7 @@ test("tabs save independently with last write winning", async ({
 				.config.expression;
 		})
 		.toBe("1200");
-	await openInvestingTransactionEditor(page);
+	await openInvestingTransactionDetail(page);
 	await page.getByLabel("Amount (USD)").fill("1300");
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect
