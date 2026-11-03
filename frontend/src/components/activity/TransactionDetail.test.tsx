@@ -7,6 +7,7 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { dialogScope, runInteractions } from "../../mocks/interactions.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { fixtureModel } from "../../mocks/model.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
@@ -458,30 +459,71 @@ it("keeps the discard confirmation after a failed occurrence claim", async () =>
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
 
-it("opens sharing in its own sheet from the footer status", async () => {
-	stubTestServer();
-	const savedTransaction = {
-		...financialModelFixture.transactions[0]!,
-		id: "renovation-once",
-		name: "Home renovation",
-		frequency: "once" as const,
-		amountKnown: true,
-		readOnly: false,
-	};
+it("toggles projections from the options menu and saves", async () => {
+	const server = stubTestServer();
+	setServerModelFixture(financialModelFixture);
+	const savedTransaction = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
 	render(
 		<TransactionDetail
 			transaction={occurrence(savedTransaction)}
 			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[savedTransaction]}
+			transactions={financialModelFixture.transactions}
 			onClose={() => {}}
 		/>,
 	);
-	fireEvent.click(
-		screen.getByRole("button", { name: /Sharing status: Private/ }),
+	await runInteractions(
+		[
+			{ click: ["button", "More options"] },
+			{ click: ["menuitemcheckbox", "Exclude from projections"] },
+			{ expectPresent: ["button", "Save changes"] },
+			{ click: ["button", "Save changes"] },
+		],
+		dialogScope(/Home renovation/),
 	);
-	const sheet = await screen.findByRole("dialog", { name: "Sharing" });
-	expect(within(sheet).getByRole("heading", { name: "Sharing" })).toBeTruthy();
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "PATCH" && call.url === "/v1/postings/renovation",
+			),
+		).toBe(true),
+	);
+	const body = server.calls.find(
+		(call) => call.method === "PATCH" && call.url === "/v1/postings/renovation",
+	)?.body as Record<string, unknown>;
+	expect(body.enabled).toBe(false);
+});
+
+it("opens and closes the sharing sheet without closing the detail", async () => {
+	stubTestServer();
+	const savedTransaction = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	await runInteractions(
+		[{ click: ["button", /Sharing status: Private/] }],
+		dialogScope(/Home renovation/),
+	);
+	expect(screen.getByRole("dialog", { name: "Sharing" })).toBeTruthy();
+	await runInteractions(
+		[{ click: ["button", "Close dialog"] }],
+		dialogScope("Sharing"),
+	);
+	await waitFor(() =>
+		expect(screen.queryByRole("dialog", { name: "Sharing" })).toBeNull(),
+	);
+	expect(screen.getByRole("dialog", { name: /Home renovation/ })).toBeTruthy();
 });
 
 it("lets the owner pick the posted charge and remove the vanished hold", async () => {

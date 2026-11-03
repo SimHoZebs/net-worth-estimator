@@ -28,11 +28,21 @@ export function ConfirmDialog({
 	error?: string | null;
 }) {
 	return (
-		<Modal title={title} eyebrow={eyebrow} onClose={onCancel}>
+		<Modal
+			title={title}
+			eyebrow={eyebrow}
+			onClose={onCancel}
+			onCloseRequest={() => !busy}
+		>
 			{children}
 			{error && <ErrorNotice message={error} />}
 			<div className={dialogActionsStyles}>
-				<Button type="button" variant="secondary" onClick={onCancel}>
+				<Button
+					type="button"
+					variant="secondary"
+					onClick={onCancel}
+					disabled={busy}
+				>
 					{cancelLabel}
 				</Button>
 				<Button
