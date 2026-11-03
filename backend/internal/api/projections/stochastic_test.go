@@ -2,6 +2,7 @@ package projections
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,33 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/apitest"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
+
+// volatileStochasticBody builds a request whose rule actually samples: the
+// attach test needs a run slow enough to join in flight. A fixed-amount
+// model short-circuits to one simulation and finishes before attach.
+func volatileStochasticBody(t *testing.T, runCount int, seed *int64) []byte {
+	t.Helper()
+	model := apitest.StochasticModel()
+	model.RecurrenceRules[0].Amount = types.PostingAmountResolution{
+		Resolver: "expression",
+		Config:   map[string]any{"expression": "(base) * (1 + rate)"},
+		Inputs: map[string]types.AmountInputBinding{
+			"base": {Source: "literal", Value: 100.0},
+			"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07, "volatility": 0.5}},
+		},
+	}
+	raw, err := json.Marshal(map[string]any{
+		"model": model,
+		"settings": types.ProjectionRuntimeSettings{
+			FallbackProjectionStartDate: "2026-06-01", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables(),
+		},
+		"config": map[string]any{"runCount": runCount, "seed": seed},
+	})
+	if err != nil {
+		t.Fatalf("marshal volatile stochastic body: %v", err)
+	}
+	return raw
+}
 
 func resetSharedRunsForTest() {
 	sharedStochasticRegistry.Lock()
@@ -33,7 +61,7 @@ func TestStochasticSSEAttachJoinsInFlightRun(t *testing.T) {
 	t.Cleanup(resetSharedRunsForTest)
 	handler := projectionTestHandler(t)
 	seed := int64(7)
-	body := apitest.StochasticBody(t, 2000, &seed)
+	body := volatileStochasticBody(t, 2000, &seed)
 	firstDone := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
 		request := httptest.NewRequest(http.MethodPost, "/v1/projections/stochastic", bytes.NewReader(body))

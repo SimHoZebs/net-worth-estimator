@@ -188,7 +188,7 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 				Facts:             transactionFacts(transaction, account.Currency),
 				Posting: types.Posting{
 					Name:   truncateLabel(transaction.Description),
-					Source: store.SourceSimpleFIN,
+					Source: store.SourceBankSync,
 					Amount: types.PostingAmountResolution{
 						Resolver: "expression",
 						Config:   map[string]any{"expression": abs},

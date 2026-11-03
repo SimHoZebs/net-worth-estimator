@@ -93,16 +93,13 @@ func (run *sharedStochasticRun) publish(event stochasticStreamEvent) {
 	}
 }
 
-// finish records the outcome, wakes subscribers, persists success, and evicts.
-func (run *sharedStochasticRun) finish(key string, persist func(*types.StochasticProjectionResult), result *types.StochasticProjectionResult, runErr error) {
+// finish records the outcome, wakes subscribers, and evicts.
+func (run *sharedStochasticRun) finish(key string, result *types.StochasticProjectionResult, runErr error) {
 	run.mu.Lock()
 	run.result = result
 	run.runErr = runErr
 	close(run.done)
 	run.mu.Unlock()
-	if runErr == nil && result != nil && persist != nil {
-		persist(result)
-	}
 	removeSharedRun(key, run)
 }
 

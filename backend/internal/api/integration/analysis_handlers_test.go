@@ -95,11 +95,11 @@ func TestAnalysisReadsArePassiveAndReviewDoesNotChangeModel(t *testing.T) {
 		t.Fatal("analysis mutated model")
 	}
 	next := rangeRequest(t, handler, deterministic)
-	if next.Header().Get("Projection-Source") != projectionSourceStored || next.Body.String() != base.Body.String() {
+	if next.Header().Get("Projection-Source") != projectionSourceComputed || next.Body.String() != base.Body.String() {
 		t.Fatal("analysis changed deterministic output or artifact identity")
 	}
 	rangeNext := postStochastic(t, handler, stochastic)
-	if rangeNext.Header().Get("Projection-Source") != projectionSourceStored || !strings.Contains(rangeNext.Body.String(), sseEvents(t, rangeBase.Body.String())["result"][0]) {
+	if rangeNext.Header().Get("Projection-Source") != projectionSourceComputed || !strings.Contains(rangeNext.Body.String(), sseEvents(t, rangeBase.Body.String())["result"][0]) {
 		t.Fatal("analysis changed seeded stochastic output or artifact identity")
 	}
 }

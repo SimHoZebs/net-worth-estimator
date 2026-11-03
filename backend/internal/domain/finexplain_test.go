@@ -13,7 +13,7 @@ func finExplainFixture() (*types.FinancialModel, *types.CurrentPosition, types.F
 	model, position := finHealthFixture()
 	model.Checkpoints = []types.Checkpoint{
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
-		{AccountID: "card", Balance: -2000, Source: "simplefin", ObservedAt: midnightUnix("2026-10-30")},
+		{AccountID: "card", Balance: -2000, Source: "banksync", ObservedAt: midnightUnix("2026-10-30")},
 	}
 	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
 	return model, position, report
@@ -171,7 +171,7 @@ func TestExplainFinancialHealthStaleSync(t *testing.T) {
 	model, position, _ := finExplainFixture()
 	model.Checkpoints = []types.Checkpoint{
 		{AccountID: "checking", Balance: 9000, Source: "user", ObservedAt: midnightUnix("2026-10-30")},
-		{AccountID: "card", Balance: -2000, Source: "simplefin", ObservedAt: midnightUnix("2026-08-01")},
+		{AccountID: "card", Balance: -2000, Source: "banksync", ObservedAt: midnightUnix("2026-08-01")},
 	}
 	report := EvaluateFinancialHealth(model, position, types.DefaultFinancialHealthStandards())
 	explanation := ExplainFinancialHealth(model, position, report, types.DefaultFinancialHealthExplanationOptions())

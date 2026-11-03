@@ -1,0 +1,112 @@
+package simplefin
+
+import (
+	"context"
+	"time"
+
+	"github.com/simhozebs/net-worth-estimator/backend/internal/ingest"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
+)
+
+// bridgeAdapter is the SimpleFIN TransactionProvider adapter. Native fetch
+// shapes stay in this package; the ingest orchestrator owns provisioning,
+// apply, and dirty marking for every provider.
+type bridgeAdapter struct {
+	runner *Runner
+}
+
+var _ ingest.Adapter = bridgeAdapter{}
+
+func (a bridgeAdapter) Key() string {
+	return store.ProviderSimpleFIN
+}
+
+func (a bridgeAdapter) Fetch(ctx context.Context, start, end time.Time) (any, error) {
+	return a.runner.fetchWithRetry(ctx, start, end)
+}
+
+func (a bridgeAdapter) Provisions(native any) []store.SyncProvision {
+	set, ok := native.(*AccountSet)
+	if !ok || set == nil {
+		return nil
+	}
+	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
+	for _, account := range set.Accounts {
+		provisions = append(provisions, store.SyncProvision{
+			BridgeID: account.ID,
+			Name:     account.Name,
+			Currency: account.Currency,
+			Kind:     types.AccountKind(provisionKind(account)),
+		})
+	}
+	return provisions
+}
+
+func (a bridgeAdapter) WithoutStale(native any, stale []string) any {
+	set, ok := native.(*AccountSet)
+	if !ok || set == nil || len(stale) == 0 {
+		return native
+	}
+	dropped := make(map[string]struct{}, len(stale))
+	for _, id := range stale {
+		dropped[id] = struct{}{}
+	}
+	kept := make([]Account, 0, len(set.Accounts))
+	for _, account := range set.Accounts {
+		if _, ok := dropped[account.ID]; !ok {
+			kept = append(kept, account)
+		}
+	}
+	filtered := *set
+	filtered.Accounts = kept
+	return &filtered
+}
+
+func (a bridgeAdapter) Translate(ctx context.Context, st store.Store, native any, resolved map[string]string, now time.Time) ([]store.SyncCheckpoint, []store.BankDirective, map[string]int, error) {
+	set, ok := native.(*AccountSet)
+	if !ok || set == nil {
+		return nil, nil, map[string]int{}, nil
+	}
+	translation, err := Translate(set, resolved, now)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// Re-resolve every checkpoint against post-provisioning truth. A
+	// stale link (model account deleted) resolves to nothing and its
+	// checkpoint is dropped: counted, never written.
+	kept := translation.Checkpoints[:0]
+	for _, checkpoint := range translation.Checkpoints {
+		modelID, ok := resolved[checkpoint.BridgeID]
+		if !ok {
+			continue
+		}
+		checkpoint.AccountID = modelID
+		kept = append(kept, checkpoint)
+	}
+	translation.Checkpoints = kept
+	checkpoints := make([]store.SyncCheckpoint, 0, len(translation.Checkpoints))
+	for _, checkpoint := range translation.Checkpoints {
+		checkpoints = append(checkpoints, store.SyncCheckpoint{
+			AccountID:  checkpoint.AccountID,
+			Balance:    checkpoint.Balance,
+			Source:     store.SourceBankSync,
+			Provider:   store.ProviderSimpleFIN,
+			ObservedAt: checkpoint.ObservedAt,
+		})
+	}
+	bank, err := st.LoadBankPostings()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	covered := make(map[string]bool, len(resolved))
+	for _, modelID := range resolved {
+		covered[modelID] = true
+	}
+	directives := Reconcile(translation.Pending, translation.Settled, bank, covered)
+	skipped := map[string]int{}
+	for reason, count := range translation.Skipped {
+		skipped[string(reason)] = count
+	}
+	return checkpoints, directives, skipped, nil
+}

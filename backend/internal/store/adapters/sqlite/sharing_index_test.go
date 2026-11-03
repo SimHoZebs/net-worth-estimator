@@ -499,11 +499,11 @@ func TestSharingSyncMaintainsIndex(t *testing.T) {
 		t.Fatalf("pending access = %+v, want automatic-group allow", access)
 	}
 	settled := syncSettledPosting("posted-a", "prime_card", "Posted a", "2026-08-03")
-	settled.Source = SourceSimpleFIN
+	settled.Source = SourceBankSync
 	summary, err = storeA.ApplySync(nil, []BankDirective{{Convert: &BankConvert{
 		ID:      pendingID,
 		Posting: settled.Posting,
-		AddKeys: []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+		AddKeys: []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
 	}}})
 	if err != nil || summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v, err %v", summary, err)

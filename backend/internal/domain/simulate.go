@@ -39,7 +39,7 @@ func simulateScheduled(request types.SimulationRequest, purchases []scheduledPur
 	snapshots := []types.SimulationSnapshot{}
 	transactionSequence := 0
 
-	resolved := ResolveOccurrences(request.Model.RecurrenceRules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	resolved := ExpandProjectionSchedule(request.Model.RecurrenceRules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	eventDates := resolved.ByDate
 	for _, date := range candidateDates {
 		if _, exists := eventDates[date]; !exists {

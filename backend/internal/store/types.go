@@ -12,10 +12,13 @@ import (
 const (
 	SourceUser = "user"
 
-	// SourceSimpleFIN is the sync source written by the current SimpleFIN
-	// adapter. Other providers must use their own source value.
-	SourceSimpleFIN = "simplefin"
+	// SourceBankSync is the row source for bank facts. The provider
+	// identity lives in sync keys, not in the row source.
+	SourceBankSync = "banksync"
 )
+
+// ProviderSimpleFIN identifies the SimpleFIN bridge provider in sync keys.
+const ProviderSimpleFIN = "simplefin"
 
 const (
 	LinkOriginManual = "manual"
@@ -108,11 +111,15 @@ func (c GmailCredential) Connected() bool { return c.RefreshToken != "" }
 type SyncCheckpoint struct {
 	AccountID string
 	Balance   float64
-	// Source is the provider provenance carried from translation (never
+	// Source is the bank-fact category carried from translation (never
 	// user). The store validates it at the boundary and never defaults
 	// it: owner rows keep collision precedence and repeat writes keep
 	// provider identity.
-	Source     string
+	Source string
+	// Provider identifies the bridge that supplied the observation
+	// (simplefin today). Same-instant refresh matches on provider, so
+	// two bridges never overwrite each other.
+	Provider   string
 	ObservedAt int64
 }
 
@@ -136,6 +143,29 @@ type SyncProvision struct {
 	Name     string
 	Currency string
 	Kind     types.AccountKind
+}
+
+// GeneratedPosting is one engine-output transaction for a slice. Generated
+// rows carry the public event as JSON and never participate in model reads,
+// sync reconciliation, or analysis: every model query filters them out by
+// null slice.
+type GeneratedPosting struct {
+	SliceID         string
+	Name            string
+	SourceAccountID *string
+	DestinationIDs  []string
+	PostedTime      int64
+	TransactionTime int64
+	EventJSON       string
+	AppliedAmount   float64
+	Outcome         string
+}
+
+// ProjectionRowPayload is one persisted timeline row for a slice date.
+type ProjectionRowPayload struct {
+	SliceID string
+	Date    string
+	Payload string
 }
 
 // SyncPosting separates the exact provider identity from the local posting ID.

@@ -70,6 +70,9 @@ func (s *sqliteStore) CreatePlannedPurchase(p types.PlannedPurchase) (types.Plan
 	if err != nil {
 		return types.PlannedPurchase{}, err
 	}
+	if err := s.markDirty(dirtyDay(string(p.EarliestDate))); err != nil {
+		return types.PlannedPurchase{}, err
+	}
 	return p, err
 }
 
@@ -89,11 +92,14 @@ func (s *sqliteStore) UpdatePlannedPurchase(p types.PlannedPurchase) (types.Plan
 	if err != nil {
 		return types.PlannedPurchase{}, err
 	}
+	if err := s.markDirtyStart(); err != nil {
+		return types.PlannedPurchase{}, err
+	}
 	return p, err
 }
 
 func (s *sqliteStore) DeletePlannedPurchase(id string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		result, err := tx.Exec(`DELETE FROM planned_purchases WHERE id = ? AND user_id = :user_id`, id)
 		if err != nil {
 			return err
@@ -107,12 +113,16 @@ func (s *sqliteStore) DeletePlannedPurchase(id string) error {
 		}
 		return releaseRowID(tx, id)
 	})
+	if err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 // Purchases order by priority, then position. A move normalizes both so equal
 // priorities and later imports cannot undo the owner's requested queue order.
 func (s *sqliteStore) MovePlannedPurchase(id, beforeID string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		purchases, err := loadPlannedPurchases(tx)
 		if err != nil {
 			return err
@@ -150,4 +160,8 @@ func (s *sqliteStore) MovePlannedPurchase(id, beforeID string) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }

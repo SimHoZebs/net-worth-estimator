@@ -233,73 +233,8 @@ func buildProjectionPath(prepared *types.PreparedProjection, run *types.Simulati
 // AdaptSimulationRun produces RawProjectionOutput (path + public result).
 func AdaptSimulationRun(prepared *types.PreparedProjection, run *types.SimulationRun) (*types.ProjectionPath, *types.ProjectionResult) {
 	path := BuildProjectionPath(prepared, run)
-	accounts := prepared.EffectiveModel.Accounts
-
-	var latestHistoricalRow *types.ProjectionRow
-	var latestRow *types.ProjectionRow
-	for index := range path.Rows {
-		row := &path.Rows[index]
-		if row.IsHistorical {
-			latestHistoricalRow = row
-		}
-		latestRow = row
-	}
-	currentNetWorth := ComputeNetWorth(run.InitialState.Balances, accounts)
-	if latestHistoricalRow != nil {
-		currentNetWorth = latestHistoricalRow.NetWorth
-	}
-	endingBalances := map[string]float64{}
-	if latestRow != nil {
-		for _, snapshot := range latestRow.AccountSnapshots {
-			endingBalances[snapshot.AccountID] = snapshot.Balance
-		}
-	} else {
-		endingBalances = run.InitialState.Balances
-	}
-	accountSummaries := make([]types.ProjectionAccountSummary, 0, len(accounts))
-	for _, account := range accounts {
-		accountSummaries = append(accountSummaries, types.ProjectionAccountSummary{
-			AccountID:       account.ID,
-			Name:            account.Name,
-			Color:           account.Color,
-			Enabled:         account.Enabled,
-			StartingBalance: roundCurrency(run.InitialState.Balances[account.ID]),
-			EndingBalance:   roundCurrency(endingBalances[account.ID]),
-		})
-	}
-	totals := struct {
-		inflow   float64
-		outflow  float64
-		transfer float64
-	}{}
-	for _, row := range path.Rows {
-		totals.inflow += row.ExternalInflowAmount
-		totals.outflow += row.ExternalOutflowAmount
-		totals.transfer += row.InternalTransferAmount
-	}
-
-	result := &types.ProjectionResult{}
-	result.Timeline.Rows = make([]types.ProjectionRow, len(path.Rows))
-	for index, row := range path.Rows {
-		result.Timeline.Rows[index] = roundRow(row)
-	}
-	result.AccountSummaries = accountSummaries
-	result.Totals.ExternalInflowAmount = roundCurrency(totals.inflow)
-	result.Totals.ExternalOutflowAmount = roundCurrency(totals.outflow)
-	result.Totals.InternalTransferAmount = roundCurrency(totals.transfer)
-	if latestHistoricalRow != nil {
-		date := latestHistoricalRow.Date
-		result.Milestones.LatestHistoricalDate = &date
-	}
-	result.Milestones.ProjectionStartDate = run.Request.StartDate
-	result.Summary.CurrentNetWorth = roundCurrency(currentNetWorth)
-	finalNetWorth := currentNetWorth
-	if latestRow != nil {
-		finalNetWorth = latestRow.NetWorth
-	}
-	result.Summary.FinalNetWorth = roundCurrency(finalNetWorth)
-	result.TransactionEvents = publicTransactionEvents(path)
-
+	events := publicTransactionEvents(path)
+	result := RenderProjectionResult(path.Rows, events, path.EffectiveModel, run.InitialState.Balances, run.Request.StartDate)
 	return path, result
 }
 
@@ -315,4 +250,94 @@ func ProjectRawFinancialModel(model *types.FinancialModel, settings *types.Proje
 	}
 	path, result := AdaptSimulationRun(prepared, &run)
 	return path, result, nil
+}
+
+// HistoricalProjectionRows replays history through the as-of cut and returns
+// unrounded historical rows plus the replayed initial balances. The unified
+// reader serves history live and projected dates from slices.
+func HistoricalProjectionRows(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides) ([]types.ProjectionRow, map[string]float64, error) {
+	prepared, err := orchestratedPrepare(model, settings, overrides, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows := make([]types.ProjectionRow, 0, len(prepared.HistoricalSnapshots))
+	for _, snapshot := range prepared.HistoricalSnapshots {
+		rows = append(rows, createRow(
+			snapshot.Date, true, snapshot.Balances, prepared.EffectiveModel.Accounts,
+			map[string][]types.AccountDelta{}, 0, 0, 0, snapshot.CheckpointCorrections,
+		))
+	}
+	return rows, prepared.Request.InitialState.Balances, nil
+}
+
+// RenderProjectionResult assembles the public result from unrounded rows and
+// final-form events. AdaptSimulationRun and the unified reader share it so
+// stored and computed responses agree bit-for-bit.
+func RenderProjectionResult(rows []types.ProjectionRow, events []types.TransactionEvent, model types.FinancialModel, initialBalances map[string]float64, startDate types.IsoDate) *types.ProjectionResult {
+	accounts := model.Accounts
+	var latestHistoricalRow *types.ProjectionRow
+	var latestRow *types.ProjectionRow
+	for index := range rows {
+		row := &rows[index]
+		if row.IsHistorical {
+			latestHistoricalRow = row
+		}
+		latestRow = row
+	}
+	currentNetWorth := ComputeNetWorth(initialBalances, accounts)
+	if latestHistoricalRow != nil {
+		currentNetWorth = latestHistoricalRow.NetWorth
+	}
+	endingBalances := map[string]float64{}
+	if latestRow != nil {
+		for _, snapshot := range latestRow.AccountSnapshots {
+			endingBalances[snapshot.AccountID] = snapshot.Balance
+		}
+	} else {
+		endingBalances = initialBalances
+	}
+	accountSummaries := make([]types.ProjectionAccountSummary, 0, len(accounts))
+	for _, account := range accounts {
+		accountSummaries = append(accountSummaries, types.ProjectionAccountSummary{
+			AccountID:       account.ID,
+			Name:            account.Name,
+			Color:           account.Color,
+			Enabled:         account.Enabled,
+			StartingBalance: roundCurrency(initialBalances[account.ID]),
+			EndingBalance:   roundCurrency(endingBalances[account.ID]),
+		})
+	}
+	totals := struct {
+		inflow   float64
+		outflow  float64
+		transfer float64
+	}{}
+	for _, row := range rows {
+		totals.inflow += row.ExternalInflowAmount
+		totals.outflow += row.ExternalOutflowAmount
+		totals.transfer += row.InternalTransferAmount
+	}
+
+	result := &types.ProjectionResult{}
+	result.Timeline.Rows = make([]types.ProjectionRow, len(rows))
+	for index, row := range rows {
+		result.Timeline.Rows[index] = roundRow(row)
+	}
+	result.AccountSummaries = accountSummaries
+	result.Totals.ExternalInflowAmount = roundCurrency(totals.inflow)
+	result.Totals.ExternalOutflowAmount = roundCurrency(totals.outflow)
+	result.Totals.InternalTransferAmount = roundCurrency(totals.transfer)
+	if latestHistoricalRow != nil {
+		date := latestHistoricalRow.Date
+		result.Milestones.LatestHistoricalDate = &date
+	}
+	result.Milestones.ProjectionStartDate = startDate
+	result.Summary.CurrentNetWorth = roundCurrency(currentNetWorth)
+	finalNetWorth := currentNetWorth
+	if latestRow != nil {
+		finalNetWorth = latestRow.NetWorth
+	}
+	result.Summary.FinalNetWorth = roundCurrency(finalNetWorth)
+	result.TransactionEvents = events
+	return result
 }

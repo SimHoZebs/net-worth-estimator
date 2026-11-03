@@ -120,7 +120,7 @@ func TestAnalysisFeedbackValidationAndSourceConflicts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{Keys: bankKeys(SourceSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY NOW", Amount: "-25", Currency: "USD"}}}})
+	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{Keys: bankKeys(ProviderSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY NOW", Amount: "-25", Currency: "USD"}}}})
 	for _, action := range []string{"confirm", "reject"} {
 		if _, err := s.ReviewAnalysisFinding(finding.ID, feedbackInput(t, finding, action)); !errors.Is(err, store.ErrAnalysisFeedbackConflict) {
 			t.Fatalf("stale source=%v", err)

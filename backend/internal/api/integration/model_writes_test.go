@@ -114,14 +114,14 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 		t.Fatalf("seed account: %v", err)
 	}
 	if _, err := database.ApplySync([]store.SyncCheckpoint{
-		{AccountID: "checking", Balance: 10, Source: store.SourceSimpleFIN, ObservedAt: 1785974399},
-		{AccountID: "checking", Balance: 20, Source: store.SourceSimpleFIN, ObservedAt: 1786060799},
+		{AccountID: "checking", Balance: 10, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1785974399},
+		{AccountID: "checking", Balance: 20, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: 1786060799},
 	}, nil); err != nil {
 		t.Fatalf("seed synced balance checks: %v", err)
 	}
 	handler := New(database, Config{})
 	saved := decodePlanEntrySave[types.Checkpoint](t, doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
-		`{"AccountId":"checking","Balance":30,"source":"simplefin","observedAt":1785974399}`))
+		`{"AccountId":"checking","Balance":30,"source":"banksync","observedAt":1785974399}`))
 	if !saved.Persisted || saved.Row.Source != store.SourceUser || saved.Row.Balance != 30 {
 		t.Fatalf("owner balance check = %+v", saved)
 	}
@@ -130,7 +130,7 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 	}
 	model := assertSavedModelIdentity(t, database.Store, saved.Revision)
 	if len(model.Checkpoints) != 2 || !reflect.DeepEqual(model.Checkpoints[0], saved.Row) ||
-		model.Checkpoints[1].Source != store.SourceSimpleFIN || model.Checkpoints[1].Balance != 20 {
+		model.Checkpoints[1].Source != store.SourceBankSync || model.Checkpoints[1].Balance != 20 {
 		t.Fatalf("balance-check ownership/key changed: %+v", model.Checkpoints)
 	}
 	if len(saved.Issues) != 0 {

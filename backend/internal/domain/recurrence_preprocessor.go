@@ -21,6 +21,14 @@ type RecurrencePreprocessorResult struct {
 	ByRule        map[string]RuleBehavior
 }
 
+// ExpandProjectionSchedule expands enabled rules into dated occurrences
+// for the projection window. Schedule expansion is preprocessor work: it
+// needs rules, the window, and claims, but no balances, caps, or samples.
+// The engine consumes the dated result without knowing rules exist.
+func ExpandProjectionSchedule(rules []types.RecurrenceRule, postings []types.Posting, windowStart, windowEnd string, includeStartDate bool) ResolvedOccurrences {
+	return ResolveOccurrences(rules, postings, windowStart, windowEnd, includeStartDate)
+}
+
 // RecurrencePreprocessor classifies rules without executing them.
 // A rule is stochastic when any amount input binds provider
 // occurrence-rate with volatility above zero. All other rules are

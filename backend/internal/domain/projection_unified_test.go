@@ -2,6 +2,7 @@ package domain
 
 import (
 	"testing"
+	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -34,34 +35,28 @@ func TestRecurrencePreprocessor(t *testing.T) {
 }
 
 func TestFindFirstInvalidSlice(t *testing.T) {
+	day := func(date string) int64 {
+		moment, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return moment.UTC().Unix()
+	}
 	slices := []types.ProjectionSlice{
-		{ID: "a", FromAt: "2026-01-01", ToAt: "2026-04-01"},
-		{ID: "b", FromAt: "2026-04-01", ToAt: "2026-07-01"},
-		{ID: "c", FromAt: "2026-07-01", ToAt: "2026-10-01"},
+		{ID: "a", FromAt: day("2026-01-01"), ToAt: day("2026-04-01")},
+		{ID: "b", FromAt: day("2026-04-01"), ToAt: day("2026-07-01")},
+		{ID: "c", FromAt: day("2026-07-01"), ToAt: day("2026-10-01")},
 	}
-	if got := FindFirstInvalidSlice(slices, ""); got != -1 {
-		t.Fatalf("empty dirty should need no rebuild, got %d", got)
+	if got := FindFirstInvalidSlice(slices, 0); got != -1 {
+		t.Fatalf("zero dirty should need no rebuild, got %d", got)
 	}
-	if got := FindFirstInvalidSlice(slices, "2026-05-01"); got != 1 {
+	if got := FindFirstInvalidSlice(slices, day("2026-05-01")); got != 1 {
 		t.Fatalf("expected slice 1, got %d", got)
 	}
-	if got := FindFirstInvalidSlice(slices, "2026-04-01"); got != 0 {
+	if got := FindFirstInvalidSlice(slices, day("2026-04-01")); got != 0 {
 		t.Fatalf("dirty equal to boundary to_at rebuilds that slice, got %d", got)
 	}
-	if got := FindFirstInvalidSlice(slices, "2027-01-01"); got != -1 {
+	if got := FindFirstInvalidSlice(slices, day("2027-01-01")); got != -1 {
 		t.Fatalf("dirty past end should need no rebuild, got %d", got)
-	}
-}
-
-func TestSlicesNeedRebuild(t *testing.T) {
-	state := types.ProjectionState{Revision: 3, DirtyFrom: ""}
-	slices := []types.ProjectionSlice{{ID: "a", BuiltRevision: 3}}
-	if SlicesNeedRebuild(slices, state) {
-		t.Fatal("clean state with current slices should not rebuild")
-	}
-	state.DirtyFrom = "2026-02-01"
-	slices = []types.ProjectionSlice{{ID: "a", FromAt: "2026-01-01", ToAt: "2026-04-01", BuiltRevision: 3}}
-	if !SlicesNeedRebuild(slices, state) {
-		t.Fatal("dirty inside slice should rebuild")
 	}
 }

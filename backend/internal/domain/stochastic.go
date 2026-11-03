@@ -28,7 +28,69 @@ func StochasticProjection(
 	if err != nil {
 		return nil, err
 	}
+	if err := runStochasticSession(ctx, session); err != nil {
+		return nil, err
+	}
+	return session.result()
+}
 
+// StochasticNetWorthSamples runs the full Monte Carlo projection and
+// returns the result plus a copy of the per-date sorted net worth samples.
+// The builder persists statistics from the samples; readers serve bands.
+func StochasticNetWorthSamples(
+	ctx context.Context,
+	model *types.FinancialModel,
+	settings *types.ProjectionRuntimeSettings,
+	overrides types.ModelOverrides,
+	config types.StochasticConfig,
+	onProgress StochasticProgressCallback,
+) (*types.StochasticProjectionResult, map[string][]float64, error) {
+	session, err := newStochasticSession(model, settings, overrides, config, onProgress)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := runStochasticSession(ctx, session); err != nil {
+		return nil, nil, err
+	}
+	result, err := session.result()
+	if err != nil {
+		return nil, nil, err
+	}
+	samples := make(map[string][]float64, len(session.sortedValuesByDate))
+	for date, values := range session.sortedValuesByDate {
+		copied := make([]float64, len(values))
+		copy(copied, values)
+		samples[date] = copied
+	}
+	return result, samples, nil
+}
+
+// runUnsampledSession runs the no-volatility fast path: Monte Carlo stays
+// opt-in per rule, so a model with nothing to sample simulates once and
+// folds that path into every trial. Percentiles of identical values equal
+// the value, probabilities stay 0 or 1, and sample counts still advance, so
+// the result is bit-identical to N identical trials at ~1/N the cost.
+func runUnsampledSession(ctx context.Context, session *stochasticSession) error {
+	sample := session.createSample()
+	path, err := session.projectSample(sample)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < session.config.RunCount; i++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := consumeOrdered(session, path, sample); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func runStochasticSession(ctx context.Context, session *stochasticSession) error {
+	if len(session.sampleCountsByPostingID) == 0 {
+		return runUnsampledSession(ctx, session)
+	}
 	// Scale the pool with available CPUs: accumulation stays ordered in
 	// submission order, so extra workers only add throughput, never
 	// result churn.
@@ -109,7 +171,7 @@ consumer:
 			break consumer
 		}
 		if result.err != nil {
-			return nil, fmt.Errorf("stochastic run %d: %w", result.index, result.err)
+			return fmt.Errorf("stochastic run %d: %w", result.index, result.err)
 		}
 		pending[result.index] = pendingRun{path: result.path, sample: result.sample}
 		for {
@@ -121,15 +183,15 @@ consumer:
 			// Accumulation happens in submission order to preserve exact ordered
 			// semantics for sorted merges and counters.
 			if err := consumeOrdered(session, run.path, run.sample); err != nil {
-				return nil, err
+				return err
 			}
 			nextIndex++
 		}
 	}
 	if nextIndex < session.config.RunCount {
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
-	return session.result()
+	return nil
 }
 
 func consumeOrdered(
@@ -177,3 +239,6 @@ func consumeOrdered(
 
 // mathRound rounds halves toward +Infinity, unlike truncation on v±0.5.
 func mathRound(value float64) float64 { return math.Floor(value + 0.5) }
+
+// RoundSampleValue rounds one net worth sample exactly as accumulation does.
+func RoundSampleValue(value float64) float64 { return mathRound(value) }

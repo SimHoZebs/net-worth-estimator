@@ -36,7 +36,7 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 	}
 	var settled []settledCandidate
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceSimpleFIN || row.Posting.Pending || row.Posting.Void {
+		if row.Posting.Source != store.SourceBankSync || row.Posting.Pending || row.Posting.Void {
 			continue
 		}
 		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
@@ -56,7 +56,7 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 	}
 	var pairs []HistoricalVoidPair
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceSimpleFIN || !row.Posting.Void {
+		if row.Posting.Source != store.SourceBankSync || !row.Posting.Void {
 			continue
 		}
 		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {

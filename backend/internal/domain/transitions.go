@@ -151,27 +151,23 @@ func (t *TransitionRuntime) applyAndCollectDeltas(result AccountTransactionResul
 }
 
 // ExecutePosting executes one occurrence through the shared transitions.
-// The historicalActual policy is explicit, not a second codepath: confirmed
-// historical actuals move their recorded amount without hypothetical
-// funding clamps (history describes what moved), while modeled rules and
-// all forecast requests retain funding constraints. Annual caps still
-// apply to rule instances; one-time actuals carry no cap.
+// Amount work and simulation work are separate phases: PreparePostingExecution
+// calculates the request from snapshots without touching runtime state, and
+// ApplyPreparedExecution resolves it against constraints, applies it, and
+// records the outcome. The historicalActual policy is explicit, not a second
+// codepath: confirmed historical actuals move their recorded amount without
+// hypothetical funding clamps (history describes what moved), while modeled
+// rules and all forecast requests retain funding constraints. Annual caps
+// still apply to rule instances; one-time actuals carry no cap.
 func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, date string, historicalActual bool) (PostingExecutionTransition, error) {
 	posting := occurrence.Posting
-	// Rate behavior (volatility sampling, annual caps) belongs to rules.
-	// Manual postings execute literally unless their amount carries a
-	// volatile occurrence-rate input; only rules carry caps.
-	var ruleAnnualCap *float64
-	if occurrence.Rule != nil {
-		ruleAnnualCap = occurrence.Rule.AnnualCap
-	}
-	yearIndex := ProjectionYearIndex(t.projectionStart, date)
 	var sampledRate *float64
 	// Sampling is coordinator-owned: volatile amounts look up their
 	// transaction's pre-sampled annual rate for this projection year.
 	// Providers never draw RNG; a missing entry for a volatile transaction
 	// is a preparation defect, not a fresh draw.
 	if _, volatile := VolatileRateInputOf(posting.Amount); volatile && t.monteCarloSample != nil {
+		yearIndex := ProjectionYearIndex(t.projectionStart, date)
 		rates, ok := t.monteCarloSample.AnnualRatesByPostingID[posting.ID]
 		if !ok || yearIndex >= len(rates) {
 			return PostingExecutionTransition{}, fmt.Errorf(
@@ -180,45 +176,11 @@ func (t *TransitionRuntime) ExecutePosting(occurrence DatedPostingOccurrence, da
 		rate := rates[yearIndex]
 		sampledRate = &rate
 	}
-	rawRequested, err := ComputeRequestedAmount(occurrence, date, t.State.LatestRealizedPostingAmounts, t.State.LatestRealizedPostingDates, t.State.RealizedPostingAmountsByYear, t.State.Balances, t.paymentTerms, sampledRate)
+	prepared, err := PreparePostingExecution(occurrence, date, historicalActual, t.snapshotExecutionState(), sampledRate)
 	if err != nil {
 		return PostingExecutionTransition{}, err
 	}
-	// A negative amount on a sourceless inflow posting is an investment
-	// loss: it reduces destination balances instead of clamping to zero.
-	// Clamping discards the entire downside of sampled return
-	// distributions, which biases stochastic bands above the projection.
-	if rawRequested < 0 && IsExternalInflow(posting) {
-		result := ResolveNegativeInflowTransaction(posting, rawRequested, t.State.Balances, t.accountByID)
-		transition := t.applyAndCollectDeltas(result, func() {
-			ApplyNegativeInflow(posting, result.RealizedAmount, t.State.Balances, t.accountByID)
-		})
-		t.observeLossPosting(posting.ID, result.RealizedAmount)
-		return PostingExecutionTransition{
-			AppliedTransactionTransition: transition,
-			PostingID:                    posting.ID,
-		}, nil
-	}
-	requestedAmount := maxFloat(0, rawRequested)
-	realizedAmount := requestedAmount
-	if !historicalActual {
-		year := date[:4]
-		realizedThisYear := t.State.RealizedPostingAmountsByYear[posting.ID][year]
-		annualCapRemaining := inf()
-		if ruleAnnualCap != nil {
-			annualCapRemaining = maxFloat(0, *ruleAnnualCap-realizedThisYear)
-		}
-		realizedAmount = ResolvePostingTransaction(posting, requestedAmount, annualCapRemaining, t.State.Balances, t.accountByID).RealizedAmount
-	}
-	result := AccountTransactionResult{RequestedAmount: requestedAmount, RealizedAmount: realizedAmount}
-	transition := t.applyAndCollectDeltas(result, func() {
-		ApplyPosting(posting, result.RealizedAmount, t.State.Balances, t.accountByID)
-	})
-	t.observePosting(posting.ID, result.RealizedAmount, date)
-	return PostingExecutionTransition{
-		AppliedTransactionTransition: transition,
-		PostingID:                    posting.ID,
-	}, nil
+	return t.ApplyPreparedExecution(prepared, date)
 }
 
 // ObservePosting records a realized amount without moving balances.

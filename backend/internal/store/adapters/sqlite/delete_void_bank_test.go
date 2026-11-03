@@ -10,7 +10,7 @@ func seedVoidBankRow(t *testing.T, database store.Store, name, account, amount, 
 	t.Helper()
 	seed := bankSeedPosting(name, account, amount, true)
 	summary := applyDirectives(t, database, []BankDirective{{
-		Upsert: &BankUpsert{Posting: seed, Keys: bankKeys(SourceSimpleFIN, "bridge-"+account, key)},
+		Upsert: &BankUpsert{Posting: seed, Keys: bankKeys(ProviderSimpleFIN, "bridge-"+account, key)},
 	}})
 	if summary.PendingInserted != 1 {
 		t.Fatalf("seed pending = %+v", summary)
@@ -43,7 +43,7 @@ func TestDeletePostingRemovesPhantomVoid(t *testing.T) {
 	voidID := seedVoidBankRow(t, database, "Bistro", "prime_card", "50.00", "auth-a")
 	settled := bankSeedPosting("Bistro", "prime_card", "58.00", false)
 	if inserted := applyDirectives(t, database, []BankDirective{{
-		Upsert: &BankUpsert{Posting: settled, Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "post-a")},
+		Upsert: &BankUpsert{Posting: settled, Keys: bankKeys(ProviderSimpleFIN, "bridge-prime", "post-a")},
 	}}); inserted.SettledInserted != 1 {
 		t.Fatalf("seed settled = %+v", inserted)
 	}
@@ -70,7 +70,7 @@ func TestDeletePostingAllowsSettledBankRows(t *testing.T) {
 	seedAccount(t, database, "prime_card")
 	settled := bankSeedPosting("Bistro", "prime_card", "58.00", false)
 	inserted := applyDirectives(t, database, []BankDirective{{
-		Upsert: &BankUpsert{Posting: settled, Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "post-a")},
+		Upsert: &BankUpsert{Posting: settled, Keys: bankKeys(ProviderSimpleFIN, "bridge-prime", "post-a")},
 	}})
 	if inserted.SettledInserted != 1 {
 		t.Fatalf("seed settled = %+v", inserted)

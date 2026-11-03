@@ -27,7 +27,7 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 		t.Helper()
 		_, err := scoped.ApplySync(nil, []store.BankDirective{{
 			Upsert: &store.BankUpsert{Posting: posting, Keys: []store.BankKey{
-				{Provider: store.SourceSimpleFIN, AccountID: "bridge-prime", TransactionID: key},
+				{Provider: store.ProviderSimpleFIN, AccountID: "bridge-prime", TransactionID: key},
 			}},
 		}})
 		if err != nil {
@@ -39,7 +39,7 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 		return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": expression}, Inputs: map[string]types.AmountInputBinding{}}
 	}
 	upsert(types.Posting{
-		Name: "Bistro", Source: store.SourceSimpleFIN, SourceAccountID: &source,
+		Name: "Bistro", Source: store.SourceBankSync, SourceAccountID: &source,
 		Amount: amount("50.00"), PostedTime: 1785628800, TransactionTime: 1785628800, Pending: true,
 	}, "auth-a")
 	rows, err := scoped.LoadBankPostings()
@@ -50,7 +50,7 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 		t.Fatalf("void: %v", err)
 	}
 	upsert(types.Posting{
-		Name: "Bistro", Source: store.SourceSimpleFIN, SourceAccountID: &source,
+		Name: "Bistro", Source: store.SourceBankSync, SourceAccountID: &source,
 		Amount: amount("58.00"), PostedTime: 1785715200, TransactionTime: 1785715200, Enabled: true,
 	}, "post-a")
 	return scoped

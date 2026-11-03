@@ -166,7 +166,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 		t.Fatalf("create posting status = %d, body %s", owner.Code, owner.Body.String())
 	}
 	bank := types.Posting{
-		Name: "Vanished auth", Source: store.SourceSimpleFIN, SourceAccountID: ptr("card"),
+		Name: "Vanished auth", Source: store.SourceBankSync, SourceAccountID: ptr("card"),
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785628800,
 		TransactionTime: 1785628800,
@@ -174,7 +174,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 		Pending:         true,
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
-		Upsert: &store.BankUpsert{Posting: bank, Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}}},
+		Upsert: &store.BankUpsert{Posting: bank, Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}}},
 	}}); err != nil {
 		t.Fatalf("bank upsert: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	}
 	var bankID string
 	for _, posting := range model.Postings {
-		if posting.Source == store.SourceSimpleFIN {
+		if posting.Source == store.SourceBankSync {
 			bankID = posting.ID
 		}
 	}
@@ -195,14 +195,14 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 		t.Fatalf("bank void: %v", err)
 	}
 	settled := types.Posting{
-		Name: "Settled bank charge", Source: store.SourceSimpleFIN, SourceAccountID: ptr("card"),
+		Name: "Settled bank charge", Source: store.SourceBankSync, SourceAccountID: ptr("card"),
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "18.50"}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785715200,
 		TransactionTime: 1785715200,
 		Enabled:         true,
 	}
 	if _, err := database.ApplySync(nil, []store.BankDirective{{
-		Upsert: &store.BankUpsert{Posting: settled, Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}}},
+		Upsert: &store.BankUpsert{Posting: settled, Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}}},
 	}}); err != nil {
 		t.Fatalf("bank settled upsert: %v", err)
 	}
@@ -236,7 +236,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 		t.Fatalf("bank row void = false, want the sync void flag reported")
 	}
 	for _, posting := range model.Postings {
-		if posting.Source != store.SourceSimpleFIN && seen[posting.ID].void {
+		if posting.Source != store.SourceBankSync && seen[posting.ID].void {
 			t.Fatalf("owner row %s void = true, want false", posting.ID)
 		}
 	}

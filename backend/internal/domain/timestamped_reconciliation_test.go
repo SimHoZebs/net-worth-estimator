@@ -24,8 +24,8 @@ func observerFixture() *types.FinancialModel {
 	return &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
-			{AccountID: account, Balance: 900, Source: "simplefin", ObservedAt: unixAt(10, 15)},
+			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
+			{AccountID: account, Balance: 900, Source: "banksync", ObservedAt: unixAt(10, 15)},
 		},
 		Postings: []types.Posting{
 			{ID: "manual", Name: "Expense", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
@@ -81,7 +81,7 @@ func TestExactCutIncludesTodayAfterYesterdayAnchor(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(9, 9)},
+			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(9, 9)},
 		},
 		Postings: []types.Posting{
 			{ID: "manual", Name: "Expense", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
@@ -161,8 +161,8 @@ func TestTimestampedStaleObservationDoesNotRollBack(t *testing.T) {
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
-			{AccountID: account, Balance: 850, Source: "simplefin", ObservedAt: unixAt(10, 15)},
-			{AccountID: account, Balance: 5000, Source: "simplefin", ObservedAt: unixAt(10, 10)},
+			{AccountID: account, Balance: 850, Source: "banksync", ObservedAt: unixAt(10, 15)},
+			{AccountID: account, Balance: 5000, Source: "banksync", ObservedAt: unixAt(10, 10)},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -213,7 +213,7 @@ func TestTimestampedOwnerWinsSameInstantOnly(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 700, Source: "simplefin", ObservedAt: instant},
+			{AccountID: account, Balance: 700, Source: "banksync", ObservedAt: instant},
 			{AccountID: account, Balance: 800, Source: "user", ObservedAt: instant},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -237,7 +237,7 @@ func TestTransferLegsAnchorIndependently(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: a, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
 			{AccountID: b, Balance: 200, Source: "user", ObservedAt: unixAt(10, 9)},
-			{AccountID: a, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 12)},
+			{AccountID: a, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 12)},
 		},
 		Postings: []types.Posting{
 			{ID: "transfer", Name: "Move", SourceAccountID: &source, Destinations: []string{b}, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "user"},
@@ -273,12 +273,12 @@ func TestEnabledAloneDecidesExecutionRegardlessOfLifecycle(t *testing.T) {
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
 		},
 		Postings: []types.Posting{
-			{ID: "pending-disabled", Name: "PendingOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Pending: true},
-			{ID: "pending-enabled", Name: "PendingOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin", Pending: true},
-			{ID: "void-disabled", Name: "VoidOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Void: true},
-			{ID: "void-enabled", Name: "VoidOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin", Void: true},
-			{ID: "settled-disabled", Name: "SettledOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "simplefin"},
-			{ID: "settled-enabled", Name: "SettledOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+			{ID: "pending-disabled", Name: "PendingOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "banksync", Pending: true},
+			{ID: "pending-enabled", Name: "PendingOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync", Pending: true},
+			{ID: "void-disabled", Name: "VoidOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "banksync", Void: true},
+			{ID: "void-enabled", Name: "VoidOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync", Void: true},
+			{ID: "settled-disabled", Name: "SettledOff", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: false, Source: "banksync"},
+			{ID: "settled-enabled", Name: "SettledOn", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -392,10 +392,6 @@ func TestExactCutProjectionAgreesWithPositionAndAccountList(t *testing.T) {
 	if manualMoves != 1 {
 		t.Fatalf("11:00 actual simulated %d times, want exactly once", manualMoves)
 	}
-	base := BaseModelHash(model, types.ModelOverrides{}, &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-03-10", HorizonYears: 1}, nil)
-	if got := BaseModelHash(model, types.ModelOverrides{}, settings, nil); got == base {
-		t.Fatalf("exact cut must change the cache identity")
-	}
 }
 
 func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
@@ -403,7 +399,7 @@ func TestExactCutSuppressesReplayedMorningInSimulation(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
+			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 		},
 		Postings: []types.Posting{
 			{ID: "morning", Name: "Morning", SourceAccountID: &account, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 9) + 1800, PostedTime: unixAt(10, 9) + 1800, Enabled: true, Source: "user"},
@@ -507,10 +503,10 @@ func TestSettledBankActualParticipatesLikeManual(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
+			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
 		},
 		Postings: []types.Posting{
-			{ID: "bank-expense", Name: "Groceries", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+			{ID: "bank-expense", Name: "Groceries", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -539,11 +535,11 @@ func TestBankActualBeforeLatestAnchorAbsorbedOnce(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
-			{AccountID: account, Balance: 850, Source: "simplefin", ObservedAt: unixAt(10, 15)},
+			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
+			{AccountID: account, Balance: 850, Source: "banksync", ObservedAt: unixAt(10, 15)},
 		},
 		Postings: []types.Posting{
-			{ID: "bank-expense", Name: "Groceries", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+			{ID: "bank-expense", Name: "Groceries", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -571,11 +567,11 @@ func TestBankActualsBeforeAndAfterAnchor(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: account, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 10)},
+			{AccountID: account, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 10)},
 		},
 		Postings: []types.Posting{
-			{ID: "early", Name: "Early", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 9), PostedTime: unixAt(10, 9), Enabled: true, Source: "simplefin"},
-			{ID: "late", Name: "Late", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+			{ID: "early", Name: "Early", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 9), PostedTime: unixAt(10, 9), Enabled: true, Source: "banksync"},
+			{ID: "late", Name: "Late", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}
@@ -597,11 +593,11 @@ func TestImportedTransferLegsAnchorIndependently(t *testing.T) {
 	model := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(a), cashAccount(b)},
 		Checkpoints: []types.Checkpoint{
-			{AccountID: a, Balance: 1000, Source: "simplefin", ObservedAt: unixAt(10, 9)},
-			{AccountID: b, Balance: 200, Source: "simplefin", ObservedAt: unixAt(10, 12)},
+			{AccountID: a, Balance: 1000, Source: "banksync", ObservedAt: unixAt(10, 9)},
+			{AccountID: b, Balance: 200, Source: "banksync", ObservedAt: unixAt(10, 12)},
 		},
 		Postings: []types.Posting{
-			{ID: "transfer", Name: "Move", SourceAccountID: &source, Destinations: []string{b}, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+			{ID: "transfer", Name: "Move", SourceAccountID: &source, Destinations: []string{b}, Amount: expenseAmount("50"), TransactionTime: unixAt(10, 11), PostedTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}

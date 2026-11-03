@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestReceiptEvidenceDoesNotInvalidateProjectionArtifacts(t *testing.T) {
+func TestReceiptEvidenceDoesNotChangeProjectionResults(t *testing.T) {
 	db := receiptAPIStore(t)
 	source, err := receiptmock.NewWithLatency(0)
 	if err != nil {
@@ -35,12 +35,12 @@ func TestReceiptEvidenceDoesNotInvalidateProjectionArtifacts(t *testing.T) {
 		t.Fatal(got.Body.String())
 	}
 	second := rangeRequest(t, h, deterministic)
-	if second.Header().Get("Projection-Source") != projectionSourceStored || second.Body.String() != first.Body.String() {
-		t.Fatal("receipt invalidated deterministic result or identity")
+	if second.Header().Get("Projection-Source") != projectionSourceComputed || second.Body.String() != first.Body.String() {
+		t.Fatal("receipt changed deterministic result or identity")
 	}
 	rangeSecond := postStochastic(t, h, stochastic)
 	secondEvents := sseEvents(t, rangeSecond.Body.String())
-	if rangeSecond.Header().Get("Projection-Source") != projectionSourceStored || len(secondEvents["result"]) != 1 || secondEvents["result"][0] != firstEvents["result"][0] {
-		t.Fatal("receipt invalidated seeded stochastic result or identity")
+	if rangeSecond.Header().Get("Projection-Source") != projectionSourceComputed || len(secondEvents["result"]) != 1 || secondEvents["result"][0] != firstEvents["result"][0] {
+		t.Fatal("receipt changed seeded stochastic result or identity")
 	}
 }

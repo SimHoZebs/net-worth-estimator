@@ -12,7 +12,7 @@ func reconcileInflowBankRow(id, name, account, amount string, keys ...store.Bank
 		Posting: types.Posting{
 			ID:              id,
 			Name:            name,
-			Source:          store.SourceSimpleFIN,
+			Source:          store.SourceBankSync,
 			Destinations:    []string{account},
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785715200,

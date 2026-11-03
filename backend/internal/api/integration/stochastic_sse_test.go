@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -45,19 +44,8 @@ func TestStochasticSSEPreservesLargeRequestSupport(t *testing.T) {
 	}
 }
 
-type stochasticArtifactObserver struct {
-	store.Store
-	persisted chan error
-}
-
-func (s *stochasticArtifactObserver) PutArtifact(identity, kind, payload string) error {
-	err := s.Store.PutArtifact(identity, kind, payload)
-	s.persisted <- err
-	return err
-}
-
-func TestStochasticSSEReadOnlyHTTPAndStoredRecovery(t *testing.T) {
-	database := &stochasticArtifactObserver{Store: openAPIStore(t), persisted: make(chan error, 1)}
+func TestStochasticSSEReadOnlyHTTPComputes(t *testing.T) {
+	database := openAPIStore(t)
 	server := httptest.NewServer(New(database, Config{ReadOnly: true}))
 	defer server.Close()
 	client := server.Client()
@@ -72,14 +60,14 @@ func TestStochasticSSEReadOnlyHTTPAndStoredRecovery(t *testing.T) {
 	}
 	seed := int64(29)
 	body := stochasticTestBody(t, 4, &seed)
-	for _, source := range []string{projectionSourceComputed, projectionSourceStored} {
+	for range 2 {
 		response, err := client.Post(server.URL+"/v1/projections/stochastic", "application/json", bytes.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if response.StatusCode != http.StatusOK || response.Header.Get("Projection-Source") != source || response.Header.Get("Content-Type") != "text/event-stream" || response.Header.Get("Cache-Control") != "no-store" {
+		if response.StatusCode != http.StatusOK || response.Header.Get("Projection-Source") != projectionSourceComputed || response.Header.Get("Content-Type") != "text/event-stream" || response.Header.Get("Cache-Control") != "no-store" {
 			response.Body.Close()
-			t.Fatalf("%s: status=%d headers=%v", source, response.StatusCode, response.Header)
+			t.Fatalf("status=%d headers=%v", response.StatusCode, response.Header)
 		}
 		raw, err := io.ReadAll(response.Body)
 		response.Body.Close()
@@ -87,22 +75,12 @@ func TestStochasticSSEReadOnlyHTTPAndStoredRecovery(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(sseEvents(t, string(raw))["result"]) != 1 || !strings.Contains(string(raw), "retry: 3000\n") {
-			t.Fatalf("%s: incomplete stream: %s", source, raw)
-		}
-		if source == projectionSourceComputed {
-			select {
-			case err := <-database.persisted:
-				if err != nil {
-					t.Fatal(err)
-				}
-			case <-time.After(10 * time.Second):
-				t.Fatal("seeded result was not persisted")
-			}
+			t.Fatalf("incomplete stream: %s", raw)
 		}
 	}
 }
 
-func TestStochasticSSESeededComputedThenStored(t *testing.T) {
+func TestStochasticSSESeededRecomputesIdentically(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	seed := int64(42)
@@ -121,11 +99,11 @@ func TestStochasticSSESeededComputedThenStored(t *testing.T) {
 	}
 
 	second := postStochastic(t, handler, body)
-	if got := second.Header().Get("Projection-Source"); got != projectionSourceStored {
-		t.Fatalf("second Projection-Source = %q, want stored", got)
+	if got := second.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("second Projection-Source = %q, want computed", got)
 	}
 	if sseEvents(t, second.Body.String())["result"][0] != events["result"][0] {
-		t.Fatalf("stored result differs from computed result")
+		t.Fatalf("recomputed result differs from first result")
 	}
 }
 

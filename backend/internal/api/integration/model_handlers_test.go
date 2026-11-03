@@ -368,7 +368,7 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	// server-computed source flag. Writes must accept and ignore it.
 	post := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/v1/postings", bytes.NewReader([]byte(
-		`{"id":"01900000-0000-7000-8000-000000000023","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true,"source":"simplefin","pending":true,"claim":null}`,
+		`{"id":"01900000-0000-7000-8000-000000000023","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true,"source":"banksync","pending":true,"claim":null}`,
 	)))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(post, request)
@@ -423,7 +423,7 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 	if _, err := database.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
 		Posting: types.Posting{
 			Name:            "BILTRENT",
-			Source:          store.SourceSimpleFIN,
+			Source:          store.SourceBankSync,
 			SourceAccountID: &[]string{"checking"}[0],
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "2970.25"}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      0,
@@ -431,7 +431,7 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 			Enabled:         false,
 			Pending:         true,
 		},
-		Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-checking", TransactionID: "auth1"}},
+		Keys: []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-checking", TransactionID: "auth1"}},
 	}}}); err != nil {
 		t.Fatalf("seed pending: %v", err)
 	}
@@ -580,21 +580,21 @@ func TestDeterministicResponseIncludesTransactionEvents(t *testing.T) {
 		t.Fatalf("fully funded transaction evidence = constraints %+v available %v", event.BindingConstraints, event.AvailableAmount)
 	}
 
-	storedResponse := httptest.NewRecorder()
-	storedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
-	storedRequest.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(storedResponse, storedRequest)
-	if storedResponse.Code != http.StatusOK || storedResponse.Header().Get("Projection-Source") != projectionSourceStored {
-		t.Fatalf("stored projection status = %d, source = %q, body %s", storedResponse.Code, storedResponse.Header().Get("Projection-Source"), storedResponse.Body.String())
+	recomputedResponse := httptest.NewRecorder()
+	recomputedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
+	recomputedRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(recomputedResponse, recomputedRequest)
+	if recomputedResponse.Code != http.StatusOK || recomputedResponse.Header().Get("Projection-Source") != projectionSourceComputed {
+		t.Fatalf("recomputed projection status = %d, source = %q, body %s", recomputedResponse.Code, recomputedResponse.Header().Get("Projection-Source"), recomputedResponse.Body.String())
 	}
-	var storedPayload struct {
+	var recomputedPayload struct {
 		Result *types.ProjectionResult `json:"result"`
 	}
-	if err := json.Unmarshal(storedResponse.Body.Bytes(), &storedPayload); err != nil {
-		t.Fatalf("decode stored projection response: %v", err)
+	if err := json.Unmarshal(recomputedResponse.Body.Bytes(), &recomputedPayload); err != nil {
+		t.Fatalf("decode recomputed projection response: %v", err)
 	}
-	if storedPayload.Result == nil || len(storedPayload.Result.TransactionEvents) != len(payload.Result.TransactionEvents) {
-		t.Fatalf("stored transaction events = %+v", storedPayload.Result)
+	if recomputedPayload.Result == nil || len(recomputedPayload.Result.TransactionEvents) != len(payload.Result.TransactionEvents) {
+		t.Fatalf("stored transaction events = %+v", recomputedPayload.Result)
 	}
 }
 
@@ -662,27 +662,27 @@ func TestDeterministicTransactionEvidenceIncludesBindingConstraints(t *testing.T
 		t.Fatalf("binding constraint = %+v", event.BindingConstraints[0])
 	}
 
-	storedResponse := httptest.NewRecorder()
-	storedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
-	storedRequest.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(storedResponse, storedRequest)
-	if storedResponse.Code != http.StatusOK || storedResponse.Header().Get("Projection-Source") != projectionSourceStored {
-		t.Fatalf("stored projection status = %d, source = %q, body %s", storedResponse.Code, storedResponse.Header().Get("Projection-Source"), storedResponse.Body.String())
+	recomputedResponse := httptest.NewRecorder()
+	recomputedRequest := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
+	recomputedRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(recomputedResponse, recomputedRequest)
+	if recomputedResponse.Code != http.StatusOK || recomputedResponse.Header().Get("Projection-Source") != projectionSourceComputed {
+		t.Fatalf("recomputed projection status = %d, source = %q, body %s", recomputedResponse.Code, recomputedResponse.Header().Get("Projection-Source"), recomputedResponse.Body.String())
 	}
-	var storedPayload struct {
+	var recomputedPayload struct {
 		Result *types.ProjectionResult `json:"result"`
 	}
-	if err := json.Unmarshal(storedResponse.Body.Bytes(), &storedPayload); err != nil {
-		t.Fatalf("decode stored projection response: %v", err)
+	if err := json.Unmarshal(recomputedResponse.Body.Bytes(), &recomputedPayload); err != nil {
+		t.Fatalf("decode recomputed projection response: %v", err)
 	}
-	if storedPayload.Result == nil {
+	if recomputedPayload.Result == nil {
 		t.Fatal("stored projection has no result")
 	}
 	computedEvents, err := json.Marshal(payload.Result.TransactionEvents)
 	if err != nil {
 		t.Fatalf("encode computed transaction events: %v", err)
 	}
-	storedEvents, err := json.Marshal(storedPayload.Result.TransactionEvents)
+	storedEvents, err := json.Marshal(recomputedPayload.Result.TransactionEvents)
 	if err != nil {
 		t.Fatalf("encode stored transaction events: %v", err)
 	}

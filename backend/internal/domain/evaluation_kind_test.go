@@ -183,36 +183,36 @@ func kindTestModel() (*types.FinancialModel, *types.ProjectionRuntimeSettings) {
 	return model, settings
 }
 
-func TestBaseModelHashIgnoresEvaluations(t *testing.T) {
+func TestEvaluationsDoNotAlterBaseTimeline(t *testing.T) {
 	model, settings := kindTestModel()
-	base := BaseModelHash(model, types.EmptyModelOverrides(), settings, nil)
+	base, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	withEval := *settings
 	withEval.Evaluations.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
 		{InstanceID: "t", Name: "T", Enabled: true, Config: map[string]any{"target": 50.0}},
 	}
-	if got := BaseModelHash(model, types.EmptyModelOverrides(), &withEval, nil); got != base {
-		t.Fatal("changing eval config must not change the base model hash")
+	changed, err := ProjectFinancialModel(model, &withEval, types.EmptyModelOverrides(), nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if EvaluationsHash(&settings.Evaluations) == EvaluationsHash(&withEval.Evaluations) {
-		t.Fatal("evals must be keyed separately from the base path")
+	if !reflect.DeepEqual(base.Timeline, changed.Timeline) {
+		t.Fatal("eval config must not alter the base timeline")
 	}
-	changed := *model
-	changed.Postings = append([]types.Posting{}, model.Postings...)
-	changed.Postings[0].Name = "Changed"
-	if BaseModelHash(&changed, types.EmptyModelOverrides(), settings, nil) == base {
-		t.Fatal("changing postings must change the base model hash")
+	if len(changed.Evaluations.NetWorthThreshold) != 1 {
+		t.Fatal("eval-changed result must carry the threshold eval")
+	}
+	if len(base.Evaluations.NetWorthThreshold) != 0 {
+		t.Fatal("eval-free result must carry no threshold eval")
 	}
 }
 
-func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
-	ResetBasePathCache()
+func TestEvalOnlyChangeRecomputesBasePath(t *testing.T) {
 	model, settings := kindTestModel()
 	first, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if hits, misses := BasePathCacheStats(); hits != 0 || misses != 1 {
-		t.Fatalf("first projection must simulate once, got hits=%d misses=%d", hits, misses)
 	}
 	withEval := *settings
 	withEval.Evaluations.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
@@ -221,9 +221,6 @@ func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
 	second, err := ProjectFinancialModel(model, &withEval, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if hits, misses := BasePathCacheStats(); hits != 1 || misses != 1 {
-		t.Fatalf("eval-only change must reuse the cached base path, got hits=%d misses=%d", hits, misses)
 	}
 	if !reflect.DeepEqual(first.Timeline, second.Timeline) {
 		t.Fatal("eval-only change must not alter the base timeline")
@@ -234,13 +231,61 @@ func TestEvalOnlyChangeReusesBasePath(t *testing.T) {
 	if len(second.Evaluations.NetWorthThreshold) != 1 {
 		t.Fatalf("second result must carry the threshold eval, got %+v", second.Evaluations.NetWorthThreshold)
 	}
-	// The cached base result stays evaluation-free for the next caller.
+	// Each call computes independently, so no result leaks evaluations
+	// into the next caller.
 	third, err := ProjectFinancialModel(model, settings, types.EmptyModelOverrides(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(third.Evaluations.NetWorthThreshold) != 0 {
-		t.Fatal("cached base result must not leak evaluations across calls")
+		t.Fatal("fresh result must not leak evaluations across calls")
+	}
+}
+
+func TestPartitionAndMergePreserveGlobalOrder(t *testing.T) {
+	path := kindTestPath(t)
+	tables := types.EmptyEvaluationTables()
+	tables.NetWorthThreshold = []types.EvaluationInstance[types.JsonValue]{
+		{InstanceID: "t", Name: "T", Enabled: true, Config: map[string]any{"target": 50.0}},
+	}
+	tables.PlannedPurchases = purchaseEvaluation()
+	tables.PlannedPurchases = append(tables.PlannedPurchases, types.EvaluationInstance[types.JsonValue]{
+		InstanceID: "purchases-disabled", Name: "Disabled", Enabled: false, Config: map[string]any{},
+	})
+
+	set := NewEvaluationRuntimeSet(&tables, evaluationRegistryInstance)
+	readers, simulators := set.PartitionByKind()
+	if len(readers.runtimes) != 2 || len(simulators.runtimes) != 1 {
+		t.Fatalf("partition must separate 2 readers from 1 simulator, got %d and %d",
+			len(readers.runtimes), len(simulators.runtimes))
+	}
+	if simulators.runtimes[0].instanceID != "purchases" {
+		t.Fatalf("simulator subset must hold the enabled purchase, got %q", simulators.runtimes[0].instanceID)
+	}
+
+	ctx := &EvaluationContext{Path: path, Model: &path.EffectiveModel, DetailLevel: "detailed"}
+	readers.EvaluateDeterministic(ctx)
+	simulators.EvaluateDeterministic(ctx)
+	readerCollection := readers.Result()
+	simulatorCollection := simulators.Result()
+	merged := MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
+
+	if len(merged.Evaluations.NetWorthThreshold) != 1 {
+		t.Fatalf("merged result must carry the threshold eval, got %+v", merged.Evaluations.NetWorthThreshold)
+	}
+	purchases := merged.Evaluations.PlannedPurchases
+	if len(purchases) != 2 {
+		t.Fatalf("merged result must carry both purchase evals, got %+v", purchases)
+	}
+	if purchases[0].InstanceID != "purchases" || purchases[1].InstanceID != "purchases-disabled" {
+		t.Fatalf("merge must preserve global table order, got %q then %q",
+			purchases[0].InstanceID, purchases[1].InstanceID)
+	}
+	if purchases[1].Status != types.StatusIndeterminate {
+		t.Fatalf("disabled purchase must stay indeterminate, got %q", purchases[1].Status)
+	}
+	if purchases[1].Deterministic != nil {
+		t.Fatalf("disabled purchase must not run, got %+v", purchases[1].Deterministic)
 	}
 }
 

@@ -32,8 +32,6 @@ var domainValidate = domain.ValidateFinancialModel
 
 const (
 	projectionSourceComputed = "computed"
-	projectionSourceStored   = "stored"
-	projectionSourceShared   = "shared"
 )
 
 // Wire fixtures keep whole-router tests independent of private handler types.

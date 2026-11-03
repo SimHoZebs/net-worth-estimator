@@ -68,6 +68,9 @@ func (s *sqliteStore) CreatePosting(posting types.Posting) (types.Posting, error
 	if err != nil {
 		return types.Posting{}, err
 	}
+	if err := s.markDirty(dirtyPosting(posting.PostedTime, posting.TransactionTime)); err != nil {
+		return types.Posting{}, err
+	}
 	return posting, nil
 }
 
@@ -141,11 +144,16 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 	if err != nil {
 		return types.Posting{}, err
 	}
+	// Updates dirty from projection start: an edit can re-date the row in
+	// either direction, and only a stored read would reveal the old date.
+	if err := s.markDirtyStart(); err != nil {
+		return types.Posting{}, err
+	}
 	return posting, nil
 }
 
 func (s *sqliteStore) DeletePosting(id string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		lifecycle, err := postingLifecycleOf(tx, id)
 		if err != nil {
 			return err
@@ -184,10 +192,19 @@ func (s *sqliteStore) DeletePosting(id string) error {
 		}
 		return releaseRowID(tx, id)
 	})
+	if err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 func (s *sqliteStore) MovePosting(id, beforeID string) error {
-	return withRowTx(s.db, func(tx *userTx) error { return moveRow(tx, RowPosting, "", id, beforeID) })
+	if err := withRowTx(s.db, func(tx *userTx) error {
+		return moveRow(tx, RowPosting, "", id, beforeID)
+	}); err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 // ConvertPostingToRule moves one posting across to a recurrence rule in a
@@ -233,6 +250,9 @@ func (s *sqliteStore) ConvertPostingToRule(postingID string, rule types.Recurren
 	if err != nil {
 		return types.RecurrenceRule{}, err
 	}
+	if err := s.markDirtyStart(); err != nil {
+		return types.RecurrenceRule{}, err
+	}
 	return rule, nil
 }
 
@@ -260,6 +280,9 @@ func (s *sqliteStore) ConvertRuleToPosting(ruleID string, posting types.Posting)
 		return insertPosting(tx, rulePos, &posting, SourceUser)
 	})
 	if err != nil {
+		return types.Posting{}, err
+	}
+	if err := s.markDirtyStart(); err != nil {
 		return types.Posting{}, err
 	}
 	return posting, nil

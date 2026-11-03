@@ -24,7 +24,7 @@ func TestEvidencePreservesFullSourceAndRefreshesKnownSettledKeys(t *testing.T) {
 	if len([]rune(item.Name)) != 80 || item.Facts.Description != transaction.Description || item.Facts.Payee != "Klarna" || item.Facts.Metadata["secret"] != "" || item.Facts.Metadata["category"] != "" {
 		t.Fatalf("evidence=%+v", item.Facts)
 	}
-	bank := []store.BankRow{{Posting: types.Posting{ID: "existing", Name: "Owner edited label", Source: store.SourceSimpleFIN}, Keys: []store.BankKey{candidateKey(item)}}}
+	bank := []store.BankRow{{Posting: types.Posting{ID: "existing", Name: "Owner edited label", Source: store.SourceBankSync}, Keys: []store.BankKey{candidateKey(item)}}}
 	directives := Reconcile(nil, translation.Settled, bank, map[string]bool{"checking": true})
 	if len(directives) != 1 || directives[0].Observe == nil || directives[0].Upsert != nil || directives[0].Convert != nil {
 		t.Fatalf("known settled evidence refresh overwrites financial row: %+v", directives)

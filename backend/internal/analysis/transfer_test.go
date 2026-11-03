@@ -175,7 +175,7 @@ func TestTransferSkipsUnusableEvidence(t *testing.T) {
 func TestTransferContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	items := []types.AnalysisTransaction{transferTransaction("a", "x", "simplefin", "TRANSFER OUT", "-1.00", 1)}
+	items := []types.AnalysisTransaction{transferTransaction("a", "x", "banksync", "TRANSFER OUT", "-1.00", 1)}
 	if _, err := (Transfer{}).Analyze(ctx, types.AnalysisSnapshot{Transactions: items}); err != context.Canceled {
 		t.Fatalf("cancellation=%v", err)
 	}

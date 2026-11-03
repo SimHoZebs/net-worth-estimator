@@ -37,12 +37,20 @@ func nextTablePosition(tx *userTx, table string) (int, error) {
 // Incoming owner checkpoints win key collisions, so owners always keep an
 // override path. The key carries the exact instant: several observations
 // per account/day survive, and an owner row wins only at its own instant.
-func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []types.Checkpoint, startPosition int) (int, error) {
+// syncedCheckpoint is a sync-owned checkpoint with its bridge provider.
+// Provider stays store-internal: the wire Checkpoint carries authorship,
+// and sync plumbing (sync keys, provider routing) never enters owner payloads.
+type syncedCheckpoint struct {
+	types.Checkpoint
+	Provider string
+}
+
+func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []syncedCheckpoint, startPosition int) (int, error) {
 	incomingKeys := make(map[string]struct{}, len(incoming))
 	for _, checkpoint := range incoming {
 		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)] = struct{}{}
 	}
-	syncedByKey := make(map[string]types.Checkpoint, len(synced))
+	syncedByKey := make(map[string]syncedCheckpoint, len(synced))
 	for _, checkpoint := range synced {
 		syncedByKey[syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)] = checkpoint
 	}
@@ -71,8 +79,8 @@ func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []types.
 			}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			position, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.ObservedAt,
+			`INSERT INTO checkpoints (position, model_account_id, balance, source, provider, observed_at, user_id, id) VALUES (?,?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
+			position, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.Provider, checkpoint.ObservedAt,
 		); err != nil {
 			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
 		}
@@ -120,19 +128,20 @@ func remergePostings(tx *userTx, incoming []types.Posting, synced []types.Postin
 	return position, nil
 }
 
-func loadSyncedCheckpoints(tx *userTx) ([]types.Checkpoint, error) {
-	// Any non-model source is sync-owned. Sources stay per-provider
-	// (simplefin, plaid, ...) so metrics and debugging can tell bank-data
-	// origins apart; the lifecycle treats them uniformly.
-	rows, err := tx.Query(`SELECT model_account_id, balance, source, observed_at FROM checkpoints WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
+func loadSyncedCheckpoints(tx *userTx) ([]syncedCheckpoint, error) {
+	// Any non-user source is sync-owned. The source is one bank category
+	// and the provider column names the supplying bridge, so metrics and
+	// debugging can tell bank-data origins apart; the lifecycle treats
+	// them uniformly.
+	rows, err := tx.Query(`SELECT model_account_id, balance, source, provider, observed_at FROM checkpoints WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var checkpoints []types.Checkpoint
+	var checkpoints []syncedCheckpoint
 	for rows.Next() {
-		var checkpoint types.Checkpoint
-		if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.ObservedAt); err != nil {
+		var checkpoint syncedCheckpoint
+		if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.Provider, &checkpoint.ObservedAt); err != nil {
 			return nil, err
 		}
 		checkpoints = append(checkpoints, checkpoint)
@@ -144,7 +153,7 @@ func loadSyncedCheckpoints(tx *userTx) ([]types.Checkpoint, error) {
 }
 
 func loadSyncedPostings(tx *userTx) ([]types.Posting, error) {
-	rows, err := tx.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
+	rows, err := tx.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.projection_slice_id IS NULL AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -164,14 +173,21 @@ func loadSyncedPostings(tx *userTx) ([]types.Posting, error) {
 }
 
 // validateSyncCheckpointSource rejects checkpoints without explicit
-// provider provenance. Owner rows are never valid sync input, and no
-// provider is ever defaulted: translation must carry the source.
+// bank provenance. Owner rows are never valid sync input, no source is
+// ever defaulted, and the provider is required so same-instant refresh
+// matches only the supplying bridge.
 func validateSyncCheckpointSource(checkpoint SyncCheckpoint) error {
 	if checkpoint.Source == "" {
 		return fmt.Errorf("sync checkpoint for %s requires a provider source", checkpoint.AccountID)
 	}
 	if checkpoint.Source == SourceUser {
 		return fmt.Errorf("sync checkpoint for %s carries owner source", checkpoint.AccountID)
+	}
+	if checkpoint.Source != SourceBankSync {
+		return fmt.Errorf("sync checkpoint for %s carries unknown source %q", checkpoint.AccountID, checkpoint.Source)
+	}
+	if checkpoint.Provider == "" {
+		return fmt.Errorf("sync checkpoint for %s requires a provider", checkpoint.AccountID)
 	}
 	return nil
 }
@@ -323,11 +339,11 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 		}
 		// Owner rows win key collisions; a sync row from another provider
 		// never overwrites this provider's repeat write. Only the same
-		// provider source refreshes its own checkpoint. Update-first
+		// provider refreshes its own checkpoint. Update-first
 		// avoids the old insert-then-select-then-update round trips.
 		result, err := tx.Exec(
-			`UPDATE checkpoints SET balance = ? WHERE model_account_id = ? AND observed_at = ? AND source = ? AND user_id = :user_id`,
-			checkpoint.Balance, checkpoint.AccountID, checkpoint.ObservedAt, checkpoint.Source,
+			`UPDATE checkpoints SET balance = ? WHERE model_account_id = ? AND observed_at = ? AND source = ? AND provider = ? AND user_id = :user_id`,
+			checkpoint.Balance, checkpoint.AccountID, checkpoint.ObservedAt, checkpoint.Source, checkpoint.Provider,
 		)
 		if err != nil {
 			return summary, fmt.Errorf("sync update checkpoint: %w", err)
@@ -339,8 +355,8 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 			continue
 		}
 		result, err = tx.Exec(
-			`INSERT OR IGNORE INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
-			nextPosition, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.ObservedAt,
+			`INSERT OR IGNORE INTO checkpoints (position, model_account_id, balance, source, provider, observed_at, user_id, id) VALUES (?,?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))`,
+			nextPosition, checkpoint.AccountID, checkpoint.Balance, checkpoint.Source, checkpoint.Provider, checkpoint.ObservedAt,
 		)
 		if err != nil {
 			return summary, fmt.Errorf("sync insert checkpoint: %w", err)
@@ -385,6 +401,13 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 
 	if err := tx.Commit(); err != nil {
 		return summary, fmt.Errorf("sync commit: %w", err)
+	}
+	// Every applied plan dirties the projection from its earliest date.
+	// Direct callers get the same invalidation as the ingest orchestrator.
+	if dirty, changed := dirtyFromSync(checkpoints, directives); changed {
+		if _, err := s.MarkProjectionDirty(dirty); err != nil {
+			return summary, fmt.Errorf("mark projection dirty: %w", err)
+		}
 	}
 	return summary, nil
 }

@@ -45,5 +45,8 @@ func (s *sqliteStore) ImportModel(model *types.FinancialModel) (*types.Financial
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("import commit: %w", err)
 	}
+	if err := s.markDirtyStart(); err != nil {
+		return nil, err
+	}
 	return storedModel, nil
 }

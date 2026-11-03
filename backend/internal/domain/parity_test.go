@@ -127,9 +127,9 @@ func TestValidateFinancialModelAllowsMissingPostedDateOnBankLifecycleRows(t *tes
 	document := &types.FinancialModel{
 		Accounts: []types.Account{cashAccount(account)},
 		Postings: []types.Posting{
-			{ID: "pending", Name: "Pending", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Pending: true},
-			{ID: "voided", Name: "Voided", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "simplefin", Void: true},
-			{ID: "settled", Name: "Settled", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: true, Source: "simplefin"},
+			{ID: "pending", Name: "Pending", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "banksync", Pending: true},
+			{ID: "voided", Name: "Voided", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: false, Source: "banksync", Void: true},
+			{ID: "settled", Name: "Settled", SourceAccountID: &source, Amount: expenseAmount("100"), TransactionTime: unixAt(10, 11), Enabled: true, Source: "banksync"},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
 	}

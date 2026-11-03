@@ -8,28 +8,31 @@ import (
 // without rewriting every signature. The canonical definitions live in
 // the store package; this package owns only SQL, files, and driver details.
 type (
-	SyncCredential   = store.SyncCredential
-	SyncCheckpoint   = store.SyncCheckpoint
-	SyncApplySummary = store.SyncApplySummary
-	SyncProvision    = store.SyncProvision
-	SyncPosting      = store.SyncPosting
-	BankKey          = store.BankKey
-	BankRow          = store.BankRow
-	BankDirective    = store.BankDirective
-	BankUpsert       = store.BankUpsert
-	BankConvert      = store.BankConvert
-	BankObservation  = store.BankObservation
-	Group            = store.Group
-	GroupMember      = store.GroupMember
-	GroupInvite      = store.GroupInvite
-	Friend           = store.Friend
-	AccountLink      = store.AccountLink
-	EvaluationUpdate = store.EvaluationUpdate
+	SyncCredential       = store.SyncCredential
+	SyncCheckpoint       = store.SyncCheckpoint
+	SyncApplySummary     = store.SyncApplySummary
+	SyncProvision        = store.SyncProvision
+	SyncPosting          = store.SyncPosting
+	BankKey              = store.BankKey
+	BankRow              = store.BankRow
+	BankDirective        = store.BankDirective
+	BankUpsert           = store.BankUpsert
+	BankConvert          = store.BankConvert
+	BankObservation      = store.BankObservation
+	Group                = store.Group
+	GroupMember          = store.GroupMember
+	GroupInvite          = store.GroupInvite
+	Friend               = store.Friend
+	AccountLink          = store.AccountLink
+	EvaluationUpdate     = store.EvaluationUpdate
+	GeneratedPosting     = store.GeneratedPosting
+	ProjectionRowPayload = store.ProjectionRowPayload
 )
 
 const (
 	SourceUser          = store.SourceUser
-	SourceSimpleFIN     = store.SourceSimpleFIN
+	SourceBankSync      = store.SourceBankSync
+	ProviderSimpleFIN   = store.ProviderSimpleFIN
 	LinkOriginManual    = store.LinkOriginManual
 	LinkOriginAuto      = store.LinkOriginAuto
 	GroupRoleOwner      = store.GroupRoleOwner

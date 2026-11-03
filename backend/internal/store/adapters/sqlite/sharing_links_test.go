@@ -299,7 +299,7 @@ func TestSharingCopyOfBankPostingMintsNoDuplicate(t *testing.T) {
 	const amountJSON = `{"resolver":"expression","config":{"expression":"50"},"inputs":{}}`
 	for _, stmt := range []string{
 		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, user_id)
-		 VALUES ('` + sharingBankPosting + `', 'Bank charge', 'checking', 'null', '` + amountJSON + `', 1782950400, 1782950400, 'simplefin', 0, 0, '` + alice + `')`,
+		 VALUES ('` + sharingBankPosting + `', 'Bank charge', 'checking', 'null', '` + amountJSON + `', 1782950400, 1782950400, 'banksync', 0, 0, '` + alice + `')`,
 		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id) VALUES ('` + sharingBankPosting + `', 1, 1, 1, '` + alice + `')`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + sharingBankPosting + `', 'posting', '` + alice + `')`,
 		`INSERT INTO posting_sync_keys (provider, bridge_account_id, transaction_id, posting_id, user_id) VALUES ('simplefin', 'bridge-prime', 'tx-bank-1', '` + sharingBankPosting + `', '` + alice + `')`,

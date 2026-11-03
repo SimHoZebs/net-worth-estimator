@@ -157,7 +157,7 @@ func TestGroupFeedIncludesPending(t *testing.T) {
 	d, alice, bob, storeA, _ := feedFixture(t)
 	group := sharingGroup(t, d, "alice-feed", "Cabin", "bob-feed")
 	posting := sharingPosting(t, storeA, feedPostingA)
-	if _, err := d.db.Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE user_id = ? AND id = ?`, alice, posting.ID); err != nil {
+	if _, err := d.db.Exec(`UPDATE postings SET pending = 1, source = 'banksync' WHERE user_id = ? AND id = ?`, alice, posting.ID); err != nil {
 		t.Fatal(err)
 	}
 	feedGrant(t, d, alice, feedPostingA, store.SharingAudienceGroup, group)

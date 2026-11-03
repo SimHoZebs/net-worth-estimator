@@ -3,7 +3,6 @@ package sqlite
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/testseed"
 	"path/filepath"
@@ -152,9 +151,6 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if err := s.SetLastSyncTime("before"); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.PutArtifact("same-artifact", "deterministic", s.db.userID); err != nil {
-			t.Fatal(err)
-		}
 		// Migrated sources may contain the exact same local sync UUID.
 		tx, err := s.db.Begin()
 		if err != nil {
@@ -162,11 +158,11 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		}
 		pending := syncPendingPosting("same-transaction", "checking", "2026-08-02")
 		pending.ID = pendingID
-		if err := insertPosting(tx, 1, &pending.Posting, SourceSimpleFIN); err != nil {
+		if err := insertPosting(tx, 1, &pending.Posting, SourceBankSync); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}
-		if err := insertPostingSyncKey(tx, postingSyncKey{SourceSimpleFIN, pending.ProviderAccountID, pending.TransactionID, pendingID}); err != nil {
+		if err := insertPostingSyncKey(tx, postingSyncKey{ProviderSimpleFIN, pending.ProviderAccountID, pending.TransactionID, pendingID}); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}
@@ -222,7 +218,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		},
 		func() error {
 			item := syncPendingPosting("same-transaction", "checking", "2026-08-03")
-			_, err := a.ApplySync([]SyncCheckpoint{{AccountID: "checking", Balance: 50, Source: SourceSimpleFIN, ObservedAt: 1769990399}}, []BankDirective{syncPendingDirective(item)})
+			_, err := a.ApplySync([]SyncCheckpoint{{AccountID: "checking", Balance: 50, Source: SourceBankSync, Provider: ProviderSimpleFIN, ObservedAt: 1769990399}}, []BankDirective{syncPendingDirective(item)})
 			return err
 		},
 		func() error { return a.SetLastSyncTime("after") },
@@ -246,14 +242,8 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		}
 		checkOther()
 	}
-	if payload, ok, err := b.GetArtifact("same-artifact"); err != nil || !ok || payload != "b" {
-		t.Fatalf("artifact = %q, %v, %v", payload, ok, err)
-	}
 	if exists, err := a.ModelExists(); err != nil || exists {
 		t.Fatalf("cleared presence = %v, %v", exists, err)
-	}
-	if _, ok, err := a.GetArtifact("same-artifact"); err != nil || ok {
-		t.Fatalf("cleared artifact = %v, %v", ok, err)
 	}
 }
 
@@ -319,46 +309,6 @@ func TestSharedDatabaseOwnershipLifecycleAndSeedOnce(t *testing.T) {
 	}
 }
 
-func TestSharedDatabaseArtifactEvictionIsPlanLocal(t *testing.T) {
-	d := openSharedTestDatabase(t)
-	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
-	if err := b.PutArtifact("old", "deterministic", "keep"); err != nil {
-		t.Fatal(err)
-	}
-	before := planSnapshot(t, b)
-	for i := range maxArtifacts + 4 {
-		if err := a.PutArtifact(fmt.Sprint(i), "deterministic", "payload"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := countRows(t, a, "projection_artifacts", ""); got != maxArtifacts {
-		t.Fatalf("artifact count = %d", got)
-	}
-	if !reflect.DeepEqual(before, planSnapshot(t, b)) {
-		t.Fatal("artifact eviction crossed plans")
-	}
-}
-
-func TestSharedDatabaseArtifactEvictionIsKindLocal(t *testing.T) {
-	d := openSharedTestDatabase(t)
-	a, _ := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
-	if err := a.PutArtifact("projection", "deterministic", "keep"); err != nil {
-		t.Fatal(err)
-	}
-	for i := range maxArtifacts + 4 {
-		if err := a.PutArtifact(fmt.Sprint(i), "stochastic", "payload"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := countRows(t, a, "projection_artifacts", ""); got != maxArtifacts+1 {
-		t.Fatalf("artifact count = %d", got)
-	}
-	payload, found, err := a.GetArtifact("projection")
-	if err != nil || !found || payload != "keep" {
-		t.Fatalf("range burst evicted the stored projection = %q found %v err %v", payload, found, err)
-	}
-}
-
 func TestSharedDatabaseRejectsCrossPlanRelationalReferences(t *testing.T) {
 	d := openSharedTestDatabase(t)
 	a, b := privateTestPlan(t, d, "a"), privateTestPlan(t, d, "b")
@@ -398,15 +348,15 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 		t.Fatal(err)
 	}
 	settledDirective := func(item SyncPosting) BankDirective {
-		item.Source = SourceSimpleFIN
+		item.Source = SourceBankSync
 		return BankDirective{Upsert: &BankUpsert{
 			Posting: item.Posting,
-			Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+			Keys:    []BankKey{{Provider: ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
 		}}
 	}
 	for user, s := range map[string]*sqliteStore{"a": a, "b": b} {
 		if _, err := s.ApplySync(
-			[]SyncCheckpoint{{AccountID: "checking", Balance: 10, Source: SourceSimpleFIN, ObservedAt: instant + 86400}},
+			[]SyncCheckpoint{{AccountID: "checking", Balance: 10, Source: SourceBankSync, Provider: ProviderSimpleFIN, ObservedAt: instant + 86400}},
 			[]BankDirective{settledDirective(syncSettledPosting("tx-"+user, "checking", "Settled "+user, "2026-08-06"))},
 		); err != nil {
 			t.Fatal(err)
@@ -418,7 +368,7 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, posting := range loaded.Postings {
-			if posting.Source == SourceSimpleFIN && !posting.Pending {
+			if posting.Source == SourceBankSync && !posting.Pending {
 				return posting.ID
 			}
 		}

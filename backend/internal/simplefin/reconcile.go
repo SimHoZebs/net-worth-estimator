@@ -139,7 +139,7 @@ func candidateKey(item store.SyncPosting) store.BankKey {
 	// The provider identity is SimpleFIN knowledge: pending authorizations
 	// and posted charges from this bridge share one key namespace, which is
 	// what lets a posted charge convert the pending row it settles.
-	return bankKey(store.SourceSimpleFIN, item.ProviderAccountID, item.TransactionID)
+	return bankKey(store.ProviderSimpleFIN, item.ProviderAccountID, item.TransactionID)
 }
 
 // Reconcile translates one mapped snapshot plus loaded bank rows into store
@@ -159,12 +159,12 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceSimpleFIN {
+		if row.Posting.Source != store.SourceBankSync {
 			continue
 		}
 		byID[row.Posting.ID] = row
 		for _, key := range row.Keys {
-			if key.Provider != store.SourceSimpleFIN {
+			if key.Provider != store.ProviderSimpleFIN {
 				continue
 			}
 			byKey[key] = row.Posting.ID
@@ -212,7 +212,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	settledByAccount := map[string][]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceSimpleFIN {
+		if row.Posting.Source != store.SourceBankSync {
 			continue
 		}
 		if row.Posting.Pending || row.Posting.Void {
@@ -273,7 +273,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var targets []convertTarget
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceSimpleFIN {
+		if row.Posting.Source != store.SourceBankSync {
 			continue
 		}
 		account, ok := rowAccount(row.Posting)
@@ -349,7 +349,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	convertsHold := func(row store.BankRow) bool {
 		for _, key := range row.Keys {
-			if key.Provider != store.SourceSimpleFIN {
+			if key.Provider != store.ProviderSimpleFIN {
 				continue
 			}
 			if willConvert[key] {

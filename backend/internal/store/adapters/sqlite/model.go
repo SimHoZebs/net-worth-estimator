@@ -90,14 +90,19 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM email_receipts WHERE user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear email receipts: %w", err)
 	}
-	if _, err := tx.Exec(`DELETE FROM projection_artifacts WHERE user_id = :user_id`); err != nil {
-		return err
-	}
 	if _, err := tx.Exec(`DELETE FROM monte_carlo_statistics WHERE user_id = :user_id`); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`DELETE FROM projection_slices WHERE user_id = :user_id`); err != nil {
 		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM projection_rows WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	for _, table := range []string{"net_worth_threshold_outputs", "account_balance_outputs", "posting_fulfillment_outputs", "cycle_fulfillment_outputs", "planned_purchases_outputs", "financial_independence_outputs", "whatif_outputs"} {
+		if _, err := tx.Exec(`DELETE FROM ` + table + ` WHERE user_id = :user_id`); err != nil {
+			return err
+		}
 	}
 	if _, err := tx.Exec(`DELETE FROM projection_states WHERE user_id = :user_id`); err != nil {
 		return err
@@ -560,7 +565,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, fmt.Errorf("close checkpoints: %w", err)
 	}
 
-	postingRows, err := q.Query(`SELECT ` + postingSelect + ` ` + postingJoins + ` WHERE p.user_id = :user_id ORDER BY s.position`)
+	postingRows, err := q.Query(`SELECT ` + postingSelect + ` ` + postingJoins + ` WHERE p.user_id = :user_id AND p.projection_slice_id IS NULL ORDER BY s.position`)
 	if err != nil {
 		return nil, err
 	}

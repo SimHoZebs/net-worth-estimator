@@ -10,9 +10,9 @@ func seedTransferLeg(t *testing.T, s *sqliteStore, name, account, bridge, transa
 	t.Helper()
 	seedAccount(t, s, account)
 	applyDirectives(t, s, []BankDirective{
-		bankUpsertDirective(bankSeedPosting(name, account, amount, false), SourceSimpleFIN, bridge, transaction),
+		bankUpsertDirective(bankSeedPosting(name, account, amount, false), ProviderSimpleFIN, bridge, transaction),
 		{Observe: &BankObservation{
-			Keys:  bankKeys(SourceSimpleFIN, bridge, transaction),
+			Keys:  bankKeys(ProviderSimpleFIN, bridge, transaction),
 			Facts: types.TransactionFacts{Description: name, Amount: amount, Currency: "USD", PostedTime: 1785628800},
 		}},
 	})
@@ -81,7 +81,7 @@ func TestTransferFindingsPairLegsAndSurviveReruns(t *testing.T) {
 		t.Fatal(err)
 	}
 	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{
-		Keys:  bankKeys(SourceSimpleFIN, "bridge-card", "in-1"),
+		Keys:  bankKeys(ProviderSimpleFIN, "bridge-card", "in-1"),
 		Facts: types.TransactionFacts{Description: "PAYMENT RECEIVED", Memo: "autopay", Amount: "500.00", Currency: "USD", PostedTime: 1785628800},
 	}}})
 	third := completeTransferAnalysis(t, s, detections)

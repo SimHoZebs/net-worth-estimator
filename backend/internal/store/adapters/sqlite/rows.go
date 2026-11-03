@@ -85,7 +85,7 @@ func orderedIDs(tx *userTx, kind RowKind, evaluationType string) ([]string, erro
 	case RowAccount:
 		query = `SELECT id FROM accounts WHERE user_id = :user_id ORDER BY position`
 	case RowPosting:
-		query = `SELECT p.id FROM postings p LEFT JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id WHERE p.user_id = :user_id ORDER BY s.position`
+		query = `SELECT p.id FROM postings p LEFT JOIN posting_sim s ON s.user_id = p.user_id AND s.posting_id = p.id WHERE p.user_id = :user_id AND p.projection_slice_id IS NULL ORDER BY s.position`
 	case RowRule:
 		query = `SELECT id FROM recurrence_rules WHERE user_id = :user_id ORDER BY position`
 	case RowEvaluation:
@@ -255,9 +255,9 @@ func upsertCheckpointTx(tx *userTx, checkpoint types.Checkpoint) error {
 		return err
 	}
 	result, err := tx.Exec(
-		`INSERT INTO checkpoints (position, model_account_id, balance, source, observed_at, user_id, id) VALUES (?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))
-		 ON CONFLICT(user_id, model_account_id, observed_at) DO UPDATE SET balance = excluded.balance, source = excluded.source`,
-		position, checkpoint.AccountID, checkpoint.Balance, SourceUser, checkpoint.ObservedAt,
+		`INSERT INTO checkpoints (position, model_account_id, balance, source, provider, observed_at, user_id, id) VALUES (?,?,?,?,?,?, :user_id, (SELECT COALESCE(MAX(id), 0) + 1 FROM checkpoints WHERE user_id = :user_id))
+		 ON CONFLICT(user_id, model_account_id, observed_at) DO UPDATE SET balance = excluded.balance, source = excluded.source, provider = ''`,
+		position, checkpoint.AccountID, checkpoint.Balance, SourceUser, "", checkpoint.ObservedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("save checkpoint %s %d: %w", checkpoint.AccountID, checkpoint.ObservedAt, err)
@@ -306,18 +306,26 @@ func (s *sqliteStore) CreateAccountWithBalance(account types.Account, balance *f
 	if err != nil {
 		return types.Account{}, err
 	}
+	if balance != nil {
+		if err := s.markDirty(observedAt); err != nil {
+			return types.Account{}, err
+		}
+	}
 	return account, nil
 }
 
-// UpdateAccount replaces one owner account by ID. The ID is immutable.
+// Account writes dirty from projection start: bounds, kind, and enabled gate
+// every projected event, and edits carry no date to scope a suffix.
 func (s *sqliteStore) UpdateAccount(account types.Account) (types.Account, error) {
 	if account.ID == "" {
 		return types.Account{}, NotFound("")
 	}
-	err := withRowTx(s.db, func(tx *userTx) error {
+	if err := withRowTx(s.db, func(tx *userTx) error {
 		return updateAccountTx(tx, &account)
-	})
-	if err != nil {
+	}); err != nil {
+		return types.Account{}, err
+	}
+	if err := s.markDirtyStart(); err != nil {
 		return types.Account{}, err
 	}
 	return account, nil
@@ -329,7 +337,7 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 	if account.ID == "" {
 		return types.Account{}, NotFound("")
 	}
-	err := withRowTx(s.db, func(tx *userTx) error {
+	if err := withRowTx(s.db, func(tx *userTx) error {
 		if err := updateAccountTx(tx, &account); err != nil {
 			return err
 		}
@@ -337,8 +345,10 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 			return nil
 		}
 		return upsertCheckpointTx(tx, types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: SourceUser, ObservedAt: observedAt})
-	})
-	if err != nil {
+	}); err != nil {
+		return types.Account{}, err
+	}
+	if err := s.markDirtyStart(); err != nil {
 		return types.Account{}, err
 	}
 	return account, nil
@@ -354,7 +364,7 @@ func (s *sqliteStore) UpdateAccountWithBalance(account types.Account, balance *f
 // preferences lose the deleted account in the same transaction (with a
 // version bump each), so consent never silently reattaches on ID reuse.
 func (s *sqliteStore) DeleteAccount(id string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		result, err := tx.Exec(`DELETE FROM accounts WHERE id = ? AND user_id = :user_id`, id)
 		if err != nil {
 			return fmt.Errorf("delete account %s: %w", id, err)
@@ -371,6 +381,10 @@ func (s *sqliteStore) DeleteAccount(id string) error {
 		}
 		return releaseRowID(tx, id)
 	})
+	if err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 // MoveAccount positions one account before another (or appends).
@@ -402,6 +416,9 @@ func (s *sqliteStore) CreateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 	if err != nil {
 		return types.RecurrenceRule{}, err
 	}
+	if err := s.markDirty(dirtyDay(string(rule.StartDate))); err != nil {
+		return types.RecurrenceRule{}, err
+	}
 	return rule, nil
 }
 
@@ -426,12 +443,15 @@ func (s *sqliteStore) UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 	if err != nil {
 		return types.RecurrenceRule{}, err
 	}
+	if err := s.markDirtyStart(); err != nil {
+		return types.RecurrenceRule{}, err
+	}
 	return rule, nil
 }
 
 // DeleteRule removes one recurrence rule.
 func (s *sqliteStore) DeleteRule(id string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, id)
 		if err != nil {
 			return fmt.Errorf("delete rule %s: %w", id, err)
@@ -445,13 +465,20 @@ func (s *sqliteStore) DeleteRule(id string) error {
 		}
 		return releaseRowID(tx, id)
 	})
+	if err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 // MoveRule positions one rule before another (or appends).
 func (s *sqliteStore) MoveRule(id, beforeID string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	if err := withRowTx(s.db, func(tx *userTx) error {
 		return moveRow(tx, RowRule, "", id, beforeID)
-	})
+	}); err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 // SaveCheckpoint upserts one owner checkpoint by account/instant. An owner
@@ -464,6 +491,9 @@ func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpo
 	if err != nil {
 		return types.Checkpoint{}, err
 	}
+	if err := s.markDirty(checkpoint.ObservedAt); err != nil {
+		return types.Checkpoint{}, err
+	}
 	return checkpoint, nil
 }
 
@@ -471,9 +501,12 @@ func (s *sqliteStore) SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpo
 // account/instant, regardless of owner. A deleted sync row returns on
 // the next sync.
 func (s *sqliteStore) DeleteCheckpointAt(accountID string, observedAt int64) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	if err := withRowTx(s.db, func(tx *userTx) error {
 		return deleteCheckpoints(tx, accountID, observedAt)
-	})
+	}); err != nil {
+		return err
+	}
+	return s.markDirty(observedAt)
 }
 
 func deleteCheckpoints(tx *userTx, accountID string, observedAt int64) error {
@@ -683,12 +716,15 @@ func (s *sqliteStore) SavePaymentTerms(terms types.PaymentTerms) (types.PaymentT
 	if err != nil {
 		return types.PaymentTerms{}, err
 	}
+	if err := s.markDirtyStart(); err != nil {
+		return types.PaymentTerms{}, err
+	}
 	return terms, nil
 }
 
 // DeletePaymentTerms removes the terms row for one account.
 func (s *sqliteStore) DeletePaymentTerms(accountID string) error {
-	return withRowTx(s.db, func(tx *userTx) error {
+	err := withRowTx(s.db, func(tx *userTx) error {
 		result, err := tx.Exec(`DELETE FROM payment_terms WHERE model_account_id = ? AND user_id = :user_id`, accountID)
 		if err != nil {
 			return fmt.Errorf("delete payment terms %s: %w", accountID, err)
@@ -702,6 +738,10 @@ func (s *sqliteStore) DeletePaymentTerms(accountID string) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	return s.markDirtyStart()
 }
 
 // ListAccountLinks returns all bridge-to-model bindings.

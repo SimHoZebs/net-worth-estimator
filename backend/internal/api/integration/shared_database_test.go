@@ -129,13 +129,13 @@ func TestSharedDatabaseAPIProjectionResultsRemainUserScoped(t *testing.T) {
 			t.Fatal(err)
 		}
 		handler := New(plan, Config{ResourceID: resource.ID})
-		for _, source := range []string{projectionSourceComputed, projectionSourceStored} {
+		for range 2 {
 			request := httptest.NewRequest(http.MethodPost, "/v1/projections/deterministic", bytes.NewReader(body))
 			request.Header.Set("Content-Type", "application/json")
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, request)
-			if response.Code != http.StatusOK || response.Header().Get("Projection-Source") != source {
-				t.Fatalf("account %s wanted %s: %d %s", subject, source, response.Code, response.Body.String())
+			if response.Code != http.StatusOK || response.Header().Get("Projection-Source") != projectionSourceComputed {
+				t.Fatalf("account %s wanted computed: %d %s", subject, response.Code, response.Body.String())
 			}
 			var payload struct {
 				Result *types.ProjectionResult `json:"result"`

@@ -249,7 +249,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 			PostedTime:      at,
 			TransactionTime: at,
 			Enabled:         true,
-			Source:          "simplefin",
+			Source:          "banksync",
 		})
 		for i := 0; i < 80; i++ {
 			day := stamp(2025, current, (i%28)+1)
@@ -261,7 +261,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 				PostedTime:      day,
 				TransactionTime: day,
 				Enabled:         true,
-				Source:          "simplefin",
+				Source:          "banksync",
 			})
 		}
 	}
@@ -275,7 +275,7 @@ func settledHistoryTestModel() *types.FinancialModel {
 		PostedTime:      moveAt,
 		TransactionTime: moveAt,
 		Enabled:         true,
-		Source:          "simplefin",
+		Source:          "banksync",
 	})
 	// Rows that must never draw edges: a void authorization, an
 	// owner-disabled row, a zero amount, each dated inside the window. An
@@ -284,22 +284,22 @@ func settledHistoryTestModel() *types.FinancialModel {
 		{
 			ID: "void-hold", Name: "Voided hold", SourceAccountID: &checking,
 			Amount: flowTestAmount("90"), PostedTime: moveAt, TransactionTime: moveAt,
-			Enabled: true, Source: "simplefin", Void: true,
+			Enabled: true, Source: "banksync", Void: true,
 		},
 		{
 			ID: "disabled-groceries", Name: "Disabled", SourceAccountID: &checking,
 			Amount: flowTestAmount("80"), PostedTime: moveAt, TransactionTime: moveAt,
-			Enabled: false, Source: "simplefin",
+			Enabled: false, Source: "banksync",
 		},
 		{
 			ID: "zero-fee", Name: "Zero", SourceAccountID: &checking,
 			Amount: flowTestAmount("0"), PostedTime: moveAt, TransactionTime: moveAt,
-			Enabled: true, Source: "simplefin",
+			Enabled: true, Source: "banksync",
 		},
 		{
 			ID: "pending-fuel", Name: "Pending fuel", SourceAccountID: &checking,
 			Amount: flowTestAmount("70"), PostedTime: moveAt, TransactionTime: moveAt,
-			Enabled: true, Source: "simplefin", Pending: true,
+			Enabled: true, Source: "banksync", Pending: true,
 		},
 	}
 	model.Postings = append(model.Postings, edgeCases...)

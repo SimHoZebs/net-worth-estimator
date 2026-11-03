@@ -20,27 +20,51 @@ func init() {
 }
 
 // ProjectFinancialModel produces the full public projection result.
-// The base path comes from the base-path cache (keyed without evaluations);
-// evaluations run separately against the cached path, so eval-only changes
-// never rerun the base simulation.
+// Every call prepares, simulates, and evaluates directly. No content
+// hashes and no cross-request caches exist: repeat requests recompute.
+// Suffix reuse across requests arrives with slice persistence.
 func ProjectFinancialModel(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionResult, error) {
-	_, path, baseResult, err := projectBaseWithCache(model, settings, overrides, monteCarloSample)
+	_, result, err := ProjectWithPath(model, settings, overrides, monteCarloSample)
+	return result, err
+}
+
+// ProjectWithPath produces the evaluator-facing path plus the full public
+// result. The unified builder persists both; readers reassemble results
+// without recomputing.
+func ProjectWithPath(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides, monteCarloSample *types.MonteCarloSample) (*types.ProjectionPath, *types.ProjectionResult, error) {
+	prepared, err := orchestratedPrepare(model, settings, overrides, monteCarloSample)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	// Reader and simulator results change only when the base content or the
-	// eval configuration changes: serve each stored system to every later
-	// identical request instead of recomputing per request. Detail stays in
-	// the simulator key because simulators honor it; readers ignore it.
-	baseHash := BaseModelHash(model, overrides, settings, monteCarloSample)
+	run, err := orchestratedSimulate(prepared.Request)
+	if err != nil {
+		return nil, nil, err
+	}
+	path, baseResult := AdaptSimulationRun(prepared, &run)
+	result := *baseResult
+	result.Evaluations = EvaluateProjectionPath(path, settings, monteCarloSample)
+	return path, &result, nil
+}
+
+// EvaluateProjectionPath runs reader and simulator evaluations against a
+// built path. The projection entry points share it so stored and computed
+// results attach identical evaluation tables.
+func EvaluateProjectionPath(path *types.ProjectionPath, settings *types.ProjectionRuntimeSettings, monteCarloSample *types.MonteCarloSample) types.EvaluationResultTables {
 	set := NewEvaluationRuntimeSet(&settings.Evaluations, evaluationRegistryInstance)
 	readers, simulators := set.PartitionByKind()
-	readerCollection := projectReaderEvaluationsWithCache(path, baseHash, readers)
-	simulatorCollection := projectSimulatorEvaluationsWithCache(path, baseHash, simulators, monteCarloSample, "detailed")
-	collection := MergeEvaluationResultCollections(set, readerCollection, simulatorCollection)
-	// Copy the shell: the cached base result stays evaluation-free for the
-	// next caller with different eval config.
-	result := *baseResult
-	result.Evaluations = collection.Evaluations
-	return &result, nil
+	readers.EvaluateDeterministic(&EvaluationContext{
+		Path:        path,
+		Model:       &path.EffectiveModel,
+		DetailLevel: "detailed",
+	})
+	readerCollection := readers.Result()
+	simulators.EvaluateDeterministic(&EvaluationContext{
+		Path:             path,
+		Model:            &path.EffectiveModel,
+		MonteCarloSample: monteCarloSample,
+		DetailLevel:      "detailed",
+	})
+	simulatorCollection := simulators.Result()
+	collection := MergeEvaluationResultCollections(set, &readerCollection, &simulatorCollection)
+	return collection.Evaluations
 }

@@ -156,17 +156,17 @@ func TestFlowsIncludesSettledHistoryAsActual(t *testing.T) {
 			{
 				ID: "salary", Name: "Salary", Destinations: []string{"checking"},
 				Amount: expression("3000"), PostedTime: salaryAt, TransactionTime: salaryAt,
-				Enabled: true, Source: "simplefin",
+				Enabled: true, Source: "banksync",
 			},
 			{
 				ID: "groceries", Name: "Groceries", SourceAccountID: &checking,
 				Amount: expression("120"), PostedTime: groceriesAt, TransactionTime: groceriesAt,
-				Enabled: true, Source: "simplefin",
+				Enabled: true, Source: "banksync",
 			},
 			{
 				ID: "save", Name: "Save", SourceAccountID: &checking, Destinations: []string{"savings"},
 				Amount: expression("500"), PostedTime: saveAt, TransactionTime: saveAt,
-				Enabled: true, Source: "simplefin",
+				Enabled: true, Source: "banksync",
 			},
 		},
 	}

@@ -48,9 +48,9 @@ func seedSyncRows(t *testing.T, store *sqliteStore) {
 	execSyncSetup(t, store, []string{
 		`INSERT INTO accounts (id, position, name, enabled, user_id) VALUES ('prime_card', 1, 'Prime', 1, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('prime_card', 'account', :user_id)`,
-		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, observed_at, user_id) VALUES (10, 10, 'checking', 111, 'simplefin', 1785628799, :user_id)`,
+		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, provider, observed_at, user_id) VALUES (10, 10, 'checking', 111, 'banksync', 'simplefin', 1785628799, :user_id)`,
 		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
-		 VALUES ('` + rawSyncedPostingID + `', 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'simplefin', 1, :user_id)`,
+		 VALUES ('` + rawSyncedPostingID + `', 'Pending charge', 'prime_card', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'banksync', 1, :user_id)`,
 		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id)
 		 VALUES ('` + rawSyncedPostingID + `', 10, 0, 0, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + rawSyncedPostingID + `', 'posting', :user_id)`,
@@ -108,7 +108,7 @@ func seedSyncState(t *testing.T, store store.Store) {
 	}
 	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
 	summary, err := store.ApplySync(
-		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, Source: SourceSimpleFIN, ObservedAt: 1785628799}},
+		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, Source: SourceBankSync, Provider: ProviderSimpleFIN, ObservedAt: 1785628799}},
 		[]BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
 		t.Fatalf("seed sync state = %+v, err %v", summary, err)
@@ -178,15 +178,15 @@ func TestDeleteReferencedAccountFailsWithoutChangingSyncRows(t *testing.T) {
 
 func TestRemergePreservesProviderSources(t *testing.T) {
 	// A second bank-data provider (stand-in "plaid") coexists with SimpleFIN
-	// rows. Model replace must keep every provider's source value so
-	// metrics and debugging can tell origins apart.
+	// rows. Model replace must keep bank rows as bank facts with the
+	// supplying provider on the checkpoint row so origins stay distinct.
 	store := openSQLiteStore(t)
 	seedOwnerModel(t, store)
 	seedSyncRows(t, store)
 	execSyncSetup(t, store, []string{
-		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, observed_at, user_id) VALUES (11, 11, 'checking', 222, 'plaid', 1785715199, :user_id)`,
+		`INSERT INTO checkpoints (id, position, model_account_id, balance, source, provider, observed_at, user_id) VALUES (11, 11, 'checking', 222, 'banksync', 'simplefin', 1785715199, :user_id)`,
 		`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, user_id)
-		 VALUES ('` + otherSyncedPostingID + `', 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'plaid', 1, :user_id)`,
+		 VALUES ('` + otherSyncedPostingID + `', 'Plaid pending', 'checking', 'null', '` + syncTestAmountJSON + `', 1785628800, 1785628800, 'banksync', 1, :user_id)`,
 		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id)
 		 VALUES ('` + otherSyncedPostingID + `', 11, 0, 0, :user_id)`,
 		`INSERT INTO entity_ids (id, kind, user_id) VALUES ('` + otherSyncedPostingID + `', 'posting', :user_id)`,
@@ -214,11 +214,11 @@ func TestRemergePreservesProviderSources(t *testing.T) {
 		sources["posting:"+posting.ID] = posting.Source
 	}
 	for key, want := range map[string]string{
-		"checkpoint:checking:1785628799":  "simplefin",
-		"checkpoint:checking:1785715199":  "plaid",
+		"checkpoint:checking:1785628799":  "banksync",
+		"checkpoint:checking:1785715199":  "banksync",
 		"checkpoint:checking:1782950399":  "user",
-		"posting:" + rawSyncedPostingID:   "simplefin",
-		"posting:" + otherSyncedPostingID: "plaid",
+		"posting:" + rawSyncedPostingID:   "banksync",
+		"posting:" + otherSyncedPostingID: "banksync",
 		"posting:" + ownerPostingID:       "user",
 	} {
 		if sources[key] != want {
@@ -290,11 +290,11 @@ func syncedPendingIDs(model *types.FinancialModel) []string {
 // syncPendingDirective mirrors what adapters emit for a pending seed:
 // bank source with explicit pending lifecycle.
 func syncPendingDirective(item SyncPosting) BankDirective {
-	item.Source = SourceSimpleFIN
+	item.Source = SourceBankSync
 	item.Pending = true
 	return BankDirective{Upsert: &BankUpsert{
 		Posting: item.Posting,
-		Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
+		Keys:    []BankKey{{Provider: ProviderSimpleFIN, AccountID: item.ProviderAccountID, TransactionID: item.TransactionID}},
 	}}
 }
 
@@ -332,11 +332,11 @@ func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 	}
 	id := model.Postings[0].ID
 	settled := syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03")
-	settled.Source = SourceSimpleFIN
+	settled.Source = SourceBankSync
 	summary, err := store.ApplySync(nil, []BankDirective{{Convert: &BankConvert{
 		ID:      id,
 		Posting: settled.Posting,
-		AddKeys: []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+		AddKeys: []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
 	}}})
 	if err != nil || summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v, err %v", summary, err)
@@ -346,7 +346,7 @@ func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 		t.Fatal("convert changed row count")
 	}
 	row := converted.Postings[0]
-	if row.ID != id || row.Source != SourceSimpleFIN || row.Pending || row.Void || !row.Enabled {
+	if row.ID != id || row.Source != SourceBankSync || row.Pending || row.Void || !row.Enabled {
 		t.Fatalf("converted row = %+v, want enabled settled participant", row)
 	}
 	rows, err := store.LoadBankPostings()
@@ -359,10 +359,10 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
 	settled := syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03")
-	settled.Source = SourceSimpleFIN
+	settled.Source = SourceBankSync
 	if _, err := database.ApplySync(nil, []BankDirective{{Upsert: &BankUpsert{
 		Posting: settled.Posting,
-		Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
+		Keys:    []BankKey{{Provider: ProviderSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
 	}}}); err != nil {
 		t.Fatal(err)
 	}

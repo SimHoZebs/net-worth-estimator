@@ -27,7 +27,7 @@ import (
 // Config controls HTTP integration behavior.
 type Config struct {
 	ReceiptSource *receipts.Source
-	// ResourceID namespaces in-flight projections as well as persisted artifacts.
+	// ResourceID namespaces in-flight projections per account.
 	ResourceID     string
 	CanWrite       func(context.Context) bool
 	Actor          func(context.Context) string

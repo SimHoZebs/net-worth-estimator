@@ -16,7 +16,7 @@ func bankSeedPosting(name, account, amount string, pending bool) types.Posting {
 	source := &account
 	return types.Posting{
 		Name:            name,
-		Source:          SourceSimpleFIN,
+		Source:          SourceBankSync,
 		SourceAccountID: source,
 		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 		PostedTime:      1785628800,
@@ -45,7 +45,7 @@ func applyDirectives(t *testing.T, database store.Store, directives []BankDirect
 func TestClaimedPendingSurvivesBankRefresh(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
-	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", true), SourceSimpleFIN, "bridge-prime", "pend1")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", true), ProviderSimpleFIN, "bridge-prime", "pend1")
 	if first := applyDirectives(t, database, []BankDirective{upsert}); first.PendingInserted != 1 {
 		t.Fatalf("seed = %+v", first)
 	}
@@ -88,7 +88,7 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
 	applyDirectives(t, database, []BankDirective{bankUpsertDirective(
-		bankSeedPosting("Corner Store", "prime_card", "42.10", true), SourceSimpleFIN, "bridge-prime", "pend1")})
+		bankSeedPosting("Corner Store", "prime_card", "42.10", true), ProviderSimpleFIN, "bridge-prime", "pend1")})
 	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 1 {
 		t.Fatalf("rows = %+v, err %v", loaded, err)
@@ -107,7 +107,7 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 	summary := applyDirectives(t, database, []BankDirective{{Convert: &BankConvert{
 		ID:      id,
 		Posting: settled,
-		AddKeys: bankKeys(SourceSimpleFIN, "bridge-prime", "post1"),
+		AddKeys: bankKeys(ProviderSimpleFIN, "bridge-prime", "post1"),
 	}}})
 	if summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v", summary)
@@ -136,7 +136,7 @@ func TestClaimPendingPromotesPostedTime(t *testing.T) {
 	// authorization instant.
 	seed := bankSeedPosting("Bistro", "prime_card", "50.00", true)
 	seed.PostedTime = 0
-	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, SourceSimpleFIN, "bridge-prime", "pend1")})
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(seed, ProviderSimpleFIN, "bridge-prime", "pend1")})
 	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 1 {
 		t.Fatalf("rows = %+v, err %v", loaded, err)
@@ -168,7 +168,7 @@ func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	seedAccount(t, database, "prime_card")
 	upsert := BankDirective{Upsert: &BankUpsert{
 		Posting: bankSeedPosting("Corner Store", "prime_card", "42.10", true),
-		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
+		Keys:    bankKeys(ProviderSimpleFIN, "bridge-prime", "pend1"),
 	}}
 	first := applyDirectives(t, database, []BankDirective{upsert})
 	if first.PendingInserted != 1 {
@@ -207,7 +207,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 	seedAccount(t, database, "prime_card")
 	applyDirectives(t, database, []BankDirective{{Upsert: &BankUpsert{
 		Posting: bankSeedPosting("Pending", "prime_card", "10", true),
-		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
+		Keys:    bankKeys(ProviderSimpleFIN, "bridge-prime", "pend1"),
 	}}})
 	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 1 {
@@ -218,7 +218,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 	summary := applyDirectives(t, database, []BankDirective{{Convert: &BankConvert{
 		ID:      id,
 		Posting: settled,
-		AddKeys: bankKeys(SourceSimpleFIN, "bridge-prime", "post1"),
+		AddKeys: bankKeys(ProviderSimpleFIN, "bridge-prime", "post1"),
 	}}})
 	if summary.SettledConverted != 1 {
 		t.Fatalf("convert = %+v", summary)
@@ -228,7 +228,7 @@ func TestBankConvertRotatesKeysAndKeepsUUID(t *testing.T) {
 		t.Fatal("convert changed row count")
 	}
 	row := after.Postings[0]
-	if row.ID != id || row.Name != "Settled" || row.Pending || row.Source != SourceSimpleFIN || !row.Enabled {
+	if row.ID != id || row.Name != "Settled" || row.Pending || row.Source != SourceBankSync || !row.Enabled {
 		t.Fatalf("converted row = %+v", row)
 	}
 	rows, err := database.LoadBankPostings()
@@ -244,7 +244,7 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 	posting.Enabled = true
 	applyDirectives(t, database, []BankDirective{{Upsert: &BankUpsert{
 		Posting: posting,
-		Keys:    bankKeys(SourceSimpleFIN, "bridge-prime", "pend1"),
+		Keys:    bankKeys(ProviderSimpleFIN, "bridge-prime", "pend1"),
 	}}})
 	loaded, err := database.LoadModel()
 	if err != nil {
@@ -271,7 +271,7 @@ func TestBankVoidFlipsOnceAndIgnoresMissing(t *testing.T) {
 func TestDeletePostingSuppressesBankKeysAcrossSyncs(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
-	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), SourceSimpleFIN, "bridge-prime", "post1")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), ProviderSimpleFIN, "bridge-prime", "post1")
 	if first := applyDirectives(t, database, []BankDirective{upsert}); first.SettledInserted != 1 {
 		t.Fatalf("seed = %+v", first)
 	}
@@ -295,7 +295,7 @@ func TestDeletePostingSuppressesBankKeysAcrossSyncs(t *testing.T) {
 		t.Fatalf("resupply resurrected %d rows", got)
 	}
 	// Suppression is per key: an unrelated charge still imports.
-	other := bankUpsertDirective(bankSeedPosting("Bistro", "prime_card", "58.00", false), SourceSimpleFIN, "bridge-prime", "post2")
+	other := bankUpsertDirective(bankSeedPosting("Bistro", "prime_card", "58.00", false), ProviderSimpleFIN, "bridge-prime", "post2")
 	if third := applyDirectives(t, database, []BankDirective{other}); third.SettledInserted != 1 {
 		t.Fatalf("unrelated = %+v", third)
 	}
@@ -326,7 +326,7 @@ func TestDeleteOwnerPostingSuppressesNothing(t *testing.T) {
 func TestDeleteVoidSuppressesNothingAndSameKeyStillImports(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
-	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", true), SourceSimpleFIN, "bridge-prime", "pend1")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", true), ProviderSimpleFIN, "bridge-prime", "pend1")
 	applyDirectives(t, database, []BankDirective{upsert})
 	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 1 {
@@ -352,7 +352,7 @@ func TestDeleteVoidSuppressesNothingAndSameKeyStillImports(t *testing.T) {
 func TestConvertSettledBankRowSuppressesKeys(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")
-	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), SourceSimpleFIN, "bridge-prime", "post1")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), ProviderSimpleFIN, "bridge-prime", "post1")
 	applyDirectives(t, database, []BankDirective{upsert})
 	loaded, err := database.LoadModel()
 	if err != nil || len(loaded.Postings) != 1 {
@@ -397,12 +397,12 @@ func TestBankDirectivesRejectInvalidInput(t *testing.T) {
 			p := bankSeedPosting("C", "prime_card", "10", true)
 			p.Source = SourceUser
 			return p
-		}(), Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "pend1")}}},
+		}(), Keys: bankKeys(ProviderSimpleFIN, "bridge-prime", "pend1")}}},
 		"no account": {{Upsert: &BankUpsert{Posting: func() types.Posting {
 			p := bankSeedPosting("C", "prime_card", "10", true)
 			p.SourceAccountID = nil
 			return p
-		}(), Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "pend1")}}},
+		}(), Keys: bankKeys(ProviderSimpleFIN, "bridge-prime", "pend1")}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := database.ApplySync(nil, directives); err == nil {

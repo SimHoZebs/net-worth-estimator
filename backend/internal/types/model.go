@@ -102,7 +102,7 @@ type Checkpoint struct {
 	AccountID string  `json:"AccountId"`
 	Balance   float64 `json:"Balance"`
 	// Source names the row author: "user" for owner-authored rows,
-	// "simplefin" for bank-reported rows. Authorship never changes after
+	// "banksync" for bank-reported rows. Authorship never changes after
 	// creation.
 	Source string `json:"source,omitempty"`
 	// ObservedAt is the required exact Unix instant the balance became that
@@ -216,7 +216,7 @@ type Posting struct {
 	// Owner writes cannot set it.
 	Pending bool `json:"pending,omitempty"`
 	// Source names the row author: "user" for owner-authored rows,
-	// "simplefin" for bank-reported rows. Authorship never changes after
+	// "banksync" for bank-reported rows. Authorship never changes after
 	// creation. Owner writes may touch settled bank rows but never live
 	// pending or void rows; the sync may touch pending and void rows but
 	// never settled ones.

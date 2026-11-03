@@ -11,10 +11,10 @@ import (
 func seedAnalysisEvidence(t *testing.T, s *sqliteStore) string {
 	t.Helper()
 	seedAccount(t, s, "checking")
-	keys := bankKeys(SourceSimpleFIN, "bank", "charge")
+	keys := bankKeys(ProviderSimpleFIN, "bank", "charge")
 	facts := types.TransactionFacts{Description: "KLARNA PAY IN 4", Amount: "-25.00", Currency: "USD", PostedTime: 1785628800}
 	applyDirectives(t, s, []BankDirective{
-		bankUpsertDirective(bankSeedPosting("KLARNA", "checking", "25", false), SourceSimpleFIN, "bank", "charge"),
+		bankUpsertDirective(bankSeedPosting("KLARNA", "checking", "25", false), ProviderSimpleFIN, "bank", "charge"),
 		{Observe: &BankObservation{Keys: keys, Facts: facts}},
 	})
 	rows, err := s.LoadBankPostings()
@@ -52,7 +52,7 @@ func TestAnalysisEvidenceIsIndependentAndDeduplicated(t *testing.T) {
 	if _, _, claimed, err := s.ClaimAnalysis("bnpl", "v1"); err != nil || claimed {
 		t.Fatalf("duplicate claim=%v err=%v", claimed, err)
 	}
-	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{Keys: bankKeys(SourceSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY IN 4", Amount: "-25.00", Currency: "USD", PostedTime: 1785628800}}}})
+	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{Keys: bankKeys(ProviderSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY IN 4", Amount: "-25.00", Currency: "USD", PostedTime: 1785628800}}}})
 	if _, _, claimed, err := s.ClaimAnalysis("bnpl", "v1"); err != nil || claimed {
 		t.Fatalf("identical observation scheduled analysis: %v %v", claimed, err)
 	}
@@ -88,7 +88,7 @@ func TestAnalysisStaleCompletionRecoveryAndWithdrawal(t *testing.T) {
 	if _, _, other, err := s.ClaimAnalysis("bnpl", "v2"); err != nil || other {
 		t.Fatalf("concurrent claim %v %v", other, err)
 	}
-	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{Keys: bankKeys(SourceSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY NOW", Amount: "-25", Currency: "USD"}}}})
+	applyDirectives(t, s, []BankDirective{{Observe: &BankObservation{Keys: bankKeys(ProviderSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY NOW", Amount: "-25", Currency: "USD"}}}})
 	if err := s.CompleteAnalysis(run, nil, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -135,18 +135,18 @@ func TestAnalysisIsolationImportAndClear(t *testing.T) {
 		if _, err := scoped.CreatePosting(testPostingFixture(sharedID)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := scoped.db.Exec(`UPDATE postings SET source = 'simplefin' WHERE id = ? AND user_id = :user_id`, sharedID); err != nil {
+		if _, err := scoped.db.Exec(`UPDATE postings SET source = 'banksync' WHERE id = ? AND user_id = :user_id`, sharedID); err != nil {
 			t.Fatal(err)
 		}
 		tx, err := scoped.db.Begin()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := insertPostingSyncKey(tx, postingSyncKey{provider: SourceSimpleFIN, accountID: "bank", transactionID: "charge", postingID: sharedID}); err != nil {
+		if err := insertPostingSyncKey(tx, postingSyncKey{provider: ProviderSimpleFIN, accountID: "bank", transactionID: "charge", postingID: sharedID}); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}
-		if err := observeBankTransaction(tx, &BankObservation{Keys: bankKeys(SourceSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY IN 4", Amount: "-25", Currency: "USD"}}); err != nil {
+		if err := observeBankTransaction(tx, &BankObservation{Keys: bankKeys(ProviderSimpleFIN, "bank", "charge"), Facts: types.TransactionFacts{Description: "KLARNA PAY IN 4", Amount: "-25", Currency: "USD"}}); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		}

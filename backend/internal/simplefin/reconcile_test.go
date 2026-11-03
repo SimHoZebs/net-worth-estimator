@@ -30,7 +30,7 @@ func reconcileBankRow(id, name, account, amount string, pending, void bool, keys
 		Posting: types.Posting{
 			ID:              id,
 			Name:            name,
-			Source:          store.SourceSimpleFIN,
+			Source:          store.SourceBankSync,
 			SourceAccountID: &source,
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      1785628800,
@@ -44,7 +44,7 @@ func reconcileBankRow(id, name, account, amount string, pending, void bool, keys
 }
 
 func pendingKey(account, transaction string) store.BankKey {
-	return store.BankKey{Provider: store.SourceSimpleFIN, AccountID: "bridge-" + account, TransactionID: transaction}
+	return store.BankKey{Provider: store.ProviderSimpleFIN, AccountID: "bridge-" + account, TransactionID: transaction}
 }
 
 func directivesByAction(directives []store.BankDirective) (upserts, converts int, voids []string) {

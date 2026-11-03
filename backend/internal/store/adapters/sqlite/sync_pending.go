@@ -89,7 +89,7 @@ func suppressedUpsert(suppressed map[BankKey]struct{}, upsert *BankUpsert) bool 
 // LoadBankPostings returns every bank-reported posting with the upstream
 // identities pointing at it. Adapters reconcile snapshots against this.
 func (s *sqliteStore) LoadBankPostings() ([]BankRow, error) {
-	rows, err := s.db.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
+	rows, err := s.db.Query(`SELECT `+postingSelect+` `+postingJoins+` WHERE p.source != ? AND p.projection_slice_id IS NULL AND p.user_id = :user_id ORDER BY s.position`, SourceUser)
 	if err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ func flowPosting(id, name, account, amount string, pending bool, day string) sto
 		TransactionID:     id,
 		Posting: types.Posting{
 			Name:            name,
-			Source:          store.SourceSimpleFIN,
+			Source:          store.SourceBankSync,
 			SourceAccountID: &account,
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      stamp.Unix(),
@@ -298,7 +298,7 @@ func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now 
 	}
 	var checkpoints []store.SyncCheckpoint
 	for _, checkpoint := range translation.Checkpoints {
-		checkpoints = append(checkpoints, store.SyncCheckpoint{AccountID: checkpoint.AccountID, Balance: checkpoint.Balance, Source: store.SourceSimpleFIN, ObservedAt: checkpoint.ObservedAt})
+		checkpoints = append(checkpoints, store.SyncCheckpoint{AccountID: checkpoint.AccountID, Balance: checkpoint.Balance, Source: store.SourceBankSync, Provider: store.ProviderSimpleFIN, ObservedAt: checkpoint.ObservedAt})
 	}
 	bank, err := database.LoadBankPostings()
 	if err != nil {

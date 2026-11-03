@@ -12,10 +12,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// deterministicResultVersion covers the deterministic payload shape.
-// See artifactIdentityVersion in artifacts.go: bump both together so
-// incompatible stored results are not retrieved.
-const deterministicResultVersion = 12
+// Projection-Source identifies the result's origin. Every projection
+// computes directly: no stored results exist.
+const projectionSourceComputed = "computed"
+
+const projectionSourceShared = "shared"
 
 // resolveModel returns the request model or the stored one.
 func (s *handler) resolveModel(requested *types.FinancialModel) (*types.FinancialModel, error) {
@@ -62,29 +63,36 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 
-	// Key the RESOLVED model so omitted fields track the
-	// stored state: a model save changes stored content and therefore the key.
-	// Response ranges stay out of the key: all ranges share the complete artifact.
-	resultKey := s.resourceArtifactKey("deterministic", map[string]any{
-		"publicResultVersion": deterministicResultVersion,
-		"model":               model,
-		"overrides":           input.Body.Overrides,
-		"settings":            projectionSettingsDescriptor(input.Body.Settings),
-	})
-	if stored, err := lookupArtifact[types.ProjectionResult](s.store, resultKey); err == nil && stored.found {
-		// huma writes Status verbatim; leaving it zero panics the writer.
-		output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceStored}
-		output.Body.Result = clipProjectionRange(&stored.value, input.Body.Range)
-		return output, nil
+	// Unified read path: canonical requests assemble from stored slices.
+	if input.Body.Model == nil && isEmptyOverrides(input.Body.Overrides) {
+		if _, canonical, err := s.ensureCanonicalState(&input.Body.Settings); err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		} else if canonical {
+			if result, served, err := s.readDeterministic(model, &input.Body.Settings); err != nil {
+				return nil, huma.Error500InternalServerError(err.Error())
+			} else if served {
+				output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceComputed}
+				output.Body.Result = clipProjectionRange(result, input.Body.Range)
+				return output, nil
+			}
+			if err := s.buildDeterministic(model, &input.Body.Settings); err == nil {
+				if result, served, err := s.readDeterministic(model, &input.Body.Settings); err == nil && served {
+					output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceComputed}
+					output.Body.Result = clipProjectionRange(result, input.Body.Range)
+					return output, nil
+				}
+			} else {
+				log.Printf("deterministic build failed, computing directly: %v", err)
+			}
+		}
 	}
-	_, prefix := parseArtifactKeyMeta(resultKey)
-	log.Printf("deterministic simulation key_prefix=%s accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
-		prefix, len(model.Accounts), len(model.Postings), len(model.Checkpoints),
+
+	log.Printf("deterministic compute accounts=%d postings=%d checkpoints=%d horizon=%d range=%s",
+		len(model.Accounts), len(model.Postings), len(model.Checkpoints),
 		input.Body.Settings.HorizonYears, formatProjectionRange(input.Body.Range))
 
 	result, err := domain.ProjectFinancialModel(model, &input.Body.Settings, input.Body.Overrides, nil)
-	// huma writes this status verbatim; default to 200 and only raise it for
-	// unexpected failures.
+	// huma writes Status verbatim; leaving it zero panics the writer.
 	output := &deterministicOutput{Status: http.StatusOK, Source: projectionSourceComputed}
 	if err != nil {
 		output.Body.Error = err.Error()
@@ -97,7 +105,12 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 		output.Status = http.StatusInternalServerError
 		return output, nil
 	}
-	putArtifact(s.store, resultKey, "deterministic", result)
 	output.Body.Result = clipProjectionRange(result, input.Body.Range)
 	return output, nil
+}
+
+func isEmptyOverrides(overrides types.ModelOverrides) bool {
+	return len(overrides.AddedAccounts) == 0 && len(overrides.AddedPostings) == 0 &&
+		len(overrides.AddedRules) == 0 && len(overrides.DisabledAccountIDs) == 0 &&
+		len(overrides.DisabledPostingIDs) == 0 && len(overrides.DisabledRuleIDs) == 0
 }

@@ -7,12 +7,17 @@ import (
 )
 
 // BaselineEngine runs the deterministic baseline path without evaluations.
-// It wraps the cached base path so eval-only changes never rerun the base.
+// Every call prepares and simulates directly. No hashes, no caches.
 func BaselineEngine(model *types.FinancialModel, settings *types.ProjectionRuntimeSettings, overrides types.ModelOverrides) (*types.ProjectionPath, *types.ProjectionResult, error) {
-	_, path, result, err := projectBaseWithCache(model, settings, overrides, nil)
+	prepared, err := orchestratedPrepare(model, settings, overrides, nil)
 	if err != nil {
 		return nil, nil, err
 	}
+	run, err := orchestratedSimulate(prepared.Request)
+	if err != nil {
+		return nil, nil, err
+	}
+	path, result := AdaptSimulationRun(prepared, &run)
 	return path, result, nil
 }
 

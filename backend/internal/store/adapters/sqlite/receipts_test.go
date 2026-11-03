@@ -162,7 +162,7 @@ func TestReceiptEligibilityQuotaAndClear(t *testing.T) {
 	if _, err := s.CreateReceipt(context.Background(), purchase.ID, "a.png", image); !errors.Is(err, ErrReceiptNotFound) {
 		t.Fatal("standalone purchase accepted posting evidence", err)
 	}
-	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'simplefin' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
+	if _, err := s.db.Exec(`UPDATE postings SET pending = 1, source = 'banksync' WHERE id = ? AND user_id = :user_id`, p.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateReceipt(context.Background(), p.ID, "b.png", image); !errors.Is(err, ErrReceiptIneligible) {

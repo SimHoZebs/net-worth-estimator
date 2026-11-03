@@ -24,10 +24,14 @@ import (
 var financialTables = []string{
 	"accounts", "checkpoints", "postings", "posting_sim", "posting_claims", "posting_sync_keys", "suppressed_sync_keys",
 	"planned_purchases", "recurrence_rules", "evaluations",
-	"projection_artifacts", "model_metadata", "payment_terms", "entity_ids",
+	"model_metadata", "payment_terms", "entity_ids",
 	"account_links", "pinned_evaluations", "sync_state", "sync_credentials", "gmail_credentials", "amount_presets", "safe_spending_settings",
 	"receipts", "email_receipts",
 	"analysis_inputs", "transaction_source_facts", "analysis_runs", "analysis_findings", "analysis_feedback", "analysis_promotions",
+	"provider_connections", "projection_states", "projection_slices", "monte_carlo_statistics",
+	"projection_rows",
+	"net_worth_threshold_outputs", "account_balance_outputs", "posting_fulfillment_outputs",
+	"cycle_fulfillment_outputs", "planned_purchases_outputs", "financial_independence_outputs", "whatif_outputs",
 }
 
 func main() {
@@ -150,14 +154,16 @@ func refresh(target, source, sourceUser, targetUser string, financialOnly bool) 
 		}
 	}
 	for _, table := range tables {
-		if table.name == "projection_artifacts" || table.name == "receipts" {
+		if table.name == "receipts" {
 			continue
 		}
-		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || table.name == "email_receipts" || strings.HasPrefix(table.name, "analysis_")) {
+		if financialOnly && (table.name == "account_links" || table.name == "posting_sync_keys" || table.name == "suppressed_sync_keys" || table.name == "transaction_source_facts" || table.name == "email_receipts" || strings.HasPrefix(table.name, "analysis_") || table.name == "provider_connections" || table.name == "projection_states" || table.name == "projection_slices" || table.name == "monte_carlo_statistics" || table.name == "projection_rows" || table.name == "net_worth_threshold_outputs" || table.name == "account_balance_outputs" || table.name == "posting_fulfillment_outputs" || table.name == "cycle_fulfillment_outputs" || table.name == "planned_purchases_outputs" || table.name == "financial_independence_outputs" || table.name == "whatif_outputs") {
 			// Guest publication carries no sync identity: the provisioned
 			// guest never syncs, so bank keys and the do-not-import list
 			// stay behind with the credentials. Full refresh copies both.
 			// Email receipt evidence stays private like image receipts.
+			// Provider connections and derived projection caches rebuild
+			// on first use, so publication carries none of them.
 			continue
 		}
 		columns, values := []string{"user_id"}, []string{"?"}

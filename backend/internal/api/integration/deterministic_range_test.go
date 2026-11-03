@@ -145,7 +145,7 @@ func TestDeterministicRangeClipsOneArtifact(t *testing.T) {
 	}
 }
 
-func TestDeterministicResponseRangesShareCompleteArtifact(t *testing.T) {
+func TestDeterministicResponseRangesShareCompleteResult(t *testing.T) {
 	probe := openAPIStore(t)
 	probeHandler := New(probe, Config{})
 	full := decodeRangeResult(t, rangeRequest(t, probeHandler, rangeBody(t, fullSpanRange())))
@@ -159,18 +159,18 @@ func TestDeterministicResponseRangesShareCompleteArtifact(t *testing.T) {
 	}
 	firstResult := decodeRangeResult(t, first)
 	repeated := rangeRequest(t, handler, rangeBody(t, &projectionRange{EndDate: string(mid)}))
-	if got := repeated.Header().Get("Projection-Source"); got != projectionSourceStored {
-		t.Fatalf("repeated range Projection-Source = %q, want stored", got)
+	if got := repeated.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("repeated range Projection-Source = %q, want computed", got)
 	}
 	if !reflect.DeepEqual(firstResult, decodeRangeResult(t, repeated)) {
-		t.Fatal("response filtering differs between computed and stored results")
+		t.Fatal("response filtering differs between computations")
 	}
 	second := rangeRequest(t, handler, rangeBody(t, fullSpanRange()))
-	if got := second.Header().Get("Projection-Source"); got != projectionSourceStored {
-		t.Fatalf("full-span Projection-Source = %q, want stored", got)
+	if got := second.Header().Get("Projection-Source"); got != projectionSourceComputed {
+		t.Fatalf("full-span Projection-Source = %q, want computed", got)
 	}
 	if !reflect.DeepEqual(full, decodeRangeResult(t, second)) {
-		t.Fatal("date filtering changed the stored complete result")
+		t.Fatal("date filtering changed the complete result")
 	}
 }
 

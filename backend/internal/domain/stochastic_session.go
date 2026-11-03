@@ -160,12 +160,17 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 		}, nil)
 	}
 	session.sampler = NewStochasticSampler(session.config.Seed)
-	// The deterministic base path is shared with deterministic projections
-	// through the base-path cache: identical base inputs never simulate twice.
-	prepared, path, baseResult, err := projectBaseWithCache(model, settings, overrides, nil)
+	// The deterministic base path is computed directly on every run.
+	// No hashes and no cross-request caches exist.
+	prepared, err := orchestratedPrepare(model, settings, overrides, nil)
 	if err != nil {
 		return nil, err
 	}
+	run, err := orchestratedSimulate(prepared.Request)
+	if err != nil {
+		return nil, err
+	}
+	path, baseResult := AdaptSimulationRun(prepared, &run)
 	session.prepared = prepared
 	session.deterministicPath = path
 	deterministic := *baseResult // copy the shell; evaluations attach below

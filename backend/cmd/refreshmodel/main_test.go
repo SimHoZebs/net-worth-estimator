@@ -283,7 +283,6 @@ func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = db.SQL().Exec(`INSERT INTO account_links(user_id, bridge_account_id, model_account_id) VALUES ('owner','secret-bridge-id','checking');
-		INSERT INTO projection_artifacts(user_id, identity, kind, payload) VALUES ('owner','secret-artifact','deterministic','private');
 		UPDATE sync_state SET last_sync_at='2026-01-01' WHERE user_id='owner';
 		UPDATE sync_credentials SET access_url='https://user:pass@bridge.example/simplefin', bridge_host='bridge.example', updated_at='2026-01-01T00:00:00Z', cards_json='["prime_card"]' WHERE user_id='owner';`)
 	db.Close()
@@ -296,7 +295,7 @@ func TestFinancialOnlyPublicationStripsPrivateHistory(t *testing.T) {
 	if got := query(t, target, "SELECT name FROM accounts WHERE user_id='owner'"); got != "owner" {
 		t.Fatal(got)
 	}
-	for _, table := range []string{"account_links", "projection_artifacts", "posting_sync_keys"} {
+	for _, table := range []string{"account_links", "posting_sync_keys", "provider_connections", "projection_states", "projection_slices", "monte_carlo_statistics"} {
 		if got := query(t, target, "SELECT COUNT(*) FROM "+table+" WHERE user_id='owner'"); got != "0" {
 			t.Fatal(table, got)
 		}

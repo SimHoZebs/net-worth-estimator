@@ -2,7 +2,6 @@ package identity
 
 import (
 	"encoding/json"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -13,26 +12,12 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/ingress"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
-
-// Artifact storage has a longer lifetime than its attached HTTP stream. Signal
-// completion after the entire real store operation, including retention, ends.
-type deploymentStore struct {
-	store.Store
-	completed chan error
-}
-
-func (s deploymentStore) PutArtifact(key, kind, payload string) error {
-	err := s.Store.PutArtifact(key, kind, payload)
-	s.completed <- err
-	return err
-}
 
 // Exercise the production identity and API handlers through real HTTP proxies.
 // The public TLS origin stays fixed while the API has a different host and
@@ -60,7 +45,6 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 				t.Fatal(err)
 			}
 			const secret = "0123456789abcdef0123456789abcdef"
-			artifactCompleted := make(chan error, 1)
 			var upstream atomic.Pointer[url.URL]
 			edge := httptest.NewUnstartedServer(nil)
 			publicURL := "https://" + edge.Listener.Addr().String()
@@ -93,7 +77,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				application := api.New(deploymentStore{Store: scoped, completed: artifactCompleted}, api.Config{ResourceID: resource.ID, CanWrite: CanWrite})
+				application := api.New(scoped, api.Config{ResourceID: resource.ID, CanWrite: CanWrite})
 				var handler http.Handler = login.Wrap(application)
 				if authenticatedIngress {
 					origins, err := login.config.ProxyOrigins()
@@ -191,16 +175,6 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 				}
 			}
 			checkStream("computed")
-			// A result event can precede both insertion and retention cleanup.
-			// Restart after the full writer finishes, not just after a visible row.
-			select {
-			case err := <-artifactCompleted:
-				if err != nil {
-					t.Fatal(err)
-				}
-			case <-time.After(3 * time.Second):
-				t.Fatal("seeded result writer did not finish before restart")
-			}
 			backend.Close()
 			if err := database.Close(); err != nil {
 				t.Fatal(err)
@@ -216,7 +190,8 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			if response.StatusCode != http.StatusOK || !strings.Contains(body, `"id":"checking"`) {
 				t.Fatalf("model did not survive restart: %d %s", response.StatusCode, body)
 			}
-			checkStream("stored")
+			// No stored results exist: the same request recomputes after restart.
+			checkStream("computed")
 			response, body = request("POST", prefix+"logout", "{}", publicURL)
 			if response.StatusCode != http.StatusOK {
 				t.Fatalf("logout=%d %s", response.StatusCode, body)

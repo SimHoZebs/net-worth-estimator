@@ -73,5 +73,11 @@ func (s *sqliteStore) SetPostingClaims(claims []types.PostingClaimUpdate) ([]typ
 		}
 		updated = append(updated, posting)
 	}
+	// Claims dirty from projection start: a claim can clear a pending row
+	// whose own dates predate the occurrence, and only a stored read would
+	// reveal that. The uniform rule needs no reads.
+	if err := s.markDirtyStart(); err != nil {
+		return nil, err
+	}
 	return updated, nil
 }

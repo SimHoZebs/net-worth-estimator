@@ -25,7 +25,7 @@ func advSeedBankPending(t *testing.T, scoped store.Store, name, amount string, d
 	source := "checking"
 	_, err := scoped.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
 		Posting: types.Posting{
-			Name: name, Source: store.SourceSimpleFIN, SourceAccountID: &source,
+			Name: name, Source: store.SourceBankSync, SourceAccountID: &source,
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
 			PostedTime:      day,
 			TransactionTime: day,

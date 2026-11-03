@@ -23,9 +23,9 @@ func seedRecurringEvidence(t *testing.T, s *sqliteStore) []string {
 		posting := bankSeedPosting("Grocer weekly shop", "checking", "30", false)
 		posting.PostedTime = stamp.Unix()
 		posting.TransactionTime = stamp.Unix()
-		keys := bankKeys(SourceSimpleFIN, "bank", "grocery-"+string(rune('a'+i)))
+		keys := bankKeys(ProviderSimpleFIN, "bank", "grocery-"+string(rune('a'+i)))
 		applyDirectives(t, s, []BankDirective{
-			bankUpsertDirective(posting, SourceSimpleFIN, "bank", "grocery-"+string(rune('a'+i))),
+			bankUpsertDirective(posting, ProviderSimpleFIN, "bank", "grocery-"+string(rune('a'+i))),
 			{Observe: &BankObservation{Keys: keys, Facts: types.TransactionFacts{Description: "GROCER 123", Amount: amounts[i], Currency: "USD", PostedTime: stamp.Unix(), OccurredAt: stamp.Unix()}}},
 		})
 		rows, err := s.LoadBankPostings()

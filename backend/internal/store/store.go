@@ -137,20 +137,45 @@ type Store interface {
 	// confirmed; a nil correction confirms the extraction as-is. The
 	// original extraction and provenance are preserved.
 	ReviewEmailReceipt(id string, correction *EmailReceiptCorrection) (EmailReceipt, error)
-	GetArtifact(identity string) (string, bool, error)
-	PutArtifact(identity, kind, payload string) error
 	ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
 	LoadBankPostings() ([]BankRow, error)
 	// Unified projection state: single dirty date plus slice manifest.
 	GetProjectionState() (types.ProjectionState, error)
 	SaveProjectionState(state types.ProjectionState) (types.ProjectionState, error)
-	MarkProjectionDirty(dirtyFrom string) (types.ProjectionState, error)
+	MarkProjectionDirty(dirtyFrom int64) (types.ProjectionState, error)
 	PublishProjection(revision int64) (types.ProjectionState, error)
 	ListProjectionSlices() ([]types.ProjectionSlice, error)
 	SaveProjectionSlice(slice types.ProjectionSlice) (types.ProjectionSlice, error)
-	DeleteProjectionSlicesFrom(fromAt string) error
+	DeleteProjectionSlicesFrom(fromAt int64) error
 	ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error)
 	SaveMonteCarloStatistics(stats []types.MonteCarloStatistic) error
+	DeleteMonteCarloStatistics(sliceIDs []string) error
+	// SaveGeneratedPostings stores engine-output transactions for one slice.
+	// Generated rows never enter model reads: every model query filters
+	// them by null slice.
+	SaveGeneratedPostings(rows []GeneratedPosting) error
+	ListGeneratedPostings(sliceIDs []string) ([]GeneratedPosting, error)
+	DeleteGeneratedPostings(sliceIDs []string) error
+	SaveProjectionRows(rows []ProjectionRowPayload) error
+	ListProjectionRows(sliceIDs []string) ([]ProjectionRowPayload, error)
+	DeleteProjectionRows(sliceIDs []string) error
+	// Each evaluation persists in its own table with typed result columns.
+	// Variable-length evidence stays verbatim JSON. Reader evals and
+	// simulator evals persist separately by kind.
+	SaveNetWorthThresholdOutputs(stateID, kind string, outputs []types.NetWorthThresholdOutput, builtRevision int64) error
+	ListNetWorthThresholdOutputs(stateID, kind string) ([]types.NetWorthThresholdOutput, error)
+	SaveAccountBalanceOutputs(stateID, kind string, outputs []types.AccountBalanceOutput, builtRevision int64) error
+	ListAccountBalanceOutputs(stateID, kind string) ([]types.AccountBalanceOutput, error)
+	SavePostingFulfillmentOutputs(stateID, kind string, outputs []types.PostingFulfillmentOutput, builtRevision int64) error
+	ListPostingFulfillmentOutputs(stateID, kind string) ([]types.PostingFulfillmentOutput, error)
+	SaveCycleFulfillmentOutputs(stateID, kind string, outputs []types.CycleFulfillmentOutput, builtRevision int64) error
+	ListCycleFulfillmentOutputs(stateID, kind string) ([]types.CycleFulfillmentOutput, error)
+	SavePlannedPurchasesOutputs(stateID, kind string, outputs []types.PlannedPurchasesOutput, builtRevision int64) error
+	ListPlannedPurchasesOutputs(stateID, kind string) ([]types.PlannedPurchasesOutput, error)
+	SaveFinancialIndependenceOutputs(stateID, kind string, outputs []types.FinancialIndependenceOutput, builtRevision int64) error
+	ListFinancialIndependenceOutputs(stateID, kind string) ([]types.FinancialIndependenceOutput, error)
+	SaveWhatIfOutputs(stateID, kind string, outputs []types.WhatIfOutput, builtRevision int64) error
+	ListWhatIfOutputs(stateID, kind string) ([]types.WhatIfOutput, error)
 	ListProviderConnections() ([]types.ProviderConnection, error)
 	SaveProviderConnection(conn types.ProviderConnection) (types.ProviderConnection, error)
 	Clear() error

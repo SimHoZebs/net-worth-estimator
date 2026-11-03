@@ -27,7 +27,7 @@ type accountBody struct {
 	// with Balance; there is no date fallback.
 	ObservedAt *int64 `json:"observedAt,omitempty"`
 	// Source is accepted and ignored: accounts carry no authorship flag.
-	// Row authorship lives in checkpoints/postings ("user" | "simplefin")
+	// Row authorship lives in checkpoints/postings ("user" | "banksync")
 	// plus account_links, mirroring the retired whole-model PUT contract.
 	Source *string `json:"source,omitempty"`
 }
