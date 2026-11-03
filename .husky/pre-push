@@ -13,7 +13,7 @@ backend/scripts/verify.sh ./cmd/...
 echo "pre-push: frontend lint, typecheck, unit tests"
 bun --filter ./frontend lint
 bun --filter ./frontend typecheck
-bun --filter ./frontend test
+bun --filter ./frontend test:unit
 
 echo "pre-push: extension unit tests and lint"
 bun --filter ./extension test

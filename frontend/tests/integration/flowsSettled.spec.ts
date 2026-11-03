@@ -41,9 +41,7 @@ test("settled bank history draws recorded flows with exact totals", async ({
 	await page.getByLabel("From date", { exact: true }).fill("2025-06-01");
 	await page.getByLabel("Through date", { exact: true }).fill("2025-12-31");
 	const status = page.getByRole("status");
-	await expect(status).toContainText(
-		/from 2025-06-01 through 2025-12-31/,
-	);
+	await expect(status).toContainText(/from 2025-06-01 through 2025-12-31/);
 	await page
 		.getByRole("group", { name: "Diagram or table view" })
 		.getByRole("button", { name: "Table" })
@@ -68,8 +66,12 @@ test("settled bank history draws recorded flows with exact totals", async ({
 	const flows = page.getByRole("table", { name: /Money flows from/ });
 	await expect(flows).toBeVisible();
 	await expect(flows).not.toContainText("(planned)");
-	await expect(flows.getByRole("row", { name: /Money in.*\$21,000/ })).toBeVisible();
-	await expect(flows.getByRole("row", { name: /Money out.*\$9,135/ })).toBeVisible();
+	await expect(
+		flows.getByRole("row", { name: /Money in.*\$21,000/ }),
+	).toBeVisible();
+	await expect(
+		flows.getByRole("row", { name: /Money out.*\$9,135/ }),
+	).toBeVisible();
 });
 
 test("a window with no settled rows shows no money movement", async ({

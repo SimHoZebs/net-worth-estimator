@@ -41,12 +41,12 @@ Frontend gates (run from the repository root):
 bun install --frozen-lockfile
 bun --filter ./frontend lint
 bun --filter ./frontend typecheck
-bun --filter ./frontend test
+bun --filter ./frontend test:unit
 bun --filter ./frontend build
-bun --filter ./frontend test:browser
+bun --filter ./frontend test:integration
 ```
 
-The browser suite drives the real engine over real HTTP on random free
+The integration suite drives the real engine over real HTTP on random free
 ports with a fresh temporary database per run. It never attaches to a dev
 server. Each shard starts its own servers, so concurrent runs stay
 isolated. Generate the API client before running frontend scripts
@@ -81,7 +81,7 @@ with bank re-syncs adding nothing:
 
 ```bash
 CGO_ENABLED=0 go -C backend test ./internal/integrationledger/ -count=3
-INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:browser -- ledgerCompleteness.spec.ts
+INTEGRATION_PACK=ledger TEST_BROWSER_SHARDS=1 bun --filter ./frontend test:integration -- ledgerCompleteness.spec.ts
 ```
 
 A green suite with mocked cores is a failing result: anything that

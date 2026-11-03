@@ -38,12 +38,8 @@ test("group feed lists shared transactions with viewer totals", async ({
 		feed.getByText("Cabin groceries", { exact: true }),
 	).toBeVisible();
 	await expect(feed.getByText("Cabin fuel", { exact: true })).toBeVisible();
-	await expect(
-		feed.getByText("Cabin estimate", { exact: true }),
-	).toBeVisible();
-	await expect(
-		feed.getByText("Cabin dinner", { exact: true }),
-	).toBeVisible();
+	await expect(feed.getByText("Cabin estimate", { exact: true })).toBeVisible();
+	await expect(feed.getByText("Cabin dinner", { exact: true })).toBeVisible();
 	// Source member, authorized amounts, pending marker, calculated recipe.
 	await expect(feed.getByText(/Shared by Dana/)).toHaveCount(4);
 	await expect(feed.getByText("Jun 15, 2026").first()).toBeVisible();
@@ -59,9 +55,7 @@ test("group feed lists shared transactions with viewer totals", async ({
 	expect(errors).toEqual([]);
 });
 
-test("group feed filters narrow rows and totals together", async ({
-	page,
-}) => {
+test("group feed filters narrow rows and totals together", async ({ page }) => {
 	await resetFixture();
 	await seedSharingFixture("Cabin filters", "Dana", SEED);
 	const feed = await openSeededGroup(page, "Cabin filters");
@@ -71,13 +65,9 @@ test("group feed filters narrow rows and totals together", async ({
 
 	await feed.getByLabel("From date").fill("2026-06-16");
 	await feed.getByLabel("To date").fill("2026-06-17");
-	await expect(
-		feed.getByText("Cabin groceries", { exact: true }),
-	).toBeHidden();
+	await expect(feed.getByText("Cabin groceries", { exact: true })).toBeHidden();
 	await expect(feed.getByText("Cabin fuel", { exact: true })).toBeVisible();
-	await expect(
-		feed.getByText("Cabin estimate", { exact: true }),
-	).toBeVisible();
+	await expect(feed.getByText("Cabin estimate", { exact: true })).toBeVisible();
 	await expect(
 		feed.getByText(
 			"2 transactions · $18.00 shared · 1 calculated amount not summed",
@@ -86,9 +76,7 @@ test("group feed filters narrow rows and totals together", async ({
 
 	await feed.getByLabel("Movement").selectOption("in");
 	await expect(feed.getByText("No shared transactions")).toBeVisible();
-	await expect(
-		feed.getByText("0 transactions · $0.00 shared"),
-	).toBeVisible();
+	await expect(feed.getByText("0 transactions · $0.00 shared")).toBeVisible();
 });
 
 test("group feed saves an independent copy to the viewer model", async ({

@@ -9,10 +9,7 @@ test.beforeEach(async () => {
 /** Create a group through the UI and land on its detail page. */
 async function createGroup(page: Page) {
 	await page.goto("/#groups");
-	await page
-		.getByRole("button", { name: "Create group" })
-		.first()
-		.click();
+	await page.getByRole("button", { name: "Create group" }).first().click();
 	const dialog = page.getByRole("dialog", { name: "Create group" });
 	await dialog.getByLabel("Group name").fill("Browser club");
 	await dialog.getByRole("button", { name: "Create group" }).click();
@@ -35,9 +32,7 @@ test("fixture reset clears groups between tests", async ({ page }) => {
 	await expect(page.getByText("No groups yet")).toBeVisible();
 });
 
-test("enabling policy lists own rows in the group feed", async ({
-	page,
-}) => {
+test("enabling policy lists own rows in the group feed", async ({ page }) => {
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
 	await createGroup(page);

@@ -61,9 +61,7 @@ test("inbox accept saves an independent copy to the viewer model", async ({
 		inbox.getByText("Lake cabin groceries", { exact: true }),
 	).toBeVisible();
 
-	await inbox
-		.getByRole("button", { name: "Accept and save a copy" })
-		.click();
+	await inbox.getByRole("button", { name: "Accept and save a copy" }).click();
 	await expect(
 		page.getByText("Share accepted and saved to your records."),
 	).toBeVisible();
@@ -81,9 +79,7 @@ test("inbox accept saves an independent copy to the viewer model", async ({
 
 	const model = await readSavedServerModel();
 	expect(
-		model.postings.some(
-			(posting) => posting.name === "Lake cabin groceries",
-		),
+		model.postings.some((posting) => posting.name === "Lake cabin groceries"),
 	).toBe(true);
 });
 

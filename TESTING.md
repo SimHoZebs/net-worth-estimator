@@ -6,13 +6,26 @@ Use `./scripts/test` as the single entry point:
 
 ```bash
 scripts/test --unit          # no servers, Docker daemon, or credentials
-scripts/test --integration   # playwright browser suite (fixtureapi + Vite over real HTTP)
+scripts/test --integration   # browser integration suite (fixtureapi + Vite over real HTTP)
 scripts/test --all           # unit then integration
 scripts/test --matrix        # integration edge-case suite per dataset-pack x identity-set, optional --bulk NxM[:seed] (see docs/integration-edge-gates.md)
 E2E_TEST_MUTATIONS=1 scripts/test --e2e  # disposable end-to-end gate (see below)
 ```
 
-Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test` (vitest over `src/**` and `scripts/**`, jsdom), `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon), and `node --test auth/e2e-gate.test.mjs` (e2e budget/flake/fixture contract, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images. The end-to-end gate covers the previously manual credential-gated tier (real-provider journeys, smoke scripts, proxy-header and deployment-image regressions, migration-on-image verification) against a disposable environment; physical passkeys, phone recovery, live external delivery, and any production mutation stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+The layers are separate. Do not boot a server in a unit test, and do not add
+a jsdom test to the integration runner.
+
+| Layer | Entry point | Location | Boots |
+| --- | --- | --- | --- |
+| Unit | `scripts/test --unit`, `bun --filter ./frontend test:unit` | `frontend/src/**/*.test.{ts,tsx}`, `frontend/scripts/**/*.test.ts`, Go packages | Nothing |
+| Integration | `scripts/test --integration`, `bun --filter ./frontend test:integration` | `frontend/tests/integration/*.spec.ts` | Fixture API and Vite over HTTP |
+| E2E | `E2E_TEST_MUTATIONS=1 scripts/test --e2e` | `auth/test-e2e.mjs` | Real provider and images |
+
+The root aliases are `bun run test:unit`, `bun run test:integration`, and
+`E2E_TEST_MUTATIONS=1 bun run test:e2e`. The e2e alias keeps the deliberate
+disposable-run confirmation.
+
+Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test:unit` (vitest over `src/**` and `scripts/**`, jsdom), `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon), and `node --test auth/e2e-gate.test.mjs` (e2e budget/flake/fixture contract, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images. The end-to-end gate covers the previously manual credential-gated tier (real-provider journeys, smoke scripts, proxy-header and deployment-image regressions, migration-on-image verification) against a disposable environment; physical passkeys, phone recovery, live external delivery, and any production mutation stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
 
 The purchase-capture extension adds `bun --filter ./extension test` to unit and
 `bun --filter ./extension test:browser` to integration. Install its dependencies
@@ -72,7 +85,7 @@ Run from the repository root:
 bun install --frozen-lockfile
 bun --filter ./frontend lint
 bun --filter ./frontend typecheck
-bun --filter ./frontend test
+bun --filter ./frontend test:unit
 bun --filter ./frontend build
 ```
 
@@ -99,37 +112,66 @@ Font roles live in `frontend/src/styles/typography.css`. `bun --filter ./fronten
 
 `bun --filter ./frontend lint:styles` enforces Tailwind's spacing scale in JSX classes, typed recipes, and CSS declarations. It also rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. `bun --filter ./frontend lint:fix` normalizes literal spacing values to that scale. Runtime variables, chart geometry, native state selectors, and calculated layout constraints remain valid.
 
-## Frontend Browser Tests
+### Component interactions
 
-The browser suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness, seeded from `frontend/tests/fixtures/`, and the Vite dev server pointed at it. Each run picks random free ports and a fresh temporary database. It never attaches to a dev server, and several agents can run it at the same time. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched.
+Component behavior is tested as a scenario, not as isolated clicks.
+`frontend/src/mocks/interactions.ts` provides a data-driven runner over
+Testing Library and `user-event`:
+
+```tsx
+await runInteractions(
+  [
+    { click: ["button", "Close dialog"] },
+    { expectText: "Discard the changes in this form?" },
+    { click: ["button", "Continue"] },
+    { expectNoText: "Discard the changes in this form?" },
+  ],
+  dialogScope("Home renovation"),
+);
+```
+
+Steps cover click, cancel, backdrop, type, select, check, uncheck, press,
+waits, and presence, value, enabled, and focus assertions. `cancel` simulates
+the browser turning Escape into a dialog cancel event because jsdom does not
+synthesize it. Use this runner and `user-event` for new interaction tests.
+Keep `fireEvent` for native events the browser owns, such as file input.
+
+Every interactive component needs scenarios for each state-changing control
+and each close path. Dialogs with unsaved work need the full matrix: close
+control, cancel, backdrop, continue, discard, and save failure. Native focus
+return, top layer, scroll lock, and layout occlusion stay in the integration suite.
+
+## Frontend Integration Tests
+
+The integration suite drives the real Go engine over real HTTP. `frontend/playwright.config.ts` starts two servers itself: the `fixtureapi` harness, seeded from `frontend/tests/fixtures/`, and the Vite dev server pointed at it. Each run picks random free ports and a fresh temporary database. It never attaches to a dev server, and several agents can run it at the same time. The harness returns a synthetic user and financial model through the production session contract. It uses no alternate authentication mode in the frontend. No running backend of your own is needed, and none of your data is touched. Specs and their shared helpers live under `frontend/tests/integration/`.
 
 ```bash
 (cd frontend && bunx --no-install playwright install chromium)
-bun --filter ./frontend test:browser
+bun --filter ./frontend test:integration
 ```
 
-`test:browser` (the sharding runner) is the entry point. It runs the suite in shards. Each shard starts its own fixture API and Vite server on its own random ports. The default is half the available CPUs, at most four. Set `TEST_BROWSER_SHARDS` to change it. If a port is taken between selection and startup, the shard retries with new ports. Each invocation writes its own blobs under `test-results/run-<pid>/`, so concurrent runs never share trace files. Running `playwright test` directly skips sharding, retry, and output isolation.
+`test:integration` (the sharding runner) is the entry point. It runs the suite in shards. Each shard starts its own fixture API and Vite server on its own random ports. The default is half the available CPUs, at most four. Set `TEST_BROWSER_SHARDS` to change it. If a port is taken between selection and startup, the shard retries with new ports. Each invocation writes its own blobs under `test-results/run-<pid>/`, so concurrent runs never share trace files. Running `playwright test` directly skips sharding, retry, and output isolation.
 
 Each run merges the per-shard blobs into one HTML report at `test-results/run-<pid>/html/index.html` with the failing traces, plus per-shard machine-readable `results.json` at `test-results/run-<pid>/shard-N/results.json`. Open the HTML report to inspect a failure; parse the shard JSON for the exact locator and line. The suite fixes `locale: en-US` and `timezoneId: America/Los_Angeles`, and every spec fails on an unexpected browser console error or uncaught exception.
 
 Each shard is single-worker because it shares one seeded server. Named spec files run in one shard:
 
 ```bash
-bun --filter ./frontend test:browser -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
+bun --filter ./frontend test:integration -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
 ```
 
 The database is fresh for every run, so a schema change never leaves a failing fixture behind.
 
 ### Finance independence
 
-`frontend/tests/financeIndependence.spec.ts` rejects forecast requests while
+`frontend/tests/integration/financeIndependence.spec.ts` rejects forecast requests while
 account and transaction lists, recorded activity, and ordinary account details
 load. It also verifies saved edits after a forecast failure and local recovery
 for explicitly requested projected activity. Existing account-activity tests
 retain projected transfers, funding gaps, edits, and keyboard navigation.
 
 ```bash
-bun --filter ./frontend test:browser -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
+bun --filter ./frontend test:integration -- financeIndependence.spec.ts accountActivity.spec.ts position.spec.ts
 ```
 
 Backend regressions must distinguish financial validity from forecast readiness.
@@ -139,7 +181,7 @@ and financial edits must retain dependent-reference and identity checks.
 
 Receipt upload, image replacement, deletion, review, extraction fallback,
 provenance, reload, read-only, keyboard dismissal, and mobile accessibility checks live in
-`frontend/tests/receipts.spec.ts`. The mock replaces only extraction. The generated
+`frontend/tests/integration/receipts.spec.ts`. The mock replaces only extraction. The generated
 transport, API, permissions, and SQLite remain real. See
 [receipt verification](docs/receipts.md#verification) for scoped checks and the
 Nginx upload-limit regression.
@@ -151,7 +193,7 @@ To exercise the production build instead of the dev server:
 
 ```bash
 bun --filter ./frontend build
-TEST_PRODUCTION=1 bun --filter ./frontend test:browser
+TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 ```
 
 ## Completion Gate
@@ -169,7 +211,7 @@ scripts/test --gate
 
 `scripts/test --gate` checks install drift, generates the API client up front,
 runs backend, frontend lint, typecheck, unit tests, build, and extension gates in
-parallel groups, then runs the browser suite in shards (the runner refreshes
+parallel groups, then runs the integration suite in shards (the runner refreshes
 the client again so standalone runs never use a stale tree). Use `--no-browser` for
 a fast run and `--shards=N` to control the browser fan-out. `KEEP_GATE_LOGS=1`
 keeps the per-group logs for forensics instead of deleting them.
@@ -185,14 +227,14 @@ For a frontend change, the gate is:
 ```bash
 bun --filter ./frontend lint
 bun --filter ./frontend typecheck
-bun --filter ./frontend test
+bun --filter ./frontend test:unit
 bun --filter ./frontend build
-bun --filter ./frontend test:browser
+bun --filter ./frontend test:integration
 ```
 
 For a backend change, it is the Go gate below.
 
-The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus frontend `lint`, `typecheck`, and unit tests, and extension unit tests and lint. Remaining gates (`build`, `test:browser`) run in `scripts/test --gate`.
+The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus frontend `lint`, `typecheck`, and unit tests, and extension unit tests and lint. Remaining gates (`build`, `test:integration`) run in `scripts/test --gate`.
 
 ## Shared Database Isolation
 
@@ -428,7 +470,7 @@ historical preparation as projections, without a future simulation. It requires
 `user:project`, permits projection without write permission, and stores no additional history.
 Model/date errors return HTTP 200 with `issues` and `error`, without `result`.
 
-`frontend/tests/position.spec.ts` holds forecast requests open to verify that the
+`frontend/tests/integration/position.spec.ts` holds forecast requests open to verify that the
 current-position card and evidence work independently. It also checks separate
 position/forecast failures and retries. Outlook hides previous-input forecast
 placeholders until the active forecast arrives.

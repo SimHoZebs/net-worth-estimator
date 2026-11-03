@@ -194,7 +194,10 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 	const provider = await stubSimplefin(page, { holdConnect: true });
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
-	const simplefin = bankSync.getByRole("region", { name: "SimpleFIN", exact: true });
+	const simplefin = bankSync.getByRole("region", {
+		name: "SimpleFIN",
+		exact: true,
+	});
 	await bankSync.getByLabel("Setup token", { exact: true }).fill(" dG9rZW4= ");
 	await bankSync.getByLabel("Setup token", { exact: true }).press("Enter");
 	await expect(
@@ -295,13 +298,18 @@ test("explains sync limits without retrying the provider automatically", async (
 	});
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
-	const simplefin = bankSync.getByRole("region", { name: "SimpleFIN", exact: true });
+	const simplefin = bankSync.getByRole("region", {
+		name: "SimpleFIN",
+		exact: true,
+	});
 	await bankSync.getByRole("button", { name: "Sync now" }).click();
 	await expect(bankSync.getByRole("alert")).toContainText(
 		"wait before you try again",
 	);
 	expect(provider.syncCalls()).toBe(1);
-	await expect(simplefin.getByRole("status")).not.toContainText("Sync complete");
+	await expect(simplefin.getByRole("status")).not.toContainText(
+		"Sync complete",
+	);
 });
 
 test("connected accounts and sync feedback stay accessible in dark mode on mobile", async ({
@@ -312,7 +320,10 @@ test("connected accounts and sync feedback stay accessible in dark mode on mobil
 	await page.setViewportSize({ width: 390, height: 900 });
 	await page.goto("/#sources");
 	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
-	const simplefin = bankSync.getByRole("region", { name: "SimpleFIN", exact: true });
+	const simplefin = bankSync.getByRole("region", {
+		name: "SimpleFIN",
+		exact: true,
+	});
 	await expect(
 		bankSync.getByRole("list", { name: "Synced accounts" }),
 	).toContainText("Everyday checking");

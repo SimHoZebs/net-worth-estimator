@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "./base.ts";
-import type { BackendCheckpoint } from "../src/api/contracts.ts";
+import type { BackendCheckpoint } from "../../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => resetFixture());
@@ -29,7 +29,7 @@ test("Outlook compares the latest balance with the first synced balance", async 
 				checkpoints: body.checkpoints.map(
 					(checkpoint: Record<string, unknown>) => ({
 						...checkpoint,
-						source: "simplefin",
+						source: "banksync",
 					}),
 				),
 			},

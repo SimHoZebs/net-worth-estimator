@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, trackBrowserErrors } from "./base.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
-import { SAFE_SPENDING_LABELS as labels } from "../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
+import { SAFE_SPENDING_LABELS as labels } from "../../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
 test.beforeEach(async ({ page, request }) => {
 	await resetFixture();

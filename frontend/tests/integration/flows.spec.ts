@@ -65,9 +65,7 @@ test("hovering a node shows its totals and flow counts", async ({ page }) => {
 		tallest!.y + tallest!.height / 2,
 	);
 	await expect(
-		page
-			.getByRole("status")
-			.filter({ hasText: /in across .* out across/ }),
+		page.getByRole("status").filter({ hasText: /in across .* out across/ }),
 	).toBeVisible();
 });
 
@@ -144,9 +142,7 @@ test("touch tap selects a flow through the same inspector", async ({
 		);
 		const panel = page.getByRole("region", { name: "Selected money flow" });
 		await expect(panel).toBeVisible();
-		await expect(panel).toContainText(
-			/Money in of|Money out of|Transfer of/,
-		);
+		await expect(panel).toContainText(/Money in of|Money out of|Transfer of/);
 		reportTouchErrors();
 	} finally {
 		await context.close();

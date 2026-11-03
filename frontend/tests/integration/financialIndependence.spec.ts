@@ -3,7 +3,7 @@ import { expect, type APIRequestContext, test } from "./base.ts";
 import type {
 	FinancialModelResponse,
 	JsonValue,
-} from "../src/api/contracts.ts";
+} from "../../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {

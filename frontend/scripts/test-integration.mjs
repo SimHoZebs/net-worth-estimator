@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Run the browser suite in parallel shards on isolated random ports.
+// Run the browser integration suite in parallel shards on isolated random ports.
 //
 // Several agents may run this suite at the same time on one machine, so no
 // fixed port is safe. Each shard asks the OS for a free port, and a shard that
@@ -112,7 +112,8 @@ function forward(stream, prefix) {
 
 function runShard({ index, shards, frontendPort, apiPort, passthrough }) {
 	return new Promise((resolve) => {
-		const label = shards === 1 ? "[browser]" : `[browser ${index}/${shards}]`;
+		const label =
+			shards === 1 ? "[integration]" : `[integration ${index}/${shards}]`;
 		const outputDir = join(runRoot, `shard-${index}`);
 		const argumentsList = [
 			"--no-install",
@@ -126,7 +127,7 @@ function runShard({ index, shards, frontendPort, apiPort, passthrough }) {
 		];
 		if (process.env.FIXTURE_API_ORIGIN) {
 			console.log(
-				`[browser] ignoring FIXTURE_API_ORIGIN: shards must reset their own fixture backends`,
+				`[integration] ignoring FIXTURE_API_ORIGIN: shards must reset their own fixture backends`,
 			);
 		}
 		const env = {
@@ -168,7 +169,7 @@ async function runWithRetry(shard) {
 		if (last.code === 0) return last;
 		if (!conflictPattern.test(last.output)) return last;
 		console.log(
-			`[browser] port conflict, retrying with new ports (${attempt}/${attempts})`,
+			`[integration] port conflict, retrying with new ports (${attempt}/${attempts})`,
 		);
 	}
 	return last;
@@ -214,12 +215,12 @@ function mergeReports(shards) {
 	);
 	if (result.status !== 0) {
 		console.log(
-			`[browser] could not merge reports: ${(result.stderr || result.stdout || "").trim()}`,
+			`[integration] could not merge reports: ${(result.stderr || result.stdout || "").trim()}`,
 		);
 		return;
 	}
-	console.log(`[browser] html report: ${htmlRoot}/index.html`);
-	console.log(`[browser] json results: ${runRoot}/shard-N/results.json`);
+	console.log(`[integration] html report: ${htmlRoot}/index.html`);
+	console.log(`[integration] json results: ${runRoot}/shard-N/results.json`);
 }
 
 function generateClient() {
@@ -250,7 +251,7 @@ async function main() {
 	// standalone runs never use a stale tree. Gate entries already generated
 	// it up front; the refresh is cheap and keeps one code path.
 	await generateClient();
-	console.log(`[browser] outputs: test-results/${runTag}/`);
+	console.log(`[integration] outputs: test-results/${runTag}/`);
 
 	const results = await Promise.all(
 		Array.from({ length: shards }, (_, position) =>
@@ -266,7 +267,7 @@ async function main() {
 	const passed = results.length - failed;
 	mergeReports(shards);
 	console.log(
-		`[browser] ${passed} shard${passed === 1 ? "" : "s"} passed, ${failed} failed`,
+		`[integration] ${passed} shard${passed === 1 ? "" : "s"} passed, ${failed} failed`,
 	);
 	process.exit(failed === 0 ? 0 : 1);
 }

@@ -56,10 +56,9 @@ test("Yes confirms BNPL, collects total duration, and preserves the financial mo
 		.click();
 	const suggestions = page.getByRole("dialog", { name: "Suggestions" });
 	await expect(
-		suggestions.getByText(
-			"Is this a buy now, pay later payment from Klarna?",
-			{ exact: true },
-		),
+		suggestions.getByText("Is this a buy now, pay later payment from Klarna?", {
+			exact: true,
+		}),
 	).toBeVisible();
 	await suggestions.getByRole("button", { name: "Yes", exact: true }).click();
 	const count = suggestions.getByRole("spinbutton", {

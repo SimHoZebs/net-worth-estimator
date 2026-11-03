@@ -108,4 +108,4 @@ Both produce a result from their own inputs.
 
 ## Keeping the names
 
-The interface is the surface these names appear on, so the check is visual. `frontend/tests/workspace.spec.ts` exercises every route and checks the displayed names.
+The interface is the surface these names appear on, so the check is visual. `frontend/tests/integration/workspace.spec.ts` exercises every route and checks the displayed names.

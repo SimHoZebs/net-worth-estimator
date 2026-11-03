@@ -3,7 +3,7 @@ import { expect, type Page, test } from "./base.ts";
 import type {
 	FinancialModel,
 	FinancialModelResponse,
-} from "../src/api/contracts.ts";
+} from "../../src/api/contracts.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 
 test.beforeEach(async () => {

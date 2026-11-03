@@ -58,9 +58,7 @@ test("ledger diagram table shows every seeded flow with exact sums", async ({
 	await expect(table).toContainText(
 		"Money out of $4,843 from Checking to Outside accounts",
 	);
-	await expect(table).toContainText(
-		"Transfer of $2,000 from Checking to Card",
-	);
+	await expect(table).toContainText("Transfer of $2,000 from Checking to Card");
 	await expect(table).toContainText(
 		"Money out of $200 from Card to Outside accounts",
 	);

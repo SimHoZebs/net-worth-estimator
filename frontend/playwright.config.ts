@@ -16,7 +16,7 @@ const port = (name: string) =>
 	Number(process.env[name] ?? randomInt(20_000, 60_000));
 const frontendPort = port("TEST_FRONTEND_PORT");
 const apiPort = port("TEST_API_PORT");
-// tests/fixture.ts reads the same variables in the worker processes, which
+// tests/integration/fixture.ts reads the same variables in the worker processes, which
 // inherit this process environment.
 process.env.TEST_FRONTEND_PORT = String(frontendPort);
 process.env.TEST_API_PORT = String(apiPort);
@@ -33,7 +33,7 @@ process.on("exit", () => {
 	rmSync(runDirectory, { recursive: true, force: true });
 });
 
-// The browser tests run against the real Go engine over real HTTP. The backend
+// The integration tests run against the real Go engine over real HTTP. The backend
 // is the fixtureapi harness seeded from the canonical CSV model on its own
 // ports, so a developer's running backend is never attached to or mutated.
 const apiOrigin =
@@ -47,10 +47,12 @@ const reporters: ReporterDescription[] = [["list"]];
 if (blobDirectory) reporters.push(["blob", { outputDir: blobDirectory }]);
 if (jsonOutput) reporters.push(["json", { outputFile: jsonOutput }]);
 
-console.log(`browser tests: ui=${baseURL} api=${apiOrigin} db=${databasePath}`);
+console.log(
+	`integration tests: ui=${baseURL} api=${apiOrigin} db=${databasePath}`,
+);
 
 export default defineConfig({
-	testDir: "./tests",
+	testDir: "./tests/integration",
 	fullyParallel: true,
 	retries: 0,
 	// One worker per server: the suite shares a single seeded server, and

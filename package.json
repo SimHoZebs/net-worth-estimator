@@ -3,6 +3,11 @@
 	"version": "1.0.0",
 	"private": true,
 	"type": "module",
+	"scripts": {
+		"test:unit": "scripts/test --unit",
+		"test:integration": "scripts/test --integration",
+		"test:e2e": "scripts/test --e2e"
+	},
 	"workspaces": [
 		"frontend",
 		"extension"

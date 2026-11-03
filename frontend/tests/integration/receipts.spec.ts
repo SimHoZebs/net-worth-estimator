@@ -5,7 +5,7 @@ import { resetFixture } from "./fixture.ts";
 
 const sample = fileURLToPath(
 	new URL(
-		"../../backend/internal/receipts/adapters/mock/testdata/market.png",
+		"../../../backend/internal/receipts/adapters/mock/testdata/market.png",
 		import.meta.url,
 	),
 );
