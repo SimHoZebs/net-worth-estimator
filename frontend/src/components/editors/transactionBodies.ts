@@ -146,6 +146,15 @@ export function postingUpdateBody({
 	const claimChanged =
 		(values.claimRuleId ?? null) !== baseline.claimRuleId ||
 		(values.claimOccurrenceDate ?? null) !== baseline.claimOccurrenceDate;
+	// Claiming a pending seed promotes it to a recorded occurrence, which
+	// needs a positive posted time: pending seeds carry none, so take the
+	// bank's transaction instant, matching the subscription claim body.
+	// The finance boundary validates the request before the store
+	// promotion runs, so the body must already carry it.
+	const promotedPostedTime =
+		baseline.pending && values.claimRuleId != null && raw.postedTime <= 0
+			? (values.transactionTime ?? raw.transactionTime)
+			: raw.postedTime;
 	return {
 		name: values.name,
 		amount: amountChanged
@@ -165,7 +174,7 @@ export function postingUpdateBody({
 				}),
 		postedTime: postedChanged
 			? midnightOfDay(values.postedDate ?? values.startDate)
-			: raw.postedTime,
+			: promotedPostedTime,
 		transactionTime:
 			startChanged || timeChanged
 				? (values.transactionTime ?? midnightOfDay(values.startDate))
@@ -350,6 +359,8 @@ export function detailFormValues({
 		draft.endDate < draft.startDate
 	)
 		return new Error("The last occurrence cannot come before the first one.");
+	if (isOnce && draft.claimRuleId && !draft.claimOccurrenceDate)
+		return new Error("Choose which occurrence this replaces.");
 	return {
 		name,
 		amount,

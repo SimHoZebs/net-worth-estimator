@@ -85,6 +85,7 @@ import {
 	TransactionInsightsTrigger,
 } from "./TransactionInsights.tsx";
 import { useAnalysisFindings } from "../../state/analyses.ts";
+import { useSavedTransactions } from "../../state/savedRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
@@ -915,7 +916,10 @@ export function TransactionDetail({
 	transaction: AccountTransaction;
 	savedTransaction: Transaction;
 	accounts: AccountRef[];
-	/** All saved transaction rows (claim options). */
+	/**
+	 * Rows the entry point had at hand; the detail prefers the canonical
+	 * saved list and uses these only while it loads (and in fixtures).
+	 */
 	transactions?: Transaction[];
 	readOnly?: boolean;
 	claimRuleName?: string | null;
@@ -948,10 +952,15 @@ export function TransactionDetail({
 		onDone: onClose,
 	});
 	const menuAvailable = canEdit || subscription.available || canDelete;
+	// Claim options and name lookups use the canonical saved list, so the
+	// detail never depends on which rows the entry point happened to pass.
+	// The prop (or the row itself) covers loading and test fixtures.
+	const allTransactions =
+		useSavedTransactions() ?? transactions ?? [savedTransaction];
 	const voidCandidates = transaction.void
 		? voidSettleCandidates({
 				voidRow: savedTransaction,
-				transactions: transactions ?? [],
+				transactions: allTransactions,
 			})
 		: [];
 	const [postedPick, setPostedPick] = useState("");
@@ -1021,9 +1030,8 @@ export function TransactionDetail({
 	const findingsQuery = useAnalysisFindings(once ? [savedTransaction.id] : []);
 	const grantsQuery = useSharingGrants();
 	const insightNames = useMemo(() => {
-		const rows = transactions ?? [savedTransaction];
-		return new Map(rows.map((row) => [row.id, row.name]));
-	}, [transactions, savedTransaction]);
+		return new Map(allTransactions.map((row) => [row.id, row.name]));
+	}, [allTransactions]);
 	const insightSuggestions = useMemo(
 		() =>
 			once
@@ -1449,7 +1457,13 @@ export function TransactionDetail({
 						savedTransaction={savedTransaction}
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
-						claimRuleName={claimRuleName}
+						claimRuleName={
+							savedTransaction.claimRuleId
+								? (allTransactions.find(
+										(item) => item.id === savedTransaction.claimRuleId,
+									)?.name ?? claimRuleName)
+								: null
+						}
 						editing={edit.activeField === "schedule"}
 						locked={!canEdit}
 						scheduleControlId={`${edit.formId}-schedule`}
@@ -1457,7 +1471,7 @@ export function TransactionDetail({
 					</div>
 					<MoreOptions
 						savedTransaction={savedTransaction}
-						transactions={transactions ?? [savedTransaction]}
+						transactions={allTransactions}
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}

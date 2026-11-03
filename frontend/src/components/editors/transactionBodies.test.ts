@@ -213,6 +213,65 @@ describe("posting update bodies", () => {
 		});
 		expect(cleared.claim).toBeUndefined();
 	});
+
+	it("rejects a claim with no occurrence date instead of dropping the link", () => {
+		const draft = {
+			name: "Live hold",
+			amount: "18.5",
+			fromId: "checking",
+			toId: "",
+			frequency: "once" as const,
+			startDate: "2026-10-20",
+			endDate: "",
+			noEndDate: true,
+			annualIncrease: "0",
+			enabled: false,
+			claimRuleId: "rent-rule",
+			claimOccurrenceDate: "",
+			postedDate: "",
+			transactionTime: "",
+		};
+		const item = {
+			...baselinePosting,
+			pending: true,
+		};
+		const values = detailFormValues({ draft, item, isOnce: true });
+		expect(values).toBeInstanceOf(Error);
+		expect((values as Error).message).toMatch(/occurrence/);
+	});
+	it("promotes posted time when claiming a pending seed", () => {
+		const rawPending = { ...rawPosting, postedTime: 0 };
+		const item = {
+			...baselinePosting,
+			pending: true,
+			postedDate: null,
+			transactionTime: rawPosting.transactionTime,
+		};
+		const draft = {
+			name: "Live hold",
+			amount: "48000",
+			fromId: "checking",
+			toId: "savings",
+			frequency: "once" as const,
+			startDate: item.startDate,
+			endDate: "",
+			noEndDate: true,
+			annualIncrease: "0",
+			enabled: false,
+			claimRuleId: "rent-rule",
+			claimOccurrenceDate: "2028-06-01",
+			postedDate: "",
+			transactionTime: timeOfDay(item.transactionTime),
+		};
+		const values = detailFormValues({ draft, item, isOnce: true });
+		if (values instanceof Error) throw values;
+		const body = postingUpdateBody({ baseline: item, raw: rawPending, values });
+		expect(body.claim).toEqual({
+			ruleId: "rent-rule",
+			occurrenceDate: "2028-06-01",
+		});
+		expect(body.postedTime).toBe(rawPosting.transactionTime);
+	});
 });
 
 describe("claim posting bodies", () => {

@@ -311,12 +311,7 @@ it("marks a live hold as not yet posted", () => {
 });
 
 it("lets a pending bank row record an occurrence while staying locked", async () => {
-	const rule = {
-		...financialModelFixture.transactions[0]!,
-		id: "rent-rule",
-		name: "Rent",
-		frequency: "monthly" as const,
-	};
+	stubTestServer();
 	const savedTransaction = {
 		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000095",
@@ -343,7 +338,9 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 			transaction={occurrence(savedTransaction)}
 			savedTransaction={savedTransaction}
 			accounts={financialModelFixture.accounts}
-			transactions={[savedTransaction, rule]}
+			// Narrowed list as passed by paged views: claim options still
+			// come from the canonical saved query.
+			transactions={[savedTransaction]}
 			onClose={() => {}}
 		/>,
 	);
@@ -351,16 +348,17 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 	expect(
 		(screen.getByLabelText("Amount (USD)") as HTMLInputElement).readOnly,
 	).toBe(true);
-	// But the occurrence claim is editable.
+	// But the occurrence claim is editable, with rules from the saved query.
 	const claim = screen.getByLabelText(
 		"Records an occurrence of",
 	) as HTMLSelectElement;
 	expect(claim.disabled).toBe(false);
-	fireEvent.change(claim, { target: { value: "rent-rule" } });
+	await screen.findByRole("option", { name: "Salary" });
+	fireEvent.change(claim, { target: { value: "salary" } });
 	for (const control of screen.getAllByLabelText(
 		"Records an occurrence of",
 	) as HTMLSelectElement[]) {
-		expect(control.value).toBe("rent-rule");
+		expect(control.value).toBe("salary");
 		expect(control.disabled).toBe(false);
 	}
 	await waitFor(() =>
