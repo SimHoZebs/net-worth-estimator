@@ -310,6 +310,68 @@ it("marks a live hold as not yet posted", () => {
 	expect(screen.queryByText("Excluded")).toBeNull();
 });
 
+it("lets a pending bank row record an occurrence while staying locked", async () => {
+	const rule = {
+		...financialModelFixture.transactions[0]!,
+		id: "rent-rule",
+		name: "Rent",
+		frequency: "monthly" as const,
+	};
+	const savedTransaction = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000095",
+		name: "Pending rent",
+		amount: 1200,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		frequency: "once" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: true,
+		void: false,
+		syncOwned: true,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={[savedTransaction, rule]}
+			onClose={() => {}}
+		/>,
+	);
+	// The row stays locked: the amount is not editable.
+	expect(
+		(screen.getByLabelText("Amount (USD)") as HTMLInputElement).readOnly,
+	).toBe(true);
+	// But the occurrence claim is editable.
+	const claim = screen.getByLabelText(
+		"Records an occurrence of",
+	) as HTMLSelectElement;
+	expect(claim.disabled).toBe(false);
+	fireEvent.change(claim, { target: { value: "rent-rule" } });
+	for (const control of screen.getAllByLabelText(
+		"Records an occurrence of",
+	) as HTMLSelectElement[]) {
+		expect(control.value).toBe("rent-rule");
+		expect(control.disabled).toBe(false);
+	}
+	await waitFor(() =>
+		expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy(),
+	);
+	expect(
+		(screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement)
+			.disabled,
+	).toBe(false);
+});
+
 it("lets the owner pick the posted charge and remove the vanished hold", async () => {
 	const server = stubTestServer();
 	const settled = {

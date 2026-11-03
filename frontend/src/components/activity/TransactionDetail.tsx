@@ -189,6 +189,7 @@ function MoreOptions({
 	const claimRules = transactions.filter(
 		(item) => item.frequency !== "once" && item.id !== savedTransaction.id,
 	);
+	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
 	const frequencyId = `${id}-frequency`;
 	const annualIncreaseId = `${id}-annual-increase`;
 	const claimRuleId = `${id}-claim-rule`;
@@ -252,7 +253,7 @@ function MoreOptions({
 							<Select
 								id={claimRuleId}
 								name="claimRuleId"
-								disabled={locked}
+								disabled={!claimEditable}
 								value={draft.claimRuleId}
 								onChange={(event) =>
 									updateDraft({ claimRuleId: event.target.value }, "schedule")
@@ -275,7 +276,7 @@ function MoreOptions({
 								id={claimOccurrenceId}
 								type="date"
 								name="claimOccurrenceDate"
-								disabled={locked}
+								disabled={!claimEditable}
 								value={draft.claimOccurrenceDate}
 								onChange={(event) =>
 									updateDraft(
@@ -309,6 +310,7 @@ function MoreOptions({
  * input reads as broken.
  */
 function ScheduleCapsule({
+	savedTransaction,
 	draft,
 	updateDraft,
 	claimRuleName,
@@ -316,6 +318,7 @@ function ScheduleCapsule({
 	locked,
 	scheduleControlId,
 }: {
+	savedTransaction: Transaction;
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	claimRuleName?: string | null;
@@ -326,6 +329,7 @@ function ScheduleCapsule({
 }) {
 	const id = useId();
 	const frequency = draft.frequency;
+	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
 	if (frequency === "once") {
 		if (!draft.claimRuleId) return null;
 		return (
@@ -340,7 +344,7 @@ function ScheduleCapsule({
 						})}
 						aria-label="Records an occurrence of"
 						name="claimRuleId"
-						disabled={locked}
+						disabled={!claimEditable}
 						value={draft.claimRuleId}
 						onChange={(event) =>
 							updateDraft({ claimRuleId: event.target.value }, "schedule")
@@ -359,7 +363,7 @@ function ScheduleCapsule({
 						aria-label="Replaces occurrence on"
 						type="date"
 						name="claimOccurrenceDate"
-						readOnly={locked}
+						readOnly={!claimEditable}
 						value={draft.claimOccurrenceDate}
 						onChange={(event) =>
 							updateDraft(
@@ -517,6 +521,20 @@ function draftFromTransaction(savedTransaction: Transaction): TransactionDraft {
 	};
 }
 
+/**
+ * Pending bank rows stay locked, but the occurrence claim lives outside the
+ * synced columns and the pending-to-posted convert keeps the same row id,
+ * so claiming while pending survives refreshes and settlement. Derived from
+ * the row itself at each use site; no exception flag is passed.
+ */
+function canClaimOccurrence(transaction: Transaction): boolean {
+	return (
+		transaction.frequency === "once" &&
+		transaction.pending === true &&
+		transaction.syncOwned === true
+	);
+}
+
 function useTransactionEdit({
 	savedTransaction,
 	readOnly: readOnlyProp,
@@ -540,9 +558,23 @@ function useTransactionEdit({
 	const formId = useId();
 	const rowReason = readOnlyReasonFor(savedTransaction);
 	const readOnlyReason = readOnlyProp ? "Read-only." : rowReason;
+	const claimEditable = canClaimOccurrence(savedTransaction);
 	useBeforeUnload(activeField !== null && touched && !saving);
 	const updateDraft = (patch: Partial<TransactionDraft>, field: EditField) => {
-		if (readOnlyReason) return;
+		if (readOnlyReason) {
+			// Pending bank rows refresh in place, so only the occurrence
+			// claim may change while locked. Any other schedule patch
+			// (dates, frequency) stays blocked.
+			if (!claimEditable || field !== "schedule") return;
+			const keys = Object.keys(patch);
+			if (
+				keys.length === 0 ||
+				!keys.every(
+					(key) => key === "claimRuleId" || key === "claimOccurrenceDate",
+				)
+			)
+				return;
+		}
 		edit.update(patch);
 		if (activeField !== field) setActiveField(field);
 		setTouched(true);
@@ -571,7 +603,11 @@ function useTransactionEdit({
 	};
 	const submit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
-		if (readOnlyReason || saving) return;
+		const claimOnlySave =
+			Boolean(readOnlyReason) &&
+			claimEditable &&
+			activeField === "schedule";
+		if ((readOnlyReason && !claimOnlySave) || saving) return;
 		if (edit.conflict) {
 			setError(
 				"This transaction changed during your edit. Discard your edits and try again.",
@@ -655,6 +691,11 @@ function useTransactionEdit({
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
+	// Pending claimable rows save schedule-claim edits while locked.
+	const saveBlocked =
+		saving ||
+		(Boolean(readOnlyReason) &&
+			!(claimEditable && activeField === "schedule"));
 	const actions =
 		activeField === null ? undefined : (
 			<>
@@ -668,7 +709,7 @@ function useTransactionEdit({
 					label="Save changes"
 					type="submit"
 					form={formId}
-					disabled={Boolean(readOnlyReason) || saving}
+					disabled={saveBlocked}
 				/>
 			</>
 		);
@@ -727,8 +768,7 @@ function useMarkAsSubscription({
 	// its refresh) failed, retry reuses the same rule instead of silently
 	// generating a replacement. No global draft or persistent state.
 	const attemptRef = useRef<{ ruleId: string } | null>(null);
-	const canClaimPending =
-		savedTransaction.pending === true && savedTransaction.syncOwned === true;
+	const canClaimPending = canClaimOccurrence(savedTransaction);
 	const available =
 		savedTransaction.frequency === "once" &&
 		!savedTransaction.claimRuleId &&
@@ -975,8 +1015,8 @@ export function TransactionDetail({
 		setMenuOpen(false);
 		if (restoreFocus) menuButtonRef.current?.focus();
 	};
-	// The full sharing controls stay behind the quiet footer status:
-	// clicking it reveals them instead of scrolling past them.
+	// Sharing lives in its own sheet above the detail, mirroring the
+	// suggestions sheet: the footer status reports the state and opens it.
 	const [sharingOpen, setSharingOpen] = useState(false);
 	const findingsQuery = useAnalysisFindings(once ? [savedTransaction.id] : []);
 	const grantsQuery = useSharingGrants();
@@ -1406,6 +1446,7 @@ export function TransactionDetail({
 					)}
 					<div id={`${edit.formId}-schedule-section`} className="scroll-mt-4">
 					<ScheduleCapsule
+						savedTransaction={savedTransaction}
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
 						claimRuleName={claimRuleName}
@@ -1482,32 +1523,15 @@ export function TransactionDetail({
 						/>
 					</div>
 				)}
-				{once && sharingOpen && (
-					<div id={`${edit.formId}-sharing`} className="scroll-mt-4">
-						<TransactionSharing
-							postingId={savedTransaction.id}
-							readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
-						/>
-					</div>
-				)}
 				<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5">
 					<div className="flex flex-wrap items-center gap-4">
 						{once && (
 							<TextButton
 								type="button"
 								tone="default"
-								onClick={() => {
-									if (sharingOpen) {
-										setSharingOpen(false);
-										return;
-									}
-									setSharingOpen(true);
-									requestAnimationFrame(() =>
-										scrollToSection(`${edit.formId}-sharing`),
-									);
-								}}
-								aria-label={`Sharing status: ${sharingLabel}. Go to sharing section`}
-								aria-expanded={sharingOpen}
+								onClick={() => setSharingOpen(true)}
+								aria-label={`Sharing status: ${sharingLabel}. Open sharing settings`}
+								aria-haspopup="dialog"
 							>
 								{sharedCount > 0 ? (
 									<UsersRound size={14} aria-hidden="true" />
@@ -1556,6 +1580,18 @@ export function TransactionDetail({
 						names={insightNames}
 						readOnly={insightReadOnly}
 						onDone={() => setInsightsOpen(false)}
+					/>
+				</Modal>
+			)}
+			{once && sharingOpen && (
+				<Modal
+					title="Sharing"
+					onClose={() => setSharingOpen(false)}
+					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
+				>
+					<TransactionSharing
+						postingId={savedTransaction.id}
+						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 					/>
 				</Modal>
 			)}
