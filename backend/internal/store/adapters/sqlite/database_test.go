@@ -222,11 +222,11 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		},
 		func() error {
 			item := syncPendingPosting("same-transaction", "checking", "2026-08-03")
-			_, err := a.ApplySyncPlan([]SyncCheckpoint{{AccountID: "checking", Balance: 50, Source: SourceSimpleFIN, ObservedAt: 1769990399}}, []BankDirective{syncPendingDirective(item)})
+			_, err := a.ApplySync([]SyncCheckpoint{{AccountID: "checking", Balance: 50, Source: SourceSimpleFIN, ObservedAt: 1769990399}}, []BankDirective{syncPendingDirective(item)})
 			return err
 		},
 		func() error { return a.SetLastSyncTime("after") },
-		func() error { _, err := a.ApplySyncPlan(nil, nil); return err },
+		func() error { _, err := a.ApplySync(nil, nil); return err },
 		func() error { return a.DeletePosting(postingID) },
 		func() error { return a.DeleteRule("same-rule") },
 		func() error { return a.DeleteEvaluation(eval.InstanceID) },
@@ -405,7 +405,7 @@ func TestTimestampedRowsStayIsolatedAcrossUsers(t *testing.T) {
 		}}
 	}
 	for user, s := range map[string]*sqliteStore{"a": a, "b": b} {
-		if _, err := s.ApplySyncPlan(
+		if _, err := s.ApplySync(
 			[]SyncCheckpoint{{AccountID: "checking", Balance: 10, Source: SourceSimpleFIN, ObservedAt: instant + 86400}},
 			[]BankDirective{settledDirective(syncSettledPosting("tx-"+user, "checking", "Settled "+user, "2026-08-06"))},
 		); err != nil {

@@ -30,11 +30,11 @@ func seedAPIRecurringPattern(t *testing.T, scoped store.Store, cadence string) [
 		transactions = append(transactions, simplefin.Transaction{ID: "grocery-" + string(rune('a'+i)), Description: "GROCER 123", Amount: "-30", Posted: stamp})
 	}
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", Currency: "USD", Balance: "100", Transactions: transactions}}}
-	plan, err := simplefin.Map(set, map[string]string{"bank": "checking"}, time.Unix(posted[2], 0))
+	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Unix(posted[2], 0))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := scoped.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})); err != nil {
+	if _, err := scoped.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})); err != nil {
 		t.Fatal(err)
 	}
 	run, input, claimed, err := scoped.ClaimAnalysis("recurring", "test-v1")

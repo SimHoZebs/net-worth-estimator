@@ -22,11 +22,11 @@ func seedAPIFinding(t *testing.T, scoped store.Store) types.AnalysisFinding {
 		t.Fatal(err)
 	}
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", Currency: "USD", Balance: "100", Transactions: []simplefin.Transaction{{ID: "charge", Description: "Klarna Pay in 4", Amount: "-25", Posted: 1792454400}}}}}
-	plan, err := simplefin.Map(set, map[string]string{"bank": "checking"}, time.Unix(1792454400, 0))
+	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Unix(1792454400, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = scoped.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true}))
+	_, err = scoped.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true}))
 	if err != nil {
 		t.Fatal(err)
 	}

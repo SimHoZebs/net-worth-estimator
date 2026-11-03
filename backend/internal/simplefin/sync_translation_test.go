@@ -46,19 +46,19 @@ const fixtureAccountSet = `{
   ]
 }`
 
-func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
+func TestTranslateProducesCheckpointsAndPendingOnly(t *testing.T) {
 	var set AccountSet
 	if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
-	plan, err := Map(&set, map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+	translation, err := Translate(&set, map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 	if err != nil {
-		t.Fatalf("map: %v", err)
+		t.Fatalf("translate: %v", err)
 	}
-	if len(plan.Checkpoints) != 3 {
-		t.Fatalf("checkpoints = %+v", plan.Checkpoints)
+	if len(translation.Checkpoints) != 3 {
+		t.Fatalf("checkpoints = %+v", translation.Checkpoints)
 	}
-	for _, checkpoint := range plan.Checkpoints {
+	for _, checkpoint := range translation.Checkpoints {
 		if checkpoint.AccountID == "checking" && checkpoint.Balance != 1523.10 {
 			t.Fatalf("checking checkpoint = %+v", checkpoint)
 		}
@@ -66,21 +66,21 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 			t.Fatalf("prime checkpoint = %+v", checkpoint)
 		}
 	}
-	if len(plan.Pending) != 2 {
-		t.Fatalf("pending = %+v, want charge and refund seeds", plan.Pending)
+	if len(translation.Pending) != 2 {
+		t.Fatalf("pending = %+v, want charge and refund seeds", translation.Pending)
 	}
-	pending := plan.Pending[0]
+	pending := translation.Pending[0]
 	if pending.ID != "" || pending.ProviderAccountID != "bridge-prime" || pending.TransactionID != "pend1" || !pending.Pending {
 		t.Fatalf("pending identity/state = %+v", pending)
 	}
 	var refund *store.SyncPosting
-	for i := range plan.Pending {
-		if plan.Pending[i].TransactionID == "pendpos" {
-			refund = &plan.Pending[i]
+	for i := range translation.Pending {
+		if translation.Pending[i].TransactionID == "pendpos" {
+			refund = &translation.Pending[i]
 		}
 	}
 	if refund == nil {
-		t.Fatalf("pending refund seed missing: %+v", plan.Pending)
+		t.Fatalf("pending refund seed missing: %+v", translation.Pending)
 	}
 	if refund.SourceAccountID != nil || len(refund.Destinations) != 1 || refund.Destinations[0] != "prime_card" {
 		t.Fatalf("pending refund direction = %+v, want inflow to prime_card", refund)
@@ -91,15 +91,15 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.SourceAccountID == nil || *pending.SourceAccountID != "prime_card" {
 		t.Fatalf("pending source = %+v", pending.SourceAccountID)
 	}
-	if len(plan.Provisions) != 1 || plan.Provisions[0].BridgeID != "bridge-other" || plan.Provisions[0].Kind != "cash" {
-		t.Fatalf("provisions = %+v, want bridge-other cash", plan.Provisions)
+	if len(translation.Provisions) != 1 || translation.Provisions[0].BridgeID != "bridge-other" || translation.Provisions[0].Kind != "cash" {
+		t.Fatalf("provisions = %+v, want bridge-other cash", translation.Provisions)
 	}
-	unmapped := plan.Checkpoints[2]
+	unmapped := translation.Checkpoints[2]
 	if unmapped.AccountID != "" || unmapped.BridgeID != "bridge-other" || unmapped.Balance != 1.00 {
 		t.Fatalf("unmapped checkpoint = %+v, want bridge-keyed", unmapped)
 	}
-	if plan.Skipped[SkipUnmappedAccount] != 2 {
-		t.Fatalf("skipped = %+v, want 2 unmapped rows", plan.Skipped)
+	if translation.Skipped[SkipUnmappedAccount] != 2 {
+		t.Fatalf("skipped = %+v, want 2 unmapped rows", translation.Skipped)
 	}
 	expression, ok := pending.Amount.Config["expression"].(string)
 	if !ok || pending.Amount.Resolver != "expression" {
@@ -111,7 +111,7 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.Claim != nil {
 		t.Fatalf("pending shape = %+v", pending)
 	}
-	settled := plan.Settled[0]
+	settled := translation.Settled[0]
 	if settled.ProviderAccountID != "bridge-prime" || settled.TransactionID != "post1" || settled.Pending || !settled.Enabled {
 		t.Fatalf("settled identity/state = %+v, want enabled settled participant", settled)
 	}
@@ -121,23 +121,23 @@ func TestMapProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if settled.SourceAccountID == nil || *settled.SourceAccountID != "prime_card" {
 		t.Fatalf("settled source = %+v", settled.SourceAccountID)
 	}
-	if len(plan.Settled) != 2 {
-		t.Fatalf("settled = %+v, want posted charge and posted payment", plan.Settled)
+	if len(translation.Settled) != 2 {
+		t.Fatalf("settled = %+v, want posted charge and posted payment", translation.Settled)
 	}
-	for _, settled := range plan.Settled {
+	for _, settled := range translation.Settled {
 		if settled.TransactionID == "pay1" && (settled.SourceAccountID != nil || len(settled.Destinations) != 1) {
 			t.Fatalf("posted payment direction = %+v, want inflow", settled)
 		}
 	}
-	if plan.Skipped[SkipBadAmount] != 1 || len(plan.Skipped) != 2 {
-		t.Fatalf("skipped = %+v, want broken amount plus unmapped account", plan.Skipped)
+	if translation.Skipped[SkipBadAmount] != 1 || len(translation.Skipped) != 2 {
+		t.Fatalf("skipped = %+v, want broken amount plus unmapped account", translation.Skipped)
 	}
-	if plan.Skipped[SkipUnmappedAccount] != 2 {
-		t.Fatalf("unmapped skipped = %+v", plan.Skipped)
+	if translation.Skipped[SkipUnmappedAccount] != 2 {
+		t.Fatalf("unmapped skipped = %+v", translation.Skipped)
 	}
 }
 
-func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
+func TestTranslatePreservesExactUpstreamTransactionKeys(t *testing.T) {
 	for _, key := range []string{"a/b", "a b", "a_b", "a.b"} {
 		var set AccountSet
 		if err := json.Unmarshal([]byte(fixtureAccountSet), &set); err != nil {
@@ -148,23 +148,23 @@ func TestMapPreservesExactUpstreamTransactionKeys(t *testing.T) {
 				set.Accounts[1].Transactions[i].ID = key
 			}
 		}
-		plan, err := Map(&set, map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
+		translation, err := Translate(&set, map[string]string{"bridge-checking": "checking", "bridge-prime": "prime_card"}, time.Unix(1785628800, 0).UTC())
 		if err != nil {
-			t.Fatalf("map: %+v, err %v", plan, err)
+			t.Fatalf("translate: %+v, err %v", translation, err)
 		}
 		found := false
-		for _, pending := range plan.Pending {
+		for _, pending := range translation.Pending {
 			if pending.TransactionID == key && pending.ID == "" {
 				found = true
 			}
 		}
 		if !found {
-			t.Fatalf("upstream key was changed: plan %+v, err %v", plan, err)
+			t.Fatalf("upstream key was changed: translation %+v, err %v", translation, err)
 		}
 	}
 }
 
-func TestMapNormalizesSettledEventTimeToPosted(t *testing.T) {
+func TestTranslateNormalizesSettledEventTimeToPosted(t *testing.T) {
 	// A purchase authorized at 08:00 but posted at 11:00 affects the
 	// reported balance at posting: the settled event time is the post
 	// instant. Pending seeds keep the purchase timestamp for matching.
@@ -176,21 +176,21 @@ func TestMapNormalizesSettledEventTimeToPosted(t *testing.T) {
 			{ID: "pend1", Posted: 0, Amount: "-10.00", Description: "Hold", Pending: &[]bool{true}[0], TransactedAt: &[]int64{1773129600}[0]},
 		},
 	}}}
-	plan, err := Map(set, map[string]string{"bridge-prime": "prime_card"}, time.Unix(1773140400, 0).UTC())
+	translation, err := Translate(set, map[string]string{"bridge-prime": "prime_card"}, time.Unix(1773140400, 0).UTC())
 	if err != nil {
-		t.Fatalf("map: %v", err)
+		t.Fatalf("translate: %v", err)
 	}
-	if len(plan.Settled) != 1 || len(plan.Pending) != 1 {
-		t.Fatalf("plan = %+v, want 1 settled and 1 pending", plan)
+	if len(translation.Settled) != 1 || len(translation.Pending) != 1 {
+		t.Fatalf("translation = %+v, want 1 settled and 1 pending", translation)
 	}
-	settled := plan.Settled[0]
+	settled := translation.Settled[0]
 	if !settled.Enabled {
 		t.Fatalf("settled bank actual must participate: %+v", settled.Posting)
 	}
 	if settled.Posting.TransactionTime != 1773140400 || settled.Posting.PostedTime != 1773140400 {
 		t.Fatalf("settled event time = %d/%d, want posted instant 1773140400", settled.Posting.TransactionTime, settled.Posting.PostedTime)
 	}
-	pending := plan.Pending[0]
+	pending := translation.Pending[0]
 	if pending.Enabled || pending.Posting.TransactionTime != 1773129600 {
 		t.Fatalf("pending seed must stay disabled on its purchase timestamp: %+v", pending.Posting)
 	}

@@ -25,7 +25,7 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 	}
 	upsert := func(posting types.Posting, key string) {
 		t.Helper()
-		_, err := scoped.ApplySyncPlan(nil, []store.BankDirective{{
+		_, err := scoped.ApplySync(nil, []store.BankDirective{{
 			Upsert: &store.BankUpsert{Posting: posting, Keys: []store.BankKey{
 				{Provider: store.SourceSimpleFIN, AccountID: "bridge-prime", TransactionID: key},
 			}},
@@ -46,7 +46,7 @@ func seedAuditDB(t *testing.T, path string) store.Store {
 	if err != nil || len(rows) != 1 {
 		t.Fatalf("bank rows = %+v, err %v", rows, err)
 	}
-	if _, err := scoped.ApplySyncPlan(nil, []store.BankDirective{{Void: rows[0].Posting.ID}}); err != nil {
+	if _, err := scoped.ApplySync(nil, []store.BankDirective{{Void: rows[0].Posting.ID}}); err != nil {
 		t.Fatalf("void: %v", err)
 	}
 	upsert(types.Posting{

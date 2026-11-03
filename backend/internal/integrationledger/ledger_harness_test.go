@@ -195,7 +195,7 @@ func ledgerApplyFeeds(t *testing.T, world *ledgerWorld, from, to int) {
 		set := &simplefin.AccountSet{Accounts: []simplefin.Account{{
 			ID: "ledger-bank", Currency: "USD", Balance: "10000", Transactions: transactions,
 		}}}
-		plan, err := simplefin.Map(set, map[string]string{"ledger-bank": "checking"}, time.Unix(ledgerNow, 0))
+		translation, err := simplefin.Translate(set, map[string]string{"ledger-bank": "checking"}, time.Unix(ledgerNow, 0))
 		if err != nil {
 			t.Fatalf("map bank feed: %v", err)
 		}
@@ -205,7 +205,7 @@ func ledgerApplyFeeds(t *testing.T, world *ledgerWorld, from, to int) {
 		if err != nil {
 			t.Fatalf("load bank postings: %v", err)
 		}
-		if _, err := world.ownerSC.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, bank, map[string]bool{"checking": true})); err != nil {
+		if _, err := world.ownerSC.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true})); err != nil {
 			t.Fatalf("apply bank feed: %v", err)
 		}
 	}

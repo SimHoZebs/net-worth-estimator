@@ -787,9 +787,9 @@ the user correction overlay.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
-`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Map` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
+`Runner.Sync` requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
 
-The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySyncPlan` applies checkpoints and directives in one transaction without interpreting provider behavior. Settled bank posts are normal participants at posting time: the mapper emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual postings. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
+The adapter reconciles the snapshot against stored bank rows into directives (`backend/internal/simplefin/reconcile.go`); `Store.ApplySync` applies checkpoints and directives in one transaction without interpreting provider behavior. Settled bank posts are normal participants at posting time: the translation emits them enabled with the event time normalized to the posted instant, and replay executes them through the same actual path as manual postings. There is no bank-evidence-only participation policy. Pending and void rows stay disabled and never move balances.
 
 One-off legacy interpretation, stated plainly: in databases written
 before this change, a disabled settled bank row does not distinguish the
@@ -845,6 +845,6 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/domain/stochastic.go`             | worker execution and progress                           |
 | `backend/internal/domain/stochastic_session.go`     | baseline, samples, percentiles, accumulators            |
 | `backend/internal/domain/sampler.go`                | seeded sampling and percentile helpers                  |
-| `backend/internal/simplefin/runner.go`              | fetch/map/apply orchestration and trigger guards        |
-| `backend/internal/simplefin/map.go`                 | checkpoint and bank-transaction mapping                   |
+| `backend/internal/simplefin/runner.go`              | fetch/translate/apply orchestration and trigger guards  |
+| `backend/internal/simplefin/sync_translation.go`    | checkpoint and bank-transaction translation             |
 | `backend/internal/simplefin/reconcile.go`           | snapshot-to-directive lifecycle policy                  |

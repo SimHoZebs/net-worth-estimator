@@ -11,7 +11,7 @@ import (
 )
 
 // flowPosting builds adapter-shaped sync postings: settled rows participate
-// (enabled), pending seeds stay disabled, exactly as the mapper emits them.
+// (enabled), pending seeds stay disabled, exactly as the translation emits them.
 func flowPosting(id, name, account, amount string, pending bool, day string) store.SyncPosting {
 	stamp, err := time.ParseInLocation("2006-01-02", day, time.UTC)
 	if err != nil {
@@ -40,7 +40,7 @@ func applyFlow(t *testing.T, database store.Store, pending, settled []store.Sync
 		t.Fatal(err)
 	}
 	covered := map[string]bool{"checking": true, "prime_card": true}
-	summary, err := database.ApplySyncPlan(nil, Reconcile(pending, settled, bank, covered))
+	summary, err := database.ApplySync(nil, Reconcile(pending, settled, bank, covered))
 	if err != nil {
 		t.Fatalf("apply = %v", err)
 	}
@@ -240,19 +240,19 @@ func seedFlowChecking(t *testing.T, database store.Store) {
 
 func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now time.Time) (store.SyncApplySummary, *types.FinancialModel) {
 	t.Helper()
-	plan, err := Map(set, map[string]string{"bridge-checking": "checking"}, now)
+	translation, err := Translate(set, map[string]string{"bridge-checking": "checking"}, now)
 	if err != nil {
-		t.Fatalf("map: %v", err)
+		t.Fatalf("translate: %v", err)
 	}
 	var checkpoints []store.SyncCheckpoint
-	for _, checkpoint := range plan.Checkpoints {
+	for _, checkpoint := range translation.Checkpoints {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{AccountID: checkpoint.AccountID, Balance: checkpoint.Balance, Source: store.SourceSimpleFIN, ObservedAt: checkpoint.ObservedAt})
 	}
 	bank, err := database.LoadBankPostings()
 	if err != nil {
 		t.Fatal(err)
 	}
-	summary, err := database.ApplySyncPlan(checkpoints, Reconcile(plan.Pending, plan.Settled, bank, map[string]bool{"checking": true}))
+	summary, err := database.ApplySync(checkpoints, Reconcile(translation.Pending, translation.Settled, bank, map[string]bool{"checking": true}))
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
@@ -265,7 +265,7 @@ func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now 
 
 // First sync against a blank model provisions the account and imports the
 // checkpoint and the settled transaction together. Provisioning runs
-// before translation, so the mapping is final when rows are emitted and
+// before translation, so the snapshot is final when rows are emitted and
 // the first sync drops nothing as unmapped. 09:00 observation 1000,
 // settled -100 posted 11:00; the 12:00 position is 900 on the first sync,
 // not only the second.
@@ -316,25 +316,25 @@ func TestFirstSyncImportsCheckpointAndSettledTogether(t *testing.T) {
 }
 
 // End-to-end provider feed: a settled posted expense participates as an
-// ordinary actual from Map through projection. 09:00 observation 1000,
+// ordinary actual from Translate through projection. 09:00 observation 1000,
 // purchase 08:00 but posted 11:00, cut 12:00 => 900.
 func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	database := openRunnerStore(t)
 	seedFlowChecking(t, database)
 	now := time.Unix(1773140400, 0).UTC()
 	set := settledFeed(t, 1773140400, 1773129600)
-	plan, err := Map(&set, map[string]string{"bridge-checking": "checking"}, now)
+	translation, err := Translate(&set, map[string]string{"bridge-checking": "checking"}, now)
 	if err != nil {
-		t.Fatalf("map: %v", err)
+		t.Fatalf("translate: %v", err)
 	}
-	if len(plan.Settled) != 1 {
-		t.Fatalf("settled = %+v, want 1", plan.Settled)
+	if len(translation.Settled) != 1 {
+		t.Fatalf("settled = %+v, want 1", translation.Settled)
 	}
-	if !plan.Settled[0].Posting.Enabled {
-		t.Fatalf("settled bank actual must participate: %+v", plan.Settled[0].Posting)
+	if !translation.Settled[0].Posting.Enabled {
+		t.Fatalf("settled bank actual must participate: %+v", translation.Settled[0].Posting)
 	}
-	if plan.Settled[0].Posting.TransactionTime != 1773140400 {
-		t.Fatalf("settled event time = %d, want posted instant 1773140400", plan.Settled[0].Posting.TransactionTime)
+	if translation.Settled[0].Posting.TransactionTime != 1773140400 {
+		t.Fatalf("settled event time = %d, want posted instant 1773140400", translation.Settled[0].Posting.TransactionTime)
 	}
 	_, model := applyProviderFeed(t, database, &set, now)
 	position, err := domain.ResolveCurrentPosition(model, "2026-03-10T12:00:00Z", types.ModelOverrides{})
@@ -359,7 +359,7 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	repeat, err := database.ApplySyncPlan(nil, Reconcile(nil, plan.Settled, bank, map[string]bool{"checking": true}))
+	repeat, err := database.ApplySync(nil, Reconcile(nil, translation.Settled, bank, map[string]bool{"checking": true}))
 	if err != nil {
 		t.Fatalf("repeat: %v", err)
 	}

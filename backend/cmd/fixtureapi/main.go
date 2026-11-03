@@ -191,11 +191,11 @@ func main() {
 		}
 		if len(bankTransactions) > 0 {
 			set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "fixture-bank", Currency: "USD", Balance: "0", Transactions: bankTransactions}}}
-			plan, err := simplefin.Map(set, map[string]string{"fixture-bank": "checking"}, time.Now())
+			translation, err := simplefin.Translate(set, map[string]string{"fixture-bank": "checking"}, time.Now())
 			if err != nil {
 				return err
 			}
-			if _, err := database.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})); err != nil {
+			if _, err := database.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})); err != nil {
 				return err
 			}
 		}

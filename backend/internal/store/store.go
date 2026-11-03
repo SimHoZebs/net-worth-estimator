@@ -139,7 +139,7 @@ type Store interface {
 	ReviewEmailReceipt(id string, correction *EmailReceiptCorrection) (EmailReceipt, error)
 	GetArtifact(identity string) (string, bool, error)
 	PutArtifact(identity, kind, payload string) error
-	ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
+	ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
 	LoadBankPostings() ([]BankRow, error)
 	Clear() error
 	Close() error

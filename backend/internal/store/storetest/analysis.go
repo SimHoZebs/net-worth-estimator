@@ -16,7 +16,7 @@ func testAnalysisConformance(t *testing.T, newStore func(*testing.T) store.Store
 	account := "checking"
 	key := store.BankKey{Provider: "bank-provider", AccountID: "bank", TransactionID: "charge"}
 	facts := types.TransactionFacts{Description: "Provider installment", Amount: "-25", Currency: "USD"}
-	_, err := s.ApplySyncPlan(nil, []store.BankDirective{
+	_, err := s.ApplySync(nil, []store.BankDirective{
 		{Upsert: &store.BankUpsert{Keys: []store.BankKey{key}, Posting: types.Posting{Name: "Display label", Source: "bank-provider", SourceAccountID: &account, PostedTime: 1785628800, TransactionTime: 1785628800, Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "25"}, Inputs: map[string]types.AmountInputBinding{}}}}},
 		{Observe: &store.BankObservation{Keys: []store.BankKey{key}, Facts: facts}},
 	})

@@ -480,7 +480,7 @@ func TestSharingSyncMaintainsIndex(t *testing.T) {
 	group := sharingGroup(t, d, "alice", "Club", "bob")
 	enableAuto(t, d, alice, group, "prime_card")
 	seed := syncPendingPosting("sync-a", "prime_card", "2026-08-02")
-	summary, err := storeA.ApplySyncPlan(nil, []BankDirective{syncPendingDirective(seed)})
+	summary, err := storeA.ApplySync(nil, []BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.PendingInserted != 1 {
 		t.Fatalf("apply = %+v, err %v", summary, err)
 	}
@@ -500,7 +500,7 @@ func TestSharingSyncMaintainsIndex(t *testing.T) {
 	}
 	settled := syncSettledPosting("posted-a", "prime_card", "Posted a", "2026-08-03")
 	settled.Source = SourceSimpleFIN
-	summary, err = storeA.ApplySyncPlan(nil, []BankDirective{{Convert: &BankConvert{
+	summary, err = storeA.ApplySync(nil, []BankDirective{{Convert: &BankConvert{
 		ID:      pendingID,
 		Posting: settled.Posting,
 		AddKeys: []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
@@ -515,7 +515,7 @@ func TestSharingSyncMaintainsIndex(t *testing.T) {
 		t.Fatalf("index rows after settle = %d, want 1", got)
 	}
 	voidSeed := syncPendingPosting("sync-b", "prime_card", "2026-08-04")
-	if _, err := storeA.ApplySyncPlan(nil, []BankDirective{syncPendingDirective(voidSeed)}); err != nil {
+	if _, err := storeA.ApplySync(nil, []BankDirective{syncPendingDirective(voidSeed)}); err != nil {
 		t.Fatal(err)
 	}
 	afterSeed, err := storeA.LoadModel()
@@ -531,7 +531,7 @@ func TestSharingSyncMaintainsIndex(t *testing.T) {
 	if voidID == "" {
 		t.Fatal("second synced row missing")
 	}
-	summary, err = storeA.ApplySyncPlan(nil, []BankDirective{{Void: voidID}})
+	summary, err = storeA.ApplySync(nil, []BankDirective{{Void: voidID}})
 	if err != nil {
 		t.Fatalf("void = %v", err)
 	}

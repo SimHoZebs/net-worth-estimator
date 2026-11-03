@@ -35,7 +35,7 @@ func bankUpsertDirective(posting types.Posting, provider, account, transaction s
 
 func applyDirectives(t *testing.T, database store.Store, directives []BankDirective) SyncApplySummary {
 	t.Helper()
-	summary, err := database.ApplySyncPlan(nil, directives)
+	summary, err := database.ApplySync(nil, directives)
 	if err != nil {
 		t.Fatalf("apply = %v", err)
 	}
@@ -341,7 +341,7 @@ func TestBankConvertSkipsRemovedRow(t *testing.T) {
 	seedAccount(t, database, "prime_card")
 	// A conversion racing a removal lands nowhere: the removal stands,
 	// and the sync stays green.
-	summary, err := database.ApplySyncPlan(nil, []BankDirective{{
+	summary, err := database.ApplySync(nil, []BankDirective{{
 		Convert: &BankConvert{ID: "missing", Posting: bankSeedPosting("C", "prime_card", "10", false)},
 	}})
 	if err != nil {
@@ -371,7 +371,7 @@ func TestBankDirectivesRejectInvalidInput(t *testing.T) {
 		}(), Keys: bankKeys(SourceSimpleFIN, "bridge-prime", "pend1")}}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := database.ApplySyncPlan(nil, directives); err == nil {
+			if _, err := database.ApplySync(nil, directives); err == nil {
 				t.Fatalf("%s accepted", name)
 			}
 		})

@@ -21,12 +21,12 @@ func TestAnalysisReadsArePassiveAndReviewDoesNotChangeModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", Currency: "USD", Balance: "100", BalanceDate: 1785628800, Transactions: []simplefin.Transaction{{ID: "charge", Description: "KLARNA PAY IN 4", Amount: "-25", Posted: 1785628800}}}}}
-	plan, err := simplefin.Map(set, map[string]string{"bank": "checking"}, time.Unix(1785628800, 0))
+	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Unix(1785628800, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
-	directives := simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})
-	if _, err := scoped.ApplySyncPlan(nil, directives); err != nil {
+	directives := simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})
+	if _, err := scoped.ApplySync(nil, directives); err != nil {
 		t.Fatal(err)
 	}
 	handler := New(scoped, Config{})

@@ -173,7 +173,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 		Enabled:         false,
 		Pending:         true,
 	}
-	if _, err := database.ApplySyncPlan(nil, []store.BankDirective{{
+	if _, err := database.ApplySync(nil, []store.BankDirective{{
 		Upsert: &store.BankUpsert{Posting: bank, Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-card", TransactionID: "auth1"}}},
 	}}); err != nil {
 		t.Fatalf("bank upsert: %v", err)
@@ -191,7 +191,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	if bankID == "" {
 		t.Fatalf("bank posting missing in %+v", model.Postings)
 	}
-	if _, err := database.ApplySyncPlan(nil, []store.BankDirective{{Void: bankID}}); err != nil {
+	if _, err := database.ApplySync(nil, []store.BankDirective{{Void: bankID}}); err != nil {
 		t.Fatalf("bank void: %v", err)
 	}
 	settled := types.Posting{
@@ -201,7 +201,7 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 		TransactionTime: 1785715200,
 		Enabled:         true,
 	}
-	if _, err := database.ApplySyncPlan(nil, []store.BankDirective{{
+	if _, err := database.ApplySync(nil, []store.BankDirective{{
 		Upsert: &store.BankUpsert{Posting: settled, Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-card", TransactionID: "post1"}}},
 	}}); err != nil {
 		t.Fatalf("bank settled upsert: %v", err)

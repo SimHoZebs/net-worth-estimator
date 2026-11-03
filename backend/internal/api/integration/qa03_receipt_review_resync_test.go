@@ -34,12 +34,12 @@ func qa03BankSync(t *testing.T, scoped store.Store, transactions []simplefin.Tra
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{
 		ID: "bank", Currency: "USD", Balance: "1000", Transactions: transactions,
 	}}}
-	plan, err := simplefin.Map(set, map[string]string{"bank": "checking"}, time.Now())
+	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Now())
 	if err != nil {
 		t.Fatalf("map bank rows: %v", err)
 	}
-	if _, err := scoped.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true})); err != nil {
-		t.Fatalf("apply sync plan: %v", err)
+	if _, err := scoped.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true})); err != nil {
+		t.Fatalf("apply sync: %v", err)
 	}
 }
 

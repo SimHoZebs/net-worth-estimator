@@ -23,7 +23,7 @@ func advSplitInput(world *advWorld, sourcePostingID string) store.SplitInput {
 func advSeedBankPending(t *testing.T, scoped store.Store, name, amount string, day int64, key string) string {
 	t.Helper()
 	source := "checking"
-	_, err := scoped.ApplySyncPlan(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
+	_, err := scoped.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
 		Posting: types.Posting{
 			Name: name, Source: store.SourceSimpleFIN, SourceAccountID: &source,
 			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": amount}, Inputs: map[string]types.AmountInputBinding{}},
@@ -53,7 +53,7 @@ func advSeedBankPending(t *testing.T, scoped store.Store, name, amount string, d
 // advVoid marks one bank row void through the real sync void path.
 func advVoid(t *testing.T, scoped store.Store, rowID string) {
 	t.Helper()
-	summary, err := scoped.ApplySyncPlan(nil, []store.BankDirective{{Void: rowID}})
+	summary, err := scoped.ApplySync(nil, []store.BankDirective{{Void: rowID}})
 	if err != nil {
 		t.Fatalf("void row: %v", err)
 	}

@@ -296,7 +296,7 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 	return resolved, provisioned, stale, nil
 }
 
-// ApplySyncPlan upserts sync checkpoints and applies reconciled bank
+// ApplySync upserts sync checkpoints and applies reconciled bank
 // directives in one transaction. Owner rows always win key conflicts. The
 // directives carry fully resolved lifecycle state; the store verifies
 // structural validity (keys present, non-user source, row existence) but
@@ -305,7 +305,7 @@ func (s *sqliteStore) ProvisionSyncAccounts(items []SyncProvision) (map[string]s
 // latest instant still wins, so a late arrival never rolls current state
 // back. A same-instant sync row replaces idempotently; an owner row at the
 // same instant keeps precedence.
-func (s *sqliteStore) ApplySyncPlan(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error) {
+func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error) {
 	var summary SyncApplySummary
 	tx, err := s.db.Begin()
 	if err != nil {

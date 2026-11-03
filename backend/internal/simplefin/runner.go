@@ -255,10 +255,10 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Provision before translation so the mapping is final when rows are
+	// Provision before translation so the snapshot is final when rows are
 	// emitted: a new account's first sync imports its checkpoint and its
 	// transactions together instead of dropping the transactions as
-	// unmapped. Map skips only non-USD and invalid-amount rows; stale
+	// unmapped. Translate skips only non-USD and invalid-amount rows; stale
 	// links are excluded from the snapshot and counted separately.
 	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
@@ -274,10 +274,10 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		return nil, err
 	}
 	// Stale links never reach translation: exclude those bridge accounts
-	// from the snapshot so Map does not also count them as unmapped.
+	// from the snapshot so Translate does not also count them as unmapped.
 	// The copy keeps the fetched response untouched; stale accounts are
 	// counted once under SkipStaleLink below.
-	mapped := *set
+	snapshot := *set
 	if len(stale) > 0 {
 		dropped := make(map[string]struct{}, len(stale))
 		for _, id := range stale {
@@ -289,20 +289,20 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 				kept = append(kept, account)
 			}
 		}
-		mapped.Accounts = kept
+		snapshot.Accounts = kept
 	}
-	plan, err := Map(&mapped, resolved, now)
+	translation, err := Translate(&snapshot, resolved, now)
 	if err != nil {
 		return nil, err
 	}
 	if len(stale) > 0 {
-		plan.Skipped[SkipStaleLink] += len(stale)
+		translation.Skipped[SkipStaleLink] += len(stale)
 	}
 	// Re-resolve every checkpoint against post-provisioning truth. A
 	// stale link (model account deleted) resolves to nothing and its
 	// checkpoint is dropped: counted, never written.
-	kept := plan.Checkpoints[:0]
-	for _, checkpoint := range plan.Checkpoints {
+	kept := translation.Checkpoints[:0]
+	for _, checkpoint := range translation.Checkpoints {
 		modelID, ok := resolved[checkpoint.BridgeID]
 		if !ok {
 			continue
@@ -310,9 +310,9 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		checkpoint.AccountID = modelID
 		kept = append(kept, checkpoint)
 	}
-	plan.Checkpoints = kept
-	checkpoints := make([]store.SyncCheckpoint, 0, len(plan.Checkpoints))
-	for _, checkpoint := range plan.Checkpoints {
+	translation.Checkpoints = kept
+	checkpoints := make([]store.SyncCheckpoint, 0, len(translation.Checkpoints))
+	for _, checkpoint := range translation.Checkpoints {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{
 			AccountID:  checkpoint.AccountID,
 			Balance:    checkpoint.Balance,
@@ -328,8 +328,8 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 	for _, modelID := range resolved {
 		covered[modelID] = true
 	}
-	directives := Reconcile(plan.Pending, plan.Settled, bank, covered)
-	applied, err := r.store.ApplySyncPlan(checkpoints, directives)
+	directives := Reconcile(translation.Pending, translation.Settled, bank, covered)
+	applied, err := r.store.ApplySync(checkpoints, directives)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +339,7 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		return nil, fmt.Errorf("record sync time: %w", err)
 	}
 	skipped := map[string]int{}
-	for reason, count := range plan.Skipped {
+	for reason, count := range translation.Skipped {
 		skipped[string(reason)] = count
 	}
 	return &Summary{

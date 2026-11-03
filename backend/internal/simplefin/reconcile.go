@@ -172,7 +172,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var directives []store.BankDirective
 	seen := map[string]bool{}
-	// Pending upserts are intentionally ungated by coverage: the mapper
+	// Pending upserts are intentionally ungated by coverage: the translation
 	// emits them only for resolved accounts.
 	for _, item := range pending {
 		directives = append(directives, store.BankDirective{

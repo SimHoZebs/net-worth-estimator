@@ -123,7 +123,7 @@ The trigger summary returns counts only. It does not return raw account balances
 
 ## Transactional Apply
 
-`store.ApplySyncPlan` runs one transaction:
+`store.ApplySync` runs one transaction:
 
 1. insert a sync checkpoint when the account/date key is absent;
 2. update it when the existing row is sync-owned;

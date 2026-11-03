@@ -10,7 +10,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// SkipReason counts rows the mapper deliberately drops.
+// SkipReason counts rows the translation deliberately drops.
 type SkipReason string
 
 const (
@@ -25,9 +25,9 @@ const (
 
 // Checkpoint is a balance observation for one model account.
 // BridgeID carries the source account; AccountID is empty when the bridge
-// account has no resolved model account yet (the runner provisions one,
-// then fills it in before apply). ObservedAt is the required exact Unix
-// instant; a missing bridge balance-date falls back to arrival time.
+// account has no resolved model account (the runner drops those before
+// apply). ObservedAt is the required exact Unix instant; a missing bridge
+// balance-date falls back to arrival time.
 type Checkpoint struct {
 	AccountID  string
 	BridgeID   string
@@ -44,11 +44,11 @@ type Provision struct {
 	Kind     string
 }
 
-// Plan is the mapped sync output before applying. Pending holds pending
+// Translation is one sync run's output before applying. Pending holds pending
 // authorizations; Settled holds posted charges. The reconciler voids a
 // vanished pending hold and inserts unmatched posted charges as new rows;
 // void rows never suppress an insert.
-type Plan struct {
+type Translation struct {
 	Checkpoints []Checkpoint
 	Pending     []store.SyncPosting
 	Settled     []store.SyncPosting
@@ -110,27 +110,27 @@ func truncateLabel(description string) string {
 	return name
 }
 
-// Map converts an account set into checkpoints plus bank mirror rows.
+// Translate converts an account set into checkpoints plus bank mirror rows.
 // Every mapped USD account contributes its transactions: pending ones seed
 // pending rows, posted ones become settled candidates. Charges, payments,
 // and refunds all mirror; only unmapped accounts, non-USD rows, and invalid
 // amounts are skipped, as are checking flows outside mapped accounts.
-func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, error) {
-	plan := &Plan{Skipped: map[SkipReason]int{}}
+func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Translation, error) {
+	translation := &Translation{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}
 	for _, account := range set.Accounts {
 		modelAccountID, mapped := resolved[account.ID]
 		if !mapped {
 			if account.Currency != "" && account.Currency != "USD" {
-				plan.Skipped[SkipNonUSD] += len(account.Transactions) + 1
+				translation.Skipped[SkipNonUSD] += len(account.Transactions) + 1
 				continue
 			}
 			if _, err := parseBalance(account.Balance); err != nil {
-				plan.Skipped[SkipBadAmount]++
+				translation.Skipped[SkipBadAmount]++
 				continue
 			}
-			plan.Skipped[SkipUnmappedAccount] += len(account.Transactions) + 1
-			plan.Provisions = append(plan.Provisions, Provision{
+			translation.Skipped[SkipUnmappedAccount] += len(account.Transactions) + 1
+			translation.Provisions = append(translation.Provisions, Provision{
 				BridgeID: account.ID,
 				Name:     account.Name,
 				Currency: account.Currency,
@@ -141,36 +141,36 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 			if _, seen := seenCheckpoints[key]; !seen {
 				seenCheckpoints[key] = struct{}{}
 				balance, _ := parseBalance(account.Balance)
-				plan.Checkpoints = append(plan.Checkpoints, Checkpoint{BridgeID: account.ID, Balance: balance, ObservedAt: instant})
+				translation.Checkpoints = append(translation.Checkpoints, Checkpoint{BridgeID: account.ID, Balance: balance, ObservedAt: instant})
 			}
 			continue
 		}
 		if account.Currency != "" && account.Currency != "USD" {
-			plan.Skipped[SkipNonUSD] += len(account.Transactions) + 1
+			translation.Skipped[SkipNonUSD] += len(account.Transactions) + 1
 			continue
 		}
 		balance, err := parseBalance(account.Balance)
 		if err != nil {
-			plan.Skipped[SkipBadAmount]++
+			translation.Skipped[SkipBadAmount]++
 			continue
 		}
 		instant := checkpointInstant(account.BalanceDate, now)
 		key := modelAccountID + "\x00" + strconv.FormatInt(instant, 10)
 		if _, seen := seenCheckpoints[key]; !seen {
 			seenCheckpoints[key] = struct{}{}
-			plan.Checkpoints = append(plan.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Balance: balance, ObservedAt: instant})
+			translation.Checkpoints = append(translation.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Balance: balance, ObservedAt: instant})
 		}
 
 		for _, transaction := range account.Transactions {
 			seed := transaction.IsPending()
 			amount, err := transaction.ParseAmount()
 			if err != nil {
-				plan.Skipped[SkipBadAmount]++
+				translation.Skipped[SkipBadAmount]++
 				continue
 			}
 			abs, err := absDecimal(transaction.Amount)
 			if err != nil {
-				plan.Skipped[SkipBadAmount]++
+				translation.Skipped[SkipBadAmount]++
 				continue
 			}
 			source := modelAccountID
@@ -222,11 +222,11 @@ func Map(set *AccountSet, resolved map[string]string, now time.Time) (*Plan, err
 				posting.SourceAccountID = &source
 			}
 			if seed {
-				plan.Pending = append(plan.Pending, posting)
+				translation.Pending = append(translation.Pending, posting)
 			} else {
-				plan.Settled = append(plan.Settled, posting)
+				translation.Settled = append(translation.Settled, posting)
 			}
 		}
 	}
-	return plan, nil
+	return translation, nil
 }

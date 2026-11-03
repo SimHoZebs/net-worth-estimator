@@ -107,7 +107,7 @@ func seedSyncState(t *testing.T, store store.Store) {
 		t.Fatalf("seed card account: %v", err)
 	}
 	seed := syncPendingPosting("tx1", "prime_card", "2026-08-02")
-	summary, err := store.ApplySyncPlan(
+	summary, err := store.ApplySync(
 		[]SyncCheckpoint{{AccountID: "checking", Balance: 111, Source: SourceSimpleFIN, ObservedAt: 1785628799}},
 		[]BankDirective{syncPendingDirective(seed)})
 	if err != nil || summary.CheckpointsInserted != 1 || summary.PendingInserted != 1 {
@@ -298,7 +298,7 @@ func syncPendingDirective(item SyncPosting) BankDirective {
 	}}
 }
 
-func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
+func TestApplySyncPendingDeleteSparesUserRows(t *testing.T) {
 	// Ownership, not lifecycle state or ID formatting, protects owner rows.
 	store := openSQLiteStore(t)
 	seedAccount(t, store, "prime_card")
@@ -308,7 +308,7 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 		`INSERT INTO posting_sim (posting_id, position, enabled, execution_order, user_id)
 		 VALUES ('` + ownerPostingID + `', 0, 1, 0, :user_id)`,
 	})
-	summary, err := store.ApplySyncPlan(nil, []BankDirective{
+	summary, err := store.ApplySync(nil, []BankDirective{
 		syncPendingDirective(syncPendingPosting("a", "prime_card", "2026-08-02")),
 	})
 	if err != nil || summary.PendingInserted != 1 {
@@ -319,11 +319,11 @@ func TestApplySyncPlanPendingDeleteSparesUserRows(t *testing.T) {
 	}
 }
 
-func TestApplySyncPlanConvertsNamedRowKeepingUUID(t *testing.T) {
+func TestApplySyncConvertsNamedRowKeepingUUID(t *testing.T) {
 	store := openSQLiteStore(t)
 	seedAccount(t, store, "prime_card")
 	seed := syncPendingPosting("a", "prime_card", "2026-08-02")
-	if _, err := store.ApplySyncPlan(nil, []BankDirective{syncPendingDirective(seed)}); err != nil {
+	if _, err := store.ApplySync(nil, []BankDirective{syncPendingDirective(seed)}); err != nil {
 		t.Fatal(err)
 	}
 	model, err := store.LoadModel()
@@ -333,7 +333,7 @@ func TestApplySyncPlanConvertsNamedRowKeepingUUID(t *testing.T) {
 	id := model.Postings[0].ID
 	settled := syncSettledPosting("posted-a", "prime_card", "Pending a", "2026-08-03")
 	settled.Source = SourceSimpleFIN
-	summary, err := store.ApplySyncPlan(nil, []BankDirective{{Convert: &BankConvert{
+	summary, err := store.ApplySync(nil, []BankDirective{{Convert: &BankConvert{
 		ID:      id,
 		Posting: settled.Posting,
 		AddKeys: []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
@@ -360,7 +360,7 @@ func TestCSVReplacementPreservesBankRowsAndTheirReceipts(t *testing.T) {
 	seedAccount(t, database, "prime_card")
 	settled := syncSettledPosting("posted-a", "prime_card", "Corner Store", "2026-08-03")
 	settled.Source = SourceSimpleFIN
-	if _, err := database.ApplySyncPlan(nil, []BankDirective{{Upsert: &BankUpsert{
+	if _, err := database.ApplySync(nil, []BankDirective{{Upsert: &BankUpsert{
 		Posting: settled.Posting,
 		Keys:    []BankKey{{Provider: SourceSimpleFIN, AccountID: "bridge-prime_card", TransactionID: "posted-a"}},
 	}}}); err != nil {

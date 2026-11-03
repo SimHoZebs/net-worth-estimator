@@ -37,11 +37,11 @@ func TestWorkerPairsCreditCardPaymentLegs(t *testing.T) {
 		{ID: "bridge-checking", Currency: "USD", Balance: "1000", BalanceDate: 1785628800, Transactions: []simplefin.Transaction{{ID: "pay", Description: "CREDIT CARD PAYMENT", Amount: "-500.00", Posted: 1785628800}}},
 		{ID: "bridge-card", Currency: "USD", Balance: "200", BalanceDate: 1785715200, Transactions: []simplefin.Transaction{{ID: "receive", Description: "PAYMENT RECEIVED", Amount: "500.00", Posted: 1785715200}}},
 	}}
-	plan, err := simplefin.Map(set, map[string]string{"bridge-checking": "checking", "bridge-card": "card"}, arrival)
+	translation, err := simplefin.Translate(set, map[string]string{"bridge-checking": "checking", "bridge-card": "card"}, arrival)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := scoped.ApplySyncPlan(nil, simplefin.Reconcile(plan.Pending, plan.Settled, nil, map[string]bool{"checking": true, "card": true})); err != nil {
+	if _, err := scoped.ApplySync(nil, simplefin.Reconcile(translation.Pending, translation.Settled, nil, map[string]bool{"checking": true, "card": true})); err != nil {
 		t.Fatal(err)
 	}
 	runner, err := analysis.NewRunner(database, analysis.Definitions()...)

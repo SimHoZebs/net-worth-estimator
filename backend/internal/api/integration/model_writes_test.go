@@ -113,7 +113,7 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash}); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
-	if _, err := database.ApplySyncPlan([]store.SyncCheckpoint{
+	if _, err := database.ApplySync([]store.SyncCheckpoint{
 		{AccountID: "checking", Balance: 10, Source: store.SourceSimpleFIN, ObservedAt: 1785974399},
 		{AccountID: "checking", Balance: 20, Source: store.SourceSimpleFIN, ObservedAt: 1786060799},
 	}, nil); err != nil {
