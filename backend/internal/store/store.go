@@ -141,6 +141,18 @@ type Store interface {
 	PutArtifact(identity, kind, payload string) error
 	ApplySync(checkpoints []SyncCheckpoint, directives []BankDirective) (SyncApplySummary, error)
 	LoadBankPostings() ([]BankRow, error)
+	// Unified projection state: single dirty date plus slice manifest.
+	GetProjectionState() (types.ProjectionState, error)
+	SaveProjectionState(state types.ProjectionState) (types.ProjectionState, error)
+	MarkProjectionDirty(dirtyFrom string) (types.ProjectionState, error)
+	PublishProjection(revision int64) (types.ProjectionState, error)
+	ListProjectionSlices() ([]types.ProjectionSlice, error)
+	SaveProjectionSlice(slice types.ProjectionSlice) (types.ProjectionSlice, error)
+	DeleteProjectionSlicesFrom(fromAt string) error
+	ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error)
+	SaveMonteCarloStatistics(stats []types.MonteCarloStatistic) error
+	ListProviderConnections() ([]types.ProviderConnection, error)
+	SaveProviderConnection(conn types.ProviderConnection) (types.ProviderConnection, error)
 	Clear() error
 	Close() error
 }

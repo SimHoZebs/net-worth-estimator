@@ -291,6 +291,57 @@ func schemaStatements() []string {
 		blobsqlite.Schema,
 		receiptSchema,
 		`INSERT OR IGNORE INTO schema_migrations(name) VALUES ('receipt-evidence-v1')`,
+		`CREATE TABLE IF NOT EXISTS provider_connections (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			provider_key TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT '',
+			sync_cursor TEXT NOT NULL DEFAULT '',
+			last_synced_at TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY(user_id, id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS projection_states (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			scope_id TEXT NOT NULL,
+			revision INTEGER NOT NULL DEFAULT 0,
+			published_revision INTEGER NOT NULL DEFAULT 0,
+			dirty_from TEXT NOT NULL DEFAULT '',
+			projection_start TEXT NOT NULL DEFAULT '',
+			horizon_end TEXT NOT NULL DEFAULT '',
+			calendar_timezone TEXT NOT NULL DEFAULT 'UTC',
+			engine_version TEXT NOT NULL DEFAULT 'v1',
+			trial_count INTEGER NOT NULL DEFAULT 1000,
+			stochastic_seed INTEGER,
+			PRIMARY KEY(user_id, id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS projection_slices (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			projection_state_id TEXT NOT NULL,
+			from_at TEXT NOT NULL,
+			to_at TEXT NOT NULL,
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY(user_id, id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS projection_slices_state ON projection_slices(user_id, projection_state_id, from_at)`,
+		`CREATE TABLE IF NOT EXISTS monte_carlo_statistics (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			projection_slice_id TEXT NOT NULL,
+			account_id TEXT NOT NULL,
+			as_of_at TEXT NOT NULL,
+			sample_count INTEGER NOT NULL DEFAULT 0,
+			mean REAL NOT NULL DEFAULT 0,
+			median REAL NOT NULL DEFAULT 0,
+			p10 REAL NOT NULL DEFAULT 0,
+			p90 REAL NOT NULL DEFAULT 0,
+			std_dev REAL NOT NULL DEFAULT 0,
+			probability_below_zero REAL NOT NULL DEFAULT 0,
+			PRIMARY KEY(user_id, id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS monte_carlo_statistics_slice ON monte_carlo_statistics(user_id, projection_slice_id, account_id, as_of_at)`,
 		`CREATE TABLE IF NOT EXISTS user_groups (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -495,6 +546,10 @@ var requiredSchemaColumns = map[string]string{
 	"sync_state":                "user_id, id, last_sync_at",
 	"sync_credentials":          "user_id, id, access_url, bridge_host, updated_at, cards_json",
 	"amount_presets":            "user_id, id, position, name, label, summary, when_use, amount_json, enabled",
+	"provider_connections":      "user_id, id, provider_key, status, sync_cursor, last_synced_at",
+	"projection_states":         "user_id, id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed",
+	"projection_slices":         "user_id, id, projection_state_id, from_at, to_at, built_revision, status",
+	"monte_carlo_statistics":    "user_id, id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p90, std_dev, probability_below_zero",
 }
 
 func validateSchemaObjects(db queryer) error {
@@ -576,5 +631,9 @@ func expectedSchemaTables() []string {
 		"sync_state",
 		"sync_credentials",
 		"amount_presets",
+		"provider_connections",
+		"projection_states",
+		"projection_slices",
+		"monte_carlo_statistics",
 	}
 }

@@ -93,6 +93,18 @@ func clearModel(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM projection_artifacts WHERE user_id = :user_id`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM monte_carlo_statistics WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM projection_slices WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM projection_states WHERE user_id = :user_id`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM provider_connections WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`UPDATE model_metadata SET source_path = '', document_present = 0 WHERE id = 1 AND user_id = :user_id`); err != nil {
 		return fmt.Errorf("clear model metadata: %w", err)
 	}
