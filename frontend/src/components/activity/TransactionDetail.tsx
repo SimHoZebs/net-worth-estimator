@@ -1064,7 +1064,7 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className="max-sm:m-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-t-surface max-sm:rounded-b-none"
+				className="max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
 				onCloseRequest={() => {
 					if (menuOpen) {
 						closeMenu(true);
@@ -1546,7 +1546,7 @@ export function TransactionDetail({
 				<Modal
 					title="Suggestions"
 					onClose={() => setInsightsOpen(false)}
-					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
+					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94svh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
 				>
 					<p className="mt-0 mb-6 text-[11px] text-muted">
 						Small checks to improve future estimates

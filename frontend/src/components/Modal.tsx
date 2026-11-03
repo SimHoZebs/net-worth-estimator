@@ -97,7 +97,7 @@ export function Modal({
 			<motion.div
 				ref={panelRef}
 				tabIndex={focusPanelOnOpen ? -1 : undefined}
-				className="flex flex-col gap-4 focus:outline-none"
+				className="flex flex-col gap-4 focus:outline-none max-sm:min-h-full"
 				initial={initial}
 				animate={closing ? exit : enter}
 				transition={{
