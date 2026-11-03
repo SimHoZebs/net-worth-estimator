@@ -38,7 +38,18 @@ export function TransactionAnalysisPanel({
 	const findings = (query.data?.findings ?? []).filter((item) =>
 		activeBNPLFinding([item], postingId),
 	);
-	if (!findings.length && !query.isError) return null;
+	// Quiet detection: pending questions live in the suggestions sheet.
+	// The detail body shows only completed facts (a confirmed plan with its
+	// length), so the sheet stays the single place that collects a length.
+	// Read-only viewers keep the compact badge line so findings stay
+	// inspectable without actions.
+	const visible = readOnly
+		? findings
+		: findings.filter(
+				(item) =>
+					item.review?.decision === "confirmed" && item.review?.duration,
+			);
+	if (!visible.length && !query.isError) return null;
 	return (
 		<section
 			className="mt-4 border-t border-line pt-4"
@@ -47,7 +58,7 @@ export function TransactionAnalysisPanel({
 			{query.isError && (
 				<ErrorNotice message="Transaction findings could not be loaded." />
 			)}
-			{findings.map((finding) => (
+			{visible.map((finding) => (
 				<BNPLConfirmation
 					key={finding.id}
 					finding={finding}

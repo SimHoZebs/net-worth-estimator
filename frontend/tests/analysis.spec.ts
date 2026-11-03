@@ -51,27 +51,25 @@ test("Yes confirms BNPL, collects total duration, and preserves the financial mo
 	await seedBNPL();
 	const before = await (await page.request.get("/v1/financial-model")).json();
 	let detail = await openBNPL(page);
-	const panel = detail.getByRole("region", { name: "Transaction analysis" });
+	await detail
+		.getByRole("button", { name: "Review 1 suggestion", exact: true })
+		.click();
+	const suggestions = page.getByRole("dialog", { name: "Suggestions" });
 	await expect(
-		panel.getByText("Is this a buy now, pay later payment from Klarna?", {
-			exact: true,
-		}),
+		suggestions.getByText(
+			"Is this a buy now, pay later payment from Klarna?",
+			{ exact: true },
+		),
 	).toBeVisible();
-	await expect(panel.locator("ul")).toHaveCount(0);
-	await expect(
-		panel.getByText(/forecast|recognized provider|repayment/i),
-	).toHaveCount(0);
-	await panel.getByRole("button", { name: "Yes", exact: true }).click();
-	await expect(
-		panel.getByText("How long is the plan?", { exact: true }),
-	).toBeVisible();
-	const count = panel.getByRole("spinbutton", {
-		name: "Duration",
+	await suggestions.getByRole("button", { name: "Yes", exact: true }).click();
+	const count = suggestions.getByRole("spinbutton", {
+		name: "Plan length",
 		exact: true,
 	});
+	await expect(count).toBeVisible();
 	await expect(count).toBeFocused();
 	await count.fill("0");
-	await panel.getByRole("button", { name: "Save", exact: true }).click();
+	await suggestions.getByRole("button", { name: "Save", exact: true }).click();
 	await expect
 		.poll(
 			async () =>
@@ -80,16 +78,17 @@ test("Yes confirms BNPL, collects total duration, and preserves the financial mo
 		)
 		.toBe(1);
 	await count.fill("6");
-	await panel
+	await suggestions
 		.getByRole("combobox", { name: "Unit", exact: true })
 		.selectOption("weeks");
 	await count.press("Enter");
 	await expect(
-		panel.getByText("Klarna · 6 weeks", { exact: true }),
+		suggestions.getByText("All caught up", { exact: true }),
 	).toBeVisible();
 	await expect(
-		panel.getByRole("button", { name: "Change", exact: true }),
-	).toBeFocused();
+		detail.getByText("Klarna · 6 weeks", { exact: true }),
+	).toBeVisible();
+	await suggestions.getByRole("button", { name: "Done" }).click();
 	await page.reload();
 	detail = await openBNPL(page);
 	await expect(
@@ -132,9 +131,16 @@ test("No dismisses the prompt and records a negative label", async ({
 }) => {
 	await seedBNPL();
 	const detail = await openBNPL(page);
-	await detail.getByRole("button", { name: "No", exact: true }).click();
+	await detail
+		.getByRole("button", { name: "Review 1 suggestion", exact: true })
+		.click();
+	const suggestions = page.getByRole("dialog", { name: "Suggestions" });
+	await suggestions.getByRole("button", { name: "No", exact: true }).click();
 	await expect(
-		detail.getByRole("region", { name: "Transaction analysis" }),
+		suggestions.getByText("All caught up", { exact: true }),
+	).toBeVisible();
+	await expect(
+		detail.getByRole("button", { name: /Review \d+ suggestions?/ }),
 	).toHaveCount(0);
 	await page.reload();
 	const reopened = await openBNPL(page);
@@ -167,17 +173,18 @@ test("a lost response retries the same answer without duplicate feedback", async
 		await route.fetch();
 		await route.abort("failed");
 	});
-	await detail.getByRole("button", { name: "Yes", exact: true }).click();
-	await expect(
-		detail.getByRole("spinbutton", { name: "Duration", exact: true }),
-	).toBeVisible();
+	await detail
+		.getByRole("button", { name: "Review 1 suggestion", exact: true })
+		.click();
+	const suggestions = page.getByRole("dialog", { name: "Suggestions" });
+	await suggestions.getByRole("button", { name: "Yes", exact: true }).click();
 	await expect.poll(() => requestIds.length).toBe(2);
 	expect(requestIds[1]).toBe(requestIds[0]);
 	await expect(
-		detail.getByRole("spinbutton", { name: "Duration", exact: true }),
+		suggestions.getByRole("spinbutton", { name: "Plan length", exact: true }),
 	).toBeEnabled();
 	await expect(
-		detail.getByText("Your answer could not be saved. Try again."),
+		suggestions.getByText("Your answer could not be saved. Try again."),
 	).toHaveCount(0);
 	const audit = (await (await page.request.get("/v1/analysis-feedback")).json())
 		.feedback;

@@ -39,7 +39,7 @@ function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	};
 }
 
-function NewRuleDialog({
+export function NewRuleDialog({
 	findingId,
 	title,
 	readOnly,
@@ -169,7 +169,7 @@ function evidenceSummary(plan: PatternToNewRulePreview): string {
 	return `${occurrences.length} recorded ${occurrences.length === 1 ? "payment" : "payments"} · ${plan.typicalAmount} ${plan.currency} typical · ${range}`;
 }
 
-function ExistingRuleDialog({
+export function ExistingRuleDialog({
 	findingId,
 	title,
 	names,
