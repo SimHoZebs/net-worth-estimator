@@ -91,9 +91,6 @@ func TestTranslateProducesCheckpointsAndPendingOnly(t *testing.T) {
 	if pending.SourceAccountID == nil || *pending.SourceAccountID != "prime_card" {
 		t.Fatalf("pending source = %+v", pending.SourceAccountID)
 	}
-	if len(translation.Provisions) != 1 || translation.Provisions[0].BridgeID != "bridge-other" || translation.Provisions[0].Kind != "cash" {
-		t.Fatalf("provisions = %+v, want bridge-other cash", translation.Provisions)
-	}
 	unmapped := translation.Checkpoints[2]
 	if unmapped.AccountID != "" || unmapped.BridgeID != "bridge-other" || unmapped.Balance != 1.00 {
 		t.Fatalf("unmapped checkpoint = %+v, want bridge-keyed", unmapped)

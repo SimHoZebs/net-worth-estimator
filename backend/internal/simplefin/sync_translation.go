@@ -35,15 +35,6 @@ type Checkpoint struct {
 	ObservedAt int64
 }
 
-// Provision asks the store to create a model account plus an auto link
-// for an unmapped bridge account.
-type Provision struct {
-	BridgeID string
-	Name     string
-	Currency string
-	Kind     string
-}
-
 // Translation is one sync run's output before applying. Pending holds pending
 // authorizations; Settled holds posted charges. The reconciler voids a
 // vanished pending hold and inserts unmatched posted charges as new rows;
@@ -52,7 +43,6 @@ type Translation struct {
 	Checkpoints []Checkpoint
 	Pending     []store.SyncPosting
 	Settled     []store.SyncPosting
-	Provisions  []Provision
 	Skipped     map[SkipReason]int
 }
 
@@ -130,12 +120,6 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 				continue
 			}
 			translation.Skipped[SkipUnmappedAccount] += len(account.Transactions) + 1
-			translation.Provisions = append(translation.Provisions, Provision{
-				BridgeID: account.ID,
-				Name:     account.Name,
-				Currency: account.Currency,
-				Kind:     provisionKind(account),
-			})
 			instant := checkpointInstant(account.BalanceDate, now)
 			key := account.ID + "\x00" + strconv.FormatInt(instant, 10)
 			if _, seen := seenCheckpoints[key]; !seen {
