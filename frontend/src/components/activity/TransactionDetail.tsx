@@ -5,8 +5,10 @@ import {
 	ArrowRightLeft,
 	ArrowUpRight,
 	Check,
-	ChevronDown,
 	Clock3,
+	Ellipsis,
+	Eye,
+	EyeOff,
 	Link2,
 	LockKeyhole,
 	Repeat,
@@ -14,9 +16,18 @@ import {
 	Save,
 	Trash2,
 	TriangleAlert,
+	UsersRound,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+	type FormEvent,
+	type ReactNode,
+} from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { voidSettleCandidates } from "../../domain/accountActivity.ts";
 import { dateLabel, money } from "../../domain/format.ts";
@@ -36,9 +47,9 @@ import { Badge } from "../Badge.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
-import { Button, IconButton } from "../Button.tsx";
+import { Button, IconButton, TextButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
-import { Checkbox, InputField, SelectField } from "../Field.tsx";
+import { Checkbox, Input, Select, SelectField } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import {
@@ -68,6 +79,13 @@ import {
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
 import { TransactionSharing } from "./TransactionSharing.tsx";
+import {
+	buildInsightSuggestions,
+	TransactionInsightsPanel,
+	TransactionInsightsTrigger,
+} from "./TransactionInsights.tsx";
+import { useAnalysisFindings } from "../../state/analyses.ts";
+import { useSharingGrants } from "../../state/sharing.ts";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
@@ -171,97 +189,107 @@ function MoreOptions({
 	const claimRules = transactions.filter(
 		(item) => item.frequency !== "once" && item.id !== savedTransaction.id,
 	);
+	const frequencyId = `${id}-frequency`;
+	const annualIncreaseId = `${id}-annual-increase`;
+	const claimRuleId = `${id}-claim-rule`;
+	const claimOccurrenceId = `${id}-claim-occurrence`;
+	const rowLabel = "w-36 flex-none text-sm font-semibold text-muted";
 	return (
-		<details className="group mt-4">
-			<summary className="inline-flex w-fit cursor-pointer list-none items-center gap-1 rounded-control text-xs text-muted hover:text-ink hover:underline hover:underline-offset-4 [&::-webkit-details-marker]:hidden">
-				<ChevronDown
-					size={13}
-					aria-hidden="true"
-					className="transition-transform duration-150 ease-out group-open:rotate-90"
-				/>
-				More options
-			</summary>
-			<div className="mt-3 flex flex-col gap-3 rounded-surface border border-line bg-surface-2 p-4">
-				<SelectField
-					label="Frequency"
-					name="frequency"
-					disabled={locked}
-					value={frequency}
-					onChange={(event) => {
-						const next = parseUnion(event.target.value, [
-							"monthly",
-							"yearly",
-							"once",
-						] as const);
-						if (next) onFrequency(next);
-					}}
-				>
-					<FrequencyOptions />
-				</SelectField>
-				<InputField
-					label="Annual amount increase (%)"
-					name="annualIncrease"
-					type="number"
-					required
-					disabled={locked}
-					min="-50"
-					max="50"
-					step="0.1"
-					value={draft.annualIncrease}
-					onChange={(event) =>
-						updateDraft({ annualIncrease: event.target.value }, "schedule")
-					}
-				/>
-				{frequency === "once" && (
+		<section aria-label="Schedule options" className="mt-4 border-t border-line pt-4">
+			<div className="flex flex-col">
+				{savedTransaction.frequency !== "once" && (
 					<>
-						<SelectField
-							label="Records an occurrence of"
-							name="claimRuleId"
-							disabled={locked}
-							value={draft.claimRuleId}
-							onChange={(event) =>
-								updateDraft({ claimRuleId: event.target.value }, "schedule")
-							}
-						>
-							<option value="">No link — standalone record</option>
-							{claimRules.map((rule) => (
-								<option key={rule.id} value={rule.id}>
-									{rule.name}
-								</option>
-							))}
-						</SelectField>
-						<InputField
-							label="Replaces occurrence on"
-							type="date"
-							name="claimOccurrenceDate"
-							disabled={locked}
-							value={draft.claimOccurrenceDate}
-							onChange={(event) =>
-								updateDraft(
-									{ claimOccurrenceDate: event.target.value },
-									"schedule",
-								)
-							}
-						/>
+									<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+										<label htmlFor={frequencyId} className={rowLabel}>
+											Frequency
+										</label>
+										<Select
+											id={frequencyId}
+											name="frequency"
+											disabled={locked}
+											value={frequency}
+											onChange={(event) => {
+												const next = parseUnion(event.target.value, [
+													"monthly",
+													"yearly",
+													"once",
+												] as const);
+												if (next) onFrequency(next);
+											}}
+											className="min-w-0 flex-1"
+										>
+											<FrequencyOptions />
+										</Select>
+									</div>
+									<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+										<label htmlFor={annualIncreaseId} className={rowLabel}>
+											Annual amount increase (%)
+										</label>
+										<Input
+											id={annualIncreaseId}
+											name="annualIncrease"
+											type="number"
+											required
+											disabled={locked}
+											min="-50"
+											max="50"
+											step="0.1"
+											value={draft.annualIncrease}
+											onChange={(event) =>
+												updateDraft({ annualIncrease: event.target.value }, "schedule")
+											}
+											className="min-w-0 flex-1"
+										/>
+									</div>
 					</>
 				)}
-				<label
-					htmlFor={`${id}-enabled`}
-					className="flex items-center gap-2 text-xs text-muted"
-				>
-					<Checkbox
-						id={`${id}-enabled`}
-						name="enabled"
-						disabled={locked}
-						checked={draft.enabled}
-						onChange={(event) =>
-							updateDraft({ enabled: event.target.checked }, "schedule")
-						}
-					/>
-					Include in projections
-				</label>
+				{frequency === "once" && (
+					<>
+						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+							<label htmlFor={claimRuleId} className={rowLabel}>
+								Records an occurrence of
+							</label>
+							<Select
+								id={claimRuleId}
+								name="claimRuleId"
+								disabled={locked}
+								value={draft.claimRuleId}
+								onChange={(event) =>
+									updateDraft({ claimRuleId: event.target.value }, "schedule")
+								}
+								className="min-w-0 flex-1"
+							>
+								<option value="">No link — standalone record</option>
+								{claimRules.map((rule) => (
+									<option key={rule.id} value={rule.id}>
+										{rule.name}
+									</option>
+								))}
+							</Select>
+						</div>
+						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+							<label htmlFor={claimOccurrenceId} className={rowLabel}>
+								Replaces occurrence on
+							</label>
+							<Input
+								id={claimOccurrenceId}
+								type="date"
+								name="claimOccurrenceDate"
+								disabled={locked}
+								value={draft.claimOccurrenceDate}
+								onChange={(event) =>
+									updateDraft(
+										{ claimOccurrenceDate: event.target.value },
+										"schedule",
+									)
+								}
+								className="min-w-0 flex-1"
+							/>
+						</div>
+					</>
+				)}
 			</div>
-		</details>
+		</section>
 	);
 }
 
@@ -684,7 +712,7 @@ async function ruleExistsAuthoritative(ruleId: string): Promise<boolean> {
 	}
 }
 
-function MarkAsSubscriptionAction({
+function useMarkAsSubscription({
 	savedTransaction,
 	locked,
 	onDone,
@@ -701,12 +729,10 @@ function MarkAsSubscriptionAction({
 	const attemptRef = useRef<{ ruleId: string } | null>(null);
 	const canClaimPending =
 		savedTransaction.pending === true && savedTransaction.syncOwned === true;
-	if (
-		savedTransaction.frequency !== "once" ||
-		savedTransaction.claimRuleId ||
-		(locked && !canClaimPending)
-	)
-		return null;
+	const available =
+		savedTransaction.frequency === "once" &&
+		!savedTransaction.claimRuleId &&
+		(!locked || canClaimPending);
 	const mark = async () => {
 		if (saving) return;
 		const ruleId = attemptRef.current?.ruleId ?? crypto.randomUUID();
@@ -800,21 +826,7 @@ function MarkAsSubscriptionAction({
 				"The rule was created, but the source transaction could not be claimed. Review the workspace notice and try again.",
 			);
 	};
-	return (
-		<div className="mt-4">
-			<Button
-				type="button"
-				variant="secondary"
-				size="sm"
-				onClick={() => void mark()}
-				disabled={saving}
-			>
-				<Repeat size={16} aria-hidden="true" />
-				{saving ? "Marking…" : "Mark as subscription"}
-			</Button>
-			{error && <ErrorNotice message={error} />}
-		</div>
-	);
+	return { available, marking: saving, error, mark };
 }
 
 function DiscardConfirm({
@@ -890,6 +902,12 @@ export function TransactionDetail({
 	// Live pending holds stay locked: each feed refreshes them in place,
 	// so an edit could not survive the next refresh.
 	const canDelete = canEdit && !savedTransaction.pending;
+	const subscription = useMarkAsSubscription({
+		savedTransaction,
+		locked: !canEdit,
+		onDone: onClose,
+	});
+	const menuAvailable = canEdit || subscription.available || canDelete;
 	const voidCandidates = transaction.void
 		? voidSettleCandidates({
 				voidRow: savedTransaction,
@@ -946,6 +964,58 @@ export function TransactionDetail({
 		else setDeleteError("The transaction could not be removed.");
 	};
 	const fullAccounts = accounts as Account[];
+	const [insightsOpen, setInsightsOpen] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
+	const menuButtonRef = useRef<HTMLButtonElement>(null);
+	const menuRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (menuOpen) menuRef.current?.focus();
+	}, [menuOpen]);
+	const closeMenu = (restoreFocus: boolean) => {
+		setMenuOpen(false);
+		if (restoreFocus) menuButtonRef.current?.focus();
+	};
+	// The full sharing controls stay behind the quiet footer status:
+	// clicking it reveals them instead of scrolling past them.
+	const [sharingOpen, setSharingOpen] = useState(false);
+	const findingsQuery = useAnalysisFindings(once ? [savedTransaction.id] : []);
+	const grantsQuery = useSharingGrants();
+	const insightNames = useMemo(() => {
+		const rows = transactions ?? [savedTransaction];
+		return new Map(rows.map((row) => [row.id, row.name]));
+	}, [transactions, savedTransaction]);
+	const insightSuggestions = useMemo(
+		() =>
+			once
+				? buildInsightSuggestions({
+						findings: findingsQuery.data?.findings ?? [],
+						postingId: savedTransaction.id,
+					})
+				: [],
+		[once, findingsQuery.data?.findings, savedTransaction.id],
+	);
+	const insightReadOnly = Boolean(readOnly ?? savedTransaction.readOnly);
+	const sharedIntents = useMemo(
+		() =>
+			(grantsQuery.data ?? []).filter(
+				(grant) => grant.postingId === savedTransaction.id,
+			),
+		[grantsQuery.data, savedTransaction.id],
+	);
+	const sharedCount = sharedIntents.filter(
+		(intent) => intent.intent === "shared",
+	).length;
+	const sharingLabel =
+		sharedCount > 0
+			? `Shared · ${sharedCount}`
+			: sharedIntents.length > 0
+				? "Hidden"
+				: "Private";
+	const scrollToSection = (id: string) => {
+		document
+			.getElementById(id)
+			?.scrollIntoView({ behavior: "smooth", block: "start" });
+	};
 	const editHeading = (
 		<span className="flex items-center gap-3">
 			<span className="sr-only">{edit.draft.name}</span>
@@ -994,12 +1064,109 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className="max-sm:m-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none"
-				actions={edit.actions}
+				className="max-sm:m-0 max-sm:h-dvh max-sm:max-h-dvh max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-t-surface max-sm:rounded-b-none"
+				onCloseRequest={() => {
+					if (menuOpen) {
+						closeMenu(true);
+						return false;
+					}
+					return true;
+				}}
+				actions={
+					<>
+						{menuAvailable && (
+							<span className="relative inline-flex">
+								<IconButton
+									ref={menuButtonRef}
+									icon={Ellipsis}
+									label="More options"
+									aria-haspopup="menu"
+									aria-expanded={menuOpen}
+									onClick={() => setMenuOpen((open) => !open)}
+								/>
+								{menuOpen && (
+									<>
+										<button
+											type="button"
+											aria-label="Close menu"
+											onClick={() => closeMenu(true)}
+											className="fixed inset-0 z-40 cursor-default border-0 bg-transparent p-0"
+										/>
+										<div
+											ref={menuRef}
+											tabIndex={-1}
+											role="menu"
+											aria-label="Transaction actions"
+											className="absolute top-full right-0 z-50 mt-1 w-60 rounded-surface border border-solid border-line bg-surface p-1 shadow-overlay focus:outline-none"
+										>
+											{canEdit && (
+												<button
+													type="button"
+													role="menuitemcheckbox"
+													aria-checked={edit.draft.enabled}
+														onClick={() => {
+															edit.updateDraft({ enabled: !edit.draft.enabled }, "schedule");
+															closeMenu(true);
+													}}
+													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover"
+												>
+													{edit.draft.enabled ? (
+														<EyeOff size={14} aria-hidden="true" />
+													) : (
+														<Eye size={14} aria-hidden="true" />
+													)}
+													<span>
+														{edit.draft.enabled
+														? "Exclude from projections"
+														: "Include in projections"}
+												</span>
+											</button>
+											)}
+											{subscription.available && (
+												<button
+													type="button"
+													role="menuitem"
+													onClick={() => {
+														closeMenu(true);
+														void subscription.mark();
+													}}
+													disabled={subscription.marking}
+													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover disabled:opacity-60"
+												>
+													<Repeat size={14} aria-hidden="true" />
+													<span>
+														{subscription.marking ? "Marking…" : "Mark as subscription"}
+													</span>
+												</button>
+											)}
+											{canDelete && (
+												<button
+													type="button"
+													role="menuitem"
+													onClick={() => {
+														setDeleteError(null);
+														setConfirmingDelete(true);
+														closeMenu(false);
+													}}
+													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm text-danger-text hover:bg-hover"
+												>
+													<Trash2 size={14} aria-hidden="true" />
+													<span>Delete transaction</span>
+												</button>
+											)}
+										</div>
+									</>
+									)}
+							</span>
+						)}
+						{edit.actions}
+					</>
+				}
 				onClose={edit.close}
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
+					{subscription.error && <ErrorNotice message={subscription.error} />}
 					<div className="flex flex-col gap-3 pt-1 pb-2">
 						<div className="flex min-w-0 flex-col gap-2">
 							{showAmount && (
@@ -1237,6 +1404,7 @@ export function TransactionDetail({
 							</div>
 						</div>
 					)}
+					<div id={`${edit.formId}-schedule-section`} className="scroll-mt-4">
 					<ScheduleCapsule
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
@@ -1245,11 +1413,7 @@ export function TransactionDetail({
 						locked={!canEdit}
 						scheduleControlId={`${edit.formId}-schedule`}
 					/>
-					<MarkAsSubscriptionAction
-						savedTransaction={savedTransaction}
-						locked={!canEdit}
-						onDone={onClose}
-					/>
+					</div>
 					<MoreOptions
 						savedTransaction={savedTransaction}
 						transactions={transactions ?? [savedTransaction]}
@@ -1257,22 +1421,6 @@ export function TransactionDetail({
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}
 					/>
-					{canDelete && (
-						<div className="mt-4">
-							<Button
-								type="button"
-								variant="danger"
-								size="sm"
-								onClick={() => {
-									setDeleteError(null);
-									setConfirmingDelete(true);
-								}}
-							>
-								<Trash2 size={16} aria-hidden="true" />
-								Delete transaction
-							</Button>
-						</div>
-					)}
 					{transaction.void && !readOnly && (
 						<div className="mt-4 flex min-w-0 flex-col items-start gap-2">
 							<SelectField
@@ -1327,18 +1475,90 @@ export function TransactionDetail({
 					/>
 				)}
 				{once && (
-					<ReceiptPanel
-						postingId={savedTransaction.id}
-						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
-					/>
+					<div id={`${edit.formId}-receipts`} className="scroll-mt-4">
+						<ReceiptPanel
+							postingId={savedTransaction.id}
+							readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
+						/>
+					</div>
 				)}
-				{once && (
-					<TransactionSharing
-						postingId={savedTransaction.id}
-						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
-					/>
+				{once && sharingOpen && (
+					<div id={`${edit.formId}-sharing`} className="scroll-mt-4">
+						<TransactionSharing
+							postingId={savedTransaction.id}
+							readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
+						/>
+					</div>
 				)}
+				<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface px-8 py-3 max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:mx-0 max-sm:mb-0 max-sm:px-5">
+					<div className="flex flex-wrap items-center gap-4">
+						{once && (
+							<TextButton
+								type="button"
+								tone="default"
+								onClick={() => {
+									if (sharingOpen) {
+										setSharingOpen(false);
+										return;
+									}
+									setSharingOpen(true);
+									requestAnimationFrame(() =>
+										scrollToSection(`${edit.formId}-sharing`),
+									);
+								}}
+								aria-label={`Sharing status: ${sharingLabel}. Go to sharing section`}
+								aria-expanded={sharingOpen}
+							>
+								{sharedCount > 0 ? (
+									<UsersRound size={14} aria-hidden="true" />
+								) : (
+									<LockKeyhole size={14} aria-hidden="true" />
+									)}
+								<span>{sharingLabel}</span>
+							</TextButton>
+						)}
+						{savedTransaction.frequency !== "once" && (
+							<TextButton
+								type="button"
+								tone="default"
+								onClick={() => {
+									scrollToSection(`${edit.formId}-schedule-section`);
+									document.getElementById(`${edit.formId}-schedule`)?.focus();
+								}}
+								aria-label={`Recurring rule: ${frequencyLabel(savedTransaction.frequency)}. Go to schedule`}
+							>
+								<Repeat size={14} aria-hidden="true" />
+								<span>{frequencyLabel(savedTransaction.frequency)}</span>
+							</TextButton>
+						)}
+					</div>
+					<div className="flex flex-wrap items-center gap-4">
+						{once && (
+							<TransactionInsightsTrigger
+								count={insightSuggestions.length}
+								onClick={() => setInsightsOpen(true)}
+							/>
+						)}
+					</div>
+				</div>
 			</Modal>
+			{once && insightsOpen && (
+				<Modal
+					title="Suggestions"
+					onClose={() => setInsightsOpen(false)}
+					className="m-0 ml-auto h-dvh max-h-dvh w-full max-w-md rounded-none border-0 border-l border-solid border-line max-sm:mt-auto max-sm:mb-0 max-sm:ml-0 max-sm:h-auto max-sm:max-h-[94dvh] max-sm:w-full max-sm:max-w-none max-sm:rounded-t-surface max-sm:rounded-b-none max-sm:border-l-0 max-sm:border-t"
+				>
+					<p className="mt-0 mb-6 text-[11px] text-muted">
+						Small checks to improve future estimates
+					</p>
+					<TransactionInsightsPanel
+						suggestions={insightSuggestions}
+						names={insightNames}
+						readOnly={insightReadOnly}
+						onDone={() => setInsightsOpen(false)}
+					/>
+				</Modal>
+			)}
 			{confirmingDelete && (
 				<ConfirmDialog
 					title={`Delete ${savedTransaction.name}?`}

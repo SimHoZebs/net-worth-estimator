@@ -173,7 +173,8 @@ it("deletes the transaction through the row endpoint", async () => {
 			onClose={onClose}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Delete transaction" }));
+	fireEvent.click(screen.getByRole("button", { name: "More options" }));
+	fireEvent.click(screen.getByRole("menuitem", { name: "Delete transaction" }));
 	const confirm = screen.getByRole("dialog", {
 		name: "Delete Home renovation?",
 	});
@@ -244,7 +245,13 @@ it("marks holds that did not post instead of posted", () => {
 	expect(screen.getByText("Did not post")).toBeTruthy();
 	expect(screen.getByText("bank hold that did not post")).toBeTruthy();
 	expect(screen.getByText(/vanished without posting/)).toBeTruthy();
-	expect(screen.queryByText("Posted")).toBeNull();
+	// The details grid keeps a "Posted" section label; only status badges
+	// must stay absent. Labels carry the uppercase tracking class.
+	expect(
+		screen
+			.queryAllByText("Posted")
+			.filter((node) => !node.className.includes("uppercase")),
+	).toHaveLength(0);
 	expect(screen.queryByText("Pending")).toBeNull();
 	expect(screen.queryByText("Excluded")).toBeNull();
 });
@@ -454,7 +461,8 @@ it("converts a subscription through row endpoints and preserves the source posti
 			onClose={onClose}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Mark as subscription" }));
+	fireEvent.click(screen.getByRole("button", { name: "More options" }));
+	fireEvent.click(screen.getByRole("menuitem", { name: "Mark as subscription" }));
 	await waitFor(() =>
 		expect(
 			server.calls.some(
@@ -521,7 +529,8 @@ it("retries a rejected claim without creating a second rule", async () => {
 			onClose={onClose}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Mark as subscription" }));
+	fireEvent.click(screen.getByRole("button", { name: "More options" }));
+	fireEvent.click(screen.getByRole("menuitem", { name: "Mark as subscription" }));
 	await waitFor(() =>
 		expect(screen.getByText(/could not be claimed/)).toBeTruthy(),
 	);
@@ -532,7 +541,8 @@ it("retries a rejected claim without creating a second rule", async () => {
 		);
 	expect(ruleCreates()).toHaveLength(1);
 	// Retry: the existing rule is reused, only the claim runs again.
-	fireEvent.click(screen.getByRole("button", { name: "Mark as subscription" }));
+	fireEvent.click(screen.getByRole("button", { name: "More options" }));
+	fireEvent.click(screen.getByRole("menuitem", { name: "Mark as subscription" }));
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	expect(ruleCreates()).toHaveLength(1);
 	const claims = server.calls.filter(
@@ -548,4 +558,44 @@ it("retries a rejected claim without creating a second rule", async () => {
 		ruleId: ruleCreates().map((call) => call.body as { id: string })[0]?.id,
 		occurrenceDate: "2028-06-15",
 	});
+});
+
+it("keeps frequency controls on recurrence rules, never on postings", () => {
+	const posting = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	render(
+		<TransactionDetail
+			transaction={occurrence(posting)}
+			savedTransaction={posting}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	// A posting records a single occurrence: frequency and the annual
+	// increase belong to recurrence rules, not to the posting itself.
+	expect(screen.queryByLabelText("Frequency")).toBeNull();
+	expect(screen.queryByLabelText("Annual amount increase (%)")).toBeNull();
+	expect(
+		screen.getByLabelText("Records an occurrence of"),
+	).toBeTruthy();
+	cleanup();
+	const rule = {
+		...posting,
+		id: "renovation-rule",
+		frequency: "monthly" as const,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(rule)}
+			savedTransaction={rule}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.getByLabelText("Frequency")).toBeTruthy();
+	expect(screen.getByLabelText("Annual amount increase (%)")).toBeTruthy();
+	expect(screen.queryByLabelText("Records an occurrence of")).toBeNull();
 });
