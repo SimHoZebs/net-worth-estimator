@@ -144,19 +144,17 @@ func candidateKey(item store.SyncPosting) store.BankKey {
 
 // Reconcile translates one mapped snapshot plus loaded bank rows into store
 // directives. Pending items upsert by key; vanished pending rows void in
-// place; unmatched posted charges insert as new rows. A posted charge under
-// a new id never joins its old authorization automatically: the hold voids,
-// the charge inserts, and the owner links or removes either side by hand.
-// A posted charge that reuses its hold's id converts that hold in place
-// instead of voiding without a charge.
-// Only this provider's rows and keys participate; other providers' bank rows
-// are invisible to it. Covered limits stale handling to resolved accounts so
-// unlinked accounts' rows are never touched. A candidate whose key already
-// points at a settled row is already imported and never reprocesses, so
-// repeat feeds are stable no-ops. Keys that point only at pending or void
-// rows never suppress a settled candidate. The settled-to-settled duplicate
-// check stays exact so near-amount repeats never suppress a genuine second
-// charge.
+// place; unmatched posted charges insert as new rows. A posted charge that
+// settles a vanished hold updates that hold in place (same UUID, keys
+// rotated, occurrence claim kept) instead of voiding beside a new row: the
+// hold becomes the posted charge. Only this provider's rows and keys
+// participate; other providers' bank rows are invisible to it. Covered limits
+// stale handling to resolved accounts so unlinked accounts' rows are never
+// touched. A candidate whose key already points at a settled row is already
+// imported and never reprocesses, so repeat feeds are stable no-ops. Keys that
+// point only at pending or void rows never suppress a settled candidate. The
+// settled-to-settled duplicate check stays exact so near-amount repeats never
+// suppress a genuine second charge.
 func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, covered map[string]bool) []store.BankDirective {
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
@@ -220,6 +218,12 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		if row.Posting.Pending || row.Posting.Void {
 			continue
 		}
+		// Claimed occurrences never suppress: a settlement matching one
+		// joins it through the convert below instead of dropping as an
+		// already-imported repeat.
+		if row.Posting.Claim != nil {
+			continue
+		}
 		account, ok := rowAccount(row.Posting)
 		if !ok {
 			continue
@@ -245,6 +249,94 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		}
 		return false
 	}
+	// A posted charge that settles a vanished hold converts that hold in
+	// place: the hold keeps its UUID (and any occurrence claim on it) and
+	// takes the posted values with the posted key. Eligible holds are
+	// vanished pending rows plus vanished claimed occurrences, matched by
+	// the same tip-bounded join the manual posted-pick uses. The join
+	// needs a unique pair: several candidates for one hold, or several
+	// holds for one candidate, fall back to void-plus-insert for the owner
+	// to resolve by hand. Zero-amount auths never join, direction
+	// mismatches never join, and uncovered accounts never convert.
+	// Same-key settles keep flowing through the upsert below, which
+	// resolves by key to the same row.
+	feedKeys := map[store.BankKey]bool{}
+	for _, item := range pending {
+		feedKeys[candidateKey(item)] = true
+	}
+	for _, candidate := range settled {
+		feedKeys[candidateKey(candidate)] = true
+	}
+	type convertTarget struct {
+		id      string
+		posting types.Posting
+	}
+	var targets []convertTarget
+	for _, row := range bank {
+		if row.Posting.Source != store.SourceSimpleFIN {
+			continue
+		}
+		account, ok := rowAccount(row.Posting)
+		if !ok || !covered[account] {
+			continue
+		}
+		live := false
+		for _, key := range row.Keys {
+			if feedKeys[key] {
+				live = true
+				break
+			}
+		}
+		if live {
+			continue
+		}
+		if row.Posting.Pending {
+			targets = append(targets, convertTarget{id: row.Posting.ID, posting: row.Posting})
+		} else if row.Posting.Claim != nil && !row.Posting.Void {
+			targets = append(targets, convertTarget{id: row.Posting.ID, posting: row.Posting})
+		}
+	}
+	consumable := func(candidate store.SyncPosting) bool {
+		if recordedSettled(candidate) || !coveredAccount(candidate) || duplicateSuppressed(candidate) {
+			return false
+		}
+		if _, known := byKey[candidateKey(candidate)]; known {
+			return false
+		}
+		return true
+	}
+	matches := make([][]int, len(settled))
+	targetHits := make([]int, len(targets))
+	for ci, candidate := range settled {
+		if !consumable(candidate) {
+			continue
+		}
+		for ti := range targets {
+			if settleMatchTolerant(targets[ti].posting, candidate) {
+				matches[ci] = append(matches[ci], ti)
+				targetHits[ti]++
+			}
+		}
+	}
+	convertedCandidate := make([]bool, len(settled))
+	convertedTarget := map[string]bool{}
+	for ci, candidate := range settled {
+		if len(matches[ci]) != 1 {
+			continue
+		}
+		ti := matches[ci][0]
+		if targetHits[ti] != 1 {
+			continue
+		}
+		target := targets[ti]
+		directives = append(directives, store.BankDirective{Convert: &store.BankConvert{
+			ID:      target.id,
+			Posting: candidate.Posting,
+			AddKeys: []store.BankKey{candidateKey(candidate)},
+		}})
+		convertedCandidate[ci] = true
+		convertedTarget[target.id] = true
+	}
 	// Settled candidates that reuse a hold's id convert that hold instead of
 	// leaving a void without a charge. Collect them before voiding so a
 	// converting hold never voids first.
@@ -266,21 +358,24 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		}
 		return false
 	}
-	// Vanished holds void in place. No fuzzy join to a posted charge runs
-	// here: a charge under a new id inserts below as its own row.
+	// Vanished holds void in place, unless a posted charge converted the
+	// hold above: the hold then carries the posted values under its own id.
 	for _, entry := range stale {
 		row := byID[entry.id]
 		if account, ok := rowAccount(row.Posting); !ok || !covered[account] {
 			continue
 		}
 		if entry.pending {
-			if convertsHold(row) {
+			if convertedTarget[entry.id] || convertsHold(row) {
 				continue
 			}
 			directives = append(directives, store.BankDirective{Void: entry.id})
 		}
 	}
-	for _, candidate := range settled {
+	for ci, candidate := range settled {
+		if convertedCandidate[ci] {
+			continue
+		}
 		if recordedSettled(candidate) || !coveredAccount(candidate) {
 			continue
 		}
