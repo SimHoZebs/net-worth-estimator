@@ -2,6 +2,21 @@ import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, vi } from "vitest";
 import { resetServerQueryCache } from "../src/state/serverQuery.ts";
 
+// jsdom has no dialog API. Stub only the open-state toggle: top layer, focus
+// containment, Escape, and focus return are browser behavior covered by the
+// browser suite.
+if (
+	typeof HTMLDialogElement !== "undefined" &&
+	!HTMLDialogElement.prototype.showModal
+) {
+	HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+		this.setAttribute("open", "");
+	};
+	HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+		this.removeAttribute("open");
+	};
+}
+
 // Tests share one worker and one environment, so every file must leave no DOM,
 // storage, timers, route, or module state behind for the next file. The suite
 // runs with isolate: false (about 6s for 121 files / 958 tests, against about

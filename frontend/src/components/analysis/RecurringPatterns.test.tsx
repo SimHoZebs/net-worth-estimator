@@ -111,16 +111,6 @@ const names = new Map([
 ]);
 
 beforeEach(() => {
-	window.HTMLDialogElement.prototype.showModal = function (
-		this: HTMLDialogElement,
-	) {
-		this.setAttribute("open", "");
-	};
-	window.HTMLDialogElement.prototype.close = function (
-		this: HTMLDialogElement,
-	) {
-		this.removeAttribute("open");
-	};
 	previewState.data = undefined;
 	previewState.isPending = false;
 	previewState.isError = false;

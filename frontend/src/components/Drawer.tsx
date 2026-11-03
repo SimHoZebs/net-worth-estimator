@@ -1,36 +1,29 @@
 import { X } from "lucide-react";
 import { motion } from "motion/react";
 import {
+	type MouseEvent,
 	type ReactNode,
-	useEffect,
-	useEffectEvent,
 	useId,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
 import { mergeStyles } from "./mergeStyles.ts";
-import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
+import { useModalRegistration } from "../state/modalPresence.ts";
 import {
-	acquireModalLock,
 	drawerHiddenX,
-	releaseModalLock,
-	useDrawerBackdropTransition,
 	useDrawerTransition,
 	useHorizontalSwipe,
 	type DrawerSide,
 } from "../state/drawer.ts";
-import {
-	isTopmostModal,
-	useOpenModalRegistration,
-} from "../state/modalStack.ts";
 import { IconButton } from "./Button.tsx";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 
 // The single drawer component: the left navigation sheet and the right
 // context sheet are the same backdrop, slide, border, focus, and gesture
 // behavior with mirrored sides. Call sites configure width (sheet or full),
-// modality, backdrop, and swipe; they never reimplement the frame.
+// modality, and swipe; they never reimplement the frame.
 interface DrawerProps {
 	side: DrawerSide;
 	open: boolean;
@@ -40,18 +33,12 @@ interface DrawerProps {
 		title?: string;
 		eyebrow?: string;
 		coverage?: "sheet" | "full";
-		full?: boolean;
 		headerClassName?: string;
 		bodyClassName?: string;
 	};
 	behavior?: {
 		modal?: boolean;
-		backdrop?: boolean;
 		swipeClose?: boolean;
-		/** Sync panel focus on open. The mobile navigation skips it to avoid
-		 * a focus jump on open; containment still returns stray focus to
-		 * the panel while open. No child is ever focused. */
-		autoFocus?: boolean;
 	};
 	children: ReactNode;
 }
@@ -98,64 +85,49 @@ function DrawerSession({
 		title,
 		eyebrow,
 		coverage = "sheet",
-		full,
 		headerClassName,
 		bodyClassName,
 	} = appearance ?? {};
-	const {
-		modal = true,
-		backdrop = true,
-		swipeClose = true,
-		autoFocus = true,
-	} = behavior ?? {};
+	const { modal = true, swipeClose = true } = behavior ?? {};
+	useModalRegistration(modal);
 	const panelEl = useRef<HTMLElement | null>(null);
 	const titleId = useId();
-	// The element that held focus when the modal drawer opened. Captured once
-	// per open session (never overwritten by StrictMode remounts, which would
-	// see focus already inside the drawer) so focus reliably returns to the
-	// opener on close. A fresh mount starts empty, so reopening captures anew.
-	const openerRef = useRef<Element | null>(null);
 	const [closing, setClosing] = useState(false);
 	// Once-only close: motion reports completion per animated value, so the
 	// first close completion wins and replayed exits stay silent. Written only
 	// in the animation callback, never mirrored by an effect.
 	const closeNotifiedRef = useRef(false);
-	// The stack lives in React state, not a document query: only modal sheets count.
-	// The persistent desktop sheet stays unregistered. The id backs the
-	// topmost check so stacked sheets never fight over focus.
-	const modalId = useOpenModalRegistration(modal);
-	const queriedFull = useMediaQuery(viewportQueries.belowSm);
-	const isFull = full ?? queriedFull;
 	const drawerTransition = useDrawerTransition(closing);
-	const backdropTransition = useDrawerBackdropTransition();
-	const hiddenX = drawerHiddenX(side, isFull);
+	const hiddenX = drawerHiddenX(side);
 	const requestClose = () => {
 		setClosing(true);
 	};
-	// Native listeners read latest props and state through these events, so
-	// the subscription below never mirrors onClose or closing into refs and
-	// never resubscribes for them.
-	const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
-		if (event.key !== "Escape") return;
-		// The topmost modal owns Escape even when opening the inert
-		// background blurs the opener before focus enters the panel.
-		// Persistent navigation and sheets below a native dialog stay silent.
-		if (modal && isTopmostModal(modalId)) {
-			event.preventDefault();
-			requestClose();
-		}
-	});
-	// Focus stays in the topmost panel while open. Any focusin outside
-	// returns to that panel only; lower sheets sleep. The stack is read
-	// live so overlapping sheets never act on a stale closure.
-	const handleFocusIn = useEffectEvent((event: FocusEvent) => {
-		if (!modal || closing) return;
-		if (!isTopmostModal(modalId)) return;
-		const target = event.target as Node | null;
+	// The modal sheet is a native dialog: the browser owns the top layer,
+	// page inertness, Tab containment, Escape, and focus return to the
+	// opener. The persistent desktop sheet stays a complementary aside.
+	useLayoutEffect(() => {
+		if (!modal) return;
 		const panel = panelEl.current;
-		if (!panel || !target) return;
-		if (!panel.contains(target)) panel.focus({ preventScroll: true });
-	});
+		if (!(panel instanceof HTMLDialogElement)) return;
+		panel.showModal();
+		// Focus the panel container itself, never a child, so no brand link
+		// or value ever takes a focus ring on open.
+		panel.focus({ preventScroll: true });
+		return () => panel.close();
+	}, [modal]);
+	// A click on the backdrop targets the dialog itself. The dialog box is
+	// the sheet, so only coordinates outside its rectangle dismiss it; a
+	// click on the sheet padding stays inside.
+	const closeIfBackdrop = (event: MouseEvent<HTMLDialogElement>) => {
+		if (event.target !== event.currentTarget) return;
+		const rect = event.currentTarget.getBoundingClientRect();
+		const inside =
+			event.clientX >= rect.left &&
+			event.clientX <= rect.right &&
+			event.clientY >= rect.top &&
+			event.clientY <= rect.bottom;
+		if (!inside) requestClose();
+	};
 	// Closing swipes travel toward the docked edge: leftward for the left
 	// drawer, rightward for the right drawer. Opening is the call site's
 	// own gesture; this component only reports its direction.
@@ -170,46 +142,6 @@ function DrawerSession({
 			? { onSwipeLeft: closeIfOver }
 			: { onSwipeRight: closeIfOver }),
 	});
-	useEffect(() => {
-		if (modal && openerRef.current === null)
-			openerRef.current = document.activeElement;
-		// Focus lands on the panel container itself, never on a child, so
-		// no brand link or value ever takes a focus ring on open. The
-		// persistent desktop sheet never moves focus on load.
-		if (modal && autoFocus && isTopmostModal(modalId)) {
-			panelEl.current?.focus({ preventScroll: true });
-		}
-		window.addEventListener("keydown", handleKeyDown);
-		window.addEventListener("focusin", handleFocusIn);
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-			window.removeEventListener("focusin", handleFocusIn);
-			const opener = openerRef.current;
-			if (modal && opener instanceof HTMLElement && opener.isConnected) {
-				// The inert effect below removes the #root inertness in its
-				// own cleanup. Focusing must wait until that runs: elements
-				// inside an inert subtree refuse focus, so a synchronous
-				// restore here would silently land on <body> instead.
-				const target = opener;
-				requestAnimationFrame(() => {
-					if (target.isConnected) target.focus();
-				});
-			}
-		};
-		// Mount plus modality transitions: a desktop sheet that becomes modal
-		// captures and focuses like a fresh open. The listeners stay current
-		// through the events above, so closing needs no dependency or mirror.
-		// oxlint-disable-next-line react/exhaustive-deps
-	}, [modal, autoFocus, modalId]);
-	useEffect(() => {
-		if (!modal) return;
-		// Shared lock: overlapping sheets must not restore scroll or remove
-		// inertness while the other sheet is still open.
-		acquireModalLock();
-		return () => {
-			releaseModalLock();
-		};
-	}, [modal]);
 	const slide = {
 		initial: { opacity: 0, x: hiddenX },
 		animate: { opacity: 1, x: 0 },
@@ -223,85 +155,94 @@ function DrawerSession({
 		closeNotifiedRef.current = true;
 		onClose();
 	};
-	// The session implies open. Unmount ends its lifetime without a reset.
-	return (
-		<>
-			{backdrop && (
-				<motion.button
-					key="drawer-backdrop"
-					type="button"
-					className={`fixed inset-0 border-0 bg-backdrop-film backdrop-blur-(--backdrop-blur) ${side === "left" ? "z-29" : "z-40"}`}
-					aria-label={`Close ${label}`}
-					onClick={requestClose}
-					initial={{ opacity: 0 }}
-					animate={{ opacity: closing ? 0 : 1 }}
-					transition={closing ? drawerTransition : backdropTransition}
-				/>
-			)}
-			{side === "left" ? (
-				<motion.aside
-					key="drawer_panel"
-					ref={(node) => {
-						panelEl.current = node;
-					}}
-					className="fixed inset-y-0 left-0 z-30 flex w-(--sidebar) touch-pan-y flex-col overflow-y-auto border-0 border-r border-solid border-line bg-surface px-5 pt-8 text-ink focus:outline-none max-xl:px-3 max-md:w-60 max-md:px-5 max-md:pt-6 max-md:shadow-2xl print:hidden"
-					aria-label={label}
-					tabIndex={-1}
-					{...(modal ? { role: "dialog", "aria-modal": true as const } : {})}
-					initial={slide.initial}
-					animate={closing ? slide.exit : slide.animate}
-					transition={drawerTransition}
-					onAnimationComplete={handleAnimationComplete}
-				>
-					{children}
-				</motion.aside>
-			) : (
-				<motion.div
-					key="drawer_panel"
-					ref={(node) => {
-						panelEl.current = node;
-					}}
-					className={mergeStyles(
-						"fixed inset-y-0 right-0 z-41 flex w-3xl max-w-[calc(100%_-_--spacing(12))] touch-pan-y flex-col overflow-y-auto border-0 border-l border-solid border-line bg-surface text-ink focus:outline-none max-sm:w-md max-sm:shadow-overlay",
-						coverage === "full" &&
-							"max-sm:w-full max-sm:max-w-full max-sm:border-l-0 max-sm:shadow-none",
-					)}
-					tabIndex={-1}
-					role="dialog"
-					aria-modal="true"
-					aria-labelledby={titleId}
-					initial={slide.initial}
-					animate={closing ? slide.exit : slide.animate}
-					transition={drawerTransition}
-					onAnimationComplete={handleAnimationComplete}
-				>
-					{title && (
-						<div className={mergeStyles(dialogHeaderStyles, headerClassName)}>
-							<div className="min-w-0 flex-1">
-								{eyebrow && (
-									<p className="mb-2 text-xs font-bold tracking-widest text-muted">
-										{eyebrow}
-									</p>
-								)}
-								<h2
-									id={titleId}
-									className="type-display text-3xl leading-tight font-normal tracking-tight"
-								>
-									{title}
-								</h2>
-							</div>
-							<IconButton
-								icon={X}
-								label="Close dialog"
-								onClick={requestClose}
-							/>
+	const panelClassName = mergeStyles(
+		"fixed inset-y-0 touch-pan-y flex-col overflow-y-auto border-0 border-solid border-line bg-surface text-ink focus:outline-none",
+		side === "left"
+			? "right-auto left-0 w-(--sidebar) border-r px-5 pt-8 pb-0 max-xl:px-3 max-md:w-60 max-md:px-5 max-md:pt-6 max-md:shadow-2xl print:hidden"
+			: "left-auto right-0 w-3xl max-w-[calc(100%_-_--spacing(12))] border-l p-0 max-sm:w-md max-sm:shadow-overlay",
+		side === "right" &&
+			coverage === "full" &&
+			"max-sm:w-full max-sm:max-w-full max-sm:border-l-0 max-sm:shadow-none",
+	);
+	// The navigation sheet owns its own padding; only the context sheet has
+	// a dialog header and a padded body.
+	const body =
+		side === "left" ? (
+			children
+		) : (
+			<>
+				{title && (
+					<div className={mergeStyles(dialogHeaderStyles, headerClassName)}>
+						<div className="min-w-0 flex-1">
+							{eyebrow && (
+								<p className="mb-2 text-xs font-bold tracking-widest text-muted">
+									{eyebrow}
+								</p>
+							)}
+							<h2
+								id={titleId}
+								className="type-display text-3xl leading-tight font-normal tracking-tight"
+							>
+								{title}
+							</h2>
 						</div>
-					)}
-					<div className={mergeStyles(dialogBodyStyles, bodyClassName)}>
-						{children}
+						<IconButton icon={X} label="Close dialog" onClick={requestClose} />
 					</div>
-				</motion.div>
-			)}
-		</>
+				)}
+				<div className={mergeStyles(dialogBodyStyles, bodyClassName)}>
+					{children}
+				</div>
+			</>
+		);
+	const accessibleName = title
+		? { "aria-labelledby": titleId }
+		: { "aria-label": label };
+	// The session implies open. Unmount ends its lifetime without a reset.
+	if (modal)
+		return (
+			<motion.dialog
+				key="drawer_panel"
+				ref={(node) => {
+					panelEl.current = node;
+				}}
+				className={mergeStyles(
+					panelClassName,
+					"m-0 h-auto max-h-none open:flex backdrop:bg-backdrop-film backdrop:backdrop-blur-(--backdrop-blur)",
+					side === "left" && "max-w-none",
+				)}
+				tabIndex={-1}
+				{...accessibleName}
+				initial={slide.initial}
+				animate={closing ? slide.exit : slide.animate}
+				transition={drawerTransition}
+				onAnimationComplete={handleAnimationComplete}
+				onCancel={(event) => {
+					// React bubbles cancel through portal ancestry, so a
+					// nested sheet must not also start closing.
+					event.stopPropagation();
+					event.preventDefault();
+					requestClose();
+				}}
+				onClick={closeIfBackdrop}
+			>
+				{body}
+			</motion.dialog>
+		);
+	return (
+		<motion.aside
+			key="drawer_panel"
+			ref={(node) => {
+				panelEl.current = node;
+			}}
+			className={mergeStyles(panelClassName, "flex")}
+			tabIndex={-1}
+			aria-label={label}
+			initial={slide.initial}
+			animate={closing ? slide.exit : slide.animate}
+			transition={drawerTransition}
+			onAnimationComplete={handleAnimationComplete}
+		>
+			{body}
+		</motion.aside>
 	);
 }

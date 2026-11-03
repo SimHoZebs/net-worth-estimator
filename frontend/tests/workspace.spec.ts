@@ -51,6 +51,18 @@ test("outlook renders real calculations and evidence", async ({ page }) => {
 	expect(errors).toEqual([]);
 });
 
+test("an open modal does not scroll the page behind it", async ({ page }) => {
+	await page.goto("/");
+	await page.getByRole("button", { name: "Inspect cash flow" }).click();
+	await expect(page.getByRole("dialog")).toBeVisible();
+	const before = await page.evaluate(() => window.scrollY);
+	await page.mouse.move(10, 300);
+	await page.mouse.wheel(0, 400);
+	await page.waitForTimeout(100);
+	expect(await page.evaluate(() => window.scrollY)).toBe(before);
+	await page.keyboard.press("Escape");
+});
+
 test("saved target pins control Outlook without an evidence dialog", async ({
 	page,
 	request,
@@ -329,6 +341,9 @@ test("mobile navigation, evidence and layouts stay usable", async ({
 			name: "Open navigation",
 		});
 		await openNavigation.click();
+		await expect(
+			page.getByRole("dialog", { name: "Workspace navigation" }),
+		).toBeFocused();
 		await page.getByRole("link", { name: label, exact: true }).click();
 		await expect(page).toHaveURL(new RegExp(`#${route}$`));
 		await expect(

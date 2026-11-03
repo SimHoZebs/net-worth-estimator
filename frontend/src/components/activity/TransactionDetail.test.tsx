@@ -53,16 +53,6 @@ function calculatedTransaction() {
 }
 
 beforeEach(() => {
-	window.HTMLDialogElement.prototype.showModal = function (
-		this: HTMLDialogElement,
-	) {
-		this.setAttribute("open", "");
-	};
-	window.HTMLDialogElement.prototype.close = function (
-		this: HTMLDialogElement,
-	) {
-		this.removeAttribute("open");
-	};
 	acceptTestResource();
 	resetServerQueryCache();
 	vi.unstubAllGlobals();

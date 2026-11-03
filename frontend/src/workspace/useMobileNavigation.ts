@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useHorizontalSwipe } from "../state/drawer.ts";
-import { useHasOpenModal } from "../state/modalStack.ts";
 import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
+import { useAnyModalOpen } from "../state/modalPresence.ts";
 
 export function useMobileNavigation() {
 	const [open, setOpen] = useState(false);
@@ -20,15 +20,15 @@ export function useMobileNavigation() {
 	// drawer. Closing (leftward swipe, Escape, backdrop, focus) is owned by
 	// the shared Drawer component. Listeners are passive and act only on
 	// touchend, so vertical scrolling is never intercepted.
-	// The hamburger is already unreachable while a modal holds the top
-	// layer (root inert plus showModal). The window swipe listener bypasses
-	// inertness, so it reads the stack from React state and never stacks the
-	// nav sheet above an open modal.
-	const hasModal = useHasOpenModal();
+	// The hamburger is unreachable while a modal dialog holds the top layer
+	// because the page is inert. The window swipe listener bypasses
+	// inertness, so it reads the registered modal presence and never stacks
+	// the nav sheet above an open dialog.
+	const anyModalOpen = useAnyModalOpen();
 	const show = useCallback(() => {
-		if (!mobile || open || hasModal) return;
+		if (!mobile || open || anyModalOpen) return;
 		setOpen(true);
-	}, [mobile, open, hasModal]);
+	}, [mobile, open, anyModalOpen]);
 	useHorizontalSwipe({
 		enabled: mobile,
 		onSwipeRight: () => {

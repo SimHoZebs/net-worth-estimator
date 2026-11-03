@@ -248,7 +248,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		page.getByRole("table", { name: new RegExp(labels.recordedCharges) }),
 	).toContainText("Prior cycle purchase");
 	const accessibility = await new AxeBuilder({ page })
-		.include('[role="dialog"]')
+		.include("dialog")
 		.analyze();
 	expect(accessibility.violations).toEqual([]);
 });
@@ -373,7 +373,7 @@ for (const theme of ["light", "dark"] as const) {
 			page.getByRole("tab", { name: "Configure", exact: true }),
 		).toBeInViewport();
 		const cycleAccessibility = await new AxeBuilder({ page })
-			.include('[role="dialog"]')
+			.include("dialog")
 			.analyze();
 		expect(cycleAccessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: /This cycle/ }).click();
@@ -381,12 +381,12 @@ for (const theme of ["light", "dark"] as const) {
 			page.getByRole("region", { name: labels.paycheckAllocation }),
 		).toHaveCount(0);
 		const currentAccessibility = await new AxeBuilder({ page })
-			.include('[role="dialog"]')
+			.include("dialog")
 			.analyze();
 		expect(currentAccessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: "Configure", exact: true }).click();
 		const configureAccessibility = await new AxeBuilder({ page })
-			.include('[role="dialog"]')
+			.include("dialog")
 			.analyze();
 		expect(configureAccessibility.violations).toEqual([]);
 	});

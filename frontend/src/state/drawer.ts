@@ -10,45 +10,12 @@ import { useReducedMotion } from "motion/react";
 export const DRAWER_EASE = "easeOut" as const;
 export const DRAWER_OPEN_DURATION = 0.2;
 export const DRAWER_CLOSE_DURATION = 0.12;
-export const DRAWER_BACKDROP_DURATION = 0.15;
-export const DRAWER_DESKTOP_OFFSET = 48;
 
 export type DrawerSide = "left" | "right";
 
-// Reference-counted modal lock: overlapping drawers (nav sheet plus a
-// context sheet) share one body scroll lock and one root inert. Saving and
-// restoring per drawer races when both close together and leaves the body
-// stuck hidden or the background interactive while a sheet is still open.
-let modalLockCount = 0;
-let savedBodyOverflow: string | null = null;
-
-export function acquireModalLock(): void {
-	if (typeof document === "undefined") return;
-	if (modalLockCount === 0) {
-		savedBodyOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-		document.getElementById("root")?.setAttribute("inert", "");
-	}
-	modalLockCount += 1;
-}
-
-export function releaseModalLock(): void {
-	if (typeof document === "undefined") return;
-	modalLockCount = Math.max(0, modalLockCount - 1);
-	if (modalLockCount === 0) {
-		document.body.style.overflow = savedBodyOverflow ?? "";
-		savedBodyOverflow = null;
-		document.getElementById("root")?.removeAttribute("inert");
-	}
-}
-
-/** Off-canvas resting position: full width on mobile, subtle offset docked. */
-export function drawerHiddenX(
-	side: DrawerSide,
-	full: boolean,
-): string | number {
-	if (full) return side === "left" ? "-100%" : "100%";
-	return side === "left" ? -DRAWER_DESKTOP_OFFSET : DRAWER_DESKTOP_OFFSET;
+/** Off-canvas resting position for the shared slide animation. */
+export function drawerHiddenX(side: DrawerSide): string {
+	return side === "left" ? "-100%" : "100%";
 }
 
 export function useDrawerTransition(closing: boolean): {
@@ -62,17 +29,6 @@ export function useDrawerTransition(closing: boolean): {
 			: closing
 				? DRAWER_CLOSE_DURATION
 				: DRAWER_OPEN_DURATION,
-		ease: DRAWER_EASE,
-	};
-}
-
-export function useDrawerBackdropTransition(): {
-	duration: number;
-	ease: typeof DRAWER_EASE;
-} {
-	const reduceMotion = useReducedMotion();
-	return {
-		duration: reduceMotion ? 0 : DRAWER_BACKDROP_DURATION,
 		ease: DRAWER_EASE,
 	};
 }

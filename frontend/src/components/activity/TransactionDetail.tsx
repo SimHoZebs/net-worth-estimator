@@ -91,10 +91,10 @@ import { useSharingGrants } from "../../state/sharing.ts";
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
 
 /**
- * The detail opens above drawers that portal to model.body. Rendering the
- * native dialog as a sibling (rather than nested inside the drawer panel)
- * keeps drawer-level Escape/backdrop handling from also firing: the drawer's
- * keydown guard only acts on focus inside its own panel.
+ * The detail opens above drawers that portal to document.body. Rendering the
+ * native dialog as a sibling keeps React's cancel path flat: the browser
+ * sends Escape only to the topmost dialog, and Modal stops cancel
+ * propagation so the drawer beneath never starts closing with it.
  */
 function DetailPortal({ children }: { children: ReactNode }) {
 	return createPortal(children, document.body);
@@ -1060,9 +1060,7 @@ export function TransactionDetail({
 				? "Hidden"
 				: "Private";
 	const scrollToSection = (id: string) => {
-		document
-			.getElementById(id)
-			?.scrollIntoView({ behavior: "smooth", block: "start" });
+		document.getElementById(id)?.scrollIntoView({ block: "start" });
 	};
 	const editHeading = (
 		<span className="flex items-center gap-3">
@@ -1112,7 +1110,7 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className="max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
+				className="scroll-smooth max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
 				onCloseRequest={() => {
 					if (menuOpen) {
 						closeMenu(true);

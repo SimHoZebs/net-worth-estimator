@@ -19,6 +19,17 @@
 	}
 }
 
+/* A modal dialog owns scroll gestures: never chain them to the page behind
+   it. ::backdrop is not a scroll container until it gets a hidden overflow. */
+dialog:modal {
+	overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+	overflow: hidden;
+	overscroll-behavior: contain;
+}
+
 @media print {
 	body {
 		background: white;

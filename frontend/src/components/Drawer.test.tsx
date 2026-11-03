@@ -11,61 +11,75 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stubMatchMedia } from "../mocks/testScope.tsx";
 import { Drawer } from "./Drawer.tsx";
 
+// The shared setup stubs only the dialog open state. Top layer, focus
+// containment, Escape, and focus return are the browser's job and are
+// covered by the browser suite.
 beforeEach(() => {
 	stubMatchMedia(false);
 });
 
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 
+/** The browser turns Escape into a cancel request on the topmost dialog. */
+function requestCancel(dialog: HTMLElement) {
+	fireEvent(dialog, new Event("cancel", { bubbles: true, cancelable: true }));
+}
+
+/** The browser reports a backdrop click at coordinates outside the dialog. */
+function clickBackdrop(dialog: HTMLElement) {
+	vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+		left: 0,
+		right: 240,
+		top: 0,
+		bottom: 800,
+		width: 240,
+		height: 800,
+		x: 0,
+		y: 0,
+		toJSON: () => ({}),
+	});
+	fireEvent.click(dialog, { clientX: 320, clientY: 100 });
+}
+
 describe("drawer semantics", () => {
-	it("closes the topmost modal with Escape through the animated close", async () => {
-		const page = render(<button type="button">Open navigation</button>);
-		page.getByRole("button", { name: "Open navigation" }).focus();
+	it("closes the dialog with the native cancel request through the animated close", async () => {
 		const onClose = vi.fn();
-		render(
-			<Drawer
-				side="left"
-				open
-				label="Navigation"
-				onClose={onClose}
-				behavior={{ autoFocus: false }}
-			>
+		const view = render(
+			<Drawer side="left" open label="Navigation" onClose={onClose}>
 				<a href="#outlook">Outlook</a>
 			</Drawer>,
 		);
-		// Escape funnels through requestClose like every other close path:
-		// no synchronous onClose, and the key is owned (default prevented).
-		const prevented = fireEvent.keyDown(window, { key: "Escape" });
-		expect(prevented).toBe(false);
+		const dialog = view.getByRole("dialog", { name: "Navigation" });
+		requestCancel(dialog);
 		expect(onClose).not.toHaveBeenCalled();
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	});
-	it("captures the mobile opener after persistent desktop navigation", async () => {
-		const page = render(<button type="button">Open navigation</button>);
-		const opener = page.getByRole("button", { name: "Open navigation" });
-		const sheet = (open: boolean, modal: boolean) => (
+	it("moves focus into the modal sheet and leaves the persistent sheet alone", () => {
+		const page = render(<button type="button">Page action</button>);
+		const action = page.getByRole("button", { name: "Page action" });
+		action.focus();
+		const sheet = (modal: boolean) => (
 			<Drawer
 				side="left"
-				open={open}
-				label="Navigation"
+				open
+				label="Workspace navigation"
 				onClose={() => {}}
 				behavior={{ modal }}
 			>
 				<a href="#outlook">Outlook</a>
 			</Drawer>
 		);
-		const view = render(sheet(true, false));
-		view.rerender(sheet(false, true));
-		opener.focus();
-		view.rerender(sheet(true, true));
-		expect(document.activeElement).toBe(
-			view.getByRole("dialog", { name: "Navigation" }),
-		);
-		view.rerender(sheet(false, true));
-		await waitFor(() => expect(document.activeElement).toBe(opener));
+		const view = render(sheet(false));
+		expect(document.activeElement).toBe(action);
+		view.rerender(sheet(true));
+		const dialog = view.getByRole("dialog", {
+			name: "Workspace navigation",
+		});
+		expect(document.activeElement).toBe(dialog);
 	});
 	it("exposes modal navigation by its dialog role and label", async () => {
 		const onClose = vi.fn();
@@ -75,13 +89,10 @@ describe("drawer semantics", () => {
 			</Drawer>,
 		);
 		const dialog = view.getByRole("dialog", { name: "Workspace navigation" });
-		expect(dialog.getAttribute("aria-modal")).toBe("true");
 		// Focus lands on the panel itself, never on a queried child.
 		expect(document.activeElement).toBe(dialog);
-		expect(
-			view.getByRole("button", { name: "Close Workspace navigation" }),
-		).toBeTruthy();
-		fireEvent.keyDown(window, { key: "Escape" });
+		expect(dialog.hasAttribute("aria-modal")).toBe(false);
+		requestCancel(dialog);
 		expect(onClose).not.toHaveBeenCalled();
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	});
@@ -97,7 +108,7 @@ describe("drawer semantics", () => {
 				open
 				label="Workspace navigation"
 				onClose={onClose}
-				behavior={{ modal: false, backdrop: false, swipeClose: false }}
+				behavior={{ modal: false, swipeClose: false }}
 			>
 				<a href="#outlook">Outlook</a>
 			</Drawer>,
@@ -105,22 +116,11 @@ describe("drawer semantics", () => {
 		const navigation = view.getByRole("complementary", {
 			name: "Workspace navigation",
 		});
-		expect(navigation.hasAttribute("aria-modal")).toBe(false);
 		expect(
 			within(navigation).getByRole("link", { name: "Outlook" }),
 		).toBeTruthy();
-		expect(
-			view.queryByRole("button", { name: "Close Workspace navigation" }),
-		).toBeNull();
+		expect(view.queryByRole("dialog")).toBeNull();
 		expect(document.activeElement).toBe(action);
-		within(navigation).getByRole("link", { name: "Outlook" }).focus();
-		const escape = new KeyboardEvent("keydown", {
-			key: "Escape",
-			cancelable: true,
-		});
-		window.dispatchEvent(escape);
-		expect(escape.defaultPrevented).toBe(false);
-		expect(onClose).not.toHaveBeenCalled();
 	});
 
 	it("settles focus on the topmost sheet when two modal drawers overlap", async () => {
@@ -144,7 +144,7 @@ describe("drawer semantics", () => {
 		);
 		const upper = view.getByRole("dialog", { name: "Upper" });
 		expect(document.activeElement).toBe(upper);
-		fireEvent.keyDown(window, { key: "Escape" });
+		requestCancel(upper);
 		// Only the topmost sheet starts closing; the lower sheet stays silent.
 		expect(closeUpper).not.toHaveBeenCalled();
 		expect(closeLower).not.toHaveBeenCalled();
@@ -199,7 +199,7 @@ describe("animated close", () => {
 		expect(reopened).not.toBe(previous);
 		await waitFor(() => expect(reopened.style.opacity).toBe("1"));
 		expect(onClose).not.toHaveBeenCalled();
-		fireEvent.keyDown(window, { key: "Escape" });
+		requestCancel(reopened);
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	});
 	it("does not complete an old close action after external navigation removes the drawer", async () => {
@@ -230,21 +230,16 @@ describe("animated close", () => {
 		await waitFor(() => expect(view.queryByRole("dialog")).toBeNull());
 		expect(onClose).not.toHaveBeenCalled();
 	});
-	it("closes once when Escape fires twice before the animation completes", async () => {
+	it("closes once when cancel fires twice before the animation completes", async () => {
 		const onClose = vi.fn();
-		render(
-			<Drawer
-				side="left"
-				open
-				label="Navigation"
-				onClose={onClose}
-				behavior={{ autoFocus: false }}
-			>
+		const view = render(
+			<Drawer side="left" open label="Navigation" onClose={onClose}>
 				<a href="#outlook">Outlook</a>
 			</Drawer>,
 		);
-		fireEvent.keyDown(window, { key: "Escape" });
-		fireEvent.keyDown(window, { key: "Escape" });
+		const dialog = view.getByRole("dialog", { name: "Navigation" });
+		requestCancel(dialog);
+		requestCancel(dialog);
 		expect(onClose).not.toHaveBeenCalled();
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 		await act(async () => {
@@ -253,16 +248,39 @@ describe("animated close", () => {
 		expect(onClose).toHaveBeenCalledOnce();
 	});
 
-	it("animates backdrop dismissal instead of closing synchronously", async () => {
+	it("animates a backdrop click instead of closing synchronously", async () => {
 		const onClose = vi.fn();
 		const view = render(
 			<Drawer side="left" open label="Navigation" onClose={onClose}>
 				<a href="#outlook">Outlook</a>
 			</Drawer>,
 		);
-		fireEvent.click(view.getByRole("button", { name: "Close Navigation" }));
+		clickBackdrop(view.getByRole("dialog", { name: "Navigation" }));
 		expect(onClose).not.toHaveBeenCalled();
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+	});
+
+	it("ignores a click inside the sheet rectangle", () => {
+		const onClose = vi.fn();
+		const view = render(
+			<Drawer side="left" open label="Navigation" onClose={onClose}>
+				<a href="#outlook">Outlook</a>
+			</Drawer>,
+		);
+		const dialog = view.getByRole("dialog", { name: "Navigation" });
+		vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+			left: 0,
+			right: 240,
+			top: 0,
+			bottom: 800,
+			width: 240,
+			height: 800,
+			x: 0,
+			y: 0,
+			toJSON: () => ({}),
+		});
+		fireEvent.click(dialog, { clientX: 200, clientY: 400 });
+		expect(onClose).not.toHaveBeenCalled();
 	});
 
 	it("animates the corner button dismissal instead of closing synchronously", async () => {
@@ -286,13 +304,7 @@ describe("animated close", () => {
 	it("closes a left sheet with a closing swipe through the same animated path", async () => {
 		const onClose = vi.fn();
 		const view = render(
-			<Drawer
-				side="left"
-				open
-				label="Navigation"
-				onClose={onClose}
-				behavior={{ autoFocus: false }}
-			>
+			<Drawer side="left" open label="Navigation" onClose={onClose}>
 				<a href="#outlook">Outlook</a>
 			</Drawer>,
 		);
@@ -324,18 +336,12 @@ describe("animated close", () => {
 	it("completes the animated close with reduced motion", async () => {
 		stubMatchMedia(true);
 		const onClose = vi.fn();
-		render(
-			<Drawer
-				side="left"
-				open
-				label="Navigation"
-				onClose={onClose}
-				behavior={{ autoFocus: false }}
-			>
+		const view = render(
+			<Drawer side="left" open label="Navigation" onClose={onClose}>
 				<a href="#outlook">Outlook</a>
 			</Drawer>,
 		);
-		fireEvent.keyDown(window, { key: "Escape" });
+		requestCancel(view.getByRole("dialog", { name: "Navigation" }));
 		expect(onClose).not.toHaveBeenCalled();
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	});
@@ -365,21 +371,34 @@ describe("animated close", () => {
 			);
 		}
 		const view = render(<Harness />);
-		fireEvent.click(
-			view.getByRole("button", { name: "Close Account details" }),
-		);
+		fireEvent.click(view.getByRole("button", { name: "Close dialog" }));
 		await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 		await waitFor(() =>
 			expect(view.queryByRole("dialog", { name: "Savings" })).toBeNull(),
 		);
-		// A fresh open session starts outside the exit: no spurious close,
-		// focus captured again, and Escape closes anew.
+		// A fresh open session starts outside the exit: no spurious close
+		// and focus lands on the new panel.
 		fireEvent.click(view.getByRole("button", { name: "Reopen" }));
 		const dialog = await view.findByRole("dialog", { name: "Savings" });
 		expect(document.activeElement).toBe(dialog);
 		expect(onClose).toHaveBeenCalledOnce();
-		fireEvent.keyDown(window, { key: "Escape" });
+		requestCancel(dialog);
 		await waitFor(() => expect(onClose).toHaveBeenCalledTimes(2));
+	});
+
+	it("stops a nested sheet cancel from bubbling through portal ancestry", async () => {
+		const closeOuter = vi.fn();
+		const closeInner = vi.fn();
+		const view = render(
+			<Drawer side="left" open label="Outer sheet" onClose={closeOuter}>
+				<Drawer side="right" open label="Inner sheet" onClose={closeInner}>
+					<button type="button">Inner action</button>
+				</Drawer>
+			</Drawer>,
+		);
+		requestCancel(view.getByRole("dialog", { name: "Inner sheet" }));
+		await waitFor(() => expect(closeInner).toHaveBeenCalledOnce());
+		expect(closeOuter).not.toHaveBeenCalled();
 	});
 
 	it("closes stacked sheets top-down while preserving the lower sheet", async () => {
@@ -417,16 +436,15 @@ describe("animated close", () => {
 			);
 		}
 		const view = render(<Stack />);
-		fireEvent.keyDown(window, { key: "Escape" });
+		requestCancel(view.getByRole("dialog", { name: "Upper" }));
 		await waitFor(() => expect(closeUpper).toHaveBeenCalledOnce());
 		await waitFor(() =>
 			expect(view.queryByRole("dialog", { name: "Upper" })).toBeNull(),
 		);
 		expect(closeLower).not.toHaveBeenCalled();
-		// The surviving lower sheet is topmost again and owns the next Escape.
+		// The surviving lower sheet owns the next cancel request.
 		const lower = view.getByRole("dialog", { name: "Lower sheet" });
-		await waitFor(() => expect(document.activeElement).toBe(lower));
-		fireEvent.keyDown(window, { key: "Escape" });
+		requestCancel(lower);
 		await waitFor(() => expect(closeLower).toHaveBeenCalledOnce());
 		await waitFor(() =>
 			expect(view.queryByRole("dialog", { name: "Lower sheet" })).toBeNull(),

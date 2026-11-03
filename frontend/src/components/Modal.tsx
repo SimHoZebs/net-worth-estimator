@@ -1,8 +1,14 @@
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import {
+	type ReactNode,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
 import { IconButton } from "./Button.tsx";
-import { useOpenModalRegistration } from "../state/modalStack.ts";
+import { useModalRegistration } from "../state/modalPresence.ts";
 import { dialogBodyStyles, dialogHeaderStyles } from "./dialogStyles.ts";
 import { mergeStyles } from "./mergeStyles.ts";
 
@@ -43,22 +49,18 @@ export function Modal({
 }) {
 	const ref = useRef<HTMLDialogElement>(null);
 	const panelRef = useRef<HTMLDivElement>(null);
-	// Mounted means open for this component: showModal runs on mount.
-	useOpenModalRegistration(true);
+	useModalRegistration(true);
 	const [closing, setClosing] = useState(false);
 	const closeRequested = useRef(false);
 	const reduceMotion = useReducedMotion();
 	const id = useId();
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const dialog = ref.current;
-		const previous = document.activeElement;
 		dialog?.showModal();
 		if (focusPanelOnOpen) panelRef.current?.focus();
-		return () => {
-			dialog?.close();
-			if (previous instanceof HTMLElement && previous.isConnected)
-				previous.focus();
-		};
+		// Layout cleanup runs before React detaches the dialog, so close()
+		// still returns focus to the opener.
+		return () => dialog?.close();
 		// oxlint-disable-next-line react/exhaustive-deps
 	}, []);
 	const requestClose = () => {

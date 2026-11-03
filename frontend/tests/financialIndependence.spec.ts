@@ -366,7 +366,7 @@ for (const theme of ["light", "dark"]) {
 			expect(modalBox!.width).toBeCloseTo(width, 0);
 			expect(modalBox!.height).toBeCloseTo(844, 0);
 			const expanded = await new AxeBuilder({ page })
-				.include('[role="dialog"]')
+				.include("dialog")
 				.analyze();
 			expect(expanded.violations).toEqual([]);
 			await expect(
@@ -396,7 +396,7 @@ for (const theme of ["light", "dark"]) {
 				),
 			).toBe(true);
 			const configure = await new AxeBuilder({ page })
-				.include('[role="dialog"]')
+				.include("dialog")
 				.analyze();
 			expect(configure.violations).toEqual([]);
 			await dialog.getByRole("tab", { name: "Overview" }).click();
@@ -420,7 +420,7 @@ for (const theme of ["light", "dark"]) {
 				),
 			).toBe(true);
 			const overview = await new AxeBuilder({ page })
-				.include('[role="dialog"]')
+				.include("dialog")
 				.analyze();
 			expect(overview.violations).toEqual([]);
 			await dialog.getByText("Compare start dates", { exact: true }).click();

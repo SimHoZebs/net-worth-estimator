@@ -28,20 +28,11 @@ export function WorkspaceLayout({
 				open={open || !mobile}
 				onClose={close}
 				label="Workspace navigation"
-				appearance={{ full: mobile }}
-				behavior={{
-					backdrop: mobile,
-					modal: mobile,
-					swipeClose: mobile,
-					autoFocus: false,
-				}}
+				behavior={{ modal: mobile, swipeClose: mobile }}
 			>
 				{navigation(close)}
 			</Drawer>
-			<div
-				className="ml-(--sidebar) flex min-h-dvh flex-col print:ml-0"
-				inert={mobile && open}
-			>
+			<div className="ml-(--sidebar) flex min-h-dvh flex-col print:ml-0">
 				{header(show)}
 				<main
 					id="main-content"

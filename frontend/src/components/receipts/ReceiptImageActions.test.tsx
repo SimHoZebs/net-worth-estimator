@@ -6,17 +6,9 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { ReceiptImageActions } from "./ReceiptImageActions.tsx";
 
-beforeEach(() => {
-	HTMLDialogElement.prototype.showModal = function () {
-		this.setAttribute("open", "");
-	};
-	HTMLDialogElement.prototype.close = function () {
-		this.removeAttribute("open");
-	};
-});
 afterEach(cleanup);
 
 function props() {
