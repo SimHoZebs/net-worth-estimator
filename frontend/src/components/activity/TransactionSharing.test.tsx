@@ -130,14 +130,15 @@ it("shows the default state when nothing is shared", async () => {
 	stubSharing([]);
 	renderSharing();
 	expect(
-		await screen.findByText("Only you can see this transaction."),
+		await screen.findByRole("heading", { name: "Sharing" }),
 	).toBeTruthy();
+	expect(screen.queryByRole("list")).toBeNull();
 });
 
 it("shares one transaction with one group", async () => {
 	const { requested } = stubSharing([]);
 	renderSharing();
-	await screen.findByText("Only you can see this transaction.");
+	await screen.findByRole("heading", { name: "Sharing" });
 	fireEvent.change(screen.getByLabelText(/Share with a group/), {
 		target: { value: "g1" },
 	});
@@ -160,7 +161,7 @@ it("shares one transaction with one group", async () => {
 it("hides one transaction from everyone including future groups", async () => {
 	const { requested } = stubSharing([]);
 	renderSharing();
-	await screen.findByText("Only you can see this transaction.");
+	await screen.findByRole("heading", { name: "Sharing" });
 	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
 		target: { value: "all" },
 	});
@@ -197,11 +198,7 @@ it("surfaces the server conflict instead of double intents", async () => {
 	// g1 is already shared, so it is not offered as a hide target; the
 	// conflict path stays server-enforced. Revoking clears the way.
 	fireEvent.click(screen.getByText("Stop sharing"));
-	await waitFor(() =>
-		expect(
-			screen.getByText("Only you can see this transaction."),
-		).toBeTruthy(),
-	);
+	await waitFor(() => expect(screen.queryByText("Stop sharing")).toBeNull());
 	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
 		target: { value: "g1" },
 	});
@@ -213,7 +210,7 @@ it("surfaces the server conflict instead of double intents", async () => {
 it("hides the controls in read-only mode", async () => {
 	stubSharing([]);
 	renderSharing("p1", true);
-	await screen.findByText("Only you can see this transaction.");
+	await screen.findByRole("heading", { name: "Sharing" });
 	expect(screen.queryByText("Share")).toBeNull();
 	expect(screen.queryByText("Hide")).toBeNull();
 });
@@ -221,7 +218,7 @@ it("hides the controls in read-only mode", async () => {
 it("pauses sharing while hidden from everyone", async () => {
 	stubSharing([]);
 	renderSharing();
-	await screen.findByText("Only you can see this transaction.");
+	await screen.findByRole("heading", { name: "Sharing" });
 	fireEvent.change(screen.getByLabelText(/Hide from a group or everyone/), {
 		target: { value: "all" },
 	});
@@ -242,7 +239,7 @@ it("pauses sharing while hidden from everyone", async () => {
 it("marks shares suppressed once hidden from everyone", async () => {
 	stubSharing([]);
 	renderSharing();
-	await screen.findByText("Only you can see this transaction.");
+	await screen.findByRole("heading", { name: "Sharing" });
 	fireEvent.change(screen.getByLabelText(/Share with a group/), {
 		target: { value: "g1" },
 	});

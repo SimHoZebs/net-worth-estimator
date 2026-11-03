@@ -185,11 +185,6 @@ export function TransactionSharing({
 		<section aria-label="Sharing" className="grid gap-3">
 			<div>
 				<h3 className="m-0 text-sm font-medium">Sharing</h3>
-				<p className="mb-0 text-sm text-muted">
-					{intents.length === 0
-						? "Only you can see this transaction."
-						: "Your explicit choices for this transaction."}
-				</p>
 			</div>
 
 			{error && <ErrorNotice message={error} />}

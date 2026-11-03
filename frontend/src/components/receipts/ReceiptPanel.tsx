@@ -51,13 +51,58 @@ export function ReceiptPanel({
 	const receipts = collection.data?.receipts ?? [];
 	return (
 		<section
-			className="mt-6 flex flex-col gap-4 border-t border-line pt-5"
+			className="mt-4 flex flex-col gap-4"
 			aria-label="Receipt evidence"
 		>
-			<div className="flex items-center gap-2">
-				<ReceiptText size={17} aria-hidden="true" />
-				<h3 className="text-sm font-semibold">Receipts</h3>
-				{receipts.length > 0 && <Badge tone="neutral">{receipts.length}</Badge>}
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<div className="flex items-center gap-2">
+					<ReceiptText size={17} aria-hidden="true" />
+					<h3 className="text-sm font-semibold">Receipts</h3>
+					{receipts.length > 0 && <Badge tone="neutral">{receipts.length}</Badge>}
+				</div>
+				{saved && !locked && eligible && (
+					<div className="flex items-center gap-2">
+						<Button
+							variant="secondary"
+							size="sm"
+							disabled={actions.attach.isPending}
+							onClick={() => upload.current?.click()}
+						>
+							<ImageUp size={14} aria-hidden="true" />
+							Upload receipt
+						</Button>
+						<input
+							ref={upload}
+							type="file"
+							accept="image/jpeg,image/png"
+							className="sr-only"
+							tabIndex={-1}
+							aria-label="Upload receipt image"
+							aria-describedby="receipt-size-hint"
+							onChange={attach}
+						/>
+						<Button
+							variant="secondary"
+							size="sm"
+							disabled={actions.attach.isPending}
+							onClick={() => camera.current?.click()}
+						>
+							<Camera size={14} aria-hidden="true" />
+							Take photo
+						</Button>
+						<input
+							ref={camera}
+							type="file"
+							accept="image/jpeg,image/png"
+							capture="environment"
+							className="sr-only"
+							tabIndex={-1}
+							aria-label="Take receipt photo"
+							aria-describedby="receipt-size-hint"
+							onChange={attach}
+						/>
+					</div>
+				)}
 			</div>
 			{!saved ? (
 				<p className="text-sm text-muted">
@@ -104,54 +149,10 @@ export function ReceiptPanel({
 						</button>
 					))}
 					{!locked && eligible && (
-						<fieldset
-							disabled={actions.attach.isPending}
-							className="flex flex-col gap-2"
-						>
-							<div className="flex flex-wrap items-center gap-2">
-								<Button
-									variant="secondary"
-									size="sm"
-									onClick={() => upload.current?.click()}
-								>
-									<ImageUp size={14} aria-hidden="true" />
-									Upload receipt
-								</Button>
-								<input
-									ref={upload}
-									type="file"
-									accept="image/jpeg,image/png"
-									className="sr-only"
-									tabIndex={-1}
-									aria-label="Upload receipt image"
-									aria-describedby="receipt-size-hint"
-									onChange={attach}
-								/>
-								<Button
-									variant="secondary"
-									size="sm"
-									onClick={() => camera.current?.click()}
-								>
-									<Camera size={14} aria-hidden="true" />
-									Take photo
-								</Button>
-								<input
-									ref={camera}
-									type="file"
-									accept="image/jpeg,image/png"
-									capture="environment"
-									className="sr-only"
-									tabIndex={-1}
-									aria-label="Take receipt photo"
-									aria-describedby="receipt-size-hint"
-									onChange={attach}
-								/>
-							</div>
-							<p id="receipt-size-hint" className="text-xs text-muted">
-								JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB
-								after normalization.
-							</p>
-						</fieldset>
+						<p id="receipt-size-hint" className="text-xs text-muted">
+							JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB
+							after normalization.
+						</p>
 					)}
 					{actions.attach.isPending && (
 						<p role="status" className="text-sm text-muted">
