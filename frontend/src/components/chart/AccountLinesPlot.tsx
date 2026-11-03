@@ -1,4 +1,4 @@
-import { defineChart, lineY, ruleY } from "@tanstack/charts";
+import { type ChartPoint, defineChart, lineY, ruleY } from "@tanstack/charts";
 import { crosshair } from "@tanstack/charts/crosshair";
 import { Chart } from "@tanstack/charts/react";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
@@ -6,11 +6,11 @@ import { scalePoint } from "@tanstack/charts/scales/point";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { useMemo } from "react";
 import {
+	type AccountTrendPoint,
 	accountTrendRows,
 	assignAccountDashes,
 	netWorthDomain,
 } from "../../domain/chart.ts";
-import { useMediaQuery, viewportQueries } from "../../state/useMediaQuery.ts";
 import {
 	compactMoney,
 	dateLabel,
@@ -19,6 +19,21 @@ import {
 } from "../../domain/format.ts";
 import type { Projection } from "../../domain/result.ts";
 import { seriesTexture, toneToken } from "../texture/texture.ts";
+
+/** One legend line sample with the series dash pattern as a CSS gradient. */
+function dashImage(dash: string | undefined, color: string) {
+	if (!dash) return undefined;
+	let offset = 0;
+	const stops = dash
+		.trim()
+		.split(/\s+/)
+		.map((length, index) => {
+			const start = offset;
+			offset += Number(length);
+			return `${index % 2 === 0 ? color : "transparent"} ${start}px ${offset}px`;
+		});
+	return `repeating-linear-gradient(90deg, ${stops.join(", ")})`;
+}
 
 /**
  * Per-account balances as colored lines on one shared scale: every account
@@ -41,9 +56,6 @@ export function AccountLinesPlot({
 		() => accountTrendRows({ points, accounts }),
 		[points, accounts],
 	);
-	// The rotated axis title costs ~25px of plot width; drop it where the
-	// viewport is narrow and let the compact tick labels carry the units.
-	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const styles = useMemo(() => {
 		const dashes = assignAccountDashes(series);
 		return series.map((entry, index) => {
@@ -78,7 +90,9 @@ export function AccountLinesPlot({
 				},
 			);
 		});
-		return defineChart({
+		return defineChart(({ width }) => ({
+			// The rotated axis title costs ~25px of plot width; drop it in
+			// narrow containers and let the compact tick labels carry units.
 			marks: [
 				...lines,
 				...(showZero ? [ruleY([0])] : []),
@@ -112,7 +126,7 @@ export function AccountLinesPlot({
 					scale: scaleLinear().domain([low, high]),
 					grid: true,
 					axis: {
-						...(narrow ? {} : { label: "Balance (USD)" }),
+						...(width < 640 ? {} : { label: "Balance (USD)" }),
 						ticks: { format: (value: number) => compactMoney(value) },
 					},
 				},
@@ -125,7 +139,7 @@ export function AccountLinesPlot({
 			maxFocusDistance: Number.POSITIVE_INFINITY,
 			tooltip: {
 				use: tooltip,
-				formatGroup: (grouped) => {
+				formatGroup: (grouped: readonly ChartPoint<AccountTrendPoint>[]) => {
 					const first = grouped[0];
 					const heading = first
 						? dateLabel(String(first.xValue).slice(0, 10), true)
@@ -141,8 +155,8 @@ export function AccountLinesPlot({
 					return [heading, ...lines].join("\n");
 				},
 			},
-		});
-	}, [rows, series, styles, low, high, showZero, narrow]);
+		}));
+	}, [rows, series, styles, low, high, showZero]);
 	if (!series.length || !rows.length) {
 		return (
 			<p className="m-0 text-sm text-muted">
@@ -170,25 +184,14 @@ export function AccountLinesPlot({
 			>
 				{styles.map(({ entry, color, dash }) => (
 					<li key={entry.id} className="flex items-center gap-2">
-						<svg
-							width="28"
-							height="12"
-							viewBox="0 0 28 12"
+						<span
 							aria-hidden="true"
-							focusable="false"
-							className="block"
-						>
-							<line
-								x1="0"
-								y1="6"
-								x2="28"
-								y2="6"
-								stroke={color}
-								strokeWidth="2.25"
-								strokeLinecap="round"
-								{...(dash ? { strokeDasharray: dash } : {})}
-							/>
-						</svg>
+							className="block h-0.5 w-7"
+							style={{
+								backgroundColor: dash ? undefined : color,
+								backgroundImage: dashImage(dash, color),
+							}}
+						/>
 						{entry.name}
 					</li>
 				))}

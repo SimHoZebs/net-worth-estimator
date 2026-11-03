@@ -8,7 +8,6 @@ import { todayIso } from "../domain/format.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { useCheckpoints } from "../state/workspaceResources.ts";
 import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
-import { useMediaQuery, viewportQueries } from "../state/useMediaQuery.ts";
 import { useSavedAccounts } from "../state/savedRows.ts";
 import { visibleAccounts } from "../domain/model.ts";
 import { IconButton, TextButton } from "./Button.tsx";
@@ -25,7 +24,6 @@ const EMPTY_CHECKPOINTS: BackendCheckpoint[] = [];
 export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 	const [days, setDays] = useState<number>(TRAILING_NET_WORTH_DAYS);
 	const [view, setView] = useState<"total" | "accounts">("total");
-	const narrow = useMediaQuery(viewportQueries.belowSm);
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const savedAccounts = useSavedAccounts();
 	const trendAccounts = useMemo(
@@ -176,9 +174,7 @@ export function ProjectionChart({ onEvidence }: { onEvidence: () => void }) {
 							<AccountLinesPlot
 								points={daily}
 								accounts={trendAccounts}
-								// The wrapped legend costs vertical space on narrow
-								// screens, so the plot gets extra height there.
-								height={narrow ? 360 : 300}
+								height={300}
 							/>
 						)}
 					</div>

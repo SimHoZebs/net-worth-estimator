@@ -3,8 +3,7 @@
  * Every series pairs a tone (color) with a pattern (texture) so filled
  * areas stay distinguishable without color vision. HTML bars consume the
  * pairing through `data-tone`/`data-pattern` attributes (texture.css);
- * charts that need patterned SVG areas pair `seriesTexture` with pattern
- * definitions from TextureDefs.
+ * line charts use the tone token and reserve patterns for their line keys.
  */
 
 export const TEXTURE_PATTERNS = ["solid", "stripes", "dots", "hatch"] as const;

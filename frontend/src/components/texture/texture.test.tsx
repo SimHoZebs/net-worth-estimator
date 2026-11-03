@@ -1,6 +1,4 @@
-import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { TextureDefs } from "./TextureDefs.tsx";
 import {
 	seriesTexture,
 	toneToken,
@@ -35,39 +33,5 @@ describe("texture contract", () => {
 		expect(new Set(combos).size).toBe(16);
 		expect(seriesTexture(4)).toEqual({ tone: "sage", pattern: "stripes" });
 		expect(seriesTexture(5)).toEqual({ tone: "tan", pattern: "dots" });
-	});
-});
-
-describe("texture defs", () => {
-	it("renders one pattern per entry with motif geometry", () => {
-		render(
-			<svg>
-				<TextureDefs
-					entries={[
-						{
-							id: "test-tail",
-							background: null,
-							mark: "var(--line-strong)",
-							markOpacity: 1,
-							motif: "stripes",
-						},
-						{
-							id: "test-withdrawals",
-							background: "var(--chart-band)",
-							mark: "var(--primary)",
-							markOpacity: 0.5,
-							motif: "dots",
-						},
-					]}
-				/>
-			</svg>,
-		);
-		const tail = document.getElementById("test-tail");
-		const withdrawals = document.getElementById("test-withdrawals");
-		expect(tail?.tagName).toBe("pattern");
-		expect(tail?.querySelector("line")).toBeTruthy();
-		expect(tail?.querySelector("rect")).toBeNull();
-		expect(withdrawals?.querySelector("rect")).toBeTruthy();
-		expect(withdrawals?.querySelector("circle")).toBeTruthy();
 	});
 });

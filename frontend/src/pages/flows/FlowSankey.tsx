@@ -224,25 +224,14 @@ export function FlowSankey({
 				{(Object.keys(KIND_STROKE) as Array<keyof typeof KIND_STROKE>).map(
 					(kind) => (
 						<li key={kind} className="flex items-center gap-2">
-							<svg
-								width="28"
-								height="12"
-								viewBox="0 0 28 12"
+							<span
 								aria-hidden="true"
-								focusable="false"
-								className="block"
-							>
-								<line
-									x1="0"
-									y1="6"
-									x2="28"
-									y2="6"
-									stroke={KIND_STROKE[kind]}
-									strokeOpacity={UNSELECTED_FLOW_OPACITY}
-									strokeWidth="4"
-									strokeLinecap="butt"
-								/>
-							</svg>
+								className="block h-1 w-7"
+								style={{
+									backgroundColor: KIND_STROKE[kind],
+									opacity: UNSELECTED_FLOW_OPACITY,
+								}}
+							/>
 							{KIND_LABEL[kind]}
 						</li>
 					),

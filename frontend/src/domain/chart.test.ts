@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { projectionFixture } from "../mocks/projection.ts";
 import { compactMoney } from "./format.ts";
-import type { FundingGap } from "./fundingGaps.ts";
 import {
 	accountTrendRows,
 	assignAccountDashes,
-	fundingGapChartModel,
-	lineChartModel,
 	netWorthDomain,
 	trailingDailyPoints,
 	TRAILING_NET_WORTH_DAYS,
@@ -15,69 +12,6 @@ import {
 const projection = projectionFixture();
 
 describe("chart presentation data", () => {
-	describe("shared line geometry", () => {
-		const gap: FundingGap = {
-			id: "rent",
-			date: "2030-09-25",
-			name: "Rent",
-			fundingAccount: { id: "checking", name: "Checking" },
-			openingBalance: 1000,
-			requiredAmount: 9000,
-			availableAmount: 2500,
-			unfulfilledAmount: 6500,
-			windowStartDate: "2030-09-01",
-			transactions: [
-				{
-					id: "pay",
-					date: "2030-09-10",
-					name: "Payroll",
-					amount: 2000,
-					kind: "income",
-				},
-				{
-					id: "bill",
-					date: "2030-09-20",
-					name: "Bill",
-					amount: -500,
-					kind: "utilities",
-				},
-			],
-		};
-		it("builds the funding path on the same scales as the projection", () => {
-			const model = fundingGapChartModel({ gap, narrow: false });
-			expect(model.width).toBe(680);
-			expect(model.grid).toHaveLength(5);
-			for (const path of [
-				model.balancePath,
-				model.areaPath,
-				model.refusalPath,
-			]) {
-				expect(path).toMatch(/^M/);
-				expect(path).not.toMatch(/NaN|Infinity/);
-			}
-			// Refusal vector lands past the last executed transaction, below it.
-			expect(model.failX).toBeGreaterThan(model.endX);
-			expect(model.failY).toBeGreaterThan(model.endY);
-			expect(model.summary.shortfall).toBe(9000 - 2500);
-		});
-		it("keeps lookup and geometry in bounds for a single transaction", () => {
-			const geometry = lineChartModel({
-				xMax: 1,
-				low: -100,
-				high: 100,
-				width: 440,
-				height: 260,
-				left: 63,
-				right: 24,
-				top: 15,
-				bottom: 35,
-			});
-			expect(geometry.indexAt(-1)).toBe(0);
-			expect(geometry.indexAt(2)).toBe(1);
-			expect(geometry.line([10])).toMatch(/^M/);
-			expect(geometry.line([10])).not.toMatch(/NaN|Infinity/);
-		});
-	});
 	describe("trailingDailyPoints", () => {
 		// Fixture rows: 2026-01-01 $1,000, 2026-07-01 $1,400, 2027-01-01
 		// $1,800. The 30-day window ending 2026-07-01 runs 2026-06-02 to

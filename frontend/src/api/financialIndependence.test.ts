@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { ProjectionResult } from "./contracts.ts";
 import { modelFixture } from "../mocks/waypointServer.ts";
 import { projectionResultToLocal } from "../state/useRemoteProjection.ts";
-import { independenceChartModel } from "../domain/independenceChart.ts";
 import {
 	detailedIndependenceOutcome,
 	independenceConfig,
@@ -141,7 +140,7 @@ describe("financial independence evidence mapping", () => {
 		},
 	);
 
-	it("preserves absent numeric evidence and does not draw through incomplete points", () => {
+	it("preserves absent numeric evidence on incomplete points", () => {
 		const envelope = independenceEnvelope({
 			rows: [
 				independenceRow("2026-02-01"),
@@ -160,9 +159,6 @@ describe("financial independence evidence mapping", () => {
 			coverage: null,
 			outcome: null,
 		});
-		const model = independenceChartModel(analysis);
-		expect(model.capacityPath.match(/M/g)).toHaveLength(2);
-		expect(model.capacityPath).not.toMatch(/NaN|Infinity/);
 	});
 
 	it("keeps diagnostics even when evaluation fails before it produces rows", () => {

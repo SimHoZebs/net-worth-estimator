@@ -1,6 +1,6 @@
-import { useId } from "react";
 import type { FinancialIndependenceRange } from "@/domain/financialIndependence.ts";
 import { dateLabel, percent } from "@/domain/format.ts";
+import { cssVariables } from "@/components/cssVariables.ts";
 
 export function IndependenceRange({
 	range,
@@ -11,7 +11,6 @@ export function IndependenceRange({
 	required: number | null;
 	compact?: boolean;
 }) {
-	const id = useId();
 	if (!range || range.probability === null)
 		return <p className="m-0 text-xs text-muted">Scenarios · Not calculated</p>;
 	const probability = range.probability;
@@ -38,53 +37,25 @@ export function IndependenceRange({
 					· {range.count} scenarios
 				</span>
 			</div>
-			<svg
-				viewBox="0 0 400 18"
-				className="block h-5 w-full overflow-visible"
+			<div
 				role="img"
-				aria-labelledby={id}
+				aria-label={`Financial independence reached within the testable horizon in ${percent(probability)} of ${range.count} modeled scenarios.${required === null ? "" : ` Required confidence: ${percent(required)}.`}`}
+				className="relative h-5"
 			>
-				<title id={id}>
-					Financial independence reached within the testable horizon in{" "}
-					{percent(probability)} of {range.count} modeled scenarios.
-					{required === null
-						? ""
-						: ` Required confidence: ${percent(required)}.`}
-				</title>
-				<rect
-					x="4"
-					y="6"
-					width="392"
-					height="6"
-					rx="3"
-					className="fill-surface-3"
-				/>
-				<rect
-					x="4"
-					y="6"
-					width={392 * probability}
-					height="6"
-					rx="3"
-					className="fill-primary"
-				/>
-				{required !== null && (
-					<line
-						x1={4 + 392 * required}
-						x2={4 + 392 * required}
-						y1="0"
-						y2="18"
-						className="stroke-ink"
-						strokeWidth="2"
-					/>
-				)}
-				<circle
-					cx={4 + 392 * probability}
-					cy="9"
-					r="4"
-					className="fill-primary stroke-surface"
-					strokeWidth="2"
-				/>
-			</svg>
+				<div
+					className="absolute inset-x-1 top-1/2 h-1.5 -translate-y-1/2 overflow-visible rounded-full bg-surface-3"
+					style={cssVariables({
+						"--probability": `${probability * 100}%`,
+						"--required": required === null ? "0%" : `${required * 100}%`,
+					})}
+				>
+					<div className="h-full w-(--probability) rounded-full bg-primary" />
+					{required !== null && (
+						<span className="absolute -inset-y-2 left-(--required) w-0.5 bg-ink" />
+					)}
+					<span className="absolute top-1/2 left-(--probability) size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary ring-2 ring-surface" />
+				</div>
+			</div>
 			{range.date && (
 				<p className="m-0 text-xs text-muted">
 					Required confidence first reached ·{" "}
