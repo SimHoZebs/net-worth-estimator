@@ -28,7 +28,7 @@ import { Modal } from "../Modal.tsx";
  * Create-only transaction form. Existing rows edit through the shared
  * TransactionDetail so there is one implementation of row editing.
  */
-export function NewTransactionEditor({
+export function AddTransactionDialog({
 	onSaved,
 	onClose,
 }: {

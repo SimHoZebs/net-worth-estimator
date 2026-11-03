@@ -11,7 +11,7 @@ import { useUserReadOnly } from "../state/useUserScope.ts";
 import { TransactionDetail } from "./activity/TransactionDetail.tsx";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
 import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
-import { NewTransactionEditor } from "./editors/NewTransactionEditor.tsx";
+import { AddTransactionDialog } from "./editors/AddTransactionDialog.tsx";
 
 export type { EditorTarget } from "../domain/accountEdits.ts";
 
@@ -72,7 +72,7 @@ export function WorkspaceEditor({
 			return target.item ? (
 				<ExistingTransactionDetail item={target.item} onClose={onClose} />
 			) : (
-				<NewTransactionEditor
+				<AddTransactionDialog
 					key="new-transaction"
 					onSaved={onClose}
 					onClose={onClose}
