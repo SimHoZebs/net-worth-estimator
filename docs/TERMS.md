@@ -12,6 +12,8 @@ Use **transaction**, qualified as **planned** or **recorded**. The saved model's
 
 - A recurring rule is **scheduled**; a dated single entry is **one-time**.
 - A record supplied by a source is a **deposit** or **withdrawal**.
+- A one-time record linked to a rule's scheduled date records an
+  **occurrence** of that rule.
 
 ## B. Balance check
 
