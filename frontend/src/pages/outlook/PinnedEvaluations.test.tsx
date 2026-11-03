@@ -158,7 +158,7 @@ describe("pinned evaluation cards", () => {
 			const view = render(<PinnedEvaluations />);
 			const card = within(view.getByRole("region", { name: evaluation.name }));
 			const progress = card.getByRole("progressbar", { name: evaluation.name });
-			expect(Number(progress.getAttribute("aria-valuenow"))).toBe(
+			expect(Number(progress.getAttribute("value"))).toBe(
 				Math.round(
 					Math.min(
 						100,

@@ -92,7 +92,7 @@ function applyTheme(resolved: ResolvedTheme) {
 	const root = document.documentElement;
 	root.dataset.theme = resolved;
 	root.style.colorScheme = resolved;
-	const meta = document.querySelector('meta[name="theme-color"]');
+	const meta = document.getElementById("theme-color");
 	if (meta)
 		meta.setAttribute("content", resolved === "dark" ? DARK_META : LIGHT_META);
 }

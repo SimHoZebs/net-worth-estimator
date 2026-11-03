@@ -200,7 +200,7 @@ test("a complete test that cannot fit the horizon does not appear as financial f
 	await expect(card.getByText("More horizon needed")).toBeVisible();
 	await expect(
 		card.getByRole("progressbar", { name: "Available projection horizon" }),
-	).toHaveAttribute("aria-valuenow", "67");
+	).toHaveAttribute("value", "67");
 	await expect(card.getByRole("slider")).toHaveCount(0);
 	await expect(card.getByRole("button", { name: /failed/ })).toHaveCount(0);
 	await card

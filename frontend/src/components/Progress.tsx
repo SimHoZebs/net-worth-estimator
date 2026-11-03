@@ -1,7 +1,8 @@
 import type { VariantProps } from "class-variance-authority";
-import { cssVariables } from "./cssVariables.ts";
-import { progressFillStyles, progressTrackStyles } from "./progressStyles.ts";
+import { progressStyles } from "./progressStyles.ts";
 
+/** A determinate bar. The native element owns the progressbar role and value
+ * semantics, so no ARIA range attributes or width variables are needed. */
 export function Progress({
 	value,
 	label,
@@ -9,22 +10,13 @@ export function Progress({
 }: {
 	value: number;
 	label: string;
-} & VariantProps<typeof progressTrackStyles>) {
+} & VariantProps<typeof progressStyles>) {
 	return (
-		<div
-			className={progressTrackStyles({ tone })}
-			role="progressbar"
+		<progress
+			className={progressStyles({ tone })}
 			aria-label={label}
-			aria-valuenow={Math.round(Math.min(100, Math.max(0, value)))}
-			aria-valuemin={0}
-			aria-valuemax={100}
-		>
-			<span
-				className={progressFillStyles({ tone })}
-				style={cssVariables({
-					"--progress-width": `${Math.min(100, Math.max(0, value))}%`,
-				})}
-			/>
-		</div>
+			value={Math.min(100, Math.max(0, Math.round(value)))}
+			max={100}
+		/>
 	);
 }

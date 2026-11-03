@@ -233,7 +233,7 @@ describe("FinancialIndependenceCard", () => {
 		expect(
 			view
 				.getByRole("progressbar", { name: "Available projection horizon" })
-				.getAttribute("aria-valuenow"),
+				.getAttribute("value"),
 		).toBe("67");
 		const dialog = openInspector(view);
 		expect(
