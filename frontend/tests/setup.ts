@@ -1,5 +1,6 @@
 import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, vi } from "vitest";
+import { resetServerQueryCache } from "../src/state/serverQuery.ts";
 
 // Tests share one worker and one environment, so every file must leave no DOM,
 // storage, timers, route, or module state behind for the next file. The suite
@@ -15,6 +16,11 @@ afterEach(() => {
 	}
 	if (typeof localStorage !== "undefined") localStorage.clear();
 	if (typeof sessionStorage !== "undefined") sessionStorage.clear();
+	// The query client is a module singleton, so cached server state (and
+	// the scope it was fetched under) outlives the file that filled it.
+	// Individual files already clear it; clearing here makes the contract
+	// unconditional instead of depending on every file remembering.
+	resetServerQueryCache();
 	if (typeof window !== "undefined" && window.history) {
 		// Route state outlives cleanup(): a hash left by one file becomes
 		// the next file's initial route and poisons title and navigation
@@ -25,6 +31,22 @@ afterEach(() => {
 		document.head.querySelectorAll("title").forEach((element) => {
 			element.remove();
 		});
+	}
+	if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+		// Motion-driven exit animations outlive their test file and fire
+		// navigation callbacks in the next file. Reduced motion collapses
+		// them, so closes settle inside the test that started them.
+		// Viewport queries keep jsdom's no-match behavior; files with
+		// their own matchMedia stub keep overriding per test.
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			matches: /prefers-reduced-motion:\s*reduce/.test(query),
+			media: query,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			addListener: () => {},
+			removeListener: () => {},
+			dispatchEvent: () => false,
+		}));
 	}
 	vi.useRealTimers();
 });
