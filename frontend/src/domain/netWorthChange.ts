@@ -8,7 +8,7 @@ export function netWorthChangeSinceFirstSync(
 	checkpoints: readonly BackendCheckpoint[],
 ) {
 	const firstSyncDate = checkpoints
-		.filter((checkpoint) => checkpoint.source === "simplefin")
+		.filter((checkpoint) => checkpoint.source === "banksync")
 		.map((checkpoint) => isoDateFromEpochSeconds(checkpoint.observedAt))
 		.reduce<string | null>(
 			(first, day) => (first === null || day < first ? day : first),

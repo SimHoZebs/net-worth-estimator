@@ -55,7 +55,7 @@ export function fixtureModel(
 			observedAt: account.observedAt ?? stamp(account.observedOn) + 86399,
 			AccountId: account.id,
 			Balance: account.balance,
-			source: account.readOnly ? "simplefin" : "user",
+			source: account.readOnly ? "banksync" : "user",
 		})),
 		postings: data.transactions
 			.filter((row) => row.frequency === "once")
@@ -68,7 +68,7 @@ export function fixtureModel(
 				postedTime: stamp(row.postedDate ?? row.startDate),
 				transactionTime: stamp(row.startDate),
 				enabled: row.enabled,
-				source: row.readOnly ? "simplefin" : "user",
+				source: row.readOnly ? "banksync" : "user",
 				pending: row.pending ?? false,
 				void: row.void,
 				...(row.claimRuleId && row.claimOccurrenceDate

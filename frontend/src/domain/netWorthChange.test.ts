@@ -8,7 +8,7 @@ const checkpoints: BackendCheckpoint[] = [
 		observedAt: Date.parse("2026-07-01T09:00:00Z") / 1000,
 		AccountId: "cash",
 		Balance: 1800,
-		source: "simplefin",
+		source: "banksync",
 	},
 	{
 		observedAt: Date.parse("2026-01-01T09:00:00Z") / 1000,
@@ -20,13 +20,13 @@ const checkpoints: BackendCheckpoint[] = [
 		observedAt: Date.parse("2026-02-01T09:00:00Z") / 1000,
 		AccountId: "cash",
 		Balance: 1500,
-		source: "simplefin",
+		source: "banksync",
 	},
 	{
 		observedAt: Date.parse("2026-02-01T10:00:00Z") / 1000,
 		AccountId: "debt",
 		Balance: -500,
-		source: "simplefin",
+		source: "banksync",
 	},
 ];
 const points = [

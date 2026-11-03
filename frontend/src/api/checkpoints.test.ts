@@ -9,7 +9,7 @@ describe("latestCheckpoint", () => {
 				AccountId: "a",
 				Balance: 2,
 				observedAt: 100,
-				source: "simplefin",
+				source: "banksync",
 			},
 		];
 		expect(latestCheckpoint(rows, "a", "2026-03-10")?.Balance).toBe(1);
@@ -22,7 +22,7 @@ describe("latestCheckpoint", () => {
 				AccountId: "a",
 				Balance: 1,
 				observedAt: 100,
-				source: "simplefin",
+				source: "banksync",
 			},
 			{
 				AccountId: "a",

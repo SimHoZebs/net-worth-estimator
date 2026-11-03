@@ -110,13 +110,13 @@ describe("projection chart inspection", () => {
 					observedAt: Date.parse("2026-02-01T09:00:00Z") / 1000,
 					AccountId: "cash",
 					Balance: 1000,
-					source: "simplefin",
+					source: "banksync",
 				},
 				{
 					observedAt: Date.parse("2026-07-01T09:00:00Z") / 1000,
 					AccountId: "cash",
 					Balance: 1800,
-					source: "simplefin",
+					source: "banksync",
 				},
 			],
 		);
@@ -139,7 +139,7 @@ describe("projection chart inspection", () => {
 					observedAt: Date.parse("2026-01-01T09:00:00Z") / 1000,
 					AccountId: "cash",
 					Balance: 1000,
-					source: "simplefin",
+					source: "banksync",
 				},
 			]);
 			render(<ProjectionChart onEvidence={vi.fn()} />);

@@ -47,7 +47,7 @@ export function setServerModelFixture(
 				destinations: row.toId ? [row.toId] : null,
 				amount: fixtureAmount(row),
 				annualCap: null,
-				source: row.readOnly ? "simplefin" : "user",
+				source: row.readOnly ? "banksync" : "user",
 				claim:
 					row.claimRuleId && row.claimOccurrenceDate
 						? {
