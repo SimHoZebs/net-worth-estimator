@@ -370,6 +370,34 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 	).toBe(false);
 });
 
+it("opens sharing in its own sheet from the footer status", async () => {
+	stubTestServer();
+	const savedTransaction = {
+		...financialModelFixture.transactions[0]!,
+		id: "renovation-once",
+		name: "Home renovation",
+		frequency: "once" as const,
+		amountKnown: true,
+		readOnly: false,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(savedTransaction)}
+			savedTransaction={savedTransaction}
+			accounts={financialModelFixture.accounts}
+			transactions={[savedTransaction]}
+			onClose={() => {}}
+		/>,
+	);
+	fireEvent.click(
+		screen.getByRole("button", { name: /Sharing status: Private/ }),
+	);
+	const sheet = await screen.findByRole("dialog", { name: "Sharing" });
+	expect(
+		within(sheet).getByRole("heading", { name: "Sharing" }),
+	).toBeTruthy();
+});
+
 it("lets the owner pick the posted charge and remove the vanished hold", async () => {
 	const server = stubTestServer();
 	const settled = {

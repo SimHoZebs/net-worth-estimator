@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
@@ -386,6 +387,99 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 	}
 	if !created.Persisted || created.Row.Source != "user" || created.Row.Pending {
 		t.Fatalf("echoed source response = %+v", created)
+	}
+}
+
+// Claiming a pending bank seed promotes it to a recorded occurrence in one
+// row write: the claim lands, pending clears, and the row participates.
+// The finance boundary validates the request before the store runs, so a
+// zero posted time (pending seeds carry none) must already read as the
+// bank's transaction instant, matching the editor body.
+func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+
+	account := httptest.NewRecorder()
+	accountRequest := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(
+		`{"id":"checking","name":"Checking","kind":"cash","enabled":true}`,
+	)))
+	accountRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(account, accountRequest)
+	if account.Code != http.StatusOK {
+		t.Fatalf("account status = %d, body %s", account.Code, account.Body.String())
+	}
+
+	rule := httptest.NewRecorder()
+	ruleRequest := httptest.NewRequest(http.MethodPost, "/v1/recurrence-rules", bytes.NewReader([]byte(
+		`{"id":"housing","name":"Housing","sourceAccountId":"checking","amount":{"resolver":"expression","config":{"expression":"2970"},"inputs":{}},"frequency":"monthly","startDate":"2026-05-01","enabled":true}`,
+	)))
+	ruleRequest.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(rule, ruleRequest)
+	if rule.Code != http.StatusOK {
+		t.Fatalf("rule status = %d, body %s", rule.Code, rule.Body.String())
+	}
+
+	// Pending seed as the bridge reports it: no posted time yet.
+	if _, err := database.ApplySync(nil, []store.BankDirective{{Upsert: &store.BankUpsert{
+		Posting: types.Posting{
+			Name:            "BILTRENT",
+			Source:          store.SourceSimpleFIN,
+			SourceAccountID: &[]string{"checking"}[0],
+			Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "2970.25"}, Inputs: map[string]types.AmountInputBinding{}},
+			PostedTime:      0,
+			TransactionTime: 1788220800,
+			Enabled:         false,
+			Pending:         true,
+		},
+		Keys: []store.BankKey{{Provider: store.SourceSimpleFIN, AccountID: "bridge-checking", TransactionID: "auth1"}},
+	}}}); err != nil {
+		t.Fatalf("seed pending: %v", err)
+	}
+	model, err := database.LoadModel()
+	if err != nil || len(model.Postings) != 1 {
+		t.Fatalf("seeded rows = %+v, err %v", model, err)
+	}
+	id := model.Postings[0].ID
+
+	patch := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/v1/postings/"+id, bytes.NewReader([]byte(
+		`{"name":"BILTRENT","sourceAccountId":"checking","amount":{"resolver":"expression","config":{"expression":"2970.25"},"inputs":{}},"postedTime":1788220800,"transactionTime":1788220800,"enabled":false,"claim":{"ruleId":"housing","occurrenceDate":"2026-09-01"}}`,
+	)))
+	request.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(patch, request)
+	if patch.Code != http.StatusOK {
+		t.Fatalf("PATCH status = %d, body %s", patch.Code, patch.Body.String())
+	}
+	var saved struct {
+		Row struct {
+			Pending bool                `json:"pending"`
+			Enabled bool                `json:"enabled"`
+			Claim   *types.PostingClaim `json:"claim"`
+		} `json:"row"`
+		Issues    []types.ModelValidationIssue `json:"issues"`
+		Persisted bool                         `json:"persisted"`
+	}
+	if err := json.Unmarshal(patch.Body.Bytes(), &saved); err != nil {
+		t.Fatalf("decode PATCH response: %v", err)
+	}
+	if !saved.Persisted || hasErrorIssues(saved.Issues) {
+		t.Fatalf("claim response = %+v", saved)
+	}
+	if saved.Row.Claim == nil || saved.Row.Claim.RuleID != "housing" {
+		t.Fatalf("claim missing: %+v", saved.Row)
+	}
+	if saved.Row.Pending || !saved.Row.Enabled {
+		t.Fatalf("claimed row not recorded: %+v", saved.Row)
+	}
+	stored, err := database.LoadModel()
+	if err != nil {
+		t.Fatalf("reload stored model: %v", err)
+	}
+	if len(stored.Postings) != 1 || stored.Postings[0].ID != id {
+		t.Fatalf("claim changed identity: %+v", stored.Postings)
+	}
+	if stored.Postings[0].Pending || stored.Postings[0].Claim == nil {
+		t.Fatalf("stored row = %+v", stored.Postings[0])
 	}
 }
 

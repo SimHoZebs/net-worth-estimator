@@ -99,6 +99,58 @@ func TestSyncFlowPendingConvertsToSettled(t *testing.T) {
 	}
 }
 
+func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
+	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
+	first := applyFlow(t, database,
+		[]store.SyncPosting{flowPosting("auth-a", "Corner Store", "prime_card", "42.10", true, "2026-08-02")}, nil)
+	if first.PendingInserted != 1 {
+		t.Fatalf("seed = %+v", first)
+	}
+	rows := bankRowIDs(t, database)
+	if len(rows) != 1 {
+		t.Fatalf("pending rows = %v", rows)
+	}
+	var id string
+	for rowID := range rows {
+		id = rowID
+	}
+	if _, err := database.CreateRule(types.RecurrenceRule{
+		ID: "corner", Name: "Corner Store", Frequency: types.FrequencyMonthly,
+		StartDate: "2026-08-01", Enabled: true,
+		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
+	}); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
+		PostingID: id,
+		Claim:     types.PostingClaim{RuleID: "corner", OccurrenceDate: "2026-08-01"},
+	}}); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	// The posted charge arrives under a new id: it joins the claimed hold
+	// instead of inserting beside it, and the claim survives.
+	second := applyFlow(t, database, nil,
+		[]store.SyncPosting{flowPosting("post-a", "Corner Store", "prime_card", "42.10", false, "2026-08-03")})
+	if second.SettledConverted != 1 || second.SettledInserted != 0 || second.PendingDeleted != 0 {
+		t.Fatalf("settle = %+v, want one convert of the claimed hold", second)
+	}
+	after := bankRowIDs(t, database)
+	if len(after) != 1 {
+		t.Fatalf("settle rows = %v, want the hold updated to posted", after)
+	}
+	row, ok := after[id]
+	if !ok {
+		t.Fatalf("convert changed identity: %v", after)
+	}
+	if row.Pending || !row.Enabled {
+		t.Fatalf("settled row = %+v", row)
+	}
+	if row.Claim == nil || row.Claim.RuleID != "corner" {
+		t.Fatalf("claim lost on settle: %+v", row)
+	}
+}
+
 func TestSyncFlowTipAdjustedSettleConverts(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)
