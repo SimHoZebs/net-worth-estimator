@@ -328,8 +328,8 @@ it("shows an error instead of onboarding when the credential fails", async () =>
 
 it("announces the OAuth return outcome once and clears the flag", async () => {
 	stubGmailApi({ connected: true });
-	const replaceState = vi.fn();
-	window.history.replaceState = replaceState;
+	// Spy, so the shared jsdom history is restored for later test files.
+	const replaceState = vi.spyOn(window.history, "replaceState");
 	window.history.pushState(null, "", "/?gmail=connected");
 	render(<GmailProviderPanel />);
 	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
