@@ -853,7 +853,11 @@ func (s *handler) assembleEvaluations(stateID, kind string, tables *types.Evalua
 	count := 0
 	envelopeOf := func(base types.EvaluationOutputBase) (types.EvaluationResultEnvelope, error) {
 		var diagnostics []types.EvaluationDiagnostic
-		if err := json.Unmarshal([]byte(base.DiagnosticsJSON), &diagnostics); err != nil {
+		raw := base.DiagnosticsJSON
+		if raw == "" {
+			raw = "[]"
+		}
+		if err := json.Unmarshal([]byte(raw), &diagnostics); err != nil {
 			return types.EvaluationResultEnvelope{}, err
 		}
 		if diagnostics == nil {
