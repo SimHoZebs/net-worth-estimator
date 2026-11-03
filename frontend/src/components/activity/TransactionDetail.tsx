@@ -955,8 +955,11 @@ export function TransactionDetail({
 	// Claim options and name lookups use the canonical saved list, so the
 	// detail never depends on which rows the entry point happened to pass.
 	// The prop (or the row itself) covers loading and test fixtures.
-	const allTransactions =
-		useSavedTransactions() ?? transactions ?? [savedTransaction];
+	const savedTransactions = useSavedTransactions();
+	const allTransactions = useMemo(
+		() => savedTransactions ?? transactions ?? [savedTransaction],
+		[savedTransactions, transactions, savedTransaction],
+	);
 	const voidCandidates = transaction.void
 		? voidSettleCandidates({
 				voidRow: savedTransaction,
