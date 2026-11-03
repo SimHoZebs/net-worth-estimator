@@ -38,6 +38,11 @@ func (s *sqliteStore) SetPostingClaims(claims []types.PostingClaimUpdate) ([]typ
 				if _, err := tx.Exec(`UPDATE postings SET pending = 0 WHERE id = ? AND user_id = :user_id`, item.PostingID); err != nil {
 					return fmt.Errorf("clear pending for claim %s: %w", item.PostingID, err)
 				}
+				// A claimed pending charge now records its occurrence, so it
+				// must participate in projections.
+				if _, err := tx.Exec(`UPDATE posting_sim SET enabled = 1 WHERE posting_id = ? AND user_id = :user_id`, item.PostingID); err != nil {
+					return fmt.Errorf("enable claim %s: %w", item.PostingID, err)
+				}
 			}
 			if _, err := tx.Exec(`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)
 				ON CONFLICT(user_id, posting_id) DO UPDATE SET fulfills_rule_id = excluded.fulfills_rule_id, fulfills_occurrence_date = excluded.fulfills_occurrence_date`,

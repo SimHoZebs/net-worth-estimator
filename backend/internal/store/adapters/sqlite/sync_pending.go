@@ -253,6 +253,16 @@ func recordBankKeys(tx *userTx, postingID string, keys []BankKey) error {
 }
 
 func writeBankValues(tx *userTx, id string, posting types.Posting) error {
+	// A claimed row is the owner's recorded occurrence: the feed still
+	// delivers its values (same-key settles and converts land here), but it
+	// never returns to a pending seed while the authorization still lingers
+	// in the feed, and it stays enabled so it keeps participating.
+	var claimed int
+	_ = tx.QueryRow(`SELECT 1 FROM posting_claims WHERE posting_id = ? AND user_id = :user_id`, id).Scan(&claimed)
+	pending, enabled := posting.Pending, posting.Enabled
+	if claimed != 0 {
+		pending, enabled = false, true
+	}
 	amount, err := json.Marshal(posting.Amount)
 	if err != nil {
 		return err
@@ -262,7 +272,7 @@ func writeBankValues(tx *userTx, id string, posting types.Posting) error {
 		return err
 	}
 	result, err := tx.Exec(`UPDATE postings SET name = ?, source_account_id = ?, destination_account_ids = ?, amount_resolution_json = ?, posted_time = ?, transaction_time = ?, pending = ?, void = ? WHERE id = ? AND source != ? AND user_id = :user_id`,
-		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(posting.Pending), boolToInt(posting.Void), id, SourceUser)
+		posting.Name, nullable(posting.SourceAccountID), string(destinations), string(amount), posting.PostedTime, posting.TransactionTime, boolToInt(pending), boolToInt(posting.Void), id, SourceUser)
 	if err != nil {
 		return err
 	}
@@ -276,7 +286,7 @@ func writeBankValues(tx *userTx, id string, posting types.Posting) error {
 	// Enabled lives in the sim satellite; the core update above never
 	// touches it.
 	if _, err := tx.Exec(`UPDATE posting_sim SET enabled = ? WHERE posting_id = ? AND user_id = :user_id`,
-		boolToInt(posting.Enabled), id); err != nil {
+		boolToInt(enabled), id); err != nil {
 		return err
 	}
 	// Settled conversions and bank refreshes reshape automatic visibility

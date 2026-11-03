@@ -42,6 +42,93 @@ func applyDirectives(t *testing.T, database store.Store, directives []BankDirect
 	return summary
 }
 
+func TestClaimedPendingSurvivesBankRefresh(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", true), SourceSimpleFIN, "bridge-prime", "pend1")
+	if first := applyDirectives(t, database, []BankDirective{upsert}); first.PendingInserted != 1 {
+		t.Fatalf("seed = %+v", first)
+	}
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	id := loaded.Postings[0].ID
+	if _, err := database.CreateRule(testRuleFixture("rent")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
+		PostingID: id,
+		Claim:     types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-08-02"},
+	}}); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	// The bank still shows the authorization as pending: the refresh must
+	// not demote the claimed occurrence back to a disabled seed.
+	if second := applyDirectives(t, database, []BankDirective{upsert}); second.PendingUpdated != 1 {
+		t.Fatalf("refresh = %+v", second)
+	}
+	after, err := database.LoadModel()
+	if err != nil || len(after.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", after, err)
+	}
+	row := after.Postings[0]
+	if row.ID != id {
+		t.Fatalf("refresh changed identity: %s", row.ID)
+	}
+	if row.Pending || !row.Enabled {
+		t.Fatalf("claimed row demoted by refresh: %+v", row)
+	}
+	if row.Claim == nil || row.Claim.RuleID != "rent" {
+		t.Fatalf("claim lost on refresh: %+v", row)
+	}
+}
+
+func TestConvertPreservesOccurrenceClaim(t *testing.T) {
+	database := openSQLiteStore(t)
+	seedAccount(t, database, "prime_card")
+	applyDirectives(t, database, []BankDirective{bankUpsertDirective(
+		bankSeedPosting("Corner Store", "prime_card", "42.10", true), SourceSimpleFIN, "bridge-prime", "pend1")})
+	loaded, err := database.LoadModel()
+	if err != nil || len(loaded.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", loaded, err)
+	}
+	id := loaded.Postings[0].ID
+	if _, err := database.CreateRule(testRuleFixture("rent")); err != nil {
+		t.Fatalf("rule = %v", err)
+	}
+	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
+		PostingID: id,
+		Claim:     types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-08-02"},
+	}}); err != nil {
+		t.Fatalf("claim = %v", err)
+	}
+	settled := bankSeedPosting("Corner Store", "prime_card", "42.10", false)
+	summary := applyDirectives(t, database, []BankDirective{{Convert: &BankConvert{
+		ID:      id,
+		Posting: settled,
+		AddKeys: bankKeys(SourceSimpleFIN, "bridge-prime", "post1"),
+	}}})
+	if summary.SettledConverted != 1 {
+		t.Fatalf("convert = %+v", summary)
+	}
+	after, err := database.LoadModel()
+	if err != nil || len(after.Postings) != 1 {
+		t.Fatalf("rows = %+v, err %v", after, err)
+	}
+	row := after.Postings[0]
+	if row.ID != id || row.Pending || !row.Enabled {
+		t.Fatalf("converted row = %+v", row)
+	}
+	if row.Claim == nil || row.Claim.RuleID != "rent" {
+		t.Fatalf("claim lost on convert: %+v", row)
+	}
+	bank, err := database.LoadBankPostings()
+	if err != nil || len(bank) != 1 || len(bank[0].Keys) != 1 || bank[0].Keys[0].TransactionID != "post1" {
+		t.Fatalf("keys after rotation = %+v, %v", bank, err)
+	}
+}
+
 func TestBankUpsertInsertsAndUpdatesByKey(t *testing.T) {
 	database := openSQLiteStore(t)
 	seedAccount(t, database, "prime_card")

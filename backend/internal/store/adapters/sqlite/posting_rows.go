@@ -88,12 +88,14 @@ func (s *sqliteStore) UpdatePosting(posting types.Posting) (types.Posting, error
 		claiming := lifecycle.source != SourceUser && lifecycle.pending && posting.Claim != nil && storedClaim == 0
 		// Owner writes change values only. Source and void stay as stored so
 		// bank rows keep their provenance and lifecycle. Pending is preserved
-		// for ordinary edits and cleared only when claiming.
+		// for ordinary edits and cleared only when claiming. A claimed
+		// pending charge now records its occurrence, so it must participate
+		// in projections: claiming enables it.
 		posting.Source, posting.Void = lifecycle.source, lifecycle.void
 		if lifecycle.source == SourceUser {
 			posting.Pending = false
 		} else if claiming {
-			posting.Pending = false
+			posting.Pending, posting.Enabled = false, true
 		} else {
 			posting.Pending = lifecycle.pending
 		}
