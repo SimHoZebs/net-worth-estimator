@@ -56,8 +56,22 @@ func (s *Service) resolveAccess(ctx context.Context, p Principal) (authorization
 // Read-only-safe compute (position, projections, and the flow graph, which
 // aggregates the same projection without storing anything) requires only
 // the project permission, so guests and read-only contexts can load it.
+const clientErrorsPath = "/v1/client-errors"
+
+// IsClientErrorBeacon reports the browser error beacon. sendBeacon cannot
+// set request headers, so the beacon is the one data route that never
+// asserts a resource; every other check in the boundary still applies.
+func IsClientErrorBeacon(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == clientErrorsPath
+}
+
 // Action strings are user:* under the Casdoor model waypoint/user-access.
 func requestAction(r *http.Request) string {
+	// The browser error beacon writes nothing to the store. It requires
+	// only read access so anonymous and guest viewers can report errors.
+	if IsClientErrorBeacon(r) {
+		return "user:read"
+	}
 	if r.Method == http.MethodPost && (r.URL.Path == "/v1/position" || r.URL.Path == "/v1/projections/deterministic" || r.URL.Path == "/v1/projections/stochastic" || r.URL.Path == "/v1/flows") {
 		return "user:project"
 	}

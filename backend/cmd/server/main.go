@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +18,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
@@ -26,6 +27,13 @@ func envOr(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// bootFatalf logs one structured line and exits non-zero. Boot failures exit
+// before serving; request-path errors never use this.
+func bootFatalf(message string, err error) {
+	slog.Error(message, "error", err)
+	os.Exit(1)
 }
 
 // defaultDBPath prefers a durable per-user data directory over os.TempDir,
@@ -59,6 +67,7 @@ func parseReadOnly(value string) bool {
 }
 
 func main() {
+	obs.Init(os.Getenv)
 	port := 8787
 	if parsed, err := strconv.Atoi(envOr("PORT", "8787")); err == nil && parsed > 0 {
 		port = parsed
@@ -67,38 +76,38 @@ func main() {
 	dbPath := envOr("NET_WORTH_ESTIMATOR_DB", defaultDBPath())
 	allowedOrigins, err := parseAllowedOrigins(os.Getenv("NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS"))
 	if err != nil {
-		log.Fatalf("configure allowed origins: %v", err)
+		bootFatalf("configure allowed origins", err)
 	}
 	readOnly := parseReadOnly(os.Getenv("NET_WORTH_ESTIMATOR_READ_ONLY"))
 	receiptSource, err := configureReceiptSource(os.Getenv("NET_WORTH_ESTIMATOR_RECEIPT_SOURCE"))
 	if err != nil {
-		log.Fatalf("configure receipt extraction: %v", err)
+		bootFatalf("configure receipt extraction", err)
 	}
 	identityConfig, err := identity.FromEnv(os.Getenv)
 	if err != nil {
-		log.Fatalf("configure identity: %v", err)
+		bootFatalf("configure identity", err)
 	}
 	database, err := sqlite.OpenDatabase(dbPath)
 	if err != nil {
-		log.Fatalf("open store: %v", err)
+		bootFatalf("open store", err)
 	}
 	defer database.Close()
-	stopBlobCleanup := database.StartBlobCleanup(context.Background(), func(err error) { log.Printf("blob cleanup: %v", err) })
+	stopBlobCleanup := database.StartBlobCleanup(context.Background(), func(err error) { slog.Error("blob cleanup", "error", err) })
 	defer stopBlobCleanup()
 	analysisRunner, err := analysis.NewRunner(database, analysis.Definitions()...)
 	if err != nil {
-		log.Fatalf("configure analyses: %v", err)
+		bootFatalf("configure analyses", err)
 	}
-	stopAnalyses := analysisRunner.Start(context.Background(), 15*time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
+	stopAnalyses := analysisRunner.Start(context.Background(), 15*time.Second, func(error) { slog.Warn("background analysis temporarily unavailable") })
 	defer stopAnalyses()
 
 	resources, err := resourceConfigFromEnv(os.Getenv)
 	if err != nil {
-		log.Fatalf("configure user resources: %v", err)
+		bootFatalf("configure user resources", err)
 	}
 	syncStore, err := ownerSyncStore(database, identityConfig.Issuer, resources.OwnerSubject)
 	if err != nil {
-		log.Fatalf("configure SimpleFIN user: %v", err)
+		bootFatalf("configure SimpleFIN user", err)
 	}
 	syncRunner, syncStop := configureSync(syncStore)
 	defer syncStop()
@@ -113,13 +122,15 @@ func main() {
 	}
 	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig)
 	if err != nil {
-		log.Fatalf("configure resource access: %v", err)
+		bootFatalf("configure resource access", err)
 	}
 	defer closeResources()
 	handler, err = deploymentHandler(handler, database, identityConfig, os.Getenv("NET_WORTH_ESTIMATOR_PROXY_SECRET"))
 	if err != nil {
-		log.Fatalf("configure deployment ingress: %v", err)
+		bootFatalf("configure deployment ingress", err)
 	}
+	handler = obs.Recovery(handler)
+	handler = obs.RequestLogger(handler)
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		Handler:           handler,
@@ -137,14 +148,14 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			log.Printf("graceful shutdown: %v", err)
+			slog.Error("graceful shutdown", "error", err)
 		}
 		close(shutdownComplete)
 	}()
 
-	fmt.Printf("listening on %s\n", server.Addr)
+	slog.Info("server listening", "addr", server.Addr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("server: %v", err)
+		bootFatalf("server", err)
 	}
 	<-shutdownComplete
 }

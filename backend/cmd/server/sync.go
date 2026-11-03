@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"math/rand/v2"
 	"os"
 	"time"
@@ -52,17 +52,17 @@ func configureSync(database store.Store) (*simplefin.Runner, func()) {
 		simplefin.MinTriggerInterval,
 	)
 	if err != nil {
-		log.Fatalf("invalid simplefin trigger interval: %v", err)
+		bootFatalf("invalid simplefin trigger interval", err)
 	}
 	rateLimitCooldown, err := simplefin.ParsePositiveDuration(
 		os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN"),
 		simplefin.DefaultRateLimitCooldown,
 	)
 	if err != nil {
-		log.Fatalf("invalid simplefin rate-limit cooldown: %v", err)
+		bootFatalf("invalid simplefin rate-limit cooldown", err)
 	}
 	if database == nil {
-		log.Print("simplefin sync is not configured: no owner user provisioned yet")
+		slog.Info("simplefin sync is not configured: no owner user provisioned yet", "component", "simplefin")
 		return nil, func() {}
 	}
 	config := simplefin.Config{
@@ -83,7 +83,7 @@ func newDynamicRunner(database store.Store, config simplefin.Config) *simplefin.
 		if err != nil {
 			// A transient store failure must not trigger a Bridge fetch
 			// with an empty key; report unconfigured until the next run.
-			log.Printf("simplefin credential read failed: %v", err)
+			slog.Error("simplefin credential read failed", "component", "simplefin", "error", err)
 			return "", nil
 		}
 		if stored.AccessURL == "" {
@@ -135,9 +135,19 @@ func startSyncScheduler(runner *simplefin.Runner) func() {
 				}
 				summary, err := runner.Sync(context.Background())
 				if err != nil {
-					log.Printf("simplefin scheduled sync failed: %v", err)
+					slog.Error("simplefin scheduled sync failed", "component", "simplefin", "error", err)
 				} else {
-					log.Printf("simplefin scheduled sync: %+v", summary)
+					slog.Info("simplefin scheduled sync", "component", "simplefin",
+						"checkpoints_inserted", summary.CheckpointsInserted,
+						"checkpoints_updated", summary.CheckpointsUpdated,
+						"checkpoints_skipped", summary.CheckpointsSkipped,
+						"pending_deleted", summary.PendingDeleted,
+						"pending_inserted", summary.PendingInserted,
+						"pending_updated", summary.PendingUpdated,
+						"settled_converted", summary.SettledConverted,
+						"settled_inserted", summary.SettledInserted,
+						"accounts_provisioned", summary.AccountsProvisioned,
+						"skipped", summary.Skipped)
 				}
 				timer.Reset(syncInterval)
 			}

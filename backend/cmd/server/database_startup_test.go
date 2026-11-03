@@ -50,7 +50,7 @@ func TestServerRequiresDeploymentDatabaseWithoutCreatingFiles(t *testing.T) {
 				"NET_WORTH_ESTIMATOR_GUEST_SUBJECT=11111111-1111-1111-1111-111111111111",
 			)
 			output, err := command.CombinedOutput()
-			if err == nil || !strings.Contains(string(output), "open store:") {
+			if err == nil || !strings.Contains(string(output), `"msg":"open store"`) {
 				t.Fatalf("server did not fail at database validation: %v\n%s", err, output)
 			}
 			if state == "empty" {

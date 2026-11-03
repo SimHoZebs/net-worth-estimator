@@ -7,6 +7,13 @@ import "@fontsource-variable/manrope";
 import "./styles/index.css";
 import App from "./App.tsx";
 import { Button } from "./components/Button.tsx";
+import {
+	buildReport,
+	installClientErrors,
+	reportClientError,
+} from "./clientErrors.ts";
+
+installClientErrors();
 
 class ErrorBoundary extends Component<
 	{ children: ReactNode },
@@ -18,6 +25,7 @@ class ErrorBoundary extends Component<
 	}
 	componentDidCatch(error: Error, info: ErrorInfo) {
 		console.error("Waypoint render failed", error, info.componentStack);
+		reportClientError(buildReport("error", error));
 	}
 	render() {
 		if (this.state.failed)

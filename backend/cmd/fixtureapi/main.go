@@ -34,6 +34,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/inbox"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/integrationfixtures"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	receiptmock "github.com/simhozebs/net-worth-estimator/backend/internal/receipts/adapters/mock"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/sharing"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
@@ -350,7 +351,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
-		Handler:           mux,
+		Handler:           obs.Recovery(mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      0, // SSE stochastic streams write for the run duration

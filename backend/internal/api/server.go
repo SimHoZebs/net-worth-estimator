@@ -50,7 +50,6 @@ type Config struct {
 // New builds the chi router with all routes.
 func New(st store.Store, serverConfig Config) http.Handler {
 	router := chi.NewRouter()
-	router.Use(middleware.Recoverer)
 	router.Use(corsMiddleware(serverConfig.AllowedOrigins))
 	// Compress JSON payloads (8 MB deterministic results gzip to ~400 KB).
 	// text/event-stream is not a compressible type, so stochastic SSE
@@ -91,6 +90,7 @@ func New(st store.Store, serverConfig Config) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	registerClientErrors(router)
 	// The Google OAuth redirect is a plain browser GET (code and state
 	// arrive as query parameters) that must 302 back to the frontend, so
 	// it runs outside Huma next to the health probe. Its contract is

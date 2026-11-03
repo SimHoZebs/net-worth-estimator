@@ -13,11 +13,20 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	authcontract "github.com/simhozebs/net-worth-estimator/backend/internal/identity/contracts"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/obs"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"golang.org/x/oauth2"
 	"golang.org/x/sync/singleflight"
+	"log/slog"
 )
+
+// StatusCoder lets a hooked error carry its own HTTP status. Impersonation
+// failures use it to answer with 403/404 instead of a generic 500.
+type StatusCoder interface {
+	StatusCode() int
+}
 
 const prefix = "/v1/auth/"
 
@@ -196,26 +205,85 @@ func (s *Service) Wrap(next http.Handler) http.Handler {
 			w.Header().Set("Cache-Control", "no-store")
 			p, err := s.principal(r)
 			if err != nil {
+				slog.ErrorContext(r.Context(), "identity verification failed",
+					"request_id", obs.RequestID(r.Context()),
+					"path", r.URL.Path,
+					"error", err)
 				failure(w, 503, "Identity verification is temporarily unavailable. Retry this request.")
 				return
 			}
-			scope, err := s.resolveAccess(r.Context(), p)
-			if err != nil {
-				failure(w, 503, "Resource permissions are temporarily unavailable. Retry this request.")
-				return
+			var scope authorization.Scope
+			impersonated := false
+			if s.config.Impersonate != nil {
+				np, targetScope, handled, ierr := s.config.Impersonate(r.Context(), p, r.Header.Get(ResourceHeader))
+				if handled {
+					if ierr != nil {
+						status := http.StatusForbidden
+						if se, ok := ierr.(StatusCoder); ok {
+							status = se.StatusCode()
+						}
+						slog.WarnContext(r.Context(), "admin impersonation rejected",
+							"request_id", obs.RequestID(r.Context()),
+							"path", r.URL.Path,
+							"status", status,
+							"error", ierr)
+						failure(w, status, ierr.Error())
+						return
+					}
+					slog.WarnContext(r.Context(), "admin impersonated scope",
+						"request_id", obs.RequestID(r.Context()),
+						"method", r.Method,
+						"path", r.URL.Path,
+						"admin_actor", authorization.ActorKey(s.config.Issuer, p.Subject),
+						"target_resource", targetScope.Resource.ID)
+					p = np
+					scope = targetScope
+					impersonated = true
+				}
+			}
+			if !impersonated {
+				scope, err = s.resolveAccess(r.Context(), p)
+				if err != nil {
+					slog.ErrorContext(r.Context(), "resource permissions failed",
+						"request_id", obs.RequestID(r.Context()),
+						"path", r.URL.Path,
+						"error", err)
+					failure(w, 503, "Resource permissions are temporarily unavailable. Retry this request.")
+					return
+				}
 			}
 			w.Header().Set(ResourceHeader, scope.Resource.ID)
 			if !slices.Contains(scope.Permissions, requestAction(r)) {
 				if !p.Authenticated {
 					w.Header().Set("WWW-Authenticate", "Session")
+					slog.WarnContext(r.Context(), "request denied",
+						"request_id", obs.RequestID(r.Context()),
+						"method", r.Method,
+						"path", r.URL.Path,
+						"status", 401,
+						"reason", "unauthenticated")
 					failure(w, 401, "Sign in to edit your data.")
 				} else {
+					slog.WarnContext(r.Context(), "request denied",
+						"request_id", obs.RequestID(r.Context()),
+						"method", r.Method,
+						"path", r.URL.Path,
+						"status", 403,
+						"reason", "missing_action",
+						"action", requestAction(r),
+						"user_resource", scope.Resource.ID)
 					failure(w, 403, "This action is not permitted.")
 				}
 				return
 			}
 			expected := r.Header.Get(ResourceHeader)
-			if (expected != "" && expected != scope.Resource.ID) || (s.config.RequireResourceHeader && expected == "" && r.Method != http.MethodOptions) {
+			headerRequired := s.config.RequireResourceHeader && expected == "" && r.Method != http.MethodOptions && !IsClientErrorBeacon(r)
+			if (expected != "" && expected != scope.Resource.ID) || headerRequired {
+				slog.WarnContext(r.Context(), "resource assertion mismatch",
+					"request_id", obs.RequestID(r.Context()),
+					"method", r.Method,
+					"path", r.URL.Path,
+					"has_header", expected != "")
 				WriteResourceChanged(w)
 				return
 			}
