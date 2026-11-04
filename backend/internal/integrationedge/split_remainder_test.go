@@ -19,7 +19,7 @@ func TestIntegrationEdgeSplitRemainderTheft_RealSQLite(t *testing.T) {
 	if pack, err := integrationfixtures.Load(integrationfixtures.PackCurrencies); err != nil {
 		t.Fatal(err)
 	} else {
-		probes = append(probes, pack.Extras.SplitProbes...)
+		probes = append(probes, pack.SplitProbes()...)
 	}
 	currencies := []string{"USD", "JPY", "KWD", "BHD", "EUR"}
 	for _, currency := range currencies {

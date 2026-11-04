@@ -310,7 +310,7 @@ func TestLedgerImageReceiptLinksChargeAcrossResync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ledgerApplyFeeds(t, world, len(world.pack.Extras.BankFeeds)-1, len(world.pack.Extras.BankFeeds))
+	ledgerApplyFeeds(t, world, len(world.pack.BankFeeds())-1, len(world.pack.BankFeeds()))
 	after, err := world.ownerSC.LoadModel()
 	if err != nil {
 		t.Fatal(err)

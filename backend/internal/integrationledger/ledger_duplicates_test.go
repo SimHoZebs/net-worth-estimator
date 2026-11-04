@@ -79,7 +79,7 @@ func TestLedgerResyncAddsNothing(t *testing.T) {
 	}
 	// The pack repeats its final feed: the repeat must add no rows and
 	// must not resurrect the deleted phantom.
-	feeds := world.pack.Extras.BankFeeds
+	feeds := world.pack.BankFeeds()
 	ledgerApplyFeeds(t, world, len(feeds)-1, len(feeds))
 	after, err := world.ownerSC.LoadModel()
 	if err != nil {

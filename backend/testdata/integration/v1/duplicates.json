@@ -1,1 +1,109 @@
-{"breaksIfMishandled": "Dedupe keyed on name-plus-amount collapses distinct days into one row and corrupts balances. Search and feed must return every same-named row; totals must count each occurrence.", "concern": "Identical merchant names and identical amounts posted across different days; dedupe must never collapse them.", "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "4.50"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "261a7d10-fff7-59ff-b8fb-7ac90a76f015", "name": "Corner Coffee", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "4.50"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "4df8ddf7-fbbe-59f6-b704-97a242490ffa", "name": "Corner Coffee", "postedTime": 1781611200, "sourceAccountId": "checking", "transactionTime": 1781611200}, {"amount": {"config": {"expression": "4.50"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "e602f407-ee85-5d68-b8b9-6b8fb30e3b12", "name": "Corner Coffee", "postedTime": 1781697600, "sourceAccountId": "checking", "transactionTime": 1781697600}, {"amount": {"config": {"expression": "4.50"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "fff212b0-0248-5dc0-a4ab-eac9ec2bca29", "name": "corner coffee", "postedTime": 1781697600, "sourceAccountId": "checking", "transactionTime": 1781697600}, {"amount": {"config": {"expression": "4.50"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "876b971f-3fbd-5a35-9a5c-476bda26dceb", "name": "Bus fare", "postedTime": 1781697600, "sourceAccountId": "checking", "transactionTime": 1781697600}], "recurrenceRules": []}, "pack": "duplicates", "version": 1}
+{
+  "pack": "duplicates",
+  "version": 2,
+  "concern": "Identical merchant names and identical amounts posted across different days; dedupe must never collapse them.",
+  "breaksIfMishandled": "Dedupe keyed on name-plus-amount collapses distinct days into one row and corrupts balances. Search and feed must return every same-named row; totals must count each occurrence.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "4.50"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "261a7d10-fff7-59ff-b8fb-7ac90a76f015",
+            "name": "Corner Coffee",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "4.50"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "4df8ddf7-fbbe-59f6-b704-97a242490ffa",
+            "name": "Corner Coffee",
+            "postedTime": 1781611200,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781611200
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "4.50"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "e602f407-ee85-5d68-b8b9-6b8fb30e3b12",
+            "name": "Corner Coffee",
+            "postedTime": 1781697600,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781697600
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "4.50"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "fff212b0-0248-5dc0-a4ab-eac9ec2bca29",
+            "name": "corner coffee",
+            "postedTime": 1781697600,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781697600
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "4.50"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "876b971f-3fbd-5a35-9a5c-476bda26dceb",
+            "name": "Bus fare",
+            "postedTime": 1781697600,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781697600
+          }
+        ],
+        "recurrenceRules": []
+      }
+    }
+  ]
+}

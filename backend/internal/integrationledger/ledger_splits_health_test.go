@@ -92,7 +92,7 @@ func TestLedgerSplitAcceptMovesNoMoney(t *testing.T) {
 
 func TestLedgerYenSplitAllocatesExactShares(t *testing.T) {
 	world := ledgerSetup(t, nil)
-	probe := world.pack.Extras.SplitProbes
+	probe := world.pack.SplitProbes()
 	if len(probe) != 1 || probe[0].Currency != "JPY" {
 		t.Fatalf("split probes = %+v, want the yen probe beside the seed", probe)
 	}

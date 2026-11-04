@@ -20,7 +20,11 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, posting := range pack.Model.Postings {
+	packModel, ok := pack.Model()
+	if !ok {
+		t.Fatal("unicode pack has no model seed")
+	}
+	for _, posting := range packModel.Postings {
 		advEnsurePostingID(t, world.ownerSC, posting.ID, posting.Name, "12.00", 1781524800)
 		if _, err := world.db.GrantSharedPosting(world.owner, posting.ID, "group", world.groupID, advRequestID(t)); err != nil {
 			t.Fatal(err)
@@ -28,8 +32,8 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 	}
 	feed := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodGet, "/v1/shared/groups/"+world.groupID+"/feed", world.secondSubject, ""), http.StatusOK)
 	items, _ := feed["items"].([]any)
-	if len(items) < len(pack.Model.Postings) {
-		t.Fatalf("feed items = %d, want at least the %d unicode rows", len(items), len(pack.Model.Postings))
+	if len(items) < len(packModel.Postings) {
+		t.Fatalf("feed items = %d, want at least the %d unicode rows", len(items), len(packModel.Postings))
 	}
 	advFeedTotalsAgreement(t, feed)
 	byID := map[string]string{}
@@ -40,7 +44,7 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 		name, _ := posting["name"].(string)
 		byID[id] = name
 	}
-	for _, want := range pack.Model.Postings {
+	for _, want := range packModel.Postings {
 		got, ok := byID[want.ID]
 		if !ok {
 			t.Fatalf("unicode row %q missing from the feed", want.ID)
@@ -52,10 +56,10 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 
 	// A saved copy keeps the exact name, and the owner's own list does too.
 	copied := advDecode(t, advServe(t, world.sharing.Routes(), http.MethodPost, "/v1/shared/copies", world.secondSubject,
-		`{"owner":`+advQuote(advResource(world.owner))+`,"postingId":"`+pack.Model.Postings[0].ID+`","requestId":`+advQuote(advRequestID(t))+`}`), http.StatusCreated)
+		`{"owner":`+advQuote(advResource(world.owner))+`,"postingId":"`+packModel.Postings[0].ID+`","requestId":`+advQuote(advRequestID(t))+`}`), http.StatusCreated)
 	saved, _ := copied["posting"].(map[string]any)
-	if saved["name"] != pack.Model.Postings[0].Name {
-		t.Fatalf("copy name = %q, want byte-identical %q", saved["name"], pack.Model.Postings[0].Name)
+	if saved["name"] != packModel.Postings[0].Name {
+		t.Fatalf("copy name = %q, want byte-identical %q", saved["name"], packModel.Postings[0].Name)
 	}
 	model, err := world.ownerSC.LoadModel()
 	if err != nil {
@@ -65,7 +69,7 @@ func TestIntegrationEdgeUnicodeNames_RealSQLite_RealHTTP(t *testing.T) {
 	for _, posting := range model.Postings {
 		stored[posting.ID] = posting.Name
 	}
-	for _, want := range pack.Model.Postings {
+	for _, want := range packModel.Postings {
 		if stored[want.ID] != want.Name {
 			t.Fatalf("stored name for %q = %q, want byte-identical %q", want.ID, stored[want.ID], want.Name)
 		}

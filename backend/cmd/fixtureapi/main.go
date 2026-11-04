@@ -96,16 +96,20 @@ func withFixturePrincipal(next http.Handler) http.Handler {
 	})
 }
 
-// loadFixtureModel seeds the harness baseline. INTEGRATION_PACK names one
+// loadFixturePack seeds the harness baseline. INTEGRATION_PACK names one
 // integration fixture pack (backend/testdata/integration/v1) to seed
 // instead of the CSV model, so the browser suite can run its journeys
 // against any edge-case dataset on its own isolated ports and throwaway
 // database. Empty selects the default CSV fixture.
-func loadFixtureModel(modelPath string) (*types.FinancialModel, error) {
+func loadFixturePack(modelPath string) (integrationfixtures.Pack, error) {
 	if pack := envOr("INTEGRATION_PACK", ""); pack != "" {
-		return integrationfixtures.Model(pack)
+		return integrationfixtures.Load(pack)
 	}
-	return csvio.ImportModel(modelPath)
+	model, err := csvio.ImportModel(modelPath)
+	if err != nil {
+		return integrationfixtures.Pack{}, err
+	}
+	return integrationfixtures.FromModel(model), nil
 }
 
 func main() {
@@ -167,11 +171,11 @@ func main() {
 		if _, err := application.SQL().Exec(`DELETE FROM sharing_grants WHERE audience_type = 'user' AND audience_id = ?`, fixtureActor); err != nil {
 			return fmt.Errorf("clear fixture direct shares: %w", err)
 		}
-		doc, err := loadFixtureModel(modelPath)
+		pack, err := loadFixturePack(modelPath)
 		if err != nil {
-			return fmt.Errorf("import fixture: %w", err)
+			return fmt.Errorf("load fixture: %w", err)
 		}
-		if _, err := database.ImportModel(doc); err != nil {
+		if err := integrationfixtures.Apply(database, pack); err != nil {
 			return fmt.Errorf("import fixture: %w", err)
 		}
 		// Bulk seed is additive on top of the pack or CSV baseline. The
@@ -397,7 +401,11 @@ func main() {
 		close(closed)
 	}()
 
-	fmt.Printf("fixtureapi listening on %s from %s\n", server.Addr, modelPath)
+	source := modelPath
+	if pack := envOr("INTEGRATION_PACK", ""); pack != "" {
+		source = "pack " + pack
+	}
+	fmt.Printf("fixtureapi listening on %s from %s\n", server.Addr, source)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server: %v", err)
 	}

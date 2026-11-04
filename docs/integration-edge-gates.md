@@ -29,10 +29,14 @@ the manual tier below.
 
 Versioned synthetic datasets under `backend/testdata/integration/v1`, one
 concern per file. Synthetic by construction: no production rows, no real
-credentials, no real counterparties. Every pack documents its concern and
-what breaks if mishandled; the loader (`backend/internal/integrationfixtures`)
-refuses packs whose version envelope is not v1, so a format change mints
-v2 alongside — loaders never migrate old packs in place.
+credentials, no real counterparties. A pack is an ordered sequence of seeds:
+a model seed, an optional safe-spending settings seed, and optional
+harness-specific seeds for sync state, sharing, invites, split probes, bank
+feeds, and ledger expectations. The loader applies the model and settings
+seeds and exposes the rest by kind. Every pack documents its concern and what
+breaks if mishandled; the loader refuses packs whose version envelope is not
+v2, so a format change mints a new version alongside — loaders never migrate
+old packs in place.
 
 | Pack | Concern | Breaks if mishandled |
 | ---- | ------- | -------------------- |
@@ -53,17 +57,22 @@ v2 alongside — loaders never migrate old packs in place.
 | exclusions | Wildcard (audience all) exclusion before later rows arrive | Exclusions evaluated at write time leak rows to later audiences |
 | ledger | Fixed household ledger with hand-computed sums for completeness journeys: every surface must show the seed's known rows | Dropped, duplicated, or miscounted seed rows; merged lookalikes; resurrected phantoms; leaked revocations |
 | negative-net-worth | Sustained negative net worth with volatile debt-driven swings below zero | Charts or domains assuming a $0 floor; backwards compact signs; dropped negative layers or unformattable sub-zero tooltips |
+| safe-spending | Card spending thresholds, pace projection, and a protected-reserve crossing | Missing income selection, card charges, or reserve hides the dividers and pace |
+| safe-spending-shortfall | A recurring bill the cash balance cannot fulfill | Missing raised savings contribution or income selection hides the unfulfilled row |
 
 Loading per harness:
 
 - Store and API tests: `integrationfixtures.SeedUser` (throwaway database,
-  replaces the user's model like the browser reseed) or
+  applies the model and settings seeds like the browser reseed) or
   `integrationfixtures.Model` plus the harness's own setup. The edge-case
-  suite seeds `INTEGRATION_PACK` automatically when set.
+  suite seeds `INTEGRATION_PACK` automatically when set. Harness-specific
+  seeds are read through the pack accessors (`BankFeeds`, `SplitProbes`,
+  `LedgerExpected`, `SyncState`, `SharingScript`, `InviteScript`).
 - Browser suite: `INTEGRATION_PACK=<pack>` in the environment. The
-  fixtureapi harness seeds the pack instead of the CSV model on its own
-  isolated ports and throwaway database; the Playwright config forwards the
-  variable explicitly. Empty keeps the default fixture.
+  fixtureapi harness applies the pack's model and settings seeds instead of
+  the CSV model on its own isolated ports and throwaway database; the
+  Playwright config forwards the variable explicitly. Empty keeps the default
+  fixture.
 - Bulk rows: `INTEGRATION_BULK=<NxM[:seed]>` in the environment, or `bulk`
   on one reset call. The harness injects tagged synthetic accounts beside
   the pack or CSV baseline through the same additive builder the Go leg

@@ -1,1 +1,128 @@
-{"breaksIfMishandled": "A detector that assumes perfect monthly cadence promotes phantom occurrences or misses drifted ones, corrupting forecasts. Skipped months must stay skipped; drifted amounts must not snap back to the template.", "concern": "Monthly recurring pattern with a skipped month, an amount-drifted month, and an early-posted actual claiming its occurrence.", "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "1200.00"}, "resolver": "expression"}, "claim": {"occurrenceDate": "2026-01-01", "ruleId": "edge-rule-rent"}, "destinations": [], "enabled": true, "id": "1d49ddb1-57b0-5ffb-a173-95b6e85ccb13", "name": "Rent Jan actual", "postedTime": 1767225600, "sourceAccountId": "checking", "transactionTime": 1767225600}, {"amount": {"config": {"expression": "1200.00"}, "resolver": "expression"}, "claim": {"occurrenceDate": "2026-02-01", "ruleId": "edge-rule-rent"}, "destinations": [], "enabled": true, "id": "f5f4590a-d43c-5a3d-a9dd-f23205b7504f", "name": "Rent Feb actual", "postedTime": 1769904000, "sourceAccountId": "checking", "transactionTime": 1769904000}, {"amount": {"config": {"expression": "1275.50"}, "resolver": "expression"}, "claim": {"occurrenceDate": "2026-04-01", "ruleId": "edge-rule-rent"}, "destinations": [], "enabled": true, "id": "80c3fc5c-f33c-5554-a652-a4c45c5b12c0", "name": "Rent Apr actual drifted", "postedTime": 1775002800, "sourceAccountId": "checking", "transactionTime": 1775002800}, {"amount": {"config": {"expression": "1200.00"}, "resolver": "expression"}, "claim": {"occurrenceDate": "2026-05-01", "ruleId": "edge-rule-rent"}, "destinations": [], "enabled": true, "id": "8695d971-07bd-550b-ad01-5c0229987ca4", "name": "Rent May actual posted early", "postedTime": 1777594800, "sourceAccountId": "checking", "transactionTime": 1777594800}], "recurrenceRules": [{"amount": {"config": {"expression": "1200"}, "resolver": "expression"}, "destinations": [], "enabled": true, "endDate": "2026-12-01", "frequency": "monthly", "id": "edge-rule-rent", "name": "Rent template", "priority": 1, "sourceAccountId": "checking", "startDate": "2026-01-01"}]}, "pack": "recurring", "version": 1}
+{
+  "pack": "recurring",
+  "version": 2,
+  "concern": "Monthly recurring pattern with a skipped month, an amount-drifted month, and an early-posted actual claiming its occurrence.",
+  "breaksIfMishandled": "A detector that assumes perfect monthly cadence promotes phantom occurrences or misses drifted ones, corrupting forecasts. Skipped months must stay skipped; drifted amounts must not snap back to the template.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "1200.00"
+              },
+              "resolver": "expression"
+            },
+            "claim": {
+              "occurrenceDate": "2026-01-01",
+              "ruleId": "edge-rule-rent"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "1d49ddb1-57b0-5ffb-a173-95b6e85ccb13",
+            "name": "Rent Jan actual",
+            "postedTime": 1767225600,
+            "sourceAccountId": "checking",
+            "transactionTime": 1767225600
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "1200.00"
+              },
+              "resolver": "expression"
+            },
+            "claim": {
+              "occurrenceDate": "2026-02-01",
+              "ruleId": "edge-rule-rent"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "f5f4590a-d43c-5a3d-a9dd-f23205b7504f",
+            "name": "Rent Feb actual",
+            "postedTime": 1769904000,
+            "sourceAccountId": "checking",
+            "transactionTime": 1769904000
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "1275.50"
+              },
+              "resolver": "expression"
+            },
+            "claim": {
+              "occurrenceDate": "2026-04-01",
+              "ruleId": "edge-rule-rent"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "80c3fc5c-f33c-5554-a652-a4c45c5b12c0",
+            "name": "Rent Apr actual drifted",
+            "postedTime": 1775002800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1775002800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "1200.00"
+              },
+              "resolver": "expression"
+            },
+            "claim": {
+              "occurrenceDate": "2026-05-01",
+              "ruleId": "edge-rule-rent"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "8695d971-07bd-550b-ad01-5c0229987ca4",
+            "name": "Rent May actual posted early",
+            "postedTime": 1777594800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1777594800
+          }
+        ],
+        "recurrenceRules": [
+          {
+            "amount": {
+              "config": {
+                "expression": "1200"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "endDate": "2026-12-01",
+            "frequency": "monthly",
+            "id": "edge-rule-rent",
+            "name": "Rent template",
+            "priority": 1,
+            "sourceAccountId": "checking",
+            "startDate": "2026-01-01"
+          }
+        ]
+      }
+    }
+  ]
+}

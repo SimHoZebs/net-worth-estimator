@@ -1,1 +1,64 @@
-{"pack": "overlong", "version": 1, "concern": "Names and memos far past any display width, including multi-byte heavy text; storage must keep every rune and clients must not break.", "breaksIfMishandled": "Silent truncation or column errors lose money identity; UI overflow breaks review; search indexes on truncated prefixes miss rows.", "model": {"accounts": [{"id": "checking", "name": "Checking", "kind": "cash", "enabled": true}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"id": "9548accc-98f0-5d75-aef8-e7a72983b041", "name": "Merchant AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "sourceAccountId": "checking", "destinations": [], "amount": {"resolver": "expression", "config": {"expression": "25.00"}}, "postedTime": 1781524800, "transactionTime": 1781524800, "enabled": true}, {"id": "d0e94604-c99c-5edc-a20d-0796e84fcde3", "name": "🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾", "sourceAccountId": "checking", "destinations": [], "amount": {"resolver": "expression", "config": {"expression": "1.00"}}, "postedTime": 1781524800, "transactionTime": 1781524800, "enabled": true}], "recurrenceRules": []}}
+{
+  "pack": "overlong",
+  "version": 2,
+  "concern": "Names and memos far past any display width, including multi-byte heavy text; storage must keep every rune and clients must not break.",
+  "breaksIfMishandled": "Silent truncation or column errors lose money identity; UI overflow breaks review; search indexes on truncated prefixes miss rows.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "id": "checking",
+            "name": "Checking",
+            "kind": "cash",
+            "enabled": true
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "id": "9548accc-98f0-5d75-aef8-e7a72983b041",
+            "name": "Merchant AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "sourceAccountId": "checking",
+            "destinations": [],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "25.00"
+              }
+            },
+            "postedTime": 1781524800,
+            "transactionTime": 1781524800,
+            "enabled": true
+          },
+          {
+            "id": "d0e94604-c99c-5edc-a20d-0796e84fcde3",
+            "name": "🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾🧾",
+            "sourceAccountId": "checking",
+            "destinations": [],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "1.00"
+              }
+            },
+            "postedTime": 1781524800,
+            "transactionTime": 1781524800,
+            "enabled": true
+          }
+        ],
+        "recurrenceRules": []
+      }
+    }
+  ]
+}

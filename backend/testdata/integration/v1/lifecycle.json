@@ -1,1 +1,49 @@
-{"breaksIfMishandled": "Void rows resurrected into balances or shared feeds leak dead authorizations. Pending rows shared as settled overstate agreement. Deleted rows that reappear on re-sync corrupt history.", "concern": "Bank lifecycle rows interleaved with live owner rows: pending authorizations, voided authorizations, and settled rows, via the real sync apply path.", "extras": {"syncLifecycle": {"pending": [{"amount": "18.20", "description": "Pending fuel hold", "id": "edge-life-pending", "posted": 1781524800}], "settle": [{"amount": "18.20", "description": "Pending fuel hold", "id": "edge-life-pending", "posted": 1781611200}], "void": [{"amount": "9.99", "description": "Voided trial hold", "id": "edge-life-void", "posted": 1781524800}]}}, "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "42.50"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "d9fe52af-cd57-5724-91b9-62f1e30e02d5", "name": "Live groceries", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}], "recurrenceRules": []}, "pack": "lifecycle", "version": 1}
+{
+  "pack": "lifecycle",
+  "version": 2,
+  "concern": "Bank lifecycle rows interleaved with live owner rows: pending authorizations, voided authorizations, and settled rows, via the real sync apply path.",
+  "breaksIfMishandled": "Void rows resurrected into balances or shared feeds leak dead authorizations. Pending rows shared as settled overstate agreement. Deleted rows that reappear on re-sync corrupt history.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "42.50"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "d9fe52af-cd57-5724-91b9-62f1e30e02d5",
+            "name": "Live groceries",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          }
+        ],
+        "recurrenceRules": []
+      }
+    }
+  ]
+}

@@ -1,131 +1,136 @@
 {
   "pack": "negative-net-worth",
-  "version": 1,
+  "version": 2,
   "concern": "Sustained negative net worth with volatile debt-driven swings: every plotted day sits below zero while individual accounts move sharply in both directions.",
   "breaksIfMishandled": "Charts or domains that assume a $0 floor fill the wrong side of the line, hide the zero rule, or print compact signs backwards ($-50k); views that drop negative layers misstate debt; tooltips and crosshairs that cannot format sub-zero values hide the recovery path.",
-  "model": {
-    "accounts": [
-      {
-        "enabled": true,
-        "id": "checking",
-        "kind": "cash",
-        "name": "Everyday checking",
-        "minBalance": 0
-      },
-      {
-        "enabled": true,
-        "id": "savings",
-        "kind": "investment",
-        "name": "Investment portfolio",
-        "minBalance": 0
-      },
-      {
-        "enabled": true,
-        "id": "brokerage",
-        "kind": "investment",
-        "name": "Brokerage"
-      },
-      {
-        "enabled": true,
-        "id": "loan",
-        "kind": "debt",
-        "name": "Student loan",
-        "maxBalance": 0
-      },
-      {
-        "enabled": true,
-        "id": "home",
-        "kind": "property",
-        "name": "Home value"
-      }
-    ],
-    "checkpoints": [
-      {
-        "AccountId": "checking",
-        "Balance": 4200,
-        "ObservedAt": 1769903999
-      },
-      {
-        "AccountId": "savings",
-        "Balance": 15000,
-        "ObservedAt": 1769903999
-      },
-      {
-        "AccountId": "brokerage",
-        "Balance": 20000,
-        "ObservedAt": 1769903999
-      },
-      {
-        "AccountId": "loan",
-        "Balance": -18000,
-        "ObservedAt": 1769903999
-      },
-      {
-        "AccountId": "home",
-        "Balance": 340000,
-        "ObservedAt": 1769903999
-      }
-    ],
-    "evaluations": {
-      "accountBalance": [],
-      "cycleFulfillment": [],
-      "financialIndependence": [],
-      "netWorthThreshold": [],
-      "plannedPurchases": [],
-      "postingFulfillment": [],
-      "whatIf": []
-    },
-    "postings": [
-      {
-        "id": "4471aed2-883e-474b-8a92-bfac6639954b",
-        "name": "Leveraged blowup",
-        "sourceAccountId": "brokerage",
-        "amount": {
-          "resolver": "expression",
-          "config": {
-            "expression": "600000"
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Everyday checking",
+            "minBalance": 0
           },
-          "inputs": {}
-        },
-        "postedTime": 1790856000,
-        "transactionTime": 1790856000,
-        "enabled": true
-      },
-      {
-        "id": "51ae1e98-fc27-425b-829b-c380e512e868",
-        "name": "Partial recovery",
-        "destinations": [
-          "brokerage"
+          {
+            "enabled": true,
+            "id": "savings",
+            "kind": "investment",
+            "name": "Investment portfolio",
+            "minBalance": 0
+          },
+          {
+            "enabled": true,
+            "id": "brokerage",
+            "kind": "investment",
+            "name": "Brokerage"
+          },
+          {
+            "enabled": true,
+            "id": "loan",
+            "kind": "debt",
+            "name": "Student loan",
+            "maxBalance": 0
+          },
+          {
+            "enabled": true,
+            "id": "home",
+            "kind": "property",
+            "name": "Home value"
+          }
         ],
-        "amount": {
-          "resolver": "expression",
-          "config": {
-            "expression": "100000"
+        "checkpoints": [
+          {
+            "AccountId": "checking",
+            "Balance": 4200,
+            "ObservedAt": 1769903999
           },
-          "inputs": {}
-        },
-        "postedTime": 1792065600,
-        "transactionTime": 1792065600,
-        "enabled": true
-      },
-      {
-        "id": "f2cad37d-9159-44bc-8297-df56ce93a139",
-        "name": "Second recovery",
-        "destinations": [
-          "checking"
+          {
+            "AccountId": "savings",
+            "Balance": 15000,
+            "ObservedAt": 1769903999
+          },
+          {
+            "AccountId": "brokerage",
+            "Balance": 20000,
+            "ObservedAt": 1769903999
+          },
+          {
+            "AccountId": "loan",
+            "Balance": -18000,
+            "ObservedAt": 1769903999
+          },
+          {
+            "AccountId": "home",
+            "Balance": 340000,
+            "ObservedAt": 1769903999
+          }
         ],
-        "amount": {
-          "resolver": "expression",
-          "config": {
-            "expression": "80000"
-          },
-          "inputs": {}
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
         },
-        "postedTime": 1792929600,
-        "transactionTime": 1792929600,
-        "enabled": true
+        "postings": [
+          {
+            "id": "4471aed2-883e-474b-8a92-bfac6639954b",
+            "name": "Leveraged blowup",
+            "sourceAccountId": "brokerage",
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "600000"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1790856000,
+            "transactionTime": 1790856000,
+            "enabled": true
+          },
+          {
+            "id": "51ae1e98-fc27-425b-829b-c380e512e868",
+            "name": "Partial recovery",
+            "destinations": [
+              "brokerage"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "100000"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1792065600,
+            "transactionTime": 1792065600,
+            "enabled": true
+          },
+          {
+            "id": "f2cad37d-9159-44bc-8297-df56ce93a139",
+            "name": "Second recovery",
+            "destinations": [
+              "checking"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "80000"
+              },
+              "inputs": {}
+            },
+            "postedTime": 1792929600,
+            "transactionTime": 1792929600,
+            "enabled": true
+          }
+        ],
+        "recurrenceRules": []
       }
-    ],
-    "recurrenceRules": []
-  }
+    }
+  ]
 }

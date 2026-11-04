@@ -126,10 +126,10 @@ func ledgerSetup(t *testing.T, gmailService *gmail.Service) *ledgerWorld {
 	world.ownerSubject = "ledger-owner-" + tag.String()
 	world.secondSubject = "ledger-second-" + tag.String()
 	world.owner, world.ownerSC, world.pack = ledgerSeedUser(t, db, world.ownerSubject)
-	if world.pack.Extras.LedgerExpected == nil {
+	if world.pack.LedgerExpected() == nil {
 		t.Fatal("ledger pack carries no hand-computed expected numbers")
 	}
-	world.expected = world.pack.Extras.LedgerExpected
+	world.expected = world.pack.LedgerExpected()
 	second, err := db.EnsureGroupUser(ledgerIssuer, world.secondSubject)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func ledgerSetup(t *testing.T, gmailService *gmail.Service) *ledgerWorld {
 	world.inbox = inbox.New(db, ledgerIssuer, inbox.Config{})
 	// Apply every bank feed but the last: the pack repeats its final feed
 	// so the re-sync spec can prove the repeat adds nothing.
-	ledgerApplyFeeds(t, world, 0, len(world.pack.Extras.BankFeeds)-1)
+	ledgerApplyFeeds(t, world, 0, len(world.pack.BankFeeds())-1)
 	return world
 }
 
@@ -175,7 +175,7 @@ func ledgerSeedUser(t *testing.T, db *sqlite.Database, subject string) (string, 
 // path: map the bridge rows, reconcile against stored rows, apply.
 func ledgerApplyFeeds(t *testing.T, world *ledgerWorld, from, to int) {
 	t.Helper()
-	feeds := world.pack.Extras.BankFeeds
+	feeds := world.pack.BankFeeds()
 	if to > len(feeds) {
 		t.Fatalf("bank feeds = %d, want up to %d", len(feeds), to)
 	}

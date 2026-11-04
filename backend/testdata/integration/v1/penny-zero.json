@@ -1,1 +1,94 @@
-{"breaksIfMishandled": "Penny remainders dropped in splits or rounded away in totals silently move money between participants. Zero-amount rows must still list, count, and feed; a pipeline that treats 0 as missing hides rows and breaks totals agreement.", "concern": "Sub-cent and zero amounts: one-cent rows, zero rows, and a split-hostile 1-cent total across three participants.", "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "0.01"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "acaafe7c-3d61-5a4b-ac7a-d13e3b0e44fd", "name": "Penny post", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "0.01"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "0ea16de1-507b-5248-8664-79b13ba47875", "name": "Penny post twin", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "0.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "a4fbab1b-0287-5615-9d0d-218ce15b34ca", "name": "Zero row", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "0.01"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "3ee8fed0-6421-513e-b97f-5f0024841bbf", "name": "One cent split three ways", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}], "recurrenceRules": []}, "pack": "penny-zero", "version": 1}
+{
+  "pack": "penny-zero",
+  "version": 2,
+  "concern": "Sub-cent and zero amounts: one-cent rows, zero rows, and a split-hostile 1-cent total across three participants.",
+  "breaksIfMishandled": "Penny remainders dropped in splits or rounded away in totals silently move money between participants. Zero-amount rows must still list, count, and feed; a pipeline that treats 0 as missing hides rows and breaks totals agreement.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "0.01"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "acaafe7c-3d61-5a4b-ac7a-d13e3b0e44fd",
+            "name": "Penny post",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "0.01"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "0ea16de1-507b-5248-8664-79b13ba47875",
+            "name": "Penny post twin",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "0.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "a4fbab1b-0287-5615-9d0d-218ce15b34ca",
+            "name": "Zero row",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "0.01"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "3ee8fed0-6421-513e-b97f-5f0024841bbf",
+            "name": "One cent split three ways",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          }
+        ],
+        "recurrenceRules": []
+      }
+    }
+  ]
+}

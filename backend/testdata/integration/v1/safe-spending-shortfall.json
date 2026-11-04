@@ -1,0 +1,226 @@
+{
+  "pack": "safe-spending-shortfall",
+  "version": 2,
+  "concern": "A recurring bill that the cash balance cannot fulfill.",
+  "breaksIfMishandled": "Dropping the raised savings contribution or the income selection hides the unfulfilled recurring row.",
+  "seeds": [
+    {
+      "kind": "model",
+      "anchorDate": "2026-02-10",
+      "model": {
+        "sourcePath": "",
+        "accounts": [
+          {
+            "id": "checking",
+            "name": "Everyday checking",
+            "kind": "cash",
+            "minBalance": 0,
+            "maxBalance": null,
+            "color": "#2f6f4f",
+            "enabled": true
+          },
+          {
+            "id": "savings",
+            "name": "Investment portfolio",
+            "kind": "investment",
+            "minBalance": 0,
+            "maxBalance": null,
+            "color": "#3d7a5c",
+            "enabled": true
+          },
+          {
+            "id": "brokerage",
+            "name": "Brokerage",
+            "kind": "investment",
+            "minBalance": null,
+            "maxBalance": null,
+            "color": "#2b5f8a",
+            "enabled": true
+          },
+          {
+            "id": "loan",
+            "name": "Student loan",
+            "kind": "debt",
+            "minBalance": null,
+            "maxBalance": 0,
+            "color": "#8a4b2b",
+            "enabled": true
+          },
+          {
+            "id": "home",
+            "name": "Home value",
+            "kind": "property",
+            "minBalance": null,
+            "maxBalance": null,
+            "color": "#7a5c2b",
+            "enabled": true
+          }
+        ],
+        "checkpoints": [
+          {
+            "AccountId": "checking",
+            "Balance": 4200,
+            "source": "user",
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "savings",
+            "Balance": 15000,
+            "source": "user",
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "brokerage",
+            "Balance": 20000,
+            "source": "user",
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "loan",
+            "Balance": -18000,
+            "source": "user",
+            "observedAt": 1769903999
+          },
+          {
+            "AccountId": "home",
+            "Balance": 340000,
+            "source": "user",
+            "observedAt": 1769903999
+          }
+        ],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [],
+        "recurrenceRules": [
+          {
+            "id": "salary",
+            "name": "Salary",
+            "sourceAccountId": null,
+            "destinations": [
+              "checking"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "5600"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-01-01",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 4,
+            "enabled": true
+          },
+          {
+            "id": "spend",
+            "name": "Housing and living",
+            "sourceAccountId": "checking",
+            "destinations": [],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "3800"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-05",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 4,
+            "enabled": true
+          },
+          {
+            "id": "invest",
+            "name": "Monthly investing",
+            "sourceAccountId": "checking",
+            "destinations": [
+              "brokerage"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "600"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-10",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 5,
+            "enabled": true
+          },
+          {
+            "id": "savings_contribution",
+            "name": "Retirement contribution",
+            "sourceAccountId": "checking",
+            "destinations": [
+              "savings"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "10000"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-12",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 6,
+            "enabled": true
+          },
+          {
+            "id": "loan_payment",
+            "name": "Student loan payment",
+            "sourceAccountId": "checking",
+            "destinations": [
+              "loan"
+            ],
+            "amount": {
+              "resolver": "expression",
+              "config": {
+                "expression": "450"
+              },
+              "inputs": {}
+            },
+            "frequency": "monthly",
+            "startDate": "2026-02-20",
+            "endDate": null,
+            "annualCap": null,
+            "priority": 7,
+            "enabled": true
+          }
+        ],
+        "paymentTerms": [],
+        "plannedPurchases": []
+      }
+    },
+    {
+      "kind": "settings",
+      "settings": {
+        "statementDay": 20,
+        "reserve": 725,
+        "accountIds": null,
+        "spendingAccountIds": null,
+        "incomeAccountIds": null,
+        "incomeRuleIds": [
+          "salary"
+        ],
+        "transactionIds": null,
+        "statementDaySet": false
+      }
+    }
+  ]
+}

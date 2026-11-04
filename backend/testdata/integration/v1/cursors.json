@@ -1,1 +1,59 @@
-{"breaksIfMishandled": "A stale cursor that replays from months ago duplicates rows or resurrects voided ones. Sync must resume exactly at the cursor and reconcile against current rows, never blindly re-insert.", "concern": "Sync cursors far behind the newest rows: an old completion stamp and an old mail scan cursor with newer rows present.", "extras": {"syncState": {"gmailCursor": {"historyId": "100", "scannedAt": "2025-06-01T00:00:00Z"}, "lastSyncTime": "2025-06-01T00:00:00Z"}}, "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "31.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "e37a9f81-acb7-58da-a139-54f3b3c4685e", "name": "Post-cursor groceries", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}], "recurrenceRules": []}, "pack": "cursors", "version": 1}
+{
+  "pack": "cursors",
+  "version": 2,
+  "concern": "Sync cursors far behind the newest rows: an old completion stamp and an old mail scan cursor with newer rows present.",
+  "breaksIfMishandled": "A stale cursor that replays from months ago duplicates rows or resurrects voided ones. Sync must resume exactly at the cursor and reconcile against current rows, never blindly re-insert.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "31.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "e37a9f81-acb7-58da-a139-54f3b3c4685e",
+            "name": "Post-cursor groceries",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          }
+        ],
+        "recurrenceRules": []
+      }
+    },
+    {
+      "kind": "syncState",
+      "syncState": {
+        "gmailCursor": {
+          "historyId": "100",
+          "scannedAt": "2025-06-01T00:00:00Z"
+        },
+        "lastSyncTime": "2025-06-01T00:00:00Z"
+      }
+    }
+  ]
+}

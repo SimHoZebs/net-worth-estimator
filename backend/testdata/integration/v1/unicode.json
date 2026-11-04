@@ -1,1 +1,109 @@
-{"breaksIfMishandled": "Byte-length limits truncate multi-byte names mid-rune and corrupt rows. Case- or normalization-sensitive search hides counterparties. Broken encoding in feeds or totals breaks clients parsing the response.", "concern": "Counterparty names with multi-byte unicode, emoji, combining marks, and right-to-left text; every row must round-trip, list, and total.", "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "12.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "72a671f5-b0b2-503b-b9ea-5ce5c665a645", "name": "Café Münchén ☕", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "88.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "7c42bb55-7a7f-572a-b064-768180f637d9", "name": "東京ラーメン 🍜", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "5.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "050610de-cd15-5259-99de-94bd6f1a96b9", "name": "مطعم دمشق 🧆", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "7.25"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "69550c9e-86e2-5152-87b5-351c9d29e7e9", "name": "Café münster", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "3.33"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "4acd0d46-a89e-57b0-b2f1-dede5b1c4eb9", "name": "Family deli ‍👨‍👩‍👧", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}], "recurrenceRules": []}, "pack": "unicode", "version": 1}
+{
+  "pack": "unicode",
+  "version": 2,
+  "concern": "Counterparty names with multi-byte unicode, emoji, combining marks, and right-to-left text; every row must round-trip, list, and total.",
+  "breaksIfMishandled": "Byte-length limits truncate multi-byte names mid-rune and corrupt rows. Case- or normalization-sensitive search hides counterparties. Broken encoding in feeds or totals breaks clients parsing the response.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "12.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "72a671f5-b0b2-503b-b9ea-5ce5c665a645",
+            "name": "Café Münchén ☕",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "88.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "7c42bb55-7a7f-572a-b064-768180f637d9",
+            "name": "東京ラーメン 🍜",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "5.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "050610de-cd15-5259-99de-94bd6f1a96b9",
+            "name": "مطعم دمشق 🧆",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "7.25"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "69550c9e-86e2-5152-87b5-351c9d29e7e9",
+            "name": "Café münster",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "3.33"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "4acd0d46-a89e-57b0-b2f1-dede5b1c4eb9",
+            "name": "Family deli ‍👨‍👩‍👧",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          }
+        ],
+        "recurrenceRules": []
+      }
+    }
+  ]
+}

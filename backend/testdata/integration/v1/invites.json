@@ -1,1 +1,50 @@
-{"breaksIfMishandled": "An expired code that still redeems admits members without consent. A fully-used code redeemed twice over-admits. Both must fail closed with no membership written.", "concern": "Invite codes at their limits: one already expired, one already fully used, one single-use raced by two redeemers.", "extras": {"inviteScript": [{"maxUses": 5, "state": "expired"}, {"maxUses": 1, "state": "exhausted"}, {"maxUses": 1, "state": "fresh"}]}, "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [], "recurrenceRules": []}, "pack": "invites", "version": 1}
+{
+  "pack": "invites",
+  "version": 2,
+  "concern": "Invite codes at their limits: one already expired, one already fully used, one single-use raced by two redeemers.",
+  "breaksIfMishandled": "An expired code that still redeems admits members without consent. A fully-used code redeemed twice over-admits. Both must fail closed with no membership written.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [],
+        "recurrenceRules": []
+      }
+    },
+    {
+      "kind": "inviteScript",
+      "inviteScript": [
+        {
+          "maxUses": 5,
+          "state": "expired"
+        },
+        {
+          "maxUses": 1,
+          "state": "exhausted"
+        },
+        {
+          "maxUses": 1,
+          "state": "fresh"
+        }
+      ]
+    }
+  ]
+}

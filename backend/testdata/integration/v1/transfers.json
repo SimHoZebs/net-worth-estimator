@@ -1,1 +1,87 @@
-{"breaksIfMishandled": "Legs matched by round amount pair the wrong transfer when two share one figure. Legs days apart must still net to zero in transfer views; mismatched legs inflate inflow and outflow together.", "concern": "Account-to-account transfers with legs days apart, plus two same-day round-amount decoys that must not pair.", "model": {"accounts": [{"enabled": true, "id": "checking", "kind": "cash", "name": "Checking"}, {"enabled": true, "id": "savings", "kind": "cash", "name": "Savings"}], "checkpoints": [], "evaluations": {"accountBalance": [], "cycleFulfillment": [], "financialIndependence": [], "netWorthThreshold": [], "plannedPurchases": [], "postingFulfillment": [], "whatIf": []}, "postings": [{"amount": {"config": {"expression": "500.00"}, "resolver": "expression"}, "destinations": ["savings"], "enabled": true, "id": "3ac65f3f-53e7-535c-ab30-b8afe77e6411", "name": "Move to savings", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "500.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "af78576b-8d6f-54b1-9528-706c86e5a9cc", "name": "ATM withdrawal", "postedTime": 1781524800, "sourceAccountId": "checking", "transactionTime": 1781524800}, {"amount": {"config": {"expression": "500.00"}, "resolver": "expression"}, "destinations": [], "enabled": true, "id": "6efac9e7-b54d-526b-beaf-40a1ba67cb5c", "name": "Cash deposit", "postedTime": 1781524800, "sourceAccountId": "savings", "transactionTime": 1782132000}], "recurrenceRules": []}, "pack": "transfers", "version": 1}
+{
+  "pack": "transfers",
+  "version": 2,
+  "concern": "Account-to-account transfers with legs days apart, plus two same-day round-amount decoys that must not pair.",
+  "breaksIfMishandled": "Legs matched by round amount pair the wrong transfer when two share one figure. Legs days apart must still net to zero in transfer views; mismatched legs inflate inflow and outflow together.",
+  "seeds": [
+    {
+      "kind": "model",
+      "model": {
+        "accounts": [
+          {
+            "enabled": true,
+            "id": "checking",
+            "kind": "cash",
+            "name": "Checking"
+          },
+          {
+            "enabled": true,
+            "id": "savings",
+            "kind": "cash",
+            "name": "Savings"
+          }
+        ],
+        "checkpoints": [],
+        "evaluations": {
+          "accountBalance": [],
+          "cycleFulfillment": [],
+          "financialIndependence": [],
+          "netWorthThreshold": [],
+          "plannedPurchases": [],
+          "postingFulfillment": [],
+          "whatIf": []
+        },
+        "postings": [
+          {
+            "amount": {
+              "config": {
+                "expression": "500.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [
+              "savings"
+            ],
+            "enabled": true,
+            "id": "3ac65f3f-53e7-535c-ab30-b8afe77e6411",
+            "name": "Move to savings",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "500.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "af78576b-8d6f-54b1-9528-706c86e5a9cc",
+            "name": "ATM withdrawal",
+            "postedTime": 1781524800,
+            "sourceAccountId": "checking",
+            "transactionTime": 1781524800
+          },
+          {
+            "amount": {
+              "config": {
+                "expression": "500.00"
+              },
+              "resolver": "expression"
+            },
+            "destinations": [],
+            "enabled": true,
+            "id": "6efac9e7-b54d-526b-beaf-40a1ba67cb5c",
+            "name": "Cash deposit",
+            "postedTime": 1781524800,
+            "sourceAccountId": "savings",
+            "transactionTime": 1782132000
+          }
+        ],
+        "recurrenceRules": []
+      }
+    }
+  ]
+}
