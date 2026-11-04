@@ -20,14 +20,14 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
 	}
 	var accountPayload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
+		} `json:"value"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
 		t.Fatalf("decode account: %v", err)
 	}
-	accountID := accountPayload.Row.ID
+	accountID := accountPayload.Result.ID
 
 	holdTime := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC).Unix()
 	hold := types.Posting{

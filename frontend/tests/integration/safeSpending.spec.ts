@@ -501,7 +501,7 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 			},
 		},
 	);
-	expect((await contributionResponse.json()).persisted).toBe(true);
+	expect((await contributionResponse.json()).saved).toBe(true);
 	await request.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
 		data: {
 			statementDay: 20,

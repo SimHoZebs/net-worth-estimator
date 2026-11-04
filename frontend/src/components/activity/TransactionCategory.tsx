@@ -39,7 +39,7 @@ import {
 	type TransactionCategory as TransactionCategoryKey,
 } from "../../domain/categories.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
-import { useSavedTransactions } from "../../state/savedRows.ts";
+import { useSavedTransactions } from "../../state/savedState.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import { mergeStyles } from "../mergeStyles.ts";
 import { controlStyles } from "../fieldStyles.ts";
