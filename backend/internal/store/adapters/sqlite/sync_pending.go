@@ -393,6 +393,11 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			if err := recordBankKeys(tx, conversion.ID, conversion.AddKeys); err != nil {
 				return err
 			}
+			if conversion.Facts != nil {
+				if err := observeBankTransaction(tx, &BankObservation{Keys: conversion.AddKeys, Facts: *conversion.Facts}); err != nil {
+					return err
+				}
+			}
 			summary.SettledConverted++
 		case directive.Upsert != nil:
 			upsert := directive.Upsert
@@ -427,6 +432,11 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 				if err := recordBankKeys(tx, posting.ID, upsert.Keys); err != nil {
 					return err
 				}
+				if upsert.Facts != nil {
+					if err := observeBankTransaction(tx, &BankObservation{Keys: upsert.Keys, Facts: *upsert.Facts}); err != nil {
+						return err
+					}
+				}
 				position++
 				if posting.Pending {
 					summary.PendingInserted++
@@ -438,6 +448,11 @@ func applyBankDirectives(tx *userTx, directives []BankDirective, summary *SyncAp
 			posting.ID = postingID
 			if err := writeBankValues(tx, posting.ID, posting); err != nil {
 				return err
+			}
+			if upsert.Facts != nil {
+				if err := observeBankTransaction(tx, &BankObservation{Keys: upsert.Keys, Facts: *upsert.Facts}); err != nil {
+					return err
+				}
 			}
 			summary.PendingUpdated++
 		default:

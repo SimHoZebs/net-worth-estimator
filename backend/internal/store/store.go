@@ -32,6 +32,7 @@ import (
 type Store interface {
 	ReceiptStore
 	AnalysisStore
+	CategoryStore
 	LoadModel() (*types.FinancialModel, error)
 	ModelExists() (bool, error)
 	InitializeModel() error

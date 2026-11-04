@@ -3202,6 +3202,51 @@
 				],
 				"type": "object"
 			},
+			"PostingCategoryBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PostingCategoryBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"category": {
+						"description": "Supported category key; null clears the override",
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["category"],
+				"type": "object"
+			},
+			"PostingCategoryOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/PostingCategoryOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"category": {
+						"type": "string"
+					},
+					"categorySource": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					}
+				},
+				"required": ["postingId"],
+				"type": "object"
+			},
 			"PostingClaim": {
 				"additionalProperties": false,
 				"properties": {
@@ -5282,6 +5327,12 @@
 				"properties": {
 					"amount": {
 						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"category": {
+						"type": "string"
+					},
+					"categorySource": {
+						"type": "string"
 					},
 					"claim": {
 						"$ref": "#/components/schemas/PostingClaim"
@@ -7643,6 +7694,54 @@
 					}
 				},
 				"summary": "Update the edited fields of one posting"
+			}
+		},
+		"/v1/postings/{id}/category": {
+			"patch": {
+				"operationId": "set-posting-category",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/PostingCategoryBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PostingCategoryOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Set or clear one transaction category"
 			}
 		},
 		"/v1/postings/{id}/receipts": {

@@ -20,7 +20,17 @@ func observeBankTransaction(tx *userTx, observation *BankObservation) error {
 	_, err = tx.Exec(`INSERT INTO transaction_source_facts(posting_id, facts_json, user_id) VALUES (?, ?, :user_id)
 		ON CONFLICT(user_id, posting_id) DO UPDATE SET facts_json = excluded.facts_json
 		WHERE transaction_source_facts.facts_json != excluded.facts_json`, id, string(data))
-	return err
+	if err != nil {
+		return err
+	}
+	if err := ensureCategorySchema(tx); err != nil {
+		return fmt.Errorf("ensure posting categories: %w", err)
+	}
+	provider := ""
+	if len(observation.Keys) > 0 {
+		provider = observation.Keys[0].Provider
+	}
+	return setBankPostingCategory(tx, id, provider, observation.Facts)
 }
 
 func analysisRevision(tx *userTx) (int64, error) {

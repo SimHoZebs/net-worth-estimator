@@ -29,6 +29,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/analysis"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
+	"github.com/simhozebs/net-worth-estimator/backend/internal/categorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/csvio"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/groups"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/identity"
@@ -251,6 +252,12 @@ func main() {
 	}
 	stopAnalyses := analysisRunner.Start(context.Background(), time.Second, func(error) { log.Print("background analysis temporarily unavailable") })
 	defer stopAnalyses()
+	categoryWorker, err := categorization.NewWorker(application, categorization.KeywordClassifier{})
+	if err != nil {
+		log.Fatalf("configure categorization: %v", err)
+	}
+	stopCategories := categoryWorker.Start(context.Background(), time.Second, func(error) { log.Print("background categorization temporarily unavailable") })
+	defer stopCategories()
 
 	mux := http.NewServeMux()
 	// Sharing seed provisions a fresh second user, a group with the fixture

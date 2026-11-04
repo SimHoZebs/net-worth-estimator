@@ -36,6 +36,7 @@ func Register(api huma.API, st store.Store, receiptService *receipts.Service, re
 	huma.Register(api, huma.Operation{OperationID: "create-posting", Method: "POST", Path: "/postings", Summary: "Create one posting"}, s.createPosting)
 	huma.Register(api, huma.Operation{OperationID: "update-posting", Method: "PATCH", Path: "/postings/{id}", Summary: "Update the edited fields of one posting"}, s.updatePosting)
 	huma.Register(api, huma.Operation{OperationID: "list-settle-candidates", Method: "GET", Path: "/postings/{id}/settle-candidates", Summary: "List posted charges that could settle a vanished hold"}, s.listSettleCandidates)
+	huma.Register(api, huma.Operation{OperationID: "set-posting-category", Method: "PATCH", Path: "/postings/{id}/category", Summary: "Set or clear one transaction category"}, s.setPostingCategory)
 	huma.Register(api, huma.Operation{OperationID: "delete-posting", Method: "DELETE", Path: "/postings/{id}", Summary: "Delete one posting"}, s.deletePosting)
 	huma.Register(api, huma.Operation{OperationID: "move-posting", Method: "POST", Path: "/postings/reorder", Summary: "Move one posting"}, s.movePosting)
 	huma.Register(api, huma.Operation{OperationID: "create-rule", Method: "POST", Path: "/recurrence-rules", Summary: "Create one recurrence rule"}, s.createRule)

@@ -192,6 +192,8 @@ type transactionRow struct {
 	Void            bool                          `json:"void,omitempty"`
 	PostedTime      int64                         `json:"postedTime,omitempty"`
 	TransactionTime int64                         `json:"transactionTime,omitempty"`
+	Category        string                        `json:"category,omitempty"`
+	CategorySource  string                        `json:"categorySource,omitempty"`
 }
 
 // transactionDay renders a unix stamp as a UTC calendar day for display rows.
@@ -238,10 +240,12 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			}
 			return false
 		}
+		postingIDs := make([]string, 0, len(model.Postings))
 		for _, posting := range model.Postings {
 			if !touches(posting.SourceAccountID, posting.Destinations) {
 				continue
 			}
+			postingIDs = append(postingIDs, posting.ID)
 			syncOwned := isSyncOwned(posting.Source)
 			startDate := transactionDay(posting.TransactionTime)
 			if startDate == "" {
@@ -268,6 +272,16 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 				PostedTime:      posting.PostedTime,
 				TransactionTime: posting.TransactionTime,
 			})
+		}
+		categories, err := s.store.LoadPostingCategories(postingIDs)
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+		for index := range transactions {
+			if item, ok := categories[transactions[index].ID]; ok {
+				transactions[index].Category = item.Category
+				transactions[index].CategorySource = item.Source
+			}
 		}
 	}
 	output := &transactionListOutput{}

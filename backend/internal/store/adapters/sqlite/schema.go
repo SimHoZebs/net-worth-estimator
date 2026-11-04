@@ -65,6 +65,21 @@ const suppressedSyncKeysDDL = `CREATE TABLE IF NOT EXISTS suppressed_sync_keys (
 	PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
 )`
 
+// postingCategoriesDDL is one assignment per posting. It is a sidecar table,
+// not a taxonomy: the supported keys live in Go. Fresh databases get it from
+// schemaStatements; existing databases self-heal at first use so no operator
+// migration is needed for this additive metadata.
+const postingCategoriesDDL = `CREATE TABLE IF NOT EXISTS posting_categories (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	posting_id TEXT NOT NULL,
+	category TEXT NOT NULL,
+	source TEXT NOT NULL CHECK(source IN ('bank', 'inferred', 'user')),
+	producer TEXT NOT NULL DEFAULT '',
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY (user_id, posting_id),
+	FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
+)`
+
 func schemaStatements() []string {
 	statements := []string{
 		`CREATE TABLE IF NOT EXISTS sessions (
@@ -181,6 +196,7 @@ func schemaStatements() []string {
 			PRIMARY KEY (user_id, provider, bridge_account_id, transaction_id)
 		)`,
 		suppressedSyncKeysDDL,
+		postingCategoriesDDL,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			name TEXT PRIMARY KEY
 		)`,
@@ -803,6 +819,7 @@ func expectedSchemaTables() []string {
 		"posting_sim",
 		"posting_claims",
 		"posting_sync_keys",
+		"posting_categories",
 		"schema_migrations",
 		"planned_purchases",
 		"recurrence_rules",

@@ -212,10 +212,13 @@ type BankDirective struct {
 	Observe *BankObservation
 }
 
-// BankUpsert carries full row values for insert-or-update by key.
+// BankUpsert carries full row values for insert-or-update by key. Facts
+// carries the source evidence observed in the same snapshot, so the first
+// sync stores evidence and category hints without waiting for a later pass.
 type BankUpsert struct {
 	Posting types.Posting
 	Keys    []BankKey
+	Facts   *types.TransactionFacts
 }
 
 // BankConvert carries settled values for an existing row the adapter
@@ -224,6 +227,7 @@ type BankConvert struct {
 	ID      string
 	Posting types.Posting
 	AddKeys []BankKey
+	Facts   *types.TransactionFacts
 }
 
 // Group describes one user group plus the caller's role in it.

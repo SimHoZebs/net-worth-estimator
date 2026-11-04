@@ -163,7 +163,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	// emits them only for resolved accounts.
 	for _, item := range pending {
 		directives = append(directives, store.BankDirective{
-			Upsert: &store.BankUpsert{Posting: item.Posting, Keys: []store.BankKey{candidateKey(item)}},
+			Upsert: &store.BankUpsert{Posting: item.Posting, Keys: []store.BankKey{candidateKey(item)}, Facts: item.Facts},
 		})
 		if id, ok := byKey[candidateKey(item)]; ok {
 			seen[id] = true
@@ -323,6 +323,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 			ID:      target.id,
 			Posting: candidate.Posting,
 			AddKeys: []store.BankKey{candidateKey(candidate)},
+			Facts:   candidate.Facts,
 		}})
 		convertedCandidate[ci] = true
 		convertedTarget[target.id] = true
@@ -373,7 +374,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 			continue
 		}
 		directives = append(directives, store.BankDirective{
-			Upsert: &store.BankUpsert{Posting: candidate.Posting, Keys: []store.BankKey{candidateKey(candidate)}},
+			Upsert: &store.BankUpsert{Posting: candidate.Posting, Keys: []store.BankKey{candidateKey(candidate)}, Facts: candidate.Facts},
 		})
 	}
 	// Evidence refreshes also apply to known settled keys, independently of the
