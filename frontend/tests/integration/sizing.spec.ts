@@ -66,6 +66,44 @@ test("projection inspection remains keyboard-accessible after resize", async ({
 	}
 });
 
+test("chart shows no selection box on pointer click", async ({ page }) => {
+	await page.goto("/");
+	const chart = page.getByRole("img", {
+		name: /Net worth over the trailing/,
+	});
+	await expect(chart).toBeAttached();
+	// The surface is tabbable by design so keyboard users can inspect the
+	// trailing window. Browsers paint a UA outline around a tabbable element
+	// on pointer focus; the stylesheet must suppress that one case, while a
+	// keyboard focus keeps the shared :focus-visible ring.
+	await chart.click();
+	await expect(chart).toBeFocused();
+	const clicked = await chart.evaluate((element) => ({
+		focusVisible: element.matches(":focus-visible"),
+		outlineStyle: getComputedStyle(element).outlineStyle,
+	}));
+	expect(clicked.focusVisible).toBe(false);
+	expect(clicked.outlineStyle).toBe("none");
+	await page.evaluate(() => {
+		if (document.activeElement instanceof HTMLElement)
+			document.activeElement.blur();
+	});
+	// Tab from the page start, like a keyboard user. Playwright focus() is
+	// programmatic, and a programmatic focus right after a pointer click does
+	// not reliably match :focus-visible.
+	for (let tab = 0; tab < 40; tab++) {
+		await page.keyboard.press("Tab");
+		if (await chart.evaluate((element) => element.matches(":focus"))) break;
+	}
+	await expect(chart).toBeFocused();
+	const keyboard = await chart.evaluate((element) => ({
+		focusVisible: element.matches(":focus-visible"),
+		outlineStyle: getComputedStyle(element).outlineStyle,
+	}));
+	expect(keyboard.focusVisible).toBe(true);
+	expect(keyboard.outlineStyle).not.toBe("none");
+});
+
 test("outlook summary keeps full width on a narrow phone", async ({ page }) => {
 	// Below sm the summary stacks above its controls; side by side the
 	// flex-1 summary can collapse to leftover width beside them and the
