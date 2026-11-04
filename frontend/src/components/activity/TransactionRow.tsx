@@ -55,7 +55,7 @@ export function TransactionRow({
 	const finding = useTransactionBNPL(savedTransaction?.id ?? "");
 	const analysisBadge =
 		finding &&
-		savedTransaction?.frequency === "once" &&
+		savedTransaction?.kind === "posting" &&
 		!transaction.pending &&
 		!transaction.void ? (
 			<Badge tone="neutral" className={transactionBadgeStyles()}>

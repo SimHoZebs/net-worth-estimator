@@ -54,7 +54,9 @@ export const transactionSchema = z.object({
 	amountKnown: z.boolean().default(true),
 	fromId: id.nullable(),
 	toId: id.nullable(),
-	frequency: z.enum(["monthly", "yearly", "once"]),
+	// Which row this is: a one-time posting or a recurrence rule. The
+	// schedule itself lives on the rule; the row only carries the tag.
+	kind: z.enum(["posting", "rule"]),
 	startDate: date,
 	endDate: date.nullable(),
 	annualIncrease: z.number().min(-50).max(50),
@@ -89,11 +91,11 @@ export const transactionSchema = z.object({
  * Planned purchases live in their own slice and never count as history.
  */
 export function isHistoricalTransaction(
-	transaction: Transaction,
+	transaction: Pick<Transaction, "kind" | "startDate">,
 	projectionStartDate: string,
 ): boolean {
 	return (
-		transaction.frequency === "once" &&
+		transaction.kind === "posting" &&
 		transaction.startDate <= projectionStartDate
 	);
 }

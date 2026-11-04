@@ -28,7 +28,8 @@ import {
 } from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { voidSettleCandidates } from "../../domain/accountActivity.ts";
-import { dateLabel, money } from "../../domain/format.ts";
+import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
+import { dateLabel, money, todayIso } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { AccountIconFallback } from "./AccountIconFallback.tsx";
 import { parseUnion } from "../../domain/guards.ts";
@@ -60,13 +61,16 @@ import {
 	updateRule,
 } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
+import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import {
 	getServerModel,
 	modelOptions,
 	refreshTransactions,
+	useServerModel,
 } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
+	frequencyChoiceOf,
 	timeOfDay,
 	claimPostingBody,
 	detailFormValues,
@@ -74,6 +78,7 @@ import {
 	postingUpdateBody,
 	ruleBody,
 	ruleUpdateBody,
+	type FrequencyChoice,
 } from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
@@ -97,17 +102,6 @@ type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
  */
 function DetailPortal({ children }: { children: ReactNode }) {
 	return createPortal(children, document.body);
-}
-
-function frequencyLabel(frequency: Transaction["frequency"]): string {
-	switch (frequency) {
-		case "monthly":
-			return "Monthly";
-		case "yearly":
-			return "Yearly";
-		case "once":
-			return "One-time";
-	}
 }
 
 function DirectionIcon({
@@ -159,35 +153,28 @@ function associatedAccountLabel({
 	return unique.join(" → ");
 }
 
-function FrequencyOptions() {
-	return (
-		<>
-			<option value="monthly">Monthly</option>
-			<option value="yearly">Yearly</option>
-			<option value="once">One time</option>
-		</>
-	);
-}
-
 function MoreOptions({
 	savedTransaction,
 	transactions,
 	draft,
 	updateDraft,
 	locked,
+	occurrenceOptions,
 }: {
 	savedTransaction: Transaction;
 	transactions: Transaction[];
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	locked: boolean;
+	/** Scheduled dates of the selected rule, closest to the posted day first. */
+	occurrenceOptions: string[];
 }) {
 	const id = useId();
 	const frequency = draft.frequency;
-	const onFrequency = (next: Transaction["frequency"]) =>
+	const onFrequency = (next: FrequencyChoice) =>
 		updateDraft({ frequency: next }, "schedule");
 	const claimRules = transactions.filter(
-		(item) => item.frequency !== "once" && item.id !== savedTransaction.id,
+		(item) => item.kind === "rule" && item.id !== savedTransaction.id,
 	);
 	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
 	const frequencyId = `${id}-frequency`;
@@ -220,7 +207,9 @@ function MoreOptions({
 						}}
 						className="min-w-0 flex-1"
 					>
-						<FrequencyOptions />
+						<option value="monthly">Monthly</option>
+						<option value="yearly">Yearly</option>
+						<option value="once">One time</option>
 					</Select>
 				</div>
 				{frequency !== "once" && (
@@ -273,11 +262,10 @@ function MoreOptions({
 							<label htmlFor={claimOccurrenceId} className={rowLabel}>
 								Replaces occurrence on
 							</label>
-							<Input
+							<Select
 								id={claimOccurrenceId}
-								type="date"
 								name="claimOccurrenceDate"
-								disabled={!claimEditable}
+								disabled={!claimEditable || !draft.claimRuleId}
 								value={draft.claimOccurrenceDate}
 								onChange={(event) =>
 									updateDraft(
@@ -286,7 +274,20 @@ function MoreOptions({
 									)
 								}
 								className="min-w-0 flex-1"
-							/>
+							>
+								<option value="">
+									{!draft.claimRuleId
+										? "Choose a rule first"
+										: occurrenceOptions.length === 0
+											? "No claimable occurrences"
+											: "Choose the occurrence"}
+								</option>
+								{occurrenceOptions.map((date) => (
+									<option key={date} value={date}>
+										{dateLabel(date, true)}
+									</option>
+								))}
+							</Select>
 						</div>
 					</>
 				)}
@@ -315,18 +316,24 @@ function ScheduleCapsule({
 	draft,
 	updateDraft,
 	claimRuleName,
+	ruleCadence,
 	editing,
 	locked,
 	scheduleControlId,
+	occurrenceOptions,
 }: {
 	savedTransaction: Transaction;
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	claimRuleName?: string | null;
+	/** Stored cadence from the raw rule, shown while it loads. */
+	ruleCadence?: string | null;
 	editing: boolean;
 	locked: boolean;
 	/** DOM id for the first schedule control. */
 	scheduleControlId?: string;
+	/** Scheduled dates of the selected rule, closest to the posted day first. */
+	occurrenceOptions: string[];
 }) {
 	const id = useId();
 	const frequency = draft.frequency;
@@ -359,12 +366,14 @@ function ScheduleCapsule({
 						)}
 					</select>{" "}
 					on{" "}
-					<input
-						className={transactionControlStyles({ shape: "date" })}
+					<select
+						className={transactionControlStyles({
+							element: "select",
+							shape: "compact",
+						})}
 						aria-label="Replaces occurrence on"
-						type="date"
 						name="claimOccurrenceDate"
-						readOnly={!claimEditable}
+						disabled={!claimEditable}
 						value={draft.claimOccurrenceDate}
 						onChange={(event) =>
 							updateDraft(
@@ -372,7 +381,14 @@ function ScheduleCapsule({
 								"schedule",
 							)
 						}
-					/>
+					>
+						<option value="">Choose a date</option>
+						{occurrenceOptions.map((date) => (
+							<option key={date} value={date}>
+								{dateLabel(date, true)}
+							</option>
+						))}
+					</select>
 				</span>
 			</p>
 		);
@@ -391,7 +407,7 @@ function ScheduleCapsule({
 						Recurring transaction
 					</strong>
 					<span className="text-xs text-muted">
-						{frequencyLabel(frequency)}
+						{ruleCadence ?? frequencyLabel(frequency)}
 						{growth}
 					</span>
 				</div>
@@ -491,7 +507,7 @@ type TransactionDraft = {
 	amount: string;
 	fromId: string;
 	toId: string;
-	frequency: Transaction["frequency"];
+	frequency: FrequencyChoice;
 	startDate: string;
 	endDate: string;
 	noEndDate: boolean;
@@ -503,13 +519,17 @@ type TransactionDraft = {
 	transactionTime: string;
 };
 
-function draftFromTransaction(savedTransaction: Transaction): TransactionDraft {
+function draftFromTransaction(
+	savedTransaction: Transaction,
+	ruleFrequencyChoice: FrequencyChoice,
+): TransactionDraft {
 	return {
 		name: savedTransaction.name,
 		amount: String(savedTransaction.amount),
 		fromId: savedTransaction.fromId ?? "",
 		toId: savedTransaction.toId ?? "",
-		frequency: savedTransaction.frequency,
+		frequency:
+			savedTransaction.kind === "posting" ? "once" : ruleFrequencyChoice,
 		startDate: savedTransaction.startDate,
 		endDate: savedTransaction.endDate ?? "",
 		noEndDate: savedTransaction.endDate == null,
@@ -530,7 +550,7 @@ function draftFromTransaction(savedTransaction: Transaction): TransactionDraft {
  */
 function canClaimOccurrence(transaction: Transaction): boolean {
 	return (
-		transaction.frequency === "once" &&
+		transaction.kind === "posting" &&
 		transaction.pending === true &&
 		transaction.syncOwned === true
 	);
@@ -540,10 +560,12 @@ function useTransactionEdit({
 	savedTransaction,
 	readOnly: readOnlyProp,
 	onClose,
+	ruleFrequencyChoice,
 }: {
 	savedTransaction: Transaction;
 	readOnly?: boolean;
 	onClose: () => void;
+	ruleFrequencyChoice: FrequencyChoice;
 }) {
 	// Only the clicked value is editable; null renders the pure read view.
 	const [activeField, setActiveField] = useState<EditField | null>(null);
@@ -553,7 +575,7 @@ function useTransactionEdit({
 	const [saving, setSaving] = useState(false);
 	const edit = useEditDraft(
 		savedTransaction.id,
-		draftFromTransaction(savedTransaction),
+		draftFromTransaction(savedTransaction, ruleFrequencyChoice),
 	);
 	const draft = edit.value;
 	const formId = useId();
@@ -634,7 +656,7 @@ function useTransactionEdit({
 		// Direct row write. Conversions state an explicit new body; updates
 		// carry unedited fields over from the canonical raw row because the
 		// backend replaces the full authored row.
-		const wasOnce = savedTransaction.frequency === "once";
+		const wasOnce = savedTransaction.kind === "posting";
 		const nowOnce = values.frequency === "once";
 		if (wasOnce !== nowOnce) {
 			const ok = await performSave({
@@ -774,7 +796,7 @@ function useMarkAsSubscription({
 	const attemptRef = useRef<{ ruleId: string } | null>(null);
 	const canClaimPending = canClaimOccurrence(savedTransaction);
 	const available =
-		savedTransaction.frequency === "once" &&
+		savedTransaction.kind === "posting" &&
 		!savedTransaction.claimRuleId &&
 		(!locked || canClaimPending);
 	const mark = async () => {
@@ -933,16 +955,29 @@ export function TransactionDetail({
 		transaction.category === "transfer"
 			? ("transfer" as const)
 			: transaction.direction;
+	// Cadence of the rule this row displays, read from the canonical raw
+	// rule. Display-only; the editor keeps its own monthly/yearly choice.
+	const rawRules = useServerModel().data?.model?.recurrenceRules;
+	const rawRule =
+		savedTransaction.kind === "rule"
+			? rawRules?.find((rule) => rule.id === savedTransaction.id)
+			: undefined;
+	const ruleCadence = rawRule ? frequencyLabel(rawRule.frequency) : null;
+	const ruleFrequencyChoice: FrequencyChoice =
+		rawRule === undefined
+			? "monthly"
+			: frequencyChoiceOf(rawRule.frequency);
 	const edit = useTransactionEdit({
 		savedTransaction,
 		readOnly,
 		onClose,
+		ruleFrequencyChoice,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [confirmingVoidRemove, setConfirmingVoidRemove] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
-	const once = savedTransaction.frequency === "once";
+	const once = savedTransaction.kind === "posting";
 	const canEdit = !edit.readOnlyReason;
 	// Settled bank rows are editable and removable through the UI: removing
 	// one suppresses its bank ids, so the feed will not re-import it.
@@ -962,6 +997,41 @@ export function TransactionDetail({
 		() => savedTransactions ?? transactions ?? [savedTransaction],
 		[savedTransactions, transactions, savedTransaction],
 	);
+	// Claim candidates: the selected rule's scheduled dates through today,
+	// closest to the day the posting actually happened first, already
+	// claimed dates removed. The row's own saved claim always stays listed.
+	const postedRef = savedTransaction.postedDate ?? savedTransaction.startDate;
+	const occurrenceOptions = useMemo(() => {
+		const ruleId = edit.draft.claimRuleId;
+		const rule = ruleId
+			? rawRules?.find((row) => row.id === ruleId)
+			: undefined;
+		if (!rule) return [];
+		const claimed = new Set<string>();
+		for (const row of allTransactions) {
+			if (
+				row.id !== savedTransaction.id &&
+				row.claimRuleId === ruleId &&
+				row.claimOccurrenceDate
+			)
+				claimed.add(row.claimOccurrenceDate);
+		}
+		const candidates = claimOccurrenceCandidates({
+			rule,
+			through: todayIso(),
+			postedRef,
+			claimed,
+		});
+		const own = edit.draft.claimOccurrenceDate;
+		return own && !candidates.includes(own) ? [own, ...candidates] : candidates;
+	}, [
+		edit.draft.claimRuleId,
+		edit.draft.claimOccurrenceDate,
+		rawRules,
+		allTransactions,
+		savedTransaction.id,
+		postedRef,
+	]);
 	const voidCandidates = transaction.void
 		? voidSettleCandidates({
 				voidRow: savedTransaction,
@@ -1007,7 +1077,7 @@ export function TransactionDetail({
 		setDeleteError(null);
 		const ok = await performSave({
 			call: () =>
-				savedTransaction.frequency === "once"
+				savedTransaction.kind === "posting"
 					? deletePosting(savedTransaction.id)
 					: deleteRule(savedTransaction.id),
 			refresh: refreshTransactions,
@@ -1087,7 +1157,7 @@ export function TransactionDetail({
 				form={edit.formId}
 				className={transactionControlStyles({ shape: "name" })}
 			/>
-			{savedTransaction.frequency !== "once" && (
+			{savedTransaction.kind === "rule" && (
 				<span
 					title="Recurring transaction"
 					aria-label="Recurring transaction"
@@ -1406,6 +1476,8 @@ export function TransactionDetail({
 										)?.name ?? claimRuleName)
 									: null
 							}
+							ruleCadence={ruleCadence}
+						occurrenceOptions={occurrenceOptions}
 							editing={edit.activeField === "schedule"}
 							locked={!canEdit}
 							scheduleControlId={`${edit.formId}-schedule`}
@@ -1417,6 +1489,7 @@ export function TransactionDetail({
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}
+						occurrenceOptions={occurrenceOptions}
 					/>
 					{transaction.void && !readOnly && (
 						<div className="mt-4 flex min-w-0 flex-col items-start gap-2">
@@ -1498,7 +1571,7 @@ export function TransactionDetail({
 										<span>{sharingLabel}</span>
 									</TextButton>
 								)}
-								{savedTransaction.frequency !== "once" && (
+								{savedTransaction.kind === "rule" && (
 									<TextButton
 										type="button"
 										tone="default"
@@ -1508,10 +1581,14 @@ export function TransactionDetail({
 												.getElementById(`${edit.formId}-schedule`)
 												?.focus();
 										}}
-										aria-label={`Recurring rule: ${frequencyLabel(savedTransaction.frequency)}. Go to schedule`}
+										aria-label={
+											ruleCadence
+												? `Recurring rule: ${ruleCadence}. Go to schedule`
+												: "Recurring rule. Go to schedule"
+										}
 									>
 										<Repeat size={14} aria-hidden="true" />
-										<span>{frequencyLabel(savedTransaction.frequency)}</span>
+										<span>{ruleCadence ?? "Recurring rule"}</span>
 									</TextButton>
 								)}
 							</div>

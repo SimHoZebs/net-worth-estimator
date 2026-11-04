@@ -58,7 +58,7 @@ export function fixtureModel(
 			source: account.readOnly ? "banksync" : "user",
 		})),
 		postings: data.transactions
-			.filter((row) => row.frequency === "once")
+			.filter((row) => row.kind === "posting")
 			.map((row) => ({
 				id: row.id,
 				name: row.name,
@@ -81,14 +81,14 @@ export function fixtureModel(
 					: {}),
 			})),
 		recurrenceRules: data.transactions
-			.filter((row) => row.frequency !== "once")
+			.filter((row) => row.kind === "rule")
 			.map((row, priority) => ({
 				id: row.id,
 				name: row.name,
 				sourceAccountId: row.fromId,
 				destinations: row.toId ? [row.toId] : null,
 				amount: fixtureAmount(row),
-				frequency: row.frequency === "yearly" ? "annual" : "monthly",
+				frequency: "monthly",
 				startDate: row.startDate,
 				endDate: row.endDate,
 				annualCap: null,

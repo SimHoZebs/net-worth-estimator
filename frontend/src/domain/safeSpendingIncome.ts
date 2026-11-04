@@ -11,7 +11,6 @@ export interface SafeSpendingIncome {
 	candidates: {
 		id: string;
 		name: string;
-		frequency: Transaction["frequency"];
 		amount: number;
 		nextPayment: IncomePayment | null;
 	}[];
@@ -52,7 +51,7 @@ export function safeSpendingIncome({
 	const eligible = rules.filter(
 		(rule) =>
 			rule.enabled &&
-			rule.frequency !== "once" &&
+			rule.kind === "rule" &&
 			rule.startDate <= today &&
 			(rule.endDate === null || rule.endDate >= today) &&
 			rule.toId !== null &&
@@ -75,7 +74,6 @@ export function safeSpendingIncome({
 		candidates: eligible.map((rule) => ({
 			id: rule.id,
 			name: rule.name,
-			frequency: rule.frequency,
 			amount: rule.amount,
 			nextPayment: nextPayments.get(rule.id) ?? null,
 		})),

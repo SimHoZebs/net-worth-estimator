@@ -16,6 +16,8 @@ import {
 	type Account,
 	type Transaction,
 } from "../../domain/model.ts";
+import { frequencyLabel } from "../../domain/recurringPatterns.ts";
+import { useServerModel } from "../../state/workspaceResources.ts";
 import type { ResolvedTransactionAmount } from "../../domain/resolvedTransactionAmounts.ts";
 
 export function TransactionsPanel({
@@ -33,6 +35,17 @@ export function TransactionsPanel({
 	resolvedAmounts?: Map<string, ResolvedTransactionAmount>;
 	showHeaders?: boolean;
 }) {
+	// Cadence labels for rule rows come from the raw rule rows, read
+	// reactively through the saved model so a late-loaded model re-renders
+	// the labels without touching the narrow rows.
+	const serverModel = useServerModel().data?.model;
+	const cadenceById = new Map(
+		(serverModel?.recurrenceRules ?? []).map((rule) => [
+			rule.id,
+			frequencyLabel(rule.frequency),
+		]),
+	);
+	const cadenceOf = (id: string) => cadenceById.get(id) ?? "Recurring";
 	if (!transactions.length)
 		return <EmptyState icon={ArrowRight} title="No matching transactions" />;
 	const names = new Map(accounts.map((account) => [account.id, account.name]));
@@ -76,17 +89,15 @@ export function TransactionsPanel({
 							: ("outflow" as const)
 						: ("inflow" as const);
 					const dateText =
-						transaction.frequency === "once"
+						transaction.kind === "posting"
 							? dateLabel(transaction.startDate, true)
-							: transaction.frequency === "monthly"
-								? "Monthly"
-								: "Yearly";
+							: cadenceOf(transaction.id);
 					return (
 						<TransactionItemRow
 							key={transaction.id}
 							dimmed={!transaction.enabled && !pending}
 							date={
-								transaction.frequency === "once" ? (
+								transaction.kind === "posting" ? (
 									<time dateTime={transaction.startDate}>{dateText}</time>
 								) : (
 									dateText
@@ -150,7 +161,7 @@ export function TransactionsPanel({
 									)}
 								</>
 							}
-							actionLabel={`View ${transaction.name} on ${transaction.frequency === "once" ? dateText : transaction.frequency}`}
+							actionLabel={`View ${transaction.name} on ${dateText}`}
 							onSelect={() => setSelectedId(transaction.id)}
 						/>
 					);
@@ -191,7 +202,7 @@ function TransactionAmount({
 		);
 	if (resolved) {
 		const label =
-			transaction.frequency === "once"
+			transaction.kind === "posting"
 				? `Calculated for ${dateLabel(resolved.date, true)}`
 				: `Next calculated amount ${dateLabel(resolved.date, true)} · varies each occurrence`;
 		return (

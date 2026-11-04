@@ -75,7 +75,6 @@ describe("transaction rows", () => {
 						},
 					},
 				},
-				frequency: "monthly",
 				startDate: "2026-02-01",
 				endDate: null,
 				enabled: true,
@@ -90,7 +89,7 @@ describe("transaction rows", () => {
 			amountKnown: true,
 			fromId: null,
 			toId: "cash",
-			frequency: "monthly",
+			kind: "rule",
 			annualIncrease: 3,
 			postedDate: null,
 			pending: false,
@@ -107,7 +106,6 @@ describe("transaction rows", () => {
 				config: { expression: "200" },
 				inputs: {},
 			},
-			frequency: "once",
 			startDate: "2026-02-15",
 			endDate: null,
 			enabled: true,
@@ -115,7 +113,7 @@ describe("transaction rows", () => {
 			readOnly: false,
 		} as never);
 		expect(posting).toMatchObject({
-			frequency: "once",
+			kind: "posting",
 			amount: 200,
 			amountKnown: true,
 			annualIncrease: 0,
@@ -128,7 +126,6 @@ describe("transaction rows", () => {
 				sourceAccountId: null,
 				destinations: ["cash"],
 				amount: { resolver: "other", config: {}, inputs: {} },
-				frequency: "annual",
 				startDate: "2026-02-01",
 				endDate: null,
 				enabled: true,
@@ -140,7 +137,7 @@ describe("transaction rows", () => {
 		expect(varied).toMatchObject({
 			amount: 0,
 			amountKnown: false,
-			frequency: "yearly",
+			kind: "rule",
 		});
 		const bankRow = transactionToDisplay({
 			id: "void-1",
@@ -153,7 +150,6 @@ describe("transaction rows", () => {
 				config: { expression: "42.10" },
 				inputs: {},
 			},
-			frequency: "once",
 			startDate: "2026-02-15",
 			endDate: null,
 			enabled: false,
@@ -179,7 +175,6 @@ describe("transaction rows", () => {
 				config: { expression: "18.50" },
 				inputs: {},
 			},
-			frequency: "once",
 			startDate: "2026-02-16",
 			endDate: null,
 			enabled: false,

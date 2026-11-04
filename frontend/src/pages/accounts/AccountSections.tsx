@@ -233,10 +233,10 @@ function TransactionsView({
 		[rows, accounts],
 	);
 	const recurringCount = visible.filter(
-		(transaction) => transaction.frequency !== "once",
+		(transaction) => transaction.kind === "rule",
 	).length;
 	const transactionsCount = visible.filter(
-		(transaction) => transaction.frequency === "once",
+		(transaction) => transaction.kind === "posting",
 	).length;
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
@@ -253,8 +253,8 @@ function TransactionsView({
 					(transaction) =>
 						transaction.name.toLowerCase().includes(query.toLowerCase()) &&
 						(schedule === "all"
-							? transaction.frequency === "once"
-							: transaction.frequency !== "once"),
+							? transaction.kind === "posting"
+							: transaction.kind === "rule"),
 				),
 				getDate: (transaction) => transaction.startDate,
 				getId: (transaction) => transaction.id,

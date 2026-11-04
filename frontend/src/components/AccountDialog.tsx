@@ -61,7 +61,7 @@ export function AccountDialog({
 		() =>
 			transactions.filter(
 				(transaction) =>
-					transaction.frequency !== "once" &&
+					transaction.kind === "rule" &&
 					(transaction.fromId === account.id ||
 						transaction.toId === account.id),
 			),

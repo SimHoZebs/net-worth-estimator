@@ -5,13 +5,20 @@ import type { RuleBody } from "@/api/generated/model/ruleBody.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 
+/**
+ * Editor vocabulary for the recurrence choice on a form. A one-time row, or
+ * the monthly/yearly cadence the editor offers. Stored rules may carry any
+ * cadence; edits that leave the choice untouched keep the raw stored value.
+ */
+export type FrequencyChoice = "monthly" | "yearly" | "once";
+
 export interface TransactionFormValues {
 	name: string;
 	amount: number;
 	annualIncrease: number;
 	fromId: string | null;
 	toId: string | null;
-	frequency: Transaction["frequency"];
+	frequency: FrequencyChoice;
 	startDate: string;
 	endDate: string | null;
 	postedDate: string | null;
@@ -92,6 +99,11 @@ export function postingBody(values: TransactionFormValues): PostingBody {
 				}
 			: {}),
 	};
+}
+
+/** Editor choice matching a stored rule cadence: annual reads as yearly. */
+export function frequencyChoiceOf(rawFrequency: string): FrequencyChoice {
+	return rawFrequency === "annual" ? "yearly" : "monthly";
 }
 
 /**
@@ -213,7 +225,8 @@ export function ruleUpdateBody({
 	const amountChanged =
 		values.amount !== baseline.amount ||
 		values.annualIncrease !== baseline.annualIncrease;
-	const frequencyChanged = values.frequency !== baseline.frequency;
+	const frequencyChanged =
+		values.frequency !== frequencyChoiceOf(raw.frequency);
 	const endChanged = (values.endDate ?? null) !== baseline.endDate;
 	return {
 		name: values.name,
@@ -291,6 +304,8 @@ export function validateTransactionValues(
 	if (!values.fromId && !values.toId)
 		return "Choose a source or destination account.";
 	if (!values.startDate) return "Choose a date.";
+	if (values.claimRuleId && !values.claimOccurrenceDate)
+		return "Choose which occurrence this replaces.";
 	if (
 		values.frequency !== "once" &&
 		values.endDate &&
@@ -322,7 +337,7 @@ export function detailFormValues({
 		amount: string;
 		fromId: string;
 		toId: string;
-		frequency: Transaction["frequency"];
+		frequency: FrequencyChoice;
 		startDate: string;
 		endDate: string;
 		noEndDate: boolean;

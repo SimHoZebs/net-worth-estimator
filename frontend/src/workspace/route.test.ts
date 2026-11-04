@@ -38,7 +38,7 @@ function transaction(id: string): Transaction {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		frequency: "monthly",
+		kind: "rule",
 		startDate: "2026-02-01",
 		endDate: null,
 		annualIncrease: 0,

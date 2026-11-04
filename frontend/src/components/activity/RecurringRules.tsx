@@ -16,9 +16,11 @@ import { moveRule } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
+	useServerModel,
 	useServerStatus,
 } from "../../state/workspaceResources.ts";
 import { ruleTransaction } from "../../domain/accountActivity.ts";
+import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import { Badge } from "../Badge.tsx";
 import { EmptyState } from "../EmptyState.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
@@ -47,23 +49,7 @@ function directionLabel(direction: Direction): string {
 	}
 }
 
-function frequencyLabel(frequency: string): string {
-	switch (frequency) {
-		case "daily":
-			return "Daily";
-		case "weekly":
-			return "Weekly";
-		case "monthly":
-			return "Monthly";
-		case "quarterly":
-			return "Quarterly";
-		case "annual":
-		case "yearly":
-			return "Yearly";
-		default:
-			return frequency;
-	}
-}
+
 
 // One draggable row. The drag starts only from the grip handle
 // (dragListener={false} + drag controls) so the up/down buttons and the
@@ -124,6 +110,18 @@ export function RecurringRules({
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const status = useServerStatus().data;
+	const serverModel = useServerModel().data?.model;
+	const cadenceById = useMemo(
+		() =>
+			new Map(
+				(serverModel?.recurrenceRules ?? []).map((rule) => [
+					rule.id,
+					frequencyLabel(rule.frequency),
+				]),
+			),
+		[serverModel],
+	);
+	const cadenceOf = (id: string) => cadenceById.get(id) ?? "Recurring";
 	const [editing, setEditing] = useState(false);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -131,7 +129,7 @@ export function RecurringRules({
 		() =>
 			transactions.filter(
 				(transaction) =>
-					transaction.frequency !== "once" &&
+					transaction.kind === "rule" &&
 					(transaction.fromId === account.id ||
 						transaction.toId === account.id),
 			),
@@ -293,7 +291,7 @@ export function RecurringRules({
 					</strong>
 					<span className="m-0 text-xs text-muted">
 						{directionLabel(direction)} ·{" "}
-						{frequencyLabel(transaction.frequency)} ·{" "}
+						{cadenceOf(transaction.id)} ·{" "}
 						{transaction.amountKnown ? money(transaction.amount) : "Varies"}
 					</span>
 					{!transaction.enabled && (
@@ -397,7 +395,7 @@ export function RecurringRules({
 							<button
 								type="button"
 								className="flex min-w-0 flex-1 items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left"
-								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${frequencyLabel(transaction.frequency).toLowerCase()}, position ${index + 1} of ${rules.length}`}
+								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${cadenceOf(transaction.id).toLowerCase()}, position ${index + 1} of ${rules.length}`}
 								onClick={() => setSelectedId(transaction.id)}
 							>
 								{rowContent(transaction, index + 1, false)}

@@ -78,11 +78,6 @@ function settledDayOf(postedTime: unknown): string | null {
 	return isoDateFromEpochSeconds(postedTime);
 }
 
-function displayFrequencyOf(frequency: string): Transaction["frequency"] {
-	if (frequency === "annual" || frequency === "yearly") return "yearly";
-	return "monthly";
-}
-
 /**
  * Narrow query transaction to display transaction. Non-literal amounts resolve
  * through the caller's projection figure; without one the transaction stays
@@ -100,13 +95,13 @@ export function transactionToDisplay(
 	const once = row.kind === "posting";
 	const claim = extra.claim;
 	return {
+		kind: once ? "posting" : "rule",
 		id: row.id,
 		name: row.name || row.id,
 		amount: Math.max(0, amount ?? 0),
 		amountKnown: amount !== null,
 		fromId: row.sourceAccountId,
 		toId: row.destinations?.[0] ?? null,
-		frequency: once ? "once" : displayFrequencyOf(row.frequency),
 		startDate:
 			row.startDate ||
 			dayFromStamps(extra.transactionTime, extra.postedTime) ||

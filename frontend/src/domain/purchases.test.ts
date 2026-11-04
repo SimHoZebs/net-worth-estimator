@@ -82,7 +82,7 @@ describe("purchase queue", () => {
 		expect(transactionSchema.safeParse(item).success).toBe(false);
 		// Queue rows never grow transaction fields by moving.
 		for (const row of movePurchase([item, wish("chair")], "chair", -1)) {
-			expect(row).not.toHaveProperty("frequency");
+			expect(row).not.toHaveProperty("kind");
 			expect(row).not.toHaveProperty("toId");
 		}
 	});

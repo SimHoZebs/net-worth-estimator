@@ -104,5 +104,4 @@ export interface BillCandidate {
 	id: string;
 	name: string;
 	amount: number;
-	frequency: string;
 }

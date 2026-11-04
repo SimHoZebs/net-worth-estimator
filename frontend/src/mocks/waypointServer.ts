@@ -291,7 +291,9 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					unknown
 				>[]) {
 					if (!touches(rule.sourceAccountId, rule.destinations)) continue;
-					transactions.push({ ...rule, kind: "rule" });
+					const row = { ...rule };
+					delete row.frequency;
+					transactions.push({ ...row, kind: "rule" });
 				}
 			}
 			if (recurring !== "recurring") {
@@ -307,7 +309,6 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					transactions.push({
 						...posting,
 						kind: "posting",
-						frequency: "once",
 						syncOwned,
 						// Only lifecycle bank rows stay sync-owned: pending
 						// seeds refresh in place and voids convert. Settled

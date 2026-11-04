@@ -19,7 +19,7 @@ const baselinePosting: Transaction = {
 	amountKnown: true,
 	fromId: "checking",
 	toId: "savings",
-	frequency: "once",
+	kind: "posting",
 	startDate: "2028-06-15",
 	endDate: null,
 	annualIncrease: 0,
@@ -297,7 +297,7 @@ const baselineRule: Transaction = {
 	amountKnown: true,
 	fromId: "checking",
 	toId: "brokerage",
-	frequency: "yearly",
+	kind: "rule",
 	startDate: "2026-10-03",
 	endDate: "2028-10-03",
 	annualIncrease: 0,
@@ -367,6 +367,29 @@ describe("rule update bodies", () => {
 		});
 	});
 
+	it("keeps a stored cadence the editor never offered untouched", () => {
+		const weeklyRaw: RecurrenceRule = { ...rawRule, frequency: "weekly" };
+		const body = ruleUpdateBody({
+			baseline: baselineRule,
+			raw: weeklyRaw,
+			values: {
+				name: "Monthly investing revised",
+				amount: 1800,
+				annualIncrease: 0,
+				fromId: "checking",
+				toId: "brokerage",
+				frequency: "monthly",
+				startDate: "2026-10-03",
+				endDate: "2028-10-03",
+				postedDate: null,
+				enabled: true,
+				claimRuleId: null,
+				claimOccurrenceDate: null,
+			},
+		});
+		expect(body.frequency).toBe("weekly");
+	});
+
 	it("rebuilds edited amount and frequency while keeping cap and priority", () => {
 		const body = ruleUpdateBody({
 			baseline: baselineRule,
@@ -407,7 +430,7 @@ describe("rule update bodies", () => {
 		const body = ruleUpdateBody({
 			baseline: baselineRule,
 			raw: rawRule,
-			values: { ...baselineRule, startDate: "2026-11-15" },
+			values: { ...baselineRule, frequency: "yearly", startDate: "2026-11-15" },
 		});
 		expect(body.startDate).toBe("2026-11-15");
 		expect(body.amount).toEqual(rawRule.amount);

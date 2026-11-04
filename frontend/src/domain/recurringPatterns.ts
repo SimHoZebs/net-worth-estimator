@@ -118,6 +118,8 @@ export function directionLabel(direction: string): string {
 
 export function frequencyLabel(frequency: string): string {
 	switch (frequency) {
+		case "daily":
+			return "Daily";
 		case "weekly":
 			return "Weekly";
 		case "monthly":
@@ -125,7 +127,10 @@ export function frequencyLabel(frequency: string): string {
 		case "quarterly":
 			return "Every 3 months";
 		case "annual":
+		case "yearly":
 			return "Yearly";
+		case "once":
+			return "One-time";
 		default:
 			return frequency || "Repeating";
 	}

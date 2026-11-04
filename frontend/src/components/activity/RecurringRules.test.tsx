@@ -84,7 +84,7 @@ it("keeps an existing selected rule current across row updates and closes it on 
 		...financialModelFixture.transactions[0]!,
 		id: "selected",
 		name: "Original rule",
-		frequency: "monthly" as const,
+		kind: "rule" as const,
 		fromId: account.id,
 		toId: null,
 	};
@@ -109,7 +109,7 @@ it("returns a rejected drag preview to the server order", async () => {
 		...financialModelFixture.transactions[0]!,
 		id,
 		name: id,
-		frequency: "monthly" as const,
+		kind: "rule" as const,
 		fromId: account.id,
 		toId: null,
 	}));
@@ -145,7 +145,7 @@ it("adopts reordered server rows outside a gesture", () => {
 		...financialModelFixture.transactions[0]!,
 		id,
 		name: id,
-		frequency: "monthly" as const,
+		kind: "rule" as const,
 		fromId: account.id,
 		toId: null,
 	}));
@@ -171,7 +171,7 @@ it("settles a saved drag and adopts later independent server reorders", async ()
 		...financialModelFixture.transactions[0]!,
 		id,
 		name: id,
-		frequency: "monthly" as const,
+		kind: "rule" as const,
 		fromId: account.id,
 		toId: null,
 	}));
@@ -221,7 +221,7 @@ it("moves rows with keyboard controls and rolls back a rejected move", async () 
 		...financialModelFixture.transactions[0]!,
 		id,
 		name: id,
-		frequency: "monthly" as const,
+		kind: "rule" as const,
 		fromId: account.id,
 		toId: null,
 	}));

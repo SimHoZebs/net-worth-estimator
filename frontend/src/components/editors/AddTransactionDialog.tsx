@@ -1,21 +1,28 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { createPosting, createRule } from "@/api/generated/endpoints.ts";
-import { type Transaction, visibleAccounts } from "../../domain/model.ts";
-import { todayIso } from "../../domain/format.ts";
+import { visibleAccounts } from "../../domain/model.ts";
+import { dateLabel, todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
+	useServerModel,
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
-import { useSavedAccounts, useSavedStartDate } from "../../state/savedRows.ts";
+import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+	useSavedTransactions,
+} from "../../state/savedRows.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import {
 	combineDayTime,
 	postingBody,
 	ruleBody,
 	validateTransactionValues,
+	type FrequencyChoice,
 	type TransactionFormValues,
 } from "./transactionBodies.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
@@ -49,12 +56,14 @@ export function AddTransactionDialog({
 		() => (catalog.data?.items ?? []).filter((rule) => rule.kind === "rule"),
 		[catalog.data],
 	);
+	// The create form picks from the same scheduled occurrence list as the
+	// detail editor: closest to the new posting's own day first.
+	const savedTransactions = useSavedTransactions();
 	const [name, setName] = useState("");
 	const [amount, setAmount] = useState("500");
 	const [amountKind, setAmountKind] = useState<"fixed" | "growth">("fixed");
 	const [annualIncrease, setAnnualIncrease] = useState("3");
-	const [frequency, setFrequency] =
-		useState<Transaction["frequency"]>("monthly");
+	const [frequency, setFrequency] = useState<FrequencyChoice>("monthly");
 	const [fromId, setFromId] = useState("");
 	const [toId, setToId] = useState("");
 	const [startDate, setStartDate] = useState(fallbackStart);
@@ -63,6 +72,34 @@ export function AddTransactionDialog({
 	const [enabled, setEnabled] = useState(true);
 	const [claimRuleId, setClaimRuleId] = useState("");
 	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState("");
+	const serverModel = useServerModel().data?.model;
+	const occurrenceOptions = useMemo(() => {
+		const rule = serverModel?.recurrenceRules.find(
+			(row) => row.id === claimRuleId,
+		);
+		if (!rule) return [];
+		const claimed = new Set<string>();
+		for (const row of savedTransactions ?? []) {
+			if (row.claimRuleId === claimRuleId && row.claimOccurrenceDate)
+				claimed.add(row.claimOccurrenceDate);
+		}
+		if (claimOccurrenceDate) claimed.delete(claimOccurrenceDate);
+		const candidates = claimOccurrenceCandidates({
+			rule,
+			through: todayIso(),
+			postedRef: startDate,
+			claimed,
+		});
+		return claimOccurrenceDate && !candidates.includes(claimOccurrenceDate)
+			? [claimOccurrenceDate, ...candidates]
+			: candidates;
+	}, [
+		serverModel,
+		claimRuleId,
+		startDate,
+		claimOccurrenceDate,
+		savedTransactions,
+	]);
 	const [saving, setSaving] = useState(false);
 	const [transactionTime, setTransactionTime] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -277,12 +314,27 @@ export function AddTransactionDialog({
 									</option>
 								))}
 							</SelectField>
-							<InputField
+							<SelectField
 								label="Replaces occurrence on"
-								type="date"
 								value={claimOccurrenceDate}
-								onChange={(event) => setClaimOccurrenceDate(event.target.value)}
-							/>
+								onChange={(event) =>
+									setClaimOccurrenceDate(event.target.value)
+								}
+								disabled={!claimRuleId}
+							>
+								<option value="">
+									{!claimRuleId
+										? "Choose a rule first"
+										: occurrenceOptions.length === 0
+											? "No claimable occurrences"
+											: "Choose the occurrence"}
+								</option>
+								{occurrenceOptions.map((date) => (
+									<option key={date} value={date}>
+										{dateLabel(date, true)}
+									</option>
+								))}
+							</SelectField>
 						</>
 					) : (
 						<>

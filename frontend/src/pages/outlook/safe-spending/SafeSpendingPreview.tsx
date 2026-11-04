@@ -244,13 +244,12 @@ export function SafeSpendingPreview({
 				(transaction) =>
 					transaction.fromId !== null &&
 					spendingIds.includes(transaction.fromId) &&
-					transaction.frequency !== "once",
+					transaction.kind === "rule",
 			)
 			.map((transaction) => ({
 				id: transaction.id,
 				name: transaction.name,
 				amount: transaction.amount,
-				frequency: transaction.frequency,
 			}));
 	}, [transactions, spendingIds]);
 
@@ -309,7 +308,7 @@ export function SafeSpendingPreview({
 		const bills = new Set(trackedBillIds);
 		const ruleIds = new Set(
 			(transactions ?? [])
-				.filter((transaction) => transaction.frequency !== "once")
+				.filter((transaction) => transaction.kind === "rule")
 				.map((transaction) => transaction.id),
 		);
 		const sources = new Set(spendingIds);

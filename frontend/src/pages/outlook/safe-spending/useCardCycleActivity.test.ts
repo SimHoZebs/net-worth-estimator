@@ -26,7 +26,7 @@ function purchase(
 		name: id,
 		startDate: date,
 		amount,
-		frequency: "once",
+		kind: "posting",
 		fromId: card.id,
 		toId: null,
 		...overrides,

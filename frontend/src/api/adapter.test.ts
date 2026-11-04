@@ -294,7 +294,7 @@ describe("display visibility helpers over saved rows", () => {
 			amountKnown: true,
 			fromId: null,
 			toId: "cash",
-			frequency: "monthly",
+			kind: "rule",
 			startDate: "2026-02-05",
 			endDate: null,
 			annualIncrease: 2,
@@ -312,7 +312,7 @@ describe("display visibility helpers over saved rows", () => {
 			amountKnown: true,
 			fromId: "cash",
 			toId: "loan",
-			frequency: "monthly",
+			kind: "rule",
 			startDate: "2026-02-05",
 			endDate: null,
 			annualIncrease: 0,
@@ -367,7 +367,7 @@ describe("display visibility helpers over saved rows", () => {
 			isHistoricalTransaction(
 				{
 					...transactions[0]!,
-					frequency: "once",
+					kind: "posting",
 					startDate: "2026-02-01",
 				},
 				startDate,
@@ -376,7 +376,7 @@ describe("display visibility helpers over saved rows", () => {
 		expect(isHistoricalTransaction(transactions[0]!, startDate)).toBe(false);
 		expect(
 			isHistoricalTransaction(
-				{ ...transactions[0]!, frequency: "once", startDate: "2026-03-01" },
+				{ ...transactions[0]!, kind: "posting", startDate: "2026-03-01" },
 				startDate,
 			),
 		).toBe(false);

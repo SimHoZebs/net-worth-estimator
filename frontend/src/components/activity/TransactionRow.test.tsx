@@ -17,7 +17,7 @@ function voidTransaction(): {
 		amountKnown: true,
 		fromId: "checking",
 		toId: null,
-		frequency: "once" as const,
+		kind: "posting" as const,
 		startDate: "2026-10-20",
 		endDate: null,
 		annualIncrease: 0,

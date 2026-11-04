@@ -37,7 +37,7 @@ function isIsoDate(value: string): boolean {
 
 /** Why a source row cannot become a subscription. Null means it can. */
 export function subscriptionSourceError(source: Transaction): Error | null {
-	if (source.frequency !== "once") {
+	if (source.kind !== "posting") {
 		return new Error("Only one-time transactions can be marked as recurring.");
 	}
 	if (source.claimRuleId || source.claimOccurrenceDate) {
@@ -53,8 +53,27 @@ export function subscriptionSourceError(source: Transaction): Error | null {
 	return null;
 }
 
+/**
+ * The new rule a subscription conversion creates, before the caller persists
+ * it. This is a rule draft, not a display transaction: the schedule cadence
+ * is the rule's own data.
+ */
+export interface SubscriptionRuleDraft {
+	id: string;
+	name: string;
+	amount: number;
+	amountKnown: boolean;
+	fromId: string | null;
+	toId: string | null;
+	frequency: SubscriptionFrequency;
+	startDate: string;
+	endDate: string | null;
+	annualIncrease: number;
+	enabled: boolean;
+}
+
 export interface SubscriptionConversion {
-	rule: Transaction;
+	rule: SubscriptionRuleDraft;
 	claimed: Transaction;
 }
 
@@ -82,7 +101,7 @@ export function buildSubscriptionConversion(
 	}
 	const generateId = options.generateId ?? (() => crypto.randomUUID());
 	const ruleId = options.ruleId ?? generateId();
-	const rule: Transaction = {
+	const rule: SubscriptionRuleDraft = {
 		id: ruleId,
 		name: source.name,
 		amount: source.amount,
@@ -94,11 +113,6 @@ export function buildSubscriptionConversion(
 		endDate,
 		annualIncrease: 0,
 		enabled: source.enabled,
-		readOnly: false,
-		claimRuleId: null,
-		claimOccurrenceDate: null,
-		postedDate: null,
-		void: false,
 	};
 	const claimed: Transaction = {
 		...source,

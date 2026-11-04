@@ -136,7 +136,7 @@ describe("PlannedPurchaseEditor", () => {
 		// A planned-purchase row is hypothetical: it validates as one
 		// and never carries scheduled-transaction fields.
 		expect(plannedPurchaseSchema.safeParse(saved).success).toBe(true);
-		expect(saved).not.toHaveProperty("frequency");
+		expect(saved).not.toHaveProperty("kind");
 		expect(saved).not.toHaveProperty("toId");
 		expect(saved).toMatchObject({
 			name: "Desk",

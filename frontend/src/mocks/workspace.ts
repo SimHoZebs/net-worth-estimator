@@ -42,7 +42,6 @@ export function setServerModelFixture(
 		{
 			transactions: data.transactions.map((row) => ({
 				...row,
-				kind: row.frequency === "once" ? "posting" : "rule",
 				sourceAccountId: row.fromId,
 				destinations: row.toId ? [row.toId] : null,
 				amount: fixtureAmount(row),

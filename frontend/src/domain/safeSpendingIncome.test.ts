@@ -109,7 +109,7 @@ describe("safeSpendingIncome", () => {
 			rule("disabled", { enabled: false }),
 			rule("expired", { endDate: "2026-10-07" }),
 			rule("future", { startDate: "2026-10-09" }),
-			rule("one-time", { frequency: "once" }),
+			rule("one-time", { kind: "posting" }),
 			rule("expense", { fromId: "checking", toId: null }),
 			rule("other-account", { toId: "brokerage" }),
 			rule("starts-today", { startDate: "2026-10-08" }),

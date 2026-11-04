@@ -182,7 +182,6 @@ type transactionRow struct {
 	SourceAccountID *string                       `json:"sourceAccountId"`
 	Destinations    []string                      `json:"destinations"`
 	Amount          types.PostingAmountResolution `json:"amount"`
-	Frequency       string                        `json:"frequency"`
 	StartDate       types.IsoDate                 `json:"startDate"`
 	EndDate         *types.IsoDate                `json:"endDate"`
 	Priority        *int                          `json:"priority,omitempty"`
@@ -253,7 +252,6 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 					SourceAccountID: rule.SourceAccountID,
 					Destinations:    rule.Destinations,
 					Amount:          rule.Amount,
-					Frequency:       string(rule.Frequency),
 					StartDate:       rule.StartDate,
 					EndDate:         rule.EndDate,
 					Priority:        &priority,
@@ -278,7 +276,6 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 					SourceAccountID: posting.SourceAccountID,
 					Destinations:    posting.Destinations,
 					Amount:          posting.Amount,
-					Frequency:       "once",
 					StartDate:       startDate,
 					Enabled:         posting.Enabled,
 					SyncOwned:       syncOwned,
