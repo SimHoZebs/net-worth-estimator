@@ -44,6 +44,14 @@
 	:focus-visible {
 		@apply rounded-control outline-3 outline-solid outline-primary outline-offset-1;
 	}
+	/* TanStack charts stay tabbable so keyboard users can reach the chart
+	   surface and move through data points. Chromium and WebKit paint a UA
+	   outline on the focused SVG for pointer focus; suppress that one case
+	   so clicking the chart does not box it in. The :focus-visible ring stays
+	   the keyboard indicator. */
+	.ts-chart:focus:not(:focus-visible) {
+		outline: none;
+	}
 	h1 {
 		@apply text-4xl leading-tight font-normal tracking-tight;
 	}
