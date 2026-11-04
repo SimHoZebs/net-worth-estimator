@@ -43,7 +43,15 @@ func TestTokenStoreRoundTripKeepsOwnerOnlyPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
+	// Compare instants, not the time.Time struct: a JSON round trip keeps the
+	// exact instant but not the original *time.Location pointer, and on a
+	// UTC host the local and parsed locations are distinct pointers with
+	// identical output.
+	if got.Subject != want.Subject ||
+		got.ResourceID != want.ResourceID ||
+		got.AccessToken != want.AccessToken ||
+		got.RefreshToken != want.RefreshToken ||
+		!got.Expiry.Equal(want.Expiry) {
 		t.Fatalf("round trip=%+v want %+v", got, want)
 	}
 	if err := clearCredentials(); err != nil {
