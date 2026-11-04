@@ -6,6 +6,7 @@ test("setup binds a user to its verified identity and keeps canonical ports fixe
   assert.throws(() => validateSetup({ user: "users/private" }), /only to refresh-db/);
   assert.throws(() => validateSetup({ bulk: "20x200" }), /only to seed/);
   assert.throws(() => validateSetup({ clear: true }), /only to seed/);
+  assert.throws(() => validateSetup({ pack: "safe-spending" }), /only to demo/);
   assert.doesNotThrow(() =>
     validateSetup({ from: "shared.db", "source-user": "users/reviewed-owner" }),
   );

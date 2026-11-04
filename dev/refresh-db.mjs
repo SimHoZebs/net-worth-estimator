@@ -15,6 +15,8 @@ export function validateRefresh(values, positionals = []) {
   slotFromOptions(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
+  if (values.pack !== undefined)
+    throw new Error("--pack applies only to demo.");
   if (values.tailnet) throw new Error("--tailnet applies only to setup");
   if (
     values["app-port"] !== undefined ||

@@ -8,6 +8,7 @@ export const devOptions = {
   "source-user": { type: "string" },
   bulk: { type: "string" },
   clear: { type: "boolean" },
+  pack: { type: "string" },
   slot: { type: "string" },
   "app-port": { type: "string" },
   "casdoor-port": { type: "string" },

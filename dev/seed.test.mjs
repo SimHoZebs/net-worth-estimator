@@ -4,6 +4,7 @@ import { actorResource, validateSeed } from "./seed.mjs";
 
 test("seed requires exactly one of bulk or clear before any service operation", () => {
   assert.throws(() => validateSeed({}, []), /exactly one/);
+  assert.throws(() => validateSeed({ pack: "safe-spending" }, []), /only to demo/);
   assert.throws(() => validateSeed({ bulk: "nope" }, []), /NxM/);
   assert.throws(() => validateSeed({ bulk: "3x5:abc" }, []), /NxM/);
   assert.throws(() => validateSeed({ bulk: "20x200", clear: true }, []), /exactly one/);

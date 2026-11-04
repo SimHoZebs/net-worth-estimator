@@ -67,6 +67,11 @@ to refresh one user's financial data without resetting identities or passkeys.
 See [the dev guide](dev/README.md) for tailnet setup, private user data, published guest data,
 logs, and state recovery.
 
+For a seeded safe-spending demo without touching the dev stack, run
+`./scripts/dev demo --pack safe-spending`. Use
+`--pack safe-spending-shortfall` for the unfulfilled recurring bill. The demo
+uses the same fixture packs as the browser suite and stops with Ctrl-C.
+
 ## Run from Source (Advanced)
 
 For low-level source debugging, run the API and Vite separately. Normal manual

@@ -7,6 +7,7 @@ test("publication explicitly selects reviewed source and the provisioned guest d
     () => validatePublish({ bulk: "20x200", "source-user": "s", user: `users/${"a".repeat(64)}` }),
     /only to seed/,
   );
+  assert.throws(() => validatePublish({ pack: "safe-spending" }), /only to demo/);
   assert.throws(() => validatePublish({}), /source-user/);
   assert.throws(
     () => validatePublish({ "source-user": "users/source" }),

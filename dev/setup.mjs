@@ -36,6 +36,8 @@ export function validateSetup(values, positionals = []) {
   const slot = slotFromOptions(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
+  if (values.pack !== undefined)
+    throw new Error("--pack applies only to demo.");
   if (values.user)
     throw new Error(
       "--user applies only to refresh-db; setup binds a user to its verified dev identity",

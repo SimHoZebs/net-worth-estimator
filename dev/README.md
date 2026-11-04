@@ -95,6 +95,8 @@ is the production container: stop it first so the file copies cleanly.
 ./scripts/dev publish-sample --user "$GUEST_USER" --source-user "$SOURCE_USER" --from /absolute/path/approved-snapshot.db
 ./scripts/dev seed --bulk 20x200:7
 ./scripts/dev seed --clear
+./scripts/dev demo --pack safe-spending
+./scripts/dev demo --pack safe-spending-shortfall
 ```
 
 `refresh-db` backs up the shared application database under `tmp/dev/backups/`.
@@ -107,6 +109,16 @@ passkeys, application sessions, grants, logout records, and other users.
 only those tagged rows. Real rows stay untouched; the prior database is
 backed up under `tmp/dev/backups/` first. The default target is the
 bootstrap dev owner; pass `--user users/<64hex>` for another scope.
+
+`demo` starts the browser fixture API and Vite on isolated ports with a
+throwaway database, loads the named fixture pack, sets the browser clock to
+the pack's anchor date, and opens a headed browser. It never touches the
+dev stack or the owner's data. Stop it with Ctrl-C. The same pack feeds the
+browser suite, so the demo and the tests share one seed sequence. The
+`safe-spending` pack shows the card spending thresholds and pace chart; the
+`safe-spending-shortfall` pack shows an unfulfilled recurring bill.
+Automated smoke checks may set `DEMO_HEADLESS=1` and
+`DEMO_EXIT_AFTER_MS=<ms>`; normal use is headed and waits for Ctrl-C.
 
 `publish-sample` keeps its name but publishes into the provisioned guest scope
 (`--user users/<guest-hash>`, never a sample wire). Without `--from`, it reads

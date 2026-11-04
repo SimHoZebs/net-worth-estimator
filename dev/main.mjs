@@ -3,6 +3,7 @@ import { run as runSetup } from "./setup.mjs";
 import { run as runRefresh } from "./refresh-db.mjs";
 import { run as runPublish } from "./publish-sample.mjs";
 import { run as runSeed } from "./seed.mjs";
+import { run as runDemo } from "./demo.mjs";
 import { run as runStatus } from "./ps-all.mjs";
 import { devOptions } from "./lib/args.mjs";
 import { runIfCli } from "./lib/entry.mjs";
@@ -12,6 +13,7 @@ const commands = {
   "refresh-db": runRefresh,
   "publish-sample": runPublish,
   seed: runSeed,
+  demo: runDemo,
   "ps-all": runStatus,
 };
 
@@ -24,7 +26,7 @@ export async function main(args) {
   const { values, positionals } = parseMainArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | seed (--bulk NxM[:seed] | --clear) [--user USER_ID] [--slot NAME] | ps-all",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | seed (--bulk NxM[:seed] | --clear) [--user USER_ID] [--slot NAME] | demo [--pack NAME] | ps-all",
     );
     return;
   }
