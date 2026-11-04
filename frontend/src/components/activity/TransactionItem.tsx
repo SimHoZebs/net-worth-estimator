@@ -31,6 +31,7 @@ export function TransactionItemRow({
 	onSelect,
 	selectDisabled = false,
 	dimmed = false,
+	divider,
 	slots,
 }: {
 	date: ReactNode;
@@ -42,10 +43,11 @@ export function TransactionItemRow({
 	onSelect: () => void;
 	selectDisabled?: boolean;
 	dimmed?: boolean;
+	divider?: "warning" | "danger";
 	slots?: TransactionItemSlots;
 }) {
 	return (
-		<TableRow className={transactionRowStyles({ dimmed })}>
+		<TableRow className={transactionRowStyles({ dimmed, divider })}>
 			<TableCell className={transactionCellStyles({ column: "date" })}>
 				{date}
 			</TableCell>

@@ -46,7 +46,7 @@ function legendSwatch(dashed: boolean, tone: string) {
 			className={mergeStyles(
 				"inline-block w-4 shrink-0",
 				dashed
-					? `border-t-2 border-dashed ${tone}`
+					? `border-t-2 [border-top-style:dashed] ${tone}`
 					: `h-0.5 rounded-control ${tone}`,
 			)}
 		/>

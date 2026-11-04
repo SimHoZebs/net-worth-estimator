@@ -444,13 +444,9 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	await expect(
 		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
 	).toContainText("Card spending limit $1,750");
-	const reserveDivider = drawer.getByRole("separator", {
-		name: labels.reserveStarts,
-	});
 	const limitDivider = drawer.getByRole("separator", {
 		name: labels.spendingLimit,
 	});
-	await expect(reserveDivider).toBeVisible();
 	await expect(limitDivider).toBeVisible();
 	const charges = drawer.getByRole("table", {
 		name: new RegExp(labels.cycleSpending),
@@ -462,18 +458,24 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	const chargeA = charges.getByText("Cycle charge A");
 	const chargeB = charges.getByText("Cycle charge B");
 	const chargeC = charges.getByText("Cycle charge C");
+	const chargeCRow = charges.getByRole("row", { name: /Cycle charge C/ });
+	await expect(chargeCRow).toContainText(labels.reserveStarts);
+	await expect(chargeCRow).toHaveClass(/border-warning-text/);
+	await expect(chargeCRow).not.toHaveClass(/border-line/);
 	expect(await y(limitDivider)).toBeLessThan(await y(chargeC));
-	expect(await y(chargeC)).toBeLessThan(await y(reserveDivider));
-	expect(await y(reserveDivider)).toBeLessThan(await y(chargeB));
+	expect(await y(chargeC)).toBeLessThan(await y(chargeB));
 	expect(await y(chargeB)).toBeLessThan(await y(chargeA));
 	await drawer
 		.getByRole("button", { name: /Sort transactions:/ })
 		.last()
 		.click();
 	await expect(charges.getByText("Cycle charge A")).toBeVisible();
+	const chargeBRow = charges.getByRole("row", { name: /Cycle charge B/ });
+	await expect(chargeBRow).toContainText(labels.reserveStarts);
+	await expect(chargeBRow).toHaveClass(/border-warning-text/);
+	await expect(chargeBRow).not.toHaveClass(/border-line/);
 	expect(await y(chargeA)).toBeLessThan(await y(chargeB));
-	expect(await y(chargeB)).toBeLessThan(await y(reserveDivider));
-	expect(await y(reserveDivider)).toBeLessThan(await y(chargeC));
+	expect(await y(chargeB)).toBeLessThan(await y(chargeC));
 	expect(await y(chargeC)).toBeLessThan(await y(limitDivider));
 });
 

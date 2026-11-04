@@ -17,6 +17,7 @@ import { findingLabel } from "../../domain/analysisFindings.ts";
 import {
 	transactionAmountStyles,
 	transactionBadgeStyles,
+	transactionDividerLabelStyles,
 } from "./activityStyles.ts";
 
 export function TransactionRow({
@@ -24,11 +25,13 @@ export function TransactionRow({
 	savedTransaction,
 	onEdit,
 	shortfallLabel,
+	divider,
 }: {
 	transaction: AccountTransaction;
 	savedTransaction: Transaction | null;
 	onEdit: (savedTransaction: Transaction) => void;
 	shortfallLabel?: string;
+	divider?: { tone: "warning" | "danger"; label: string };
 }) {
 	const DirectionIcon =
 		transaction.category === "transfer"
@@ -82,6 +85,7 @@ export function TransactionRow({
 			icon={<DirectionIcon size={16} aria-hidden="true" />}
 			tone={tone}
 			title={transaction.name}
+			divider={divider?.tone}
 			slots={{
 				subtitle: counterparty && (
 					<span>
@@ -143,9 +147,16 @@ export function TransactionRow({
 							{exactMoney(transaction.requested)} planned
 						</small>
 					)}
+					{divider && (
+						<small
+							className={transactionDividerLabelStyles({ tone: divider.tone })}
+						>
+							{divider.label}
+						</small>
+					)}
 				</>
 			}
-			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}${analysisBadge && finding ? `; ${findingLabel(finding)}` : ""}`}
+			actionLabel={`${action} ${transaction.name} on ${dateLabel(transaction.date, true)}${counterparty ? `; ${transaction.direction === "in" ? "money in from" : "money out to"} ${counterparty}` : ""}${transaction.shortfall > 0.01 ? "; shortfall" : ""}${divider ? `; ${divider.label}` : ""}${transaction.void ? "; did not post" : transaction.pending ? "; pending" : transaction.excluded ? "; excluded from account" : ""}${analysisBadge && finding ? `; ${findingLabel(finding)}` : ""}`}
 			onSelect={() => {
 				if (savedTransaction) onEdit(savedTransaction);
 			}}

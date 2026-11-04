@@ -56,7 +56,7 @@ function ThresholdDivider({
 						className={
 							tone === "danger"
 								? "h-0.5 flex-1 rounded-control bg-danger-text"
-								: "flex-1 border-t-2 border-dashed border-warning-text"
+								: "flex-1 border-t-2 [border-top-style:dashed] border-warning-text"
 						}
 					/>
 					<span
@@ -111,39 +111,43 @@ export function TransactionSectionView({
 			dividerByDate.set(divider.date, divider);
 		}
 	}
-	const rows: ReactNode[] = [];
-	let index = 0;
-	while (index < transactions.length) {
-		const date = transactions[index]!.date;
-		const divider = dividerByDate.get(date);
-		// The divider follows the crossing date chronologically. In
-		// newest-first order that boundary sits above the date's first row.
-		if (divider && order === "newest") {
-			rows.push(
-				<ThresholdDivider key={`divider-${divider.date}`} {...divider} />,
-			);
-		}
-		do {
-			const transaction = transactions[index]!;
-			rows.push(
-				<TransactionRow
-					key={transaction.id}
-					transaction={transaction}
-					savedTransaction={
-						savedTransactions.get(transaction.transactionId) ?? null
-					}
-					onEdit={(savedTransaction) =>
-						onInspect(transaction, savedTransaction)
-					}
-				/>,
-			);
-			index++;
-		} while (index < transactions.length && transactions[index]!.date === date);
-		if (divider && order === "oldest") {
-			rows.push(
-				<ThresholdDivider key={`divider-${divider.date}`} {...divider} />,
-			);
-		}
+	// The latest transaction date has no newer row to carry its bottom
+	// border. Keep that boundary as a standalone divider at the list edge.
+	const latestDate = transactions.reduce(
+		(latest, transaction) =>
+			transaction.date > latest ? transaction.date : latest,
+		transactions[0]!.date,
+	);
+	const edgeDivider = dividerByDate.get(latestDate) ?? null;
+	const rowDividers = new Map<string, SpendingLimitDivider>();
+	for (let index = 0; index < transactions.length - 1; index++) {
+		const current = transactions[index]!;
+		const next = transactions[index + 1]!;
+		if (current.date === next.date) continue;
+		const boundaryDate = current.date < next.date ? current.date : next.date;
+		const divider = dividerByDate.get(boundaryDate);
+		if (divider) rowDividers.set(current.id, divider);
+	}
+	const rows: ReactNode[] = transactions.map((transaction) => (
+		<TransactionRow
+			key={transaction.id}
+			transaction={transaction}
+			savedTransaction={
+				savedTransactions.get(transaction.transactionId) ?? null
+			}
+			onEdit={(savedTransaction) => onInspect(transaction, savedTransaction)}
+			divider={rowDividers.get(transaction.id)}
+		/>
+	));
+	if (edgeDivider && order === "newest") {
+		rows.unshift(
+			<ThresholdDivider key={`divider-${edgeDivider.date}`} {...edgeDivider} />,
+		);
+	}
+	if (edgeDivider && order === "oldest") {
+		rows.push(
+			<ThresholdDivider key={`divider-${edgeDivider.date}`} {...edgeDivider} />,
+		);
 	}
 	return (
 		<TransactionTable

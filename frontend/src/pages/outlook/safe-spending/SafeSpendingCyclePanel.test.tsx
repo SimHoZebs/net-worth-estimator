@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AccountTransaction } from "../../../domain/accountActivity.ts";
 import { financialModelFixture } from "../../../mocks/financialModel.ts";
@@ -103,37 +103,37 @@ describe("SafeSpendingCyclePanel", () => {
 		},
 	};
 
-	it("places threshold dividers after the crossing date in newest-first order", () => {
+	it("replaces the divider above the crossing in newest-first order", () => {
 		show(spending, "newest");
-		const reserve = screen.getByRole("separator", {
-			name: "Protected reserve starts",
-		});
 		const limit = screen.getByRole("separator", {
 			name: "Card spending limit",
 		});
 		const sep20 = screen.getByText("Charge Sep 20");
 		const sep22 = screen.getByText("Charge Sep 22");
 		const sep25 = screen.getByText("Charge Sep 25");
+		const sep25Row = sep25.closest("tr")!;
+		expect(within(sep25Row).getByText("Protected reserve starts")).toBeTruthy();
+		expect(sep25Row.className).toContain("border-warning-text");
+		expect(sep25Row.className).not.toContain("border-line");
 		expect(follows(limit, sep25)).toBe(true);
-		expect(follows(sep25, reserve)).toBe(true);
-		expect(follows(reserve, sep22)).toBe(true);
+		expect(follows(sep25, sep22)).toBe(true);
 		expect(follows(sep22, sep20)).toBe(true);
 	});
 
-	it("places threshold dividers after the crossing date in oldest-first order", () => {
+	it("replaces the divider above the crossing in oldest-first order", () => {
 		show(spending, "oldest");
-		const reserve = screen.getByRole("separator", {
-			name: "Protected reserve starts",
-		});
 		const limit = screen.getByRole("separator", {
 			name: "Card spending limit",
 		});
 		const sep20 = screen.getByText("Charge Sep 20");
 		const sep22 = screen.getByText("Charge Sep 22");
 		const sep25 = screen.getByText("Charge Sep 25");
+		const sep22Row = sep22.closest("tr")!;
+		expect(within(sep22Row).getByText("Protected reserve starts")).toBeTruthy();
+		expect(sep22Row.className).toContain("border-warning-text");
+		expect(sep22Row.className).not.toContain("border-line");
 		expect(follows(sep20, sep22)).toBe(true);
-		expect(follows(sep22, reserve)).toBe(true);
-		expect(follows(reserve, sep25)).toBe(true);
+		expect(follows(sep22, sep25)).toBe(true);
 		expect(follows(sep25, limit)).toBe(true);
 	});
 
@@ -148,5 +148,6 @@ describe("SafeSpendingCyclePanel", () => {
 		const dividers = screen.getAllByRole("separator");
 		expect(dividers).toHaveLength(1);
 		expect(dividers[0]?.getAttribute("aria-label")).toBe("Card spending limit");
+		expect(screen.queryByText("Protected reserve starts")).toBeNull();
 	});
 });

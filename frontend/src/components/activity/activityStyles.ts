@@ -17,7 +17,14 @@ export type TransactionTone = NonNullable<
 >;
 
 export const transactionRowStyles = cva("hover:bg-surface-2", {
-	variants: { dimmed: { true: "bg-surface-2", false: "" } },
+	variants: {
+		dimmed: { true: "bg-surface-2", false: "" },
+		divider: {
+			warning:
+				"border-b-2 [border-bottom-style:dashed] border-warning-text",
+			danger: "border-b-2 border-danger-text",
+		},
+	},
 });
 
 export const transactionCellStyles = cva("py-3", {
@@ -39,3 +46,15 @@ export const transactionAmountStyles = cva(
 );
 
 export const transactionBadgeStyles = cva("px-1 py-0.5 text-xs");
+
+export const transactionDividerLabelStyles = cva(
+	"block text-xs font-semibold whitespace-nowrap",
+	{
+		variants: {
+			tone: {
+				warning: "text-warning-text",
+				danger: "text-danger-text",
+			},
+		},
+	},
+);
