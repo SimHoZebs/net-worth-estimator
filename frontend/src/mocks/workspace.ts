@@ -15,6 +15,22 @@ import { fixtureAmount, fixtureModel } from "./model.ts";
 export function setServerStatusFixture(status: ServerStatus) {
 	serverQueryClient().setQueryData(userResourceKey("status"), status);
 }
+/**
+ * Model resource only. Leaves narrow row caches untouched so a test can
+ * supply its own local rows through props.
+ */
+export function setServerModelOnly(
+	data: FinancialModelFixture = financialModelFixture,
+) {
+	const model = fixtureModel(data);
+	const response: ServerModel = {
+		model,
+		issues: [],
+		revision: '"test-revision"',
+		fingerprint: serverModelFingerprint(model),
+	};
+	serverQueryClient().setQueryData(userResourceKey("model"), response);
+}
 export function setServerModelFixture(
 	data: FinancialModelFixture = financialModelFixture,
 	overrides: Partial<ServerModel> = {},

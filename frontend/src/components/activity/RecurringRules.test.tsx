@@ -12,6 +12,7 @@ import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
+import { setServerModelFixture } from "../../mocks/workspace.ts";
 import { RecurringRules } from "./RecurringRules.tsx";
 
 vi.mock("./TransactionDetail.tsx", () => ({
@@ -103,6 +104,7 @@ it("keeps an existing selected rule current across row updates and closes it on 
 it("returns a rejected drag preview to the server order", async () => {
 	acceptTestResource();
 	resetServerQueryCache();
+	setServerModelFixture(financialModelFixture);
 	const server = stubTestServer();
 	const account = financialModelFixture.accounts[0]!;
 	const transactions = ["first", "second"].map((id) => ({
@@ -165,6 +167,7 @@ it("adopts reordered server rows outside a gesture", () => {
 it("settles a saved drag and adopts later independent server reorders", async () => {
 	acceptTestResource();
 	resetServerQueryCache();
+	setServerModelFixture(financialModelFixture);
 	const server = stubTestServer();
 	const account = financialModelFixture.accounts[0]!;
 	const transactions = ["first", "second"].map((id) => ({
@@ -215,6 +218,7 @@ it("settles a saved drag and adopts later independent server reorders", async ()
 it("moves rows with keyboard controls and rolls back a rejected move", async () => {
 	acceptTestResource();
 	resetServerQueryCache();
+	setServerModelFixture(financialModelFixture);
 	const server = stubTestServer();
 	const account = financialModelFixture.accounts[0]!;
 	const transactions = ["first", "second"].map((id) => ({

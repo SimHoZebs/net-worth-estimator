@@ -12,7 +12,10 @@ import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { fixtureModel } from "../../mocks/model.ts";
 import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
-import { setServerModelFixture } from "../../mocks/workspace.ts";
+import {
+	setServerModelFixture,
+	setServerModelOnly,
+} from "../../mocks/workspace.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { ruleTransaction } from "../../domain/accountActivity.ts";
@@ -157,6 +160,7 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 
 it("deletes the transaction through the row endpoint", async () => {
 	const server = stubTestServer();
+	setServerModelFixture(financialModelFixture);
 	const savedTransaction = {
 		...financialModelFixture.transactions[0]!,
 		id: "renovation-once",
@@ -528,6 +532,7 @@ it("opens and closes the sharing sheet without closing the detail", async () => 
 
 it("lets the owner pick the posted charge and remove the vanished hold", async () => {
 	const server = stubTestServer();
+	setServerModelOnly();
 	const settled = {
 		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000097",
