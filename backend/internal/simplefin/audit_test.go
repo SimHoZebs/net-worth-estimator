@@ -43,6 +43,21 @@ func TestAuditHistoricalVoidsFlagsUniqueTipPair(t *testing.T) {
 	}
 }
 
+func TestAuditHistoricalVoidsFlagsRenamedAuthDescriptor(t *testing.T) {
+	// The hold names the authorization, the posted charge names the
+	// product. The shared merchant still identifies the phantom void.
+	bank := []store.BankRow{
+		reconcileBankRow("uuid-void", "LYFT *TEMP AUTH HOLD", "prime_card", "74.94", false, true,
+			pendingKey("prime_card", "old-auth")),
+		reconcileBankRow("uuid-settled", "LYFT *STANDARD 10-30", "prime_card", "81.22", false, false,
+			pendingKey("prime_card", "post-a")),
+	}
+	pairs := AuditHistoricalVoids(bank, "prime_card")
+	if len(pairs) != 1 || pairs[0].VoidID != "uuid-void" || pairs[0].SettledID != "uuid-settled" {
+		t.Fatalf("pairs = %+v, want the renamed pair flagged", pairs)
+	}
+}
+
 func TestAuditHistoricalVoidsSkipsAmbiguous(t *testing.T) {
 	bank := []store.BankRow{
 		reconcileBankRow("uuid-void", "Bistro", "prime_card", "50.00", false, true,

@@ -525,6 +525,59 @@ describe("void posted-version candidates", () => {
 		).toEqual(["01900000-0000-7000-8000-000000000021"]);
 	});
 
+	it("flags a posted charge whose descriptor changed from the hold", () => {
+		const lyftHold = bankRow({
+			name: "LYFT *TEMP AUTH HOLD",
+			amount: 74.94,
+			startDate: "2026-10-31",
+		});
+		const lyftPosted = settledRow({
+			name: "LYFT *STANDARD 10-30",
+			amount: 81.22,
+			startDate: "2026-11-01",
+		});
+		expect(
+			voidSettleCandidates({
+				voidRow: lyftHold,
+				transactions: [lyftPosted],
+			}).map((row) => row.id),
+		).toEqual([lyftPosted.id]);
+	});
+
+	it("orders candidates by date and amount closeness", () => {
+		const lyftHold = bankRow({
+			name: "LYFT *TEMP AUTH HOLD",
+			amount: 74.94,
+			startDate: "2026-10-31",
+		});
+		const airport = settledRow({
+			id: "airport",
+			name: "LYFT *AIRPORT 10-30",
+			amount: 86.18,
+			startDate: "2026-11-01",
+		});
+		const standard = settledRow({
+			id: "standard",
+			name: "LYFT *STANDARD 10-30",
+			amount: 81.22,
+			startDate: "2026-11-01",
+		});
+		expect(
+			voidSettleCandidates({
+				voidRow: lyftHold,
+				transactions: [airport, standard],
+			}).map((row) => row.id),
+		).toEqual(["standard", "airport"]);
+	});
+
+	it("does not join a different branch that shares the first token", () => {
+		const hold = bankRow({ name: "BISTRO UPTOWN" });
+		const posted = settledRow({ name: "BISTRO DOWNTOWN" });
+		expect(
+			voidSettleCandidates({ voidRow: hold, transactions: [posted] }),
+		).toEqual([]);
+	});
+
 	it("lists ambiguous matches for the reviewer instead of holding out", () => {
 		const candidates = voidSettleCandidates({
 			voidRow: voidHold,

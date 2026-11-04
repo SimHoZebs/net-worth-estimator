@@ -744,6 +744,66 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
 
+it("preselects the closest posted charge when several match", () => {
+	stubTestServer();
+	const base = financialModelFixture.transactions[0]!;
+	const hold = {
+		...base,
+		id: "01900000-0000-7000-8000-0000000000a1",
+		name: "LYFT *TEMP AUTH HOLD",
+		amount: 74.94,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		kind: "posting" as const,
+		startDate: "2026-10-31",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: true,
+		syncOwned: true,
+	};
+	const closer = {
+		...hold,
+		id: "01900000-0000-7000-8000-0000000000a2",
+		name: "LYFT *STANDARD 10-30",
+		amount: 81.22,
+		startDate: "2026-11-01",
+		enabled: true,
+		readOnly: false,
+		void: false,
+		postedDate: "2026-11-01",
+	};
+	const farther = {
+		...hold,
+		id: "01900000-0000-7000-8000-0000000000a3",
+		name: "LYFT *AIRPORT 10-30",
+		amount: 86.18,
+		startDate: "2026-11-01",
+		enabled: true,
+		readOnly: false,
+		void: false,
+		postedDate: "2026-11-01",
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(hold)}
+			savedTransaction={hold}
+			accounts={financialModelFixture.accounts}
+			transactions={[farther, closer, hold]}
+			onClose={() => {}}
+		/>,
+	);
+	const picker = screen.getByLabelText("Posted as") as HTMLSelectElement;
+	expect(picker.value).toBe(closer.id);
+	expect(picker.textContent).toContain("LYFT *STANDARD");
+});
+
 it("saves row edits through the posting endpoint and closes", async () => {
 	// Raw row carries server shapes the display never shows: non-midnight
 	// seconds that a date-unchanged save must keep verbatim.

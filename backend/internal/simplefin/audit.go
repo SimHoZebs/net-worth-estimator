@@ -1,10 +1,6 @@
 package simplefin
 
-import (
-	"strings"
-
-	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
-)
+import "github.com/simhozebs/net-worth-estimator/backend/internal/store"
 
 // HistoricalVoidPair is one void bank row with exactly one tip-bounded
 // settled sibling on the same model account: the pair the live lifecycle
@@ -30,7 +26,6 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 	type settledCandidate struct {
 		row             store.BankRow
 		cents           int64
-		name            string
 		outflow         bool
 		transactionTime int64
 	}
@@ -49,7 +44,6 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 		settled = append(settled, settledCandidate{
 			row:             row,
 			cents:           cents,
-			name:            strings.ToUpper(strings.TrimSpace(row.Posting.Name)),
 			outflow:         rowOutflow(row.Posting),
 			transactionTime: row.Posting.TransactionTime,
 		})
@@ -66,7 +60,6 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 		if !ok || staleCents <= 0 {
 			continue
 		}
-		staleName := strings.ToUpper(strings.TrimSpace(row.Posting.Name))
 		staleOutflow := rowOutflow(row.Posting)
 		minCents, maxCents, ok := settleTipBounds(staleCents)
 		if !ok {
@@ -83,7 +76,7 @@ func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []Histori
 			if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
 				continue
 			}
-			if !strings.Contains(candidate.name, staleName) && !strings.Contains(staleName, candidate.name) {
+			if !merchantNamesMatch(candidate.row.Posting.Name, row.Posting.Name) {
 				continue
 			}
 			if candidate.cents != staleCents && (candidate.cents < minCents || candidate.cents > maxCents) {

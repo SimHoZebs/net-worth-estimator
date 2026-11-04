@@ -1047,14 +1047,18 @@ export function TransactionDetail({
 				transactions: allTransactions,
 			})
 		: [];
-	const [postedPick, setPostedPick] = useState("");
-	// A pick that is not among the current candidates reads as unpicked,
-	// which also resets the selection when the modal moves to another row.
-	const effectivePick = voidCandidates.some(
-		(candidate) => candidate.id === postedPick,
-	)
-		? postedPick
-		: "";
+	const [postedPick, setPostedPick] = useState<string | null>(null);
+	// The closest candidate is the suggested posted version, so the
+	// confirmation states the link without an extra choice. An explicit empty
+	// pick keeps "No link", and a stale pick from another row falls back to
+	// the current candidate set.
+	const effectivePick =
+		postedPick === ""
+			? ""
+			: postedPick !== null &&
+				  voidCandidates.some((candidate) => candidate.id === postedPick)
+				? postedPick
+				: (voidCandidates[0]?.id ?? "");
 	const pickedPosted = voidCandidates.find(
 		(candidate) => candidate.id === effectivePick,
 	);

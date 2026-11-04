@@ -38,9 +38,21 @@ func rowOutflow(posting types.Posting) bool {
 
 // settleJoinKeys verifies the non-amount join between a stale bank row and
 // a settled candidate: same mirror account, same direction, parseable
-// amounts, post within a week of the authorization, and overlapping names.
+// amounts, post within a week of the authorization, and the same merchant.
 // It returns both amounts in cents for the caller's amount comparison.
 func settleJoinKeys(stale types.Posting, candidate store.SyncPosting) (staleCents, candidateCents int64, ok bool) {
+	return settleJoinKeysWith(stale, candidate, merchantNamesMatch)
+}
+
+// settleStrictJoinKeys keeps the containment rule for settled-to-settled
+// deduplication. The wider merchant key is only for hold-to-posted
+// settlement: two posted charges at the same chain but different store
+// numbers can be genuine separate charges.
+func settleStrictJoinKeys(stale types.Posting, candidate store.SyncPosting) (staleCents, candidateCents int64, ok bool) {
+	return settleJoinKeysWith(stale, candidate, merchantNamesContain)
+}
+
+func settleJoinKeysWith(stale types.Posting, candidate store.SyncPosting, namesMatch func(string, string) bool) (staleCents, candidateCents int64, ok bool) {
 	staleAccount, ok := rowAccount(stale)
 	if !ok {
 		return 0, 0, false
@@ -64,15 +76,14 @@ func settleJoinKeys(stale types.Posting, candidate store.SyncPosting) (staleCent
 	if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
 		return 0, 0, false
 	}
-	a, b := strings.ToUpper(strings.TrimSpace(candidate.Name)), strings.ToUpper(strings.TrimSpace(stale.Name))
-	if !strings.Contains(a, b) && !strings.Contains(b, a) {
+	if !namesMatch(candidate.Name, stale.Name) {
 		return 0, 0, false
 	}
 	return staleCents, candidateCents, true
 }
 
 func settleMatch(stale types.Posting, candidate store.SyncPosting) bool {
-	staleCents, candidateCents, ok := settleJoinKeys(stale, candidate)
+	staleCents, candidateCents, ok := settleStrictJoinKeys(stale, candidate)
 	return ok && staleCents == candidateCents
 }
 

@@ -244,6 +244,32 @@ func TestReconcileConvertsAuthBelowFinal(t *testing.T) {
 	}
 }
 
+func TestReconcileConvertsRenamedAuthDescriptor(t *testing.T) {
+	// A rideshare authorization describes the hold; the posted charge
+	// carries a different product descriptor. The shared merchant still
+	// settles the hold in place.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "LYFT *TEMP AUTH HOLD", "prime_card", "74.94", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	settled := []store.SyncPosting{reconcilePosting("LYFT *STANDARD 10-30", "prime_card", "81.22", false, 1785715200)}
+	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 0 || converts != 1 || len(voids) != 0 {
+		t.Fatalf("renamed auth = %+v, want one convert", directives)
+	}
+}
+
+func TestReconcileRejectsDifferentMerchantBranches(t *testing.T) {
+	// The same first token is not enough when the branch token differs.
+	bank := []store.BankRow{reconcileBankRow("uuid-pending", "BISTRO UPTOWN", "prime_card", "50.00", true, false,
+		pendingKey("prime_card", "old-auth"))}
+	settled := []store.SyncPosting{reconcilePosting("BISTRO DOWNTOWN", "prime_card", "58.00", false, 1785715200)}
+	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 1 || converts != 0 || len(voids) != 1 {
+		t.Fatalf("different branches = %+v, want void plus insert", directives)
+	}
+}
+
 func TestReconcileRejectsBeyondTolerance(t *testing.T) {
 	// +60% is not a tip: the auth voids and the posted charge inserts
 	// as its own row, exactly like an unmatched charge.
@@ -254,6 +280,20 @@ func TestReconcileRejectsBeyondTolerance(t *testing.T) {
 	upserts, converts, voids := directivesByAction(directives)
 	if upserts != 1 || converts != 0 || len(voids) != 1 {
 		t.Fatalf("beyond-tolerance = %+v, want void plus insert", directives)
+	}
+}
+
+func TestReconcileSettledDedupKeepsDifferentStoreNumbers(t *testing.T) {
+	// The hold-to-posted merchant key ignores store numbers. Settled-to-
+	// settled dedup must not: two exact-amount charges at different
+	// stores are distinct.
+	bank := []store.BankRow{reconcileBankRow("uuid-settled", "CORNER STORE 1234", "prime_card", "10.00", false, false,
+		pendingKey("prime_card", "old-post"))}
+	second := []store.SyncPosting{reconcilePosting("CORNER STORE 5678", "prime_card", "10.00", false, 1785715200)}
+	directives := Reconcile(nil, second, bank, map[string]bool{"prime_card": true})
+	upserts, converts, voids := directivesByAction(directives)
+	if upserts != 1 || converts != 0 || len(voids) != 0 {
+		t.Fatalf("different stores = %+v, want one insert", directives)
 	}
 }
 

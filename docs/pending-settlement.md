@@ -10,13 +10,24 @@ A posted charge that settles a vanished hold updates that hold under its own
 id instead of deleting the hold and creating the charge. The posted values
 and the posted bank key land on the hold's row.
 
-The join is tip-bounded: same mirror account, same direction, overlapping
-names, posted within a week of the authorization, amount within the tip
-band. The pair must be unique. Several candidates for one hold, or several
-holds for one candidate, void the hold and insert the charge, and the owner
-links or removes either side by hand. Zero-amount authorizations never join.
+The join is tip-bounded: same mirror account, same direction, the same
+leading merchant tokens after authorization noise and processor prefixes are
+removed, posted within a week of the authorization, amount within the tip
+band. A hold descriptor that names the authorization (`LYFT *TEMP AUTH
+HOLD`) still joins the posted descriptor for the same merchant
+(`LYFT *STANDARD`). When both descriptors carry a branch or product token,
+the tokens must agree. A single-token hold still lists each variant, and the
+uniqueness guard or the owner picks the right one. The pair must be unique.
+Several candidates for one hold, or several holds for one candidate, void the
+hold and insert the charge, and the owner links or removes either side by
+hand. Zero-amount authorizations never join.
 Direction mismatches never join. Uncovered accounts never convert. A posted
 charge that reuses its hold's id updates by key.
+
+The transaction detail uses the same merchant key to list candidates for an
+already-void hold. The closest candidate is preselected, and the picker keeps
+`No link — just remove` available. Removing the hold record leaves the posted
+charge unchanged.
 
 ## Occurrence claims survive settlement
 
