@@ -9,12 +9,12 @@ import {
 	useSavedEvaluations,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "@/state/savedRows.ts";
+} from "@/state/savedState.ts";
 import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
 import { useOutlookProjection } from "./useOutlookProjection.ts";
 import { useServerStatus } from "@/state/workspaceResources.ts";
 
-vi.mock("@/state/savedRows.ts", () => ({
+vi.mock("@/state/savedState.ts", () => ({
 	useSavedAccounts: vi.fn(),
 	useSavedTransactions: vi.fn(),
 	useSavedStartDate: vi.fn(),

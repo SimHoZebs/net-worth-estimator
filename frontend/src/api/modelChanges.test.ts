@@ -12,10 +12,10 @@ import {
 	suspendUserScope,
 } from "@/auth/resourceScope.ts";
 import {
-	applyRowOperations,
+	applyModelChanges,
 	diffFinancialModels,
-	type RowOperation,
-} from "@/api/rowSync.ts";
+	type ModelChange,
+} from "@/api/modelChanges.ts";
 import { ok } from "@/mocks/fetch.ts";
 import { ApiNetworkError } from "@/api/http.ts";
 
@@ -109,10 +109,10 @@ describe("diffFinancialModels", () => {
 		expect(kinds).toContain("account:delete");
 		expect(kinds).toContain("account:move");
 		const created = operations.find(
-			(operation): operation is Extract<RowOperation, { action: "create" }> =>
+			(operation): operation is Extract<ModelChange, { action: "create" }> =>
 				operation.action === "create" && operation.kind === "account",
 		);
-		expect(created?.row).toMatchObject({ id: "new" });
+		expect(created?.value).toMatchObject({ id: "new" });
 		const moves = operations.filter((operation) => operation.action === "move");
 		expect(moves.length).toBeGreaterThan(0);
 	});
@@ -133,7 +133,7 @@ describe("diffFinancialModels", () => {
 		expect(operations).toContainEqual({
 			kind: "checkpoint",
 			action: "save",
-			row: checkpoint("a", "2026-08-01", 150),
+			value: checkpoint("a", "2026-08-01", 150),
 		});
 		expect(operations).toContainEqual({
 			kind: "checkpoint",
@@ -184,7 +184,7 @@ describe("diffFinancialModels", () => {
 			action: "update",
 			evaluationType: "netWorthThreshold",
 			instanceId: "t1",
-			row: {
+			value: {
 				instanceId: "t1",
 				name: "T1x",
 				enabled: true,
@@ -195,7 +195,7 @@ describe("diffFinancialModels", () => {
 			kind: "evaluation",
 			action: "create",
 			evaluationType: "netWorthThreshold",
-			row: {
+			value: {
 				instanceId: "t2",
 				name: "T2",
 				enabled: true,
@@ -205,7 +205,7 @@ describe("diffFinancialModels", () => {
 	});
 });
 
-describe("applyRowOperations", () => {
+describe("applyModelChanges", () => {
 	it("diffs planned purchases and uses their dedicated endpoints", async () => {
 		const base: FinancialModel = {
 			...emptyModel(),
@@ -231,13 +231,13 @@ describe("applyRowOperations", () => {
 		expect(kinds).toContain("plannedPurchase:move");
 		const seen = stubFetch(() =>
 			ok({
-				row: posting("new"),
+				value: posting("new"),
 				issues: [],
-				persisted: true,
+				saved: true,
 				revision: "r1",
 			}),
 		);
-		const result = await applyRowOperations(operations);
+		const result = await applyModelChanges(operations);
 		expect(result).toEqual({ ok: true, issues: [] });
 		const urls = seen.map((call) => call.url);
 		expect(urls).toContain("/v1/planned-purchases");
@@ -290,17 +290,17 @@ describe("applyRowOperations", () => {
 	it("applies operations in order and reports success", async () => {
 		const seen = stubFetch(() =>
 			ok({
-				row: account("a"),
+				value: account("a"),
 				issues: [],
-				persisted: true,
+				saved: true,
 				revision: "r1",
 			}),
 		);
-		const operations: RowOperation[] = [
-			{ kind: "account", action: "create", row: account("a") },
+		const operations: ModelChange[] = [
+			{ kind: "account", action: "create", value: account("a") },
 			{ kind: "account", action: "move", id: "a", beforeId: null },
 		];
-		const result = await applyRowOperations(operations);
+		const result = await applyModelChanges(operations);
 		expect(result).toEqual({ ok: true, issues: [] });
 		expect(seen.map((call) => call.url)).toEqual([
 			"/v1/accounts",
@@ -321,11 +321,11 @@ describe("applyRowOperations", () => {
 		const seen = stubFetch(() => {
 			throw new TypeError("Failed to fetch");
 		});
-		const operations: RowOperation[] = [
-			{ kind: "account", action: "create", row: account("a") },
-			{ kind: "account", action: "create", row: account("b") },
+		const operations: ModelChange[] = [
+			{ kind: "account", action: "create", value: account("a") },
+			{ kind: "account", action: "create", value: account("b") },
 		];
-		const result = await applyRowOperations(operations);
+		const result = await applyModelChanges(operations);
 		expect(result).toBeInstanceOf(ApiNetworkError);
 		expect(seen).toHaveLength(1);
 	});
@@ -333,17 +333,17 @@ describe("applyRowOperations", () => {
 	it("stops at the first rejected write and returns issues", async () => {
 		const seen = stubFetch(() =>
 			ok({
-				row: account("a"),
+				value: account("a"),
 				issues: [{ severity: "error", code: "x", message: "bad", path: [] }],
-				persisted: false,
+				saved: false,
 				revision: "r0",
 			}),
 		);
-		const operations: RowOperation[] = [
-			{ kind: "account", action: "create", row: account("a") },
-			{ kind: "account", action: "create", row: account("b") },
+		const operations: ModelChange[] = [
+			{ kind: "account", action: "create", value: account("a") },
+			{ kind: "account", action: "create", value: account("b") },
 		];
-		const result = await applyRowOperations(operations);
+		const result = await applyModelChanges(operations);
 		expect(result).toEqual({
 			ok: false,
 			issues: [{ severity: "error", code: "x", message: "bad", path: [] }],
@@ -353,12 +353,12 @@ describe("applyRowOperations", () => {
 
 	it("skips network access for an aborted save", async () => {
 		const seen = stubFetch(() => ok({}));
-		const operations: RowOperation[] = [
-			{ kind: "account", action: "create", row: account("a") },
+		const operations: ModelChange[] = [
+			{ kind: "account", action: "create", value: account("a") },
 		];
 		const controller = new AbortController();
 		controller.abort();
-		const result = await applyRowOperations(operations, {
+		const result = await applyModelChanges(operations, {
 			signal: controller.signal,
 		});
 		expect(result).toEqual({ ok: true, issues: [] });

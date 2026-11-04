@@ -29,18 +29,18 @@ func TestPinnedEvaluationsEndToEnd(t *testing.T) {
 		t.Fatalf("create status = %d, body %s", created.Code, created.Body.String())
 	}
 	var createdPayload struct {
-		Row struct {
+		Result struct {
 			InstanceID string `json:"instanceId"`
-		} `json:"row"`
-		Persisted bool `json:"persisted"`
+		} `json:"value"`
+		Saved bool `json:"saved"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &createdPayload); err != nil {
 		t.Fatalf("decode create: %v", err)
 	}
-	if !createdPayload.Persisted || createdPayload.Row.InstanceID == "" {
+	if !createdPayload.Saved || createdPayload.Result.InstanceID == "" {
 		t.Fatalf("create = %+v", createdPayload)
 	}
-	id := createdPayload.Row.InstanceID
+	id := createdPayload.Result.InstanceID
 
 	empty := doRowRequest(t, handler, http.MethodGet, "/v1/pinned-evaluations", "")
 	if empty.Code != http.StatusOK {

@@ -6,7 +6,7 @@ import {
 	useSavedAccounts,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "../state/savedRows.ts";
+} from "../state/savedState.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
 import { TransactionDetail } from "./activity/TransactionDetail.tsx";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
@@ -28,7 +28,7 @@ function ExistingTransactionDetail({
 	const startDate = useSavedStartDate();
 	const readOnly = useUserReadOnly();
 	const accountList = accounts ?? [];
-	const savedRows = transactions ?? [item];
+	const savedState = transactions ?? [item];
 	return (
 		<TransactionDetail
 			key={item.id}
@@ -39,7 +39,7 @@ function ExistingTransactionDetail({
 			})}
 			savedTransaction={item}
 			accounts={accountList}
-			transactions={savedRows}
+			transactions={savedState}
 			readOnly={readOnly}
 			onClose={onClose}
 		/>

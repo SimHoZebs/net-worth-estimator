@@ -4,7 +4,7 @@ import { financialModelFixture } from "../mocks/financialModel.ts";
 import { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
-vi.mock("../state/savedRows.ts", () => ({
+vi.mock("../state/savedState.ts", () => ({
 	useSavedAccounts: () => financialModelFixture.accounts,
 	useSavedTransactions: () =>
 		financialModelFixture.transactions.filter(

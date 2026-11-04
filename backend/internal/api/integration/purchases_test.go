@@ -20,17 +20,17 @@ func TestPlannedPurchaseHTTPRoundTrip(t *testing.T) {
 	const id = "01900000-0000-7000-8000-000000000022"
 	body := `{"id":"` + id + `","name":"Laptop","fundingAccountId":"cash","cost":500,"earliestDate":"2026-02-01","enabled":true,"priority":3}`
 	created := doRowRequest(t, handler, "POST", "/v1/planned-purchases", body)
-	var result rowResultBody[types.PlannedPurchase]
+	var result writeResult[types.PlannedPurchase]
 	if created.Code != 200 {
 		t.Fatalf("create: %d %s", created.Code, created.Body.String())
 	}
-	if err := json.Unmarshal(created.Body.Bytes(), &result); err != nil || !result.Persisted || result.Row.Priority != 3 {
+	if err := json.Unmarshal(created.Body.Bytes(), &result); err != nil || !result.Saved || result.Result.Priority != 3 {
 		t.Fatalf("create: %s %v", created.Body.String(), err)
 	}
 	if w := doRowRequest(t, handler, "POST", "/v1/planned-purchases", body); w.Code != 409 {
 		t.Fatalf("retry: %d %s", w.Code, w.Body.String())
 	}
-	row := result.Row
+	row := result.Result
 	row.Cost = 600
 	update, _ := json.Marshal(row)
 	if w := doRowRequest(t, handler, "PATCH", "/v1/planned-purchases/"+id, string(update)); w.Code != 200 {
@@ -51,10 +51,10 @@ func TestPlannedPurchaseHTTPRoundTrip(t *testing.T) {
 		data, _ := json.Marshal(invalid)
 		w := doRowRequest(t, handler, "PATCH", "/v1/planned-purchases/"+id, string(data))
 		if w.Code == 200 {
-			var rejected rowResultBody[types.PlannedPurchase]
+			var rejected writeResult[types.PlannedPurchase]
 			json.Unmarshal(w.Body.Bytes(), &rejected)
-			if rejected.Persisted {
-				t.Fatalf("invalid purchase persisted: %s", change)
+			if rejected.Saved {
+				t.Fatalf("invalid purchase saved: %s", change)
 			}
 		} else if w.Code != 422 {
 			t.Fatalf("invalid purchase: %d %s", w.Code, w.Body.String())
@@ -84,9 +84,9 @@ func TestPlannedPurchaseAppendAndReorder(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		body := fmt.Sprintf(`{"id":"01900000-0000-7000-8000-%012d","name":"Item","fundingAccountId":"cash","cost":100,"earliestDate":"2026-02-01","enabled":true}`, i)
 		w := doRowRequest(t, handler, "POST", "/v1/planned-purchases", body)
-		var result rowResultBody[types.PlannedPurchase]
+		var result writeResult[types.PlannedPurchase]
 		json.Unmarshal(w.Body.Bytes(), &result)
-		if w.Code != 200 || !result.Persisted || result.Row.Priority != i {
+		if w.Code != 200 || !result.Saved || result.Result.Priority != i {
 			t.Fatalf("append: %d %s", w.Code, w.Body.String())
 		}
 	}

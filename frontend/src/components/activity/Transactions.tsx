@@ -70,13 +70,13 @@ export function Transactions({
 		currentPage * PAGE_SIZE,
 		(currentPage + 1) * PAGE_SIZE,
 	);
-	const savedRows = useMemo(
+	const savedState = useMemo(
 		() => new Map(rows.map((transaction) => [transaction.id, transaction])),
 		[rows],
 	);
 	const { selected, inspect, close } = useTransactionSelection(
 		occurrences,
-		savedRows,
+		savedState,
 	);
 	const update = (change: Partial<ActivityFilters>) => {
 		setFilters((previous) => ({ ...previous, ...change }));
@@ -140,10 +140,10 @@ export function Transactions({
 									key={transaction.id}
 									transaction={transaction}
 									savedTransaction={
-										savedRows.get(transaction.transactionId) ?? null
+										savedState.get(transaction.transactionId) ?? null
 									}
 									onEdit={() => {
-										const savedTransaction = savedRows.get(
+										const savedTransaction = savedState.get(
 											transaction.transactionId,
 										);
 										if (savedTransaction) inspect(transaction);

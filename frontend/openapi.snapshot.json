@@ -438,29 +438,29 @@
 						},
 						"type": ["array", "null"]
 					},
-					"patternKey": {
-						"type": "string"
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"rows": {
+					"matches": {
 						"items": {
 							"$ref": "#/components/schemas/Posting"
 						},
 						"type": ["array", "null"]
 					},
+					"patternKey": {
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					},
 					"ruleId": {
 						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
 					}
 				},
 				"required": [
-					"rows",
+					"matches",
 					"issues",
-					"persisted",
+					"saved",
 					"revision",
 					"patternKey",
 					"ruleId"
@@ -1114,14 +1114,14 @@
 					"kind": {
 						"type": "string"
 					},
-					"persisted": {
-						"type": "boolean"
-					},
 					"revision": {
 						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
 					}
 				},
-				"required": ["id", "kind", "issues", "persisted", "revision"],
+				"required": ["id", "kind", "issues", "saved", "revision"],
 				"type": "object"
 			},
 			"Create-pattern-to-new-ruleResponse": {
@@ -1145,17 +1145,17 @@
 					"patternKey": {
 						"type": "string"
 					},
-					"persisted": {
-						"type": "boolean"
-					},
 					"revision": {
 						"type": "string"
 					},
-					"row": {
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
 						"$ref": "#/components/schemas/RecurrenceRule"
 					}
 				},
-				"required": ["row", "issues", "persisted", "revision", "patternKey"],
+				"required": ["value", "issues", "saved", "revision", "patternKey"],
 				"type": "object"
 			},
 			"CurrentPosition": {
@@ -1199,14 +1199,14 @@
 						},
 						"type": ["array", "null"]
 					},
-					"persisted": {
-						"type": "boolean"
-					},
 					"revision": {
 						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
 					}
 				},
-				"required": ["deletedId", "issues", "persisted", "revision"],
+				"required": ["deletedId", "issues", "saved", "revision"],
 				"type": "object"
 			},
 			"Delete-amount-presetResponse": {
@@ -3390,12 +3390,12 @@
 				"required": ["presets"],
 				"type": "object"
 			},
-			"PresetResultBody": {
+			"PresetWriteResult": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/PresetResultBody.json"],
+						"examples": ["https://example.com/schemas/PresetWriteResult.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -3406,14 +3406,14 @@
 						},
 						"type": ["array", "null"]
 					},
-					"persisted": {
+					"saved": {
 						"type": "boolean"
 					},
-					"row": {
+					"value": {
 						"$ref": "#/components/schemas/AmountPreset"
 					}
 				},
-				"required": ["row", "issues", "persisted"],
+				"required": ["value", "issues", "saved"],
 				"type": "object"
 			},
 			"Preview-pattern-to-existing-ruleResponse": {
@@ -4189,223 +4189,6 @@
 				"required": ["revision", "details", "confirm"],
 				"type": "object"
 			},
-			"RowResultBodyAccount": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyAccount.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/Account"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
-			"RowResultBodyCheckpoint": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyCheckpoint.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/Checkpoint"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
-			"RowResultBodyEvaluationUpdate": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyEvaluationUpdate.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/EvaluationUpdate"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
-			"RowResultBodyPaymentTerms": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyPaymentTerms.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/PaymentTerms"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
-			"RowResultBodyPlannedPurchase": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyPlannedPurchase.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/PlannedPurchase"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
-			"RowResultBodyPosting": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyPosting.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/Posting"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
-			"RowResultBodyRecurrenceRule": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RowResultBodyRecurrenceRule.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"persisted": {
-						"type": "boolean"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"row": {
-						"$ref": "#/components/schemas/RecurrenceRule"
-					}
-				},
-				"required": ["row", "issues", "persisted", "revision"],
-				"type": "object"
-			},
 			"RuleBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -5057,11 +4840,11 @@
 					"manualAccountId": {
 						"type": "string"
 					},
-					"persisted": {
-						"type": "boolean"
-					},
 					"revision": {
 						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
 					},
 					"syncedAccountId": {
 						"type": "string"
@@ -5071,7 +4854,7 @@
 					"manualAccountId",
 					"syncedAccountId",
 					"issues",
-					"persisted",
+					"saved",
 					"revision"
 				],
 				"type": "object"
@@ -5412,6 +5195,219 @@
 				},
 				"required": ["date", "amount"],
 				"type": "object"
+			},
+			"WriteResultAccount": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/WriteResultAccount.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/Account"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultCheckpoint": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/WriteResultCheckpoint.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/Checkpoint"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultEvaluationUpdate": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/WriteResultEvaluationUpdate.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/EvaluationUpdate"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultPaymentTerms": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/WriteResultPaymentTerms.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/PaymentTerms"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultPlannedPurchase": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/WriteResultPlannedPurchase.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/PlannedPurchase"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultPosting": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/WriteResultPosting.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/Posting"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"WriteResultRecurrenceRule": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/WriteResultRecurrenceRule.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/RecurrenceRule"
+					}
+				},
+				"required": ["value", "issues", "saved", "revision"],
+				"type": "object"
 			}
 		}
 	},
@@ -5439,7 +5435,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyAccount"
+									"$ref": "#/components/schemas/WriteResultAccount"
 								}
 							}
 						},
@@ -5601,7 +5597,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyAccount"
+									"$ref": "#/components/schemas/WriteResultAccount"
 								}
 							}
 						},
@@ -5665,7 +5661,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/PresetResultBody"
+									"$ref": "#/components/schemas/PresetWriteResult"
 								}
 							}
 						},
@@ -5787,7 +5783,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/PresetResultBody"
+									"$ref": "#/components/schemas/PresetWriteResult"
 								}
 							}
 						},
@@ -6003,7 +5999,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Read persisted transaction findings"
+				"summary": "Read saved transaction findings"
 			}
 		},
 		"/v1/analysis-findings/{id}": {
@@ -6560,7 +6556,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyCheckpoint"
+									"$ref": "#/components/schemas/WriteResultCheckpoint"
 								}
 							}
 						},
@@ -6598,7 +6594,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyEvaluationUpdate"
+									"$ref": "#/components/schemas/WriteResultEvaluationUpdate"
 								}
 							}
 						},
@@ -6748,7 +6744,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyEvaluationUpdate"
+									"$ref": "#/components/schemas/WriteResultEvaluationUpdate"
 								}
 							}
 						},
@@ -7190,7 +7186,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyPaymentTerms"
+									"$ref": "#/components/schemas/WriteResultPaymentTerms"
 								}
 							}
 						},
@@ -7356,7 +7352,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyPlannedPurchase"
+									"$ref": "#/components/schemas/WriteResultPlannedPurchase"
 								}
 							}
 						},
@@ -7478,7 +7474,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyPlannedPurchase"
+									"$ref": "#/components/schemas/WriteResultPlannedPurchase"
 								}
 							}
 						},
@@ -7554,7 +7550,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyPosting"
+									"$ref": "#/components/schemas/WriteResultPosting"
 								}
 							}
 						},
@@ -7676,7 +7672,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyPosting"
+									"$ref": "#/components/schemas/WriteResultPosting"
 								}
 							}
 						},
@@ -8331,7 +8327,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyRecurrenceRule"
+									"$ref": "#/components/schemas/WriteResultRecurrenceRule"
 								}
 							}
 						},
@@ -8453,7 +8449,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/RowResultBodyRecurrenceRule"
+									"$ref": "#/components/schemas/WriteResultRecurrenceRule"
 								}
 							}
 						},

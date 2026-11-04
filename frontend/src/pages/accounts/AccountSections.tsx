@@ -36,7 +36,7 @@ import { useUserReadOnly } from "../../state/useUserScope.ts";
 import {
 	useSavedAccounts,
 	useSavedStartDate,
-} from "../../state/savedRows.ts";
+} from "../../state/savedState.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
 

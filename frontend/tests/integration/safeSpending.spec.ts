@@ -19,7 +19,7 @@ test.beforeEach(async ({ page, request }) => {
 			data: { ...salary, startDate: "2026-01-01" },
 		},
 	);
-	expect((await response.json()).persisted).toBe(true);
+	expect((await response.json()).saved).toBe(true);
 });
 
 test("Configure settings survive in a fresh browser context", async ({
@@ -198,7 +198,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 			},
 		});
 		expect(response.ok()).toBe(true);
-		expect((await response.json()).persisted).toBe(true);
+		expect((await response.json()).saved).toBe(true);
 	}
 	await page.goto("/#outlook/safe-spending-detail/cycle");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
@@ -276,7 +276,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 			enabled: true,
 		},
 	});
-	expect((await response.json()).persisted).toBe(true);
+	expect((await response.json()).saved).toBe(true);
 	await page.goto("/#outlook/safe-spending-detail/configure");
 	const sources = page.getByRole("group", { name: "Income sources" });
 	const salary = sources.getByRole("button", { name: /^Salary/ });
@@ -364,7 +364,7 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 			enabled: true,
 		},
 	});
-	expect((await partner.json()).persisted).toBe(true);
+	expect((await partner.json()).saved).toBe(true);
 	const settings = await request.put(
 		`${FIXTURE_API}/v1/safe-spending-settings`,
 		{
@@ -419,7 +419,7 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 			},
 		});
 		expect(response.ok()).toBe(true);
-		expect((await response.json()).persisted).toBe(true);
+		expect((await response.json()).saved).toBe(true);
 	}
 	await page.goto("/#outlook/safe-spending-detail/cycle");
 	const drawer = page.getByRole("dialog", { name: "Safe card spending" });

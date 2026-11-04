@@ -27,7 +27,7 @@ type accountBody struct {
 	// with Balance; there is no date fallback.
 	ObservedAt *int64 `json:"observedAt,omitempty"`
 	// Source is accepted and ignored: accounts carry no authorship flag.
-	// Row authorship lives in checkpoints/postings ("user" | "banksync")
+	// Record authorship lives in checkpoints/postings ("user" | "banksync")
 	// plus account_links, mirroring the retired whole-model PUT contract.
 	Source *string `json:"source,omitempty"`
 }
@@ -52,7 +52,7 @@ type accountInput struct {
 }
 
 type accountOutput struct {
-	Body rowResultBody[types.Account] `json:"body"`
+	Body writeResult[types.Account] `json:"body"`
 }
 
 func accountID(account types.Account) string { return account.ID }
@@ -80,7 +80,7 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 	if err != nil {
 		return nil, err
 	}
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
@@ -92,7 +92,7 @@ func (s *handler) createAccount(_ context.Context, input *accountInput) (*accoun
 	if err != nil {
 		return nil, err
 	}
-	return &accountOutput{Body: rowResultBody[types.Account]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &accountOutput{Body: writeResult[types.Account]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) updateAccount(_ context.Context, input *struct {
@@ -104,7 +104,7 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = replaceByID(model.Accounts, account.ID, accountID, account)
 		if balance != nil {
 			pending := types.Checkpoint{AccountID: account.ID, Balance: *balance, Source: store.SourceUser, ObservedAt: observedAt}
@@ -116,7 +116,7 @@ func (s *handler) updateAccount(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &accountOutput{Body: rowResultBody[types.Account]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &accountOutput{Body: writeResult[types.Account]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deleteAccount(_ context.Context, input *struct {
@@ -125,12 +125,12 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 	Body struct {
 		DeletedID string                       `json:"deletedId"`
 		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		Saved     bool                         `json:"saved"`
 		Revision  string                       `json:"revision"`
 	} `json:"body"`
 }, error) {
 	id := input.ID
-	_, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	_, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Accounts = removeByID(model.Accounts, id, accountID)
 	}, func() (struct{}, error) {
 		return struct{}{}, s.store.DeleteAccount(id)
@@ -142,13 +142,13 @@ func (s *handler) deleteAccount(_ context.Context, input *struct {
 		Body struct {
 			DeletedID string                       `json:"deletedId"`
 			Issues    []types.ModelValidationIssue `json:"issues"`
-			Persisted bool                         `json:"persisted"`
+			Saved     bool                         `json:"saved"`
 			Revision  string                       `json:"revision"`
 		} `json:"body"`
 	}{}
 	output.Body.DeletedID = id
 	output.Body.Issues = issues
-	output.Body.Persisted = persisted
+	output.Body.Saved = saved
 	output.Body.Revision = revision
 	return output, nil
 }

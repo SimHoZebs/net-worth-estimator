@@ -27,12 +27,12 @@ type paymentTermsInput struct {
 }
 
 type paymentTermsOutput struct {
-	Body rowResultBody[types.PaymentTerms] `json:"body"`
+	Body writeResult[types.PaymentTerms] `json:"body"`
 }
 
 func (s *handler) savePaymentTerms(_ context.Context, input *paymentTermsInput) (*paymentTermsOutput, error) {
 	terms := input.Body.toTerms()
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		replaced := false
 		for i, existing := range model.PaymentTerms {
 			if existing.AccountID == terms.AccountID {
@@ -49,7 +49,7 @@ func (s *handler) savePaymentTerms(_ context.Context, input *paymentTermsInput) 
 	if err != nil {
 		return nil, err
 	}
-	return &paymentTermsOutput{Body: rowResultBody[types.PaymentTerms]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &paymentTermsOutput{Body: writeResult[types.PaymentTerms]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deletePaymentTerms(_ context.Context, input *struct {

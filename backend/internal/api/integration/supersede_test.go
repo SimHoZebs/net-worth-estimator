@@ -43,18 +43,18 @@ func TestSupersedeAccountEndpointRetiresManualAccount(t *testing.T) {
 		ManualAccountID string                       `json:"manualAccountId"`
 		SyncedAccountID string                       `json:"syncedAccountId"`
 		Issues          []types.ModelValidationIssue `json:"issues"`
-		Persisted       bool                         `json:"persisted"`
+		Saved           bool                         `json:"saved"`
 		Revision        string                       `json:"revision"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatalf("decode supersede: %v", err)
 	}
-	if !result.Persisted || result.ManualAccountID != "manual" || result.SyncedAccountID != "synced" {
+	if !result.Saved || result.ManualAccountID != "manual" || result.SyncedAccountID != "synced" {
 		t.Fatalf("supersede = %+v", result)
 	}
 	for _, issue := range result.Issues {
 		if issue.Severity == types.SeverityError {
-			t.Fatalf("supersede persisted an error issue: %+v", issue)
+			t.Fatalf("supersede saved an error issue: %+v", issue)
 		}
 	}
 	assertSavedModelIdentity(t, database, result.Revision)
@@ -100,14 +100,14 @@ func TestSupersedeAccountEndpointReturnsIssuesWithoutPersisting(t *testing.T) {
 		t.Fatalf("supersede status = %d, body %s", response.Code, response.Body.String())
 	}
 	var result struct {
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		Issues []types.ModelValidationIssue `json:"issues"`
+		Saved  bool                         `json:"saved"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatalf("decode supersede: %v", err)
 	}
-	if result.Persisted || !hasErrorIssues(result.Issues) {
-		t.Fatalf("supersede = %+v, want persisted false with errors", result)
+	if result.Saved || !hasErrorIssues(result.Issues) {
+		t.Fatalf("supersede = %+v, want saved false with errors", result)
 	}
 	model, err := database.LoadModel()
 	if err != nil {

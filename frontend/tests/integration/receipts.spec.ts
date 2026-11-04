@@ -30,8 +30,8 @@ async function seedExpense(page: Page) {
 	});
 	expect(response.ok()).toBe(true);
 	const body = await response.json();
-	expect(body.persisted).toBe(true);
-	return body.row.id as string;
+	expect(body.saved).toBe(true);
+	return body.value.id as string;
 }
 
 async function openExpense(page: Page) {

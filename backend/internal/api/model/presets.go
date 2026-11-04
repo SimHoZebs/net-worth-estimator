@@ -26,14 +26,14 @@ type presetListOutput struct {
 	} `json:"body"`
 }
 
-type presetResultBody struct {
-	Row       types.AmountPreset           `json:"row"`
-	Issues    []types.ModelValidationIssue `json:"issues"`
-	Persisted bool                         `json:"persisted"`
+type presetWriteResult struct {
+	Result types.AmountPreset           `json:"value"`
+	Issues []types.ModelValidationIssue `json:"issues"`
+	Saved  bool                         `json:"saved"`
 }
 
 type presetOutput struct {
-	Body presetResultBody `json:"body"`
+	Body presetWriteResult `json:"body"`
 }
 
 func presetIssues(preset types.AmountPreset) []types.ModelValidationIssue {
@@ -60,7 +60,7 @@ func presetIssues(preset types.AmountPreset) []types.ModelValidationIssue {
 }
 
 func rejectedPreset(issues []types.ModelValidationIssue) *presetOutput {
-	return &presetOutput{Body: presetResultBody{Row: types.AmountPreset{}, Issues: issues, Persisted: false}}
+	return &presetOutput{Body: presetWriteResult{Result: types.AmountPreset{}, Issues: issues, Saved: false}}
 }
 
 func (s *handler) listPresets(_ context.Context, _ *struct{}) (*presetListOutput, error) {
@@ -88,7 +88,7 @@ func (s *handler) createPreset(_ context.Context, input *struct {
 	if err != nil {
 		return nil, modelstate.WriteError(err)
 	}
-	return &presetOutput{Body: presetResultBody{Row: row, Issues: issues, Persisted: true}}, nil
+	return &presetOutput{Body: presetWriteResult{Result: row, Issues: issues, Saved: true}}, nil
 }
 
 func (s *handler) updatePreset(_ context.Context, input *struct {
@@ -112,7 +112,7 @@ func (s *handler) updatePreset(_ context.Context, input *struct {
 	if err != nil {
 		return nil, modelstate.WriteError(err)
 	}
-	return &presetOutput{Body: presetResultBody{Row: row, Issues: issues, Persisted: true}}, nil
+	return &presetOutput{Body: presetWriteResult{Result: row, Issues: issues, Saved: true}}, nil
 }
 
 func findPreset(s *handler, id string) (types.AmountPreset, error) {

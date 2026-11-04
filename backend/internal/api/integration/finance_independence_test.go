@@ -9,7 +9,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Finance-first lifecycle over HTTP: a persisted invalid forecast
+// Finance-first lifecycle over HTTP: a saved invalid forecast
 // evaluation (seeded through the low-level store, modeling invalid
 // config no public endpoint would accept) cannot block current-position,
 // balance, or transaction reads, nor unrelated finance writes. The
@@ -20,18 +20,18 @@ import (
 func financeIndependenceIDs(t *testing.T, responseBody []byte) string {
 	t.Helper()
 	var payload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
-		Persisted bool `json:"persisted"`
+		} `json:"value"`
+		Saved bool `json:"saved"`
 	}
 	if err := json.Unmarshal(responseBody, &payload); err != nil {
 		t.Fatalf("decode row id: %v", err)
 	}
-	if !payload.Persisted || payload.Row.ID == "" {
-		t.Fatalf("row not persisted: %s", responseBody)
+	if !payload.Saved || payload.Result.ID == "" {
+		t.Fatalf("row not saved: %s", responseBody)
 	}
-	return payload.Row.ID
+	return payload.Result.ID
 }
 
 func financeHasIssueCode(body []byte, code string) bool {
@@ -74,7 +74,7 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		t.Fatalf("create evaluation status = %d, body %s", response.Code, response.Body.String())
 	}
 
-	// Seed persisted invalid forecast state the public API would reject:
+	// Seed saved invalid forecast state the public API would reject:
 	// a broken config shape and a dangling account reference.
 	if _, err := database.CreateEvaluation(store.EvaluationUpdate{
 		Type: "netWorthThreshold", Name: "Broken", Enabled: true,
@@ -168,10 +168,10 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		if response.Code != http.StatusOK {
 			t.Fatalf("%s %s status = %d, body %s", patch.method, patch.path, response.Code, response.Body.String())
 		}
-		var persisted struct {
-			Persisted bool `json:"persisted"`
+		var saved struct {
+			Saved bool `json:"saved"`
 		}
-		if err := json.Unmarshal(response.Body.Bytes(), &persisted); err != nil || !persisted.Persisted {
+		if err := json.Unmarshal(response.Body.Bytes(), &saved); err != nil || !saved.Saved {
 			t.Fatalf("%s %s must persist: %s", patch.method, patch.path, response.Body.String())
 		}
 	}
@@ -215,13 +215,13 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		t.Fatalf("delete account status = %d, body %s", deleted.Code, deleted.Body.String())
 	}
 	var deletedPayload struct {
-		Persisted bool   `json:"persisted"`
-		Revision  string `json:"revision"`
+		Saved    bool   `json:"saved"`
+		Revision string `json:"revision"`
 	}
 	if err := json.Unmarshal(deleted.Body.Bytes(), &deletedPayload); err != nil {
 		t.Fatalf("decode delete: %v", err)
 	}
-	if deletedPayload.Persisted {
+	if deletedPayload.Saved {
 		t.Fatal("deleting a referenced account must not persist")
 	}
 	if !financeHasIssueCode(deleted.Body.Bytes(), "evaluation.accountBalance.accountId.invalid") {
@@ -251,6 +251,6 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		t.Fatalf("rejected delete changed revision %q to %q", deletedPayload.Revision, afterPayload.Revision)
 	}
 	if afterPayload.Revision == revisionBefore {
-		t.Fatalf("expected the persisted patches to advance revision from %q", revisionBefore)
+		t.Fatalf("expected the saved patches to advance revision from %q", revisionBefore)
 	}
 }

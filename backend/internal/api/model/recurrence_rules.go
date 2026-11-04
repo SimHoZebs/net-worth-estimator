@@ -128,7 +128,7 @@ type ruleInput struct {
 }
 
 type ruleOutput struct {
-	Body rowResultBody[types.RecurrenceRule] `json:"body"`
+	Body writeResult[types.RecurrenceRule] `json:"body"`
 }
 
 func ruleID(rule types.RecurrenceRule) string { return rule.ID }
@@ -142,7 +142,7 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			// Omitted priority appends after the current maximum, so callers
 			// that never model ordering leave it out.
@@ -166,7 +166,7 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 	if err != nil {
 		return nil, err
 	}
-	return &ruleOutput{Body: rowResultBody[types.RecurrenceRule]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &ruleOutput{Body: writeResult[types.RecurrenceRule]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) updateRule(_ context.Context, input *struct {
@@ -194,7 +194,7 @@ func (s *handler) updateRule(_ context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {
 		return s.store.UpdateRule(rule)
@@ -202,7 +202,7 @@ func (s *handler) updateRule(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &ruleOutput{Body: rowResultBody[types.RecurrenceRule]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &ruleOutput{Body: writeResult[types.RecurrenceRule]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deleteRule(_ context.Context, input *struct {

@@ -548,7 +548,7 @@ Exercise each row through the real identity boundary against disposable state.
 A shared Authorization bearer header cannot replace a session or bypass a denied
 permission. `AUTH_TOKEN` and `AUTH_PROVIDER=none` cause server startup to fail.
 After each rejected write, confirm financial data stays unchanged. Row validation
-can return 200 with error-severity issues and `persisted: false`.
+can return 200 with error-severity issues and `saved: false`.
 
 `auth/test-integration.mjs` owns the disposable real-provider session, CSRF,
 owner/provisioned-guest/second-user, and logout checks. Go identity tests also check that

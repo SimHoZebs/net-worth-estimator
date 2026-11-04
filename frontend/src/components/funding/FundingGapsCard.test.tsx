@@ -29,30 +29,30 @@ vi.mock("./FundingGapsModal.tsx", () => ({
 // swap data identities the way a background refetch does. The holders start
 // empty because vi.hoisted runs before imports initialize; beforeEach seeds
 // the fixture data.
-const savedRows = vi.hoisted(
+const savedState = vi.hoisted(
 	(): {
 		accounts: Account[];
 		transactions: Transaction[];
 		startDate: string;
 	} => ({ accounts: [], transactions: [], startDate: "" }),
 );
-vi.mock("@/state/savedRows.ts", () => ({
-	useSavedAccounts: () => savedRows.accounts,
-	useSavedTransactions: () => savedRows.transactions,
-	useSavedStartDate: () => savedRows.startDate,
+vi.mock("@/state/savedState.ts", () => ({
+	useSavedAccounts: () => savedState.accounts,
+	useSavedTransactions: () => savedState.transactions,
+	useSavedStartDate: () => savedState.startDate,
 }));
 
 beforeEach(() => {
-	savedRows.accounts = financialModelFixture.accounts;
-	savedRows.transactions = financialModelFixture.transactions;
-	savedRows.startDate = financialModelFixture.startDate;
+	savedState.accounts = financialModelFixture.accounts;
+	savedState.transactions = financialModelFixture.transactions;
+	savedState.startDate = financialModelFixture.startDate;
 });
 
 afterEach(() => {
 	cleanup();
-	savedRows.accounts = financialModelFixture.accounts;
-	savedRows.transactions = financialModelFixture.transactions;
-	savedRows.startDate = financialModelFixture.startDate;
+	savedState.accounts = financialModelFixture.accounts;
+	savedState.transactions = financialModelFixture.transactions;
+	savedState.startDate = financialModelFixture.startDate;
 });
 
 const item: OtherEvaluation = {
@@ -97,8 +97,8 @@ describe("FundingGapsCard", () => {
 		const refresh = projectionFixture({
 			transactions: [transactionFixture()],
 		});
-		savedRows.accounts = [...financialModelFixture.accounts];
-		savedRows.transactions = [...financialModelFixture.transactions];
+		savedState.accounts = [...financialModelFixture.accounts];
+		savedState.transactions = [...financialModelFixture.transactions];
 		view.rerender(<FundingGapsCard {...cardProps()} projection={refresh} />);
 		expect(view.getByTestId("funding-selection").textContent).toBe(
 			"renovation-2026-03-06",

@@ -1,5 +1,5 @@
 import type { BackendPlannedPurchase } from "@/api/contracts.ts";
-import { applyRowOperations, type RowOperation } from "@/api/rowSync.ts";
+import { applyModelChanges, type ModelChange } from "@/api/modelChanges.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import type { PlannedPurchase } from "@/domain/model.ts";
 import { movePurchase } from "@/domain/purchases.ts";
@@ -30,32 +30,32 @@ export function purchaseRow(
 export function createPurchaseOperation(
 	purchase: PlannedPurchase,
 	priority: number,
-): RowOperation {
+): ModelChange {
 	return {
 		kind: "plannedPurchase",
 		action: "create",
-		row: purchaseRow(purchase, priority),
+		value: purchaseRow(purchase, priority),
 	};
 }
 
 export function updatePurchaseOperation(
 	purchase: PlannedPurchase,
 	priority: number,
-): RowOperation {
+): ModelChange {
 	return {
 		kind: "plannedPurchase",
 		action: "update",
 		id: purchase.id,
-		row: purchaseRow(purchase, priority),
+		value: purchaseRow(purchase, priority),
 	};
 }
 
-export function deletePurchaseOperation(id: string): RowOperation {
+export function deletePurchaseOperation(id: string): ModelChange {
 	return { kind: "plannedPurchase", action: "delete", id };
 }
 
 export interface PurchaseReorder {
-	operations: RowOperation[];
+	operations: ModelChange[];
 	next: PlannedPurchase[];
 }
 
@@ -76,7 +76,7 @@ export function movePurchaseOperations(
 	const previousIndex = new Map(
 		purchases.map((purchase, index) => [purchase.id, index]),
 	);
-	const operations: RowOperation[] = [];
+	const operations: ModelChange[] = [];
 	next.forEach((purchase, index) => {
 		if (previousIndex.get(purchase.id) !== index)
 			operations.push(updatePurchaseOperation(purchase, index));
@@ -112,16 +112,16 @@ export async function refreshPurchases(): Promise<void> {
  * every operation and the refresh confirmed it for the same resource.
  */
 export async function persistPurchaseOperations(
-	operations: RowOperation[],
+	operations: ModelChange[],
 	failureMessage: string,
 ): Promise<boolean> {
 	if (!operations.length) return true;
 	return performSave({
 		call: async () => {
-			const result = await applyRowOperations(operations);
+			const result = await applyModelChanges(operations);
 			// A thrown result surfaces through performSave's failure path.
 			if (result instanceof Error) throw result;
-			return { data: { persisted: result.ok, issues: result.issues } };
+			return { data: { saved: result.ok, issues: result.issues } };
 		},
 		refresh: refreshPurchases,
 		failureMessage,

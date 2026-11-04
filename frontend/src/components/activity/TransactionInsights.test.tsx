@@ -48,7 +48,7 @@ vi.mock("@/state/workspaceResources.ts", () => ({
 	useTransactionCatalog: () => ({ data: { items: [] } }),
 }));
 
-vi.mock("@/state/savedRows.ts", () => ({
+vi.mock("@/state/savedState.ts", () => ({
 	useSavedAccounts: () => [],
 }));
 

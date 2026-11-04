@@ -160,7 +160,7 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 				t.Fatalf("cross-origin write passed: %d %s", response.StatusCode, body)
 			}
 			response, body = request("POST", "/v1/accounts", account, publicURL)
-			if response.StatusCode != http.StatusOK || !strings.Contains(body, `"persisted":true`) {
+			if response.StatusCode != http.StatusOK || !strings.Contains(body, `"saved":true`) {
 				t.Fatalf("same-origin write=%d %s", response.StatusCode, body)
 			}
 			const projection = `{"settings":{"fallbackProjectionStartDate":"2026-10-27","horizonYears":1},"config":{"runCount":1,"seed":42}}`

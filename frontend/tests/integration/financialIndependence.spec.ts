@@ -37,8 +37,8 @@ async function addIndependence(
 	});
 	expect(response.ok()).toBe(true);
 	const body = await response.json();
-	expect(body.persisted).toBe(true);
-	return body.row.instanceId as string;
+	expect(body.saved).toBe(true);
+	return body.value.instanceId as string;
 }
 
 test("compact financial independence cards open an inspector without more calculations or card growth", async ({

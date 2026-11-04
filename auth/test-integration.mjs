@@ -217,7 +217,7 @@ try {
     enabled: true,
   });
   assert.equal(created.status(), 200);
-  assert.equal((await created.json()).persisted, true);
+  assert.equal((await created.json()).saved, true);
   await ownerPage.reload();
   await ownerPage.goto(`${origin.origin}/#sources`);
   await ownerPage.getByRole("tab", { name: "Account", exact: true }).click();
@@ -362,7 +362,7 @@ try {
       id: "guest-policy-probe", name: "Guest policy probe", kind: "cash", enabled: true,
     });
     assert.equal(probe.status(), 200, "The provider can grant the ordinary guest write access");
-    assert.equal((await probe.json()).persisted, true);
+    assert.equal((await probe.json()).saved, true);
     assert.equal((await request(guest, writableGuest, "DELETE", "/v1/accounts/guest-policy-probe")).status(), 200);
   } finally {
     await admin(`/api/update-permission${permissionPath}`, { method: "POST", body: originalPermission });

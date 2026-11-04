@@ -58,7 +58,7 @@ afterEach(() => {
 it("runs the call, refreshes, and confirms with the shared success notice", async () => {
 	stubTestServer();
 	const call = vi.fn(async () => ({
-		data: { persisted: true, issues: [] },
+		data: { saved: true, issues: [] },
 	}));
 	const refresh = vi.fn(async () => {});
 	expect(await performSave({ call, refresh, failureMessage: "Nope." })).toBe(
@@ -79,7 +79,7 @@ it("reloads authoritative state on a rejection, then reports it", async () => {
 	stubTestServer();
 	const call = vi.fn(async () => ({
 		data: {
-			persisted: false,
+			saved: false,
 			issues: [{ severity: "error", message: "Choose an account." }],
 		},
 	}));
@@ -121,7 +121,7 @@ it("uses the recovery refresh when a rejection needs authoritative state", async
 	const result = await performSave({
 		call: async () => ({
 			data: {
-				persisted: false,
+				saved: false,
 				issues: [{ severity: "error", message: "Choose an account." }],
 			},
 		}),
@@ -154,7 +154,7 @@ it("uses the recovery refresh when a transport failure needs authoritative state
 it("refuses saves before the workspace is ready", async () => {
 	stubTestServer();
 	suspendUserScope();
-	const call = vi.fn(async () => ({ data: { persisted: true } }));
+	const call = vi.fn(async () => ({ data: { saved: true } }));
 	const refresh = vi.fn(async () => {});
 	expect(await performSave({ call, refresh, failureMessage: "Nope." })).toBe(
 		false,
@@ -169,7 +169,7 @@ it("stays silent without refresh when the resource switches during the call", as
 	const result = await performSave({
 		call: async () => {
 			suspendUserScope();
-			return { data: { persisted: true, issues: [] } };
+			return { data: { saved: true, issues: [] } };
 		},
 		refresh,
 		failureMessage: "Nope.",
@@ -185,7 +185,7 @@ it("reports a saved-but-unconfirmed state when the reload fails", async () => {
 		throw new Error("reload failed");
 	});
 	const result = await performSave({
-		call: async () => ({ data: { persisted: true, issues: [] } }),
+		call: async () => ({ data: { saved: true, issues: [] } }),
 		refresh,
 		failureMessage: "Nope.",
 	});
@@ -208,7 +208,7 @@ it("stays silent without success when the resource switches during refresh", asy
 		suspendUserScope();
 	});
 	const result = await performSave({
-		call: async () => ({ data: { persisted: true, issues: [] } }),
+		call: async () => ({ data: { saved: true, issues: [] } }),
 		refresh,
 		failureMessage: "Nope.",
 	});
@@ -224,7 +224,7 @@ it("runs one save at a time and exposes the active save to observers", async () 
 	});
 	const call = vi.fn(async () => {
 		await gate;
-		return { data: { persisted: true, issues: [] } };
+		return { data: { saved: true, issues: [] } };
 	});
 	const refresh = vi.fn(async () => {});
 	const saving = renderHook(() => useWorkspaceSaving());

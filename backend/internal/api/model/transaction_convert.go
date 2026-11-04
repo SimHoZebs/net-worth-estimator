@@ -20,11 +20,11 @@ type convertTransactionBody struct {
 
 type convertTransactionOutput struct {
 	Body struct {
-		ID        string                       `json:"id"`
-		Kind      string                       `json:"kind"`
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
-		Revision  string                       `json:"revision"`
+		ID       string                       `json:"id"`
+		Kind     string                       `json:"kind"`
+		Issues   []types.ModelValidationIssue `json:"issues"`
+		Saved    bool                         `json:"saved"`
+		Revision string                       `json:"revision"`
 	} `json:"body"`
 }
 
@@ -108,7 +108,7 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 		}
 		posting = next
 	}
-	_, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	_, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = removeByID(model.Postings, id, postingID)
 		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
 		if kind == "rule" {
@@ -131,7 +131,7 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 	output.Body.ID = id
 	output.Body.Kind = kind
 	output.Body.Issues = issues
-	output.Body.Persisted = persisted
+	output.Body.Saved = saved
 	output.Body.Revision = revision
 	return output, nil
 }

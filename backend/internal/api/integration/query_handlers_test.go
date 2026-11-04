@@ -27,14 +27,14 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
 	}
 	var accountPayload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
+		} `json:"value"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
 		t.Fatalf("decode account: %v", err)
 	}
-	accountID := accountPayload.Row.ID
+	accountID := accountPayload.Result.ID
 
 	posting := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
 		`{"name":"Pay","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
@@ -378,14 +378,14 @@ func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
 		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
 	}
 	var accountPayload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
+		} `json:"value"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
 		t.Fatalf("decode account: %v", err)
 	}
-	accountID := accountPayload.Row.ID
+	accountID := accountPayload.Result.ID
 
 	// 09:00 observed 1000 by instant; an 11:00 manual actual of -100 follows.
 	observed := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
@@ -460,14 +460,14 @@ func TestExactCutPositionAndAccountListAgree(t *testing.T) {
 		t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
 	}
 	var accountPayload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
+		} `json:"value"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &accountPayload); err != nil {
 		t.Fatalf("decode account: %v", err)
 	}
-	accountID := accountPayload.Row.ID
+	accountID := accountPayload.Result.ID
 
 	observed := doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
 		`{"AccountId":"`+accountID+`","Balance":1000,"observedAt":1773133200}`)
@@ -598,14 +598,14 @@ func TestAccountListArchivedDebtUsesExactObservation(t *testing.T) {
 			t.Fatalf("create account status = %d, body %s", created.Code, created.Body.String())
 		}
 		var payload struct {
-			Row struct {
+			Result struct {
 				ID string `json:"id"`
-			} `json:"row"`
+			} `json:"value"`
 		}
 		if err := json.Unmarshal(created.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("decode account: %v", err)
 		}
-		ids[kind] = payload.Row.ID
+		ids[kind] = payload.Result.ID
 	}
 	morning := int64(1773100800) + 9*3600
 	evening := morning + 6*3600

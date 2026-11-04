@@ -33,7 +33,7 @@ func (b plannedPurchaseBody) purchase(id string) types.PlannedPurchase {
 func plannedPurchaseID(p types.PlannedPurchase) string { return p.ID }
 
 type plannedPurchaseOutput struct {
-	Body rowResultBody[types.PlannedPurchase]
+	Body writeResult[types.PlannedPurchase]
 }
 
 func (s *handler) registerPlannedPurchaseRoutes(api huma.API) {
@@ -70,7 +70,7 @@ func (s *handler) listPlannedPurchases(_ context.Context, _ *struct{}) (*struct 
 
 func (s *handler) createPlannedPurchase(_ context.Context, input *struct{ Body plannedPurchaseBody }) (*plannedPurchaseOutput, error) {
 	p := input.Body.purchase("")
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			for _, existing := range model.PlannedPurchases {
 				if existing.Priority >= p.Priority {
@@ -83,7 +83,7 @@ func (s *handler) createPlannedPurchase(_ context.Context, input *struct{ Body p
 	if err != nil {
 		return nil, err
 	}
-	return &plannedPurchaseOutput{Body: rowResultBody[types.PlannedPurchase]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &plannedPurchaseOutput{Body: writeResult[types.PlannedPurchase]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
@@ -91,7 +91,7 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 	Body plannedPurchaseBody
 }) (*plannedPurchaseOutput, error) {
 	p := input.Body.purchase(input.ID)
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			for _, existing := range model.PlannedPurchases {
 				if existing.ID == p.ID {
@@ -104,7 +104,7 @@ func (s *handler) updatePlannedPurchase(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &plannedPurchaseOutput{Body: rowResultBody[types.PlannedPurchase]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &plannedPurchaseOutput{Body: writeResult[types.PlannedPurchase]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deletePlannedPurchase(_ context.Context, input *struct {

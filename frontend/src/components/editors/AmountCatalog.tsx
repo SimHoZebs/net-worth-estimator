@@ -11,7 +11,7 @@ import {
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
-import { useSavedAccounts } from "../../state/savedRows.ts";
+import { useSavedAccounts } from "../../state/savedState.ts";
 import {
 	createPreset,
 	updatePreset,

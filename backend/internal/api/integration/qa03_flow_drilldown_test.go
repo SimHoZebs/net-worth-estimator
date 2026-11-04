@@ -56,17 +56,17 @@ func qa03CreateRow(t *testing.T, handler http.Handler, path, body string) string
 		t.Fatalf("POST %s = %d %s", path, response.Code, response.Body.String())
 	}
 	var payload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
+		} `json:"value"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload.Row.ID == "" {
+	if payload.Result.ID == "" {
 		t.Fatalf("POST %s returned no row ID: %s", path, response.Body.String())
 	}
-	return payload.Row.ID
+	return payload.Result.ID
 }
 
 func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {

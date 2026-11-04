@@ -155,7 +155,7 @@ export async function ownerSignIn(ctx) {
     enabled: true,
   });
   assert.equal(created.status(), 200);
-  assert.equal((await created.json()).persisted, true);
+  assert.equal((await created.json()).saved, true);
 
   await page.reload();
   await page.goto(`${origin}/#sources`);
@@ -265,7 +265,7 @@ export async function guestGrantRevoke(ctx, guestBundle) {
       enabled: true,
     });
     assert.equal(probe.status(), 200, "the provider grant must enable the ordinary guest write");
-    assert.equal((await probe.json()).persisted, true);
+    assert.equal((await probe.json()).saved, true);
     assert.equal((await api(guest, origin, writable, "DELETE", "/v1/accounts/e2e-policy-probe")).status(), 200);
   } finally {
     await admin(`/api/update-permission${permissionPath}`, { method: "POST", body: original });
@@ -345,8 +345,8 @@ async function createPosting(ctx, ownerBundle, name, accountId = E2E_SEED.accoun
   const response = await api(owner, origin, own, "POST", "/v1/postings", postingPayload(name, accountId));
   assert.equal(response.status(), 200, `create posting ${name}: ${await response.text()}`);
   const body = await response.json();
-  assert.equal(body.persisted, true);
-  return body.row.id;
+  assert.equal(body.saved, true);
+  return body.value.id;
 }
 
 // Share → inbox accept → copy → revoke across two real users. Accepting
@@ -629,7 +629,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       enabled: row.enabled ?? true,
     });
     assert.equal(response.status(), 200, `seed account ${row.id}: ${await response.text()}`);
-    assert.equal((await response.json()).persisted, true);
+    assert.equal((await response.json()).saved, true);
     haveAccounts.add(row.id);
     addedAccounts += 1;
   }
@@ -698,7 +698,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       enabled: row.enabled ?? true,
     });
     assert.equal(response.status(), 200, `seed posting ${row.id}: ${await response.text()}`);
-    assert.equal((await response.json()).persisted, true);
+    assert.equal((await response.json()).saved, true);
     addedPostings += 1;
   }
 

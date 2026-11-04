@@ -8,7 +8,7 @@ import { todayIso } from "../domain/format.ts";
 import type { BackendCheckpoint } from "../api/contracts.ts";
 import { useCheckpoints } from "../state/workspaceResources.ts";
 import { useOutlookProjection } from "../pages/outlook/useOutlookProjection.ts";
-import { useSavedAccounts } from "../state/savedRows.ts";
+import { useSavedAccounts } from "../state/savedState.ts";
 import { visibleAccounts } from "../domain/model.ts";
 import { IconButton, TextButton } from "./Button.tsx";
 import { NetWorthTrendPlot } from "./chart/NetWorthTrendPlot.tsx";

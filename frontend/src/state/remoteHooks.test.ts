@@ -40,7 +40,7 @@ import {
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
 import { useWorkspaceStartup } from "./useWorkspaceStartup.ts";
-import { useSavedAccounts } from "./savedRows.ts";
+import { useSavedAccounts } from "./savedState.ts";
 import {
 	useServerModel,
 	useServerStatus,
@@ -683,9 +683,9 @@ describe("remote workspace state", () => {
 		server.writeOnce(
 			(method, path) => method === "POST" && path === "/v1/accounts",
 			{
-				row: null,
+				value: null,
 				issues: [{ severity: "error", message: "Name is required." }],
-				persisted: false,
+				saved: false,
 				revision: '"rejected"',
 			},
 		);

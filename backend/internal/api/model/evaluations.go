@@ -13,7 +13,7 @@ type evaluationInput struct {
 }
 
 type evaluationOutput struct {
-	Body rowResultBody[store.EvaluationUpdate] `json:"body"`
+	Body writeResult[store.EvaluationUpdate] `json:"body"`
 }
 
 func evalSlice(model *types.FinancialModel, evalType string) *[]types.EvaluationInstance[types.JsonValue] {
@@ -30,7 +30,7 @@ func instanceIDOf(instance types.EvaluationInstance[types.JsonValue]) string {
 
 func (s *handler) createEvaluation(_ context.Context, input *evaluationInput) (*evaluationOutput, error) {
 	item := input.Body
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		if slice := evalSlice(model, item.Type); slice != nil {
 			*slice = replaceByID(*slice, item.InstanceID, instanceIDOf, evalToInstance(item))
 		}
@@ -40,7 +40,7 @@ func (s *handler) createEvaluation(_ context.Context, input *evaluationInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return &evaluationOutput{Body: rowResultBody[store.EvaluationUpdate]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &evaluationOutput{Body: writeResult[store.EvaluationUpdate]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) updateEvaluation(_ context.Context, input *struct {
@@ -49,7 +49,7 @@ func (s *handler) updateEvaluation(_ context.Context, input *struct {
 }) (*evaluationOutput, error) {
 	item := input.Body
 	item.InstanceID = input.InstanceID
-	row, issues, persisted, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runRowWrite(s, func(model *types.FinancialModel) {
 		// A type change moves the instance across tables: remove it
 		// everywhere first, then insert into the target table. The store
 		// does the same atomically and keeps the pin.
@@ -67,7 +67,7 @@ func (s *handler) updateEvaluation(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	return &evaluationOutput{Body: rowResultBody[store.EvaluationUpdate]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &evaluationOutput{Body: writeResult[store.EvaluationUpdate]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deleteEvaluation(_ context.Context, input *struct {

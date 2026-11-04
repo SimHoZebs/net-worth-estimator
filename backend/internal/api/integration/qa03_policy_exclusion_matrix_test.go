@@ -34,7 +34,7 @@ func qa03DeleteOwnerAccount(t *testing.T, social *qa03Social, accountID string, 
 	var payload struct {
 		DeletedID string                       `json:"deletedId"`
 		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		Saved     bool                         `json:"saved"`
 	}
 	response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/accounts/"+accountID, "")
 	if response.Code != http.StatusOK {
@@ -43,8 +43,8 @@ func qa03DeleteOwnerAccount(t *testing.T, social *qa03Social, accountID string, 
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload.Persisted != wantPersisted {
-		t.Fatalf("delete account %s persisted = %v, want %v (issues %+v)", accountID, payload.Persisted, wantPersisted, payload.Issues)
+	if payload.Saved != wantPersisted {
+		t.Fatalf("delete account %s saved = %v, want %v (issues %+v)", accountID, payload.Saved, wantPersisted, payload.Issues)
 	}
 }
 

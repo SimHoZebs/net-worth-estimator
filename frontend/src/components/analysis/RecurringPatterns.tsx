@@ -18,7 +18,7 @@ import {
 	usePatternToNewRulePreview,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
-import { useSavedAccounts } from "@/state/savedRows.ts";
+import { useSavedAccounts } from "@/state/savedState.ts";
 import { useTransactionCatalog } from "@/state/workspaceResources.ts";
 import { Badge } from "../Badge.tsx";
 import { Button } from "../Button.tsx";
@@ -142,7 +142,7 @@ export function NewRuleDialog({
 										{
 											onSuccess: (result) => {
 												setFailed(false);
-												setCreated(result.row.name);
+												setCreated(result.value.name);
 											},
 											onError: () => setFailed(true),
 										},
@@ -277,7 +277,7 @@ export function ExistingRuleDialog({
 											{
 												onSuccess: (result) => {
 													setFailed(false);
-													setAdded((result.rows ?? []).length);
+													setAdded((result.matches ?? []).length);
 													setAddedRule(plan.ruleName);
 												},
 												onError: () => setFailed(true),

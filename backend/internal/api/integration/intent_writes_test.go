@@ -13,12 +13,12 @@ import (
 // Intent writes: one frontend call persists every row its abstraction owns,
 // atomically. The frontend no longer sequences CRUD calls for these intents.
 
-func decodeRowResult[T any](t *testing.T, code int, body []byte) rowResultBody[T] {
+func decodeWriteResult[T any](t *testing.T, code int, body []byte) writeResult[T] {
 	t.Helper()
 	if code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", code, body)
 	}
-	var result rowResultBody[T]
+	var result writeResult[T]
 	if err := json.Unmarshal(body, &result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -30,22 +30,22 @@ func TestCreateAccountWithBalanceWritesCheckpoint(t *testing.T) {
 	handler := New(database, Config{})
 	response := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
 		`{"name":"Checking","kind":"cash","enabled":true,"balance":2500,"observedAt":1772409599}`)
-	created := decodeRowResult[types.Account](t, response.Code, response.Body.Bytes())
-	if !created.Persisted || created.Row.ID == "" {
+	created := decodeWriteResult[types.Account](t, response.Code, response.Body.Bytes())
+	if !created.Saved || created.Result.ID == "" {
 		t.Fatalf("create = %+v", created)
 	}
 	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(model.Accounts) != 1 || model.Accounts[0].ID != created.Row.ID {
+	if len(model.Accounts) != 1 || model.Accounts[0].ID != created.Result.ID {
 		t.Fatalf("accounts = %+v", model.Accounts)
 	}
 	if len(model.Checkpoints) != 1 {
 		t.Fatalf("checkpoints = %+v, want the opening observation", model.Checkpoints)
 	}
 	got := model.Checkpoints[0]
-	if got.AccountID != created.Row.ID || got.ObservedAt != 1772409599 || got.Balance != 2500 || got.Source != store.SourceUser {
+	if got.AccountID != created.Result.ID || got.ObservedAt != 1772409599 || got.Balance != 2500 || got.Source != store.SourceUser {
 		t.Fatalf("checkpoint = %+v", got)
 	}
 	assertSavedModelIdentity(t, database, created.Revision)
@@ -125,13 +125,13 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 
 func ruleRequestBody(t *testing.T, handler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request)
-}, method, path, body string) rowResultBody[types.RecurrenceRule] {
+}, method, path, body string) writeResult[types.RecurrenceRule] {
 	t.Helper()
 	response := doRowRequest(t, handler, method, path, body)
 	if response.Code != http.StatusOK {
 		t.Fatalf("%s %s status = %d, body %s", method, path, response.Code, response.Body.String())
 	}
-	var result rowResultBody[types.RecurrenceRule]
+	var result writeResult[types.RecurrenceRule]
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -148,16 +148,16 @@ func TestCreateRuleDefaultsPriority(t *testing.T) {
 	}
 	base := `{"name":"%s","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true%s}`
 	first := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", fmt.Sprintf(base, "First", ""))
-	if !first.Persisted || first.Row.Priority != 0 {
+	if !first.Saved || first.Result.Priority != 0 {
 		t.Fatalf("first rule = %+v", first)
 	}
 	second := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", fmt.Sprintf(base, "Second", ""))
-	if second.Row.Priority != 1 {
-		t.Fatalf("second rule priority = %d, want 1", second.Row.Priority)
+	if second.Result.Priority != 1 {
+		t.Fatalf("second rule priority = %d, want 1", second.Result.Priority)
 	}
 	explicit := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", fmt.Sprintf(base, "Explicit", `,"priority":10`))
-	if explicit.Row.Priority != 10 {
-		t.Fatalf("explicit rule priority = %d, want 10", explicit.Row.Priority)
+	if explicit.Result.Priority != 10 {
+		t.Fatalf("explicit rule priority = %d, want 10", explicit.Result.Priority)
 	}
 }
 
@@ -171,19 +171,19 @@ func TestUpdateRuleKeepsUnmodeledFields(t *testing.T) {
 	}
 	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules",
 		`{"id":"rule-1","name":"Rule","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true,"priority":7,"annualCap":500}`)
-	if created.Row.Priority != 7 || created.Row.AnnualCap == nil || *created.Row.AnnualCap != 500 {
-		t.Fatalf("created rule = %+v", created.Row)
+	if created.Result.Priority != 7 || created.Result.AnnualCap == nil || *created.Result.AnnualCap != 500 {
+		t.Fatalf("created rule = %+v", created.Result)
 	}
 	updated := ruleRequestBody(t, handler, http.MethodPatch, "/v1/recurrence-rules/rule-1",
 		`{"name":"Renamed","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true}`)
-	if updated.Row.Name != "Renamed" {
-		t.Fatalf("updated rule = %+v", updated.Row)
+	if updated.Result.Name != "Renamed" {
+		t.Fatalf("updated rule = %+v", updated.Result)
 	}
-	if updated.Row.Priority != 7 {
-		t.Fatalf("priority = %d, want stored 7 kept", updated.Row.Priority)
+	if updated.Result.Priority != 7 {
+		t.Fatalf("priority = %d, want stored 7 kept", updated.Result.Priority)
 	}
-	if updated.Row.AnnualCap == nil || *updated.Row.AnnualCap != 500 {
-		t.Fatalf("annualCap = %+v, want stored 500 kept", updated.Row.AnnualCap)
+	if updated.Result.AnnualCap == nil || *updated.Result.AnnualCap != 500 {
+		t.Fatalf("annualCap = %+v, want stored 500 kept", updated.Result.AnnualCap)
 	}
 	model, err := database.LoadModel()
 	if err != nil {
@@ -251,7 +251,7 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 	}
 	ruleBody := `{"name":"Invest","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"enabled":true}`
 	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", ruleBody)
-	convert := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Row.ID+"/convert",
+	convert := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
 		`{"kind":"posting","posting":{"name":"Invest","sourceAccountId":"checking","postedTime":1782950400,"transactionTime":1782950400,"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"enabled":true}}`)
 	if convert.Code != http.StatusOK {
 		t.Fatalf("convert status = %d, body %s", convert.Code, convert.Body.String())
@@ -263,11 +263,11 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 	if len(model.RecurrenceRules) != 0 {
 		t.Fatalf("rules = %+v, want the old row gone", model.RecurrenceRules)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != created.Row.ID || model.Postings[0].Name != "Invest" {
+	if len(model.Postings) != 1 || model.Postings[0].ID != created.Result.ID || model.Postings[0].Name != "Invest" {
 		t.Fatalf("postings = %+v", model.Postings)
 	}
 
-	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Row.ID+"/convert",
+	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
 		`{"kind":"rule","rule":`+ruleBody+`}`)
 	if back.Code != http.StatusOK {
 		t.Fatalf("convert back status = %d, body %s", back.Code, back.Body.String())
@@ -280,7 +280,7 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 		t.Fatalf("round trip tables = %+v / %+v", model.Postings, model.RecurrenceRules)
 	}
 
-	sameKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Row.ID+"/convert",
+	sameKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
 		`{"kind":"rule","rule":`+ruleBody+`}`)
 	if sameKind.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("same-kind status = %d, want 422, body %s", sameKind.Code, sameKind.Body.String())
@@ -290,7 +290,7 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing status = %d, want 404, body %s", missing.Code, missing.Body.String())
 	}
-	badKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Row.ID+"/convert",
+	badKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
 		`{"kind":"ledger"}`)
 	if badKind.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("bad kind status = %d, want 422, body %s", badKind.Code, badKind.Body.String())
@@ -333,29 +333,29 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 			`,"postedTime":1782950400,"transactionTime":1782950400,"amount":` + amount + `,"enabled":true}`
 	}
 	create := doRowRequest(t, handler, http.MethodPost, "/v1/postings", postingBody(`["checking","savings"]`))
-	created := decodeRowResult[types.Posting](t, create.Code, create.Body.Bytes())
-	if len(created.Row.Destinations) != 2 {
-		t.Fatalf("created destinations = %+v, want both legs", created.Row.Destinations)
+	created := decodeWriteResult[types.Posting](t, create.Code, create.Body.Bytes())
+	if len(created.Result.Destinations) != 2 {
+		t.Fatalf("created destinations = %+v, want both legs", created.Result.Destinations)
 	}
 	// A patch that omits destinations keeps the stored multi-destination set:
 	// the editor states only the members an edit changes, so an untouched
 	// route can never trim legs it never modeled.
-	renamed := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Row.ID, `{"name":"Split renamed"}`)
-	updated := decodeRowResult[types.Posting](t, renamed.Code, renamed.Body.Bytes())
-	if updated.Row.Name != "Split renamed" {
-		t.Fatalf("patched name = %q, want Split renamed", updated.Row.Name)
+	renamed := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Result.ID, `{"name":"Split renamed"}`)
+	updated := decodeWriteResult[types.Posting](t, renamed.Code, renamed.Body.Bytes())
+	if updated.Result.Name != "Split renamed" {
+		t.Fatalf("patched name = %q, want Split renamed", updated.Result.Name)
 	}
-	if len(updated.Row.Destinations) != 2 {
-		t.Fatalf("patched destinations = %+v, want stored legs kept", updated.Row.Destinations)
+	if len(updated.Result.Destinations) != 2 {
+		t.Fatalf("patched destinations = %+v, want stored legs kept", updated.Result.Destinations)
 	}
 	if got := storedDestinations(); len(got) != 2 {
 		t.Fatalf("stored destinations = %+v, want stored legs kept", got)
 	}
 	// An explicit destinations member replaces the set verbatim.
-	moved := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Row.ID, `{"destinations":["savings"]}`)
-	replaced := decodeRowResult[types.Posting](t, moved.Code, moved.Body.Bytes())
-	if len(replaced.Row.Destinations) != 1 || replaced.Row.Destinations[0] != "savings" {
-		t.Fatalf("changed destinations = %+v, want [savings]", replaced.Row.Destinations)
+	moved := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Result.ID, `{"destinations":["savings"]}`)
+	replaced := decodeWriteResult[types.Posting](t, moved.Code, moved.Body.Bytes())
+	if len(replaced.Result.Destinations) != 1 || replaced.Result.Destinations[0] != "savings" {
+		t.Fatalf("changed destinations = %+v, want [savings]", replaced.Result.Destinations)
 	}
 
 	ruleBody := func(destinations string) string {
@@ -363,20 +363,20 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 			`,"frequency":"monthly","startDate":"2026-01-01","amount":` + amount + `,"enabled":true}`
 	}
 	ruleCreate := doRowRequest(t, handler, http.MethodPost, "/v1/recurrence-rules", ruleBody(`["checking","savings"]`))
-	createdRule := decodeRowResult[types.RecurrenceRule](t, ruleCreate.Code, ruleCreate.Body.Bytes())
-	ruleEcho := doRowRequest(t, handler, http.MethodPatch, "/v1/recurrence-rules/"+createdRule.Row.ID, `{"name":"SplitRule renamed"}`)
-	updatedRule := decodeRowResult[types.RecurrenceRule](t, ruleEcho.Code, ruleEcho.Body.Bytes())
-	if len(updatedRule.Row.Destinations) != 2 {
-		t.Fatalf("patched rule destinations = %+v, want stored legs kept", updatedRule.Row.Destinations)
+	createdRule := decodeWriteResult[types.RecurrenceRule](t, ruleCreate.Code, ruleCreate.Body.Bytes())
+	ruleEcho := doRowRequest(t, handler, http.MethodPatch, "/v1/recurrence-rules/"+createdRule.Result.ID, `{"name":"SplitRule renamed"}`)
+	updatedRule := decodeWriteResult[types.RecurrenceRule](t, ruleEcho.Code, ruleEcho.Body.Bytes())
+	if len(updatedRule.Result.Destinations) != 2 {
+		t.Fatalf("patched rule destinations = %+v, want stored legs kept", updatedRule.Result.Destinations)
 	}
-	if updatedRule.Row.Amount.Resolver != "expression" {
-		t.Fatalf("patched rule amount = %+v, want stored descriptor kept", updatedRule.Row.Amount)
+	if updatedRule.Result.Amount.Resolver != "expression" {
+		t.Fatalf("patched rule amount = %+v, want stored descriptor kept", updatedRule.Result.Amount)
 	}
 
 	// Convert echoes the display destination the same way, in both directions.
 	splitCreate := doRowRequest(t, handler, http.MethodPost, "/v1/postings", postingBody(`["checking","savings"]`))
-	split := decodeRowResult[types.Posting](t, splitCreate.Code, splitCreate.Body.Bytes())
-	toRule := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Row.ID+"/convert",
+	split := decodeWriteResult[types.Posting](t, splitCreate.Code, splitCreate.Body.Bytes())
+	toRule := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/convert",
 		`{"kind":"rule","rule":`+ruleBody(`["checking"]`)+`}`)
 	if toRule.Code != http.StatusOK {
 		t.Fatalf("convert status = %d, body %s", toRule.Code, toRule.Body.String())
@@ -386,11 +386,11 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	for _, existing := range model.RecurrenceRules {
-		if existing.ID == split.Row.ID && len(existing.Destinations) != 2 {
+		if existing.ID == split.Result.ID && len(existing.Destinations) != 2 {
 			t.Fatalf("converted rule destinations = %+v, want echoed legs kept", existing.Destinations)
 		}
 	}
-	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Row.ID+"/convert",
+	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/convert",
 		`{"kind":"posting","posting":`+postingBody(`["checking"]`)+`}`)
 	if back.Code != http.StatusOK {
 		t.Fatalf("convert back status = %d, body %s", back.Code, back.Body.String())
@@ -400,7 +400,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 		t.Fatalf("load: %v", err)
 	}
 	for _, existing := range model.Postings {
-		if existing.ID == split.Row.ID && len(existing.Destinations) != 2 {
+		if existing.ID == split.Result.ID && len(existing.Destinations) != 2 {
 			t.Fatalf("converted posting destinations = %+v, want echoed legs kept", existing.Destinations)
 		}
 	}

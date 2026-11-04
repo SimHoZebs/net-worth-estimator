@@ -146,7 +146,7 @@ func TestReceiptHTTPContractSurvivesAdapterSwap(t *testing.T) {
 			reviewBody := map[string]any{"revision": r.Revision, "details": details, "confirm": true}
 			r = decodeReceipt(t, receiptRequest(h, "PATCH", "/v1/receipts/"+r.ID, reviewBody))
 			if r.Confirmed == nil || r.Confirmed.Merchant != "User correction" {
-				t.Fatal("review not persisted")
+				t.Fatal("review not saved")
 			}
 			stale := receiptRequest(h, "PATCH", "/v1/receipts/"+r.ID, reviewBody)
 			if stale.Code != 409 {

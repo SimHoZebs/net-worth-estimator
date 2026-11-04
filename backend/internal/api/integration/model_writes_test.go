@@ -22,12 +22,12 @@ func (s *countingModelStore) LoadModel() (*types.FinancialModel, error) {
 	return s.Store.LoadModel()
 }
 
-func decodePlanEntrySave[T any](t *testing.T, response *httptest.ResponseRecorder) rowResultBody[T] {
+func decodePlanEntrySave[T any](t *testing.T, response *httptest.ResponseRecorder) writeResult[T] {
 	t.Helper()
 	if response.Code != http.StatusOK {
 		t.Fatalf("save status = %d, body %s", response.Code, response.Body.String())
 	}
-	var result rowResultBody[T]
+	var result writeResult[T]
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatalf("decode save: %v", err)
 	}
@@ -58,20 +58,20 @@ func TestPlanEntrySaveReusesStoredSnapshot(t *testing.T) {
 	handler := New(database, Config{})
 	created := decodePlanEntrySave[types.Account](t, doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
 		`{"name":"Probe","kind":"cash","enabled":true}`))
-	if !created.Persisted || created.Row.ID == "" {
+	if !created.Saved || created.Result.ID == "" {
 		t.Fatalf("create = %+v", created)
 	}
 	if database.loads != 2 {
 		t.Errorf("create complete-plan loads = %d, want 2", database.loads)
 	}
 	model := assertSavedModelIdentity(t, database.Store, created.Revision)
-	if len(model.Accounts) != 1 || model.Accounts[0].ID != created.Row.ID || model.Accounts[0].Name != created.Row.Name {
+	if len(model.Accounts) != 1 || model.Accounts[0].ID != created.Result.ID || model.Accounts[0].Name != created.Result.Name {
 		t.Fatalf("generated account identity/name differs from stored content: %+v", model.Accounts)
 	}
-	if created.Row.MinBalance != nil || created.Row.MaxBalance != nil ||
+	if created.Result.MinBalance != nil || created.Result.MaxBalance != nil ||
 		model.Accounts[0].MinBalance == nil || *model.Accounts[0].MinBalance != types.NoFloor ||
 		model.Accounts[0].MaxBalance == nil || *model.Accounts[0].MaxBalance != types.NoCeiling {
-		t.Fatalf("stored bounds must normalize without changing the response: response %+v, stored %+v", created.Row, model.Accounts[0])
+		t.Fatalf("stored bounds must normalize without changing the response: response %+v, stored %+v", created.Result, model.Accounts[0])
 	}
 	wantIssues, err := json.Marshal(domainValidate(model))
 	if err != nil {
@@ -82,23 +82,23 @@ func TestPlanEntrySaveReusesStoredSnapshot(t *testing.T) {
 		t.Fatalf("encode response warnings: %v", err)
 	}
 	if string(gotIssues) != string(wantIssues) || len(created.Issues) != 1 ||
-		!strings.Contains(created.Issues[0].Message, created.Row.ID) {
+		!strings.Contains(created.Issues[0].Message, created.Result.ID) {
 		t.Fatalf("warnings must use the generated stored ID: %+v", created.Issues)
 	}
 
 	previousRevision := created.Revision
 	for _, name := range []string{"Renamed", "Last write"} {
 		database.loads = 0
-		updated := decodePlanEntrySave[types.Account](t, doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/"+created.Row.ID,
+		updated := decodePlanEntrySave[types.Account](t, doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/"+created.Result.ID,
 			`{"name":"`+name+`","kind":"cash","enabled":false}`))
-		if !updated.Persisted || updated.Row.ID != created.Row.ID || updated.Row.Name != name {
+		if !updated.Saved || updated.Result.ID != created.Result.ID || updated.Result.Name != name {
 			t.Fatalf("update = %+v", updated)
 		}
 		if database.loads != 2 {
 			t.Errorf("update complete-plan loads = %d, want 2", database.loads)
 		}
 		model = assertSavedModelIdentity(t, database.Store, updated.Revision)
-		if model.Accounts[0].ID != created.Row.ID || model.Accounts[0].Name != name || model.Accounts[0].Enabled || len(updated.Issues) != 0 {
+		if model.Accounts[0].ID != created.Result.ID || model.Accounts[0].Name != name || model.Accounts[0].Enabled || len(updated.Issues) != 0 {
 			t.Fatalf("update must return stored content and empty issues: %+v", updated)
 		}
 		if updated.Revision == previousRevision {
@@ -122,14 +122,14 @@ func TestBalanceCheckSaveUsesStoredOwnership(t *testing.T) {
 	handler := New(database, Config{})
 	saved := decodePlanEntrySave[types.Checkpoint](t, doRowRequest(t, handler, http.MethodPost, "/v1/checkpoints",
 		`{"AccountId":"checking","Balance":30,"source":"banksync","observedAt":1785974399}`))
-	if !saved.Persisted || saved.Row.Source != store.SourceUser || saved.Row.Balance != 30 {
+	if !saved.Saved || saved.Result.Source != store.SourceUser || saved.Result.Balance != 30 {
 		t.Fatalf("owner balance check = %+v", saved)
 	}
 	if database.loads != 2 {
 		t.Errorf("balance-check complete-plan loads = %d, want 2", database.loads)
 	}
 	model := assertSavedModelIdentity(t, database.Store, saved.Revision)
-	if len(model.Checkpoints) != 2 || !reflect.DeepEqual(model.Checkpoints[0], saved.Row) ||
+	if len(model.Checkpoints) != 2 || !reflect.DeepEqual(model.Checkpoints[0], saved.Result) ||
 		model.Checkpoints[1].Source != store.SourceBankSync || model.Checkpoints[1].Balance != 20 {
 		t.Fatalf("balance-check ownership/key changed: %+v", model.Checkpoints)
 	}
@@ -162,7 +162,7 @@ func TestRejectedPlanEntrySaveUsesStoredIdentity(t *testing.T) {
 				t.Fatalf("load original plan: %v", err)
 			}
 			rejected := decodePlanEntrySave[json.RawMessage](t, doRowRequest(t, New(database, Config{}), test.method, test.path, test.body))
-			if rejected.Persisted || !hasErrorIssues(rejected.Issues) {
+			if rejected.Saved || !hasErrorIssues(rejected.Issues) {
 				t.Fatalf("invalid save = %+v", rejected)
 			}
 			if database.loads != 2 {
@@ -206,7 +206,7 @@ func TestAccountLinkWritesKeepIdentityLookup(t *testing.T) {
 	if err := json.Unmarshal(linked.Body.Bytes(), &fields); err != nil {
 		t.Fatalf("decode link fields: %v", err)
 	}
-	for _, field := range []string{"row", "issues", "persisted"} {
+	for _, field := range []string{"result", "issues", "saved"} {
 		if _, exists := fields[field]; exists {
 			t.Fatalf("link response must retain its distinct shape: %s", linked.Body.String())
 		}

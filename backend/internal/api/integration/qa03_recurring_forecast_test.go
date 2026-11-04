@@ -105,8 +105,8 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	}
 
 	var created struct {
-		Row        types.RecurrenceRule `json:"row"`
-		Persisted  bool                 `json:"persisted"`
+		Result     types.RecurrenceRule `json:"value"`
+		Saved      bool                 `json:"saved"`
 		PatternKey string               `json:"patternKey"`
 	}
 	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 200 {
@@ -114,7 +114,7 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	} else if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if !created.Persisted || created.PatternKey == "" {
+	if !created.Saved || created.PatternKey == "" {
 		t.Fatalf("created = %+v", created)
 	}
 
@@ -150,10 +150,10 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	// Disabling the rule drops it from the forecast but leaves the
 	// detection evidence — findings and confirmation — intact.
 	disable, _ := json.Marshal(map[string]any{
-		"name": created.Row.Name, "sourceAccountId": "checking", "amount": created.Row.Amount,
-		"frequency": created.Row.Frequency, "startDate": created.Row.StartDate, "enabled": false,
+		"name": created.Result.Name, "sourceAccountId": "checking", "amount": created.Result.Amount,
+		"frequency": created.Result.Frequency, "startDate": created.Result.StartDate, "enabled": false,
 	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Row.ID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Result.ID, string(disable)); res.Code != 200 {
 		t.Fatalf("disable = %d %s", res.Code, res.Body.String())
 	}
 	clean := qa03StoredProjection(t, handler)

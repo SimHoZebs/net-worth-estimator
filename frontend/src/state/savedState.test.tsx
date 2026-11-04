@@ -14,7 +14,7 @@ import {
 	useSavedRules,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "./savedRows.ts";
+} from "./savedState.ts";
 
 function emptyModel(): FinancialModel {
 	return {

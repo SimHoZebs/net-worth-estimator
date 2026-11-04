@@ -44,8 +44,8 @@ const model: FinancialModel = {
 	accounts: [account],
 };
 
-function rowResponse(row: unknown) {
-	return { row, issues: [], persisted: true, revision: "r1" };
+function valueResponse(row: unknown) {
+	return { row, issues: [], saved: true, revision: "r1" };
 }
 
 function setup(
@@ -69,7 +69,7 @@ function setup(
 			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		if (method === "DELETE" || path.endsWith("/reorder"))
 			return ok({ revision: "r1" });
-		return ok(rowResponse(JSON.parse(String(init?.body ?? "{}"))));
+		return ok(valueResponse(JSON.parse(String(init?.body ?? "{}"))));
 	});
 	vi.stubGlobal("fetch", fetcher);
 	const recover = vi.fn(async () => true);
@@ -120,7 +120,7 @@ describe("server model replacement", () => {
 				(init?.method ?? "GET") === "POST"
 			) {
 				suspendUserScope();
-				return ok(rowResponse(account));
+				return ok(valueResponse(account));
 			}
 			return ok({ model: emptyModel, issues: [], revision: "r-model" });
 		});
@@ -210,7 +210,7 @@ describe("server model replacement", () => {
 				(init?.method ?? "GET") === "POST"
 			)
 				return ok({
-					row: account,
+					value: account,
 					issues: [
 						{
 							severity: "error",
@@ -225,7 +225,7 @@ describe("server model replacement", () => {
 							message: "Checkpoint is old.",
 						},
 					],
-					persisted: false,
+					saved: false,
 					revision: "r1",
 				});
 			return ok({ model: emptyModel, issues: [], revision: "r-model" });
@@ -244,7 +244,7 @@ describe("server model replacement", () => {
 				(init?.method ?? "GET") === "POST"
 			)
 				return ok({
-					row: account,
+					value: account,
 					issues: [
 						{
 							severity: "warning",
@@ -253,7 +253,7 @@ describe("server model replacement", () => {
 							message: "Checkpoint is old.",
 						},
 					],
-					persisted: true,
+					saved: true,
 					revision: "r1",
 				});
 			return ok({ model: emptyModel, issues: [], revision: "r-model" });

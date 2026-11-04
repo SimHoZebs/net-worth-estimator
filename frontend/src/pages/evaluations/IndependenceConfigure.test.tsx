@@ -67,9 +67,9 @@ vi.mock("@/api/generated/endpoints.ts", async (importOriginal) => {
 			writesState.saved.push({ instanceId, input: body });
 			return {
 				data: writesState.result
-					? { persisted: true, issues: [], revision: "test" }
+					? { saved: true, issues: [], revision: "test" }
 					: {
-							persisted: false,
+							saved: false,
 							issues: [{ severity: "error", message: "Choose an account." }],
 							revision: "test",
 						},

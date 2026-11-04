@@ -176,9 +176,9 @@ it("refreshes authoritative state after a rejected write", async () => {
 	server.writeOnce(
 		(method, path) => method === "POST" && path === "/v1/planned-purchases",
 		{
-			row: {},
+			value: {},
 			issues: [{ severity: "error", message: "Choose an account." }],
-			persisted: false,
+			saved: false,
 			revision: "rev-1",
 		},
 	);

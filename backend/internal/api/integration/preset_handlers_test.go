@@ -31,17 +31,17 @@ func presetRequest(t *testing.T, handler http.Handler, method, path string, body
 	return response
 }
 
-func decodePresetOutput(t *testing.T, response *httptest.ResponseRecorder) presetResultBody {
+func decodePresetOutput(t *testing.T, response *httptest.ResponseRecorder) presetWriteResult {
 	t.Helper()
 	var payload struct {
-		Row       types.AmountPreset           `json:"row"`
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		Result types.AmountPreset           `json:"value"`
+		Issues []types.ModelValidationIssue `json:"issues"`
+		Saved  bool                         `json:"saved"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode preset response: %v", err)
 	}
-	return presetResultBody(payload)
+	return presetWriteResult(payload)
 }
 
 func validPresetBody() types.AmountPreset {
@@ -79,27 +79,27 @@ func TestPresetCreateRoundTrip(t *testing.T) {
 		t.Fatalf("POST status = %d, body %s", response.Code, response.Body.String())
 	}
 	out := decodePresetOutput(t, response)
-	if !out.Persisted || out.Row.ID == "" || out.Row.Name != "custom" {
+	if !out.Saved || out.Result.ID == "" || out.Result.Name != "custom" {
 		t.Fatalf("create preset = %+v", out)
 	}
-	id := out.Row.ID
+	id := out.Result.ID
 
 	dup := presetRequest(t, handler, http.MethodPost, "/v1/amount-presets", validPresetBody())
 	if dup.Code != http.StatusConflict {
 		t.Fatalf("duplicate POST status = %d, want 409", dup.Code)
 	}
 
-	out.Row.Label = "Renamed"
-	update := presetRequest(t, handler, http.MethodPatch, "/v1/amount-presets/"+id, out.Row)
+	out.Result.Label = "Renamed"
+	update := presetRequest(t, handler, http.MethodPatch, "/v1/amount-presets/"+id, out.Result)
 	if update.Code != http.StatusOK {
 		t.Fatalf("PATCH status = %d, body %s", update.Code, update.Body.String())
 	}
 	updated := decodePresetOutput(t, update)
-	if !updated.Persisted || updated.Row.Label != "Renamed" {
+	if !updated.Saved || updated.Result.Label != "Renamed" {
 		t.Fatalf("update preset = %+v", updated)
 	}
 
-	renamed := updated.Row
+	renamed := updated.Result
 	renamed.Name = "other"
 	immutable := presetRequest(t, handler, http.MethodPatch, "/v1/amount-presets/"+id, renamed)
 	if immutable.Code != http.StatusUnprocessableEntity {
@@ -134,8 +134,8 @@ func TestPresetCreateRejectsBadAmount(t *testing.T) {
 		t.Fatalf("POST status = %d, body %s", response.Code, response.Body.String())
 	}
 	out := decodePresetOutput(t, response)
-	if out.Persisted {
-		t.Fatalf("bad preset persisted: %+v", out)
+	if out.Saved {
+		t.Fatalf("bad preset saved: %+v", out)
 	}
 	hasAmountIssue := false
 	for _, issue := range out.Issues {
@@ -154,7 +154,7 @@ func TestPresetCreateRejectsBlankLabel(t *testing.T) {
 	body.Label = "  "
 	response := presetRequest(t, handler, http.MethodPost, "/v1/amount-presets", body)
 	out := decodePresetOutput(t, response)
-	if out.Persisted {
-		t.Fatalf("blank-label preset persisted: %+v", out)
+	if out.Saved {
+		t.Fatalf("blank-label preset saved: %+v", out)
 	}
 }

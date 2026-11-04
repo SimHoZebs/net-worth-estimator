@@ -46,7 +46,7 @@ import { ApiRequestError } from "@/api/http.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { UserScopeError } from "@/api/scopedRequest.ts";
 
-// Row operations run through generated endpoints. Wire payloads pass through
+// Model changes run through generated endpoints. Wire payloads pass through
 // untouched; only the envelope is normalized onto the domain shape.
 function toIssue(issue: GeneratedIssue): ModelValidationIssue {
 	return {
@@ -63,13 +63,13 @@ async function runWrite(
 ): Promise<Error | ModelValidationIssue[] | null> {
 	let data: {
 		issues?: GeneratedIssue[] | null;
-		persisted?: boolean;
+		saved?: boolean;
 		revision: string;
 	};
 	try {
 		data = (await task()).data as {
 			issues?: GeneratedIssue[] | null;
-			persisted?: boolean;
+			saved?: boolean;
 			revision: string;
 		};
 	} catch (cause) {
@@ -77,36 +77,36 @@ async function runWrite(
 	}
 	// The server can send null issues; callers below always expect an array.
 	issues.push(...(data.issues ?? []).map(toIssue));
-	if (data.persisted === false) return issues;
+	if (data.saved === false) return issues;
 	return null;
 }
 
-export type RowOperation =
-	| { kind: "account"; action: "create"; row: BackendAccount }
-	| { kind: "account"; action: "update"; id: string; row: BackendAccount }
+export type ModelChange =
+	| { kind: "account"; action: "create"; value: BackendAccount }
+	| { kind: "account"; action: "update"; id: string; value: BackendAccount }
 	| { kind: "account"; action: "delete"; id: string }
 	| { kind: "account"; action: "move"; id: string; beforeId: string | null }
-	| { kind: "posting"; action: "create"; row: BackendPosting }
-	| { kind: "posting"; action: "update"; id: string; row: BackendPosting }
+	| { kind: "posting"; action: "create"; value: BackendPosting }
+	| { kind: "posting"; action: "update"; id: string; value: BackendPosting }
 	| { kind: "posting"; action: "delete"; id: string }
 	| { kind: "posting"; action: "move"; id: string; beforeId: string | null }
-	| { kind: "rule"; action: "create"; row: BackendRecurrenceRule }
-	| { kind: "rule"; action: "update"; id: string; row: BackendRecurrenceRule }
+	| { kind: "rule"; action: "create"; value: BackendRecurrenceRule }
+	| { kind: "rule"; action: "update"; id: string; value: BackendRecurrenceRule }
 	| { kind: "rule"; action: "delete"; id: string }
 	| { kind: "rule"; action: "move"; id: string; beforeId: string | null }
-	| { kind: "checkpoint"; action: "save"; row: BackendCheckpoint }
+	| { kind: "checkpoint"; action: "save"; value: BackendCheckpoint }
 	| {
 			kind: "checkpoint";
 			action: "delete";
 			accountId: string;
 			observedAt: number;
 	  }
-	| { kind: "plannedPurchase"; action: "create"; row: BackendPlannedPurchase }
+	| { kind: "plannedPurchase"; action: "create"; value: BackendPlannedPurchase }
 	| {
 			kind: "plannedPurchase";
 			action: "update";
 			id: string;
-			row: BackendPlannedPurchase;
+			value: BackendPlannedPurchase;
 	  }
 	| { kind: "plannedPurchase"; action: "delete"; id: string }
 	| {
@@ -119,14 +119,14 @@ export type RowOperation =
 			kind: "evaluation";
 			action: "create";
 			evaluationType: string;
-			row: EvaluationInstance;
+			value: EvaluationInstance;
 	  }
 	| {
 			kind: "evaluation";
 			action: "update";
 			evaluationType: string;
 			instanceId: string;
-			row: EvaluationInstance;
+			value: EvaluationInstance;
 	  }
 	| { kind: "evaluation"; action: "delete"; instanceId: string }
 	| {
@@ -146,12 +146,12 @@ function diffOrdered<T>(
 	next: T[],
 	getID: (row: T) => string,
 	equal: (a: T, b: T) => boolean,
-	create: (row: T) => RowOperation,
-	update: (id: string, row: T) => RowOperation,
-	remove: (id: string) => RowOperation,
-	move: (id: string, beforeId: string | null) => RowOperation,
-): RowOperation[] {
-	const operations: RowOperation[] = [];
+	create: (row: T) => ModelChange,
+	update: (id: string, row: T) => ModelChange,
+	remove: (id: string) => ModelChange,
+	move: (id: string, beforeId: string | null) => ModelChange,
+): ModelChange[] {
+	const operations: ModelChange[] = [];
 	const baseByID = new Map(base.map((row) => [getID(row), row]));
 	const nextByID = new Map(next.map((row) => [getID(row), row]));
 	for (const row of next) {
@@ -179,7 +179,7 @@ function diffOrdered<T>(
 export function diffFinancialModels(
 	base: FinancialModel | null,
 	next: FinancialModel,
-): RowOperation[] {
+): ModelChange[] {
 	const empty: FinancialModel = {
 		sourcePath: "",
 		accounts: [],
@@ -196,7 +196,7 @@ export function diffFinancialModels(
 		plannedPurchases: [],
 	};
 	const from = base ?? empty;
-	const operations: RowOperation[] = [];
+	const operations: ModelChange[] = [];
 	const same = (a: unknown, b: unknown) =>
 		stableStringify(a) === stableStringify(b);
 
@@ -206,8 +206,8 @@ export function diffFinancialModels(
 			next.accounts,
 			(row) => row.id,
 			same,
-			(row) => ({ kind: "account", action: "create", row }),
-			(id, row) => ({ kind: "account", action: "update", id, row }),
+			(row) => ({ kind: "account", action: "create", value: row }),
+			(id, row) => ({ kind: "account", action: "update", id, value: row }),
 			(id) => ({ kind: "account", action: "delete", id }),
 			(id, beforeId) => ({ kind: "account", action: "move", id, beforeId }),
 		),
@@ -218,8 +218,8 @@ export function diffFinancialModels(
 			next.postings,
 			(row) => row.id,
 			same,
-			(row) => ({ kind: "posting", action: "create", row }),
-			(id, row) => ({ kind: "posting", action: "update", id, row }),
+			(row) => ({ kind: "posting", action: "create", value: row }),
+			(id, row) => ({ kind: "posting", action: "update", id, value: row }),
 			(id) => ({ kind: "posting", action: "delete", id }),
 			(id, beforeId) => ({ kind: "posting", action: "move", id, beforeId }),
 		),
@@ -230,8 +230,8 @@ export function diffFinancialModels(
 			next.recurrenceRules,
 			(row) => row.id,
 			same,
-			(row) => ({ kind: "rule", action: "create", row }),
-			(id, row) => ({ kind: "rule", action: "update", id, row }),
+			(row) => ({ kind: "rule", action: "create", value: row }),
+			(id, row) => ({ kind: "rule", action: "update", id, value: row }),
 			(id) => ({ kind: "rule", action: "delete", id }),
 			(id, beforeId) => ({ kind: "rule", action: "move", id, beforeId }),
 		),
@@ -242,8 +242,8 @@ export function diffFinancialModels(
 			next.plannedPurchases ?? [],
 			(row) => row.id,
 			same,
-			(row) => ({ kind: "plannedPurchase", action: "create", row }),
-			(id, row) => ({ kind: "plannedPurchase", action: "update", id, row }),
+			(row) => ({ kind: "plannedPurchase", action: "create", value: row }),
+			(id, row) => ({ kind: "plannedPurchase", action: "update", id, value: row }),
 			(id) => ({ kind: "plannedPurchase", action: "delete", id }),
 			(id, beforeId) => ({
 				kind: "plannedPurchase",
@@ -262,7 +262,7 @@ export function diffFinancialModels(
 	for (const row of next.checkpoints) {
 		const previous = baseCheckpoints.get(checkpointKey(row));
 		if (!previous || !same(previous, row))
-			operations.push({ kind: "checkpoint", action: "save", row });
+			operations.push({ kind: "checkpoint", action: "save", value: row });
 	}
 	for (const row of from.checkpoints) {
 		if (
@@ -298,19 +298,19 @@ export function diffFinancialModels(
 	];
 	const baseEvalByID = new Map<
 		string,
-		{ type: string; row: EvaluationInstance }
+		{ type: string; value: EvaluationInstance }
 	>();
 	for (const table of evalTables(from)) {
 		for (const row of table.rows)
-			baseEvalByID.set(row.instanceId, { type: table.type, row });
+			baseEvalByID.set(row.instanceId, { type: table.type, value: row });
 	}
 	const nextEvalByID = new Map<
 		string,
-		{ type: string; row: EvaluationInstance }
+		{ type: string; value: EvaluationInstance }
 	>();
 	for (const table of evalTables(next)) {
 		for (const row of table.rows)
-			nextEvalByID.set(row.instanceId, { type: table.type, row });
+			nextEvalByID.set(row.instanceId, { type: table.type, value: row });
 	}
 	for (const [instanceId, entry] of nextEvalByID) {
 		const previous = baseEvalByID.get(instanceId);
@@ -319,15 +319,15 @@ export function diffFinancialModels(
 				kind: "evaluation",
 				action: "create",
 				evaluationType: entry.type,
-				row: entry.row,
+				value: entry.value,
 			});
-		else if (!same(previous.row, entry.row) || previous.type !== entry.type)
+		else if (!same(previous.value, entry.value) || previous.type !== entry.type)
 			operations.push({
 				kind: "evaluation",
 				action: "update",
 				evaluationType: entry.type,
 				instanceId,
-				row: entry.row,
+				value: entry.value,
 			});
 	}
 	for (const [instanceId] of baseEvalByID) {
@@ -355,15 +355,15 @@ export function diffFinancialModels(
 	return operations;
 }
 
-export type RowApplyResult =
+export type ModelChangeResult =
 	| { ok: true; issues: ModelValidationIssue[] }
 	| { ok: false; issues: ModelValidationIssue[] }
 	| Error;
 
-export async function applyRowOperations(
-	operations: RowOperation[],
+export async function applyModelChanges(
+	operations: ModelChange[],
 	options: ApiRequestOptions = {},
-): Promise<RowApplyResult> {
+): Promise<ModelChangeResult> {
 	const scope = getUserScope();
 	const issues: ModelValidationIssue[] = [];
 	for (const operation of operations) {
@@ -377,13 +377,13 @@ export async function applyRowOperations(
 			case "account":
 				if (operation.action === "create")
 					outcome = await runWrite(issues, () =>
-						createAccount(operation.row as unknown as AccountBody, options),
+						createAccount(operation.value as unknown as AccountBody, options),
 					);
 				else if (operation.action === "update")
 					outcome = await runWrite(issues, () =>
 						updateAccount(
 							operation.id,
-							operation.row as unknown as AccountBody,
+							operation.value as unknown as AccountBody,
 							options,
 						),
 					);
@@ -402,13 +402,13 @@ export async function applyRowOperations(
 			case "posting":
 				if (operation.action === "create")
 					outcome = await runWrite(issues, () =>
-						createPosting(operation.row as unknown as PostingBody, options),
+						createPosting(operation.value as unknown as PostingBody, options),
 					);
 				else if (operation.action === "update")
 					outcome = await runWrite(issues, () =>
 						updatePosting(
 							operation.id,
-							operation.row as unknown as PostingBody,
+							operation.value as unknown as PostingBody,
 							options,
 						),
 					);
@@ -427,13 +427,13 @@ export async function applyRowOperations(
 			case "rule":
 				if (operation.action === "create")
 					outcome = await runWrite(issues, () =>
-						createRule(operation.row as unknown as RuleBody, options),
+						createRule(operation.value as unknown as RuleBody, options),
 					);
 				else if (operation.action === "update")
 					outcome = await runWrite(issues, () =>
 						updateRule(
 							operation.id,
-							operation.row as unknown as RuleBody,
+							operation.value as unknown as RuleBody,
 							options,
 						),
 					);
@@ -452,7 +452,7 @@ export async function applyRowOperations(
 			case "checkpoint":
 				if (operation.action === "save")
 					outcome = await runWrite(issues, () =>
-						saveCheckpoint(operation.row as unknown as Checkpoint, options),
+						saveCheckpoint(operation.value as unknown as Checkpoint, options),
 					);
 				else
 					outcome = await runWrite(issues, () =>
@@ -469,7 +469,7 @@ export async function applyRowOperations(
 				if (operation.action === "create")
 					outcome = await runWrite(issues, () =>
 						createPlannedPurchase(
-							operation.row as PlannedPurchaseBody,
+							operation.value as PlannedPurchaseBody,
 							options,
 						),
 					);
@@ -477,7 +477,7 @@ export async function applyRowOperations(
 					outcome = await runWrite(issues, () =>
 						updatePlannedPurchase(
 							operation.id,
-							operation.row as PlannedPurchaseBody,
+							operation.value as PlannedPurchaseBody,
 							options,
 						),
 					);
@@ -498,7 +498,7 @@ export async function applyRowOperations(
 					outcome = await runWrite(issues, () =>
 						createEvaluation(
 							{
-								...operation.row,
+								...operation.value,
 								type: operation.evaluationType,
 							} as EvaluationUpdate,
 							options,
@@ -509,7 +509,7 @@ export async function applyRowOperations(
 						updateEvaluation(
 							operation.instanceId,
 							{
-								...operation.row,
+								...operation.value,
 								type: operation.evaluationType,
 							} as EvaluationUpdate,
 							options,

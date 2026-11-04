@@ -124,7 +124,7 @@ type postingInput struct {
 }
 
 type postingOutput struct {
-	Body rowResultBody[types.Posting] `json:"body"`
+	Body writeResult[types.Posting] `json:"body"`
 }
 
 func postingID(posting types.Posting) string { return posting.ID }
@@ -147,7 +147,7 @@ func (s *handler) createPosting(_ context.Context, input *postingInput) (*postin
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
 
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.CreatePosting(posting)
@@ -155,10 +155,10 @@ func (s *handler) createPosting(_ context.Context, input *postingInput) (*postin
 	if err != nil {
 		return nil, err
 	}
-	if persisted {
+	if saved {
 		row.Source = store.SourceUser
 	}
-	return &postingOutput{Body: rowResultBody[types.Posting]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &postingOutput{Body: writeResult[types.Posting]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) updatePosting(_ context.Context, input *struct {
@@ -186,7 +186,7 @@ func (s *handler) updatePosting(_ context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error422UnprocessableEntity(err.Error())
 	}
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
 		return s.store.UpdatePosting(posting)
@@ -194,10 +194,10 @@ func (s *handler) updatePosting(_ context.Context, input *struct {
 	if err != nil {
 		return nil, err
 	}
-	if persisted {
+	if saved {
 		row.Source = store.SourceUser
 	}
-	return &postingOutput{Body: rowResultBody[types.Posting]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &postingOutput{Body: writeResult[types.Posting]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deletePosting(_ context.Context, input *struct {

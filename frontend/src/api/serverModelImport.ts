@@ -3,7 +3,7 @@ import type { FinancialModel } from "@/api/contracts.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { responseScopeError } from "@/api/scopedRequest.ts";
 import { getFinancialModel } from "@/api/generated/endpoints.ts";
-import { applyRowOperations, diffFinancialModels } from "@/api/rowSync.ts";
+import { applyModelChanges, diffFinancialModels } from "@/api/modelChanges.ts";
 
 export const READ_ONLY_IMPORT_MESSAGE =
 	"The server is read-only. The selected model was not uploaded.";
@@ -24,7 +24,7 @@ export type ServerModelImportOptions = {
 };
 
 // The recovery callback owns initial activation. Replacement diffs the
-// reviewed model against the current server model and applies row
+// reviewed model against the current server model and applies model changes
 // operations, then reloads authoritative state.
 export async function importServerModel({
 	model,
@@ -54,7 +54,7 @@ export async function importServerModel({
 	const stale = responseScopeError(scope);
 	if (stale) return stale;
 	const operations = diffFinancialModels(current, model);
-	const applied = await applyRowOperations(operations);
+	const applied = await applyModelChanges(operations);
 	const changed = responseScopeError(scope);
 	if (changed) return changed;
 	if (applied instanceof Error) return applied;

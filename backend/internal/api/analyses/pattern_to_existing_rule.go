@@ -68,9 +68,9 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 	}
 }) (*struct {
 	Body struct {
-		Rows       []types.Posting              `json:"rows"`
+		Matches    []types.Posting              `json:"matches"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
-		Persisted  bool                         `json:"persisted"`
+		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
 		PatternKey string                       `json:"patternKey"`
 		RuleID     string                       `json:"ruleId"`
@@ -164,14 +164,14 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 	}
 	output := &struct {
 		Body struct {
-			Rows       []types.Posting              `json:"rows"`
+			Matches    []types.Posting              `json:"matches"`
 			Issues     []types.ModelValidationIssue `json:"issues"`
-			Persisted  bool                         `json:"persisted"`
+			Saved      bool                         `json:"saved"`
 			Revision   string                       `json:"revision"`
 			PatternKey string                       `json:"patternKey"`
 			RuleID     string                       `json:"ruleId"`
 		}
 	}{}
-	output.Body.Rows, output.Body.Issues, output.Body.Persisted, output.Body.Revision, output.Body.PatternKey, output.Body.RuleID = rows, warnings, true, revision, preview.PatternKey, preview.RuleID
+	output.Body.Matches, output.Body.Issues, output.Body.Saved, output.Body.Revision, output.Body.PatternKey, output.Body.RuleID = rows, warnings, true, revision, preview.PatternKey, preview.RuleID
 	return output, nil
 }

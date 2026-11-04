@@ -108,19 +108,19 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	const viaPut = (
 		row: unknown,
 	):
-		| { row: unknown; issues: unknown[]; persisted: boolean; revision: string }
+		| { value: unknown; issues: unknown[]; saved: boolean; revision: string }
 		| Error => {
 		if (!put)
-			return { row, issues: [], persisted: true, revision: revisionValue };
+			return { value: row, issues: [], saved: true, revision: revisionValue };
 		const response = put(structuredClone(current) as FinancialModel);
 		if (response instanceof Error) return response;
 		const errors = (response.issues ?? []).filter(
 			(issue) => issue.severity === "error",
 		);
 		return {
-			row,
+			value: row,
 			issues: response.issues ?? [],
-			persisted: errors.length === 0,
+			saved: errors.length === 0,
 			revision: response.revision ?? revisionValue,
 		};
 	};
@@ -369,12 +369,12 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		}
 		if (path === "/v1/amount-presets" && method === "POST")
 			return ok({
-				row: {
+				value: {
 					...(body as Record<string, unknown>),
 					id: (body as { id?: string }).id || "preset-1",
 				},
 				issues: [],
-				persisted: true,
+				saved: true,
 			});
 		if (path === "/v1/amount-presets/reorder" && method === "POST")
 			return ok({ movedId: (body as { id: string }).id });
@@ -382,7 +382,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		if (presetMatch) {
 			if (method === "DELETE")
 				return ok({ deletedId: decodeURIComponent(presetMatch[1]!) });
-			return ok({ row: body, issues: [], persisted: true });
+			return ok({ value: body, issues: [], saved: true });
 		}
 		const override = writeOverrides.find((entry) => entry.match(method, path));
 		if (override) {

@@ -59,14 +59,14 @@ export function createPurchaseSaver(connection, captures, storage) {
           throw new Error(
             "This purchase ID conflicts with saved data. Check Waypoint before starting another capture.",
           );
-        result = { persisted: true };
+        result = { saved: true };
       } else {
         // A rejection is definitive. A timeout/5xx can follow a successful commit.
         if (!state.pendingSave && [400, 403, 413, 422].includes(error.status)) await clearPending();
         throw error;
       }
     }
-    if (!result.persisted) {
+    if (!result.saved) {
       if (!state.pendingSave) await clearPending();
       throw new Error(
         result.issues

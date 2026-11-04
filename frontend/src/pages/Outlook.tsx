@@ -5,7 +5,7 @@ import {
 	useSavedAccounts,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "../state/savedRows.ts";
+} from "../state/savedState.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
 import { PinnedEvaluations } from "./outlook/PinnedEvaluations.tsx";
 import type { SafeSpendingDetailTab } from "./outlook/safe-spending/safeSpendingDetailModel.ts";

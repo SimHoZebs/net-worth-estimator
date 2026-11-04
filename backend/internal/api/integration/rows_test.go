@@ -34,31 +34,31 @@ func TestRowAccountEndToEnd(t *testing.T) {
 		t.Fatalf("create status = %d, body %s", created.Code, created.Body.String())
 	}
 	var createdPayload struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
-		Persisted bool `json:"persisted"`
+		} `json:"value"`
+		Saved bool `json:"saved"`
 	}
 	if err := json.Unmarshal(created.Body.Bytes(), &createdPayload); err != nil {
 		t.Fatalf("decode create: %v", err)
 	}
-	if !createdPayload.Persisted || createdPayload.Row.ID == "" {
+	if !createdPayload.Saved || createdPayload.Result.ID == "" {
 		t.Fatalf("create = %+v", createdPayload)
 	}
 
-	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/"+createdPayload.Row.ID, `{"name":"Renamed","kind":"cash","enabled":false}`)
+	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/accounts/"+createdPayload.Result.ID, `{"name":"Renamed","kind":"cash","enabled":false}`)
 	if updated.Code != http.StatusOK {
 		t.Fatalf("update status = %d, body %s", updated.Code, updated.Body.String())
 	}
-	moved := doRowRequest(t, handler, http.MethodPost, "/v1/accounts/reorder", `{"id":"`+createdPayload.Row.ID+`"}`)
+	moved := doRowRequest(t, handler, http.MethodPost, "/v1/accounts/reorder", `{"id":"`+createdPayload.Result.ID+`"}`)
 	if moved.Code != http.StatusOK {
 		t.Fatalf("move status = %d, body %s", moved.Code, moved.Body.String())
 	}
-	deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+createdPayload.Row.ID, "")
+	deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+createdPayload.Result.ID, "")
 	if deleted.Code != http.StatusOK {
 		t.Fatalf("delete status = %d, body %s", deleted.Code, deleted.Body.String())
 	}
-	again := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+createdPayload.Row.ID, "")
+	again := doRowRequest(t, handler, http.MethodDelete, "/v1/accounts/"+createdPayload.Result.ID, "")
 	if again.Code != http.StatusNotFound {
 		t.Fatalf("second delete status = %d, want 404", again.Code)
 	}
@@ -74,13 +74,13 @@ func TestRowWriteValidationRejectsDanglingReference(t *testing.T) {
 		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
 	}
 	var payload struct {
-		Issues    []map[string]any `json:"issues"`
-		Persisted bool             `json:"persisted"`
+		Issues []map[string]any `json:"issues"`
+		Saved  bool             `json:"saved"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if payload.Persisted || len(payload.Issues) == 0 {
+	if payload.Saved || len(payload.Issues) == 0 {
 		t.Fatalf("dangling reference response = %+v", payload)
 	}
 }

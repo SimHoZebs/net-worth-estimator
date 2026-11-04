@@ -7,7 +7,7 @@ import {
 	useSavedRules,
 	useSavedTransactions,
 	useSavedEvaluations,
-} from "../state/savedRows.ts";
+} from "../state/savedState.ts";
 import { ruleToDisplay } from "../domain/transactionRows.ts";
 import {
 	editorHash,

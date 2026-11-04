@@ -16,7 +16,7 @@ import {
 	useSavedAccounts,
 	useSavedPurchases,
 	useSavedStartDate,
-} from "../../state/savedRows.ts";
+} from "../../state/savedState.ts";
 import { PlannedPurchaseEditor } from "./PlannedPurchaseEditor.tsx";
 import { toPurchaseViewItems } from "./purchase.adapter.ts";
 import { PurchasePlanner } from "./PurchasePlanner.tsx";

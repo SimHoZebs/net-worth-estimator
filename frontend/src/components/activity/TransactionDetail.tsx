@@ -94,7 +94,7 @@ import {
 	TransactionInsightsTrigger,
 } from "./TransactionInsights.tsx";
 import { useAnalysisFindings } from "../../state/analyses.ts";
-import { useSavedRules, useSavedTransactions } from "../../state/savedRows.ts";
+import { useSavedRules, useSavedTransactions } from "../../state/savedState.ts";
 import { ruleToDisplay } from "../../domain/transactionRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
 import { useSettleCandidates } from "../../state/settleCandidates.ts";

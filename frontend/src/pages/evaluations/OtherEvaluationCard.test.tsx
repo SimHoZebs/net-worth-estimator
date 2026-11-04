@@ -8,9 +8,9 @@ import {
 	useSavedAccounts,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "@/state/savedRows.ts";
+} from "@/state/savedState.ts";
 
-vi.mock("@/state/savedRows.ts", () => ({
+vi.mock("@/state/savedState.ts", () => ({
 	useSavedAccounts: vi.fn(),
 	useSavedTransactions: vi.fn(),
 	useSavedStartDate: vi.fn(),

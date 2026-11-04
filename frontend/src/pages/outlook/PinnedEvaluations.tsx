@@ -9,7 +9,7 @@ import {
 	useSavedAccounts,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "@/state/savedRows.ts";
+} from "@/state/savedState.ts";
 import { useServerStatus } from "@/state/workspaceResources.ts";
 
 type PinnedItem =

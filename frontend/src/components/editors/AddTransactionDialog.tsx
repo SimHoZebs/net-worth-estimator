@@ -15,7 +15,7 @@ import {
 	useSavedRules,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "../../state/savedRows.ts";
+} from "../../state/savedState.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 import {
 	combineDayTime,

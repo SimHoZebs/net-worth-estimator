@@ -49,7 +49,7 @@ vi.mock("@/state/workspaceResources.ts", () => ({
 	}),
 }));
 
-vi.mock("@/state/savedRows.ts", () => ({
+vi.mock("@/state/savedState.ts", () => ({
 	useSavedAccounts: () => [{ id: "checking", name: "Everyday checking" }],
 }));
 
@@ -166,9 +166,9 @@ describe("repeating-payment patterns", () => {
 		createMutate.mockImplementation(
 			(
 				_args: unknown,
-				options?: { onSuccess?: (result: { row: { name: string } }) => void },
+				options?: { onSuccess?: (result: { value: { name: string } }) => void },
 			) => {
-				options?.onSuccess?.({ row: { name: "Grocer" } });
+				options?.onSuccess?.({ value: { name: "Grocer" } });
 			},
 		);
 		fireEvent.click(
@@ -249,9 +249,9 @@ describe("repeating-payment patterns", () => {
 		addMutate.mockImplementation(
 			(
 				_args: unknown,
-				options?: { onSuccess?: (result: { rows: unknown[] }) => void },
+				options?: { onSuccess?: (result: { matches: unknown[] }) => void },
 			) => {
-				options?.onSuccess?.({ rows: [{}, {}] });
+				options?.onSuccess?.({ matches: [{}, {}] });
 			},
 		);
 		fireEvent.click(
@@ -261,7 +261,7 @@ describe("repeating-payment patterns", () => {
 			expect.objectContaining({ ruleId: "rent" }),
 			expect.objectContaining({}),
 		);
-		expect(screen.getAllByText(/an occurrence/).length).toBeGreaterThan(0);
+		expect(screen.getByText(/2 recorded payments now record an occurrence/)).toBeDefined();
 	});
 	it("hides the link action in a read-only dialog", () => {
 		existingRulePreviewState.data = {

@@ -4,7 +4,7 @@ import { useRemoteProjection } from "../../state/useRemoteProjection.ts";
 import {
 	useSavedAccounts,
 	useSavedEvaluations,
-} from "../../state/savedRows.ts";
+} from "../../state/savedState.ts";
 
 export type OutlookProjection = {
 	base: Projection | null;

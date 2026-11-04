@@ -23,7 +23,7 @@ type supersedeOutput struct {
 		ManualAccountID string                       `json:"manualAccountId"`
 		SyncedAccountID string                       `json:"syncedAccountId"`
 		Issues          []types.ModelValidationIssue `json:"issues"`
-		Persisted       bool                         `json:"persisted"`
+		Saved           bool                         `json:"saved"`
 		Revision        string                       `json:"revision"`
 	}
 }
@@ -33,7 +33,7 @@ type supersedeOutput struct {
 // and bank facts; the manual account's profile and account-scoped
 // configuration move over, then the manual account and its history are
 // deleted. Validation issues return in the row-write envelope with
-// persisted=false.
+// saved=false.
 func (s *handler) supersedeAccount(_ context.Context, input *supersedeInput) (*supersedeOutput, error) {
 	links, err := s.store.ListAccountLinks()
 	if err != nil {
@@ -72,7 +72,7 @@ func (s *handler) supersedeAccount(_ context.Context, input *supersedeInput) (*s
 	if output.Body.Issues == nil {
 		output.Body.Issues = []types.ModelValidationIssue{}
 	}
-	output.Body.Persisted = result.Persisted
+	output.Body.Saved = result.Persisted
 	output.Body.Revision = revision
 	return output, nil
 }

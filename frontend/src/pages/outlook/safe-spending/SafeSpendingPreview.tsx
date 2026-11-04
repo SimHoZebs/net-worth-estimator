@@ -41,7 +41,7 @@ import {
 	useSavedRules,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "@/state/savedRows.ts";
+} from "@/state/savedState.ts";
 import { ruleToDisplay } from "@/domain/transactionRows.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
@@ -94,7 +94,7 @@ export function SafeSpendingPreview({
 	);
 	// Detail mapping spans both row kinds: projected occurrences of a rule
 	// resolve to the rule definition, posted rows to the posting.
-	const savedRows = useMemo(
+	const savedState = useMemo(
 		() => [...(transactions ?? []), ...rules],
 		[transactions, rules],
 	);
@@ -706,7 +706,7 @@ export function SafeSpendingPreview({
 									trend={spendingTrend}
 									section={billsSection}
 									accounts={accounts}
-									transactions={savedRows}
+									transactions={savedState}
 									readOnly={readOnly}
 									transactionOrder={transactionOrder}
 									onTransactionOrderChange={setTransactionOrder}
@@ -721,7 +721,7 @@ export function SafeSpendingPreview({
 								key={detail}
 								cycle={tabChargeCycles[detail]}
 								accounts={accounts}
-								transactions={savedRows}
+								transactions={savedState}
 								readOnly={readOnly}
 								transactionOrder={transactionOrder}
 								onTransactionOrderChange={setTransactionOrder}

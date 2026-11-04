@@ -5,7 +5,7 @@ import {
 	moveAmountPreset,
 	updateAmountPreset,
 } from "@/api/generated/endpoints.ts";
-import { applyRowOperations, diffFinancialModels } from "@/api/rowSync.ts";
+import { applyModelChanges, diffFinancialModels } from "@/api/modelChanges.ts";
 import {
 	ApiHttpError,
 	type AmountPreset,
@@ -34,14 +34,14 @@ export function workspaceWriteKey(kind: "model" | "presets") {
 	return ["workspace-write", getUserScope().key, kind] as const;
 }
 
-/** Backend save envelope: persisted with issues, or rejected with reasons. */
+/** Backend save envelope: saved with issues, or rejected with reasons. */
 export interface SaveResult {
 	issues?: { severity: string; message?: string | null }[] | null;
-	persisted?: boolean;
+	saved?: boolean;
 }
 
 function saveRejection(envelope: SaveResult): string | null {
-	if (envelope.persisted === false) {
+	if (envelope.saved === false) {
 		const messages = (envelope.issues ?? [])
 			.map((issue) => issue.message)
 			.filter(Boolean);
@@ -59,7 +59,7 @@ function saveRejection(envelope: SaveResult): string | null {
 /**
  * One immediate save behind a form action: guard the workspace, run the
  * call, surface a rejection notice, then refresh the given queries.
- * Returns true only when the server persisted the change and the
+ * Returns true only when the server saved the change and the
  * authoritative refresh completed for the same resource.
  *
  * The save runs inside the single `write("model", …)` Query mutation, so
@@ -74,7 +74,7 @@ function saveRejection(envelope: SaveResult): string | null {
  * the original resource stays current. A resource switch at any
  * awaited boundary reports failure silently: no refresh, no stale notice,
  * no success. Returning false always keeps the caller's edited form
- * intact for retry. When the write persisted but the reload failed, the
+ * intact for retry. When the write saved but the reload failed, the
  * notice says exactly that instead of claiming nothing was saved.
  * Success owns the shared "Changes saved." confirmation.
  */
@@ -244,7 +244,7 @@ export async function importServerModel(
 					status: 403,
 					message: READ_ONLY_IMPORT_MESSAGE,
 				});
-			const result = await applyRowOperations(diffFinancialModels(null, model));
+			const result = await applyModelChanges(diffFinancialModels(null, model));
 			if (scope !== getUserScope()) return false;
 			if (result instanceof Error) throw result;
 			if (!result.ok)
@@ -260,7 +260,7 @@ export async function importServerModel(
 	);
 }
 
-async function changePreset(action: () => Promise<{ persisted: boolean }>) {
+async function changePreset(action: () => Promise<{ saved: boolean }>) {
 	const scope = getUserScope();
 	return (
 		(await write("presets", async () => {
@@ -268,7 +268,7 @@ async function changePreset(action: () => Promise<{ persisted: boolean }>) {
 				queryKey: userResourceKey("presets", scope),
 			});
 			const response = await action();
-			if (!response.persisted)
+			if (!response.saved)
 				throw new Error("The recipe was rejected by the server.");
 			if (scope !== getUserScope()) return false;
 			await serverQueryClient().invalidateQueries({
@@ -290,10 +290,10 @@ export const updatePreset = (preset: AmountPreset) =>
 export const deletePreset = (id: string) =>
 	changePreset(async () => {
 		await deleteAmountPreset(id);
-		return { persisted: true };
+		return { saved: true };
 	});
 export const movePreset = (id: string, beforeId: string | null) =>
 	changePreset(async () => {
 		await moveAmountPreset({ id, beforeId: beforeId ?? undefined });
-		return { persisted: true };
+		return { saved: true };
 	});

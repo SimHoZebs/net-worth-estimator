@@ -23,7 +23,7 @@ import {
 	useSavedAccounts,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "@/state/savedRows.ts";
+} from "@/state/savedState.ts";
 import { SegmentedBar } from "@/components/SegmentedBar.tsx";
 import { IconButton } from "@/components/Button.tsx";
 import { Badge } from "@/components/Badge.tsx";

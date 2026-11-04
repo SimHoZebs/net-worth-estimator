@@ -1,5 +1,5 @@
 import { useCurrentPosition } from "../../state/useCurrentPosition.ts";
-import { useSavedAccounts } from "../../state/savedRows.ts";
+import { useSavedAccounts } from "../../state/savedState.ts";
 import { TextButton } from "../Button.tsx";
 import { Modal } from "../Modal.tsx";
 import { Skeleton } from "../Skeleton.tsx";

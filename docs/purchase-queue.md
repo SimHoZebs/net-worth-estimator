@@ -39,7 +39,7 @@ details remain local to the extension.
 - `DELETE /v1/planned-purchases/{id}` removes a purchase.
 - `POST /v1/planned-purchases/reorder` moves `{ id, beforeId }`. Empty `beforeId` appends.
 
-Create and update return `row/issues/persisted/revision`. Delete and reorder
+Create and update return `value/issues/saved/revision`. Delete and reorder
 return the revision. All writes use the normal validation, resource guard,
 permissions and read-only protection. Duplicate IDs return `409`.
 

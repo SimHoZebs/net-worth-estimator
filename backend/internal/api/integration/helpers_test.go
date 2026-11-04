@@ -52,17 +52,17 @@ type positionRequestBody struct {
 	AsOfDate string                `json:"asOfDate"`
 }
 
-type presetResultBody struct {
-	Row       types.AmountPreset           `json:"row"`
-	Issues    []types.ModelValidationIssue `json:"issues"`
-	Persisted bool                         `json:"persisted"`
+type presetWriteResult struct {
+	Result types.AmountPreset           `json:"value"`
+	Issues []types.ModelValidationIssue `json:"issues"`
+	Saved  bool                         `json:"saved"`
 }
 
-type rowResultBody[T any] struct {
-	Row       T                            `json:"row"`
-	Issues    []types.ModelValidationIssue `json:"issues"`
-	Persisted bool                         `json:"persisted"`
-	Revision  string                       `json:"revision"`
+type writeResult[T any] struct {
+	Result   T                            `json:"value"`
+	Issues   []types.ModelValidationIssue `json:"issues"`
+	Saved    bool                         `json:"saved"`
+	Revision string                       `json:"revision"`
 }
 
 func hasErrorIssues(issues []types.ModelValidationIssue) bool {

@@ -23,12 +23,12 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 		t.Fatalf("create rule=%d %s", res.Code, res.Body.String())
 	}
 	var created struct {
-		Row types.RecurrenceRule `json:"row"`
+		Result types.RecurrenceRule `json:"value"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	ruleID := created.Row.ID
+	ruleID := created.Result.ID
 	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-rule-preview?ruleId=" + ruleID
 	addPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-rule"
 
@@ -71,8 +71,8 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 		t.Fatalf("add=%d %s", res.Code, res.Body.String())
 	}
 	var added struct {
-		Rows       []types.Posting              `json:"rows"`
-		Persisted  bool                         `json:"persisted"`
+		Matches    []types.Posting              `json:"matches"`
+		Saved      bool                         `json:"saved"`
 		PatternKey string                       `json:"patternKey"`
 		RuleID     string                       `json:"ruleId"`
 		Revision   string                       `json:"revision"`
@@ -81,7 +81,7 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &added); err != nil {
 		t.Fatal(err)
 	}
-	if !added.Persisted || len(added.Rows) != 3 || added.RuleID != ruleID {
+	if !added.Saved || len(added.Matches) != 3 || added.RuleID != ruleID {
 		t.Fatalf("added=%+v", added)
 	}
 	model, err := scoped.LoadModel()

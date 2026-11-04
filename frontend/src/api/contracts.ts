@@ -126,9 +126,9 @@ export interface AmountPresetListResponse extends HumaMetadata {
 }
 
 export interface AmountPresetWriteResponse extends HumaMetadata {
-	row: AmountPreset;
+	value: AmountPreset;
 	issues: ModelValidationIssue[];
-	persisted: boolean;
+	saved: boolean;
 }
 
 export interface AmountPresetDeleteResponse extends HumaMetadata {
@@ -533,17 +533,6 @@ export interface FinancialModelResponse extends HumaMetadata {
 }
 
 export type ModelResponse = FinancialModelResponse;
-
-export interface RowWriteResponse<TRow> extends HumaMetadata {
-	row: TRow;
-	issues: ModelValidationIssue[];
-	persisted: boolean;
-	revision: string;
-}
-
-export interface RowDeleteResponse extends HumaMetadata {
-	revision: string;
-}
 
 export interface PinnedEvaluationsResponse extends HumaMetadata {
 	instanceIds: string[];

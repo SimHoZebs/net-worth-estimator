@@ -62,9 +62,9 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	ID string `path:"id"`
 }) (*struct {
 	Body struct {
-		Row        types.RecurrenceRule         `json:"row"`
+		Result     types.RecurrenceRule         `json:"value"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
-		Persisted  bool                         `json:"persisted"`
+		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
 		PatternKey string                       `json:"patternKey"`
 	}
@@ -107,8 +107,8 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	if err := s.store.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
 		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
 	}
-	row, issues, persisted, revision, err := model.PersistFinanceRule(s.store, rule)
-	if err != nil || !persisted {
+	row, issues, saved, revision, err := model.PersistFinanceRule(s.store, rule)
+	if err != nil || !saved {
 		// Leave a concurrent winner's link alone: remove only our own.
 		_ = s.store.RemovePatternToNewRule(preview.PatternKey, rule.ID)
 		if err != nil {
@@ -118,13 +118,13 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	}
 	output := &struct {
 		Body struct {
-			Row        types.RecurrenceRule         `json:"row"`
+			Result     types.RecurrenceRule         `json:"value"`
 			Issues     []types.ModelValidationIssue `json:"issues"`
-			Persisted  bool                         `json:"persisted"`
+			Saved      bool                         `json:"saved"`
 			Revision   string                       `json:"revision"`
 			PatternKey string                       `json:"patternKey"`
 		}
 	}{}
-	output.Body.Row, output.Body.Issues, output.Body.Persisted, output.Body.Revision, output.Body.PatternKey = row, issues, persisted, revision, preview.PatternKey
+	output.Body.Result, output.Body.Issues, output.Body.Saved, output.Body.Revision, output.Body.PatternKey = row, issues, saved, revision, preview.PatternKey
 	return output, nil
 }

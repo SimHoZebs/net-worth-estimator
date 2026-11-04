@@ -4,14 +4,14 @@ import { financialModelFixture } from "../../mocks/financialModel.ts";
 import { projectionFixture } from "../../mocks/projection.ts";
 import { ProjectionChart } from "../ProjectionChart.tsx";
 import { useOutlookProjection } from "../../pages/outlook/useOutlookProjection.ts";
-import { useSavedAccounts } from "../../state/savedRows.ts";
+import { useSavedAccounts } from "../../state/savedState.ts";
 import { useCheckpoints } from "../../state/workspaceResources.ts";
 
 vi.mock("../../pages/outlook/useOutlookProjection.ts", () => ({
 	useOutlookProjection: vi.fn(),
 }));
 
-vi.mock("../../state/savedRows.ts", () => ({
+vi.mock("../../state/savedState.ts", () => ({
 	useSavedAccounts: vi.fn(),
 }));
 

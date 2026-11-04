@@ -8,16 +8,16 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// Row writes replace the retired whole-model PUT. Each handler loads
+// Model writes replace the retired whole-model PUT. Each handler loads
 // the stored model, applies one change in memory, runs the
 // authoritative validator, and persists only when no error-severity issue
 // exists. Last write wins: concurrent row edits overwrite each other,
 // which is correct for a single writer and revisable later.
-type rowResultBody[T any] struct {
-	Row       T                            `json:"row"`
-	Issues    []types.ModelValidationIssue `json:"issues"`
-	Persisted bool                         `json:"persisted"`
-	Revision  string                       `json:"revision"`
+type writeResult[T any] struct {
+	Result   T                            `json:"value"`
+	Issues   []types.ModelValidationIssue `json:"issues"`
+	Saved    bool                         `json:"saved"`
+	Revision string                       `json:"revision"`
 }
 
 func hasErrorIssues(issues []types.ModelValidationIssue) bool {
@@ -32,7 +32,7 @@ func hasErrorIssues(issues []types.ModelValidationIssue) bool {
 // runRowWrite validates and persists one model-entry change with full
 // validation (finance plus forecast evaluation configuration), then
 // computes its revision from the stored snapshot used for response
-// warnings. Handlers wrap row/issues/persisted/revision in their output
+// warnings. Handlers wrap row/issues/saved/revision in their output
 // shape. Evaluation writes use it so a broken forecast cannot be saved.
 func runRowWrite[T any](s *handler, mutate func(model *types.FinancialModel), persist func() (T, error)) (T, []types.ModelValidationIssue, bool, string, error) {
 	return runRowWriteWithValidator(s.store, mutate, persist, domain.ValidateFinancialModel, domain.ValidateFinancialModel)
@@ -115,7 +115,7 @@ func runRowWriteWithValidator[T any](st store.Store, mutate func(model *types.Fi
 	if err != nil {
 		return zero, nil, false, "", modelstate.WriteError(err)
 	}
-	// Re-read warnings against the persisted model so the response
+	// Re-read warnings against the saved model so the response
 	// reflects stored state, not the request echo.
 	model, err = st.LoadModel()
 	if err != nil {

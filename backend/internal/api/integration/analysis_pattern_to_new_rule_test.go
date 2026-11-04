@@ -125,9 +125,9 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 		}
 	}
 	var created struct {
-		Row        types.RecurrenceRule         `json:"row"`
+		Result     types.RecurrenceRule         `json:"value"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
-		Persisted  bool                         `json:"persisted"`
+		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
 		PatternKey string                       `json:"patternKey"`
 	}
@@ -138,7 +138,7 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if !created.Persisted || created.Row.Frequency != types.FrequencyMonthly || created.Row.StartDate != "2026-04-15" || !created.Row.Enabled || created.PatternKey == "" {
+	if !created.Saved || created.Result.Frequency != types.FrequencyMonthly || created.Result.StartDate != "2026-04-15" || !created.Result.Enabled || created.PatternKey == "" {
 		t.Fatalf("created=%+v", created)
 	}
 	model, err := scoped.LoadModel()
@@ -152,17 +152,17 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Creatable || preview.Preview.ExistingRuleID != created.Row.ID {
+	if preview.Preview.Creatable || preview.Preview.ExistingRuleID != created.Result.ID {
 		t.Fatalf("second preview=%+v", preview.Preview)
 	}
 	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
 		t.Fatalf("second create=%d %s", res.Code, res.Body.String())
 	}
 	disable, _ := json.Marshal(map[string]any{
-		"name": created.Row.Name, "sourceAccountId": "checking", "amount": created.Row.Amount,
-		"frequency": created.Row.Frequency, "startDate": created.Row.StartDate, "enabled": false,
+		"name": created.Result.Name, "sourceAccountId": "checking", "amount": created.Result.Amount,
+		"frequency": created.Result.Frequency, "startDate": created.Result.StartDate, "enabled": false,
 	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Row.ID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Result.ID, string(disable)); res.Code != 200 {
 		t.Fatalf("disable=%d %s", res.Code, res.Body.String())
 	}
 	res = callAPI(t, handler, "POST", createPath, "")
@@ -170,16 +170,16 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 		t.Fatalf("recreate=%d %s", res.Code, res.Body.String())
 	}
 	var second struct {
-		Row       types.RecurrenceRule `json:"row"`
-		Persisted bool                 `json:"persisted"`
+		Result types.RecurrenceRule `json:"value"`
+		Saved  bool                 `json:"saved"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &second); err != nil {
 		t.Fatal(err)
 	}
-	if !second.Persisted || second.Row.ID == created.Row.ID {
+	if !second.Saved || second.Result.ID == created.Result.ID {
 		t.Fatalf("recreate=%+v", second)
 	}
-	if res := callAPI(t, handler, "DELETE", "/v1/recurrence-rules/"+second.Row.ID, ""); res.Code != 200 {
+	if res := callAPI(t, handler, "DELETE", "/v1/recurrence-rules/"+second.Result.ID, ""); res.Code != 200 {
 		t.Fatalf("delete=%d %s", res.Code, res.Body.String())
 	}
 	findingsAfter, err := scoped.ListAnalysisFindings(types.AnalysisFindingFilter{})

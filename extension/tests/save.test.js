@@ -71,6 +71,24 @@ test("a different account cannot replay a pending purchase", async () => {
   assert.equal(writes, 0);
 });
 
+test("a saved capture resolves and clears its pending save", async () => {
+  const { storage, captures, identity, model } = await fixture();
+  let savedPayload;
+  const connection = {
+    identity: async () => identity,
+    api: async (path, payload) => {
+      if (path === "/v1/financial-model") return model;
+      if (path === "/v1/status") return { readOnly: false };
+      savedPayload = payload;
+      return { value: payload, issues: [], saved: true, revision: '"r1"' };
+    },
+  };
+  await createPurchaseSaver(connection, captures, storage)();
+  const state = await captures.read();
+  assert.equal(state.pendingSave, undefined);
+  assert.equal(state.saved?.name, savedPayload.name);
+});
+
 test("definitive first-attempt validation failures unlock the draft for correction", async () => {
   const { storage, captures, identity, model } = await fixture();
   const connection = {
@@ -78,7 +96,7 @@ test("definitive first-attempt validation failures unlock the draft for correcti
     api: async (path) => {
       if (path === "/v1/financial-model") return model;
       if (path === "/v1/status") return { readOnly: false };
-      return { persisted: false, issues: [{ severity: "error", message: "Account unavailable" }] };
+      return { saved: false, issues: [{ severity: "error", message: "Account unavailable" }] };
     },
   };
   await assert.rejects(createPurchaseSaver(connection, captures, storage)(), /Account unavailable/);

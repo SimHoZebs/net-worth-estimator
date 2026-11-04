@@ -5,7 +5,7 @@ import { Button } from "../components/Button.tsx";
 import { ErrorNotice } from "../components/ErrorNotice.tsx";
 import { InputField } from "../components/Field.tsx";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
-import { useSavedAccounts } from "../state/savedRows.ts";
+import { useSavedAccounts } from "../state/savedState.ts";
 import {
 	refreshSharingViewsFor,
 	useSetSharingPolicy,

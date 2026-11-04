@@ -29,7 +29,7 @@ type handler struct {
 func Register(api huma.API, st store.Store, canWrite func(context.Context) bool, actor func(context.Context) string) {
 	s := &handler{store: st, canWrite: canWrite, actor: actor}
 	huma.Register(api, huma.Operation{OperationID: "list-analyses", Method: "GET", Path: "/v1/analyses", Summary: "Read background analysis status without starting work"}, s.listAnalyses)
-	huma.Register(api, huma.Operation{OperationID: "list-analysis-findings", Method: "GET", Path: "/v1/analysis-findings", Summary: "Read persisted transaction findings"}, s.listAnalysisFindings)
+	huma.Register(api, huma.Operation{OperationID: "list-analysis-findings", Method: "GET", Path: "/v1/analysis-findings", Summary: "Read saved transaction findings"}, s.listAnalysisFindings)
 	huma.Register(api, huma.Operation{OperationID: "dismiss-analysis-finding", Method: "PATCH", Path: "/v1/analysis-findings/{id}", Summary: "Dismiss or restore a transaction finding"}, s.dismissAnalysisFinding)
 	huma.Register(api, huma.Operation{OperationID: "review-analysis-finding", Method: "POST", Path: "/v1/analysis-findings/{id}/feedback", Summary: "Confirm or reject a finding and record plan duration"}, s.reviewAnalysisFinding)
 	huma.Register(api, huma.Operation{OperationID: "preview-pattern-to-new-rule", Method: "GET", Path: "/v1/analysis-findings/{id}/pattern-to-new-rule-preview", Summary: "Preview the forecast rule a confirmed repeating pattern would create"}, s.previewPatternToNewRule)

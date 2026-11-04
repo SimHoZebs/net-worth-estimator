@@ -5,7 +5,7 @@ import { ActionMenu } from "../../components/ActionMenu.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import type { Account } from "../../domain/model.ts";
-import { useSavedAccounts } from "../../state/savedRows.ts";
+import { useSavedAccounts } from "../../state/savedState.ts";
 import { refreshSyncSettings, useSyncLinks } from "../../state/syncSettings.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 import { SyncLinkAccountDialog } from "./SyncLinkAccountDialog.tsx";

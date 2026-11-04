@@ -247,16 +247,16 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
 	}
 	var created struct {
-		Row struct {
+		Result struct {
 			ID string `json:"id"`
-		} `json:"row"`
-		Persisted bool   `json:"persisted"`
-		Revision  string `json:"revision"`
+		} `json:"value"`
+		Saved    bool   `json:"saved"`
+		Revision string `json:"revision"`
 	}
 	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode POST response: %v", err)
 	}
-	if !created.Persisted || created.Row.ID == "" || created.Revision == "" {
+	if !created.Saved || created.Result.ID == "" || created.Revision == "" {
 		t.Fatalf("create response = %+v", created)
 	}
 	afterGet := httptest.NewRecorder()
@@ -268,7 +268,7 @@ func TestRowWriteReturnsRevision(t *testing.T) {
 		t.Fatalf("decode GET response: %v", err)
 	}
 	if created.Revision != afterPayload.Revision {
-		t.Fatalf("revision = %q, persisted revision = %q", created.Revision, afterPayload.Revision)
+		t.Fatalf("revision = %q, saved revision = %q", created.Revision, afterPayload.Revision)
 	}
 }
 
@@ -299,13 +299,13 @@ func TestRowWriteRejectsInvalidRow(t *testing.T) {
 		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
 	}
 	var rejected struct {
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		Issues []types.ModelValidationIssue `json:"issues"`
+		Saved  bool                         `json:"saved"`
 	}
 	if err := json.Unmarshal(post.Body.Bytes(), &rejected); err != nil {
 		t.Fatalf("decode POST response: %v", err)
 	}
-	if rejected.Persisted || len(rejected.Issues) == 0 {
+	if rejected.Saved || len(rejected.Issues) == 0 {
 		t.Fatalf("invalid write response = %+v", rejected)
 	}
 
@@ -376,16 +376,16 @@ func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
 		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
 	}
 	var created struct {
-		Row struct {
+		Result struct {
 			Source  string `json:"source"`
 			Pending bool   `json:"pending"`
-		} `json:"row"`
-		Persisted bool `json:"persisted"`
+		} `json:"value"`
+		Saved bool `json:"saved"`
 	}
 	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
 		t.Fatalf("decode POST response: %v", err)
 	}
-	if !created.Persisted || created.Row.Source != "user" || created.Row.Pending {
+	if !created.Saved || created.Result.Source != "user" || created.Result.Pending {
 		t.Fatalf("echoed source response = %+v", created)
 	}
 }
@@ -451,25 +451,25 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 		t.Fatalf("PATCH status = %d, body %s", patch.Code, patch.Body.String())
 	}
 	var saved struct {
-		Row struct {
+		Result struct {
 			Pending bool                `json:"pending"`
 			Enabled bool                `json:"enabled"`
 			Claim   *types.PostingClaim `json:"claim"`
-		} `json:"row"`
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		} `json:"value"`
+		Issues []types.ModelValidationIssue `json:"issues"`
+		Saved  bool                         `json:"saved"`
 	}
 	if err := json.Unmarshal(patch.Body.Bytes(), &saved); err != nil {
 		t.Fatalf("decode PATCH response: %v", err)
 	}
-	if !saved.Persisted || hasErrorIssues(saved.Issues) {
+	if !saved.Saved || hasErrorIssues(saved.Issues) {
 		t.Fatalf("claim response = %+v", saved)
 	}
-	if saved.Row.Claim == nil || saved.Row.Claim.RuleID != "housing" {
-		t.Fatalf("claim missing: %+v", saved.Row)
+	if saved.Result.Claim == nil || saved.Result.Claim.RuleID != "housing" {
+		t.Fatalf("claim missing: %+v", saved.Result)
 	}
-	if saved.Row.Pending || !saved.Row.Enabled {
-		t.Fatalf("claimed row not recorded: %+v", saved.Row)
+	if saved.Result.Pending || !saved.Result.Enabled {
+		t.Fatalf("claimed row not recorded: %+v", saved.Result)
 	}
 	stored, err := database.LoadModel()
 	if err != nil {
@@ -498,13 +498,13 @@ func TestRowDeleteAccountWithDependentsIsRejected(t *testing.T) {
 		t.Fatalf("DELETE status = %d, body %s", deleted.Code, deleted.Body.String())
 	}
 	var payload struct {
-		Issues    []types.ModelValidationIssue `json:"issues"`
-		Persisted bool                         `json:"persisted"`
+		Issues []types.ModelValidationIssue `json:"issues"`
+		Saved  bool                         `json:"saved"`
 	}
 	if err := json.Unmarshal(deleted.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode DELETE response: %v", err)
 	}
-	if payload.Persisted || len(payload.Issues) == 0 {
+	if payload.Saved || len(payload.Issues) == 0 {
 		t.Fatalf("dangling delete response = %+v", payload)
 	}
 	loaded, err := database.LoadModel()

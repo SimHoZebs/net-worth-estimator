@@ -75,7 +75,7 @@ const { mockAccounts, mockPurchases } = vi.hoisted(() => {
 	return { mockAccounts, mockPurchases };
 });
 
-vi.mock("../../state/savedRows.ts", () => ({
+vi.mock("../../state/savedState.ts", () => ({
 	useSavedAccounts: () => mockAccounts,
 	useSavedPurchases: () => mockPurchases,
 	useSavedStartDate: () => "2026-09-24",

@@ -116,7 +116,7 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		{ data: { ...pending, enabled: false } },
 	);
 	expect(disabled.ok()).toBe(true);
-	expect((await disabled.json()).persisted).toBe(true);
+	expect((await disabled.json()).saved).toBe(true);
 	baseline = (
 		(await (
 			await request.get(`${FIXTURE_API}/v1/financial-model`)

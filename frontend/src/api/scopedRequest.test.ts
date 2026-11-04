@@ -6,7 +6,7 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { ApiHttpError } from "./http.ts";
-import { applyRowOperations } from "./rowSync.ts";
+import { applyModelChanges } from "./modelChanges.ts";
 import { requestStochasticProjection } from "./sse.ts";
 import {
 	UserScopeError,
@@ -70,14 +70,14 @@ describe("resource assertion at the API boundary", () => {
 		const fetcher = stubFetch(async () => {
 			owner(B);
 			return response(
-				JSON.stringify({ persisted: true, issues: [], revision: "r1" }),
+				JSON.stringify({ saved: true, issues: [], revision: "r1" }),
 			);
 		});
-		const result = await applyRowOperations([
+		const result = await applyModelChanges([
 			{
 				kind: "account",
 				action: "create",
-				row: {
+				value: {
 					id: "a",
 					name: "A",
 					kind: "cash",
@@ -90,7 +90,7 @@ describe("resource assertion at the API boundary", () => {
 			{
 				kind: "account",
 				action: "create",
-				row: {
+				value: {
 					id: "b",
 					name: "B",
 					kind: "cash",

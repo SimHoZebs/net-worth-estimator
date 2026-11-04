@@ -79,8 +79,8 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	response = httptest.NewRecorder()
 	handlers[0].ServeHTTP(response, request)
 	var rejected struct {
-		Persisted bool                         `json:"persisted"`
-		Issues    []types.ModelValidationIssue `json:"issues"`
+		Saved  bool                         `json:"saved"`
+		Issues []types.ModelValidationIssue `json:"issues"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &rejected); err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	for _, issue := range rejected.Issues {
 		missingDestination = missingDestination || issue.Code == "posting.destination.missing"
 	}
-	if response.Code != http.StatusOK || rejected.Persisted || !missingDestination {
+	if response.Code != http.StatusOK || rejected.Saved || !missingDestination {
 		t.Fatalf("cross-plan JSON reference accepted: %d %s", response.Code, response.Body.String())
 	}
 	if err := stores[0].Clear(); err != nil {

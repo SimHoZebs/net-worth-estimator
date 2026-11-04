@@ -13,7 +13,7 @@ type checkpointInput struct {
 }
 
 type checkpointOutput struct {
-	Body rowResultBody[types.Checkpoint] `json:"body"`
+	Body writeResult[types.Checkpoint] `json:"body"`
 }
 
 // checkpointKey identifies one observation: the account and exact instant.
@@ -25,7 +25,7 @@ func checkpointKey(checkpoint types.Checkpoint) string {
 
 func (s *handler) saveCheckpoint(_ context.Context, input *checkpointInput) (*checkpointOutput, error) {
 	checkpoint := input.Body
-	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+	row, issues, saved, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Checkpoints = replaceByID(model.Checkpoints, checkpointKey(checkpoint), checkpointKey, checkpoint)
 	}, func() (types.Checkpoint, error) {
 		return s.store.SaveCheckpoint(checkpoint)
@@ -33,7 +33,7 @@ func (s *handler) saveCheckpoint(_ context.Context, input *checkpointInput) (*ch
 	if err != nil {
 		return nil, err
 	}
-	return &checkpointOutput{Body: rowResultBody[types.Checkpoint]{Row: row, Issues: issues, Persisted: persisted, Revision: revision}}, nil
+	return &checkpointOutput{Body: writeResult[types.Checkpoint]{Result: row, Issues: issues, Saved: saved, Revision: revision}}, nil
 }
 
 func (s *handler) deleteCheckpoint(_ context.Context, input *struct {

@@ -4,7 +4,7 @@ import {
 	useSavedAccounts,
 	useSavedStartDate,
 	useSavedTransactions,
-} from "../state/savedRows.ts";
+} from "../state/savedState.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { FailureEvidence } from "./evidence/FailureEvidence.tsx";
