@@ -73,6 +73,7 @@ const FINANCIAL_QUERY_KINDS = [
 	"deterministic-projection",
 	"stochastic-projection",
 	"current-position",
+	"settle-candidates",
 ] as const;
 
 let shared: QueryClient | null = null;

@@ -128,3 +128,17 @@ func TestAuditHistoricalVoidsFlagsAgainstDisabledSettled(t *testing.T) {
 		t.Fatalf("pairs = %+v, want the void flagged", pairs)
 	}
 }
+
+func TestAuditHistoricalVoidsSkipsSuggestOnlyProfiles(t *testing.T) {
+	// Lodging is a suggest-only profile. The live lifecycle never converts
+	// it, so the phantom-void audit must not flag it either.
+	bank := []store.BankRow{
+		reconcileBankRow("uuid-void", "MARRIOTT HOTEL", "prime_card", "300.00", false, true,
+			pendingKey("prime_card", "old-auth")),
+		reconcileBankRow("uuid-settled", "MARRIOTT HOTEL", "prime_card", "320.00", false, false,
+			pendingKey("prime_card", "post-a")),
+	}
+	if pairs := AuditHistoricalVoids(bank, "prime_card"); len(pairs) != 0 {
+		t.Fatalf("suggest-only pairs = %+v, want none flagged", pairs)
+	}
+}

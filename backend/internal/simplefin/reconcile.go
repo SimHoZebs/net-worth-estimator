@@ -9,9 +9,8 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// settleMatchWindowSeconds bounds pending-to-settled matching: charges
-// usually finalize within days, and a wider window risks joining two
-// distinct same-merchant charges.
+// settleMatchWindowSeconds bounds settled-to-settled duplicate detection.
+// Hold settlement uses the merchant profile's window instead.
 const settleMatchWindowSeconds = 7 * 24 * 3600
 
 func postingAmountCents(posting types.Posting) (int64, bool) {
@@ -36,44 +35,38 @@ func rowOutflow(posting types.Posting) bool {
 	return posting.SourceAccountID != nil
 }
 
-// settleJoinKeys verifies the non-amount join between a stale bank row and
-// a settled candidate: same mirror account, same direction, parseable
-// amounts, post within a week of the authorization, and the same merchant.
-// It returns both amounts in cents for the caller's amount comparison.
-func settleJoinKeys(stale types.Posting, candidate store.SyncPosting) (staleCents, candidateCents int64, ok bool) {
-	return settleJoinKeysWith(stale, candidate, merchantNamesMatch)
-}
-
 // settleStrictJoinKeys keeps the containment rule for settled-to-settled
 // deduplication. The wider merchant key is only for hold-to-posted
 // settlement: two posted charges at the same chain but different store
 // numbers can be genuine separate charges.
-func settleStrictJoinKeys(stale types.Posting, candidate store.SyncPosting) (staleCents, candidateCents int64, ok bool) {
-	return settleJoinKeysWith(stale, candidate, merchantNamesContain)
+func settleStrictJoinKeys(stale types.Posting, candidate types.Posting) (staleCents, candidateCents int64, ok bool) {
+	return settleJoinKeysWith(stale, candidate, settleMatchWindowSeconds, merchantNamesContain)
 }
 
-func settleJoinKeysWith(stale types.Posting, candidate store.SyncPosting, namesMatch func(string, string) bool) (staleCents, candidateCents int64, ok bool) {
+// settleJoinKeysWith checks the account, direction, positive amounts, window,
+// and the injected name rule. It returns both amounts in cents.
+func settleJoinKeysWith(stale types.Posting, candidate types.Posting, windowSeconds int64, namesMatch func(string, string) bool) (staleCents, candidateCents int64, ok bool) {
 	staleAccount, ok := rowAccount(stale)
 	if !ok {
 		return 0, 0, false
 	}
-	candidateAccount, ok := rowAccount(candidate.Posting)
+	candidateAccount, ok := rowAccount(candidate)
 	if !ok || staleAccount != candidateAccount {
 		return 0, 0, false
 	}
-	if rowOutflow(stale) != rowOutflow(candidate.Posting) {
+	if rowOutflow(stale) != rowOutflow(candidate) {
 		return 0, 0, false
 	}
 	staleCents, ok = postingAmountCents(stale)
-	if !ok {
+	if !ok || staleCents <= 0 {
 		return 0, 0, false
 	}
-	candidateCents, ok = postingAmountCents(candidate.Posting)
+	candidateCents, ok = postingAmountCents(candidate)
 	if !ok || candidateCents <= 0 {
 		return 0, 0, false
 	}
 	gap := candidate.TransactionTime - stale.TransactionTime
-	if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
+	if gap < -windowSeconds || gap > windowSeconds {
 		return 0, 0, false
 	}
 	if !namesMatch(candidate.Name, stale.Name) {
@@ -82,43 +75,17 @@ func settleJoinKeysWith(stale types.Posting, candidate store.SyncPosting, namesM
 	return staleCents, candidateCents, true
 }
 
-func settleMatch(stale types.Posting, candidate store.SyncPosting) bool {
+func settleMatch(stale types.Posting, candidate types.Posting) bool {
 	staleCents, candidateCents, ok := settleStrictJoinKeys(stale, candidate)
 	return ok && staleCents == candidateCents
 }
 
-// settleTipBounds bounds a posted total against its authorization: tips and
-// final-amount adjustments move a charge up or down by a bounded fraction,
-// capped absolutely so a small auth never joins a large unrelated charge.
-// Zero-amount auths (card checks) never join: they vanish on their own.
-func settleTipBounds(staleCents int64) (minCents, maxCents int64, ok bool) {
-	if staleCents <= 0 {
-		return 0, 0, false
-	}
-	tol := staleCents / 4
-	if tol < 300 {
-		tol = 300
-	}
-	if tol > 5000 {
-		tol = 5000
-	}
-	return staleCents - tol, staleCents + tol, true
-}
-
-// settleMatchTolerant extends the exact join with tip-bounded amounts: a
-// restaurant auth posts higher with the tip, an Instacart final posts near
-// its estimate. Exact matches always qualify. Near matches still require a
-// unique candidate, enforced by the caller's ambiguity guard.
-func settleMatchTolerant(stale types.Posting, candidate store.SyncPosting) bool {
-	staleCents, candidateCents, ok := settleJoinKeys(stale, candidate)
-	if !ok {
-		return false
-	}
-	if staleCents == candidateCents {
-		return true
-	}
-	minCents, maxCents, ok := settleTipBounds(staleCents)
-	return ok && candidateCents >= minCents && candidateCents <= maxCents
+// settleMatchTolerant applies the merchant profile's amount policy. Exact
+// matches always qualify. Near matches still require a unique candidate,
+// enforced by the caller's ambiguity guard.
+func settleMatchTolerant(stale types.Posting, candidate types.Posting) bool {
+	_, ok := settleCandidate(stale, candidate)
+	return ok
 }
 
 // rowAccount returns the model account a bank posting touches.
@@ -144,6 +111,15 @@ func settledGroupKey(account string, outflow bool) string {
 
 func bankKey(provider, account, transaction string) store.BankKey {
 	return store.BankKey{Provider: provider, AccountID: account, TransactionID: transaction}
+}
+
+func hasSimpleFINKey(row store.BankRow) bool {
+	for _, key := range row.Keys {
+		if key.Provider == store.ProviderSimpleFIN {
+			return true
+		}
+	}
+	return false
 }
 
 func candidateKey(item store.SyncPosting) store.BankKey {
@@ -199,7 +175,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var stale []staleRow
 	for _, row := range bank {
-		if seen[row.Posting.ID] {
+		if seen[row.Posting.ID] || !hasSimpleFINKey(row) {
 			continue
 		}
 		if row.Posting.Pending || row.Posting.Void {
@@ -223,7 +199,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	settledByAccount := map[string][]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync {
+		if row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
 			continue
 		}
 		if row.Posting.Pending || row.Posting.Void {
@@ -254,7 +230,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 		}
 		key := settledGroupKey(account, rowOutflow(candidate.Posting))
 		for _, row := range settledByAccount[key] {
-			if settleMatch(row.Posting, candidate) {
+			if settleMatch(row.Posting, candidate.Posting) {
 				return true
 			}
 		}
@@ -264,7 +240,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	// place: the hold keeps its UUID (and any occurrence claim on it) and
 	// takes the posted values with the posted key. Eligible holds are
 	// vanished pending rows plus vanished claimed occurrences, matched by
-	// the same tip-bounded join the manual posted-pick uses. The join
+	// the same merchant-profile join the candidate endpoint uses. The join
 	// needs a unique pair: several candidates for one hold, or several
 	// holds for one candidate, fall back to void-plus-insert for the owner
 	// to resolve by hand. Zero-amount auths never join, direction
@@ -284,7 +260,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var targets []convertTarget
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync {
+		if row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
 			continue
 		}
 		account, ok := rowAccount(row.Posting)
@@ -323,7 +299,10 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 			continue
 		}
 		for ti := range targets {
-			if settleMatchTolerant(targets[ti].posting, candidate) {
+			if !profileForPosting(targets[ti].posting).AutoConvert {
+				continue
+			}
+			if settleMatchTolerant(targets[ti].posting, candidate.Posting) {
 				matches[ci] = append(matches[ci], ti)
 				targetHits[ti]++
 			}

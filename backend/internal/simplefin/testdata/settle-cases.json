@@ -1,0 +1,252 @@
+{
+	"version": 1,
+	"cases": [
+		{
+			"name": "renamed rideshare authorization",
+			"hold": {
+				"name": "LYFT *TEMP AUTH HOLD",
+				"amountCents": 7494,
+				"day": "2026-10-31"
+			},
+			"posted": [
+				{
+					"name": "LYFT *STANDARD 10-30",
+					"amountCents": 8122,
+					"day": "2026-11-01"
+				}
+			],
+			"want": ["LYFT *STANDARD 10-30"]
+		},
+		{
+			"name": "closest amount leads when two rides match",
+			"hold": {
+				"name": "LYFT *TEMP AUTH HOLD",
+				"amountCents": 7494,
+				"day": "2026-10-31"
+			},
+			"posted": [
+				{
+					"name": "LYFT *AIRPORT 10-30",
+					"amountCents": 8618,
+					"day": "2026-11-01"
+				},
+				{
+					"name": "LYFT *STANDARD 10-30",
+					"amountCents": 8122,
+					"day": "2026-11-01"
+				}
+			],
+			"want": ["LYFT *STANDARD 10-30", "LYFT *AIRPORT 10-30"]
+		},
+		{
+			"name": "tipped restaurant authorization",
+			"hold": {
+				"name": "Bistro",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Bistro",
+					"amountCents": 5800,
+					"day": "2026-10-21"
+				}
+			],
+			"want": ["Bistro"]
+		},
+		{
+			"name": "estimate posts lower",
+			"hold": {
+				"name": "Instacart",
+				"amountCents": 10000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Instacart",
+					"amountCents": 9200,
+					"day": "2026-10-21"
+				}
+			],
+			"want": ["Instacart"]
+		},
+		{
+			"name": "processor prefix and store number",
+			"hold": {
+				"name": "SQ *Blue Bottle 1234",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Blue Bottle Coffee",
+					"amountCents": 5000,
+					"day": "2026-10-21"
+				}
+			],
+			"want": ["Blue Bottle Coffee"]
+		},
+		{
+			"name": "amazon abbreviation",
+			"hold": {
+				"name": "AMZN MKTP US*2A3B4C5D3",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "AMAZON MKTPLACE PMTS AMZN.COM/BILL WA",
+					"amountCents": 5000,
+					"day": "2026-10-21"
+				}
+			],
+			"want": ["AMAZON MKTPLACE PMTS AMZN.COM/BILL WA"]
+		},
+		{
+			"name": "gas authorization is a floor",
+			"hold": {
+				"name": "SHELL OIL 1234",
+				"amountCents": 100,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "SHELL OIL 5678",
+					"amountCents": 4500,
+					"day": "2026-10-21"
+				}
+			],
+			"want": ["SHELL OIL 5678"]
+		},
+		{
+			"name": "hotel hold outside the default window",
+			"hold": {
+				"name": "MARRIOTT HOTEL",
+				"amountCents": 30000,
+				"day": "2026-10-01"
+			},
+			"posted": [
+				{
+					"name": "MARRIOTT HOTEL",
+					"amountCents": 32000,
+					"day": "2026-10-15"
+				}
+			],
+			"want": ["MARRIOTT HOTEL"]
+		},
+		{
+			"name": "marketplace hold settles later",
+			"hold": {
+				"name": "AMAZON MKTPLACE",
+				"amountCents": 2000,
+				"day": "2026-10-01"
+			},
+			"posted": [
+				{
+					"name": "AMAZON MKTPLACE",
+					"amountCents": 4000,
+					"day": "2026-10-10"
+				}
+			],
+			"want": ["AMAZON MKTPLACE"]
+		},
+		{
+			"name": "different branch stays apart",
+			"hold": {
+				"name": "BISTRO UPTOWN",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "BISTRO DOWNTOWN",
+					"amountCents": 5800,
+					"day": "2026-10-21"
+				}
+			],
+			"want": []
+		},
+		{
+			"name": "beyond tip band stays apart",
+			"hold": {
+				"name": "Bistro",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Bistro",
+					"amountCents": 8000,
+					"day": "2026-10-21"
+				}
+			],
+			"want": []
+		},
+		{
+			"name": "zero authorization never joins",
+			"hold": {
+				"name": "Bistro",
+				"amountCents": 0,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Bistro",
+					"amountCents": 200,
+					"day": "2026-10-21"
+				}
+			],
+			"want": []
+		},
+		{
+			"name": "outside settlement window",
+			"hold": {
+				"name": "Bistro",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Bistro",
+					"amountCents": 5000,
+					"day": "2026-10-28"
+				}
+			],
+			"want": []
+		},
+		{
+			"name": "direction mismatch stays apart",
+			"hold": {
+				"name": "Refund Desk",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Refund Desk",
+					"amountCents": 5000,
+					"day": "2026-10-21",
+					"direction": "in"
+				}
+			],
+			"want": []
+		},
+		{
+			"name": "account mismatch stays apart",
+			"hold": {
+				"name": "Bistro",
+				"amountCents": 5000,
+				"day": "2026-10-20"
+			},
+			"posted": [
+				{
+					"name": "Bistro",
+					"amountCents": 5000,
+					"day": "2026-10-21",
+					"account": "other_card"
+				}
+			],
+			"want": []
+		}
+	]
+}

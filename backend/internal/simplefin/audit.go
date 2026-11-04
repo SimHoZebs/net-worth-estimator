@@ -2,8 +2,8 @@ package simplefin
 
 import "github.com/simhozebs/net-worth-estimator/backend/internal/store"
 
-// HistoricalVoidPair is one void bank row with exactly one tip-bounded
-// settled sibling on the same model account: the pair the live lifecycle
+// HistoricalVoidPair is one void bank row with exactly one merchant-profile
+// matched settled sibling on the same model account: the pair the live lifecycle
 // would have converted had both sides arrived in one feed. The operator
 // reviews the list; it never writes. Ambiguous voids are never flagged,
 // mirroring the reconciler's uniqueness guard.
@@ -19,88 +19,37 @@ type HistoricalVoidPair struct {
 
 // AuditHistoricalVoids scans loaded bank rows for phantom voids on one
 // model account: voids with exactly one settled sibling under the same
-// tip-bounded join the reconciler uses for pending-to-posted transitions.
+// merchant-profile join the reconciler uses for pending-to-posted
+// transitions.
 // Only this provider's rows participate. No writes; the listing is the
 // whole operation.
 func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []HistoricalVoidPair {
-	type settledCandidate struct {
-		row             store.BankRow
-		cents           int64
-		outflow         bool
-		transactionTime int64
-	}
-	var settled []settledCandidate
-	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || row.Posting.Pending || row.Posting.Void {
-			continue
-		}
-		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
-			continue
-		}
-		cents, ok := postingAmountCents(row.Posting)
-		if !ok || cents <= 0 {
-			continue
-		}
-		settled = append(settled, settledCandidate{
-			row:             row,
-			cents:           cents,
-			outflow:         rowOutflow(row.Posting),
-			transactionTime: row.Posting.TransactionTime,
-		})
-	}
 	var pairs []HistoricalVoidPair
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !row.Posting.Void {
+		if row.Posting.Source != store.SourceBankSync || !row.Posting.Void || !hasSimpleFINKey(row) {
 			continue
 		}
 		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
 			continue
 		}
-		staleCents, ok := postingAmountCents(row.Posting)
-		if !ok || staleCents <= 0 {
+		if !profileForPosting(row.Posting).AutoConvert {
 			continue
 		}
-		staleOutflow := rowOutflow(row.Posting)
-		minCents, maxCents, ok := settleTipBounds(staleCents)
-		if !ok {
+		candidates := SettleCandidates(row, bank)
+		if len(candidates) != 1 {
 			continue
 		}
-		var match *settledCandidate
-		ambiguous := false
-		for i := range settled {
-			candidate := &settled[i]
-			if candidate.outflow != staleOutflow {
-				continue
-			}
-			gap := candidate.transactionTime - row.Posting.TransactionTime
-			if gap < -settleMatchWindowSeconds || gap > settleMatchWindowSeconds {
-				continue
-			}
-			if !merchantNamesMatch(candidate.row.Posting.Name, row.Posting.Name) {
-				continue
-			}
-			if candidate.cents != staleCents && (candidate.cents < minCents || candidate.cents > maxCents) {
-				continue
-			}
-			if match != nil {
-				ambiguous = true
-				break
-			}
-			match = candidate
-		}
-		if match == nil || ambiguous {
-			continue
-		}
+		match := candidates[0]
 		voidAmount, _ := row.Posting.Amount.Config["expression"].(string)
-		settledAmount, _ := match.row.Posting.Amount.Config["expression"].(string)
+		settledAmount, _ := match.Posting.Amount.Config["expression"].(string)
 		pairs = append(pairs, HistoricalVoidPair{
 			VoidID:        row.Posting.ID,
-			SettledID:     match.row.Posting.ID,
-			Name:          match.row.Posting.Name,
+			SettledID:     match.Posting.ID,
+			Name:          match.Posting.Name,
 			VoidAmount:    voidAmount,
 			SettledAmount: settledAmount,
 			VoidTime:      row.Posting.TransactionTime,
-			SettledTime:   match.row.Posting.PostedTime,
+			SettledTime:   match.Posting.PostedTime,
 		})
 	}
 	return pairs

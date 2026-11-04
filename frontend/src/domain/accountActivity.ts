@@ -1,5 +1,4 @@
 import { shiftDate } from "./format.ts";
-import { merchantNamesMatch } from "./merchantName.ts";
 import {
 	isHistoricalTransaction,
 	isPendingTransaction,
@@ -299,76 +298,6 @@ export function ruleTransaction({
 		pending,
 		void: transaction.void === true,
 	};
-}
-
-// Tip-bounded join shared with the backend pending matcher: it bounds how
-// far a posted total may move from its authorization.
-const TIP_RATE = 0.25;
-const TIP_FLOOR_CENTS = 300;
-const TIP_CAP_CENTS = 5000;
-const TIP_WINDOW_DAYS = 7;
-
-function mirrorAccountOf(transaction: Pick<Transaction, "fromId" | "toId">) {
-	return transaction.fromId ?? transaction.toId ?? null;
-}
-
-/**
- * Settled bank rows that could be the posted version of a void hold:
- * same mirror account and direction, the same merchant, posted within a
- * week of the hold, amount within the tip band. Ambiguity is the caller's
- * call: the live path holds out on several matches, while a person
- * reviewing the list picks the right one.
- */
-export function voidSettleCandidates({
-	voidRow,
-	transactions,
-}: {
-	voidRow: Transaction;
-	transactions: Transaction[];
-}): Transaction[] {
-	if (!voidRow.void || voidRow.pending) return [];
-	if (!voidRow.amountKnown || !(voidRow.amount > 0)) return [];
-	const mirror = mirrorAccountOf(voidRow);
-	if (!mirror) return [];
-	const voidCents = Math.round(voidRow.amount * 100);
-	let tolerance = Math.floor(voidCents * TIP_RATE);
-	if (tolerance < TIP_FLOOR_CENTS) tolerance = TIP_FLOOR_CENTS;
-	if (tolerance > TIP_CAP_CENTS) tolerance = TIP_CAP_CENTS;
-	const voidDay = Date.parse(`${voidRow.startDate}T00:00:00Z`);
-	if (!Number.isFinite(voidDay)) return [];
-	const metrics = new Map<string, { day: number; cents: number }>();
-	const matches = transactions.filter((candidate) => {
-		if (candidate.id === voidRow.id) return false;
-		if (candidate.syncOwned !== true || candidate.pending === true)
-			return false;
-		if (candidate.void) return false;
-		if (!candidate.amountKnown || !(candidate.amount > 0)) return false;
-		if (mirrorAccountOf(candidate) !== mirror) return false;
-		if ((candidate.fromId != null) !== (voidRow.fromId != null)) return false;
-		if (!merchantNamesMatch(candidate.name, voidRow.name)) return false;
-		const day = Date.parse(`${candidate.startDate}T00:00:00Z`);
-		if (!Number.isFinite(day)) return false;
-		if (Math.abs(day - voidDay) > TIP_WINDOW_DAYS * 86400000) return false;
-		const cents = Math.round(candidate.amount * 100);
-		if (cents < voidCents - tolerance || cents > voidCents + tolerance)
-			return false;
-		metrics.set(candidate.id, { day, cents });
-		return true;
-	});
-	// Closest date first, then closest amount: the most likely posted
-	// version leads the picker when several charges fit the band.
-	return matches.sort((left, right) => {
-		const leftMetric = metrics.get(left.id)!;
-		const rightMetric = metrics.get(right.id)!;
-		const dayGap =
-			Math.abs(leftMetric.day - voidDay) - Math.abs(rightMetric.day - voidDay);
-		if (dayGap !== 0) return dayGap;
-		const amountGap =
-			Math.abs(leftMetric.cents - voidCents) -
-			Math.abs(rightMetric.cents - voidCents);
-		if (amountGap !== 0) return amountGap;
-		return left.id.localeCompare(right.id);
-	});
 }
 
 export function filterTransactions({

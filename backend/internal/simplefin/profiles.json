@@ -1,0 +1,78 @@
+{
+	"version": 1,
+	"default": {
+		"windowDays": 7,
+		"amountMode": "bounded",
+		"minRatio": 0.75,
+		"maxRatio": 1.25,
+		"floorCents": 300,
+		"capCents": 5000,
+		"capture": "one-to-one",
+		"autoConvert": true
+	},
+	"profiles": {
+		"tipped": {
+			"windowDays": 7,
+			"amountMode": "bounded",
+			"minRatio": 0.75,
+			"maxRatio": 1.25,
+			"floorCents": 300,
+			"capCents": 5000,
+			"capture": "one-to-one",
+			"autoConvert": true
+		},
+		"estimate": {
+			"windowDays": 7,
+			"amountMode": "bounded",
+			"minRatio": 0.75,
+			"maxRatio": 1.25,
+			"floorCents": 300,
+			"capCents": 5000,
+			"capture": "one-to-one",
+			"autoConvert": true
+		},
+		"floor": {
+			"windowDays": 3,
+			"amountMode": "floor",
+			"minRatio": 0,
+			"maxRatio": 0,
+			"floorCents": 500,
+			"capCents": 10000,
+			"capture": "one-to-one",
+			"autoConvert": true
+		},
+		"lodging": {
+			"windowDays": 21,
+			"amountMode": "bounded",
+			"minRatio": 0.5,
+			"maxRatio": 1.5,
+			"floorCents": 300,
+			"capCents": 20000,
+			"capture": "one-to-many",
+			"autoConvert": false
+		},
+		"split": {
+			"windowDays": 14,
+			"amountMode": "bounded",
+			"minRatio": 0.1,
+			"maxRatio": 2,
+			"floorCents": 300,
+			"capCents": 20000,
+			"capture": "one-to-many",
+			"autoConvert": false
+		}
+	},
+	"merchants": {
+		"AMAZON": "split",
+		"CHEVRON": "floor",
+		"DOORDASH": "estimate",
+		"GRUBHUB": "estimate",
+		"HILTON": "lodging",
+		"HYATT": "lodging",
+		"INSTACART": "estimate",
+		"LYFT": "tipped",
+		"MARRIOTT": "lodging",
+		"SHELL": "floor",
+		"UBER": "tipped"
+	}
+}

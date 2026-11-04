@@ -94,6 +94,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		syncQuotaLimit: 24,
 	};
 	let revisionValue = '"sha256-test"';
+	const settleCandidates = new Map<string, unknown[]>();
 	let modelHold: Promise<Response> | null = null;
 	const writeOverrides: Array<{
 		match: (method: string, path: string) => boolean;
@@ -211,6 +212,17 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		const [route, queryString] = String(path).split("?");
 		const query = new URLSearchParams(queryString ?? "");
 		const narrowRevision = revisionValue;
+		const settleRoute = route?.match(
+			/^\/v1\/postings\/([^/]+)\/settle-candidates$/,
+		);
+		if (settleRoute && method === "GET") {
+			const postingId = settleRoute[1]!;
+			return ok({
+				postingId,
+				candidates: settleCandidates.get(postingId) ?? [],
+				revision: revisionValue,
+			});
+		}
 		if (route === "/v1/accounts/balances" && method === "GET") {
 			const checkpoints = current.checkpoints as unknown as Record<
 				string,
@@ -697,6 +709,9 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		},
 		setRevision: (revision: string) => {
 			revisionValue = revision;
+		},
+		setSettleCandidates: (postingId: string, candidates: unknown[]) => {
+			settleCandidates.set(postingId, candidates);
 		},
 		setModel: (model: FinancialModel | null) => {
 			(current as { model?: unknown }).model = model;

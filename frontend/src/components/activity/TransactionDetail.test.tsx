@@ -40,6 +40,28 @@ function occurrence(
 	});
 }
 
+function settleCandidate(transaction: {
+	id: string;
+	name: string;
+	amount: number;
+	startDate: string;
+	claimRuleId?: string | null;
+	claimOccurrenceDate?: string | null;
+}) {
+	return {
+		postingId: transaction.id,
+		name: transaction.name,
+		amount: transaction.amount,
+		date: transaction.startDate,
+		dayGap: 1,
+		amountDeltaCents: 800,
+		descriptorChanged: false,
+		recommended: true,
+		claimRuleId: transaction.claimRuleId ?? undefined,
+		claimOccurrenceDate: transaction.claimOccurrenceDate ?? undefined,
+	};
+}
+
 function calculatedTransaction() {
 	return {
 		...financialModelFixture.transactions[0]!,
@@ -598,6 +620,7 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 		syncOwned: true,
 	};
 	const onClose = vi.fn();
+	server.setSettleCandidates(voidHold.id, [settleCandidate(settled)]);
 	render(
 		<TransactionDetail
 			transaction={occurrence(voidHold)}
@@ -608,7 +631,7 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 		/>,
 	);
 	const picker = screen.getByLabelText("Posted as");
-	expect(picker.textContent).toContain("Bistro dinner");
+	await waitFor(() => expect(picker.textContent).toContain("Bistro dinner"));
 	fireEvent.change(picker, { target: { value: settled.id } });
 	fireEvent.click(screen.getByRole("button", { name: "Remove vanished hold" }));
 	await waitFor(() =>
@@ -775,6 +798,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		syncOwned: true,
 	};
 	const onClose = vi.fn();
+	server.setSettleCandidates(voidHold.id, [settleCandidate(settled)]);
 	render(
 		<TransactionDetail
 			transaction={occurrence(voidHold)}
@@ -784,7 +808,9 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 			onClose={onClose}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Review 1 suggestion" }));
+	const trigger = await screen.findByRole("button", {
+		name: "Review 1 suggestion",
+	});
 	await waitFor(() =>
 		expect(
 			serverQueryClient().isFetching({
@@ -793,6 +819,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		).toBe(0),
 	);
 	const modelFetchesBeforeMerge = server.modelFetches().length;
+	fireEvent.click(trigger);
 	const sheet = screen.getByRole("dialog", { name: "Suggestions" });
 	expect(within(sheet).getByText(/Did this hold post/)).toBeTruthy();
 	fireEvent.click(
@@ -838,6 +865,7 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 		transactions: [voidHold, settled],
 	});
 	const onClose = vi.fn();
+	server.setSettleCandidates(voidHold.id, [settleCandidate(settled)]);
 	render(
 		<TransactionDetail
 			transaction={occurrence(voidHold)}
@@ -847,7 +875,10 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 			onClose={onClose}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Review 1 suggestion" }));
+	const trigger = await screen.findByRole("button", {
+		name: "Review 1 suggestion",
+	});
+	fireEvent.click(trigger);
 	const sheet = screen.getByRole("dialog", { name: "Suggestions" });
 	fireEvent.click(
 		within(sheet).getByRole("button", {
@@ -877,8 +908,8 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
 
-it("preselects the closest posted charge when several match", () => {
-	stubTestServer();
+it("preselects the closest posted charge when several match", async () => {
+	const server = stubTestServer();
 	const base = financialModelFixture.transactions[0]!;
 	const hold = {
 		...base,
@@ -923,6 +954,10 @@ it("preselects the closest posted charge when several match", () => {
 		void: false,
 		postedDate: "2026-11-01",
 	};
+	server.setSettleCandidates(hold.id, [
+		settleCandidate(closer),
+		settleCandidate(farther),
+	]);
 	render(
 		<TransactionDetail
 			transaction={occurrence(hold)}
@@ -933,7 +968,7 @@ it("preselects the closest posted charge when several match", () => {
 		/>,
 	);
 	const picker = screen.getByLabelText("Posted as") as HTMLSelectElement;
-	expect(picker.value).toBe(closer.id);
+	await waitFor(() => expect(picker.value).toBe(closer.id));
 	expect(picker.textContent).toContain("LYFT *STANDARD");
 });
 

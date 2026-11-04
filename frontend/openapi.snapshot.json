@@ -4749,6 +4749,83 @@
 				],
 				"type": "object"
 			},
+			"SettleCandidateRow": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"format": "double",
+						"type": "number"
+					},
+					"amountDeltaCents": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"claimOccurrenceDate": {
+						"type": "string"
+					},
+					"claimRuleId": {
+						"type": "string"
+					},
+					"date": {
+						"type": "string"
+					},
+					"dayGap": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"descriptorChanged": {
+						"type": "boolean"
+					},
+					"name": {
+						"type": "string"
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"recommended": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"postingId",
+					"name",
+					"amount",
+					"date",
+					"dayGap",
+					"amountDeltaCents",
+					"descriptorChanged",
+					"recommended"
+				],
+				"type": "object"
+			},
+			"SettleCandidatesOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SettleCandidatesOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"candidates": {
+						"items": {
+							"$ref": "#/components/schemas/SettleCandidateRow"
+						},
+						"type": ["array", "null"]
+					},
+					"postingId": {
+						"type": "string"
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["postingId", "candidates", "revision"],
+				"type": "object"
+			},
 			"StatusOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -7611,6 +7688,44 @@
 					}
 				},
 				"summary": "List private receipt evidence for a saved posting"
+			}
+		},
+		"/v1/postings/{id}/settle-candidates": {
+			"get": {
+				"operationId": "list-settle-candidates",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SettleCandidatesOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List posted charges that could settle a vanished hold"
 			}
 		},
 		"/v1/projections/deterministic": {

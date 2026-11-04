@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Info, Link2, Repeat, Sparkles, Wallet, X } from "lucide-react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import { voidSettleCandidates } from "@/domain/accountActivity.ts";
 import { providerLabel } from "@/domain/analysisFindings.ts";
 import { dateLabel, money } from "@/domain/format.ts";
 import type { Transaction } from "@/domain/model.ts";
+import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import {
 	cadenceLabel,
 	directionLabel,
@@ -29,7 +29,7 @@ export type InsightSuggestion =
 	| {
 			kind: "void";
 			voidRow: Transaction;
-			candidates: Transaction[];
+			candidates: SettleCandidateRow[];
 			priority: number;
 	  }
 	| { kind: "bnpl"; finding: AnalysisFinding; priority: number }
@@ -79,25 +79,23 @@ export function buildInsightSuggestions({
 	findings,
 	postingId,
 	voidRow,
-	transactions,
+	candidates,
 }: {
 	findings: AnalysisFinding[];
 	postingId: string;
 	/** Settling a void hold is an action too, not just a badge. */
 	voidRow?: Transaction;
-	transactions?: Transaction[];
+	/** Server-ranked posted charges for this hold. */
+	candidates?: SettleCandidateRow[];
 }): InsightSuggestion[] {
 	const suggestions: InsightSuggestion[] = [];
-	if (voidRow?.id === postingId && voidRow.void && transactions) {
-		const candidates = voidSettleCandidates({ voidRow, transactions });
-		if (candidates.length > 0) {
-			suggestions.push({
-				kind: "void",
-				voidRow,
-				candidates,
-				priority: 0,
-			});
-		}
+	if (voidRow?.id === postingId && voidRow.void && candidates?.length) {
+		suggestions.push({
+			kind: "void",
+			voidRow,
+			candidates,
+			priority: 0,
+		});
 	}
 	const bnpl = findings.find(
 		(finding) =>
@@ -151,7 +149,7 @@ function suggestionEvidence(suggestion: InsightSuggestion): string {
 		const first = suggestion.candidates[0];
 		if (!first) return "A posted charge matches this vanished hold.";
 		if (suggestion.candidates.length === 1)
-			return `${first.name} for ${money(first.amount)} on ${dateLabel(first.startDate, true)} matches this hold.`;
+			return `${first.name} for ${money(first.amount)} on ${dateLabel(first.date, true)} matches this hold.`;
 		return `${suggestion.candidates.length} posted charges match this hold. Pick the one it posted as.`;
 	}
 	if (suggestion.kind === "bnpl") {
@@ -223,7 +221,7 @@ export function TransactionInsightsPanel({
 		setDurationUnit("months");
 		setRuleDialog(null);
 		setVoidCandidateId(
-			active?.kind === "void" ? (active.candidates[0]?.id ?? "") : "",
+			active?.kind === "void" ? (active.candidates[0]?.postingId ?? "") : "",
 		);
 		setVoidError(null);
 	}
@@ -322,7 +320,7 @@ export function TransactionInsightsPanel({
 	const selectedVoid =
 		shown.kind === "void"
 			? (shown.candidates.find(
-					(candidate) => candidate.id === voidCandidateId,
+					(candidate) => candidate.postingId === voidCandidateId,
 				) ??
 				shown.candidates[0] ??
 				null)
@@ -456,9 +454,9 @@ export function TransactionInsightsPanel({
 							onChange={(event) => setVoidCandidateId(event.target.value)}
 						>
 							{shown.candidates.map((candidate) => (
-								<option key={candidate.id} value={candidate.id}>
+								<option key={candidate.postingId} value={candidate.postingId}>
 									{candidate.name} — {money(candidate.amount)} on{" "}
-									{dateLabel(candidate.startDate, true)}
+									{dateLabel(candidate.date, true)}
 								</option>
 							))}
 						</SelectField>

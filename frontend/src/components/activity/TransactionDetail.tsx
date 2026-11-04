@@ -27,7 +27,6 @@ import {
 	type ReactNode,
 } from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { voidSettleCandidates } from "../../domain/accountActivity.ts";
 import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
 import { dateLabel, money, todayIso } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
@@ -65,11 +64,13 @@ import {
 	removeDeletedTransactionFromCache,
 	transactionRemovalNeedsProjectionRefresh,
 } from "../../state/transactionCache.ts";
+import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import {
 	getServerModel,
 	modelOptions,
 	refreshTransactions,
+	useServerModel,
 } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
@@ -95,8 +96,11 @@ import { useAnalysisFindings } from "../../state/analyses.ts";
 import { useSavedRules, useSavedTransactions } from "../../state/savedRows.ts";
 import { ruleToDisplay } from "../../domain/transactionRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
+import { useSettleCandidates } from "../../state/settleCandidates.ts";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
+
+const EMPTY_SETTLE_CANDIDATES: SettleCandidateRow[] = [];
 
 /**
  * The detail opens above drawers that portal to document.body. Rendering the
@@ -960,6 +964,8 @@ export function TransactionDetail({
 	// rules endpoint returns. Display-only; the editor keeps its own
 	// monthly/yearly choice.
 	const savedRules = useSavedRules();
+	const serverModel = useServerModel({ enabled: false });
+	const modelRevision = serverModel.data?.revision;
 	const rawRules = savedRules ?? undefined;
 	const rawRule =
 		savedTransaction.kind === "rule"
@@ -1039,12 +1045,13 @@ export function TransactionDetail({
 		savedTransaction.id,
 		postedRef,
 	]);
-	const voidCandidates = transaction.void
-		? voidSettleCandidates({
-				voidRow: savedTransaction,
-				transactions: allTransactions,
-			})
-		: [];
+	const settleCandidates = useSettleCandidates(
+		savedTransaction.id,
+		transaction.void && !savedTransaction.pending,
+		modelRevision,
+	);
+	const voidCandidates =
+		settleCandidates.data?.candidates ?? EMPTY_SETTLE_CANDIDATES;
 	const [postedPick, setPostedPick] = useState<string | null>(null);
 	// The closest candidate is the suggested posted version, so the
 	// confirmation states the link without an extra choice. An explicit empty
@@ -1054,11 +1061,11 @@ export function TransactionDetail({
 		postedPick === ""
 			? ""
 			: postedPick !== null &&
-				  voidCandidates.some((candidate) => candidate.id === postedPick)
+				  voidCandidates.some((candidate) => candidate.postingId === postedPick)
 				? postedPick
-				: (voidCandidates[0]?.id ?? "");
+				: (voidCandidates[0]?.postingId ?? "");
 	const pickedPosted = voidCandidates.find(
-		(candidate) => candidate.id === effectivePick,
+		(candidate) => candidate.postingId === effectivePick,
 	);
 	const showShortfall = transaction.shortfall > 0.01;
 	const showExcluded = transaction.excluded && !transaction.pending;
@@ -1122,8 +1129,10 @@ export function TransactionDetail({
 	// moves to it when the charge records none.
 	const mergeVoidHold = async (candidateId: string): Promise<boolean> => {
 		if (deleting || readOnly) return false;
-		const candidate = allTransactions.find((row) => row.id === candidateId);
-		if (!candidate || candidate.void || candidate.pending) return false;
+		const candidate = voidCandidates.find(
+			(row) => row.postingId === candidateId,
+		);
+		if (!candidate) return false;
 		const claimRuleId = savedTransaction.claimRuleId;
 		const claimOccurrenceDate = savedTransaction.claimOccurrenceDate;
 		setDeleting(true);
@@ -1174,10 +1183,10 @@ export function TransactionDetail({
 						findings: findingsQuery.data?.findings ?? [],
 						postingId: savedTransaction.id,
 						voidRow: savedTransaction,
-						transactions: allTransactions,
+						candidates: voidCandidates,
 					})
 				: [],
-		[once, findingsQuery.data?.findings, savedTransaction, allTransactions],
+		[once, findingsQuery.data?.findings, savedTransaction, voidCandidates],
 	);
 	// A void hold is read-only as a row, but its merge suggestion stays
 	// actionable for the owner. Only the app-level read-only gate blocks it.
@@ -1577,12 +1586,22 @@ export function TransactionDetail({
 							>
 								<option value="">No link — just remove</option>
 								{voidCandidates.map((candidate) => (
-									<option key={candidate.id} value={candidate.id}>
+									<option key={candidate.postingId} value={candidate.postingId}>
 										{candidate.name} — {money(candidate.amount)} on{" "}
-										{dateLabel(candidate.startDate, true)}
+										{dateLabel(candidate.date, true)}
 									</option>
 								))}
 							</SelectField>
+							{settleCandidates.isPending && (
+								<p className="m-0 text-[11px] text-muted" role="status">
+									Loading posted charges…
+								</p>
+							)}
+							{settleCandidates.isError && (
+								<p className="m-0 text-[11px] text-muted" role="status">
+									Posted charges could not be loaded.
+								</p>
+							)}
 							<Button
 								type="button"
 								variant="danger"
@@ -1755,7 +1774,7 @@ export function TransactionDetail({
 							<>
 								It posted as {pickedPosted.name} for{" "}
 								{money(pickedPosted.amount)} on{" "}
-								{dateLabel(pickedPosted.startDate, true)}. The posted charge is
+								{dateLabel(pickedPosted.date, true)}. The posted charge is
 								untouched; this clears the vanished hold record.
 							</>
 						) : (

@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import { financialModelFixture } from "../../mocks/financialModel.ts";
 import type { Transaction } from "../../domain/model.ts";
 import {
@@ -128,17 +129,20 @@ function bankRow(overrides: Partial<Transaction> = {}): Transaction {
 	};
 }
 
-function settledMatch(overrides: Partial<Transaction> = {}): Transaction {
-	return bankRow({
-		id: "settled-1",
+function settleCandidate(
+	overrides: Partial<SettleCandidateRow> = {},
+): SettleCandidateRow {
+	return {
+		postingId: "settled-1",
 		name: "Bistro dinner",
 		amount: 58,
-		enabled: true,
-		readOnly: false,
-		postedDate: "2026-10-21",
-		void: false,
+		date: "2026-10-21",
+		dayGap: 1,
+		amountDeltaCents: 800,
+		descriptorChanged: false,
+		recommended: true,
 		...overrides,
-	});
+	};
 }
 
 beforeEach(() => {
@@ -230,7 +234,7 @@ describe("buildInsightSuggestions", () => {
 			findings: [bnplFinding({ postingId: hold.id })],
 			postingId: hold.id,
 			voidRow: hold,
-			transactions: [hold, settledMatch()],
+			candidates: [settleCandidate()],
 		});
 		expect(suggestions.map((item) => item.kind)).toEqual(["void", "bnpl"]);
 	});
@@ -241,7 +245,7 @@ describe("buildInsightSuggestions", () => {
 			findings: [],
 			postingId: hold.id,
 			voidRow: hold,
-			transactions: [hold],
+			candidates: [],
 		});
 		expect(suggestions).toEqual([]);
 	});
@@ -286,14 +290,14 @@ describe("TransactionInsightsPanel", () => {
 	it("merges a vanished hold into its posted charge", async () => {
 		const onMergeVoid = vi.fn().mockResolvedValue(true);
 		const hold = bankRow();
-		const settled = settledMatch();
+		const settled = settleCandidate();
 		render(
 			<TransactionInsightsPanel
 				suggestions={buildInsightSuggestions({
 					findings: [],
 					postingId: hold.id,
 					voidRow: hold,
-					transactions: [hold, settled],
+					candidates: [settled],
 				})}
 				names={new Map([[hold.id, hold.name]])}
 				readOnly={false}
@@ -305,7 +309,9 @@ describe("TransactionInsightsPanel", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Merge and remove hold" }),
 		);
-		await waitFor(() => expect(onMergeVoid).toHaveBeenCalledWith(settled.id));
+		await waitFor(() =>
+			expect(onMergeVoid).toHaveBeenCalledWith(settled.postingId),
+		);
 		expect(screen.getByText("All caught up")).toBeTruthy();
 	});
 
@@ -320,7 +326,7 @@ describe("TransactionInsightsPanel", () => {
 					findings: [],
 					postingId: hold.id,
 					voidRow: hold,
-					transactions: [hold, settledMatch()],
+					candidates: [settleCandidate()],
 				})}
 				names={new Map([["living", "Everyday living"]])}
 				readOnly={false}
@@ -338,7 +344,7 @@ describe("TransactionInsightsPanel", () => {
 			claimRuleId: "living",
 			claimOccurrenceDate: "2026-10-01",
 		});
-		const settled = settledMatch({
+		const settled = settleCandidate({
 			claimRuleId: "living",
 			claimOccurrenceDate: "2026-10-01",
 		});
@@ -348,7 +354,7 @@ describe("TransactionInsightsPanel", () => {
 					findings: [],
 					postingId: hold.id,
 					voidRow: hold,
-					transactions: [hold, settled],
+					candidates: [settled],
 				})}
 				names={new Map([["living", "Everyday living"]])}
 				readOnly={false}
@@ -362,9 +368,9 @@ describe("TransactionInsightsPanel", () => {
 	it("picks among several posted matches", async () => {
 		const onMergeVoid = vi.fn().mockResolvedValue(true);
 		const hold = bankRow();
-		const first = settledMatch();
-		const second = settledMatch({
-			id: "settled-2",
+		const first = settleCandidate();
+		const second = settleCandidate({
+			postingId: "settled-2",
 			name: "Bistro lunch",
 			amount: 51,
 		});
@@ -374,7 +380,7 @@ describe("TransactionInsightsPanel", () => {
 					findings: [],
 					postingId: hold.id,
 					voidRow: hold,
-					transactions: [hold, first, second],
+					candidates: [first, second],
 				})}
 				names={new Map()}
 				readOnly={false}
@@ -383,12 +389,14 @@ describe("TransactionInsightsPanel", () => {
 			/>,
 		);
 		fireEvent.change(screen.getByLabelText("Posted as"), {
-			target: { value: second.id },
+			target: { value: second.postingId },
 		});
 		fireEvent.click(
 			screen.getByRole("button", { name: "Merge and remove hold" }),
 		);
-		await waitFor(() => expect(onMergeVoid).toHaveBeenCalledWith(second.id));
+		await waitFor(() =>
+			expect(onMergeVoid).toHaveBeenCalledWith(second.postingId),
+		);
 	});
 
 	it("rejects the detection on No", () => {

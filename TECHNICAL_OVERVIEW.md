@@ -795,7 +795,7 @@ cost of the repair, and operator release notes should call it out.
 Post-upgrade owner disables remain honored: the script only converts
 legacy date-shaped databases and only verifies already-converted ones,
 so a repeat run never re-enables an explicit disable. Delete-plus-
-tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
+tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. The settlement matcher reads merchant behavior classes from `backend/internal/simplefin/profiles.json`. `GET /v1/postings/{id}/settle-candidates` exposes the same ranked candidates to the browser, so the frontend keeps no matching rule. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 
@@ -848,3 +848,5 @@ The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00,
 | `backend/internal/simplefin/runner.go`              | fetch/translate/apply orchestration and trigger guards  |
 | `backend/internal/simplefin/sync_translation.go`    | checkpoint and bank-transaction translation             |
 | `backend/internal/simplefin/reconcile.go`           | snapshot-to-directive lifecycle policy                  |
+| `backend/internal/simplefin/settle.go`              | ranked hold-to-posted candidates                        |
+| `backend/internal/simplefin/profiles.json`          | merchant settlement behavior classes                    |
