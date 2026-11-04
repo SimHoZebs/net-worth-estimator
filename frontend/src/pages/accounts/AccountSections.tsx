@@ -23,12 +23,20 @@ import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshAccounts,
 	useAccountBalances,
+	useRecurrenceRules,
 	useTransactions,
 } from "../../state/workspaceResources.ts";
-import { transactionToDisplay } from "../../domain/transactionRows.ts";
+import {
+	ruleToDisplay,
+	transactionToDisplay,
+} from "../../domain/transactionRows.ts";
+import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import { deleteAccount } from "@/api/generated/endpoints.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
-import { useSavedAccounts, useSavedStartDate } from "../../state/savedRows.ts";
+import {
+	useSavedAccounts,
+	useSavedStartDate,
+} from "../../state/savedRows.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
 
@@ -213,6 +221,7 @@ function TransactionsView({
 	const [page, setPage] = useState(0);
 	const listId = useId();
 	const transactionsQuery = useTransactions();
+	const rulesQuery = useRecurrenceRules();
 	// Finance-first: rows render from saved query rows alone. Literal
 	// amounts show directly; formula-derived amounts stay Varies without
 	// a forecast request. Memos stay mounted while rows load, so inputs
@@ -224,13 +233,27 @@ function TransactionsView({
 			),
 		[transactionsQuery.data],
 	);
+	// Rules are their own rows from their own endpoint. The table renders
+	// them through the same display shape the shared editor uses.
+	const rules = useMemo(
+		() => rulesQuery.data?.recurrenceRules ?? [],
+		[rulesQuery.data],
+	);
+	const ruleRows = useMemo(() => rules.map(ruleToDisplay), [rules]);
+	const ruleCadence = useMemo(
+		() =>
+			new Map(
+				rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)]),
+			),
+		[rules],
+	);
 	const visible = useMemo(
 		() =>
 			visibleTransactions({
-				transactions: rows,
+				transactions: [...rows, ...ruleRows],
 				accounts: accounts ?? [],
 			}),
-		[rows, accounts],
+		[rows, ruleRows, accounts],
 	);
 	const recurringCount = visible.filter(
 		(transaction) => transaction.kind === "rule",
@@ -318,16 +341,19 @@ function TransactionsView({
 				</div>
 			</div>
 			<div id={listId}>
-				{transactionsQuery.isPending ? (
+				{transactionsQuery.isPending || rulesQuery.isPending ? (
 					<p role="status">Loading transactions…</p>
-				) : transactionsQuery.isError ? (
+				) : transactionsQuery.isError || rulesQuery.isError ? (
 					<p role="alert">
 						Transactions could not be loaded.{" "}
 						<Button
 							type="button"
 							variant="secondary"
 							size="sm"
-							onClick={() => void transactionsQuery.refetch()}
+							onClick={() => {
+								void transactionsQuery.refetch();
+								void rulesQuery.refetch();
+							}}
 						>
 							Retry
 						</Button>
@@ -338,6 +364,7 @@ function TransactionsView({
 						accounts={visibleAccounts(accounts)}
 						startDate={startDate}
 						readOnly={readOnly}
+						ruleCadence={ruleCadence}
 					/>
 				)}
 			</div>

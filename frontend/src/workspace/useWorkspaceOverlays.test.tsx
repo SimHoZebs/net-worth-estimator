@@ -6,7 +6,30 @@ import { useWorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
 vi.mock("../state/savedRows.ts", () => ({
 	useSavedAccounts: () => financialModelFixture.accounts,
-	useSavedTransactions: () => financialModelFixture.transactions,
+	useSavedTransactions: () =>
+		financialModelFixture.transactions.filter(
+			(row) => row.kind === "posting",
+		),
+	useSavedRules: () =>
+		financialModelFixture.transactions
+			.filter((row) => row.kind === "rule")
+			.map((row) => ({
+				id: row.id,
+				name: row.name,
+				sourceAccountId: row.fromId,
+				destinations: row.toId ? [row.toId] : null,
+				amount: {
+					resolver: "expression",
+					config: { expression: String(row.amount) },
+					inputs: {},
+				},
+				frequency: "monthly",
+				startDate: row.startDate,
+				endDate: row.endDate,
+				annualCap: null,
+				priority: 0,
+				enabled: row.enabled,
+			})),
 	useSavedEvaluations: () => [],
 }));
 

@@ -7,12 +7,12 @@ import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
-	useServerModel,
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
 import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
 import {
 	useSavedAccounts,
+	useSavedRules,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "../../state/savedRows.ts";
@@ -72,11 +72,9 @@ export function AddTransactionDialog({
 	const [enabled, setEnabled] = useState(true);
 	const [claimRuleId, setClaimRuleId] = useState("");
 	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState("");
-	const serverModel = useServerModel().data?.model;
+	const savedRules = useSavedRules();
 	const occurrenceOptions = useMemo(() => {
-		const rule = serverModel?.recurrenceRules.find(
-			(row) => row.id === claimRuleId,
-		);
+		const rule = (savedRules ?? []).find((row) => row.id === claimRuleId);
 		if (!rule) return [];
 		const claimed = new Set<string>();
 		for (const row of savedTransactions ?? []) {
@@ -94,7 +92,7 @@ export function AddTransactionDialog({
 			? [claimOccurrenceDate, ...candidates]
 			: candidates;
 	}, [
-		serverModel,
+		savedRules,
 		claimRuleId,
 		startDate,
 		claimOccurrenceDate,

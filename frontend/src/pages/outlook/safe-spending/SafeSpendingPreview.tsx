@@ -37,9 +37,11 @@ import type { Projection } from "@/domain/result.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
 import {
 	useSavedAccounts,
+	useSavedRules,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "@/state/savedRows.ts";
+import { ruleToDisplay } from "@/domain/transactionRows.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx";
@@ -78,10 +80,23 @@ export function SafeSpendingPreview({
 	// Outlook forecast instead of receiving it as props.
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
+	const savedRules = useSavedRules();
 	const startDate = useSavedStartDate();
 	const readOnly = useUserReadOnly();
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
 	const { base: projection, pending } = useOutlookProjection();
+	// Rules are their own rows; bills and income read them through the same
+	// display shape as the posting rows.
+	const rules = useMemo(
+		() => (savedRules ?? []).map(ruleToDisplay),
+		[savedRules],
+	);
+	// Detail mapping spans both row kinds: projected occurrences of a rule
+	// resolve to the rule definition, posted rows to the posting.
+	const savedRows = useMemo(
+		() => [...(transactions ?? []), ...rules],
+		[transactions, rules],
+	);
 	// Hooks stay mounted while rows load, so derivations below are
 	// null-safe; the null gate before rendering only skips output.
 	const projectionTransactions = projection?.transactions ?? EMPTY_TRANSACTIONS;
@@ -189,7 +204,7 @@ export function SafeSpendingPreview({
 		() =>
 			safeSpendingIncome({
 				accounts: accounts ?? [],
-				rules: transactions ?? [],
+				rules,
 				transactions: projectionTransactions,
 				incomeAccountIds: incomeIds,
 				incomeRuleIds: settings.incomeRuleIds,
@@ -197,7 +212,7 @@ export function SafeSpendingPreview({
 			}),
 		[
 			accounts,
-			transactions,
+			rules,
 			projectionTransactions,
 			incomeIds,
 			settings.incomeRuleIds,
@@ -239,19 +254,17 @@ export function SafeSpendingPreview({
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
-		return (transactions ?? [])
+		return rules
 			.filter(
-				(transaction) =>
-					transaction.fromId !== null &&
-					spendingIds.includes(transaction.fromId) &&
-					transaction.kind === "rule",
+				(rule) =>
+					rule.fromId !== null && spendingIds.includes(rule.fromId),
 			)
-			.map((transaction) => ({
-				id: transaction.id,
-				name: transaction.name,
-				amount: transaction.amount,
+			.map((rule) => ({
+				id: rule.id,
+				name: rule.name,
+				amount: rule.amount,
 			}));
-	}, [transactions, spendingIds]);
+	}, [rules, spendingIds]);
 
 	const trackedBillIds = useMemo(() => {
 		const knownIds = billCandidates.map((bill) => bill.id);
@@ -306,11 +319,7 @@ export function SafeSpendingPreview({
 	const directBaseTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
 		const bills = new Set(trackedBillIds);
-		const ruleIds = new Set(
-			(transactions ?? [])
-				.filter((transaction) => transaction.kind === "rule")
-				.map((transaction) => transaction.id),
-		);
+		const ruleIds = new Set(rules.map((rule) => rule.id));
 		const sources = new Set(spendingIds);
 		return projectionTransactions.filter(
 			(transaction) =>
@@ -319,7 +328,7 @@ export function SafeSpendingPreview({
 				!bills.has(transaction.transactionId) &&
 				!ruleIds.has(transaction.transactionId),
 		);
-	}, [projectionTransactions, spendingIds, trackedBillIds, transactions]);
+	}, [projectionTransactions, spendingIds, trackedBillIds, rules]);
 
 	const directSpentSinceStart = useMemo(
 		() =>
@@ -384,7 +393,8 @@ export function SafeSpendingPreview({
 	}, [chargeCycles, directTransactions, transactionOrder]);
 	// Saved rows gate rendering, not hooks: every subscription above stays
 	// mounted while rows load.
-	if (!accounts || !transactions || !startDate) return null;
+	if (!accounts || !transactions || savedRules === null || !startDate)
+		return null;
 	if (!projection && !pending) return null;
 	if (!cards.length) {
 		return (
@@ -665,7 +675,7 @@ export function SafeSpendingPreview({
 									paycheck={paycheckDetails}
 									section={billsSection}
 									accounts={accounts}
-									transactions={transactions}
+									transactions={savedRows}
 									readOnly={readOnly}
 									transactionOrder={transactionOrder}
 									onTransactionOrderChange={setTransactionOrder}
@@ -680,7 +690,7 @@ export function SafeSpendingPreview({
 								key={detail}
 								cycle={tabChargeCycles[detail]}
 								accounts={accounts}
-								transactions={transactions}
+								transactions={savedRows}
 								readOnly={readOnly}
 								transactionOrder={transactionOrder}
 								onTransactionOrderChange={setTransactionOrder}

@@ -278,47 +278,44 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		}
 		if (route === "/v1/transactions" && method === "GET") {
 			const accountId = query.get("accountId") ?? "";
-			const recurring = query.get("recurring") ?? "all";
 			const touches = (source: unknown, destinations: unknown) => {
 				if (!accountId) return true;
 				if (source === accountId) return true;
 				return Array.isArray(destinations) && destinations.includes(accountId);
 			};
 			const transactions: unknown[] = [];
-			if (recurring !== "once") {
-				for (const rule of current.recurrenceRules as unknown as Record<
-					string,
-					unknown
-				>[]) {
-					if (!touches(rule.sourceAccountId, rule.destinations)) continue;
-					const row = { ...rule };
-					delete row.frequency;
-					transactions.push({ ...row, kind: "rule" });
-				}
-			}
-			if (recurring !== "recurring") {
-				for (const posting of current.postings as unknown as Record<
-					string,
-					unknown
-				>[]) {
-					if (!touches(posting.sourceAccountId, posting.destinations)) continue;
-					const syncOwned =
-						typeof posting.source === "string" &&
-						posting.source !== "" &&
-						posting.source !== "user";
-					transactions.push({
-						...posting,
-						kind: "posting",
-						syncOwned,
-						// Only lifecycle bank rows stay sync-owned: pending
-						// seeds refresh in place and voids convert. Settled
-						// bank rows are write-stable after import.
-						readOnly:
-							syncOwned && (posting.pending === true || posting.void === true),
-					});
-				}
+			for (const posting of current.postings as unknown as Record<
+				string,
+				unknown
+			>[]) {
+				if (!touches(posting.sourceAccountId, posting.destinations)) continue;
+				const syncOwned =
+					typeof posting.source === "string" &&
+					posting.source !== "" &&
+					posting.source !== "user";
+				transactions.push({
+					...posting,
+					syncOwned,
+					// Only lifecycle bank rows stay sync-owned: pending
+					// seeds refresh in place and voids convert. Settled
+					// bank rows are write-stable after import.
+					readOnly:
+						syncOwned && (posting.pending === true || posting.void === true),
+				});
 			}
 			return ok({ transactions, revision: narrowRevision });
+		}
+		if (route === "/v1/recurrence-rules" && method === "GET") {
+			const accountId = query.get("accountId") ?? "";
+			const touches = (source: unknown, destinations: unknown) => {
+				if (!accountId) return true;
+				if (source === accountId) return true;
+				return Array.isArray(destinations) && destinations.includes(accountId);
+			};
+			const recurrenceRules = (
+				current.recurrenceRules as unknown as Record<string, unknown>[]
+			).filter((rule) => touches(rule.sourceAccountId, rule.destinations));
+			return ok({ recurrenceRules, revision: narrowRevision });
 		}
 		if (route === "/v1/transactions/catalog" && method === "GET") {
 			const items = [

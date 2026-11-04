@@ -1,12 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
 import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import {
 	useSavedAccounts,
+	useSavedRules,
 	useSavedTransactions,
 	useSavedEvaluations,
 } from "../state/savedRows.ts";
+import { ruleToDisplay } from "../domain/transactionRows.ts";
 import {
 	editorHash,
 	evidenceHash,
@@ -31,8 +33,26 @@ export function useWorkspaceOverlays({
 }) {
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
+	const savedRules = useSavedRules();
+	const ruleRows = useMemo(
+		() => (savedRules ?? []).map(ruleToDisplay),
+		[savedRules],
+	);
+	// Deep links resolve against every saved row. Wait for both row
+	// sources so a rule link never normalizes away before it arrives.
+	const allTransactions = useMemo(
+		() =>
+			transactions === null || savedRules === null
+				? null
+				: [...transactions, ...ruleRows],
+		[transactions, savedRules, ruleRows],
+	);
 	const evaluations = useSavedEvaluations();
-	const rows: OverlayRows = { accounts, transactions, evaluations };
+	const rows: OverlayRows = {
+		accounts,
+		transactions: allTransactions,
+		evaluations,
+	};
 	const resolution = resolveOverlayRoute(route, rows);
 	const page = route.page;
 	useEffect(() => {

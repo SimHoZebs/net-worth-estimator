@@ -4,6 +4,7 @@ import {
 	savedPurchasesToDisplay,
 } from "../api/adapter.ts";
 import { transactionToDisplay } from "../domain/transactionRows.ts";
+import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
 import type {
 	Account,
 	Evaluation,
@@ -15,6 +16,7 @@ import { projectionStartDate } from "./projectionStartDate.ts";
 import {
 	useAccountBalances,
 	useEvaluationSummary,
+	useRecurrenceRules,
 	useServerModel,
 	useTransactions,
 } from "./workspaceResources.ts";
@@ -46,6 +48,19 @@ export function useSavedTransactions(): Transaction[] | null {
 	return useMemo(
 		() =>
 			list ? list.transactions.map((row) => transactionToDisplay(row)) : null,
+		[list],
+	);
+}
+
+/**
+ * Saved recurrence rules as the canonical rule rows. They are not display
+ * transactions; callers that need the shared row views map them through
+ * ruleToDisplay and read cadence directly from the rule.
+ */
+export function useSavedRules(): RecurrenceRule[] | null {
+	const list = useRecurrenceRules().data;
+	return useMemo(
+		() => (list ? list.recurrenceRules : null),
 		[list],
 	);
 }

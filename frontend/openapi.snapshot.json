@@ -5,10 +5,7 @@
 				"additionalProperties": false,
 				"properties": {
 					"color": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
@@ -21,17 +18,11 @@
 					},
 					"maxBalance": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"minBalance": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"name": {
 						"type": "string"
@@ -75,17 +66,11 @@
 					},
 					"maxBalance": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"minBalance": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"name": {
 						"type": "string"
@@ -140,10 +125,7 @@
 						"items": {
 							"$ref": "#/components/schemas/AccountBalanceRow"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"asOf": {
 						"type": "string"
@@ -152,11 +134,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"accounts",
-					"asOf",
-					"revision"
-				],
+				"required": ["accounts", "asOf", "revision"],
 				"type": "object"
 			},
 			"AccountBody": {
@@ -164,9 +142,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/AccountBody.json"
-						],
+						"examples": ["https://example.com/schemas/AccountBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -206,11 +182,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"name",
-					"kind",
-					"enabled"
-				],
+				"required": ["name", "kind", "enabled"],
 				"type": "object"
 			},
 			"AccountDelta": {
@@ -224,10 +196,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"postingId",
-					"delta"
-				],
+				"required": ["postingId", "delta"],
 				"type": "object"
 			},
 			"AccountLink": {
@@ -281,10 +250,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"oldPassword",
-					"newPassword"
-				],
+				"required": ["oldPassword", "newPassword"],
 				"type": "object"
 			},
 			"AccountPasswordChanged": {
@@ -303,9 +269,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"reauth"
-				],
+				"required": ["reauth"],
 				"type": "object"
 			},
 			"AccountProfile": {
@@ -313,9 +277,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/AccountProfile.json"
-						],
+						"examples": ["https://example.com/schemas/AccountProfile.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -333,12 +295,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"owner",
-					"name",
-					"displayName",
-					"avatar"
-				],
+				"required": ["owner", "name", "displayName", "avatar"],
 				"type": "object"
 			},
 			"AccountProfileUpdate": {
@@ -378,12 +335,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id",
-					"current",
-					"loginStartedAt",
-					"expiresAt"
-				],
+				"required": ["id", "current", "loginStartedAt", "expiresAt"],
 				"type": "object"
 			},
 			"AccountSessionRevoked": {
@@ -402,9 +354,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"revoked"
-				],
+				"required": ["revoked"],
 				"type": "object"
 			},
 			"AccountSessions": {
@@ -412,9 +362,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/AccountSessions.json"
-						],
+						"examples": ["https://example.com/schemas/AccountSessions.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -426,9 +374,7 @@
 						"type": "array"
 					}
 				},
-				"required": [
-					"sessions"
-				],
+				"required": ["sessions"],
 				"type": "object"
 			},
 			"AccountSnapshot": {
@@ -448,18 +394,10 @@
 						"items": {
 							"$ref": "#/components/schemas/AccountDelta"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"accountId",
-					"date",
-					"balance",
-					"impacts"
-				],
+				"required": ["accountId", "date", "balance", "impacts"],
 				"type": "object"
 			},
 			"Add-pattern-to-existing-ruleRequest": {
@@ -479,9 +417,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"ruleId"
-				],
+				"required": ["ruleId"],
 				"type": "object"
 			},
 			"Add-pattern-to-existing-ruleResponse": {
@@ -500,10 +436,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"patternKey": {
 						"type": "string"
@@ -518,10 +451,7 @@
 						"items": {
 							"$ref": "#/components/schemas/Posting"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"ruleId": {
 						"type": "string"
@@ -550,11 +480,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"key",
-					"kind",
-					"required"
-				],
+				"required": ["key", "kind", "required"],
 				"type": "object"
 			},
 			"AmountInputBinding": {
@@ -572,9 +498,7 @@
 					},
 					"value": {}
 				},
-				"required": [
-					"source"
-				],
+				"required": ["source"],
 				"type": "object"
 			},
 			"AmountPreset": {
@@ -582,9 +506,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/AmountPreset.json"
-						],
+						"examples": ["https://example.com/schemas/AmountPreset.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -611,13 +533,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id",
-					"name",
-					"label",
-					"amount",
-					"enabled"
-				],
+				"required": ["id", "name", "label", "amount", "enabled"],
 				"type": "object"
 			},
 			"AmountProviderInfo": {
@@ -627,10 +543,7 @@
 						"items": {
 							"$ref": "#/components/schemas/AmountFieldSpec"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"description": {
 						"type": "string"
@@ -642,10 +555,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"name",
-					"description"
-				],
+				"required": ["name", "description"],
 				"type": "object"
 			},
 			"AmountResolverInfo": {
@@ -655,10 +565,7 @@
 						"items": {
 							"$ref": "#/components/schemas/AmountFieldSpec"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"description": {
 						"type": "string"
@@ -667,10 +574,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"name",
-					"description"
-				],
+				"required": ["name", "description"],
 				"type": "object"
 			},
 			"AmountResolversOutputBody": {
@@ -689,25 +593,16 @@
 						"items": {
 							"$ref": "#/components/schemas/AmountProviderInfo"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"resolvers": {
 						"items": {
 							"$ref": "#/components/schemas/AmountResolverInfo"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"resolvers",
-					"providers"
-				],
+				"required": ["resolvers", "providers"],
 				"type": "object"
 			},
 			"AnalysisDetection": {
@@ -717,10 +612,7 @@
 						"items": {
 							"$ref": "#/components/schemas/AnalysisEvidence"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"kind": {
 						"type": "string"
@@ -762,17 +654,11 @@
 						"type": "integer"
 					},
 					"unit": {
-						"enum": [
-							"weeks",
-							"months"
-						],
+						"enum": ["weeks", "months"],
 						"type": "string"
 					}
 				},
-				"required": [
-					"count",
-					"unit"
-				],
+				"required": ["count", "unit"],
 				"type": "object"
 			},
 			"AnalysisEvidence": {
@@ -785,20 +671,13 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"reason": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"code",
-					"reason",
-					"postingIds"
-				],
+				"required": ["code", "reason", "postingIds"],
 				"type": "object"
 			},
 			"AnalysisFeedback": {
@@ -880,13 +759,7 @@
 						"type": "string"
 					},
 					"action": {
-						"enum": [
-							"confirm",
-							"reject",
-							"set-duration",
-							"hide",
-							"restore"
-						],
+						"enum": ["confirm", "reject", "set-duration", "hide", "restore"],
 						"type": "string"
 					},
 					"duration": {
@@ -908,12 +781,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"requestId",
-					"runId",
-					"revision",
-					"action"
-				],
+				"required": ["requestId", "runId", "revision", "action"],
 				"type": "object"
 			},
 			"AnalysisFinding": {
@@ -932,10 +800,7 @@
 						"items": {
 							"$ref": "#/components/schemas/AnalysisEvidence"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"feedbackRevision": {
 						"format": "int64",
@@ -1025,19 +890,13 @@
 						"items": {
 							"$ref": "#/components/schemas/AnalysisFinding"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"nextCursor": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"findings",
-					"nextCursor"
-				],
+				"required": ["findings", "nextCursor"],
 				"type": "object"
 			},
 			"AnalysisReview": {
@@ -1057,11 +916,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"decision",
-					"provider",
-					"answeredAt"
-				],
+				"required": ["decision", "provider", "answeredAt"],
 				"type": "object"
 			},
 			"AnalysisRun": {
@@ -1127,12 +982,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"type",
-					"version",
-					"state",
-					"currentRevision"
-				],
+				"required": ["type", "version", "state", "currentRevision"],
 				"type": "object"
 			},
 			"Checkpoint": {
@@ -1140,9 +990,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/Checkpoint.json"
-						],
+						"examples": ["https://example.com/schemas/Checkpoint.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -1162,11 +1010,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"AccountId",
-					"Balance",
-					"observedAt"
-				],
+				"required": ["AccountId", "Balance", "observedAt"],
 				"type": "object"
 			},
 			"CheckpointCorrection": {
@@ -1212,19 +1056,13 @@
 						"items": {
 							"$ref": "#/components/schemas/Checkpoint"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"revision": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"checkpoints",
-					"revision"
-				],
+				"required": ["checkpoints", "revision"],
 				"type": "object"
 			},
 			"ConvertTransactionBody": {
@@ -1249,9 +1087,7 @@
 						"$ref": "#/components/schemas/RuleBody"
 					}
 				},
-				"required": [
-					"kind"
-				],
+				"required": ["kind"],
 				"type": "object"
 			},
 			"ConvertTransactionOutputBody": {
@@ -1273,10 +1109,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"kind": {
 						"type": "string"
@@ -1288,13 +1121,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id",
-					"kind",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["id", "kind", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"Create-pattern-to-new-ruleResponse": {
@@ -1313,10 +1140,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"patternKey": {
 						"type": "string"
@@ -1331,13 +1155,7 @@
 						"$ref": "#/components/schemas/RecurrenceRule"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision",
-					"patternKey"
-				],
+				"required": ["row", "issues", "persisted", "revision", "patternKey"],
 				"type": "object"
 			},
 			"CurrentPosition": {
@@ -1347,10 +1165,7 @@
 						"items": {
 							"$ref": "#/components/schemas/PositionAccount"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"asOfDate": {
 						"type": "string"
@@ -1360,11 +1175,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"asOfDate",
-					"netWorth",
-					"accounts"
-				],
+				"required": ["asOfDate", "netWorth", "accounts"],
 				"type": "object"
 			},
 			"Delete-accountResponse": {
@@ -1386,10 +1197,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -1398,12 +1206,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"deletedId",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["deletedId", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"Delete-amount-presetResponse": {
@@ -1422,9 +1225,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"deletedId"
-				],
+				"required": ["deletedId"],
 				"type": "object"
 			},
 			"Delete-receiptResponse": {
@@ -1443,9 +1244,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"deletedId"
-				],
+				"required": ["deletedId"],
 				"type": "object"
 			},
 			"DeterministicOutputBody": {
@@ -1467,10 +1266,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"result": {
 						"$ref": "#/components/schemas/ProjectionResult"
@@ -1494,9 +1290,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"dismissed"
-				],
+				"required": ["dismissed"],
 				"type": "object"
 			},
 			"Dismiss-analysis-findingResponse": {
@@ -1518,10 +1312,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id",
-					"dismissed"
-				],
+				"required": ["id", "dismissed"],
 				"type": "object"
 			},
 			"EmailReceipt": {
@@ -1548,10 +1339,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"fromAddress": {
 						"type": "string"
@@ -1647,18 +1435,14 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/ErrorModel.json"
-						],
+						"examples": ["https://example.com/schemas/ErrorModel.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
 					},
 					"detail": {
 						"description": "A human-readable explanation specific to this occurrence of the problem.",
-						"examples": [
-							"Property foo is required but is missing."
-						],
+						"examples": ["Property foo is required but is missing."],
 						"type": "string"
 					},
 					"errors": {
@@ -1666,40 +1450,29 @@
 						"items": {
 							"$ref": "#/components/schemas/ErrorDetail"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"instance": {
 						"description": "A URI reference that identifies the specific occurrence of the problem.",
-						"examples": [
-							"https://example.com/error-log/abc123"
-						],
+						"examples": ["https://example.com/error-log/abc123"],
 						"format": "uri",
 						"type": "string"
 					},
 					"status": {
 						"description": "HTTP status code",
-						"examples": [
-							400
-						],
+						"examples": [400],
 						"format": "int64",
 						"type": "integer"
 					},
 					"title": {
 						"description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
-						"examples": [
-							"Bad Request"
-						],
+						"examples": ["Bad Request"],
 						"type": "string"
 					},
 					"type": {
 						"default": "about:blank",
 						"description": "A URI reference to human-readable documentation for the error.",
-						"examples": [
-							"https://example.com/errors/example"
-						],
+						"examples": ["https://example.com/errors/example"],
 						"format": "uri",
 						"type": "string"
 					}
@@ -1722,29 +1495,19 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"relatedPostingIds": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"severity": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"code",
-					"severity",
-					"message"
-				],
+				"required": ["code", "severity", "message"],
 				"type": "object"
 			},
 			"EvaluationInstanceInterface": {
@@ -1761,12 +1524,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"instanceId",
-					"name",
-					"enabled",
-					"config"
-				],
+				"required": ["instanceId", "name", "enabled", "config"],
 				"type": "object"
 			},
 			"EvaluationResultEnvelope": {
@@ -1777,10 +1535,7 @@
 						"items": {
 							"$ref": "#/components/schemas/EvaluationDiagnostic"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"instanceId": {
 						"type": "string"
@@ -1810,64 +1565,43 @@
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"cycleFulfillment": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"financialIndependence": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"netWorthThreshold": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"plannedPurchases": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"postingFulfillment": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"whatIf": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationResultEnvelope"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -1898,10 +1632,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"evaluations",
-					"revision"
-				],
+				"required": ["evaluations", "revision"],
 				"type": "object"
 			},
 			"EvaluationTables": {
@@ -1911,64 +1642,43 @@
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"cycleFulfillment": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"financialIndependence": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"netWorthThreshold": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"plannedPurchases": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"postingFulfillment": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"whatIf": {
 						"items": {
 							"$ref": "#/components/schemas/EvaluationInstanceInterface"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -1985,9 +1695,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/EvaluationUpdate.json"
-						],
+						"examples": ["https://example.com/schemas/EvaluationUpdate.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -2009,11 +1717,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"type",
-					"name",
-					"enabled"
-				],
+				"required": ["type", "name", "enabled"],
 				"type": "object"
 			},
 			"FinancialModel": {
@@ -2023,19 +1727,13 @@
 						"items": {
 							"$ref": "#/components/schemas/Account"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"checkpoints": {
 						"items": {
 							"$ref": "#/components/schemas/Checkpoint"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"evaluations": {
 						"$ref": "#/components/schemas/EvaluationTables"
@@ -2044,37 +1742,25 @@
 						"items": {
 							"$ref": "#/components/schemas/PaymentTerms"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"plannedPurchases": {
 						"items": {
 							"$ref": "#/components/schemas/PlannedPurchase"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"postings": {
 						"items": {
 							"$ref": "#/components/schemas/Posting"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"recurrenceRules": {
 						"items": {
 							"$ref": "#/components/schemas/RecurrenceRule"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"sourcePath": {
 						"type": "string"
@@ -2107,10 +1793,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"model": {
 						"$ref": "#/components/schemas/FinancialModel"
@@ -2120,10 +1803,7 @@
 							"items": {
 								"type": "string"
 							},
-							"type": [
-								"array",
-								"null"
-							]
+							"type": ["array", "null"]
 						},
 						"type": "object"
 					},
@@ -2131,10 +1811,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"model",
-					"issues"
-				],
+				"required": ["model", "issues"],
 				"type": "object"
 			},
 			"FlowClassTotals": {
@@ -2153,11 +1830,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"inflow",
-					"outflow",
-					"transfer"
-				],
+				"required": ["inflow", "outflow", "transfer"],
 				"type": "object"
 			},
 			"FlowCoverage": {
@@ -2167,25 +1840,16 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"unobservedAccounts": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"observedAccounts",
-					"unobservedAccounts"
-				],
+				"required": ["observedAccounts", "unobservedAccounts"],
 				"type": "object"
 			},
 			"FlowEdge": {
@@ -2208,23 +1872,13 @@
 						"items": {
 							"$ref": "#/components/schemas/FlowSourceRecord"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"to": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"from",
-					"to",
-					"kind",
-					"movement",
-					"amount",
-					"sources"
-				],
+				"required": ["from", "to", "kind", "movement", "amount", "sources"],
 				"type": "object"
 			},
 			"FlowGraph": {
@@ -2237,10 +1891,7 @@
 						"items": {
 							"$ref": "#/components/schemas/FlowEdge"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"endDate": {
 						"type": "string"
@@ -2249,10 +1900,7 @@
 						"items": {
 							"$ref": "#/components/schemas/FlowNode"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"reconciliation": {
 						"$ref": "#/components/schemas/FlowReconciliation"
@@ -2267,19 +1915,13 @@
 						"items": {
 							"$ref": "#/components/schemas/FlowUnmatchedEvent"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"unobserved": {
 						"items": {
 							"$ref": "#/components/schemas/FlowUnobservedCorrection"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -2319,14 +1961,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"id",
-					"name",
-					"external",
-					"enabled",
-					"inflow",
-					"outflow"
-				],
+				"required": ["id", "name", "external", "enabled", "inflow", "outflow"],
 				"type": "object"
 			},
 			"FlowReconciliation": {
@@ -2445,12 +2080,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"actual",
-					"projected",
-					"unmatched",
-					"unobserved"
-				],
+				"required": ["actual", "projected", "unmatched", "unobserved"],
 				"type": "object"
 			},
 			"FlowUnmatchedEvent": {
@@ -2471,12 +2101,7 @@
 						"type": "integer"
 					}
 				},
-				"required": [
-					"postingId",
-					"date",
-					"sequence",
-					"realizedAmount"
-				],
+				"required": ["postingId", "date", "sequence", "realizedAmount"],
 				"type": "object"
 			},
 			"FlowUnobservedCorrection": {
@@ -2515,9 +2140,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/FlowsOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/FlowsOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -2532,10 +2155,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"type": "object"
@@ -2556,9 +2176,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"url"
-				],
+				"required": ["url"],
 				"type": "object"
 			},
 			"GmailCredentialBody": {
@@ -2593,10 +2211,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"connected",
-					"lookbackDays"
-				],
+				"required": ["connected", "lookbackDays"],
 				"type": "object"
 			},
 			"GmailLookbackInputBody": {
@@ -2616,9 +2231,7 @@
 						"type": "integer"
 					}
 				},
-				"required": [
-					"lookbackDays"
-				],
+				"required": ["lookbackDays"],
 				"type": "object"
 			},
 			"GmailReceiptOutputBody": {
@@ -2637,9 +2250,7 @@
 						"$ref": "#/components/schemas/EmailReceipt"
 					}
 				},
-				"required": [
-					"receipt"
-				],
+				"required": ["receipt"],
 				"type": "object"
 			},
 			"GmailReceiptsOutputBody": {
@@ -2661,16 +2272,10 @@
 						"items": {
 							"$ref": "#/components/schemas/EmailReceipt"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"receipts",
-					"nextCursor"
-				],
+				"required": ["receipts", "nextCursor"],
 				"type": "object"
 			},
 			"GmailReviewInputBody": {
@@ -2707,15 +2312,10 @@
 						"items": {
 							"$ref": "#/components/schemas/ProviderEntry"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"providers"
-				],
+				"required": ["providers"],
 				"type": "object"
 			},
 			"Item": {
@@ -2731,11 +2331,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id",
-					"kind",
-					"name"
-				],
+				"required": ["id", "kind", "name"],
 				"type": "object"
 			},
 			"Item1": {
@@ -2749,10 +2345,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"accountId",
-					"delta"
-				],
+				"required": ["accountId", "delta"],
 				"type": "object"
 			},
 			"LinkListOutputBody": {
@@ -2760,9 +2353,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/LinkListOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/LinkListOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -2771,15 +2362,10 @@
 						"items": {
 							"$ref": "#/components/schemas/AccountLink"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"links"
-				],
+				"required": ["links"],
 				"type": "object"
 			},
 			"LinkOutputBody": {
@@ -2787,9 +2373,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/LinkOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/LinkOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -2801,10 +2385,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"link",
-					"revision"
-				],
+				"required": ["link", "revision"],
 				"type": "object"
 			},
 			"LinkPutInputBody": {
@@ -2812,9 +2393,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/LinkPutInputBody.json"
-						],
+						"examples": ["https://example.com/schemas/LinkPutInputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -2823,9 +2402,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"modelAccountId"
-				],
+				"required": ["modelAccountId"],
 				"type": "object"
 			},
 			"List-analysesResponse": {
@@ -2844,15 +2421,10 @@
 						"items": {
 							"$ref": "#/components/schemas/AnalysisStatus"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"analyses"
-				],
+				"required": ["analyses"],
 				"type": "object"
 			},
 			"List-analysis-feedbackResponse": {
@@ -2871,19 +2443,13 @@
 						"items": {
 							"$ref": "#/components/schemas/AnalysisFeedback"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"nextCursor": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"feedback",
-					"nextCursor"
-				],
+				"required": ["feedback", "nextCursor"],
 				"type": "object"
 			},
 			"List-planned-purchasesResponse": {
@@ -2902,19 +2468,13 @@
 						"items": {
 							"$ref": "#/components/schemas/PlannedPurchase"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"revision": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"plannedPurchases",
-					"revision"
-				],
+				"required": ["plannedPurchases", "revision"],
 				"type": "object"
 			},
 			"List-receiptsResponse": {
@@ -2936,16 +2496,10 @@
 						"items": {
 							"$ref": "#/components/schemas/Receipt"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"receipts",
-					"extractionAvailable"
-				],
+				"required": ["receipts", "extractionAvailable"],
 				"type": "object"
 			},
 			"LogoutResponse": {
@@ -2953,9 +2507,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/LogoutResponse.json"
-						],
+						"examples": ["https://example.com/schemas/LogoutResponse.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -2964,9 +2516,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"logoutURL"
-				],
+				"required": ["logoutURL"],
 				"type": "object"
 			},
 			"ModelOverrides": {
@@ -2976,55 +2526,37 @@
 						"items": {
 							"$ref": "#/components/schemas/Account"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"addedPostings": {
 						"items": {
 							"$ref": "#/components/schemas/Posting"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"addedRules": {
 						"items": {
 							"$ref": "#/components/schemas/RecurrenceRule"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"disabledAccountIds": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"disabledPostingIds": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"disabledRuleIds": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -3048,21 +2580,13 @@
 					},
 					"path": {
 						"items": {},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"severity": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"severity",
-					"code",
-					"message",
-					"path"
-				],
+				"required": ["severity", "code", "message", "path"],
 				"type": "object"
 			},
 			"Move-amount-presetRequest": {
@@ -3084,9 +2608,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id"
-				],
+				"required": ["id"],
 				"type": "object"
 			},
 			"Move-amount-presetResponse": {
@@ -3105,9 +2627,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"movedId"
-				],
+				"required": ["movedId"],
 				"type": "object"
 			},
 			"Move-evaluationRequest": {
@@ -3132,10 +2652,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"type",
-					"instanceId"
-				],
+				"required": ["type", "instanceId"],
 				"type": "object"
 			},
 			"PatternOccurrence": {
@@ -3151,11 +2668,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"postingId",
-					"date",
-					"amount"
-				],
+				"required": ["postingId", "date", "amount"],
 				"type": "object"
 			},
 			"PatternToExistingRulePreview": {
@@ -3168,10 +2681,7 @@
 						"items": {
 							"$ref": "#/components/schemas/PatternOccurrence"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"cadence": {
 						"type": "string"
@@ -3241,10 +2751,7 @@
 						"items": {
 							"$ref": "#/components/schemas/PatternOccurrence"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"patternKey": {
 						"type": "string"
@@ -3262,10 +2769,7 @@
 						"items": {
 							"$ref": "#/components/schemas/UpcomingNewRuleOccurrence"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -3306,11 +2810,7 @@
 						"type": "integer"
 					}
 				},
-				"required": [
-					"accountId",
-					"minimumFixed",
-					"dueDay"
-				],
+				"required": ["accountId", "minimumFixed", "dueDay"],
 				"type": "object"
 			},
 			"PinnedEvaluationsInputBody": {
@@ -3329,15 +2829,10 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"instanceIds"
-				],
+				"required": ["instanceIds"],
 				"type": "object"
 			},
 			"PinnedEvaluationsOutputBody": {
@@ -3356,15 +2851,10 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"instanceIds"
-				],
+				"required": ["instanceIds"],
 				"type": "object"
 			},
 			"PlannedPurchase": {
@@ -3430,10 +2920,7 @@
 						"type": "boolean"
 					},
 					"fundingAccountId": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"id": {
 						"format": "uuid",
@@ -3478,10 +2965,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"accountId",
-					"balance"
-				],
+				"required": ["accountId", "balance"],
 				"type": "object"
 			},
 			"PositionOutputBody": {
@@ -3489,9 +2973,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/PositionOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/PositionOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -3503,10 +2985,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"result": {
 						"$ref": "#/components/schemas/CurrentPosition"
@@ -3533,9 +3012,7 @@
 						"$ref": "#/components/schemas/FinancialModel"
 					}
 				},
-				"required": [
-					"asOfDate"
-				],
+				"required": ["asOfDate"],
 				"type": "object"
 			},
 			"Posting": {
@@ -3551,10 +3028,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
@@ -3580,10 +3054,7 @@
 						"type": "string"
 					},
 					"sourceAccountId": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"transactionTime": {
 						"format": "int64",
@@ -3622,11 +3093,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"resolver",
-					"config",
-					"inputs"
-				],
+				"required": ["resolver", "config", "inputs"],
 				"type": "object"
 			},
 			"PostingBody": {
@@ -3634,9 +3101,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/PostingBody.json"
-						],
+						"examples": ["https://example.com/schemas/PostingBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -3651,10 +3116,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
@@ -3707,10 +3169,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"ruleId",
-					"occurrenceDate"
-				],
+				"required": ["ruleId", "occurrenceDate"],
 				"type": "object"
 			},
 			"PresetListOutputBody": {
@@ -3729,15 +3188,10 @@
 						"items": {
 							"$ref": "#/components/schemas/AmountPreset"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"presets"
-				],
+				"required": ["presets"],
 				"type": "object"
 			},
 			"PresetResultBody": {
@@ -3745,9 +3199,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/PresetResultBody.json"
-						],
+						"examples": ["https://example.com/schemas/PresetResultBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -3756,10 +3208,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -3768,11 +3217,7 @@
 						"$ref": "#/components/schemas/AmountPreset"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted"
-				],
+				"required": ["row", "issues", "persisted"],
 				"type": "object"
 			},
 			"Preview-pattern-to-existing-ruleResponse": {
@@ -3791,9 +3236,7 @@
 						"$ref": "#/components/schemas/PatternToExistingRulePreview"
 					}
 				},
-				"required": [
-					"preview"
-				],
+				"required": ["preview"],
 				"type": "object"
 			},
 			"Preview-pattern-to-new-ruleResponse": {
@@ -3812,9 +3255,7 @@
 						"$ref": "#/components/schemas/PatternToNewRulePreview"
 					}
 				},
-				"required": [
-					"preview"
-				],
+				"required": ["preview"],
 				"type": "object"
 			},
 			"Principal": {
@@ -3827,10 +3268,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"subject",
-					"name"
-				],
+				"required": ["subject", "name"],
 				"type": "object"
 			},
 			"ProjectionAccountSummary": {
@@ -3840,10 +3278,7 @@
 						"type": "string"
 					},
 					"color": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
@@ -3907,10 +3342,7 @@
 						"$ref": "#/components/schemas/ProjectionRuntimeSettings"
 					}
 				},
-				"required": [
-					"settings",
-					"range"
-				],
+				"required": ["settings", "range"],
 				"type": "object"
 			},
 			"ProjectionResult": {
@@ -3920,10 +3352,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ProjectionAccountSummary"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"evaluations": {
 						"$ref": "#/components/schemas/EvaluationResultTables"
@@ -3944,10 +3373,7 @@
 						"items": {
 							"$ref": "#/components/schemas/TransactionEvent"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -3964,19 +3390,13 @@
 				"additionalProperties": false,
 				"properties": {
 					"latestHistoricalDate": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"projectionStartDate": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"latestHistoricalDate",
-					"projectionStartDate"
-				],
+				"required": ["latestHistoricalDate", "projectionStartDate"],
 				"type": "object"
 			},
 			"ProjectionResultSummaryStruct": {
@@ -3991,10 +3411,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"currentNetWorth",
-					"finalNetWorth"
-				],
+				"required": ["currentNetWorth", "finalNetWorth"],
 				"type": "object"
 			},
 			"ProjectionResultTimelineStruct": {
@@ -4004,15 +3421,10 @@
 						"items": {
 							"$ref": "#/components/schemas/ProjectionRow"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"rows"
-				],
+				"required": ["rows"],
 				"type": "object"
 			},
 			"ProjectionResultTotalsStruct": {
@@ -4045,19 +3457,13 @@
 						"items": {
 							"$ref": "#/components/schemas/AccountSnapshot"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"checkpointCorrections": {
 						"items": {
 							"$ref": "#/components/schemas/CheckpointCorrection"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"date": {
 						"type": "string"
@@ -4129,10 +3535,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
@@ -4150,13 +3553,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"name",
-					"amount",
-					"frequency",
-					"startDate",
-					"enabled"
-				],
+				"required": ["name", "amount", "frequency", "startDate", "enabled"],
 				"type": "object"
 			},
 			"ProviderEntry": {
@@ -4181,11 +3578,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"id",
-					"connected",
-					"syncConfigured"
-				],
+				"required": ["id", "connected", "syncConfigured"],
 				"type": "object"
 			},
 			"Receipt": {
@@ -4277,20 +3670,14 @@
 					},
 					"discountCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					},
 					"items": {
 						"items": {
 							"$ref": "#/components/schemas/ReceiptItem"
 						},
 						"maxItems": 200,
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"merchant": {
 						"maxLength": 200,
@@ -4298,31 +3685,19 @@
 					},
 					"subtotalCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					},
 					"taxCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					},
 					"tipCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					},
 					"totalCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					}
 				},
 				"required": [
@@ -4343,10 +3718,7 @@
 				"properties": {
 					"confidence": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"details": {
 						"$ref": "#/components/schemas/ReceiptDetails"
@@ -4355,21 +3727,13 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"provenance": {
 						"$ref": "#/components/schemas/ReceiptProvenance"
 					}
 				},
-				"required": [
-					"details",
-					"provenance",
-					"confidence",
-					"diagnostics"
-				],
+				"required": ["details", "provenance", "confidence", "diagnostics"],
 				"type": "object"
 			},
 			"ReceiptItem": {
@@ -4385,24 +3749,15 @@
 					},
 					"quantity": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"totalCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					},
 					"unitPriceCents": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					}
 				},
 				"required": [
@@ -4419,9 +3774,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/ReceiptOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/ReceiptOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -4430,19 +3783,13 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"receipt": {
 						"$ref": "#/components/schemas/Receipt"
 					}
 				},
-				"required": [
-					"receipt",
-					"diagnostics"
-				],
+				"required": ["receipt", "diagnostics"],
 				"type": "object"
 			},
 			"ReceiptProblem": {
@@ -4462,11 +3809,7 @@
 						"type": "boolean"
 					}
 				},
-				"required": [
-					"code",
-					"message",
-					"retryable"
-				],
+				"required": ["code", "message", "retryable"],
 				"type": "object"
 			},
 			"ReceiptProvenance": {
@@ -4482,11 +3825,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"producer",
-					"version",
-					"simulated"
-				],
+				"required": ["producer", "version", "simulated"],
 				"type": "object"
 			},
 			"RecurrenceRule": {
@@ -4497,28 +3836,19 @@
 					},
 					"annualCap": {
 						"format": "double",
-						"type": [
-							"number",
-							"null"
-						]
+						"type": ["number", "null"]
 					},
 					"destinations": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
 					},
 					"endDate": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"frequency": {
 						"type": "string"
@@ -4534,10 +3864,7 @@
 						"type": "integer"
 					},
 					"sourceAccountId": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"startDate": {
 						"type": "string"
@@ -4558,14 +3885,37 @@
 				],
 				"type": "object"
 			},
-			"ReorderInputBody": {
+			"RecurrenceRuleListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/ReorderInputBody.json"
+							"https://example.com/schemas/RecurrenceRuleListOutputBody.json"
 						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"recurrenceRules": {
+						"items": {
+							"$ref": "#/components/schemas/RecurrenceRule"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					}
+				},
+				"required": ["recurrenceRules", "revision"],
+				"type": "object"
+			},
+			"ReorderInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ReorderInputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -4577,9 +3927,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"id"
-				],
+				"required": ["id"],
 				"type": "object"
 			},
 			"ReorderOutputBody": {
@@ -4587,9 +3935,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/ReorderOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/ReorderOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -4598,9 +3944,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"revision"
-				],
+				"required": ["revision"],
 				"type": "object"
 			},
 			"Review-analysis-findingResponse": {
@@ -4619,9 +3963,7 @@
 						"$ref": "#/components/schemas/AnalysisFeedback"
 					}
 				},
-				"required": [
-					"feedback"
-				],
+				"required": ["feedback"],
 				"type": "object"
 			},
 			"Review-receiptRequest": {
@@ -4648,11 +3990,7 @@
 						"type": "integer"
 					}
 				},
-				"required": [
-					"revision",
-					"details",
-					"confirm"
-				],
+				"required": ["revision", "details", "confirm"],
 				"type": "object"
 			},
 			"RowResultBodyAccount": {
@@ -4671,10 +4009,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4686,12 +4021,7 @@
 						"$ref": "#/components/schemas/Account"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RowResultBodyCheckpoint": {
@@ -4710,10 +4040,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4725,12 +4052,7 @@
 						"$ref": "#/components/schemas/Checkpoint"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RowResultBodyEvaluationUpdate": {
@@ -4749,10 +4071,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4764,12 +4083,7 @@
 						"$ref": "#/components/schemas/EvaluationUpdate"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RowResultBodyPaymentTerms": {
@@ -4788,10 +4102,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4803,12 +4114,7 @@
 						"$ref": "#/components/schemas/PaymentTerms"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RowResultBodyPlannedPurchase": {
@@ -4827,10 +4133,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4842,12 +4145,7 @@
 						"$ref": "#/components/schemas/PlannedPurchase"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RowResultBodyPosting": {
@@ -4866,10 +4164,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4881,12 +4176,7 @@
 						"$ref": "#/components/schemas/Posting"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RowResultBodyRecurrenceRule": {
@@ -4905,10 +4195,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"persisted": {
 						"type": "boolean"
@@ -4920,12 +4207,7 @@
 						"$ref": "#/components/schemas/RecurrenceRule"
 					}
 				},
-				"required": [
-					"row",
-					"issues",
-					"persisted",
-					"revision"
-				],
+				"required": ["row", "issues", "persisted", "revision"],
 				"type": "object"
 			},
 			"RuleBody": {
@@ -4933,9 +4215,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RuleBody.json"
-						],
+						"examples": ["https://example.com/schemas/RuleBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -4951,10 +4231,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
@@ -4982,13 +4259,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"name",
-					"amount",
-					"frequency",
-					"startDate",
-					"enabled"
-				],
+				"required": ["name", "amount", "frequency", "startDate", "enabled"],
 				"type": "object"
 			},
 			"SafeSpendingOutputBody": {
@@ -5007,9 +4278,7 @@
 						"$ref": "#/components/schemas/SafeSpendingSettings"
 					}
 				},
-				"required": [
-					"settings"
-				],
+				"required": ["settings"],
 				"type": "object"
 			},
 			"SafeSpendingSettings": {
@@ -5028,28 +4297,19 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"incomeAccountIds": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"incomeRuleIds": {
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"reserve": {
 						"format": "double",
@@ -5060,10 +4320,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"statementDay": {
 						"format": "int64",
@@ -5078,10 +4335,7 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
 				"required": [
@@ -5101,9 +4355,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/ScanSummary.json"
-						],
+						"examples": ["https://example.com/schemas/ScanSummary.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5169,10 +4421,7 @@
 						"type": "array"
 					}
 				},
-				"required": [
-					"id",
-					"permissions"
-				],
+				"required": ["id", "permissions"],
 				"type": "object"
 			},
 			"SessionResponse": {
@@ -5180,9 +4429,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/SessionResponse.json"
-						],
+						"examples": ["https://example.com/schemas/SessionResponse.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5225,9 +4472,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/StatusOutputBody.json"
-						],
+						"examples": ["https://example.com/schemas/StatusOutputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5270,16 +4515,10 @@
 					},
 					"seed": {
 						"format": "int64",
-						"type": [
-							"integer",
-							"null"
-						]
+						"type": ["integer", "null"]
 					}
 				},
-				"required": [
-					"runCount",
-					"seed"
-				],
+				"required": ["runCount", "seed"],
 				"type": "object"
 			},
 			"StochasticRequest": {
@@ -5287,9 +4526,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/StochasticRequest.json"
-						],
+						"examples": ["https://example.com/schemas/StochasticRequest.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5307,10 +4544,7 @@
 						"$ref": "#/components/schemas/ProjectionRuntimeSettings"
 					}
 				},
-				"required": [
-					"settings",
-					"config"
-				],
+				"required": ["settings", "config"],
 				"type": "object"
 			},
 			"Summary": {
@@ -5318,9 +4552,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/Summary.json"
-						],
+						"examples": ["https://example.com/schemas/Summary.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5388,9 +4620,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/SupersedeInputBody.json"
-						],
+						"examples": ["https://example.com/schemas/SupersedeInputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5399,9 +4629,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"manualAccountId"
-				],
+				"required": ["manualAccountId"],
 				"type": "object"
 			},
 			"SupersedeOutputBody": {
@@ -5420,10 +4648,7 @@
 						"items": {
 							"$ref": "#/components/schemas/ModelValidationIssue"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"manualAccountId": {
 						"type": "string"
@@ -5452,9 +4677,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/SyncCardsInputBody.json"
-						],
+						"examples": ["https://example.com/schemas/SyncCardsInputBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5463,15 +4686,10 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"cards"
-				],
+				"required": ["cards"],
 				"type": "object"
 			},
 			"SyncCardsOutputBody": {
@@ -5490,15 +4708,10 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"cards"
-				],
+				"required": ["cards"],
 				"type": "object"
 			},
 			"SyncCredentialBody": {
@@ -5506,9 +4719,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/SyncCredentialBody.json"
-						],
+						"examples": ["https://example.com/schemas/SyncCredentialBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5523,9 +4734,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"configured"
-				],
+				"required": ["configured"],
 				"type": "object"
 			},
 			"SyncCredentialInputBody": {
@@ -5554,9 +4763,7 @@
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/TermsBody.json"
-						],
+						"examples": ["https://example.com/schemas/TermsBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -5581,11 +4788,7 @@
 						"type": "integer"
 					}
 				},
-				"required": [
-					"accountId",
-					"minimumFixed",
-					"dueDay"
-				],
+				"required": ["accountId", "minimumFixed", "dueDay"],
 				"type": "object"
 			},
 			"TransactionCatalogOutputBody": {
@@ -5604,19 +4807,13 @@
 						"items": {
 							"$ref": "#/components/schemas/Item"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"revision": {
 						"type": "string"
 					}
 				},
-				"required": [
-					"items",
-					"revision"
-				],
+				"required": ["items", "revision"],
 				"type": "object"
 			},
 			"TransactionEvent": {
@@ -5626,10 +4823,7 @@
 						"items": {
 							"$ref": "#/components/schemas/Item1"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"availableAmount": {
 						"format": "double",
@@ -5637,10 +4831,7 @@
 					},
 					"bindingConstraints": {
 						"items": {},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"date": {
 						"type": "string"
@@ -5686,10 +4877,7 @@
 						"type": "number"
 					}
 				},
-				"required": [
-					"unfulfilledAmount",
-					"destinationLimitedAmount"
-				],
+				"required": ["unfulfilledAmount", "destinationLimitedAmount"],
 				"type": "object"
 			},
 			"TransactionListOutputBody": {
@@ -5711,16 +4899,10 @@
 						"items": {
 							"$ref": "#/components/schemas/TransactionRow"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					}
 				},
-				"required": [
-					"transactions",
-					"revision"
-				],
+				"required": ["transactions", "revision"],
 				"type": "object"
 			},
 			"TransactionOrigin": {
@@ -5733,10 +4915,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"type",
-					"postingId"
-				],
+				"required": ["type", "postingId"],
 				"type": "object"
 			},
 			"TransactionRow": {
@@ -5752,24 +4931,15 @@
 						"items": {
 							"type": "string"
 						},
-						"type": [
-							"array",
-							"null"
-						]
+						"type": ["array", "null"]
 					},
 					"enabled": {
 						"type": "boolean"
 					},
 					"endDate": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"id": {
-						"type": "string"
-					},
-					"kind": {
 						"type": "string"
 					},
 					"name": {
@@ -5790,10 +4960,7 @@
 						"type": "boolean"
 					},
 					"sourceAccountId": {
-						"type": [
-							"string",
-							"null"
-						]
+						"type": ["string", "null"]
 					},
 					"startDate": {
 						"type": "string"
@@ -5811,7 +4978,6 @@
 				},
 				"required": [
 					"id",
-					"kind",
 					"name",
 					"sourceAccountId",
 					"destinations",
@@ -5834,10 +5000,7 @@
 						"type": "string"
 					}
 				},
-				"required": [
-					"date",
-					"amount"
-				],
+				"required": ["date", "amount"],
 				"type": "object"
 			}
 		}
@@ -8273,10 +7436,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"postingId",
-									"image"
-								],
+								"required": ["postingId", "image"],
 								"type": "object"
 							}
 						}
@@ -8581,10 +7741,7 @@
 										"type": "integer"
 									}
 								},
-								"required": [
-									"revision",
-									"image"
-								],
+								"required": ["revision", "image"],
 								"type": "object"
 							}
 						}
@@ -8623,6 +7780,44 @@
 			}
 		},
 		"/v1/recurrence-rules": {
+			"get": {
+				"operationId": "list-recurrence-rules",
+				"parameters": [
+					{
+						"description": "Only rules touching this account",
+						"explode": false,
+						"in": "query",
+						"name": "accountId",
+						"schema": {
+							"description": "Only rules touching this account",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RecurrenceRuleListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List recurrence rules touching an account"
+			},
 			"post": {
 				"operationId": "create-rule",
 				"requestBody": {
@@ -9229,17 +8424,6 @@
 							"description": "Only transactions touching this account",
 							"type": "string"
 						}
-					},
-					{
-						"description": "once, recurring, or all",
-						"explode": false,
-						"in": "query",
-						"name": "recurring",
-						"schema": {
-							"default": "all",
-							"description": "once, recurring, or all",
-							"type": "string"
-						}
 					}
 				],
 				"responses": {
@@ -9264,7 +8448,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "List transactions touching an account"
+				"summary": "List postings touching an account"
 			}
 		},
 		"/v1/transactions/catalog": {

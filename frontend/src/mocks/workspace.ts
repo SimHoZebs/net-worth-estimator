@@ -54,9 +54,18 @@ export function setServerModelFixture(
 		revision: response.revision,
 	});
 	serverQueryClient().setQueryData(
-		[...userResourceKey("transactions"), "", "all"],
+		[...userResourceKey("rules"), ""],
 		{
-			transactions: data.transactions.map((row) => ({
+			recurrenceRules: model.recurrenceRules,
+			revision: response.revision,
+		},
+	);
+	serverQueryClient().setQueryData(
+		[...userResourceKey("transactions"), ""],
+		{
+			transactions: data.transactions
+				.filter((row) => row.kind === "posting")
+				.map((row) => ({
 				...row,
 				sourceAccountId: row.fromId,
 				destinations: row.toId ? [row.toId] : null,

@@ -177,7 +177,6 @@ func latestObservationDay(adjusted types.PositionAccount, asOf types.IsoDate) ty
 
 type transactionRow struct {
 	ID              string                        `json:"id"`
-	Kind            string                        `json:"kind"`
 	Name            string                        `json:"name"`
 	SourceAccountID *string                       `json:"sourceAccountId"`
 	Destinations    []string                      `json:"destinations"`
@@ -207,13 +206,13 @@ type transactionListOutput struct {
 	} `json:"body"`
 }
 
-// listTransactions answers "which transactions touch this account" (or all
-// of them). Postings and rules arrive as the single combined list the
-// activity screens render; amount display resolution still comes from
-// projection transaction events, which already travel with projection results.
+// listTransactions answers "which postings touch this account" (or all of
+// them). Recurrence rules are not transactions: they answer a different
+// question and travel through listRecurrenceRules. Amount display resolution
+// still comes from projection transaction events, which already travel with
+// projection results.
 func (s *handler) listTransactions(_ context.Context, input *struct {
 	AccountID string `query:"accountId" doc:"Only transactions touching this account"`
-	Recurring string `query:"recurring" doc:"once, recurring, or all" default:"all"`
 }) (*transactionListOutput, error) {
 	model, err := s.store.LoadModel()
 	if err != nil {
@@ -239,63 +238,91 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			}
 			return false
 		}
-		if input.Recurring == "" || input.Recurring == "all" || input.Recurring == "recurring" {
-			for _, rule := range model.RecurrenceRules {
-				if !touches(rule.SourceAccountID, rule.Destinations) {
-					continue
-				}
-				priority := rule.Priority
-				transactions = append(transactions, transactionRow{
-					ID:              rule.ID,
-					Kind:            "rule",
-					Name:            rule.Name,
-					SourceAccountID: rule.SourceAccountID,
-					Destinations:    rule.Destinations,
-					Amount:          rule.Amount,
-					StartDate:       rule.StartDate,
-					EndDate:         rule.EndDate,
-					Priority:        &priority,
-					Enabled:         rule.Enabled,
-				})
+		for _, posting := range model.Postings {
+			if !touches(posting.SourceAccountID, posting.Destinations) {
+				continue
 			}
-		}
-		if input.Recurring == "" || input.Recurring == "all" || input.Recurring == "once" {
-			for _, posting := range model.Postings {
-				if !touches(posting.SourceAccountID, posting.Destinations) {
-					continue
-				}
-				syncOwned := isSyncOwned(posting.Source)
-				startDate := transactionDay(posting.TransactionTime)
-				if startDate == "" {
-					startDate = transactionDay(posting.PostedTime)
-				}
-				transactions = append(transactions, transactionRow{
-					ID:              posting.ID,
-					Kind:            "posting",
-					Name:            posting.Name,
-					SourceAccountID: posting.SourceAccountID,
-					Destinations:    posting.Destinations,
-					Amount:          posting.Amount,
-					StartDate:       startDate,
-					Enabled:         posting.Enabled,
-					SyncOwned:       syncOwned,
-					// Only lifecycle bank rows stay sync-owned: pending
-					// seeds refresh in place and voids convert, so owner
-					// edits would be clobbered. Settled bank rows are
-					// write-stable after import, so the owner can edit,
-					// exclude, and remove phantoms through them.
-					ReadOnly:        syncOwned && (posting.Pending || posting.Void),
-					Claim:           posting.Claim,
-					Pending:         posting.Pending,
-					Void:            posting.Void,
-					PostedTime:      posting.PostedTime,
-					TransactionTime: posting.TransactionTime,
-				})
+			syncOwned := isSyncOwned(posting.Source)
+			startDate := transactionDay(posting.TransactionTime)
+			if startDate == "" {
+				startDate = transactionDay(posting.PostedTime)
 			}
+			transactions = append(transactions, transactionRow{
+				ID:              posting.ID,
+				Name:            posting.Name,
+				SourceAccountID: posting.SourceAccountID,
+				Destinations:    posting.Destinations,
+				Amount:          posting.Amount,
+				StartDate:       startDate,
+				Enabled:         posting.Enabled,
+				SyncOwned:       syncOwned,
+				// Only lifecycle bank rows stay sync-owned: pending
+				// seeds refresh in place and voids convert, so owner
+				// edits would be clobbered. Settled bank rows are
+				// write-stable after import, so the owner can edit,
+				// exclude, and remove phantoms through them.
+				ReadOnly:        syncOwned && (posting.Pending || posting.Void),
+				Claim:           posting.Claim,
+				Pending:         posting.Pending,
+				Void:            posting.Void,
+				PostedTime:      posting.PostedTime,
+				TransactionTime: posting.TransactionTime,
+			})
 		}
 	}
 	output := &transactionListOutput{}
 	output.Body.Transactions = transactions
+	output.Body.Revision = revision
+	return output, nil
+}
+
+type recurrenceRuleListOutput struct {
+	Body struct {
+		RecurrenceRules []types.RecurrenceRule `json:"recurrenceRules"`
+		Revision        string                 `json:"revision"`
+	} `json:"body"`
+}
+
+// listRecurrenceRules answers "which standing schedules touch this account"
+// (or all of them). A rule owns repetition; it is not a transaction and never
+// appears in the postings list. Rows keep the model's storage order, which is
+// the owner's execution priority order.
+func (s *handler) listRecurrenceRules(_ context.Context, input *struct {
+	AccountID string `query:"accountId" doc:"Only rules touching this account"`
+}) (*recurrenceRuleListOutput, error) {
+	model, err := s.store.LoadModel()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	revision, err := store.ModelETag(model)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	rules := []types.RecurrenceRule{}
+	if model != nil {
+		touches := func(source *string, destinations []string) bool {
+			if input.AccountID == "" {
+				return true
+			}
+			if source != nil && *source == input.AccountID {
+				return true
+			}
+			for _, destination := range destinations {
+				if destination == input.AccountID {
+					return true
+				}
+			}
+			return false
+		}
+		for _, rule := range model.RecurrenceRules {
+			if !touches(rule.SourceAccountID, rule.Destinations) {
+				continue
+			}
+			rules = append(rules, rule)
+		}
+	}
+	output := &recurrenceRuleListOutput{}
+	output.Body.RecurrenceRules = rules
 	output.Body.Revision = revision
 	return output, nil
 }

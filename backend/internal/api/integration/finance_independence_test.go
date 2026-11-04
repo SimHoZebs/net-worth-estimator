@@ -121,8 +121,23 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	if err := json.Unmarshal(transactions.Body.Bytes(), &transactionPayload); err != nil {
 		t.Fatalf("decode transactions: %v", err)
 	}
-	if len(transactionPayload.Transactions) != 2 {
-		t.Fatalf("transactions = %+v, want posting plus rule", transactionPayload.Transactions)
+	if len(transactionPayload.Transactions) != 1 {
+		t.Fatalf("transactions = %+v, want only the posting", transactionPayload.Transactions)
+	}
+	rules := doRowRequest(t, handler, http.MethodGet, "/v1/recurrence-rules", "")
+	if rules.Code != http.StatusOK {
+		t.Fatalf("recurrence rules status = %d, body %s", rules.Code, rules.Body.String())
+	}
+	var rulePayload struct {
+		RecurrenceRules []struct {
+			ID string `json:"id"`
+		} `json:"recurrenceRules"`
+	}
+	if err := json.Unmarshal(rules.Body.Bytes(), &rulePayload); err != nil {
+		t.Fatalf("decode recurrence rules: %v", err)
+	}
+	if len(rulePayload.RecurrenceRules) != 1 {
+		t.Fatalf("recurrence rules = %+v, want only the rule", rulePayload.RecurrenceRules)
 	}
 
 	position := doRowRequest(t, handler, http.MethodPost, "/v1/position", `{"asOfDate":"2026-03-10"}`)

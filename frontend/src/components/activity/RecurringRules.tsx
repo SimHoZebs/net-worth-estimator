@@ -11,12 +11,13 @@ import { Reorder, useDragControls } from "motion/react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
+import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
+import { ruleToDisplay } from "../../domain/transactionRows.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
 import { moveRule } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
-	useServerModel,
 	useServerStatus,
 } from "../../state/workspaceResources.ts";
 import { ruleTransaction } from "../../domain/accountActivity.ts";
@@ -97,51 +98,39 @@ function SortableRow({
 export function RecurringRules({
 	account,
 	accounts,
-	transactions,
+	rules,
 	startDate,
 	readOnly,
 	onEdit,
 }: {
 	account: Account;
 	accounts: Account[];
-	transactions: Transaction[];
+	/** Rules touching this account, in execution order. */
+	rules: RecurrenceRule[];
 	startDate: string;
 	readOnly: boolean;
 	onEdit: (target: EditorTarget) => void;
 }) {
 	const status = useServerStatus().data;
-	const serverModel = useServerModel().data?.model;
 	const cadenceById = useMemo(
 		() =>
 			new Map(
-				(serverModel?.recurrenceRules ?? []).map((rule) => [
-					rule.id,
-					frequencyLabel(rule.frequency),
-				]),
+				rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)]),
 			),
-		[serverModel],
+		[rules],
 	);
 	const cadenceOf = (id: string) => cadenceById.get(id) ?? "Recurring";
 	const [editing, setEditing] = useState(false);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
-	const rules = useMemo(
-		() =>
-			transactions.filter(
-				(transaction) =>
-					transaction.kind === "rule" &&
-					(transaction.fromId === account.id ||
-						transaction.toId === account.id),
-			),
-		[transactions, account.id],
-	);
+	const rows = useMemo(() => rules.map(ruleToDisplay), [rules]);
 	// Local identity only: the rule is resolved from current rows each
 	// render, so updates stay current while a removed rule renders as no
 	// selection and closes the detail.
 	const selected =
 		selectedId === null
 			? null
-			: (rules.find((rule) => rule.id === selectedId) ?? null);
+			: (rows.find((row) => row.id === selectedId) ?? null);
 
 	const persistOrder = async (orderedIds: string[]): Promise<boolean> => {
 		// Rebuild the account order with row moves, anchoring from the end
@@ -166,8 +155,8 @@ export function RecurringRules({
 	// displace. Instead a gesture snapshots a temporary order at drag start,
 	// plays out in that draft, and settles explicitly on drop.
 	const savedIds = useMemo(
-		() => rules.map((transaction) => transaction.id),
-		[rules],
+		() => rows.map((row) => row.id),
+		[rows],
 	);
 	const [draftIds, setDraftIds] = useState<string[] | null>(null);
 	const draftRef = useRef<string[] | null>(null);
@@ -183,24 +172,22 @@ export function RecurringRules({
 	const displayedIds =
 		draftIds && !sameOrder(draftIds, savedIds) ? draftIds : savedIds;
 	const orderedRules = useMemo(() => {
-		const byId = new Map(
-			rules.map((transaction) => [transaction.id, transaction]),
-		);
+		const byId = new Map(rows.map((row) => [row.id, row]));
 		const ordered = displayedIds
 			.map((id) => byId.get(id))
 			.filter((item): item is Transaction => item !== undefined);
 		const seen = new Set(ordered.map((transaction) => transaction.id));
-		for (const transaction of rules) {
+		for (const transaction of rows) {
 			if (!seen.has(transaction.id)) {
 				seen.add(transaction.id);
 				ordered.push(transaction);
 			}
 		}
 		return ordered;
-	}, [rules, displayedIds]);
+	}, [rows, displayedIds]);
 	const beginGesture = () => {
 		if (draftRef.current === null) {
-			setDraft(rules.map((transaction) => transaction.id));
+			setDraft(rows.map((row) => row.id));
 		}
 	};
 	const handleReorder = (orderedIds: string[]) => {
@@ -210,7 +197,7 @@ export function RecurringRules({
 	const handleDrop = () => {
 		const next = draftRef.current;
 		if (next === null) return;
-		const current = rules.map((transaction) => transaction.id);
+		const current = rows.map((row) => row.id);
 		if (sameOrder(next, current)) {
 			setDraft(null);
 			return;
@@ -226,7 +213,7 @@ export function RecurringRules({
 	};
 
 	const moveBy = (id: string, delta: -1 | 1) => {
-		const base = draftRef.current ?? rules.map((transaction) => transaction.id);
+		const base = draftRef.current ?? rows.map((row) => row.id);
 		const index = base.indexOf(id);
 		const target = index + delta;
 		if (index < 0 || target < 0 || target >= base.length) return;
@@ -243,7 +230,7 @@ export function RecurringRules({
 
 	const canEdit = !readOnly && !status?.readOnly;
 
-	if (!rules.length)
+	if (!rows.length)
 		return (
 			<EmptyState
 				icon={Repeat}
@@ -387,7 +374,7 @@ export function RecurringRules({
 					className="m-0 flex list-none flex-col border-t border-line p-0"
 					aria-label={`Recurring transactions for ${account.name}`}
 				>
-					{rules.map((transaction, index) => (
+					{rows.map((transaction, index) => (
 						<li
 							key={transaction.id}
 							className="flex items-center gap-3 border-b border-line bg-transparent p-3 max-sm:gap-2 max-sm:px-2 max-sm:py-3"
@@ -395,7 +382,7 @@ export function RecurringRules({
 							<button
 								type="button"
 								className="flex min-w-0 flex-1 items-center gap-3 rounded-control border-0 bg-transparent px-2 py-0.5 text-left"
-								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${cadenceOf(transaction.id).toLowerCase()}, position ${index + 1} of ${rules.length}`}
+								aria-label={`View ${transaction.name}, ${directionLabel(directionFor(transaction, account.id)).toLowerCase()} ${cadenceOf(transaction.id).toLowerCase()}, position ${index + 1} of ${rows.length}`}
 								onClick={() => setSelectedId(transaction.id)}
 							>
 								{rowContent(transaction, index + 1, false)}
@@ -413,7 +400,6 @@ export function RecurringRules({
 					})}
 					savedTransaction={selected}
 					accounts={accounts}
-					transactions={transactions}
 					readOnly={readOnly}
 					onClose={() => setSelectedId(null)}
 				/>

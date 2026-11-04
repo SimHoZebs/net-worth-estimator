@@ -11,6 +11,7 @@ import {
 	useSavedAccounts,
 	useSavedEvaluations,
 	useSavedPurchases,
+	useSavedRules,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "./savedRows.ts";
@@ -50,11 +51,13 @@ describe("saved rows", () => {
 		stubTestServer();
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
+		const rules = renderHook(() => useSavedRules());
 		const evaluations = renderHook(() => useSavedEvaluations());
 		const purchases = renderHook(() => useSavedPurchases());
 		const startDate = renderHook(() => useSavedStartDate());
 		expect(accounts.result.current).toBeNull();
 		expect(transactions.result.current).toBeNull();
+		expect(rules.result.current).toBeNull();
 		expect(evaluations.result.current).toBeNull();
 		expect(purchases.result.current).toBeNull();
 		expect(startDate.result.current).toBeNull();
@@ -64,9 +67,12 @@ describe("saved rows", () => {
 			accounts.result.current?.map((account) => account.id).sort(),
 		).toEqual(["cash", "loan"]);
 		await waitFor(() => expect(transactions.result.current).not.toBeNull());
-		expect(transactions.result.current?.map((row) => row.id)).toEqual([
-			"salary",
-		]);
+		// The narrow transaction query carries postings only; the fixture
+		// model holds a rule and no postings.
+		expect(transactions.result.current).toEqual([]);
+		await waitFor(() => expect(rules.result.current).not.toBeNull());
+		expect(rules.result.current?.map((rule) => rule.id)).toEqual(["salary"]);
+		expect(rules.result.current?.[0]?.frequency).toBe("monthly");
 		await waitFor(() => expect(evaluations.result.current).not.toBeNull());
 		expect(evaluations.result.current).toMatchObject([
 			{ id: "target", kind: "net-worth", target: 500 },
@@ -81,16 +87,19 @@ describe("saved rows", () => {
 		stubTestServer();
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
+		const rules = renderHook(() => useSavedRules());
 		const evaluations = renderHook(() => useSavedEvaluations());
 		const purchases = renderHook(() => useSavedPurchases());
 		const startDate = renderHook(() => useSavedStartDate());
 		await waitFor(() => expect(accounts.result.current).not.toBeNull());
 		await waitFor(() => expect(transactions.result.current).not.toBeNull());
+		await waitFor(() => expect(rules.result.current).not.toBeNull());
 		await waitFor(() => expect(evaluations.result.current).not.toBeNull());
 		await waitFor(() => expect(purchases.result.current).not.toBeNull());
 		await waitFor(() => expect(startDate.result.current).not.toBeNull());
 
 		const firstAccounts = accounts.result.current;
+		const firstRules = rules.result.current;
 		const firstTransactions = transactions.result.current;
 		const firstEvaluations = evaluations.result.current;
 		const firstPurchases = purchases.result.current;
@@ -100,6 +109,7 @@ describe("saved rows", () => {
 		purchases.rerender();
 		startDate.rerender();
 		expect(accounts.result.current).toBe(firstAccounts);
+		expect(rules.result.current).toBe(firstRules);
 		expect(transactions.result.current).toBe(firstTransactions);
 		expect(evaluations.result.current).toBe(firstEvaluations);
 		expect(purchases.result.current).toBe(firstPurchases);
@@ -109,14 +119,17 @@ describe("saved rows", () => {
 		stubTestServer(undefined, emptyModel());
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
+		const rules = renderHook(() => useSavedRules());
 		const evaluations = renderHook(() => useSavedEvaluations());
 		const purchases = renderHook(() => useSavedPurchases());
 		await waitFor(() => expect(accounts.result.current).not.toBeNull());
 		await waitFor(() => expect(transactions.result.current).not.toBeNull());
+		await waitFor(() => expect(rules.result.current).not.toBeNull());
 		await waitFor(() => expect(evaluations.result.current).not.toBeNull());
 		await waitFor(() => expect(purchases.result.current).not.toBeNull());
 		expect(accounts.result.current).toEqual([]);
 		expect(transactions.result.current).toEqual([]);
+		expect(rules.result.current).toEqual([]);
 		expect(evaluations.result.current).toEqual([]);
 		expect(purchases.result.current).toEqual([]);
 	});

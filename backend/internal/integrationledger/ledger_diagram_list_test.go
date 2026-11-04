@@ -196,7 +196,6 @@ func TestLedgerEmptyWindowShowsEmpty(t *testing.T) {
 
 type ledgerListRow struct {
 	ID     string `json:"id"`
-	Kind   string `json:"kind"`
 	Name   string `json:"name"`
 	Amount struct {
 		Config map[string]any `json:"config"`
@@ -244,9 +243,6 @@ func TestLedgerTransactionListShowsSeedRows(t *testing.T) {
 			t.Fatalf("row %s listed twice", row.ID)
 		}
 		byID[row.ID] = row
-		if row.Kind != "posting" {
-			t.Fatalf("row %q kind = %q, want posting (no rules seeded)", row.Name, row.Kind)
-		}
 	}
 	// Hand-checked spot rows: exact expression, calendar day, merchant.
 	for _, spot := range []struct{ name, expression, day string }{

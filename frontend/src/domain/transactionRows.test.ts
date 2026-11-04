@@ -60,7 +60,6 @@ describe("transaction rows", () => {
 		const rule = transactionToDisplay(
 			{
 				id: "salary",
-				kind: "rule",
 				name: "Salary",
 				sourceAccountId: null,
 				destinations: ["cash"],
@@ -89,7 +88,7 @@ describe("transaction rows", () => {
 			amountKnown: true,
 			fromId: null,
 			toId: "cash",
-			kind: "rule",
+			kind: "posting",
 			annualIncrease: 3,
 			postedDate: null,
 			pending: false,
@@ -97,7 +96,6 @@ describe("transaction rows", () => {
 		});
 		const posting = transactionToDisplay({
 			id: "once-1",
-			kind: "posting",
 			name: "Groceries",
 			sourceAccountId: "cash",
 			destinations: null,
@@ -121,7 +119,6 @@ describe("transaction rows", () => {
 		const varied = transactionToDisplay(
 			{
 				id: "varied",
-				kind: "rule",
 				name: "Varied",
 				sourceAccountId: null,
 				destinations: ["cash"],
@@ -137,11 +134,10 @@ describe("transaction rows", () => {
 		expect(varied).toMatchObject({
 			amount: 0,
 			amountKnown: false,
-			kind: "rule",
+			kind: "posting",
 		});
 		const bankRow = transactionToDisplay({
 			id: "void-1",
-			kind: "posting",
 			name: "Vanished auth",
 			sourceAccountId: "cash",
 			destinations: null,
@@ -166,7 +162,6 @@ describe("transaction rows", () => {
 		expect(bankRow.postedDate).toBeNull();
 		const pendingRow = transactionToDisplay({
 			id: "pending-1",
-			kind: "posting",
 			name: "Live auth",
 			sourceAccountId: "cash",
 			destinations: null,

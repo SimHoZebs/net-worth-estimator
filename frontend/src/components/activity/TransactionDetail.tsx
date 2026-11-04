@@ -66,7 +66,6 @@ import {
 	getServerModel,
 	modelOptions,
 	refreshTransactions,
-	useServerModel,
 } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
@@ -89,7 +88,11 @@ import {
 	TransactionInsightsTrigger,
 } from "./TransactionInsights.tsx";
 import { useAnalysisFindings } from "../../state/analyses.ts";
-import { useSavedTransactions } from "../../state/savedRows.ts";
+import {
+	useSavedRules,
+	useSavedTransactions,
+} from "../../state/savedRows.ts";
+import { ruleToDisplay } from "../../domain/transactionRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
 
 type AccountRef = Pick<Account, "id" | "kind" | "color" | "name">;
@@ -955,9 +958,11 @@ export function TransactionDetail({
 		transaction.category === "transfer"
 			? ("transfer" as const)
 			: transaction.direction;
-	// Cadence of the rule this row displays, read from the canonical raw
-	// rule. Display-only; the editor keeps its own monthly/yearly choice.
-	const rawRules = useServerModel().data?.model?.recurrenceRules;
+	// Cadence of the rule this row displays, read from the rule rows the
+	// rules endpoint returns. Display-only; the editor keeps its own
+	// monthly/yearly choice.
+	const savedRules = useSavedRules();
+	const rawRules = savedRules ?? undefined;
 	const rawRule =
 		savedTransaction.kind === "rule"
 			? rawRules?.find((rule) => rule.id === savedTransaction.id)
@@ -991,10 +996,16 @@ export function TransactionDetail({
 	// detail never depends on which rows the entry point happened to pass.
 	// The prop (or the row itself) covers loading and test fixtures.
 	const savedTransactions = useSavedTransactions();
-	const allTransactions = useMemo(
-		() => savedTransactions ?? transactions ?? [savedTransaction],
-		[savedTransactions, transactions, savedTransaction],
-	);
+	// Claim targets and void candidates span both row kinds; rules arrive
+	// from their own endpoint and are mapped to the shared display shape.
+	const allTransactions = useMemo(() => {
+		const rows = [
+			...(savedTransactions ?? transactions ?? [savedTransaction]),
+			...(savedRules ?? []).map(ruleToDisplay),
+		];
+		const byId = new Map(rows.map((row) => [row.id, row]));
+		return [...byId.values()];
+	}, [savedTransactions, transactions, savedTransaction, savedRules]);
 	// Claim candidates: the selected rule's scheduled dates through today,
 	// closest to the day the posting actually happened first, already
 	// claimed dates removed. The row's own saved claim always stays listed.

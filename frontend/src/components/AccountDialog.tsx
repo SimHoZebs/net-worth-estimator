@@ -8,6 +8,8 @@ import {
 } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/accountEdits.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
+import { useRecurrenceRules } from "../state/workspaceResources.ts";
+import { ruleToDisplay } from "../domain/transactionRows.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";
 import { RecurringRules } from "./activity/RecurringRules.tsx";
@@ -57,15 +59,26 @@ export function AccountDialog({
 			}),
 		[account.id, accounts, transactions, startDate, projection],
 	);
-	const recurring = useMemo(
+	const rulesQuery = useRecurrenceRules();
+	const rules = rulesQuery.data?.recurrenceRules ?? null;
+	const accountRules = useMemo(
 		() =>
-			transactions.filter(
-				(transaction) =>
-					transaction.kind === "rule" &&
-					(transaction.fromId === account.id ||
-						transaction.toId === account.id),
+			(rules ?? []).filter(
+				(rule) =>
+					rule.sourceAccountId === account.id ||
+					(rule.destinations ?? []).includes(account.id),
 			),
-		[transactions, account.id],
+		[rules, account.id],
+	);
+	const recurring = useMemo(
+		() => accountRules.map(ruleToDisplay),
+		[accountRules],
+	);
+	// The activity tab maps projected occurrences back to their saved
+	// definition, and both postings and rules own occurrences.
+	const savedRows = useMemo(
+		() => [...transactions, ...recurring],
+		[transactions, recurring],
 	);
 	// Saved rows alone decide whether projected activity can exist: a
 	// recurring rule or future-dated record for this account. No forecast
@@ -73,13 +86,14 @@ export function AccountDialog({
 	// recorded facts.
 	const canRequestForecast = useMemo(
 		() =>
+			accountRules.length > 0 ||
 			transactions.some(
 				(transaction) =>
 					!isHistoricalTransaction(transaction, startDate) &&
 					(transaction.fromId === account.id ||
 						transaction.toId === account.id),
 			),
-		[transactions, account.id, startDate],
+		[accountRules, transactions, account.id, startDate],
 	);
 	const last = projection?.points.at(-1);
 	// Finance-first: null means not requested. Once a forecast resolves,
@@ -136,7 +150,7 @@ export function AccountDialog({
 				{view === "transactions" ? (
 					<Transactions
 						occurrences={occurrences}
-						rows={transactions}
+						rows={savedRows}
 						accounts={accounts}
 						startDate={startDate}
 						readOnly={readOnly}
@@ -153,14 +167,20 @@ export function AccountDialog({
 						}}
 					/>
 				) : view === "recurring" ? (
-					<RecurringRules
-						account={account}
-						accounts={accounts}
-						transactions={transactions}
-						startDate={startDate}
-						readOnly={readOnly}
-						onEdit={onEdit}
-					/>
+					rulesQuery.isPending ? (
+						<p role="status">Loading recurring transactions…</p>
+					) : rulesQuery.isError ? (
+						<p role="alert">Recurring transactions could not be loaded.</p>
+					) : (
+						<RecurringRules
+							account={account}
+							accounts={accounts}
+							rules={accountRules}
+							startDate={startDate}
+							readOnly={readOnly}
+							onEdit={onEdit}
+						/>
+					)
 				) : (
 					<AccountDetails
 						key={account.id}

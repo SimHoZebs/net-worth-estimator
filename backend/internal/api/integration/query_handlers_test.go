@@ -93,12 +93,29 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	}
 
 	transactions := get("/v1/transactions?accountId=" + accountID)
-	if len(decodeQueryBody(t, transactions, "transactions")) != 2 {
-		t.Fatalf("transactions for account = %s, want 2 rows", transactions["transactions"])
+	if len(decodeQueryBody(t, transactions, "transactions")) != 1 {
+		t.Fatalf("transactions for account = %s, want only the posting", transactions["transactions"])
 	}
-	once := get("/v1/transactions?recurring=once")
-	if len(decodeQueryBody(t, once, "transactions")) != 1 {
-		t.Fatalf("once transactions = %s, want 1 row", once["transactions"])
+	rules := get("/v1/recurrence-rules?accountId=" + accountID)
+	ruleRows := decodeQueryBody(t, rules, "recurrenceRules")
+	if len(ruleRows) != 1 {
+		t.Fatalf("recurrence rules for account = %s, want 1 row", rules["recurrenceRules"])
+	}
+	var ruleRow struct {
+		ID        string `json:"id"`
+		Frequency string `json:"frequency"`
+	}
+	if err := json.Unmarshal(ruleRows[0], &ruleRow); err != nil {
+		t.Fatalf("decode rule row: %v", err)
+	}
+	if ruleRow.Frequency != "monthly" {
+		t.Fatalf("rule cadence = %q, want monthly", ruleRow.Frequency)
+	}
+	if len(decodeQueryBody(t, get("/v1/transactions"), "transactions")) != 1 {
+		t.Fatal("/v1/transactions returned no rows")
+	}
+	if len(decodeQueryBody(t, get("/v1/recurrence-rules"), "recurrenceRules")) != 1 {
+		t.Fatal("/v1/recurrence-rules returned no rows")
 	}
 
 	catalog := get("/v1/transactions/catalog")
@@ -273,23 +290,37 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 		t.Fatalf("create purchase status = %d, body %s", marker.Code, marker.Body.String())
 	}
 
-	for _, path := range []string{"/v1/transactions", "/v1/transactions?recurring=once"} {
-		response := doRowRequest(t, handler, http.MethodGet, path, "")
-		if response.Code != http.StatusOK {
-			t.Fatalf("GET %s status = %d, body %s", path, response.Code, response.Body.String())
-		}
-		var payload struct {
-			Transactions []struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
-			} `json:"transactions"`
-		}
-		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-			t.Fatalf("decode %s: %v", path, err)
-		}
-		if len(payload.Transactions) != 1 || payload.Transactions[0].ID != "01900000-0000-7000-8000-000000000031" {
-			t.Fatalf("GET %s rows = %+v, want only the non-purchase posting", path, payload.Transactions)
-		}
+	response := doRowRequest(t, handler, http.MethodGet, "/v1/transactions", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("GET /v1/transactions status = %d, body %s", response.Code, response.Body.String())
+	}
+	var payload struct {
+		Transactions []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"transactions"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode /v1/transactions: %v", err)
+	}
+	if len(payload.Transactions) != 1 || payload.Transactions[0].ID != "01900000-0000-7000-8000-000000000031" {
+		t.Fatalf("GET /v1/transactions rows = %+v, want only the non-purchase posting", payload.Transactions)
+	}
+	rulesResponse := doRowRequest(t, handler, http.MethodGet, "/v1/recurrence-rules", "")
+	if rulesResponse.Code != http.StatusOK {
+		t.Fatalf("GET /v1/recurrence-rules status = %d, body %s", rulesResponse.Code, rulesResponse.Body.String())
+	}
+	var rulesPayload struct {
+		RecurrenceRules []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"recurrenceRules"`
+	}
+	if err := json.Unmarshal(rulesResponse.Body.Bytes(), &rulesPayload); err != nil {
+		t.Fatalf("decode /v1/recurrence-rules: %v", err)
+	}
+	if len(rulesPayload.RecurrenceRules) != 0 {
+		t.Fatalf("GET /v1/recurrence-rules rows = %+v, want none", rulesPayload.RecurrenceRules)
 	}
 
 	// The purchase row stays in the model: planned purchases remain

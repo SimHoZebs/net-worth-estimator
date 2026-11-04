@@ -1,3 +1,4 @@
+import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import type { Transaction } from "./model.ts";
 
@@ -92,10 +93,9 @@ export function transactionToDisplay(
 	const requested =
 		resolved && Number.isFinite(resolved.requested) ? resolved.requested : null;
 	const amount = literal ?? requested;
-	const once = row.kind === "posting";
 	const claim = extra.claim;
 	return {
-		kind: once ? "posting" : "rule",
+		kind: "posting",
 		id: row.id,
 		name: row.name || row.id,
 		amount: Math.max(0, amount ?? 0),
@@ -107,7 +107,7 @@ export function transactionToDisplay(
 			dayFromStamps(extra.transactionTime, extra.postedTime) ||
 			"",
 		endDate: row.endDate,
-		annualIncrease: once ? 0 : growthPercentOf(row.amount),
+		annualIncrease: growthPercentOf(row.amount),
 		enabled: row.enabled,
 		readOnly: row.readOnly,
 		claimRuleId:
@@ -119,7 +119,7 @@ export function transactionToDisplay(
 		// Neither pending holds nor vanished holds have posted: legacy
 		// rows may still carry a fabricated sync-time posted instant.
 		postedDate:
-			once && extra.pending !== true && extra.void !== true
+			extra.pending !== true && extra.void !== true
 				? settledDayOf(extra.postedTime)
 				: null,
 		pending: extra.pending === true,
@@ -129,5 +129,35 @@ export function transactionToDisplay(
 			typeof extra.transactionTime === "number" && extra.transactionTime > 0
 				? extra.transactionTime
 				: null,
+	};
+}
+
+/**
+ * Narrow rule row to the display transaction the shared row views edit.
+ * A rule is not a posting: kind marks the source table, cadence stays on
+ * the rule row itself, and no posting lifecycle fields apply.
+ */
+export function ruleToDisplay(rule: RecurrenceRule): Transaction {
+	const literal = literalAmountOf(rule.amount);
+	return {
+		kind: "rule",
+		id: rule.id,
+		name: rule.name || rule.id,
+		amount: Math.max(0, literal ?? 0),
+		amountKnown: literal !== null,
+		fromId: rule.sourceAccountId,
+		toId: rule.destinations?.[0] ?? null,
+		startDate: rule.startDate,
+		endDate: rule.endDate,
+		annualIncrease: growthPercentOf(rule.amount),
+		enabled: rule.enabled,
+		readOnly: false,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: false,
+		syncOwned: false,
+		transactionTime: null,
 	};
 }

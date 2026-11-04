@@ -16,8 +16,6 @@ import {
 	type Account,
 	type Transaction,
 } from "../../domain/model.ts";
-import { frequencyLabel } from "../../domain/recurringPatterns.ts";
-import { useServerModel } from "../../state/workspaceResources.ts";
 import type { ResolvedTransactionAmount } from "../../domain/resolvedTransactionAmounts.ts";
 
 export function TransactionsPanel({
@@ -26,6 +24,7 @@ export function TransactionsPanel({
 	startDate,
 	readOnly,
 	resolvedAmounts,
+	ruleCadence,
 	showHeaders = false,
 }: {
 	transactions: Transaction[];
@@ -33,19 +32,11 @@ export function TransactionsPanel({
 	startDate: string;
 	readOnly: boolean;
 	resolvedAmounts?: Map<string, ResolvedTransactionAmount>;
+	/** Display cadence per rule id, read from the rule rows by the caller. */
+	ruleCadence?: Map<string, string>;
 	showHeaders?: boolean;
 }) {
-	// Cadence labels for rule rows come from the raw rule rows, read
-	// reactively through the saved model so a late-loaded model re-renders
-	// the labels without touching the narrow rows.
-	const serverModel = useServerModel().data?.model;
-	const cadenceById = new Map(
-		(serverModel?.recurrenceRules ?? []).map((rule) => [
-			rule.id,
-			frequencyLabel(rule.frequency),
-		]),
-	);
-	const cadenceOf = (id: string) => cadenceById.get(id) ?? "Recurring";
+	const cadenceOf = (id: string) => ruleCadence?.get(id) ?? "Recurring";
 	if (!transactions.length)
 		return <EmptyState icon={ArrowRight} title="No matching transactions" />;
 	const names = new Map(accounts.map((account) => [account.id, account.name]));

@@ -13,6 +13,7 @@ import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
 import { setServerModelFixture } from "../../mocks/workspace.ts";
+import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
 import { RecurringRules } from "./RecurringRules.tsx";
 
 vi.mock("./TransactionDetail.tsx", () => ({
@@ -65,12 +66,32 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function rulesProps(transactions: typeof financialModelFixture.transactions) {
+function ruleRow(
+	id: string,
+	overrides: Partial<RecurrenceRule> = {},
+): RecurrenceRule {
+	return {
+		id,
+		name: id,
+		amount: { resolver: "expression", config: { expression: "100" }, inputs: {} },
+		frequency: "monthly",
+		startDate: "2026-01-01",
+		endDate: null,
+		annualCap: null,
+		priority: 0,
+		sourceAccountId: financialModelFixture.accounts[0]!.id,
+		destinations: null,
+		enabled: true,
+		...overrides,
+	};
+}
+
+function rulesProps(rules: RecurrenceRule[]) {
 	const account = financialModelFixture.accounts[0]!;
 	return {
 		account,
 		accounts: financialModelFixture.accounts,
-		transactions,
+		rules,
 		startDate: financialModelFixture.startDate,
 		readOnly: false as const,
 		onEdit: () => {},
@@ -80,15 +101,7 @@ function rulesProps(transactions: typeof financialModelFixture.transactions) {
 it("keeps an existing selected rule current across row updates and closes it on removal", () => {
 	acceptTestResource();
 	resetServerQueryCache();
-	const account = financialModelFixture.accounts[0]!;
-	const transaction = {
-		...financialModelFixture.transactions[0]!,
-		id: "selected",
-		name: "Original rule",
-		kind: "rule" as const,
-		fromId: account.id,
-		toId: null,
-	};
+	const transaction = ruleRow("selected", { name: "Original rule" });
 	const view = render(<RecurringRules {...rulesProps([transaction])} />);
 	fireEvent.click(screen.getByRole("button", { name: /^View Original rule/ }));
 	view.rerender(
@@ -106,15 +119,7 @@ it("returns a rejected drag preview to the server order", async () => {
 	resetServerQueryCache();
 	setServerModelFixture(financialModelFixture);
 	const server = stubTestServer();
-	const account = financialModelFixture.accounts[0]!;
-	const transactions = ["first", "second"].map((id) => ({
-		...financialModelFixture.transactions[0]!,
-		id,
-		name: id,
-		kind: "rule" as const,
-		fromId: account.id,
-		toId: null,
-	}));
+	const transactions = ["first", "second"].map((id) => ruleRow(id));
 	render(<RecurringRules {...rulesProps(transactions)} />);
 	fireEvent.click(
 		screen.getByRole("button", { name: "Reorder recurring transactions" }),
@@ -142,15 +147,7 @@ it("returns a rejected drag preview to the server order", async () => {
 it("adopts reordered server rows outside a gesture", () => {
 	acceptTestResource();
 	resetServerQueryCache();
-	const account = financialModelFixture.accounts[0]!;
-	const transactions = ["first", "second"].map((id) => ({
-		...financialModelFixture.transactions[0]!,
-		id,
-		name: id,
-		kind: "rule" as const,
-		fromId: account.id,
-		toId: null,
-	}));
+	const transactions = ["first", "second"].map((id) => ruleRow(id));
 	const view = render(<RecurringRules {...rulesProps(transactions)} />);
 	const labels = () =>
 		screen
@@ -169,15 +166,7 @@ it("settles a saved drag and adopts later independent server reorders", async ()
 	resetServerQueryCache();
 	setServerModelFixture(financialModelFixture);
 	const server = stubTestServer();
-	const account = financialModelFixture.accounts[0]!;
-	const transactions = ["first", "second"].map((id) => ({
-		...financialModelFixture.transactions[0]!,
-		id,
-		name: id,
-		kind: "rule" as const,
-		fromId: account.id,
-		toId: null,
-	}));
+	const transactions = ["first", "second"].map((id) => ruleRow(id));
 	const view = render(<RecurringRules {...rulesProps(transactions)} />);
 	fireEvent.click(
 		screen.getByRole("button", { name: "Reorder recurring transactions" }),
@@ -220,15 +209,7 @@ it("moves rows with keyboard controls and rolls back a rejected move", async () 
 	resetServerQueryCache();
 	setServerModelFixture(financialModelFixture);
 	const server = stubTestServer();
-	const account = financialModelFixture.accounts[0]!;
-	const transactions = ["first", "second"].map((id) => ({
-		...financialModelFixture.transactions[0]!,
-		id,
-		name: id,
-		kind: "rule" as const,
-		fromId: account.id,
-		toId: null,
-	}));
+	const transactions = ["first", "second"].map((id) => ruleRow(id));
 	render(<RecurringRules {...rulesProps(transactions)} />);
 	fireEvent.click(
 		screen.getByRole("button", { name: "Reorder recurring transactions" }),

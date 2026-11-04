@@ -12,12 +12,14 @@ import {
 	listAmountPresets,
 	listCheckpoints,
 	listEvaluationSummary,
+	listRecurrenceRules,
 	listTransactionCatalog,
 	listTransactions,
 } from "@/api/generated/endpoints.ts";
 import type { AccountBalanceRow } from "@/api/generated/model/accountBalanceRow.ts";
 import type { Checkpoint } from "@/api/generated/model/checkpoint.ts";
 import type { ListCheckpointsParams } from "@/api/generated/model/listCheckpointsParams.ts";
+import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import {
@@ -39,6 +41,7 @@ export function userResourceKey(
 		| "resolvers"
 		| "balances"
 		| "transactions"
+		| "rules"
 		| "catalog"
 		| "eval-summary"
 		| "checkpoints",
@@ -275,6 +278,11 @@ export interface TransactionList {
 	revision: string | null;
 }
 
+export interface RuleList {
+	recurrenceRules: RecurrenceRule[];
+	revision: string | null;
+}
+
 export interface TransactionCatalog {
 	items: { id: string; kind: string; name: string }[];
 	revision: string | null;
@@ -314,28 +322,17 @@ export function balancesOptions(scope = getUserScope(), asOf?: string) {
 
 export function transactionsOptions(
 	scope = getUserScope(),
-	filters: {
-		accountId?: string;
-		recurring?: "once" | "recurring" | "all";
-	} = {},
+	filters: { accountId?: string } = {},
 ) {
-	const { accountId, recurring } = filters;
+	const { accountId } = filters;
 	return queryOptions({
 		...defaults,
-		queryKey: [
-			...userResourceKey("transactions", scope),
-			accountId ?? "",
-			recurring ?? "all",
-		],
+		queryKey: [...userResourceKey("transactions", scope), accountId ?? ""],
 		queryFn: async ({ signal }): Promise<TransactionList> => {
 			const result = (
-				await listTransactions(
-					{
-						...(accountId ? { accountId } : {}),
-						...(recurring && recurring !== "all" ? { recurring } : {}),
-					},
-					{ signal },
-				)
+				await listTransactions(accountId ? { accountId } : {}, {
+					signal,
+				})
 			).data as unknown as {
 				transactions?: TransactionRow[] | null;
 				revision?: string;
@@ -343,6 +340,33 @@ export function transactionsOptions(
 			current(scope, signal);
 			return {
 				transactions: result.transactions ?? [],
+				revision: result.revision ?? null,
+			};
+		},
+	});
+}
+
+export function rulesOptions(
+	scope = getUserScope(),
+	filters: { accountId?: string } = {},
+) {
+	const { accountId } = filters;
+	return queryOptions({
+		...defaults,
+		queryKey: [...userResourceKey("rules", scope), accountId ?? ""],
+		queryFn: async ({ signal }): Promise<RuleList> => {
+			const result = (
+				await listRecurrenceRules(
+					accountId ? { accountId } : {},
+					{ signal },
+				)
+			).data as unknown as {
+				recurrenceRules?: RecurrenceRule[] | null;
+				revision?: string;
+			};
+			current(scope, signal);
+			return {
+				recurrenceRules: result.recurrenceRules ?? [],
 				revision: result.revision ?? null,
 			};
 		},
@@ -421,16 +445,23 @@ export async function refreshAccounts(): Promise<void> {
 		if (result.status === "rejected") throw result.reason;
 }
 
-export function useTransactions(
-	filters: {
-		accountId?: string;
-		recurring?: "once" | "recurring" | "all";
-	} = {},
-) {
+export function useTransactions(filters: { accountId?: string } = {}) {
 	const scope = useUserScope();
 	return useQuery(
 		{
 			...transactionsOptions(scope, filters),
+			refetchOnMount: "always",
+			enabled: scope.status === "ready",
+		},
+		serverQueryClient(),
+	);
+}
+
+export function useRecurrenceRules(filters: { accountId?: string } = {}) {
+	const scope = useUserScope();
+	return useQuery(
+		{
+			...rulesOptions(scope, filters),
 			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
@@ -463,6 +494,9 @@ export async function refreshTransactions(): Promise<void> {
 		queryKey: userResourceKey("transactions", scope),
 	});
 	await cache.invalidateQueries({
+		queryKey: userResourceKey("rules", scope),
+	});
+	await cache.invalidateQueries({
 		queryKey: userResourceKey("catalog", scope),
 	});
 	await cache.invalidateQueries({
@@ -470,12 +504,13 @@ export async function refreshTransactions(): Promise<void> {
 		refetchType: "none",
 	});
 	if (scope !== getUserScope() || scope.status !== "ready") return;
-	// Refetch the list so the new row is visible immediately; mounted
+	// Refetch the lists so new rows are visible immediately; mounted
 	// observers would refetch anyway, but a save should not have to wait.
-	// Both refetches run so one failure cannot hide the other; the first
+	// Every refetch runs so one failure cannot hide the others; the first
 	// failure throws so a save refresh reports it instead of swallowing it.
 	const settled = await Promise.allSettled([
 		cache.fetchQuery(transactionsOptions(scope)),
+		cache.fetchQuery(rulesOptions(scope)),
 		cache.fetchQuery(modelOptions(scope)),
 	]);
 	for (const result of settled)
