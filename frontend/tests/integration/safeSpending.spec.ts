@@ -479,6 +479,54 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	expect(await y(chargeC)).toBeLessThan(await y(limitDivider));
 });
 
+test("highlights recurring bills that cannot be fulfilled", async ({
+	page,
+	request,
+}) => {
+	await page.clock.setFixedTime(new Date("2026-02-10T12:00:00Z"));
+	const modelResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
+	const { model } = await modelResponse.json();
+	const contribution = model.recurrenceRules.find(
+		(rule: { id: string }) => rule.id === "savings_contribution",
+	);
+	const contributionResponse = await request.patch(
+		`${FIXTURE_API}/v1/recurrence-rules/savings_contribution`,
+		{
+			data: {
+				...contribution,
+				amount: {
+					...contribution.amount,
+					config: { ...contribution.amount.config, expression: "10000" },
+				},
+			},
+		},
+	);
+	expect((await contributionResponse.json()).persisted).toBe(true);
+	await request.put(`${FIXTURE_API}/v1/safe-spending-settings`, {
+		data: {
+			statementDay: 20,
+			reserve: 725,
+			accountIds: null,
+			spendingAccountIds: null,
+			incomeAccountIds: null,
+			incomeRuleIds: ["salary"],
+			transactionIds: null,
+			statementDaySet: false,
+		},
+	});
+	await page.goto("/#outlook/safe-spending-detail/cycle");
+	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
+	const bills = drawer.getByRole("table", {
+		name: new RegExp(labels.scheduledBills),
+	});
+	await expect(bills).toContainText("Retirement contribution");
+	await expect(bills).toContainText("Unfulfilled");
+	await expect(bills).toContainText("$10,000.00 planned");
+	const row = bills.getByRole("row", { name: /Retirement contribution/ });
+	await expect(row).toHaveClass(/bg-warning-bg/);
+	await expect(row).toHaveClass(/border-warning-text/);
+});
+
 for (const theme of ["light", "dark"] as const) {
 	test(`household budget fits a narrow ${theme} drawer and passes accessibility checks`, async ({
 		page,

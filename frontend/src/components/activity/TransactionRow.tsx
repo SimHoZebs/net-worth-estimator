@@ -19,6 +19,7 @@ import {
 	transactionBadgeStyles,
 	transactionDividerLabelStyles,
 } from "./activityStyles.ts";
+import { mergeStyles } from "../mergeStyles.ts";
 
 export function TransactionRow({
 	transaction,
@@ -26,12 +27,14 @@ export function TransactionRow({
 	onEdit,
 	shortfallLabel,
 	divider,
+	shortfall,
 }: {
 	transaction: AccountTransaction;
 	savedTransaction: Transaction | null;
 	onEdit: (savedTransaction: Transaction) => void;
 	shortfallLabel?: string;
 	divider?: { tone: "warning" | "danger"; label: string };
+	shortfall?: boolean;
 }) {
 	const DirectionIcon =
 		transaction.category === "transfer"
@@ -86,6 +89,7 @@ export function TransactionRow({
 			tone={tone}
 			title={transaction.name}
 			divider={divider?.tone}
+			shortfall={transaction.shortfall > 0.01 && shortfall}
 			slots={{
 				subtitle: counterparty && (
 					<span>
@@ -134,9 +138,12 @@ export function TransactionRow({
 			amount={
 				<>
 					<strong
-						className={transactionAmountStyles({
-							positive: transaction.direction === "in",
-						})}
+						className={mergeStyles(
+							transactionAmountStyles({
+								positive: transaction.direction === "in",
+							}),
+							transaction.shortfall > 0.01 && shortfall && "text-warning-text",
+						)}
 					>
 						{transaction.amount === 0
 							? exactMoney(0)

@@ -5,6 +5,7 @@ import {
 	transactionIconStyles,
 	transactionCellStyles,
 	transactionRowStyles,
+	transactionShortfallRowStyles,
 	type TransactionTone,
 } from "./activityStyles.ts";
 
@@ -32,6 +33,7 @@ export function TransactionItemRow({
 	selectDisabled = false,
 	dimmed = false,
 	divider,
+	shortfall,
 	slots,
 }: {
 	date: ReactNode;
@@ -44,10 +46,16 @@ export function TransactionItemRow({
 	selectDisabled?: boolean;
 	dimmed?: boolean;
 	divider?: "warning" | "danger";
+	shortfall?: boolean;
 	slots?: TransactionItemSlots;
 }) {
 	return (
-		<TableRow className={transactionRowStyles({ dimmed, divider })}>
+		<TableRow
+			className={mergeStyles(
+				transactionRowStyles({ dimmed, divider }),
+				shortfall && transactionShortfallRowStyles(),
+			)}
+		>
 			<TableCell className={transactionCellStyles({ column: "date" })}>
 				{date}
 			</TableCell>

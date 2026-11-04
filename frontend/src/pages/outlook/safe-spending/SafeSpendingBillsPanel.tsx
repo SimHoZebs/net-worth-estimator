@@ -292,6 +292,8 @@ export function SafeSpendingBillsPanel({
 					onInspect={inspect}
 					order={transactionOrder}
 					showHeaders={showHeaders}
+					shortfall
+					shortfallLabel="Unfulfilled"
 				/>
 			</section>
 			{selected && (

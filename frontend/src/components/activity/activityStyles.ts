@@ -20,8 +20,7 @@ export const transactionRowStyles = cva("hover:bg-surface-2", {
 	variants: {
 		dimmed: { true: "bg-surface-2", false: "" },
 		divider: {
-			warning:
-				"border-b-2 [border-bottom-style:dashed] border-warning-text",
+			warning: "border-b-2 [border-bottom-style:dashed] border-warning-text",
 			danger: "border-b-2 border-danger-text",
 		},
 	},
@@ -46,6 +45,10 @@ export const transactionAmountStyles = cva(
 );
 
 export const transactionBadgeStyles = cva("px-1 py-0.5 text-xs");
+
+export const transactionShortfallRowStyles = cva(
+	"bg-warning-bg border-l-4 border-warning-text hover:bg-warning-bg",
+);
 
 export const transactionDividerLabelStyles = cva(
 	"block text-xs font-semibold whitespace-nowrap",

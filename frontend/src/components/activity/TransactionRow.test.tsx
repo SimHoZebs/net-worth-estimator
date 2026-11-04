@@ -77,3 +77,28 @@ it("does not render any badge without status", () => {
 	);
 	expect(screen.queryByText("Did not post")).toBeNull();
 });
+
+it("tints an unfulfilled row and names the shortfall", () => {
+	const { transaction, savedTransaction } = voidTransaction();
+	render(
+		<TransactionRow
+			transaction={{
+				...transaction,
+				void: false,
+				excluded: false,
+				shortfall: 100,
+				requested: 142.1,
+			}}
+			savedTransaction={savedTransaction}
+			onEdit={() => {}}
+			shortfall
+			shortfallLabel="Unfulfilled"
+		/>,
+	);
+	const row = screen.getByRole("row");
+	expect(row.className).toContain("bg-warning-bg");
+	expect(row.className).toContain("border-warning-text");
+	expect(screen.getByText("Unfulfilled")).toBeTruthy();
+	expect(screen.getByText("$142.10 planned")).toBeTruthy();
+	expect(screen.getByText("−$42.10").className).toContain("text-warning-text");
+});

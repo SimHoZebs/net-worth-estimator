@@ -84,6 +84,8 @@ export function TransactionSectionView({
 	order,
 	showHeaders = false,
 	dividers = [],
+	shortfall,
+	shortfallLabel,
 }: {
 	transactions: AccountTransaction[];
 	caption: string;
@@ -96,6 +98,8 @@ export function TransactionSectionView({
 	order: TransactionOrder;
 	showHeaders?: boolean;
 	dividers?: SpendingLimitDivider[];
+	shortfall?: boolean;
+	shortfallLabel?: string;
 }) {
 	if (!transactions.length) {
 		return (
@@ -137,6 +141,8 @@ export function TransactionSectionView({
 			}
 			onEdit={(savedTransaction) => onInspect(transaction, savedTransaction)}
 			divider={rowDividers.get(transaction.id)}
+			shortfall={shortfall}
+			shortfallLabel={shortfallLabel}
 		/>
 	));
 	if (edgeDivider && order === "newest") {
