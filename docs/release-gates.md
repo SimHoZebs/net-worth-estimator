@@ -1,7 +1,9 @@
 # Release gates
 
-Nothing ships until every gate below passes on the release commit. Run
-gates locally; hosted CI does not run them. The Northflank workflow only
+Nothing ships until every gate below passes on the release commit. Hosted
+CI repeats the automated tiers on every push to `main` and every pull
+request (`.github/workflows/tests.yml`) and runs the disposable e2e gate
+nightly (`.github/workflows/e2e.yml`). The Northflank workflow only
 requests a gated deployment for the pushed SHA.
 
 ## 1. Automated test gates

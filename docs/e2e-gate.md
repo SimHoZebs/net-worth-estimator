@@ -49,6 +49,9 @@ failure. Leftover containers, volumes, or networks fail the gate.
   provider startup plus browser journeys measure in the tens of minutes; a
   per-push leg would serialize every change behind a half-hour gate and train
   authors to bypass it. Unit and integration tiers stay the per-push signal.
+  `.github/workflows/e2e.yml` runs this gate nightly, on manual dispatch, and
+  on pull requests carrying the `e2e` label; the label is the pre-release
+  lever for a risky change.
 - **Budget: 30 minutes wall clock** (`E2E_BUDGET_SECONDS` in
   `auth/e2e-lib.mjs`, overridable with `scripts/test --e2e --timeout=N`).
   A run that exceeds budget fails: slowness is signal about the stack, not
