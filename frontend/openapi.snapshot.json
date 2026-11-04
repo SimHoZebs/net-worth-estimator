@@ -3107,7 +3107,47 @@
 						"type": "string"
 					},
 					"amount": {
-						"$ref": "#/components/schemas/PostingAmountResolution"
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
 					},
 					"claim": {
 						"$ref": "#/components/schemas/PostingClaim"
@@ -3148,6 +3188,9 @@
 					"transactionTime": {
 						"format": "int64",
 						"type": "integer"
+					},
+					"void": {
+						"type": "boolean"
 					}
 				},
 				"required": [
@@ -3170,6 +3213,114 @@
 					}
 				},
 				"required": ["ruleId", "occurrenceDate"],
+				"type": "object"
+			},
+			"PostingUpdateBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/PostingUpdateBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
+					},
+					"claim": {
+						"additionalProperties": false,
+						"properties": {
+							"occurrenceDate": {
+								"type": "string"
+							},
+							"ruleId": {
+								"type": "string"
+							}
+						},
+						"required": ["ruleId", "occurrenceDate"],
+						"type": ["object", "null"]
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"executionOrder": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"pending": {
+						"type": "boolean"
+					},
+					"postedTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"source": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"transactionTime": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"void": {
+						"type": "boolean"
+					}
+				},
 				"type": "object"
 			},
 			"PresetListOutputBody": {
@@ -4221,7 +4372,47 @@
 						"type": "string"
 					},
 					"amount": {
-						"$ref": "#/components/schemas/PostingAmountResolution"
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
 					},
 					"annualCap": {
 						"format": "double",
@@ -4260,6 +4451,97 @@
 					}
 				},
 				"required": ["name", "amount", "frequency", "startDate", "enabled"],
+				"type": "object"
+			},
+			"RuleUpdateBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/RuleUpdateBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
+					},
+					"annualCap": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"endDate": {
+						"type": ["string", "null"]
+					},
+					"frequency": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
 				"type": "object"
 			},
 			"SafeSpendingOutputBody": {
@@ -7255,7 +7537,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/PostingBody"
+								"$ref": "#/components/schemas/PostingUpdateBody"
 							}
 						}
 					},
@@ -7283,7 +7565,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Replace one posting"
+				"summary": "Update the edited fields of one posting"
 			}
 		},
 		"/v1/postings/{id}/receipts": {
@@ -7946,7 +8228,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/RuleBody"
+								"$ref": "#/components/schemas/RuleUpdateBody"
 							}
 						}
 					},
@@ -7974,7 +8256,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Replace one recurrence rule"
+				"summary": "Update the edited fields of one recurrence rule"
 			}
 		},
 		"/v1/safe-spending-settings": {

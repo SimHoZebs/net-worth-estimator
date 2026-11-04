@@ -1,7 +1,7 @@
-import type { Posting, RecurrenceRule } from "../../api/contracts.ts";
-import type { PostingAmountResolution } from "@/api/generated/model/postingAmountResolution.ts";
 import type { PostingBody } from "@/api/generated/model/postingBody.ts";
+import type { PostingUpdateBody } from "@/api/generated/model/postingUpdateBody.ts";
 import type { RuleBody } from "@/api/generated/model/ruleBody.ts";
+import type { RuleUpdateBody } from "@/api/generated/model/ruleUpdateBody.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 
@@ -45,35 +45,13 @@ export function combineDayTime(day: string, time: string): number {
 		: midnightOfDay(day);
 }
 
-/**
- * Literal amount descriptor. A non-zero annual increase rides as a
- * growth-factor provider input, the same shape the adapter reads and writes,
- * so rules round-trip without dedicated backend columns.
- */
-export function transactionAmountDescriptor(
-	amount: number,
-	annualIncrease: number,
-): PostingAmountResolution {
-	const expression = String(amount);
-	if (!annualIncrease)
-		return { resolver: "expression", config: { expression }, inputs: {} };
-	return {
-		resolver: "expression",
-		config: { expression: `(${expression}) * growth` },
-		inputs: {
-			growth: {
-				source: "provider",
-				provider: "growth-factor",
-				arguments: { annualGrowthRate: annualIncrease / 100 },
-			},
-		},
-	};
-}
-
-/** Raw stored amount as a request amount. Wire shapes match; the cast only
- * bridges the generated and canonical type aliases. */
-function rawAmount(amount: Posting["amount"]): PostingAmountResolution {
-	return amount as unknown as PostingAmountResolution;
+/** Authored amount in the API's semantic form: a literal value and, for
+ * rules, an optional yearly growth percent. The server compiles the stored
+ * resolution descriptor, so the client never authors resolver input. */
+function authoredAmount(amount: number, annualIncrease: number) {
+	return annualIncrease
+		? { value: amount, annualIncrease }
+		: { value: amount };
 }
 
 /**
@@ -83,7 +61,7 @@ function rawAmount(amount: Posting["amount"]): PostingAmountResolution {
 export function postingBody(values: TransactionFormValues): PostingBody {
 	return {
 		name: values.name,
-		amount: transactionAmountDescriptor(values.amount, 0),
+		amount: authoredAmount(values.amount, 0),
 		enabled: values.enabled,
 		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
 		destinations: values.toId ? [values.toId] : null,
@@ -113,7 +91,7 @@ export function frequencyChoiceOf(rawFrequency: string): FrequencyChoice {
 export function ruleBody(values: TransactionFormValues): RuleBody {
 	return {
 		name: values.name,
-		amount: transactionAmountDescriptor(values.amount, values.annualIncrease),
+		amount: authoredAmount(values.amount, values.annualIncrease),
 		enabled: values.enabled,
 		frequency: values.frequency === "yearly" ? "annual" : "monthly",
 		startDate: values.startDate,
@@ -123,171 +101,92 @@ export function ruleBody(values: TransactionFormValues): RuleBody {
 	};
 }
 
-function sameEndpoints(
-	values: TransactionFormValues,
-	baseline: Transaction,
-): boolean {
-	return values.fromId === baseline.fromId && values.toId === baseline.toId;
-}
-
 /**
- * Update posting body. The backend replaces the full authored row, so every
- * unedited field is carried over verbatim from the canonical raw row:
- * exact timestamps (not midnight), the raw amount descriptor (custom
- * resolvers and extra inputs survive name-only edits), full destination
- * arrays, and the stored claim
- * unless the edit changes it. Only edited fields are rebuilt.
+ * Posting update: only the members the edit changed. Absent members keep
+ * their stored values on the server, so exact timestamps, amount
+ * descriptors, and extra destinations never need to be restated.
  */
-export function postingUpdateBody({
+export function postingUpdate({
 	baseline,
-	raw,
 	values,
 }: {
 	baseline: Transaction;
-	raw: Posting;
 	values: TransactionFormValues;
-}): PostingBody {
-	const endpointsChanged = !sameEndpoints(values, baseline);
-	const amountChanged = values.amount !== baseline.amount;
-	const startChanged = values.startDate !== baseline.startDate;
-	const timeChanged =
-		values.transactionTime !== undefined &&
-		(values.transactionTime ?? midnightOfDay(values.startDate)) !==
-			(baseline.transactionTime ?? raw.transactionTime);
-	const postedChanged = (values.postedDate ?? null) !== baseline.postedDate;
-	const claimChanged =
+}): PostingUpdateBody {
+	const patch: PostingUpdateBody = {};
+	if (values.name !== baseline.name) patch.name = values.name;
+	if (values.fromId !== baseline.fromId)
+		patch.sourceAccountId = values.fromId ?? null;
+	if (values.toId !== baseline.toId)
+		patch.destinations = values.toId ? [values.toId] : null;
+	if (values.amount !== baseline.amount)
+		patch.amount = authoredAmount(values.amount, 0);
+	if ((values.postedDate ?? null) !== baseline.postedDate)
+		patch.postedTime = midnightOfDay(values.postedDate ?? values.startDate);
+	if (
+		typeof values.transactionTime === "number" &&
+		values.transactionTime !== baseline.transactionTime
+	)
+		patch.transactionTime = values.transactionTime;
+	if (
 		(values.claimRuleId ?? null) !== baseline.claimRuleId ||
-		(values.claimOccurrenceDate ?? null) !== baseline.claimOccurrenceDate;
-	// Claiming a pending seed promotes it to a recorded occurrence, which
-	// needs a positive posted time: pending seeds carry none, so take the
-	// bank's transaction instant, matching the subscription claim body.
-	// The finance boundary validates the request before the store
-	// promotion runs, so the body must already carry it.
-	const promotedPostedTime =
-		baseline.pending && values.claimRuleId != null && raw.postedTime <= 0
-			? (values.transactionTime ?? raw.transactionTime)
-			: raw.postedTime;
-	return {
-		name: values.name,
-		amount: amountChanged
-			? transactionAmountDescriptor(values.amount, 0)
-			: rawAmount(raw.amount),
-		enabled: values.enabled,
-		...(endpointsChanged
-			? {
-					...(values.fromId ? { sourceAccountId: values.fromId } : {}),
-					destinations: values.toId ? [values.toId] : null,
-				}
-			: {
-					...(raw.sourceAccountId
-						? { sourceAccountId: raw.sourceAccountId }
-						: {}),
-					destinations: raw.destinations,
-				}),
-		postedTime: postedChanged
-			? midnightOfDay(values.postedDate ?? values.startDate)
-			: promotedPostedTime,
-		transactionTime:
-			startChanged || timeChanged
-				? (values.transactionTime ?? midnightOfDay(values.startDate))
-				: raw.transactionTime,
-		...(claimChanged
-			? values.claimRuleId && values.claimOccurrenceDate
+		(values.claimOccurrenceDate ?? null) !== baseline.claimOccurrenceDate
+	)
+		patch.claim =
+			values.claimRuleId && values.claimOccurrenceDate
 				? {
-						claim: {
-							ruleId: values.claimRuleId,
-							occurrenceDate: values.claimOccurrenceDate,
-						},
+						ruleId: values.claimRuleId,
+						occurrenceDate: values.claimOccurrenceDate,
 					}
-				: {}
-			: raw.claim
-				? { claim: { ...raw.claim } }
-				: {}),
-	};
+				: null;
+	if (values.enabled !== baseline.enabled) patch.enabled = values.enabled;
+	return patch;
 }
 
 /**
- * Update rule body. Unedited config rides verbatim: exact amount descriptor,
- * raw frequency string, annual cap, priority, full destinations, and end
- * date. The backend also keeps omitted priority/caps and echo-kept single
- * destinations, but stating stored values keeps one code path.
+ * Rule update: only the members the edit changed. The stored cadence is
+ * passed in because the display row never carries it; without it the update
+ * omits frequency and the server keeps the stored value.
  */
-export function ruleUpdateBody({
+export function ruleUpdate({
 	baseline,
-	raw,
 	values,
+	storedFrequency,
 }: {
 	baseline: Transaction;
-	raw: RecurrenceRule;
 	values: TransactionFormValues;
-}): RuleBody {
-	const endpointsChanged = !sameEndpoints(values, baseline);
-	const amountChanged =
+	storedFrequency?: string;
+}): RuleUpdateBody {
+	const patch: RuleUpdateBody = {};
+	if (values.name !== baseline.name) patch.name = values.name;
+	if (
 		values.amount !== baseline.amount ||
-		values.annualIncrease !== baseline.annualIncrease;
-	const frequencyChanged =
-		values.frequency !== frequencyChoiceOf(raw.frequency);
-	const endChanged = (values.endDate ?? null) !== baseline.endDate;
-	return {
-		name: values.name,
-		amount: amountChanged
-			? transactionAmountDescriptor(values.amount, values.annualIncrease)
-			: rawAmount(raw.amount),
-		enabled: values.enabled,
-		frequency: frequencyChanged
-			? values.frequency === "yearly"
-				? "annual"
-				: "monthly"
-			: raw.frequency,
-		startDate:
-			values.startDate === baseline.startDate
-				? raw.startDate
-				: values.startDate,
-		...(endChanged
-			? values.endDate
-				? { endDate: values.endDate }
-				: {}
-			: raw.endDate
-				? { endDate: raw.endDate }
-				: {}),
-		...(raw.annualCap != null ? { annualCap: raw.annualCap } : {}),
-		priority: raw.priority,
-		...(endpointsChanged
-			? {
-					...(values.fromId ? { sourceAccountId: values.fromId } : {}),
-					destinations: values.toId ? [values.toId] : null,
-				}
-			: {
-					...(raw.sourceAccountId
-						? { sourceAccountId: raw.sourceAccountId }
-						: {}),
-					destinations: raw.destinations,
-				}),
-	};
+		values.annualIncrease !== baseline.annualIncrease
+	)
+		patch.amount = authoredAmount(values.amount, values.annualIncrease);
+	if (
+		storedFrequency !== undefined &&
+		values.frequency !== frequencyChoiceOf(storedFrequency)
+	)
+		patch.frequency = values.frequency === "yearly" ? "annual" : "monthly";
+	if (values.startDate !== baseline.startDate)
+		patch.startDate = values.startDate;
+	if ((values.endDate ?? null) !== baseline.endDate)
+		patch.endDate = values.endDate ?? null;
+	if (values.fromId !== baseline.fromId)
+		patch.sourceAccountId = values.fromId ?? null;
+	if (values.toId !== baseline.toId)
+		patch.destinations = values.toId ? [values.toId] : null;
+	if (values.enabled !== baseline.enabled) patch.enabled = values.enabled;
+	return patch;
 }
 
-/**
- * Subscription claim body: the original posting raw row with only the claim
- * changed. Timestamps, amount descriptor, and destinations
- * stay byte-identical; the source posting is preserved, never rebuilt.
- */
-export function claimPostingBody(
-	raw: Posting,
+/** Claim update: one member changes, every other stored value stays. */
+export function claimUpdate(
 	ruleId: string,
 	occurrenceDate: string,
-): PostingBody {
-	return {
-		name: raw.name,
-		amount: rawAmount(raw.amount),
-		// A claimed pending charge now records its occurrence, so it must
-		// participate in projections; settled charges keep their stored flag.
-		enabled: raw.pending ? true : raw.enabled,
-		...(raw.sourceAccountId ? { sourceAccountId: raw.sourceAccountId } : {}),
-		destinations: raw.destinations,
-		postedTime: raw.postedTime > 0 ? raw.postedTime : raw.transactionTime,
-		transactionTime: raw.transactionTime,
-		claim: { ruleId, occurrenceDate },
-	};
+): PostingUpdateBody {
+	return { claim: { ruleId, occurrenceDate } };
 }
 
 /** Shared client-side validation for row transaction forms. */

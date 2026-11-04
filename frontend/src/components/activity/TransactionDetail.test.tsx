@@ -986,13 +986,9 @@ it("saves row edits through the posting endpoint and closes", async () => {
 	const body = server.calls.find(
 		(call) => call.method === "PATCH" && call.url === "/v1/postings/renovation",
 	)?.body as Record<string, unknown>;
-	expect(body.name).toBe("Home renovation updated");
-	// Dates unchanged: exact stored seconds survive instead of midnight.
-	expect(body.postedTime).toBe(day + 45245);
-	expect(body.transactionTime).toBe(day + 123);
-	// No wishlist link on this row, and the editor models none: the body
-	// must not invent one.
-	expect(body.purchase).toBeUndefined();
+	// A rename patches one member. The stored non-midnight instants are
+	// never restated, so no edit can round them to midnight.
+	expect(body).toEqual({ name: "Home renovation updated" });
 });
 
 it("converts a subscription through row endpoints and preserves the source posting", async () => {
@@ -1108,13 +1104,13 @@ it("retries a rejected claim without creating a second rule", async () => {
 	);
 	expect(claims).toHaveLength(2);
 	const claimBody = claims.at(-1)?.body as Record<string, unknown>;
-	expect(claimBody.postedTime).toBe(day + 45245);
-	expect(claimBody.transactionTime).toBe(day + 123);
-	expect(claimBody.amount).toEqual(raw.amount);
-	expect(claimBody.purchase).toBeUndefined();
-	expect(claimBody.claim).toEqual({
-		ruleId: ruleCreates().map((call) => call.body as { id: string })[0]?.id,
-		occurrenceDate: "2028-06-15",
+	// The claim patch states one member; timestamps, descriptor, and
+	// destinations stay exactly as stored.
+	expect(claimBody).toEqual({
+		claim: {
+			ruleId: ruleCreates().map((call) => call.body as { id: string })[0]?.id,
+			occurrenceDate: "2028-06-15",
+		},
 	});
 });
 

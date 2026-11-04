@@ -337,19 +337,22 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	if len(created.Row.Destinations) != 2 {
 		t.Fatalf("created destinations = %+v, want both legs", created.Row.Destinations)
 	}
-	// An unchanged display echo keeps the stored multi-destination set: the
-	// row endpoints carry a single display destination, so the echo cannot
-	// express intent to trim.
-	echo := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Row.ID, postingBody(`["checking"]`))
-	updated := decodeRowResult[types.Posting](t, echo.Code, echo.Body.Bytes())
+	// A patch that omits destinations keeps the stored multi-destination set:
+	// the editor states only the members an edit changes, so an untouched
+	// route can never trim legs it never modeled.
+	renamed := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Row.ID, `{"name":"Split renamed"}`)
+	updated := decodeRowResult[types.Posting](t, renamed.Code, renamed.Body.Bytes())
+	if updated.Row.Name != "Split renamed" {
+		t.Fatalf("patched name = %q, want Split renamed", updated.Row.Name)
+	}
 	if len(updated.Row.Destinations) != 2 {
-		t.Fatalf("echoed destinations = %+v, want stored legs kept", updated.Row.Destinations)
+		t.Fatalf("patched destinations = %+v, want stored legs kept", updated.Row.Destinations)
 	}
 	if got := storedDestinations(); len(got) != 2 {
 		t.Fatalf("stored destinations = %+v, want stored legs kept", got)
 	}
-	// An explicit change still replaces the set verbatim.
-	moved := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Row.ID, postingBody(`["savings"]`))
+	// An explicit destinations member replaces the set verbatim.
+	moved := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Row.ID, `{"destinations":["savings"]}`)
 	replaced := decodeRowResult[types.Posting](t, moved.Code, moved.Body.Bytes())
 	if len(replaced.Row.Destinations) != 1 || replaced.Row.Destinations[0] != "savings" {
 		t.Fatalf("changed destinations = %+v, want [savings]", replaced.Row.Destinations)
@@ -361,10 +364,13 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	}
 	ruleCreate := doRowRequest(t, handler, http.MethodPost, "/v1/recurrence-rules", ruleBody(`["checking","savings"]`))
 	createdRule := decodeRowResult[types.RecurrenceRule](t, ruleCreate.Code, ruleCreate.Body.Bytes())
-	ruleEcho := doRowRequest(t, handler, http.MethodPatch, "/v1/recurrence-rules/"+createdRule.Row.ID, ruleBody(`["checking"]`))
+	ruleEcho := doRowRequest(t, handler, http.MethodPatch, "/v1/recurrence-rules/"+createdRule.Row.ID, `{"name":"SplitRule renamed"}`)
 	updatedRule := decodeRowResult[types.RecurrenceRule](t, ruleEcho.Code, ruleEcho.Body.Bytes())
 	if len(updatedRule.Row.Destinations) != 2 {
-		t.Fatalf("rule echoed destinations = %+v, want stored legs kept", updatedRule.Row.Destinations)
+		t.Fatalf("patched rule destinations = %+v, want stored legs kept", updatedRule.Row.Destinations)
+	}
+	if updatedRule.Row.Amount.Resolver != "expression" {
+		t.Fatalf("patched rule amount = %+v, want stored descriptor kept", updatedRule.Row.Amount)
 	}
 
 	// Convert echoes the display destination the same way, in both directions.

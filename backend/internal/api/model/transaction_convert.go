@@ -68,8 +68,8 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 	var posting types.Posting
 	var rule types.RecurrenceRule
 	if current != nil {
-		// Convert echoes the display destination like an update does; keep
-		// a stored multi-destination set on an unchanged echo.
+		// Convert carries the stored multi-destination set when the target
+		// body echoes the display row's single destination unchanged.
 		for _, existing := range current.Postings {
 			if existing.ID == id && kind == "rule" && input.Body.Rule != nil {
 				input.Body.Rule.Destinations = keepEchoedDestinations(existing.Destinations, input.Body.Rule.Destinations)
@@ -81,26 +81,39 @@ func (s *handler) convertTransaction(_ context.Context, input *struct {
 			}
 		}
 	}
-	_, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
-		model.Postings = removeByID(model.Postings, id, postingID)
-		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
-		if kind == "rule" {
-			priority := 0
-			if input.Body.Rule.Priority != nil {
-				priority = *input.Body.Rule.Priority
-			} else {
-				max := -1
-				for _, existing := range model.RecurrenceRules {
+	if kind == "rule" {
+		priority := 0
+		if input.Body.Rule.Priority != nil {
+			priority = *input.Body.Rule.Priority
+		} else {
+			max := -1
+			if current != nil {
+				for _, existing := range current.RecurrenceRules {
 					if existing.Priority > max {
 						max = existing.Priority
 					}
 				}
-				priority = max + 1
 			}
-			rule = input.Body.Rule.toRule(id, priority)
+			priority = max + 1
+		}
+		next, buildErr := input.Body.Rule.toRule(id, priority)
+		if buildErr != nil {
+			return nil, huma.Error422UnprocessableEntity(buildErr.Error())
+		}
+		rule = next
+	} else {
+		next, buildErr := input.Body.Posting.toPosting(id)
+		if buildErr != nil {
+			return nil, huma.Error422UnprocessableEntity(buildErr.Error())
+		}
+		posting = next
+	}
+	_, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
+		model.Postings = removeByID(model.Postings, id, postingID)
+		model.RecurrenceRules = removeByID(model.RecurrenceRules, id, ruleID)
+		if kind == "rule" {
 			model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 		} else {
-			posting = input.Body.Posting.toPosting(id)
 			model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 		}
 	}, func() (struct{}, error) {

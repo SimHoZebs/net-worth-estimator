@@ -3,20 +3,21 @@ package model
 import (
 	"context"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 type ruleBody struct {
-	ID              *string                       `json:"id,omitempty"`
-	Name            string                        `json:"name"`
-	SourceAccountID *string                       `json:"sourceAccountId,omitempty"`
-	Destinations    []string                      `json:"destinations,omitempty"`
-	Amount          types.PostingAmountResolution `json:"amount"`
-	Frequency       types.RecurrenceFrequency     `json:"frequency"`
-	StartDate       types.IsoDate                 `json:"startDate"`
-	EndDate         *types.IsoDate                `json:"endDate,omitempty"`
-	AnnualCap       *float64                      `json:"annualCap,omitempty"`
+	ID              *string                   `json:"id,omitempty"`
+	Name            string                    `json:"name"`
+	SourceAccountID *string                   `json:"sourceAccountId,omitempty"`
+	Destinations    []string                  `json:"destinations,omitempty"`
+	Amount          amountInput               `json:"amount"`
+	Frequency       types.RecurrenceFrequency `json:"frequency"`
+	StartDate       types.IsoDate             `json:"startDate"`
+	EndDate         *types.IsoDate            `json:"endDate,omitempty"`
+	AnnualCap       *float64                  `json:"annualCap,omitempty"`
 	// Priority orders rules sharing a day. Omitted on create appends after
 	// the current maximum; omitted on update keeps the stored priority, so
 	// editors that never model priority leave it alone.
@@ -24,10 +25,14 @@ type ruleBody struct {
 	Enabled  bool `json:"enabled"`
 }
 
-func (b ruleBody) toRule(id string, priority int) types.RecurrenceRule {
+func (b ruleBody) toRule(id string, priority int) (types.RecurrenceRule, error) {
+	amount, err := b.Amount.resolution()
+	if err != nil {
+		return types.RecurrenceRule{}, err
+	}
 	out := types.RecurrenceRule{
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
-		Destinations: b.Destinations, Amount: b.Amount, Frequency: b.Frequency,
+		Destinations: b.Destinations, Amount: amount, Frequency: b.Frequency,
 		StartDate: b.StartDate, EndDate: b.EndDate,
 		AnnualCap: b.AnnualCap, Priority: priority, Enabled: b.Enabled,
 	}
@@ -37,7 +42,85 @@ func (b ruleBody) toRule(id string, priority int) types.RecurrenceRule {
 	if id != "" {
 		out.ID = id
 	}
-	return out
+	return out, nil
+}
+
+// ruleUpdateBody states only the members an edit changes. Absent members keep
+// their stored value; a null member clears a nullable field. Priority and cap
+// are ordinary patch members: absent keeps, present replaces, null clears the
+// cap.
+type ruleUpdateBody struct {
+	// ID is accepted and ignored: stored rows replayed as an update carry
+	// their identity, which the path already states.
+	ID              optional[string]                    `json:"id,omitempty"`
+	Name            optional[string]                    `json:"name,omitempty"`
+	SourceAccountID nullableOptional[string]            `json:"sourceAccountId,omitempty"`
+	Destinations    nullableOptional[[]string]          `json:"destinations,omitempty"`
+	Amount          optional[amountInput]               `json:"amount,omitempty"`
+	Frequency       optional[types.RecurrenceFrequency] `json:"frequency,omitempty"`
+	StartDate       optional[types.IsoDate]             `json:"startDate,omitempty"`
+	EndDate         nullableOptional[types.IsoDate]     `json:"endDate,omitempty"`
+	AnnualCap       nullableOptional[float64]           `json:"annualCap,omitempty"`
+	Priority        optional[int]                       `json:"priority,omitempty"`
+	Enabled         optional[bool]                      `json:"enabled,omitempty"`
+}
+
+func (p ruleUpdateBody) apply(stored types.RecurrenceRule) (types.RecurrenceRule, error) {
+	out := stored
+	if p.Name.Set {
+		out.Name = p.Name.Value
+	}
+	if p.SourceAccountID.Set {
+		if p.SourceAccountID.Null {
+			out.SourceAccountID = nil
+		} else {
+			value := p.SourceAccountID.Value
+			out.SourceAccountID = &value
+		}
+	}
+	if p.Destinations.Set {
+		if p.Destinations.Null {
+			out.Destinations = nil
+		} else {
+			out.Destinations = p.Destinations.Value
+		}
+	}
+	if p.Amount.Set {
+		amount, err := p.Amount.Value.resolution()
+		if err != nil {
+			return types.RecurrenceRule{}, err
+		}
+		out.Amount = amount
+	}
+	if p.Frequency.Set {
+		out.Frequency = p.Frequency.Value
+	}
+	if p.StartDate.Set {
+		out.StartDate = p.StartDate.Value
+	}
+	if p.EndDate.Set {
+		if p.EndDate.Null {
+			out.EndDate = nil
+		} else {
+			value := p.EndDate.Value
+			out.EndDate = &value
+		}
+	}
+	if p.AnnualCap.Set {
+		if p.AnnualCap.Null {
+			out.AnnualCap = nil
+		} else {
+			value := p.AnnualCap.Value
+			out.AnnualCap = &value
+		}
+	}
+	if p.Priority.Set {
+		out.Priority = p.Priority.Value
+	}
+	if p.Enabled.Set {
+		out.Enabled = p.Enabled.Value
+	}
+	return out, nil
 }
 
 type ruleInput struct {
@@ -55,7 +138,10 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 	if input.Body.Priority != nil {
 		priority = *input.Body.Priority
 	}
-	rule := input.Body.toRule("", priority)
+	rule, err := input.Body.toRule("", priority)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
 	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		if input.Body.Priority == nil {
 			// Omitted priority appends after the current maximum, so callers
@@ -67,7 +153,11 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 				}
 			}
 			priority = max + 1
-			rule = input.Body.toRule("", priority)
+			next, buildErr := input.Body.toRule("", priority)
+			if buildErr != nil {
+				return
+			}
+			rule = next
 		}
 		model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {
@@ -80,40 +170,30 @@ func (s *handler) createRule(_ context.Context, input *ruleInput) (*ruleOutput, 
 }
 
 func (s *handler) updateRule(_ context.Context, input *struct {
-	ID   string   `path:"id"`
-	Body ruleBody `json:"body"`
+	ID   string         `path:"id"`
+	Body ruleUpdateBody `json:"body"`
 }) (*ruleOutput, error) {
-	priority := input.Body.Priority
-	annualCap := input.Body.AnnualCap
-	destinations := input.Body.Destinations
-	if priority == nil || annualCap == nil || len(destinations) == 1 {
-		// Omitted optionals keep their stored values: the editor never
-		// models priority or caps, so absent means untouched, not cleared.
-		// Single destinations get the same echo treatment via
-		// keepEchoedDestinations, since the editor never models extra legs.
-		if stored, err := s.store.LoadModel(); err == nil && stored != nil {
-			for _, existing := range stored.RecurrenceRules {
-				if existing.ID != input.ID {
-					continue
-				}
-				if priority == nil {
-					kept := existing.Priority
-					priority = &kept
-				}
-				if annualCap == nil {
-					annualCap = existing.AnnualCap
-				}
-				destinations = keepEchoedDestinations(existing.Destinations, destinations)
+	stored, err := s.store.LoadModel()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	var existing types.RecurrenceRule
+	found := false
+	if stored != nil {
+		for _, rule := range stored.RecurrenceRules {
+			if rule.ID == input.ID {
+				existing, found = rule, true
+				break
 			}
 		}
 	}
-	rulePriority := 0
-	if priority != nil {
-		rulePriority = *priority
+	if !found {
+		return nil, huma.Error404NotFound("recurrence rule " + input.ID + " does not exist")
 	}
-	input.Body.Destinations = destinations
-	rule := input.Body.toRule(input.ID, rulePriority)
-	rule.AnnualCap = annualCap
+	rule, err := input.Body.apply(existing)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
 	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.RecurrenceRules = replaceByID(model.RecurrenceRules, rule.ID, ruleID, rule)
 	}, func() (types.RecurrenceRule, error) {

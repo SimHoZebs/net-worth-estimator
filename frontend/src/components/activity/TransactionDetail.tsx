@@ -73,14 +73,14 @@ import {
 } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
+	claimUpdate,
 	frequencyChoiceOf,
+	postingUpdate,
+	ruleUpdate,
 	timeOfDay,
-	claimPostingBody,
 	detailFormValues,
 	postingBody,
-	postingUpdateBody,
 	ruleBody,
-	ruleUpdateBody,
 	type FrequencyChoice,
 } from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
@@ -684,13 +684,18 @@ function useTransactionEdit({
 				);
 			return;
 		}
-		const model = getServerModel()?.model;
-		// The backend replaces the full authored row, so updates need the
-		// canonical raw row; conversions state explicit new bodies instead.
-		const raw = nowOnce
-			? model?.postings.find((row) => row.id === savedTransaction.id)
-			: model?.recurrenceRules.find((row) => row.id === savedTransaction.id);
-		if (!raw) {
+		// Updates state only the members the edit changed; absent members
+		// keep their stored values on the server. Conversions state full
+		// new bodies because they create a row in the other table.
+		const storedFrequency = nowOnce
+			? undefined
+			: getServerModel()?.model?.recurrenceRules.find(
+					(row) => row.id === savedTransaction.id,
+				)?.frequency;
+		if (!nowOnce && storedFrequency === undefined) {
+			// A cadence edit needs the stored value to tell an untouched
+			// choice from a changed one; refuse instead of saving a blind
+			// update the server would ignore.
 			setSaving(false);
 			setError(
 				"The saved transaction could not be loaded. Close and try again.",
@@ -699,14 +704,18 @@ function useTransactionEdit({
 		}
 		const ok = await performSave({
 			call: () =>
-				"postedTime" in raw
+				nowOnce
 					? updatePosting(
 							savedTransaction.id,
-							postingUpdateBody({ baseline: savedTransaction, raw, values }),
+							postingUpdate({ baseline: savedTransaction, values }),
 						)
 					: updateRule(
 							savedTransaction.id,
-							ruleUpdateBody({ baseline: savedTransaction, raw, values }),
+							ruleUpdate({
+								baseline: savedTransaction,
+								values,
+								storedFrequency,
+							}),
 						),
 			refresh: refreshTransactions,
 			failureMessage: "The transaction could not be saved.",
@@ -860,25 +869,13 @@ function useMarkAsSubscription({
 				return;
 			}
 		}
-		// Claim from the raw posting with only the claim changed: timestamps,
-		// amount descriptor, destinations, and purchase policy stay
-		// byte-identical instead of being rebuilt from display values.
-		const raw = getServerModel()?.model?.postings.find(
-			(row) => row.id === savedTransaction.id,
-		);
-		if (!raw) {
-			setSaving(false);
-			setError(
-				"The saved transaction could not be loaded. Close and try again.",
-			);
-			return;
-		}
+		// Claiming changes one member; every stored timestamp, descriptor,
+		// destination, and purchase policy stays untouched.
 		const claimOk = await performSave({
 			call: () =>
 				updatePosting(
-					raw.id,
-					claimPostingBody(
-						raw,
+					savedTransaction.id,
+					claimUpdate(
 						ruleId,
 						conversion.claimed.claimOccurrenceDate ??
 							conversion.claimed.startDate,
@@ -1132,21 +1129,11 @@ export function TransactionDetail({
 		setDeleting(true);
 		setDeleteError(null);
 		if (claimRuleId && claimOccurrenceDate && !candidate.claimRuleId) {
-			const raw = getServerModel()?.model?.postings.find(
-				(row) => row.id === candidateId,
-			);
-			if (!raw) {
-				setDeleting(false);
-				setDeleteError(
-					"The posted charge could not be loaded. Close and try again.",
-				);
-				return false;
-			}
 			const claimed = await performSave({
 				call: () =>
 					updatePosting(
 						candidateId,
-						claimPostingBody(raw, claimRuleId, claimOccurrenceDate),
+						claimUpdate(claimRuleId, claimOccurrenceDate),
 					),
 				refresh: refreshTransactions,
 				failureMessage: "The posted charge could not record the occurrence.",

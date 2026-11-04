@@ -3,34 +3,38 @@ package model
 import (
 	"context"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api/internal/modelstate"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
 type postingBody struct {
-	ID              *string                       `json:"id,omitempty" format:"uuid"`
-	Name            string                        `json:"name"`
-	SourceAccountID *string                       `json:"sourceAccountId,omitempty"`
-	Destinations    []string                      `json:"destinations,omitempty"`
-	Amount          types.PostingAmountResolution `json:"amount"`
-	PostedTime      int64                         `json:"postedTime"`
-	TransactionTime int64                         `json:"transactionTime"`
-	Claim           *types.PostingClaim           `json:"claim,omitempty"`
-	Enabled         bool                          `json:"enabled"`
-	// Source is accepted and ignored: ownership is server-computed,
-	// mirroring the retired whole-model PUT contract.
-	Source *string `json:"source,omitempty"`
-	// Pending is also server-computed bank metadata.
-	Pending *bool `json:"pending,omitempty"`
-	// Equal-time execution order is assigned and preserved by the store.
-	ExecutionOrder *int64 `json:"executionOrder,omitempty"`
+	ID              *string             `json:"id,omitempty" format:"uuid"`
+	Name            string              `json:"name"`
+	SourceAccountID *string             `json:"sourceAccountId,omitempty"`
+	Destinations    []string            `json:"destinations,omitempty"`
+	Amount          amountInput         `json:"amount"`
+	PostedTime      int64               `json:"postedTime"`
+	TransactionTime int64               `json:"transactionTime"`
+	Claim           *types.PostingClaim `json:"claim,omitempty"`
+	Enabled         bool                `json:"enabled"`
+	// Accepted and ignored: model import replays whole stored rows, and
+	// ownership plus lifecycle stay server-computed.
+	Source         *string `json:"source,omitempty"`
+	Pending        *bool   `json:"pending,omitempty"`
+	Void           *bool   `json:"void,omitempty"`
+	ExecutionOrder *int64  `json:"executionOrder,omitempty"`
 }
 
-func (b postingBody) toPosting(id string) types.Posting {
+func (b postingBody) toPosting(id string) (types.Posting, error) {
+	amount, err := b.Amount.literalResolution()
+	if err != nil {
+		return types.Posting{}, err
+	}
 	out := types.Posting{
 		Name: b.Name, SourceAccountID: b.SourceAccountID,
-		Destinations: b.Destinations, Amount: b.Amount,
+		Destinations: b.Destinations, Amount: amount,
 		PostedTime: b.PostedTime, TransactionTime: b.TransactionTime,
 		Claim: b.Claim, Enabled: b.Enabled,
 	}
@@ -40,7 +44,79 @@ func (b postingBody) toPosting(id string) types.Posting {
 	if id != "" {
 		out.ID = id
 	}
-	return out
+	return out, nil
+}
+
+// postingUpdateBody states only the members an edit changes. Absent members
+// keep their stored value; a null member clears a nullable field. Server-owned
+// source, pending, void, and execution-order fields are never authored here.
+type postingUpdateBody struct {
+	// ID is accepted and ignored: stored rows replayed as an update carry
+	// their identity, which the path already states.
+	ID              optional[string]                     `json:"id,omitempty"`
+	Name            optional[string]                     `json:"name,omitempty"`
+	SourceAccountID nullableOptional[string]             `json:"sourceAccountId,omitempty"`
+	Destinations    nullableOptional[[]string]           `json:"destinations,omitempty"`
+	Amount          optional[amountInput]                `json:"amount,omitempty"`
+	PostedTime      optional[int64]                      `json:"postedTime,omitempty"`
+	TransactionTime optional[int64]                      `json:"transactionTime,omitempty"`
+	Claim           nullableOptional[types.PostingClaim] `json:"claim,omitempty"`
+	Enabled         optional[bool]                       `json:"enabled,omitempty"`
+	// Accepted and ignored so an imported stored row can be replayed as a
+	// patch; ownership and lifecycle stay server-computed.
+	Source         optional[string] `json:"source,omitempty"`
+	Pending        optional[bool]   `json:"pending,omitempty"`
+	Void           optional[bool]   `json:"void,omitempty"`
+	ExecutionOrder optional[int64]  `json:"executionOrder,omitempty"`
+}
+
+// apply overlays the update on the stored row. Every nullable member keeps an
+// explicit clear path, so an edit never has to restate the full row.
+func (p postingUpdateBody) apply(stored types.Posting) (types.Posting, error) {
+	out := stored
+	if p.Name.Set {
+		out.Name = p.Name.Value
+	}
+	if p.SourceAccountID.Set {
+		if p.SourceAccountID.Null {
+			out.SourceAccountID = nil
+		} else {
+			value := p.SourceAccountID.Value
+			out.SourceAccountID = &value
+		}
+	}
+	if p.Destinations.Set {
+		if p.Destinations.Null {
+			out.Destinations = nil
+		} else {
+			out.Destinations = p.Destinations.Value
+		}
+	}
+	if p.Amount.Set {
+		amount, err := p.Amount.Value.literalResolution()
+		if err != nil {
+			return types.Posting{}, err
+		}
+		out.Amount = amount
+	}
+	if p.PostedTime.Set {
+		out.PostedTime = p.PostedTime.Value
+	}
+	if p.TransactionTime.Set {
+		out.TransactionTime = p.TransactionTime.Value
+	}
+	if p.Claim.Set {
+		if p.Claim.Null {
+			out.Claim = nil
+		} else {
+			claim := p.Claim.Value
+			out.Claim = &claim
+		}
+	}
+	if p.Enabled.Set {
+		out.Enabled = p.Enabled.Value
+	}
+	return out, nil
 }
 
 type postingInput struct {
@@ -66,7 +142,11 @@ func keepEchoedDestinations(stored, incoming []string) []string {
 }
 
 func (s *handler) createPosting(_ context.Context, input *postingInput) (*postingOutput, error) {
-	posting := input.Body.toPosting("")
+	posting, err := input.Body.toPosting("")
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
+
 	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
@@ -82,22 +162,30 @@ func (s *handler) createPosting(_ context.Context, input *postingInput) (*postin
 }
 
 func (s *handler) updatePosting(_ context.Context, input *struct {
-	ID   string      `path:"id"`
-	Body postingBody `json:"body"`
+	ID   string            `path:"id"`
+	Body postingUpdateBody `json:"body"`
 }) (*postingOutput, error) {
-	if len(input.Body.Destinations) == 1 {
-		// An unchanged display echo keeps the stored set (see
-		// keepEchoedDestinations); the editor never models extra legs.
-		if stored, err := s.store.LoadModel(); err == nil && stored != nil {
-			for _, existing := range stored.Postings {
-				if existing.ID == input.ID {
-					input.Body.Destinations = keepEchoedDestinations(existing.Destinations, input.Body.Destinations)
-					break
-				}
+	stored, err := s.store.LoadModel()
+	if err != nil {
+		return nil, huma.Error500InternalServerError(err.Error())
+	}
+	var existing types.Posting
+	found := false
+	if stored != nil {
+		for _, posting := range stored.Postings {
+			if posting.ID == input.ID {
+				existing, found = posting, true
+				break
 			}
 		}
 	}
-	posting := input.Body.toPosting(input.ID)
+	if !found {
+		return nil, huma.Error404NotFound("posting " + input.ID + " does not exist")
+	}
+	posting, err := input.Body.apply(existing)
+	if err != nil {
+		return nil, huma.Error422UnprocessableEntity(err.Error())
+	}
 	row, issues, persisted, revision, err := runFinanceRowWrite(s, func(model *types.FinancialModel) {
 		model.Postings = replaceByID(model.Postings, posting.ID, postingID, posting)
 	}, func() (types.Posting, error) {
