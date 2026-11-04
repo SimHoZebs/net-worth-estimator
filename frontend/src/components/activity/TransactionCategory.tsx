@@ -2,7 +2,6 @@ import {
 	ArrowDownLeft,
 	ArrowUpRight,
 	BriefcaseBusiness,
-	Building2,
 	Car,
 	Check,
 	ChevronDown,
@@ -19,7 +18,6 @@ import {
 	ShoppingBag,
 	Sparkles,
 	Tag,
-	UserRound,
 	Utensils,
 	Wrench,
 	type LucideIcon,
@@ -39,7 +37,6 @@ import {
 	transactionCategorySourceLabel,
 	transactionCategorySourceOf,
 	type TransactionCategory as TransactionCategoryKey,
-	type TransactionCategorySource,
 } from "../../domain/categories.ts";
 import { refreshTransactions } from "../../state/workspaceResources.ts";
 import { useSavedTransactions } from "../../state/savedRows.ts";
@@ -64,12 +61,6 @@ const categoryIcons: Record<TransactionCategoryKey, LucideIcon> = {
 	TRANSPORTATION: Car,
 	TRAVEL: Plane,
 	RENT_AND_UTILITIES: House,
-};
-
-const sourceIcons: Record<TransactionCategorySource, LucideIcon> = {
-	bank: Building2,
-	inferred: Sparkles,
-	user: UserRound,
 };
 
 const supportsPopover =
@@ -150,7 +141,6 @@ export function TransactionCategory({
 	const selected = draft ?? currentCategory ?? "";
 	const selectedLabel = transactionCategoryLabel(selected) ?? "Not categorized";
 	const SelectedIcon = categoryIcons[selected as TransactionCategoryKey] ?? Tag;
-	const SourceIcon = normalizedSource ? sourceIcons[normalizedSource] : null;
 	const sourceLabel = normalizedSource
 		? transactionCategorySourceLabel(normalizedSource)
 		: null;
@@ -310,19 +300,10 @@ export function TransactionCategory({
 						<span id={valueId} className="min-w-0 flex-1 truncate">
 							{selectedLabel}
 						</span>
-						{SourceIcon && sourceLabel && (
-							<>
-								<span
-									title={sourceLabel}
-									aria-hidden="true"
-									className="flex-none"
-								>
-									<SourceIcon size={14} className="text-muted" />
-								</span>
-								<span id={sourceId} className="sr-only">
-									{sourceLabel}
-								</span>
-							</>
+						{sourceLabel && (
+							<span id={sourceId} className="sr-only">
+								{sourceLabel}
+							</span>
 						)}
 						{saving ? (
 							<LoaderCircle
