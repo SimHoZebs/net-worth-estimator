@@ -61,6 +61,10 @@ import {
 	updateRule,
 } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
+import {
+	removeDeletedTransactionFromCache,
+	transactionRemovalNeedsProjectionRefresh,
+} from "../../state/transactionCache.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import {
 	getServerModel,
@@ -88,10 +92,7 @@ import {
 	TransactionInsightsTrigger,
 } from "./TransactionInsights.tsx";
 import { useAnalysisFindings } from "../../state/analyses.ts";
-import {
-	useSavedRules,
-	useSavedTransactions,
-} from "../../state/savedRows.ts";
+import { useSavedRules, useSavedTransactions } from "../../state/savedRows.ts";
 import { ruleToDisplay } from "../../domain/transactionRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
 
@@ -1084,7 +1085,11 @@ export function TransactionDetail({
 		savedTransaction.amountKnown ||
 		transaction.amount !== 0 ||
 		transaction.requested !== 0;
-	const removeTransaction = async () => {
+	const finishRemoval = async (
+		refresh: () => Promise<void>,
+		failureMessage: string,
+		recover?: () => Promise<void>,
+	) => {
 		if (deleting) return;
 		setDeleting(true);
 		setDeleteError(null);
@@ -1093,13 +1098,28 @@ export function TransactionDetail({
 				savedTransaction.kind === "posting"
 					? deletePosting(savedTransaction.id)
 					: deleteRule(savedTransaction.id),
-			refresh: refreshTransactions,
-			failureMessage: "The transaction could not be removed.",
+			refresh,
+			...(recover ? { recover } : {}),
+			failureMessage,
 		});
 		setDeleting(false);
 		if (ok) onClose();
-		else setDeleteError("The transaction could not be removed.");
+		else setDeleteError(failureMessage);
 	};
+	const removeTransaction = () =>
+		finishRemoval(refreshTransactions, "The transaction could not be removed.");
+	// A vanished hold is inert unless an evaluation names it or it supplies
+	// the projection start date. In the common case, drop the row from the
+	// narrow lists and leave the projection model untouched. A failed delete
+	// still reloads authoritative state, so the row never disappears early.
+	const removeVanishedHold = () =>
+		finishRemoval(
+			transactionRemovalNeedsProjectionRefresh(savedTransaction.id)
+				? refreshTransactions
+				: () => removeDeletedTransactionFromCache(savedTransaction.id),
+			"The vanished hold could not be removed.",
+			refreshTransactions,
+		);
 	// A void hold's suggestion merges it into the posted charge. The posted
 	// charge keeps its amount and date; an occurrence recorded on the hold
 	// moves to it when the charge records none.
@@ -1139,7 +1159,10 @@ export function TransactionDetail({
 		}
 		const ok = await performSave({
 			call: () => deletePosting(savedTransaction.id),
-			refresh: refreshTransactions,
+			refresh: transactionRemovalNeedsProjectionRefresh(savedTransaction.id)
+				? refreshTransactions
+				: () => removeDeletedTransactionFromCache(savedTransaction.id),
+			recover: refreshTransactions,
 			failureMessage: "The vanished hold could not be removed.",
 		});
 		setDeleting(false);
@@ -1733,7 +1756,7 @@ export function TransactionDetail({
 							setDeleteError(null);
 						}
 					}}
-					onConfirm={() => void removeTransaction()}
+					onConfirm={() => void removeVanishedHold()}
 					cancelLabel="Keep hold"
 					confirmLabel="Remove hold"
 					busyLabel="Removing…"

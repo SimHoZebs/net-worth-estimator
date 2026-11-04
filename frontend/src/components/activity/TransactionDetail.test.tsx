@@ -16,7 +16,12 @@ import {
 	setServerModelFixture,
 	setServerModelOnly,
 } from "../../mocks/workspace.ts";
-import { resetServerQueryCache } from "../../state/serverQuery.ts";
+import {
+	resetServerQueryCache,
+	serverQueryClient,
+} from "../../state/serverQuery.ts";
+import { userResourceKey } from "../../state/workspaceResources.ts";
+import { getUserScope } from "../../auth/resourceScope.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { ruleTransaction } from "../../domain/accountActivity.ts";
 import type { Transaction } from "../../domain/model.ts";
@@ -533,6 +538,23 @@ it("opens and closes the sharing sheet without closing the detail", async () => 
 it("lets the owner pick the posted charge and remove the vanished hold", async () => {
 	const server = stubTestServer();
 	setServerModelOnly();
+	const scope = getUserScope();
+	const listKey = [...userResourceKey("transactions", scope), "", "all"];
+	const catalogKey = userResourceKey("catalog", scope);
+	serverQueryClient().setQueryData(listKey, {
+		transactions: [{ id: "01900000-0000-7000-8000-000000000096" } as never],
+		revision: "seed",
+	});
+	serverQueryClient().setQueryData(catalogKey, {
+		items: [
+			{
+				id: "01900000-0000-7000-8000-000000000096",
+				kind: "posting",
+				name: "Bistro",
+			},
+		],
+		revision: "seed",
+	});
 	const settled = {
 		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000097",
@@ -589,6 +611,14 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 	expect(picker.textContent).toContain("Bistro dinner");
 	fireEvent.change(picker, { target: { value: settled.id } });
 	fireEvent.click(screen.getByRole("button", { name: "Remove vanished hold" }));
+	await waitFor(() =>
+		expect(
+			serverQueryClient().isFetching({
+				queryKey: userResourceKey("model", scope),
+			}),
+		).toBe(0),
+	);
+	const modelFetchesBeforeRemoval = server.modelFetches().length;
 	const confirm = screen.getByRole("dialog", {
 		name: "Remove Bistro?",
 	});
@@ -604,10 +634,104 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 		).toBe(true),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+	// The hold is inert: removal drops it from the narrow lists and leaves
+	// the financial model and its projections untouched.
+	expect(server.modelFetches()).toHaveLength(modelFetchesBeforeRemoval);
+	expect(serverQueryClient().getQueryData(listKey)).toMatchObject({
+		transactions: [],
+	});
+	expect(serverQueryClient().getQueryData(catalogKey)).toMatchObject({
+		items: [],
+	});
+});
+
+it("keeps the vanished hold in the lists when the delete fails", async () => {
+	const holdId = "01900000-0000-7000-8000-000000000094";
+	const serverModel = fixtureModel(financialModelFixture);
+	serverModel.postings.push({
+		id: holdId,
+		name: "Bistro",
+		sourceAccountId: "checking",
+		destinations: null,
+		amount: {
+			resolver: "expression",
+			config: { expression: "50" },
+			inputs: {},
+		},
+		postedTime: Math.floor(Date.parse("2026-10-20T00:00:00Z") / 1000),
+		transactionTime: Math.floor(Date.parse("2026-10-20T00:00:00Z") / 1000),
+		enabled: false,
+		source: "simplefin",
+		pending: false,
+		void: true,
+	});
+	const server = stubTestServer(undefined, serverModel);
+	setServerModelOnly();
+	const scope = getUserScope();
+	const listKey = [...userResourceKey("transactions", scope), "", "all"];
+	serverQueryClient().setQueryData(listKey, {
+		transactions: [{ id: holdId } as never],
+		revision: "seed",
+	});
+	const voidHold = {
+		...financialModelFixture.transactions[0]!,
+		id: holdId,
+		name: "Bistro",
+		amount: 50,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		kind: "posting" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: true,
+		syncOwned: true,
+	};
+	const onClose = vi.fn();
+	server.writeOnce(
+		(method, path) => method === "DELETE" && path === `/v1/postings/${holdId}`,
+		new Error("network down"),
+	);
+	render(
+		<TransactionDetail
+			transaction={occurrence(voidHold)}
+			savedTransaction={voidHold}
+			accounts={financialModelFixture.accounts}
+			transactions={[voidHold]}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Remove vanished hold" }));
+	fireEvent.click(
+		within(screen.getByRole("dialog", { name: "Remove Bistro?" })).getByRole(
+			"button",
+			{ name: "Remove hold" },
+		),
+	);
+	await waitFor(() =>
+		expect(
+			screen.getByText("The vanished hold could not be removed."),
+		).toBeTruthy(),
+	);
+	expect(onClose).not.toHaveBeenCalled();
+	await waitFor(() => {
+		const cached = serverQueryClient().getQueryData(listKey) as
+			| { transactions: { id: string }[] }
+			| undefined;
+		expect(cached?.transactions.some((row) => row.id === holdId)).toBe(true);
+	});
 });
 
 it("lets the owner merge a vanished hold from the suggestions sheet", async () => {
 	const server = stubTestServer();
+	setServerModelOnly();
 	const settled = {
 		...financialModelFixture.transactions[0]!,
 		id: "01900000-0000-7000-8000-000000000097",
@@ -661,6 +785,14 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		/>,
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Review 1 suggestion" }));
+	await waitFor(() =>
+		expect(
+			serverQueryClient().isFetching({
+				queryKey: userResourceKey("model", getUserScope()),
+			}),
+		).toBe(0),
+	);
+	const modelFetchesBeforeMerge = server.modelFetches().length;
 	const sheet = screen.getByRole("dialog", { name: "Suggestions" });
 	expect(within(sheet).getByText(/Did this hold post/)).toBeTruthy();
 	fireEvent.click(
@@ -678,6 +810,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		).toBe(true),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+	expect(server.modelFetches()).toHaveLength(modelFetchesBeforeMerge);
 });
 
 it("moves a recorded occurrence when merging a vanished hold", async () => {
