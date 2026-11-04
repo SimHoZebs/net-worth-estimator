@@ -238,6 +238,39 @@ test("connects by keyboard, protects the pending request, and confirms imported 
 	).toBeFocused();
 });
 
+test("links a manual account and retires its duplicate", async ({ page }) => {
+	await resetFixture({
+		syncLink: {
+			bridgeAccountId: "bridge-checking",
+			modelAccountId: "checking",
+			bridgeName: "Bank checking",
+		},
+	});
+	await stubSimplefin(page, { configured: true });
+	await page.goto("/#sources");
+	const bankSync = page.getByRole("region", { name: "Bank sync", exact: true });
+	const synced = bankSync.getByRole("list", { name: "Synced accounts" });
+	await expect(synced).toContainText("Everyday checking");
+	await synced
+		.getByRole("button", { name: "More options for Everyday checking" })
+		.click();
+	await page.getByRole("menuitem", { name: "Link existing account" }).click();
+	const dialog = page.getByRole("dialog", { name: "Link a manual account" });
+	await expect(dialog).toBeVisible();
+	const audit = await new AxeBuilder({ page })
+		.include("dialog")
+		.withTags(["wcag2a", "wcag2aa"])
+		.analyze();
+	expect(audit.violations).toEqual([]);
+	await dialog.getByRole("button", { name: /Brokerage/ }).click();
+	await dialog.getByRole("button", { name: "Link account" }).click();
+	await expect(dialog).toBeHidden();
+	await expect(
+		bankSync.getByText(/Brokerage is linked to the bank account/),
+	).toBeVisible();
+	await expect(synced).toContainText("Brokerage");
+});
+
 test("explains a rejected token and recovers with a new setup token", async ({
 	page,
 }) => {

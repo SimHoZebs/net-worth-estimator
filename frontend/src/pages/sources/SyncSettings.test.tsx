@@ -4,6 +4,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
@@ -43,6 +44,14 @@ function stubApi(state: {
 	failLinks?: boolean;
 	failCredential?: boolean;
 	failIntegrations?: boolean;
+	supersedeIssues?: {
+		severity: string;
+		code: string;
+		message: string;
+		path: unknown[];
+	}[];
+	supersedeError?: string;
+	holdSupersede?: Promise<void>;
 	emptyProviders?: boolean;
 	extraProviders?: { id: string }[];
 	throttled?: boolean;
@@ -61,6 +70,25 @@ function stubApi(state: {
 		return headers;
 	};
 	const requests: { method: string; path: string; body?: unknown }[] = [];
+	const linkedIDs = new Set(
+		(state.links ?? []).map((link) => link.modelAccountId),
+	);
+	const balanceRows = () =>
+		accounts.map((account) => ({
+			id: account.id,
+			name: account.name,
+			kind: account.kind,
+			enabled: true,
+			archived: false,
+			balance: 100,
+			minBalance: null,
+			maxBalance: null,
+			color: account.color ?? undefined,
+			observedOn: "2026-10-26",
+			hasCheckpoint: linkedIDs.has(account.id),
+			readOnly: linkedIDs.has(account.id),
+			syncOwned: linkedIDs.has(account.id),
+		}));
 	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
 		const raw = String(url);
 		const path = raw.slice(raw.indexOf("/v1/"));
@@ -149,10 +177,13 @@ function stubApi(state: {
 		if (path === "/v1/integrations/gmail/credential") {
 			record();
 			if (state.gmailUnavailable)
-				return new Response(JSON.stringify({ detail: "gmail is not configured" }), {
-					status: 503,
-					headers: jsonHeaders(),
-				});
+				return new Response(
+					JSON.stringify({ detail: "gmail is not configured" }),
+					{
+						status: 503,
+						headers: jsonHeaders(),
+					},
+				);
 			if (state.failGmailCredential)
 				return new Response(JSON.stringify({ detail: "boom" }), {
 					status: 500,
@@ -170,6 +201,45 @@ function stubApi(state: {
 							}
 						: { connected: false, lookbackDays: state.gmailLookback ?? 90 },
 				),
+				{ headers: jsonHeaders() },
+			);
+		}
+		if (
+			path.startsWith("/v1/sync/simplefin/accounts/") &&
+			path.endsWith("/supersede") &&
+			method === "POST"
+		) {
+			const body = JSON.parse(String(init?.body)) as {
+				manualAccountId: string;
+			};
+			record(body);
+			await state.holdSupersede;
+			if (state.supersedeError) {
+				return new Response(JSON.stringify({ detail: state.supersedeError }), {
+					status: 422,
+					headers: jsonHeaders(),
+				});
+			}
+			if (state.supersedeIssues) {
+				return new Response(
+					JSON.stringify({
+						manualAccountId: body.manualAccountId,
+						syncedAccountId: "checking",
+						issues: state.supersedeIssues,
+						persisted: false,
+						revision: "test",
+					}),
+					{ headers: jsonHeaders() },
+				);
+			}
+			return new Response(
+				JSON.stringify({
+					manualAccountId: body.manualAccountId,
+					syncedAccountId: "checking",
+					issues: [],
+					persisted: true,
+					revision: "test",
+				}),
 				{ headers: jsonHeaders() },
 			);
 		}
@@ -247,21 +317,7 @@ function stubApi(state: {
 			record();
 			return new Response(
 				JSON.stringify({
-					accounts: accounts.map((account) => ({
-						id: account.id,
-						name: account.name,
-						kind: account.kind,
-						enabled: true,
-						archived: false,
-						balance: 100,
-						minBalance: null,
-						maxBalance: null,
-						color: account.color ?? undefined,
-						observedOn: "2026-10-26",
-						hasCheckpoint: false,
-						readOnly: false,
-						syncOwned: false,
-					})),
+					accounts: balanceRows(),
 					asOf: "2026-10-26",
 					revision: "test",
 				}),
@@ -326,21 +382,7 @@ function stubApi(state: {
 		syncQuotaLimit: 24,
 	});
 	cache.setQueryData(balancesOptions().queryKey, {
-		accounts: accounts.map((account) => ({
-			id: account.id,
-			name: account.name,
-			kind: account.kind,
-			enabled: true,
-			archived: false,
-			balance: 100,
-			minBalance: null,
-			maxBalance: null,
-			color: account.color ?? undefined,
-			observedOn: "2026-10-26",
-			hasCheckpoint: false,
-			readOnly: false,
-			syncOwned: false,
-		})),
+		accounts: balanceRows(),
 		asOf: "2026-10-26",
 		revision: "test",
 	});
@@ -365,7 +407,8 @@ it("renders the registered provider from the integrations list", async () => {
 	expect(await screen.findByText("SimpleFIN")).toBeTruthy();
 	expect(
 		requests.some(
-			(request) => request.method === "GET" && request.path === "/v1/integrations",
+			(request) =>
+				request.method === "GET" && request.path === "/v1/integrations",
 		),
 	).toBe(true);
 });
@@ -453,9 +496,7 @@ it("reconnects with a replacement token without disconnecting first", async () =
 		),
 	).toBe(true);
 	// Rotation keeps the connection: no disconnect request was made.
-	expect(
-		requests.some((request) => request.method === "DELETE"),
-	).toBe(false);
+	expect(requests.some((request) => request.method === "DELETE")).toBe(false);
 });
 
 it("cancels reconnect and keeps the saved connection", async () => {
@@ -610,10 +651,146 @@ it("lists every synced account", async () => {
 	expect(await screen.findByText("Synced accounts")).toBeTruthy();
 	expect(await screen.findByText("Checking")).toBeTruthy();
 	expect(screen.getByText("Prime Card")).toBeTruthy();
-	expect(
-		screen.queryByRole("button", { name: /Checking|Prime Card/ }),
-	).toBeNull();
+	expect(screen.queryByRole("button", { name: "Checking" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Prime Card" })).toBeNull();
 	expect(screen.queryByRole("button", { name: /Save cards/ })).toBeNull();
+});
+
+it("links a manual account to a synced account", async () => {
+	const requests = stubApi({
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+	});
+	render(<SyncSettings />);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "More options for Checking" }),
+	);
+	fireEvent.click(
+		await screen.findByRole("menuitem", { name: "Link existing account" }),
+	);
+	expect(
+		await screen.findByRole("heading", { name: "Link a manual account" }),
+	).toBeTruthy();
+	fireEvent.click(screen.getByRole("button", { name: /Brokerage/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Link account" }));
+	await waitFor(() => {
+		expect(
+			requests.some(
+				(request) =>
+					request.method === "POST" &&
+					request.path === "/v1/sync/simplefin/accounts/bridge-0/supersede",
+			),
+		).toBe(true);
+	});
+	const request = requests.find(
+		(candidate) =>
+			candidate.method === "POST" &&
+			candidate.path === "/v1/sync/simplefin/accounts/bridge-0/supersede",
+	);
+	expect(request?.body).toEqual({ manualAccountId: "brokerage" });
+	expect(
+		await screen.findByText(/Brokerage is linked to the bank account/),
+	).toBeTruthy();
+});
+
+it("keeps the link dialog open when validation rejects the merge", async () => {
+	stubApi({
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+		supersedeIssues: [
+			{
+				severity: "error",
+				code: "evaluation.accountBalance.accountId.invalid",
+				message:
+					"A saved evaluation references this account. Remove it before linking.",
+				path: [],
+			},
+		],
+	});
+	render(<SyncSettings />);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "More options for Checking" }),
+	);
+	fireEvent.click(
+		await screen.findByRole("menuitem", { name: "Link existing account" }),
+	);
+	fireEvent.click(screen.getByRole("button", { name: /Brokerage/ }));
+	fireEvent.click(screen.getByRole("button", { name: "Link account" }));
+	await waitFor(() => {
+		expect(
+			screen.queryByRole("heading", { name: "Link a manual account" }),
+		).toBeTruthy();
+	});
+	expect(
+		await screen.findByText(/A saved evaluation references this account/),
+	).toBeTruthy();
+	expect(
+		screen.getByRole("heading", { name: "Link a manual account" }),
+	).toBeTruthy();
+});
+
+it("shows an HTTP rejection inside the link dialog", async () => {
+	stubApi({
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+		supersedeError: "The account already has bank history.",
+	});
+	render(<SyncSettings />);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "More options for Checking" }),
+	);
+	fireEvent.click(
+		await screen.findByRole("menuitem", { name: "Link existing account" }),
+	);
+	const dialog = await screen.findByRole("dialog", {
+		name: "Link a manual account",
+	});
+	fireEvent.click(within(dialog).getByRole("button", { name: /Brokerage/ }));
+	fireEvent.click(within(dialog).getByRole("button", { name: "Link account" }));
+	expect(
+		await within(dialog).findByText(/The account already has bank history/),
+	).toBeTruthy();
+	expect(
+		within(dialog).getByRole("button", { name: "Link account" }),
+	).toBeTruthy();
+});
+
+it("disables Cancel while the link request is pending", async () => {
+	let release!: () => void;
+	const hold = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	stubApi({
+		configured: true,
+		links: [{ modelAccountId: "checking", bridgeName: "Old Bridge Name" }],
+		holdSupersede: hold,
+	});
+	render(<SyncSettings />);
+	fireEvent.click(
+		await screen.findByRole("button", { name: "More options for Checking" }),
+	);
+	fireEvent.click(
+		await screen.findByRole("menuitem", { name: "Link existing account" }),
+	);
+	const dialog = await screen.findByRole("dialog", {
+		name: "Link a manual account",
+	});
+	fireEvent.click(within(dialog).getByRole("button", { name: /Brokerage/ }));
+	fireEvent.click(within(dialog).getByRole("button", { name: "Link account" }));
+	await waitFor(() => {
+		expect(
+			(
+				within(dialog).getByRole("button", {
+					name: "Cancel",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+	});
+	expect(within(dialog).getByRole("button", { name: "Linking…" })).toBeTruthy();
+	release();
+	await waitFor(() => {
+		expect(screen.queryByRole("dialog")).toBeNull();
+	});
 });
 
 it("falls back to the bridge name when the model account is gone", async () => {
@@ -693,9 +870,8 @@ it("disables writes when read-only", async () => {
 	});
 	render(<SyncSettings />);
 	expect(await screen.findByText("Checking")).toBeTruthy();
-	expect(
-		screen.queryByRole("button", { name: /Checking|Prime Card/ }),
-	).toBeNull();
+	expect(screen.queryByRole("button", { name: "Checking" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Prime Card" })).toBeNull();
 	expect(
 		screen.queryByRole("button", { name: "Connect SimpleFIN" }),
 	).toBeNull();

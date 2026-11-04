@@ -1,15 +1,40 @@
-import { Landmark } from "lucide-react";
+import { Landmark, Link2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { AccountLabel } from "../../components/AccountIcon.tsx";
+import { ActionMenu } from "../../components/ActionMenu.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
+import type { Account } from "../../domain/model.ts";
 import { useSavedAccounts } from "../../state/savedRows.ts";
 import { refreshSyncSettings, useSyncLinks } from "../../state/syncSettings.ts";
+import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { SyncLinkAccountDialog } from "./SyncLinkAccountDialog.tsx";
 
-export function SyncConnectedAccounts() {
+export function SyncConnectedAccounts({
+	onLinked,
+}: {
+	onLinked?: (message: string) => void;
+}) {
 	const links = useSyncLinks();
 	const savedAccounts = useSavedAccounts();
+	const readOnly = useUserReadOnly();
+	const [linking, setLinking] = useState<{
+		bridgeAccountId: string;
+		syncedAccount: Account;
+	} | null>(null);
 	const byId = new Map(
 		(savedAccounts ?? []).map((account) => [account.id, account]),
+	);
+	const linkedAccountIDs = useMemo(
+		() => new Set((links.data ?? []).map((link) => link.modelAccountId)),
+		[links.data],
+	);
+	const manualAccounts = useMemo(
+		() =>
+			(savedAccounts ?? []).filter(
+				(account) => !account.readOnly && !linkedAccountIDs.has(account.id),
+			),
+		[linkedAccountIDs, savedAccounts],
 	);
 	return (
 		<div className="border-t border-line p-5 sm:p-6">
@@ -36,11 +61,40 @@ export function SyncConnectedAccounts() {
 								key={link.bridgeAccountId}
 								className="rounded-control border border-line px-4 py-3 text-sm"
 							>
-								{account ? (
-									<AccountLabel account={account} />
-								) : (
-									link.bridgeName || link.modelAccountId
-								)}
+								<div className="flex flex-wrap items-center justify-between gap-3">
+									<div className="min-w-0">
+										{account ? (
+											<AccountLabel account={account} />
+										) : (
+											link.bridgeName || link.modelAccountId
+										)}
+									</div>
+									<ActionMenu
+										label={
+											account
+												? `More options for ${account.name}`
+												: "More options"
+										}
+										menuLabel="Synced account actions"
+										items={
+											account && !readOnly && manualAccounts.length > 0
+												? [
+														{
+															id: "link-existing-account",
+															label: "Link existing account",
+															icon: Link2,
+															restoreFocus: false,
+															onSelect: () =>
+																setLinking({
+																	bridgeAccountId: link.bridgeAccountId,
+																	syncedAccount: account,
+																}),
+														},
+													]
+												: []
+										}
+									/>
+								</div>
 							</li>
 						);
 					})}
@@ -56,6 +110,20 @@ export function SyncConnectedAccounts() {
 						connected in SimpleFIN, then choose Sync now.
 					</p>
 				</div>
+			)}
+			{linking && (
+				<SyncLinkAccountDialog
+					bridgeAccountId={linking.bridgeAccountId}
+					syncedAccount={linking.syncedAccount}
+					manualAccounts={manualAccounts}
+					onClose={() => setLinking(null)}
+					onLinked={(manualAccount) => {
+						setLinking(null);
+						onLinked?.(
+							`${manualAccount.name} is linked to the bank account. The manual record and its history were removed.`,
+						);
+					}}
+				/>
 			)}
 		</div>
 	);

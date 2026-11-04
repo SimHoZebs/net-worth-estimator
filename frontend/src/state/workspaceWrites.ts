@@ -81,6 +81,11 @@ export async function performSave(options: {
 	call: () => Promise<{ data: unknown }>;
 	refresh: () => Promise<void>;
 	failureMessage: string;
+	/**
+	 * Receives an HTTP or envelope rejection message before the save returns
+	 * false, so an open dialog can show it inline.
+	 */
+	onRejected?: (message: string) => void;
 }): Promise<boolean> {
 	const scope = getUserScope();
 	if (workspaceIsBusy()) {
@@ -101,13 +106,14 @@ export async function performSave(options: {
 			try {
 				envelope = (await options.call()).data;
 			} catch (cause) {
+				const message =
+					cause instanceof Error ? cause.message : options.failureMessage;
 				if (scope === getUserScope()) {
 					await options.refresh().catch(() => {});
-					if (scope === getUserScope())
-						notifyError(
-							"workspace",
-							cause instanceof Error ? cause.message : options.failureMessage,
-						);
+					if (scope === getUserScope()) {
+						notifyError("workspace", message);
+						options.onRejected?.(message);
+					}
 				}
 				throw cause instanceof Error
 					? cause
@@ -117,7 +123,10 @@ export async function performSave(options: {
 			const rejection = saveRejection(envelope as SaveResult);
 			if (rejection) {
 				await options.refresh().catch(() => {});
-				if (scope === getUserScope()) notifyError("workspace", rejection);
+				if (scope === getUserScope()) {
+					notifyError("workspace", rejection);
+					options.onRejected?.(rejection);
+				}
 				throw new Error(rejection);
 			}
 			try {

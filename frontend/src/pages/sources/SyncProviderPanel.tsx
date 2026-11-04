@@ -270,7 +270,12 @@ export function SyncProviderPanel() {
 									</a>
 								</div>
 							</div>
-							<SyncConnectedAccounts />
+							<SyncConnectedAccounts
+								onLinked={(linkedMessage) => {
+									setError(null);
+									setMessage(linkedMessage);
+								}}
+							/>
 							<div className="border-t border-line bg-surface-2 px-5 py-4 sm:px-6">
 								{reconnecting ? (
 									<div>

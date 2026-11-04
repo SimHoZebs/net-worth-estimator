@@ -4,6 +4,7 @@ import {
 	disconnectSyncCredential,
 	getSyncCredential,
 	listAccountLinks,
+	supersedeSimplefinAccount,
 	triggerSimplefinSync,
 } from "@/api/generated/endpoints.ts";
 import type {
@@ -20,7 +21,11 @@ import { serverQueryClient } from "@/state/serverQuery.ts";
 import { integrationsKey } from "@/state/integrations.ts";
 import { refreshWorkspaceAfterSync } from "@/state/syncWorkspaceRefresh.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
-import { userResourceKey } from "@/state/workspaceResources.ts";
+import { performSave } from "@/state/workspaceWrites.ts";
+import {
+	reloadWorkspace,
+	userResourceKey,
+} from "@/state/workspaceResources.ts";
 
 export function syncCredentialKey(scope = getUserScope()) {
 	return ["sync-credential", scope.key] as const;
@@ -238,6 +243,36 @@ export async function triggerSyncNow(): Promise<boolean> {
 	if (scope !== getUserScope()) return false;
 	dismissKey("sync-trigger");
 	return true;
+}
+
+// supersedeSyncedAccount retires one manual account in favor of the synced
+// account already linked to this bridge account. The server moves the manual
+// profile, configuration, and sharing-policy selections onto the synced
+// account, then deletes the manual account and its history. The workspace
+// reload runs inside the guarded model mutation, but the mutation is already
+// waiting on this callback, so it must not wait for itself.
+export async function supersedeSyncedAccount(
+	bridgeAccountId: string,
+	manualAccountId: string,
+	onRejected?: (message: string) => void,
+): Promise<boolean> {
+	const scope = getUserScope();
+	if (scope.status !== "ready") return false;
+	return performSave({
+		call: () => supersedeSimplefinAccount(bridgeAccountId, { manualAccountId }),
+		refresh: async () => {
+			const modelOk = await reloadWorkspace({ waitForWrites: false });
+			if (!modelOk)
+				throw new Error("The linked accounts could not be reloaded.");
+			await serverQueryClient().invalidateQueries({
+				queryKey: ["safe-spending-settings"],
+				refetchType: "active",
+			});
+			await refreshSyncSettings(true);
+		},
+		failureMessage: "The accounts could not be linked.",
+		onRejected,
+	});
 }
 
 export function resetSyncSettingsClient(): void {

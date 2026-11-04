@@ -214,12 +214,19 @@ export function workspaceIsBusy() {
 	);
 }
 
-/** Explicit refreshes retain Query's last good data. A save completes before a refresh starts. Returns whether the scoped model fetch succeeded. */
-export async function reloadWorkspace(): Promise<boolean> {
+/**
+ * Explicit refreshes retain Query's last good data. A save completes before a
+ * refresh starts. `waitForWrites: false` is for a refresh already running
+ * inside the guarded write, whose own mutation would otherwise deadlock it.
+ * Returns whether the scoped model fetch succeeded.
+ */
+export async function reloadWorkspace(
+	options: { waitForWrites?: boolean } = {},
+): Promise<boolean> {
 	const scope = getUserScope();
 	const cache = serverQueryClient();
 	const mutationKey = ["workspace-write", scope.key, "model"];
-	if (cache.isMutating({ mutationKey }))
+	if ((options.waitForWrites ?? true) && cache.isMutating({ mutationKey }))
 		await new Promise<void>((resolve) => {
 			const stop = cache.getMutationCache().subscribe(() => {
 				if (!cache.isMutating({ mutationKey })) {

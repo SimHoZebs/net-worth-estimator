@@ -18,6 +18,12 @@ export async function resetFixture(
 			posted: number;
 			pending?: boolean;
 		}[];
+		syncLink?: {
+			bridgeAccountId: string;
+			modelAccountId: string;
+			bridgeName: string;
+			currency?: string;
+		};
 	} = {},
 ): Promise<void> {
 	const api = await request.newContext();
@@ -27,6 +33,9 @@ export async function resetFixture(
 				readOnly: options.readOnly ?? false,
 				bankTransactions: options.bankTransactions,
 				bulk: options.bulk,
+				syncLink: options.syncLink
+					? { currency: "USD", ...options.syncLink }
+					: undefined,
 			},
 		});
 		if (!response.ok())

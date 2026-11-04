@@ -327,6 +327,12 @@ func main() {
 			ReadOnly         *bool                   `json:"readOnly"`
 			BankTransactions []simplefin.Transaction `json:"bankTransactions"`
 			Bulk             *string                 `json:"bulk"`
+			SyncLink         *struct {
+				BridgeAccountID string `json:"bridgeAccountId"`
+				ModelAccountID  string `json:"modelAccountId"`
+				BridgeName      string `json:"bridgeName"`
+				Currency        string `json:"currency"`
+			} `json:"syncLink"`
 		}
 		if request.Body != nil {
 			// An empty body is valid and keeps the current guard setting.
@@ -340,6 +346,19 @@ func main() {
 			writer.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintln(writer, err)
 			return
+		}
+		if body.SyncLink != nil {
+			if _, err := database.SaveAccountLink(store.AccountLink{
+				BridgeAccountID: body.SyncLink.BridgeAccountID,
+				ModelAccountID:  body.SyncLink.ModelAccountID,
+				BridgeName:      body.SyncLink.BridgeName,
+				Currency:        body.SyncLink.Currency,
+				Origin:          store.LinkOriginAuto,
+			}); err != nil {
+				writer.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintln(writer, err)
+				return
+			}
 		}
 		writer.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(writer).Encode(map[string]any{
