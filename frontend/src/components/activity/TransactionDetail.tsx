@@ -964,9 +964,7 @@ export function TransactionDetail({
 			: undefined;
 	const ruleCadence = rawRule ? frequencyLabel(rawRule.frequency) : null;
 	const ruleFrequencyChoice: FrequencyChoice =
-		rawRule === undefined
-			? "monthly"
-			: frequencyChoiceOf(rawRule.frequency);
+		rawRule === undefined ? "monthly" : frequencyChoiceOf(rawRule.frequency);
 	const edit = useTransactionEdit({
 		savedTransaction,
 		readOnly,
@@ -1087,6 +1085,53 @@ export function TransactionDetail({
 		if (ok) onClose();
 		else setDeleteError("The transaction could not be removed.");
 	};
+	// A void hold's suggestion merges it into the posted charge. The posted
+	// charge keeps its amount and date; an occurrence recorded on the hold
+	// moves to it when the charge records none.
+	const mergeVoidHold = async (candidateId: string): Promise<boolean> => {
+		if (deleting || readOnly) return false;
+		const candidate = allTransactions.find((row) => row.id === candidateId);
+		if (!candidate || candidate.void || candidate.pending) return false;
+		const claimRuleId = savedTransaction.claimRuleId;
+		const claimOccurrenceDate = savedTransaction.claimOccurrenceDate;
+		setDeleting(true);
+		setDeleteError(null);
+		if (claimRuleId && claimOccurrenceDate && !candidate.claimRuleId) {
+			const raw = getServerModel()?.model?.postings.find(
+				(row) => row.id === candidateId,
+			);
+			if (!raw) {
+				setDeleting(false);
+				setDeleteError(
+					"The posted charge could not be loaded. Close and try again.",
+				);
+				return false;
+			}
+			const claimed = await performSave({
+				call: () =>
+					updatePosting(
+						candidateId,
+						claimPostingBody(raw, claimRuleId, claimOccurrenceDate),
+					),
+				refresh: refreshTransactions,
+				failureMessage: "The posted charge could not record the occurrence.",
+			});
+			if (!claimed) {
+				setDeleting(false);
+				setDeleteError("The posted charge could not record the occurrence.");
+				return false;
+			}
+		}
+		const ok = await performSave({
+			call: () => deletePosting(savedTransaction.id),
+			refresh: refreshTransactions,
+			failureMessage: "The vanished hold could not be removed.",
+		});
+		setDeleting(false);
+		if (ok) onClose();
+		else setDeleteError("The vanished hold could not be removed.");
+		return ok;
+	};
 	const fullAccounts = accounts as Account[];
 	const [insightsOpen, setInsightsOpen] = useState(false);
 	// Sharing lives in its own sheet above the detail, mirroring the
@@ -1103,11 +1148,17 @@ export function TransactionDetail({
 				? buildInsightSuggestions({
 						findings: findingsQuery.data?.findings ?? [],
 						postingId: savedTransaction.id,
+						voidRow: savedTransaction,
+						transactions: allTransactions,
 					})
 				: [],
-		[once, findingsQuery.data?.findings, savedTransaction.id],
+		[once, findingsQuery.data?.findings, savedTransaction, allTransactions],
 	);
-	const insightReadOnly = Boolean(readOnly ?? savedTransaction.readOnly);
+	// A void hold is read-only as a row, but its merge suggestion stays
+	// actionable for the owner. Only the app-level read-only gate blocks it.
+	const insightReadOnly = savedTransaction.void
+		? Boolean(readOnly)
+		: Boolean(readOnly ?? savedTransaction.readOnly);
 	const sharedIntents = useMemo(
 		() =>
 			(grantsQuery.data ?? []).filter(
@@ -1477,7 +1528,7 @@ export function TransactionDetail({
 									: null
 							}
 							ruleCadence={ruleCadence}
-						occurrenceOptions={occurrenceOptions}
+							occurrenceOptions={occurrenceOptions}
 							editing={edit.activeField === "schedule"}
 							locked={!canEdit}
 							scheduleControlId={`${edit.formId}-schedule`}
@@ -1618,6 +1669,7 @@ export function TransactionDetail({
 						names={insightNames}
 						readOnly={insightReadOnly}
 						onDone={() => setInsightsOpen(false)}
+						onMergeVoid={savedTransaction.void ? mergeVoidHold : undefined}
 					/>
 				</Modal>
 			)}

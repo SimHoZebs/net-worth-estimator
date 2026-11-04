@@ -601,6 +601,144 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });
 
+it("lets the owner merge a vanished hold from the suggestions sheet", async () => {
+	const server = stubTestServer();
+	const settled = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000097",
+		name: "Bistro dinner",
+		amount: 58,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		kind: "posting" as const,
+		startDate: "2026-10-21",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: true,
+		readOnly: false,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: "2026-10-21",
+		pending: false,
+		void: false,
+		syncOwned: true,
+	};
+	const voidHold = {
+		...financialModelFixture.transactions[0]!,
+		id: "01900000-0000-7000-8000-000000000096",
+		name: "Bistro",
+		amount: 50,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		kind: "posting" as const,
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: true,
+		syncOwned: true,
+	};
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(voidHold)}
+			savedTransaction={voidHold}
+			accounts={financialModelFixture.accounts}
+			transactions={[voidHold, settled]}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Review 1 suggestion" }));
+	const sheet = screen.getByRole("dialog", { name: "Suggestions" });
+	expect(within(sheet).getByText(/Did this hold post/)).toBeTruthy();
+	fireEvent.click(
+		within(sheet).getByRole("button", {
+			name: "Merge and remove hold",
+		}),
+	);
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "DELETE" &&
+					call.url === "/v1/postings/01900000-0000-7000-8000-000000000096",
+			),
+		).toBe(true),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+});
+
+it("moves a recorded occurrence when merging a vanished hold", async () => {
+	const server = stubTestServer();
+	const settled = {
+		...financialModelFixture.transactions.find(
+			(row) => row.id === "renovation",
+		)!,
+		syncOwned: true,
+		postedDate: "2028-06-15",
+	};
+	const voidHold = {
+		...settled,
+		id: "01900000-0000-7000-8000-000000000095",
+		startDate: "2028-06-14",
+		enabled: false,
+		readOnly: true,
+		claimRuleId: "living",
+		claimOccurrenceDate: "2026-10-01",
+		postedDate: null,
+		void: true,
+	};
+	setServerModelFixture({
+		...financialModelFixture,
+		transactions: [voidHold, settled],
+	});
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(voidHold)}
+			savedTransaction={voidHold}
+			accounts={financialModelFixture.accounts}
+			transactions={[voidHold, settled]}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Review 1 suggestion" }));
+	const sheet = screen.getByRole("dialog", { name: "Suggestions" });
+	fireEvent.click(
+		within(sheet).getByRole("button", {
+			name: "Merge and remove hold",
+		}),
+	);
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "PATCH" &&
+					call.url === "/v1/postings/renovation" &&
+					(call.body as { claim?: { ruleId?: string } })?.claim?.ruleId ===
+						"living",
+			),
+		).toBe(true),
+	);
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "DELETE" &&
+					call.url === "/v1/postings/01900000-0000-7000-8000-000000000095",
+			),
+		).toBe(true),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+});
+
 it("saves row edits through the posting endpoint and closes", async () => {
 	// Raw row carries server shapes the display never shows: non-midnight
 	// seconds that a date-unchanged save must keep verbatim.

@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import {
-	Check,
-	Info,
-	Repeat,
-	Sparkles,
-	Wallet,
-	X,
-} from "lucide-react";
+import { Check, Info, Link2, Repeat, Sparkles, Wallet, X } from "lucide-react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import { voidSettleCandidates } from "@/domain/accountActivity.ts";
 import { providerLabel } from "@/domain/analysisFindings.ts";
+import { dateLabel, money } from "@/domain/format.ts";
+import type { Transaction } from "@/domain/model.ts";
 import {
 	cadenceLabel,
 	directionLabel,
@@ -30,6 +26,12 @@ import {
 } from "../analysis/RecurringPatterns.tsx";
 
 export type InsightSuggestion =
+	| {
+			kind: "void";
+			voidRow: Transaction;
+			candidates: Transaction[];
+			priority: number;
+	  }
 	| { kind: "bnpl"; finding: AnalysisFinding; priority: number }
 	| {
 			kind: "recurring";
@@ -76,11 +78,27 @@ function isActionablePattern(pattern: RecurringPattern): boolean {
 export function buildInsightSuggestions({
 	findings,
 	postingId,
+	voidRow,
+	transactions,
 }: {
 	findings: AnalysisFinding[];
 	postingId: string;
+	/** Settling a void hold is an action too, not just a badge. */
+	voidRow?: Transaction;
+	transactions?: Transaction[];
 }): InsightSuggestion[] {
 	const suggestions: InsightSuggestion[] = [];
+	if (voidRow?.id === postingId && voidRow.void && transactions) {
+		const candidates = voidSettleCandidates({ voidRow, transactions });
+		if (candidates.length > 0) {
+			suggestions.push({
+				kind: "void",
+				voidRow,
+				candidates,
+				priority: 0,
+			});
+		}
+	}
 	const bnpl = findings.find(
 		(finding) =>
 			finding.postingId === postingId &&
@@ -122,12 +140,20 @@ export function TransactionInsightsTrigger({
 }
 
 function suggestionKey(suggestion: InsightSuggestion): string {
+	if (suggestion.kind === "void") return `void-${suggestion.voidRow.id}`;
 	return suggestion.kind === "bnpl"
 		? suggestion.finding.id
 		: suggestion.pattern.anchor.id;
 }
 
 function suggestionEvidence(suggestion: InsightSuggestion): string {
+	if (suggestion.kind === "void") {
+		const first = suggestion.candidates[0];
+		if (!first) return "A posted charge matches this vanished hold.";
+		if (suggestion.candidates.length === 1)
+			return `${first.name} for ${money(first.amount)} on ${dateLabel(first.startDate, true)} matches this hold.`;
+		return `${suggestion.candidates.length} posted charges match this hold. Pick the one it posted as.`;
+	}
 	if (suggestion.kind === "bnpl") {
 		const reasons = (suggestion.finding.evidence ?? [])
 			.map((item) => item.reason)
@@ -145,11 +171,14 @@ export function TransactionInsightsPanel({
 	names,
 	readOnly,
 	onDone,
+	onMergeVoid,
 }: {
 	suggestions: InsightSuggestion[];
 	names: Map<string, string>;
 	readOnly: boolean;
 	onDone: () => void;
+	/** Merge a vanished hold into its posted charge, then remove the hold. */
+	onMergeVoid?: (candidateId: string) => Promise<boolean>;
 }) {
 	const review = useReviewAnalysisFinding();
 	const dismiss = useDismissAnalysisFinding();
@@ -160,9 +189,10 @@ export function TransactionInsightsPanel({
 		"months",
 	);
 	const [error, setError] = useState<string | null>(null);
-	const [ruleDialog, setRuleDialog] = useState<"new" | "existing" | null>(
-		null,
-	);
+	const [voidCandidateId, setVoidCandidateId] = useState("");
+	const [voidSaving, setVoidSaving] = useState(false);
+	const [voidError, setVoidError] = useState<string | null>(null);
+	const [ruleDialog, setRuleDialog] = useState<"new" | "existing" | null>(null);
 	// A confirmed repeating pattern leaves the queue on refetch, so the
 	// detail step keeps its own snapshot to offer rule creation.
 	const [recurringSnapshot, setRecurringSnapshot] =
@@ -192,6 +222,10 @@ export function TransactionInsightsPanel({
 		setDurationCount("");
 		setDurationUnit("months");
 		setRuleDialog(null);
+		setVoidCandidateId(
+			active?.kind === "void" ? (active.candidates[0]?.id ?? "") : "",
+		);
+		setVoidError(null);
 	}
 
 	useEffect(() => {
@@ -207,6 +241,8 @@ export function TransactionInsightsPanel({
 		setDurationCount("");
 		setDurationUnit("months");
 		setRuleDialog(null);
+		setVoidCandidateId("");
+		setVoidError(null);
 	};
 
 	// The detail step for a confirmed repeating pattern survives the
@@ -238,9 +274,10 @@ export function TransactionInsightsPanel({
 		);
 	}
 
-	const busy = review.isPending || dismiss.isPending;
+	const busy = review.isPending || dismiss.isPending || voidSaving;
 	const isBnpl = shown.kind === "bnpl";
-	const Icon = shown.kind === "bnpl" ? Wallet : Repeat;
+	const isVoid = shown.kind === "void";
+	const Icon = isVoid ? Link2 : isBnpl ? Wallet : Repeat;
 	const doneCount = handled.filter((key) =>
 		suggestions.some((item) => suggestionKey(item) === key),
 	).length;
@@ -249,31 +286,56 @@ export function TransactionInsightsPanel({
 	const position = doneCount + 1;
 	const total = Math.max(doneCount + open.length, 1);
 	const shownPosition = Math.min(position, total);
-	const kicker =
-		shown.kind === "bnpl"
+	const kicker = isVoid
+		? `Vanished hold · ${shownPosition} of ${total}`
+		: isBnpl
 			? `Payment plan · ${shownPosition} of ${total}`
 			: `Repeating payment · ${shownPosition} of ${total}`;
-	const question =
-		shown.kind === "bnpl"
+	const question = isVoid
+		? "Did this hold post as one of these charges?"
+		: isBnpl
 			? `Is this a buy now, pay later payment from ${providerLabel(shown.finding.provider)}?`
 			: "Is this a repeating payment?";
 	const findingId =
-		shown.kind === "bnpl" ? shown.finding.id : shown.pattern.anchor.id;
+		shown.kind === "bnpl"
+			? shown.finding.id
+			: shown.kind === "recurring"
+				? shown.pattern.anchor.id
+				: "";
 	const runId =
-		shown.kind === "bnpl" ? shown.finding.runId : shown.pattern.anchor.runId;
+		shown.kind === "bnpl"
+			? shown.finding.runId
+			: shown.kind === "recurring"
+				? shown.pattern.anchor.runId
+				: "";
 	const revision =
 		shown.kind === "bnpl"
 			? shown.finding.feedbackRevision
-			: shown.pattern.anchor.feedbackRevision;
+			: shown.kind === "recurring"
+				? shown.pattern.anchor.feedbackRevision
+				: 0;
 	const detailsPattern =
-		recurringSnapshot ??
-		(shown.kind === "recurring" ? shown.pattern : null);
+		recurringSnapshot ?? (shown.kind === "recurring" ? shown.pattern : null);
 	const patternTitleText = detailsPattern
 		? patternTitle(detailsPattern, names)
 		: "";
+	const selectedVoid =
+		shown.kind === "void"
+			? (shown.candidates.find(
+					(candidate) => candidate.id === voidCandidateId,
+				) ??
+				shown.candidates[0] ??
+				null)
+			: null;
+	const movesVoidClaim = Boolean(
+		shown.kind === "void" &&
+		shown.voidRow.claimRuleId &&
+		shown.voidRow.claimOccurrenceDate &&
+		!selectedVoid?.claimRuleId,
+	);
 
 	const answer = (action: "confirm" | "reject") => {
-		if (busy || readOnly) return;
+		if (busy || readOnly || isVoid) return;
 		setError(null);
 		review.mutate(
 			{
@@ -293,14 +355,17 @@ export function TransactionInsightsPanel({
 						setPhase("details");
 					} else if (active) markHandled(active);
 				},
-				onError: () =>
-					setError("Your answer could not be saved. Try again."),
+				onError: () => setError("Your answer could not be saved. Try again."),
 			},
 		);
 	};
 
 	const snooze = () => {
 		if (busy || readOnly) return;
+		if (isVoid) {
+			if (active) markHandled(active);
+			return;
+		}
 		setError(null);
 		dismiss.mutate(
 			{ id: findingId, dismissed: true },
@@ -313,9 +378,23 @@ export function TransactionInsightsPanel({
 		);
 	};
 
+	const mergeVoid = async () => {
+		if (shown.kind !== "void" || busy || readOnly) return;
+		if (!voidCandidateId || !onMergeVoid) {
+			setVoidError("Pick the posted charge first.");
+			return;
+		}
+		setVoidError(null);
+		setVoidSaving(true);
+		const merged = await onMergeVoid(voidCandidateId);
+		setVoidSaving(false);
+		if (merged) markHandled(shown);
+		else setVoidError("The hold could not be merged. Try again.");
+	};
+
 	const saveDuration = (event?: { preventDefault?: () => void }) => {
 		event?.preventDefault?.();
-		if (busy || readOnly) return;
+		if (busy || readOnly || isVoid) return;
 		const count = Number(durationCount);
 		if (!Number.isInteger(count) || count < 1 || count > 5200) {
 			setError("Check the plan length.");
@@ -367,7 +446,44 @@ export function TransactionInsightsPanel({
 				<span>{suggestionEvidence(shown)}</span>
 			</p>
 
-			{phase === "question" && !recurringSnapshot ? (
+			{shown.kind === "void" ? (
+				<div className="grid gap-3">
+					{shown.candidates.length > 1 && (
+						<SelectField
+							label="Posted as"
+							name="suggestedPostedCharge"
+							value={voidCandidateId}
+							onChange={(event) => setVoidCandidateId(event.target.value)}
+						>
+							{shown.candidates.map((candidate) => (
+								<option key={candidate.id} value={candidate.id}>
+									{candidate.name} — {money(candidate.amount)} on{" "}
+									{dateLabel(candidate.startDate, true)}
+								</option>
+							))}
+						</SelectField>
+					)}
+					{movesVoidClaim && shown.voidRow.claimRuleId && (
+						<p className="m-0 text-[11px] leading-relaxed text-muted">
+							The posted charge records the occurrence of{" "}
+							{names.get(shown.voidRow.claimRuleId) ?? "its rule"} on{" "}
+							{dateLabel(shown.voidRow.claimOccurrenceDate ?? "", true)}.
+						</p>
+					)}
+					{!movesVoidClaim &&
+						shown.voidRow.claimRuleId &&
+						selectedVoid?.claimRuleId && (
+							<p className="m-0 text-[11px] leading-relaxed text-muted">
+								The posted charge already records an occurrence. Its claim
+								stays; this hold's claim is cleared with the hold.
+							</p>
+						)}
+					<p className="m-0 text-[11px] leading-relaxed text-muted">
+						The posted charge keeps its amount and date. This clears the
+						vanished hold record.
+					</p>
+				</div>
+			) : phase === "question" && !recurringSnapshot ? (
 				<div className="grid grid-cols-2 gap-2">
 					<Button
 						type="button"
@@ -387,10 +503,7 @@ export function TransactionInsightsPanel({
 					</Button>
 				</div>
 			) : isBnpl && !recurringSnapshot ? (
-				<form
-					onSubmit={(event) => saveDuration(event)}
-					className="grid gap-4"
-				>
+				<form onSubmit={(event) => saveDuration(event)} className="grid gap-4">
 					<div className="grid grid-cols-2 gap-3">
 						<InputField
 							label="Plan length"
@@ -417,8 +530,8 @@ export function TransactionInsightsPanel({
 						</SelectField>
 					</div>
 					<p className="m-0 text-[11px] leading-relaxed text-muted">
-						Enter the full plan length. The bank charge alone does not
-						establish the total, count, or due dates.
+						Enter the full plan length. The bank charge alone does not establish
+						the total, count, or due dates.
 					</p>
 				</form>
 			) : (
@@ -450,14 +563,37 @@ export function TransactionInsightsPanel({
 				</div>
 			)}
 
-			{(error || review.isError || dismiss.isError) && (
+			{(error || voidError || review.isError || dismiss.isError) && (
 				<ErrorNotice
-					message={error ?? "Your answer could not be saved. Try again."}
+					message={
+						error ?? voidError ?? "Your answer could not be saved. Try again."
+					}
 				/>
 			)}
 
 			<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-8 flex items-center justify-between gap-3 border-t border-line bg-surface px-8 pt-4 pb-1 max-sm:-mx-5 max-sm:-mb-5 max-sm:px-5">
-				{phase === "question" ? (
+				{shown.kind === "void" ? (
+					<>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							disabled={busy || readOnly}
+							onClick={snooze}
+						>
+							Keep hold
+						</Button>
+						<Button
+							type="button"
+							variant="primary"
+							size="sm"
+							disabled={busy || readOnly || !selectedVoid}
+							onClick={() => void mergeVoid()}
+						>
+							{voidSaving ? "Merging…" : "Merge and remove hold"}
+						</Button>
+					</>
+				) : phase === "question" ? (
 					<>
 						<Button
 							type="button"

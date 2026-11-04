@@ -1,6 +1,14 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
+import { financialModelFixture } from "../../mocks/financialModel.ts";
+import type { Transaction } from "../../domain/model.ts";
 import {
 	buildInsightSuggestions,
 	TransactionInsightsPanel,
@@ -43,7 +51,9 @@ vi.mock("@/state/savedRows.ts", () => ({
 	useSavedAccounts: () => [],
 }));
 
-function bnplFinding(overrides: Partial<AnalysisFinding> = {}): AnalysisFinding {
+function bnplFinding(
+	overrides: Partial<AnalysisFinding> = {},
+): AnalysisFinding {
 	return {
 		id: "bnpl-1",
 		postingId: "posting-1",
@@ -57,7 +67,13 @@ function bnplFinding(overrides: Partial<AnalysisFinding> = {}): AnalysisFinding 
 		dismissed: false,
 		runId: "run-1",
 		feedbackRevision: 1,
-		evidence: [{ code: "bnpl.provider", reason: "Afterpay appears.", postingIds: ["posting-1"] }],
+		evidence: [
+			{
+				code: "bnpl.provider",
+				reason: "Afterpay appears.",
+				postingIds: ["posting-1"],
+			},
+		],
 		...overrides,
 	} as AnalysisFinding;
 }
@@ -85,6 +101,44 @@ function recurringFinding(
 		],
 		...overrides,
 	} as AnalysisFinding;
+}
+
+function bankRow(overrides: Partial<Transaction> = {}): Transaction {
+	return {
+		...financialModelFixture.transactions[0]!,
+		id: "void-1",
+		name: "Bistro",
+		amount: 50,
+		amountKnown: true,
+		fromId: "checking",
+		toId: null,
+		kind: "posting",
+		startDate: "2026-10-20",
+		endDate: null,
+		annualIncrease: 0,
+		enabled: false,
+		readOnly: true,
+		claimRuleId: null,
+		claimOccurrenceDate: null,
+		postedDate: null,
+		pending: false,
+		void: true,
+		syncOwned: true,
+		...overrides,
+	};
+}
+
+function settledMatch(overrides: Partial<Transaction> = {}): Transaction {
+	return bankRow({
+		id: "settled-1",
+		name: "Bistro dinner",
+		amount: 58,
+		enabled: true,
+		readOnly: false,
+		postedDate: "2026-10-21",
+		void: false,
+		...overrides,
+	});
 }
 
 beforeEach(() => {
@@ -169,6 +223,28 @@ describe("buildInsightSuggestions", () => {
 		});
 		expect(suggestions.map((item) => item.kind)).toEqual(["bnpl"]);
 	});
+
+	it("queues a vanished hold with a posted match before BNPL", () => {
+		const hold = bankRow();
+		const suggestions = buildInsightSuggestions({
+			findings: [bnplFinding({ postingId: hold.id })],
+			postingId: hold.id,
+			voidRow: hold,
+			transactions: [hold, settledMatch()],
+		});
+		expect(suggestions.map((item) => item.kind)).toEqual(["void", "bnpl"]);
+	});
+
+	it("skips a vanished hold without a posted match", () => {
+		const hold = bankRow();
+		const suggestions = buildInsightSuggestions({
+			findings: [],
+			postingId: hold.id,
+			voidRow: hold,
+			transactions: [hold],
+		});
+		expect(suggestions).toEqual([]);
+	});
 });
 
 describe("TransactionInsightsTrigger", () => {
@@ -205,6 +281,114 @@ describe("TransactionInsightsPanel", () => {
 		expect(screen.getByRole("button", { name: "Yes" })).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Not now" })).toBeTruthy();
 		expect(screen.getByText("1 to review")).toBeTruthy();
+	});
+
+	it("merges a vanished hold into its posted charge", async () => {
+		const onMergeVoid = vi.fn().mockResolvedValue(true);
+		const hold = bankRow();
+		const settled = settledMatch();
+		render(
+			<TransactionInsightsPanel
+				suggestions={buildInsightSuggestions({
+					findings: [],
+					postingId: hold.id,
+					voidRow: hold,
+					transactions: [hold, settled],
+				})}
+				names={new Map([[hold.id, hold.name]])}
+				readOnly={false}
+				onDone={() => {}}
+				onMergeVoid={onMergeVoid}
+			/>,
+		);
+		expect(screen.getByText(/Did this hold post/)).toBeTruthy();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Merge and remove hold" }),
+		);
+		await waitFor(() => expect(onMergeVoid).toHaveBeenCalledWith(settled.id));
+		expect(screen.getByText("All caught up")).toBeTruthy();
+	});
+
+	it("states when a recorded occurrence moves with the merge", () => {
+		const hold = bankRow({
+			claimRuleId: "living",
+			claimOccurrenceDate: "2026-10-01",
+		});
+		render(
+			<TransactionInsightsPanel
+				suggestions={buildInsightSuggestions({
+					findings: [],
+					postingId: hold.id,
+					voidRow: hold,
+					transactions: [hold, settledMatch()],
+				})}
+				names={new Map([["living", "Everyday living"]])}
+				readOnly={false}
+				onDone={() => {}}
+				onMergeVoid={vi.fn().mockResolvedValue(true)}
+			/>,
+		);
+		expect(
+			screen.getByText(/records the occurrence of Everyday living/),
+		).toBeTruthy();
+	});
+
+	it("states when the posted charge already records an occurrence", () => {
+		const hold = bankRow({
+			claimRuleId: "living",
+			claimOccurrenceDate: "2026-10-01",
+		});
+		const settled = settledMatch({
+			claimRuleId: "living",
+			claimOccurrenceDate: "2026-10-01",
+		});
+		render(
+			<TransactionInsightsPanel
+				suggestions={buildInsightSuggestions({
+					findings: [],
+					postingId: hold.id,
+					voidRow: hold,
+					transactions: [hold, settled],
+				})}
+				names={new Map([["living", "Everyday living"]])}
+				readOnly={false}
+				onDone={() => {}}
+				onMergeVoid={vi.fn().mockResolvedValue(true)}
+			/>,
+		);
+		expect(screen.getByText(/already records an occurrence/)).toBeTruthy();
+	});
+
+	it("picks among several posted matches", async () => {
+		const onMergeVoid = vi.fn().mockResolvedValue(true);
+		const hold = bankRow();
+		const first = settledMatch();
+		const second = settledMatch({
+			id: "settled-2",
+			name: "Bistro lunch",
+			amount: 51,
+		});
+		render(
+			<TransactionInsightsPanel
+				suggestions={buildInsightSuggestions({
+					findings: [],
+					postingId: hold.id,
+					voidRow: hold,
+					transactions: [hold, first, second],
+				})}
+				names={new Map()}
+				readOnly={false}
+				onDone={() => {}}
+				onMergeVoid={onMergeVoid}
+			/>,
+		);
+		fireEvent.change(screen.getByLabelText("Posted as"), {
+			target: { value: second.id },
+		});
+		fireEvent.click(
+			screen.getByRole("button", { name: "Merge and remove hold" }),
+		);
+		await waitFor(() => expect(onMergeVoid).toHaveBeenCalledWith(second.id));
 	});
 
 	it("rejects the detection on No", () => {
