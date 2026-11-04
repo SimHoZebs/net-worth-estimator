@@ -37,13 +37,13 @@ export function TransactionRow({
 	shortfall?: boolean;
 }) {
 	const DirectionIcon =
-		transaction.category === "transfer"
+		transaction.flow === "transfer"
 			? ArrowRightLeft
 			: transaction.direction === "in"
 				? ArrowDownLeft
 				: ArrowUpRight;
 	const tone =
-		transaction.category === "transfer"
+		transaction.flow === "transfer"
 			? ("transfer" as const)
 			: transaction.direction === "in"
 				? ("inflow" as const)

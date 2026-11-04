@@ -20,7 +20,7 @@ export interface AccountTransaction {
 	name: string;
 	source: "historical" | "projected";
 	direction: "in" | "out";
-	category: "income" | "expense" | "transfer";
+	flow: "income" | "expense" | "transfer";
 	counterparty: string;
 	from: string;
 	to: string;
@@ -111,7 +111,7 @@ export function accountTransactions({
 		}
 		const direction =
 			(delta?.delta ?? 0) < 0 ? ("out" as const) : ("in" as const);
-		const category =
+		const flow =
 			transaction.fromId && destinationIds.length > 0
 				? ("transfer" as const)
 				: transaction.fromId
@@ -129,7 +129,7 @@ export function accountTransactions({
 			: (names.get(accountId) ?? "Unknown account");
 		return {
 			direction,
-			category,
+			flow,
 			from,
 			to,
 			counterparty: direction === "in" ? from : to,
@@ -258,7 +258,7 @@ export function ruleTransaction({
 	const pending = isPendingTransaction(transaction);
 	const historical = isHistoricalTransaction(transaction, startDate) || pending;
 	const direction = transaction.fromId ? ("out" as const) : ("in" as const);
-	const category =
+	const flow =
 		transaction.fromId && transaction.toId
 			? ("transfer" as const)
 			: transaction.fromId
@@ -283,7 +283,7 @@ export function ruleTransaction({
 		name: transaction.name,
 		source: historical ? "historical" : "projected",
 		direction,
-		category,
+		flow,
 		counterparty: direction === "in" ? from : to,
 		from,
 		to,
@@ -318,10 +318,7 @@ export function filterTransactions({
 		.filter((transaction) => {
 			if (filters.source !== "all" && transaction.source !== filters.source)
 				return false;
-			if (
-				filters.direction === "transfer" &&
-				transaction.category !== "transfer"
-			)
+			if (filters.direction === "transfer" && transaction.flow !== "transfer")
 				return false;
 			if (filters.direction === "in" && transaction.direction !== "in")
 				return false;

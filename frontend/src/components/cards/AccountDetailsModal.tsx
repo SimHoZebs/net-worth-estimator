@@ -98,7 +98,7 @@ export function AccountDetailsModal({
 				if (transaction.source !== "historical") return false;
 			}
 			if (!needle) return true;
-			return `${transaction.name} ${transaction.counterparty} ${transaction.category} ${transaction.date}`
+			return `${transaction.name} ${transaction.counterparty} ${transaction.flow} ${transaction.date}`
 				.toLowerCase()
 				.includes(needle);
 		});

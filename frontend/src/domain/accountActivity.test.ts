@@ -71,11 +71,11 @@ describe("account-scoped transactions", () => {
 		const outgoing = checking.find((row) => row.transactionId === "invest");
 		const incoming = brokerage.find((row) => row.transactionId === "invest");
 		expect(outgoing).toMatchObject({
-			category: "transfer",
+			flow: "transfer",
 			direction: "out",
 		});
 		expect(incoming).toMatchObject({
-			category: "transfer",
+			flow: "transfer",
 			direction: "in",
 		});
 		expect(incoming?.amount).toBe(outgoing?.amount);
@@ -109,7 +109,7 @@ describe("account-scoped transactions", () => {
 			expect.objectContaining({
 				transactionId: "multi-destination",
 				direction: "in",
-				category: "transfer",
+				flow: "transfer",
 				amount: 40,
 			}),
 		);
@@ -340,9 +340,7 @@ describe("transaction filtering", () => {
 	it("separates recorded facts, projected activity and direction", () => {
 		expect(apply({ source: "historical" })).toHaveLength(3);
 		expect(
-			apply({ direction: "transfer" }).every(
-				(row) => row.category === "transfer",
-			),
+			apply({ direction: "transfer" }).every((row) => row.flow === "transfer"),
 		).toBe(true);
 		expect(
 			apply({ direction: "out" }).every((row) => row.direction === "out"),

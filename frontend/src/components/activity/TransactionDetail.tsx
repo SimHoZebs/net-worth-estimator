@@ -86,6 +86,7 @@ import {
 } from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
+import { TransactionCategory } from "./TransactionCategory.tsx";
 import { TransactionSharing } from "./TransactionSharing.tsx";
 import {
 	buildInsightSuggestions,
@@ -957,7 +958,7 @@ export function TransactionDetail({
 	onClose: () => void;
 }) {
 	const kind =
-		transaction.category === "transfer"
+		transaction.flow === "transfer"
 			? ("transfer" as const)
 			: transaction.direction;
 	// Cadence of the rule this row displays, read from the rule rows the
@@ -1463,6 +1464,14 @@ export function TransactionDetail({
 							</div>
 						)}
 					</div>
+					{once && !transaction.void && (
+						<TransactionCategory
+							postingId={savedTransaction.id}
+							category={savedTransaction.category}
+							source={savedTransaction.categorySource}
+							readOnly={readOnly}
+						/>
+					)}
 					{kind === "transfer" && (
 						<div className="mt-5">
 							<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>

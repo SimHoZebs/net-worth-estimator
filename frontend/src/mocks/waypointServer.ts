@@ -455,6 +455,21 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			return write(() => {
 				(current.postings as unknown[]).push(structuredClone(body));
 			}, body);
+		const categoryMatch = path.match(/^\/v1\/postings\/([^/]+)\/category$/);
+		if (categoryMatch && method === "PATCH") {
+			const [, id] = categoryMatch;
+			const category = (body as { category?: string | null }).category ?? null;
+			current.postings = (current.postings as unknown[]).map((item) => {
+				const row = item as Record<string, unknown>;
+				if (row.id !== id) return item;
+				const { category: _category, categorySource: _source, ...rest } = row;
+				return category ? { ...rest, category, categorySource: "user" } : rest;
+			}) as typeof current.postings;
+			return ok({
+				postingId: id,
+				...(category ? { category, categorySource: "user" } : {}),
+			});
+		}
 		match = path.match(/^\/v1\/postings\/([^/]+)$/);
 		if (match) {
 			const [, id] = match;
@@ -462,9 +477,21 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				return write(() => {
 					const postings = current.postings as unknown[];
 					const next = structuredClone(body) as Record<string, unknown>;
-					current.postings = postings.map((item) =>
-						(item as { id: string }).id === id ? { ...next, id } : item,
-					) as typeof current.postings;
+					current.postings = postings.map((item) => {
+						const row = item as {
+							id: string;
+							category?: string;
+							categorySource?: string;
+						};
+						if (row.id !== id) return item;
+						return {
+							...next,
+							id,
+							...(row.category
+								? { category: row.category, categorySource: row.categorySource }
+								: {}),
+						};
+					}) as typeof current.postings;
 				}, body);
 			current.postings = (current.postings as unknown[]).filter(
 				(item) => (item as { id: string }).id !== id,

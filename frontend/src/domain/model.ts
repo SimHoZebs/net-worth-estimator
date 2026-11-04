@@ -80,6 +80,11 @@ export const transactionSchema = z.object({
 	// Pending and void bank rows are recorded bank evidence, never an
 	// exclusion.
 	syncOwned: z.boolean().optional(),
+	// Category is the current sidecar assignment shared with the bank and
+	// classifier. Null means uncategorized. Source says who supplied it:
+	// "bank", "inferred", or "user". Categories never affect projections.
+	category: z.string().nullable().optional(),
+	categorySource: z.enum(["bank", "inferred", "user"]).nullable().optional(),
 	// Exact Unix transaction time. Day display stays on startDate; the
 	// instant orders intraday execution.
 	transactionTime: z.number().int().nullable().optional(),

@@ -14,7 +14,7 @@ function charge(date: string, amount: number): AccountTransaction {
 		name: "Card purchase",
 		source: "historical",
 		direction: "out",
-		category: "expense",
+		flow: "expense",
 		counterparty: "External spending",
 		from: "Household card",
 		to: "External spending",

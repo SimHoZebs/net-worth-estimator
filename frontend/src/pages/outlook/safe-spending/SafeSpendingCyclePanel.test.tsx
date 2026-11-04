@@ -19,7 +19,7 @@ function charge(
 		name,
 		source: "historical",
 		direction: "out",
-		category: "expense",
+		flow: "expense",
 		counterparty: "External spending",
 		from: "Household card",
 		to: "External spending",

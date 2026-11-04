@@ -39,7 +39,7 @@ function charge(
 		name: "Card charge",
 		source: "historical",
 		direction: "out",
-		category: "expense",
+		flow: "expense",
 		counterparty: "External spending",
 		from: "Card",
 		to: "External spending",
@@ -63,7 +63,7 @@ describe("cycle card charges", () => {
 				recorded,
 				pending,
 				charge({ id: "excluded", excluded: true }),
-				charge({ id: "payment", direction: "in", category: "transfer" }),
+				charge({ id: "payment", direction: "in", flow: "transfer" }),
 				charge({ id: "pending-refund", direction: "in", pending: true }),
 				// Bank lifecycle rows are not exclusions, so the count must
 				// reject a void hold on its own state, not on `excluded`.

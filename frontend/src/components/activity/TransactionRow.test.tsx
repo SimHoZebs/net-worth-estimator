@@ -36,7 +36,7 @@ function voidTransaction(): {
 		name: savedTransaction.name,
 		source: "historical",
 		direction: "out",
-		category: "expense",
+		flow: "expense",
 		counterparty: "Unknown account",
 		from: "Everyday checking",
 		to: "External spending",

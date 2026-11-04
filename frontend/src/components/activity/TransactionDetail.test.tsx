@@ -156,7 +156,7 @@ it("shows the resolved occurrence amount with a Calculated label", () => {
 		name: savedTransaction.name,
 		source: "projected",
 		direction: "out",
-		category: "transfer",
+		flow: "transfer",
 		counterparty: "Sapphire",
 		from: "Everyday checking",
 		to: "Home mortgage",
@@ -254,7 +254,7 @@ it("marks holds that did not post instead of posted", () => {
 		name: savedTransaction.name,
 		source: "historical",
 		direction: "out",
-		category: "expense",
+		flow: "expense",
 		counterparty: "Unknown account",
 		from: "Everyday checking",
 		to: "External spending",
@@ -317,7 +317,7 @@ it("marks a live hold as not yet posted", () => {
 		name: savedTransaction.name,
 		source: "historical",
 		direction: "out",
-		category: "expense",
+		flow: "expense",
 		counterparty: "Unknown account",
 		from: "Everyday checking",
 		to: "External spending",
@@ -1147,6 +1147,72 @@ it("retries a rejected claim without creating a second rule", async () => {
 			occurrenceDate: "2028-06-15",
 		},
 	});
+});
+
+it("shows the category control on recordings but not on rules or void holds", () => {
+	stubTestServer();
+	const posting = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	render(
+		<TransactionDetail
+			transaction={occurrence(posting)}
+			savedTransaction={posting}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.getByLabelText("Category")).toBeTruthy();
+	cleanup();
+	const rule = { ...posting, id: "renovation-rule", kind: "rule" as const };
+	render(
+		<TransactionDetail
+			transaction={occurrence(rule)}
+			savedTransaction={rule}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.queryByLabelText("Category")).toBeNull();
+	cleanup();
+	const voided = { ...posting, id: "vanished", void: true };
+	render(
+		<TransactionDetail
+			transaction={occurrence(voided)}
+			savedTransaction={voided}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.queryByLabelText("Category")).toBeNull();
+});
+
+it("keeps category edits enabled on a pending bank row", () => {
+	stubTestServer();
+	const posting = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const pending = {
+		...posting,
+		id: "pending-charge",
+		pending: true,
+		readOnly: true,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(pending)}
+			savedTransaction={pending}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	expect(
+		(screen.getByLabelText("Category") as HTMLSelectElement).disabled,
+	).toBe(false);
 });
 
 it("offers frequency conversion and keeps growth on recurrence rules", () => {

@@ -3,6 +3,7 @@ import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import type { Transaction } from "./model.ts";
 
 import { isoDateFromEpochSeconds } from "./format.ts";
+import { transactionCategorySourceOf } from "./categories.ts";
 
 const NUMERIC_EXPRESSION = /^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
 
@@ -10,7 +11,10 @@ const NUMERIC_EXPRESSION = /^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
  * Takes the minimal amount shape so rated lists and shared previews share
  * one policy instead of re-declaring the expression test. */
 export function literalAmountOf(
-	amount: { resolver?: unknown; config?: unknown; inputs?: unknown } | null | undefined,
+	amount:
+		| { resolver?: unknown; config?: unknown; inputs?: unknown }
+		| null
+		| undefined,
 ): number | null {
 	const config = (amount?.config ?? {}) as Record<string, unknown>;
 	const expression = config["expression"];
@@ -125,6 +129,8 @@ export function transactionToDisplay(
 		pending: extra.pending === true,
 		void: extra.void === true,
 		syncOwned: row.syncOwned === true,
+		category: row.category ?? null,
+		categorySource: transactionCategorySourceOf(row.categorySource),
 		transactionTime:
 			typeof extra.transactionTime === "number" && extra.transactionTime > 0
 				? extra.transactionTime
@@ -158,6 +164,8 @@ export function ruleToDisplay(rule: RecurrenceRule): Transaction {
 		pending: false,
 		void: false,
 		syncOwned: false,
+		category: null,
+		categorySource: null,
 		transactionTime: null,
 	};
 }

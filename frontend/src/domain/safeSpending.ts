@@ -377,7 +377,7 @@ export function mandatoryTransactions({
 			name: transaction.name || transaction.transactionId,
 			source: "projected",
 			direction: "out",
-			category: transaction.toId ? "transfer" : "expense",
+			flow: transaction.toId ? "transfer" : "expense",
 			counterparty,
 			from: names.get(transaction.fromId) ?? "Unknown account",
 			to: counterparty,

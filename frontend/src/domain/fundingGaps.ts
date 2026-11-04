@@ -157,9 +157,15 @@ export function deriveFundingGaps({
 	// include that month's transactions). Scan once per distinct month
 	// instead of copying and reversing the array per failure.
 	const points = current.points;
-	const priorPointByWindow = new Map<string, (typeof points)[number] | undefined>();
-	const priorPoint = (windowStart: string): (typeof points)[number] | undefined => {
-		if (priorPointByWindow.has(windowStart)) return priorPointByWindow.get(windowStart);
+	const priorPointByWindow = new Map<
+		string,
+		(typeof points)[number] | undefined
+	>();
+	const priorPoint = (
+		windowStart: string,
+	): (typeof points)[number] | undefined => {
+		if (priorPointByWindow.has(windowStart))
+			return priorPointByWindow.get(windowStart);
 		let found: (typeof points)[number] | undefined;
 		for (let i = points.length - 1; i >= 0; i--) {
 			if (points[i]!.date < windowStart) {
@@ -180,7 +186,10 @@ export function deriveFundingGaps({
 		if (group) group.push(failure);
 		else failuresByAccount.set(accountId, [failure]);
 	}
-	const ledgerByAccount = new Map<string, ReturnType<typeof accountTransactions>>();
+	const ledgerByAccount = new Map<
+		string,
+		ReturnType<typeof accountTransactions>
+	>();
 	for (const accountId of failuresByAccount.keys()) {
 		ledgerByAccount.set(
 			accountId,
@@ -203,12 +212,16 @@ export function deriveFundingGaps({
 		// strictly before the window month. Points snapshot end-of-day
 		// balances, so a same-month point already includes that month's
 		// transactions and reusing it would double-count the ledger below.
-		const opening = priorPoint(windowStart)?.balances[accountId] ?? account?.balance ?? 0;
+		const opening =
+			priorPoint(windowStart)?.balances[accountId] ?? account?.balance ?? 0;
 		// Only successfully executed transactions affecting this account before
 		// the failed payment, in execution order. Exclude the failed payment
 		// itself and any later deposits.
 		const fullLedger = ledgerByAccount.get(accountId) ?? [];
-		const failureIndex = failureIndexByObject.get(failure) ?? projectionIndex.get(`${failure.transactionId}\u0000${failure.date}`) ?? -1;
+		const failureIndex =
+			failureIndexByObject.get(failure) ??
+			projectionIndex.get(`${failure.transactionId}\u0000${failure.date}`) ??
+			-1;
 		const orderedLedger = fullLedger.filter(
 			(transaction) =>
 				transaction.date >= windowStart &&
@@ -236,14 +249,13 @@ export function deriveFundingGaps({
 					transaction.direction === "in"
 						? Math.abs(transaction.amount)
 						: -Math.abs(transaction.amount),
-				kind: kindFor(transaction.name, transaction.category),
+				kind: kindFor(transaction.name, transaction.flow),
 				...(transaction.counterparty &&
 				transaction.counterparty !== "External income" &&
 				transaction.counterparty !== "External spending"
 					? { counterpartAccountName: transaction.counterparty }
 					: {}),
-			}),
-		);
+			}));
 		const required = failure.requested;
 		return [
 			{
