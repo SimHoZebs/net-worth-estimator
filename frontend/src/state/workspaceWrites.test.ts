@@ -114,6 +114,43 @@ it("reloads authoritative state on a transport failure, then reports it", async 
 	);
 });
 
+it("uses the recovery refresh when a rejection needs authoritative state", async () => {
+	stubTestServer();
+	const refresh = vi.fn(async () => {});
+	const recover = vi.fn(async () => {});
+	const result = await performSave({
+		call: async () => ({
+			data: {
+				persisted: false,
+				issues: [{ severity: "error", message: "Choose an account." }],
+			},
+		}),
+		refresh,
+		recover,
+		failureMessage: "Nope.",
+	});
+	expect(result).toBe(false);
+	expect(recover).toHaveBeenCalledOnce();
+	expect(refresh).not.toHaveBeenCalled();
+});
+
+it("uses the recovery refresh when a transport failure needs authoritative state", async () => {
+	stubTestServer();
+	const refresh = vi.fn(async () => {});
+	const recover = vi.fn(async () => {});
+	const result = await performSave({
+		call: async () => {
+			throw new Error("boom");
+		},
+		refresh,
+		recover,
+		failureMessage: "Nope.",
+	});
+	expect(result).toBe(false);
+	expect(recover).toHaveBeenCalledOnce();
+	expect(refresh).not.toHaveBeenCalled();
+});
+
 it("refuses saves before the workspace is ready", async () => {
 	stubTestServer();
 	suspendUserScope();

@@ -69,8 +69,9 @@ function saveRejection(envelope: SaveResult): string | null {
  * read. The mutation stays silent; this function owns the one notice.
  *
  * Multi-row writes can persist partially before failing, so a rejection or
- * a transport error still reloads authoritative state first — but only
- * while the original resource stays current. A resource switch at any
+ * a transport error still reloads authoritative state first through the
+ * recovery refresh, which defaults to the success refresh, but only while
+ * the original resource stays current. A resource switch at any
  * awaited boundary reports failure silently: no refresh, no stale notice,
  * no success. Returning false always keeps the caller's edited form
  * intact for retry. When the write persisted but the reload failed, the
@@ -80,6 +81,11 @@ function saveRejection(envelope: SaveResult): string | null {
 export async function performSave(options: {
 	call: () => Promise<{ data: unknown }>;
 	refresh: () => Promise<void>;
+	/**
+	 * Loads authoritative state after a failed or rejected write. Defaults to
+	 * `refresh`; a granular success refresh supplies its full fallback here.
+	 */
+	recover?: () => Promise<void>;
 	failureMessage: string;
 	/**
 	 * Receives an HTTP or envelope rejection message before the save returns
@@ -109,7 +115,7 @@ export async function performSave(options: {
 				const message =
 					cause instanceof Error ? cause.message : options.failureMessage;
 				if (scope === getUserScope()) {
-					await options.refresh().catch(() => {});
+					await (options.recover ?? options.refresh)().catch(() => {});
 					if (scope === getUserScope()) {
 						notifyError("workspace", message);
 						options.onRejected?.(message);
@@ -122,7 +128,7 @@ export async function performSave(options: {
 			if (scope !== getUserScope()) return false;
 			const rejection = saveRejection(envelope as SaveResult);
 			if (rejection) {
-				await options.refresh().catch(() => {});
+				await (options.recover ?? options.refresh)().catch(() => {});
 				if (scope === getUserScope()) {
 					notifyError("workspace", rejection);
 					options.onRejected?.(rejection);
