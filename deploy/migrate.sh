@@ -10,7 +10,9 @@
 #      event times, all inside a single candidate transaction.
 #   2. Frozen SQL provisions Analysis on that candidate when needed.
 #   3. The standalone purchase tool converts retired purchase policies.
-#   4. The completed posting-ID migration audit table is removed.
+#   4. The additive unified projection tables and columns are provisioned
+#      when absent; a partial group fails closed.
+#   5. The completed posting-ID migration audit table is removed.
 #      setupdb then validates the complete candidate without upgrades.
 # The verified candidate is then published over the original database with
 # SQLite's backup API. The original file is never mutated before publication:
@@ -98,7 +100,6 @@ check_base_columns() {
   SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys LIMIT 0;
   SELECT user_id, id, position, name, source_account_id, destinations, amount_resolution_json, frequency, start_date, end_date, annual_cap, priority, enabled FROM recurrence_rules LIMIT 0;
   SELECT user_id, type, instance_id, position, name, enabled, config_json FROM evaluations LIMIT 0;
-  SELECT user_id, identity, kind, created_at, payload FROM projection_artifacts LIMIT 0;
   SELECT user_id, id, source_path, document_present FROM model_metadata LIMIT 0;
   SELECT user_id, model_account_id, position, minimum_fixed, minimum_percent, due_day, statement_day FROM payment_terms LIMIT 0;
   SELECT user_id, id, kind FROM entity_ids LIMIT 0;
@@ -157,6 +158,46 @@ sharing_count() {
   sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('sharing_grants','sharing_copies','inbox_share_state','sharing_policies','sharing_visibility','sharing_audit','sharing_requests','splits','split_allocations','split_settlements','split_settlement_requests');"
 }
 
+# Unified projection is one additive schema group: twelve tables plus the
+# checkpoint provider and four posting columns. Absent means provision on the
+# candidate; complete means verify; any mixture fails closed before a backup.
+check_projection() {
+  sqlite3 -readonly "$1" '
+    SELECT user_id, id, provider_key, status, sync_cursor, last_synced_at FROM provider_connections LIMIT 0;
+    SELECT user_id, id, scope_id, revision, published_revision, dirty_from, projection_start, horizon_end, calendar_timezone, engine_version, trial_count, stochastic_seed, det_evaluations_json, stoch_evaluations_json FROM projection_states LIMIT 0;
+    SELECT user_id, id, projection_state_id, from_at, to_at, built_revision, status FROM projection_slices LIMIT 0;
+    SELECT user_id, projection_slice_id, date, payload FROM projection_rows LIMIT 0;
+    SELECT user_id, id, projection_slice_id, account_id, as_of_at, sample_count, mean, median, p10, p25, p50, p75, p90, std_dev, probability_below_zero FROM monte_carlo_statistics LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM net_worth_threshold_outputs LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, reached, first_reached_date, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM account_balance_outputs LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, requested_amount, realized_amount, destination_limited_amount, unfulfilled_amount, completion_rate, first_underfulfilled_date, events_json, dates_json, postings_json, prob_run_count, prob_fulfilled_count, prob_full_probability, prob_unfulfilled_p10, prob_unfulfilled_p25, prob_unfulfilled_p50, prob_unfulfilled_p75, prob_unfulfilled_p90 FROM posting_fulfillment_outputs LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, account_ids_json, statement_day, budget, cycle_start, cycle_end, window_start, days_total, days_left, recorded_spend, scheduled_spend, spent, remaining, within_budget, shortfall, prob_run_count, prob_within_count, prob_within_probability, prob_spent_p10, prob_spent_p25, prob_spent_p50, prob_spent_p75, prob_spent_p90 FROM cycle_fulfillment_outputs LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, all_funded, first_reached_date, purchases_json, prob_probability, prob_p10_date, prob_median_date, prob_p90_date FROM planned_purchases_outputs LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, first_coverage_date, first_self_sustaining_date, detail_json, prob_success, prob_median_date, prob_self_sustaining_date, prob_self_sustaining_prob FROM financial_independence_outputs LIMIT 0;
+    SELECT user_id, projection_state_id, kind, instance_id, position, name, status, diagnostics_json, built_revision, has_deterministic, has_probabilistic, final_net_worth, transaction_count, first_unfulfilled_date, all_funded, prob_full_probability, prob_sample_count FROM whatif_outputs LIMIT 0;' || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('checkpoints') WHERE name='provider';")" = 1 || return 1
+  test "$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('postings') WHERE name IN ('projection_slice_id','event_json','applied_amount','outcome');")" = 4
+}
+
+projection_count() {
+  sqlite3 -readonly "$1" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('provider_connections','projection_states','projection_slices','projection_rows','monte_carlo_statistics','net_worth_threshold_outputs','account_balance_outputs','posting_fulfillment_outputs','cycle_fulfillment_outputs','planned_purchases_outputs','financial_independence_outputs','whatif_outputs');"
+}
+
+projection_state() {
+  tables=$(projection_count "$1") || fail "Cannot inspect unified projection tables; refusing to guess."
+  provider=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('checkpoints') WHERE name='provider';") \
+    || fail "Cannot inspect checkpoint provider column; refusing to guess."
+  posting_cols=$(sqlite3 -readonly "$1" "SELECT COUNT(*) FROM pragma_table_info('postings') WHERE name IN ('projection_slice_id','event_json','applied_amount','outcome');") \
+    || fail "Cannot inspect posting projection columns; refusing to guess."
+  case "$tables:$provider:$posting_cols" in
+    0:0:0) echo 0 ;;
+    12:1:4)
+      check_projection "$1" || fail "Incomplete unified projection schema. Refusing automatic repair."
+      echo 1 ;;
+    *) fail "Partial unified projection schema. Refusing automatic repair." ;;
+  esac
+}
+
 # Friendships are provision-if-missing like the Analysis schema: absent is
 # expected on pre-friend databases, present requires the exact accepted-edge
 # shape, and anything partial fails closed.
@@ -199,7 +240,9 @@ final_fks_ok() {
 }
 
 LEGACY_COLS="user_id,id,position,date,model_account_id,balance,source"
-FINAL_COLS="user_id,id,position,model_account_id,balance,source,observed_at"
+PRE_PROVIDER_COLS="user_id,id,position,model_account_id,balance,source,observed_at"
+FINAL_COLS="user_id,id,position,model_account_id,balance,source,provider,observed_at"
+FINAL_APPENDED_COLS="user_id,id,position,model_account_id,balance,source,observed_at,provider"
 
 check_integrity "$db" || fail "Application database integrity check failed."
 
@@ -245,6 +288,7 @@ esac
 if [ "$sharing" = 11 ]; then
   check_sharing "$db" || fail "Incomplete sharing schema. Refusing automatic repair."
 fi
+projection=$(projection_state "$db") || fail "Cannot inspect unified projection schema; refusing to guess."
 posting_audit=$(sqlite3 -readonly "$db" "SELECT count(*) FROM sqlite_schema WHERE type='table' AND name='posting_id_migrations';") \
   || fail "Cannot inspect posting-ID audit table."
 postings_split=0
@@ -255,7 +299,7 @@ fi
 mode=""
 if [ "$cols" = "$LEGACY_COLS" ]; then
   mode="convert"
-elif [ "$cols" = "$FINAL_COLS" ]; then
+elif [ "$cols" = "$PRE_PROVIDER_COLS" ] || [ "$cols" = "$FINAL_COLS" ] || [ "$cols" = "$FINAL_APPENDED_COLS" ]; then
   mode="verify"
 else
   fail "Checkpoints have unexpected shape ($cols); refusing to guess."
@@ -290,7 +334,7 @@ fi
 
 # A complete target repeats read-only checks only: no backup, no writes,
 # and post-upgrade owner disables of settled bank rows stay exactly as-is.
-if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ] && [ "$friendships" = 1 ] && [ "$sharing" = 11 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
+if [ "$mode" = verify ] && [ "$analysis" = 6 ] && [ "$purchases" = planned_purchases ] && [ "$posting_audit" = 0 ] && [ "$postings_split" = 1 ] && [ "$friendships" = 1 ] && [ "$sharing" = 11 ] && [ "$projection" = 1 ]; then  info "Checkpoints already carry observation instants with complete application schema; verified, nothing to do."
   exit 0
 fi
 
@@ -575,7 +619,8 @@ check_target "$candidate" || fail "Candidate Analysis verification failed. Origi
 check_promotions "$candidate" || fail "Candidate promotion verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_sharing "$candidate" || fail "Candidate sharing verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 check_integrity "$candidate" || fail "Candidate integrity check failed. Original unchanged; backup retained at $backup. Keep the API stopped."
-test "$(cp_cols "$candidate")" = "$FINAL_COLS" &&
+candidate_cols=$(cp_cols "$candidate")
+{ [ "$candidate_cols" = "$PRE_PROVIDER_COLS" ] || [ "$candidate_cols" = "$FINAL_COLS" ] || [ "$candidate_cols" = "$FINAL_APPENDED_COLS" ]; } &&
   test "$(scoped_pk "$candidate")" = 1 &&
   test "$(exact_unique "$candidate" user_id model_account_id observed_at)" -ge 1 &&
   final_fks_ok "$candidate" &&
@@ -689,6 +734,257 @@ if [ "$posting_audit" = 1 ]; then
     || fail "Cannot remove posting-ID audit table. Original unchanged; backup retained at $backup."
 fi
 
+# Provision the unified projection schema additively. Every statement matches
+# the current application DDL exactly. No preexisting table or row is touched.
+if [ "$projection" = 0 ]; then
+  projection_sql="$backup/projection.sql"
+  cat > "$projection_sql" <<'DDL'
+CREATE TABLE IF NOT EXISTS provider_connections (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			provider_key TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT '',
+			sync_cursor TEXT NOT NULL DEFAULT '',
+			last_synced_at TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY(user_id, id)
+		);
+CREATE TABLE IF NOT EXISTS projection_states (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			scope_id TEXT NOT NULL,
+			revision INTEGER NOT NULL DEFAULT 0,
+			published_revision INTEGER NOT NULL DEFAULT 0,
+			dirty_from INTEGER NOT NULL DEFAULT 0,
+			projection_start TEXT NOT NULL DEFAULT '',
+			horizon_end TEXT NOT NULL DEFAULT '',
+			calendar_timezone TEXT NOT NULL DEFAULT 'UTC',
+			engine_version TEXT NOT NULL DEFAULT 'v1',
+			trial_count INTEGER NOT NULL DEFAULT 1000,
+			stochastic_seed INTEGER,
+			det_evaluations_json TEXT NOT NULL DEFAULT '',
+			stoch_evaluations_json TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY(user_id, id)
+		);
+CREATE TABLE IF NOT EXISTS projection_slices (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			projection_state_id TEXT NOT NULL,
+			from_at INTEGER NOT NULL,
+			to_at INTEGER NOT NULL,
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			status TEXT NOT NULL DEFAULT '',
+			PRIMARY KEY(user_id, id)
+		);
+CREATE INDEX IF NOT EXISTS projection_slices_state ON projection_slices(user_id, projection_state_id, from_at);
+CREATE TABLE IF NOT EXISTS projection_rows (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_slice_id TEXT NOT NULL,
+			date TEXT NOT NULL,
+			payload TEXT NOT NULL,
+			PRIMARY KEY(user_id, projection_slice_id, date)
+		);
+CREATE TABLE IF NOT EXISTS monte_carlo_statistics (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			id TEXT NOT NULL,
+			projection_slice_id TEXT NOT NULL,
+			account_id TEXT NOT NULL,
+			as_of_at TEXT NOT NULL,
+			sample_count INTEGER NOT NULL DEFAULT 0,
+			mean REAL NOT NULL DEFAULT 0,
+			median REAL NOT NULL DEFAULT 0,
+			p10 REAL NOT NULL DEFAULT 0,
+			p25 REAL NOT NULL DEFAULT 0,
+			p50 REAL NOT NULL DEFAULT 0,
+			p75 REAL NOT NULL DEFAULT 0,
+			p90 REAL NOT NULL DEFAULT 0,
+			std_dev REAL NOT NULL DEFAULT 0,
+			probability_below_zero REAL NOT NULL DEFAULT 0,
+			PRIMARY KEY(user_id, id)
+		);
+CREATE INDEX IF NOT EXISTS monte_carlo_statistics_slice ON monte_carlo_statistics(user_id, projection_slice_id, account_id, as_of_at);
+CREATE TABLE IF NOT EXISTS net_worth_threshold_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			reached INTEGER,
+			first_reached_date TEXT,
+			prob_probability REAL,
+			prob_p10_date TEXT,
+			prob_median_date TEXT,
+			prob_p90_date TEXT,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+CREATE TABLE IF NOT EXISTS account_balance_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			reached INTEGER,
+			first_reached_date TEXT,
+			prob_probability REAL,
+			prob_p10_date TEXT,
+			prob_median_date TEXT,
+			prob_p90_date TEXT,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+CREATE TABLE IF NOT EXISTS posting_fulfillment_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			requested_amount REAL,
+			realized_amount REAL,
+			destination_limited_amount REAL,
+			unfulfilled_amount REAL,
+			completion_rate REAL,
+			first_underfulfilled_date TEXT,
+			events_json TEXT NOT NULL DEFAULT '[]',
+			dates_json TEXT NOT NULL DEFAULT '[]',
+			postings_json TEXT NOT NULL DEFAULT '[]',
+			prob_run_count INTEGER,
+			prob_fulfilled_count INTEGER,
+			prob_full_probability REAL,
+			prob_unfulfilled_p10 REAL,
+			prob_unfulfilled_p25 REAL,
+			prob_unfulfilled_p50 REAL,
+			prob_unfulfilled_p75 REAL,
+			prob_unfulfilled_p90 REAL,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+CREATE TABLE IF NOT EXISTS cycle_fulfillment_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			account_ids_json TEXT NOT NULL DEFAULT '[]',
+			statement_day INTEGER,
+			budget REAL,
+			cycle_start TEXT,
+			cycle_end TEXT,
+			window_start TEXT,
+			days_total INTEGER,
+			days_left INTEGER,
+			recorded_spend REAL,
+			scheduled_spend REAL,
+			spent REAL,
+			remaining REAL,
+			within_budget INTEGER,
+			shortfall REAL,
+			prob_run_count INTEGER,
+			prob_within_count INTEGER,
+			prob_within_probability REAL,
+			prob_spent_p10 REAL,
+			prob_spent_p25 REAL,
+			prob_spent_p50 REAL,
+			prob_spent_p75 REAL,
+			prob_spent_p90 REAL,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+CREATE TABLE IF NOT EXISTS planned_purchases_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			all_funded INTEGER,
+			first_reached_date TEXT,
+			purchases_json TEXT NOT NULL DEFAULT '[]',
+			prob_probability REAL,
+			prob_p10_date TEXT,
+			prob_median_date TEXT,
+			prob_p90_date TEXT,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+CREATE TABLE IF NOT EXISTS financial_independence_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			first_coverage_date TEXT,
+			first_self_sustaining_date TEXT,
+			detail_json TEXT NOT NULL DEFAULT '{}',
+			prob_success REAL,
+			prob_median_date TEXT,
+			prob_self_sustaining_date TEXT,
+			prob_self_sustaining_prob REAL,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+CREATE TABLE IF NOT EXISTS whatif_outputs (
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			projection_state_id TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			instance_id TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT '',
+			diagnostics_json TEXT NOT NULL DEFAULT '[]',
+			built_revision INTEGER NOT NULL DEFAULT 0,
+			has_deterministic INTEGER NOT NULL DEFAULT 0,
+			has_probabilistic INTEGER NOT NULL DEFAULT 0,
+			final_net_worth REAL,
+			transaction_count INTEGER,
+			first_unfulfilled_date TEXT,
+			all_funded INTEGER,
+			prob_full_probability REAL,
+			prob_sample_count INTEGER,
+			PRIMARY KEY(user_id, projection_state_id, kind, instance_id)
+		);
+ALTER TABLE checkpoints ADD COLUMN provider TEXT NOT NULL DEFAULT '';
+ALTER TABLE postings ADD COLUMN projection_slice_id TEXT;
+ALTER TABLE postings ADD COLUMN event_json TEXT;
+ALTER TABLE postings ADD COLUMN applied_amount REAL;
+ALTER TABLE postings ADD COLUMN outcome TEXT;
+CREATE INDEX IF NOT EXISTS postings_projection_slice ON postings(user_id, projection_slice_id);
+DDL
+  if ! sqlite3 "$candidate" < "$projection_sql" > "$backup/projection.log" 2>&1; then
+    printf 'migrate: projection upgrade failed: %s\n' "$(cat "$backup/projection.log")" >&2
+    fail "Candidate unified projection upgrade failed. Original unchanged; backup retained at $backup. Keep the API stopped."
+  fi
+  check_projection "$candidate" || fail "Candidate unified projection schema is incomplete. Original unchanged; backup retained at $backup. Keep the API stopped."
+fi
+
 # Setup validates the final shape only. A digest of the logical database also
 # proves that the validator did not rewrite any candidate rows or schema.
 validation_before=$(sqlite3 "$candidate" .dump | sha256sum)
@@ -705,10 +1001,11 @@ check_integrity "$candidate" || fail "Candidate integrity check failed after pur
 sqlite3 "$candidate" ".backup main '$(esc "$db")'" \
   || fail "Publication failed. Original may need recovery from the verified backup at $backup. Keep the API stopped."
 check_target "$db" || fail "Published database failed Analysis verification. Recover from the verified backup at $backup. Keep the API stopped."
+check_projection "$db" || fail "Published database failed unified projection verification. Recover from the verified backup at $backup. Keep the API stopped."
 check_integrity "$db" || fail "Published database failed integrity check. Recover from the verified backup at $backup. Keep the API stopped."
 
 if [ "$mode" = convert ]; then
-  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, and provisioned Analysis schema from $backup."
+  info "Converted legacy checkpoints to UTC day-close instants, repaired settled bank rows, and provisioned Analysis and unified projection schema from $backup."
 else
-  info "Completed current application schema on final checkpoints from $backup."
+  info "Completed current application and unified projection schema on final checkpoints from $backup."
 fi

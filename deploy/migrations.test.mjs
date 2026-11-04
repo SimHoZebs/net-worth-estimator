@@ -53,6 +53,40 @@ async function fullBase(directory, name = "application.db") {
   return { db, owner };
 }
 
+// Remove the additive unified projection schema, modelling a source from
+// before that release. Columns are dropped only when present.
+async function removeProjection(db) {
+  const provider = await rows(db, "SELECT COUNT(*) FROM pragma_table_info('checkpoints') WHERE name='provider';");
+  const postingCols = Number(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('postings') WHERE name IN ('projection_slice_id','event_json','applied_amount','outcome');"));
+  const drops = [
+    "DROP INDEX IF EXISTS postings_projection_slice;",
+    "DROP INDEX IF EXISTS projection_slices_state;",
+    "DROP INDEX IF EXISTS monte_carlo_statistics_slice;",
+    "DROP TABLE IF EXISTS whatif_outputs;",
+    "DROP TABLE IF EXISTS financial_independence_outputs;",
+    "DROP TABLE IF EXISTS planned_purchases_outputs;",
+    "DROP TABLE IF EXISTS cycle_fulfillment_outputs;",
+    "DROP TABLE IF EXISTS posting_fulfillment_outputs;",
+    "DROP TABLE IF EXISTS account_balance_outputs;",
+    "DROP TABLE IF EXISTS net_worth_threshold_outputs;",
+    "DROP TABLE IF EXISTS monte_carlo_statistics;",
+    "DROP TABLE IF EXISTS projection_rows;",
+    "DROP TABLE IF EXISTS projection_slices;",
+    "DROP TABLE IF EXISTS projection_states;",
+    "DROP TABLE IF EXISTS provider_connections;",
+  ];
+  if (postingCols > 0) {
+    drops.push(
+      "ALTER TABLE postings DROP COLUMN projection_slice_id;",
+      "ALTER TABLE postings DROP COLUMN event_json;",
+      "ALTER TABLE postings DROP COLUMN applied_amount;",
+      "ALTER TABLE postings DROP COLUMN outcome;",
+    );
+  }
+  if (provider === "1") drops.push("ALTER TABLE checkpoints DROP COLUMN provider;");
+  await sqlite(db, drops.join("\n"));
+}
+
 // Rebuild checkpoints into the exact deployed date-only shape (date 4th),
 // keeping the readable fields. With strip=false the Analysis schema stays,
 // modelling an already-Analysis date source.
@@ -69,6 +103,7 @@ async function toLegacyCheckpoints(db, stripAnalysis = true) {
   await sqlite(db, `${analysis}
     DROP TABLE checkpoints;
     CREATE TABLE checkpoints(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, id INTEGER NOT NULL, position INTEGER NOT NULL, date TEXT NOT NULL, model_account_id TEXT NOT NULL, balance REAL NOT NULL, source TEXT NOT NULL DEFAULT 'user', PRIMARY KEY(user_id, id), UNIQUE(user_id, model_account_id, date));`);
+  await removeProjection(db);
 }
 
 async function seedBankRows(db, owner, extraUser) {
@@ -94,7 +129,6 @@ async function seedBankRows(db, owner, extraUser) {
   await sqlite(db, `INSERT INTO posting_sync_keys(user_id, provider, bridge_account_id, transaction_id, posting_id) VALUES
     ('${owner}', 'simplefin', 'bridge-checking', 'tx1', 'settled-a'),
     ('${extraUser}', 'simplefin', 'bridge-checking', 'tx2', 'settled-b');`);
-  await sqlite(db, `INSERT INTO projection_artifacts(user_id, identity, kind, payload) VALUES ('${owner}', 'note-1', 'note', 'private-note');`);
   await sqlite(db, `INSERT INTO blob_objects(key,state,expires_at) VALUES ('receipt-blob','live',0);
     INSERT INTO blob_data(key,data) VALUES ('receipt-blob',X'000102FF');
     INSERT INTO receipts(user_id,id,posting_id,digest,size,blob_key,revision,payload) VALUES ('${owner}','receipt-1','settled-a','synthetic-digest',4,'receipt-blob',3,'{"privateNote":"retained synthetic attachment"}');
@@ -359,6 +393,63 @@ test("pre-sharing database gains empty sharing tracks, validates, and serves sha
   assert.match(repeat.stdout, /verified, nothing to do/);
   assert.equal(await sha256File(db), hashAfter);
   assert.deepEqual(await backups(directory), names);
+});
+
+test("final checkpoints gain the additive unified projection schema", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-projection-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('${owner}',1,0,'checking',100,'user',${DAY_CLOSE_0310});`);
+  await sqlite(db, `INSERT INTO postings(user_id,id,name,source_account_id,destination_account_ids,amount_resolution_json,posted_time,transaction_time,source,pending,void) VALUES ('${owner}','settled-a','Grocer','checking','null','{}',1773140400,1773129600,'simplefin',0,0);`);
+  await sqlite(db, `INSERT INTO posting_sim(user_id,posting_id,position,enabled,execution_order) VALUES ('${owner}','settled-a',0,1,0);`);
+  await sqlite(db, `INSERT INTO entity_ids(user_id,id,kind) VALUES ('${owner}','settled-a','posting');`);
+  await removeProjection(db);
+  const accountsBefore = await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;");
+  const postingsBefore = await rows(db, "SELECT user_id,id,name,source_account_id,amount_resolution_json,posted_time,transaction_time,source,pending,void FROM postings;");
+
+  const result = await migrate(db);
+  assert.doesNotMatch(result.stdout, /verified, nothing to do/);
+
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM sqlite_schema WHERE type='table' AND name IN ('provider_connections','projection_states','projection_slices','projection_rows','monte_carlo_statistics','net_worth_threshold_outputs','account_balance_outputs','posting_fulfillment_outputs','cycle_fulfillment_outputs','planned_purchases_outputs','financial_independence_outputs','whatif_outputs');"), "12");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('checkpoints') WHERE name='provider';"), "1");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_table_info('postings') WHERE name IN ('projection_slice_id','event_json','applied_amount','outcome');"), "4");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM projection_states;"), "0");
+  assert.equal(await rows(db, "SELECT user_id,id,position,name,kind,enabled FROM accounts;"), accountsBefore);
+  assert.equal(await rows(db, "SELECT user_id,id,name,source_account_id,amount_resolution_json,posted_time,transaction_time,source,pending,void FROM postings;"), postingsBefore);
+  assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
+  assert.equal(await rows(db, "SELECT COUNT(*) FROM pragma_foreign_key_check;"), "0");
+
+  const hashAfter = await sha256File(db);
+  const backupsBefore = await backups(directory);
+  const repeat = await migrate(db);
+  assert.match(repeat.stdout, /verified, nothing to do/);
+  assert.equal(await sha256File(db), hashAfter);
+  assert.deepEqual(await backups(directory), backupsBefore);
+});
+
+test("partial projection schema fails closed with the original unchanged", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "waypoint-migration-projection-partial-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { db, owner } = await fullBase(directory);
+  await sqlite(db, `INSERT INTO accounts(user_id,id,position,name,kind,enabled) VALUES ('${owner}','checking',0,'Checking','cash',1);`);
+  await sqlite(db, `INSERT INTO checkpoints(user_id,id,position,model_account_id,balance,source,observed_at) VALUES ('${owner}',1,0,'checking',100,'user',${DAY_CLOSE_0310});`);
+  await removeProjection(db);
+  await sqlite(db, `CREATE TABLE provider_connections (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL,
+    provider_key TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT '',
+    sync_cursor TEXT NOT NULL DEFAULT '',
+    last_synced_at TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY(user_id, id)
+  );`);
+  const hashBefore = await sha256File(db);
+
+  const error = await migrateFails(db);
+  assert.match(error.stderr, /Partial unified projection schema/);
+  assert.equal(await sha256File(db), hashBefore);
+  assert.deepEqual(await backups(directory), []);
 });
 
 test("partial sharing schema fails closed with the original unchanged", async (t) => {

@@ -203,9 +203,9 @@ in infrastructure commit `592e6b8`. Northflank was initialized with the current
 user-scoped model. Never replay that host-specific script against Northflank's
 independent issuer or Postgres database.
 
-## Unified projection schema (unreleased branch)
+## Unified projection schema
 
-The unified-projection branch adds tables and columns with no data conversion:
+The unified projection adds tables and columns with no data conversion:
 `provider_connections`, `projection_states` (plus `det_evaluations_json` and
 `stoch_evaluations_json`), `projection_slices`, `projection_rows`,
 `monte_carlo_statistics` (plus `p25`, `p50`, `p75`), one typed output table
@@ -215,11 +215,13 @@ per evaluation (`net_worth_threshold_outputs`, `account_balance_outputs`,
 `whatif_outputs`),
 `checkpoints.provider`, and on `postings`
 `projection_slice_id`, `event_json`, `applied_amount`, plus `outcome`.
-Source values unify to `user`, `banksync`, and `projected`; previously stored
-`simplefin` row sources have no reader fallback.
 
-Before this branch deploys, the offline body must create the new tables and
-add the new columns with `ALTER TABLE ... ADD COLUMN` on a verified backup
-candidate, then `setupdb` must validate the complete schema. Fresh databases
-need no body work: `SetupDatabase` creates the complete schema. There is no
-runtime conversion and no legacy alias anywhere in the server path.
+The offline body treats this group as absent, complete, or invalid. Absent
+creates every table and adds every column on the verified backup candidate.
+Complete repeats read-only. A partial group fails before mutation. `setupdb`
+then validates the complete schema on the candidate. Existing
+`projection_artifacts` tables are preserved when present but are no longer
+required. Previously stored `simplefin` row sources are preserved
+byte-identical; provider identity remains in sync keys, so no reader branch
+depends on the legacy source spelling. Fresh databases need no body work:
+`SetupDatabase` creates the complete schema.
