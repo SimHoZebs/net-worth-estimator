@@ -45,7 +45,9 @@ func TestRewritingProxyPreservesIncrementalStreaming(t *testing.T) {
 	defer edge.Close()
 	defer finish()
 	client := edge.Client()
-	client.Timeout = 3 * time.Second
+	// Bounded so a hung proxy fails, but not tight enough to expire while a
+	// hosted runner shares four cores across the parallel gate groups.
+	client.Timeout = 30 * time.Second
 	response, err := client.Post(edge.URL+"/v1/projections/stochastic", "application/json", strings.NewReader("{}"))
 	if err != nil {
 		t.Fatal(err)

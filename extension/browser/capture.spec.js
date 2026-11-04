@@ -1,8 +1,14 @@
 import { test, expect, chromium } from "@playwright/test";
 import { createServer } from "node:http";
+import { existsSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// This host pre-creates /tmp/opencode for disposable tooling; CI runners do
+// not, and mkdtemp needs an existing parent.
+const temporaryRoot = existsSync("/tmp/opencode") ? "/tmp/opencode" : tmpdir();
 
 test("installed extension connects, captures, picks, persists drafts, and retries one save", async () => {
   const requests = [];
@@ -130,7 +136,7 @@ test("installed extension connects, captures, picks, persists drafts, and retrie
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
-  const temp = await mkdtemp("/tmp/opencode/waypoint-extension-test-");
+  const temp = await mkdtemp(join(temporaryRoot, "waypoint-extension-test-"));
   const extension = join(temp, "extension");
   await mkdir(extension);
   const root = fileURLToPath(new URL("../", import.meta.url));
