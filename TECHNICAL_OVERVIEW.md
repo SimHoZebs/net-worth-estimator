@@ -342,6 +342,7 @@ The current schema stores:
 | `analysis_feedback`        | append-only answer history with actor, prediction, detector version, and review                                |
 | `amount_presets`         | ordered saved amount recipes (stable name, label, summary, amount descriptor), seeded with 8 factory defaults |
 | `posting_sync_keys`      | exact provider/account/transaction identity mapped to a local posting UUID                                    |
+| `posting_categories`     | one sidecar category assignment per posting with source and producer                                          |
 | `schema_migrations`      | compatibility markers and historical upgrade records |
 
 ### First boot and import
