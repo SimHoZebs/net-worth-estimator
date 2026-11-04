@@ -35,8 +35,13 @@ import {
 } from "./serverQuery.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
 import { useUiStore } from "./uiStore.ts";
-import { useProjectionModel } from "./useProjectionModel.ts";
+import {
+	projectionEvaluationKey,
+	projectionModelKey,
+} from "./projectionKeys.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
+import { useServerModel } from "./workspaceResources.ts";
+import { useUserScope } from "./useUserScope.ts";
 export { projectionStartDate } from "./projectionStartDate.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
 import { stochasticProjectionOptions } from "./stochasticProjectionQuery.ts";
@@ -478,10 +483,22 @@ export function useRemoteProjection({
 	dateRange: dateRangeOverride,
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
-	const { activeModel, baseModel, baseKey, evalKey } = useProjectionModel({
-		model: modelOverride,
-		evaluations: evaluationsOverride,
-	});
+	const scope = useUserScope();
+	const storeModel = useServerModel().data?.model ?? null;
+	const savedModel = modelOverride !== undefined ? modelOverride : storeModel;
+	const baseModel = scope.status === "ready" ? (savedModel ?? null) : null;
+	const activeModel = useMemo(
+		() =>
+			baseModel && evaluationsOverride
+				? { ...baseModel, evaluations: evaluationsOverride }
+				: baseModel,
+		[baseModel, evaluationsOverride],
+	);
+	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
+	const evalKey = useMemo(
+		() => projectionEvaluationKey(evaluationsOverride),
+		[evaluationsOverride],
+	);
 	const storeYears = useUiStore((state) => state.years);
 	const storeRanges = useUiStore((state) => state.ranges);
 	const years = yearsOverride ?? storeYears;

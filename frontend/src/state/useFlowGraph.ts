@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import type { FlowGraph } from "../api/flows.ts";
 import { requestFlowGraph } from "../api/flows.ts";
+import { projectionModelKey } from "./projectionKeys.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { useProjectionModel } from "./useProjectionModel.ts";
+import { useServerModel } from "./workspaceResources.ts";
 import { useUserScope } from "./useUserScope.ts";
 
 export interface FlowWindow {	startDate: string;
@@ -41,7 +43,9 @@ function flowGraphQueryKey(
  * backend queries: callers pass committed window state. */
 export function useFlowGraph(window: FlowWindow | null) {
 	const scope = useUserScope();
-	const { baseModel, baseKey } = useProjectionModel();
+	const storeModel = useServerModel().data?.model ?? null;
+	const baseModel = scope.status === "ready" ? storeModel : null;
+	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
 	const startDate = window?.startDate;
 	const endDate = window?.endDate;
 	return useQuery<FlowGraph, Error>(

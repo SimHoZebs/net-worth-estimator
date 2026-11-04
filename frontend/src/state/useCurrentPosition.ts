@@ -1,10 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { resolveCurrentPosition } from "../api/generated/endpoints.ts";
 import type { PositionRequestBody } from "../api/generated/model/index.ts";
 import type { CurrentPositionResponse } from "../api/position.ts";
 import { currentPositionQueryKey } from "./serverQuery.ts";
-import { useProjectionModel } from "./useProjectionModel.ts";
+import { projectionModelKey } from "./projectionKeys.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
+import { useServerModel } from "./workspaceResources.ts";
+import { useUserScope } from "./useUserScope.ts";
 import type { FinancialModel } from "../api/contracts.ts";
 
 export function useCurrentPosition({
@@ -16,7 +19,11 @@ export function useCurrentPosition({
 } = {}) {
 	// Position is backend-owned historical replay: it keys on the saved
 	// model only, never on forecast evaluation preferences.
-	const { baseModel, baseKey } = useProjectionModel({ model });
+	const scope = useUserScope();
+	const storeModel = useServerModel().data?.model ?? null;
+	const saved = model !== undefined ? model : storeModel;
+	const baseModel = scope.status === "ready" ? (saved ?? null) : null;
+	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
 	const asOfDate = baseModel ? projectionStartDate(baseModel) : "";
 	const query = useQuery({
 		queryKey: currentPositionQueryKey(baseKey, asOfDate),
