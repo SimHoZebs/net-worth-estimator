@@ -6,9 +6,11 @@ import { useTransactionSelection } from "../../../components/activity/useTransac
 import {
 	TransactionSectionView,
 	SafeSpendingSectionHeader,
+	type SpendingLimitDivider,
 } from "./TransactionSectionView.tsx";
 import { TransactionSortButton } from "../../../components/activity/TransactionSortButton.tsx";
 import type { SafeSpendingChargeCycle } from "./safeSpendingDetailModel.ts";
+import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
 export function SafeSpendingCyclePanel({
 	cycle,
@@ -36,6 +38,24 @@ export function SafeSpendingCyclePanel({
 		cycle.transactions,
 		savedById,
 	);
+	const dividers = useMemo<SpendingLimitDivider[]>(() => {
+		const items: SpendingLimitDivider[] = [];
+		if (cycle.thresholds?.safetyNetDate) {
+			items.push({
+				date: cycle.thresholds.safetyNetDate,
+				tone: "warning",
+				label: labels.reserveStarts,
+			});
+		}
+		if (cycle.thresholds?.limitDate) {
+			items.push({
+				date: cycle.thresholds.limitDate,
+				tone: "danger",
+				label: labels.spendingLimit,
+			});
+		}
+		return items;
+	}, [cycle.thresholds]);
 	return (
 		<div className="grid content-start gap-4">
 			<SafeSpendingSectionHeader
@@ -63,6 +83,7 @@ export function SafeSpendingCyclePanel({
 				onInspect={inspect}
 				order={transactionOrder}
 				showHeaders={showHeaders}
+				dividers={dividers}
 			/>
 			{selected && (
 				<TransactionDetail

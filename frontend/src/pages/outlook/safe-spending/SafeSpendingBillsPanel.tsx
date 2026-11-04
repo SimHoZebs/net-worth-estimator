@@ -29,6 +29,8 @@ import type {
 	SafeSpendingMandatorySection,
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
+import { SafeSpendingTrendChart } from "./SafeSpendingTrendChart.tsx";
+import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
 import {
 	householdPanelStyles,
 	householdValueStyles,
@@ -75,6 +77,7 @@ export function SafeSpendingBillsPanel({
 	heroes,
 	cashNow,
 	paycheck,
+	trend,
 	section,
 	accounts,
 	transactions,
@@ -86,6 +89,7 @@ export function SafeSpendingBillsPanel({
 	heroes: SafeSpendingHeroes;
 	cashNow: CashNowDecomposition;
 	paycheck: PaycheckDecomposition;
+	trend?: SafeSpendingTrend;
 	section: SafeSpendingMandatorySection;
 	accounts: Account[];
 	/** Saved rules, for the detail view's rule lookups and edit controls. */
@@ -209,6 +213,11 @@ export function SafeSpendingBillsPanel({
 						);
 					})}
 				</div>
+				{trend && (
+					<div className="border-t border-line pt-3">
+						<SafeSpendingTrendChart trend={trend} />
+					</div>
+				)}
 			</section>
 			<section className={householdPanelStyles()}>
 				<div className="flex items-center justify-between">

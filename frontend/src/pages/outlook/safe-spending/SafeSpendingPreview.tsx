@@ -32,6 +32,7 @@ import {
 } from "@/domain/safeSpending.ts";
 
 import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
+import { safeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
 import { visibleAccounts } from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
@@ -251,6 +252,25 @@ export function SafeSpendingPreview({
 			remainingDerived.monthEnd,
 		],
 	);
+	const spendingTrend = useMemo(() => {
+		const limit = (paycheckDerived?.amount ?? 0) - fixedDerived.total;
+		return safeSpendingTrend({
+			transactions: perAccount.flatMap((item) => item.inCycle),
+			cycleStart: cycle.cycleStart,
+			cycleEnd: cycle.cycleEnd,
+			todayIso: displayToday,
+			limit,
+			safetyNet: limit - settings.reserve,
+		});
+	}, [
+		perAccount,
+		cycle.cycleStart,
+		cycle.cycleEnd,
+		displayToday,
+		paycheckDerived,
+		fixedDerived.total,
+		settings.reserve,
+	]);
 
 	const billCandidates = useMemo(() => {
 		if (!spendingIds.length) return [];
@@ -388,9 +408,19 @@ export function SafeSpendingPreview({
 				title: labels.cycleSpending,
 				emptyMessage: "No spending this cycle yet.",
 				transactions: spending,
+				thresholds: {
+					safetyNetDate:
+						spendingTrend.safetyNetHit && !spendingTrend.safetyNetHit.projected
+							? spendingTrend.safetyNetHit.date
+							: null,
+					limitDate:
+						spendingTrend.limitHit && !spendingTrend.limitHit.projected
+							? spendingTrend.limitHit.date
+							: null,
+				},
 			},
 		};
-	}, [chargeCycles, directTransactions, transactionOrder]);
+	}, [chargeCycles, directTransactions, transactionOrder, spendingTrend]);
 	// Saved rows gate rendering, not hooks: every subscription above stays
 	// mounted while rows load.
 	if (!accounts || !transactions || savedRules === null || !startDate)
@@ -673,6 +703,7 @@ export function SafeSpendingPreview({
 										firstShort: shortWindow.firstDate,
 									}}
 									paycheck={paycheckDetails}
+									trend={spendingTrend}
 									section={billsSection}
 									accounts={accounts}
 									transactions={savedRows}

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, trackBrowserErrors } from "./base.ts";
+import { expect, test, trackBrowserErrors, type Locator } from "./base.ts";
 import { FIXTURE_API, resetFixture } from "./fixture.ts";
 import { SAFE_SPENDING_LABELS as labels } from "../../src/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
@@ -339,6 +339,142 @@ test("income sources combine independent recurrence rules and persist explicit d
 			.getByRole("region", { name: labels.allowance, exact: true })
 			.getByTestId("metric-value"),
 	).toHaveText("-$5,975");
+});
+
+test("marks the spending-limit and protected-reserve crossings and projects the pace", async ({
+	page,
+	request,
+}) => {
+	const partner = await request.post(`${FIXTURE_API}/v1/recurrence-rules`, {
+		data: {
+			id: "partner-income",
+			name: "Partner take-home pay",
+			sourceAccountId: "brokerage",
+			destinations: ["checking"],
+			amount: {
+				resolver: "expression",
+				config: { expression: "1400" },
+				inputs: {},
+			},
+			frequency: "monthly",
+			startDate: "2026-01-10",
+			endDate: null,
+			annualCap: null,
+			priority: 4,
+			enabled: true,
+		},
+	});
+	expect((await partner.json()).persisted).toBe(true);
+	const settings = await request.put(
+		`${FIXTURE_API}/v1/safe-spending-settings`,
+		{
+			data: {
+				statementDay: 20,
+				reserve: 725,
+				accountIds: null,
+				spendingAccountIds: null,
+				incomeAccountIds: null,
+				incomeRuleIds: ["salary", "partner-income"],
+				transactionIds: null,
+				statementDaySet: false,
+			},
+		},
+	);
+	expect(settings.ok()).toBe(true);
+	for (const [id, name, day, amount] of [
+		[
+			"01900000-0000-7000-8000-000000000041",
+			"Cycle charge A",
+			"2026-01-22",
+			600,
+		],
+		[
+			"01900000-0000-7000-8000-000000000042",
+			"Cycle charge B",
+			"2026-01-24",
+			600,
+		],
+		[
+			"01900000-0000-7000-8000-000000000043",
+			"Cycle charge C",
+			"2026-01-27",
+			700,
+		],
+	] as const) {
+		const time = new Date(`${day}T12:00:00Z`).getTime() / 1000;
+		const response = await request.post(`${FIXTURE_API}/v1/postings`, {
+			data: {
+				id,
+				name,
+				sourceAccountId: "loan",
+				destinations: null,
+				amount: {
+					resolver: "expression",
+					config: { expression: String(amount) },
+					inputs: {},
+				},
+				postedTime: time,
+				transactionTime: time,
+				enabled: true,
+			},
+		});
+		expect(response.ok()).toBe(true);
+		expect((await response.json()).persisted).toBe(true);
+	}
+	await page.goto("/#outlook/safe-spending-detail/cycle");
+	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
+	await expect(
+		drawer.getByRole("heading", { name: labels.spendingPace }),
+	).toBeVisible();
+	await expect(drawer.getByText("Over limit · $158 a day")).toBeVisible();
+	const chart = drawer.getByRole("img", { name: labels.spendingPace });
+	await expect(chart).toBeVisible();
+	expect(chart.locator("desc")).toContainText(
+		"limit was crossed on Jan 27, 2026",
+	);
+	await expect(
+		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+	).toContainText("Spending so far");
+	await expect(
+		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+	).toContainText("Projected at average rate");
+	await expect(
+		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+	).toContainText("Protected reserve starts $1,025");
+	await expect(
+		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+	).toContainText("Card spending limit $1,750");
+	const reserveDivider = drawer.getByRole("separator", {
+		name: labels.reserveStarts,
+	});
+	const limitDivider = drawer.getByRole("separator", {
+		name: labels.spendingLimit,
+	});
+	await expect(reserveDivider).toBeVisible();
+	await expect(limitDivider).toBeVisible();
+	const charges = drawer.getByRole("table", {
+		name: new RegExp(labels.cycleSpending),
+	});
+	await expect(charges).toContainText("Cycle charge A");
+	await expect(charges).toContainText("Cycle charge B");
+	await expect(charges).toContainText("Cycle charge C");
+	const y = async (locator: Locator) => (await locator.boundingBox())?.y ?? 0;
+	const chargeA = charges.getByText("Cycle charge A");
+	const chargeB = charges.getByText("Cycle charge B");
+	const chargeC = charges.getByText("Cycle charge C");
+	expect(await y(limitDivider)).toBeLessThan(await y(chargeC));
+	expect(await y(chargeC)).toBeLessThan(await y(reserveDivider));
+	expect(await y(reserveDivider)).toBeLessThan(await y(chargeB));
+	expect(await y(chargeB)).toBeLessThan(await y(chargeA));
+	await drawer
+		.getByRole("button", { name: /Sort transactions:/ })
+		.last()
+		.click();
+	await expect(charges.getByText("Cycle charge A")).toBeVisible();
+	expect(await y(chargeA)).toBeLessThan(await y(chargeB));
+	expect(await y(chargeB)).toBeLessThan(await y(reserveDivider));
+	expect(await y(reserveDivider)).toBeLessThan(await y(chargeC));
+	expect(await y(chargeC)).toBeLessThan(await y(limitDivider));
 });
 
 for (const theme of ["light", "dark"] as const) {

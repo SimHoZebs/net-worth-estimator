@@ -33,6 +33,11 @@ export interface SafeSpendingChargeCycle {
 	emptyMessage: string;
 	transactions: AccountTransaction[];
 	showTotal?: boolean;
+	/** Actual dates whose cumulative card spending crossed each threshold. */
+	thresholds?: {
+		safetyNetDate: string | null;
+		limitDate: string | null;
+	};
 }
 
 export interface SafeSpendingMandatorySection {
