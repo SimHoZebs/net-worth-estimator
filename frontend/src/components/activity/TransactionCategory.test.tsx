@@ -25,7 +25,26 @@ function categoryCalls(server: ReturnType<typeof stubTestServer>) {
 	);
 }
 
-it("shows the category source and saves a user choice", async () => {
+function trigger() {
+	return screen.getByRole("button", { name: /Category/ });
+}
+
+it("keeps the picker closed until the row is pressed", async () => {
+	const user = userEvent.setup();
+	stubTestServer();
+	render(
+		<TransactionCategory
+			postingId="charge"
+			category="FOOD_AND_DRINK"
+			source="bank"
+		/>,
+	);
+	expect(screen.queryByRole("listbox", { name: "Category" })).toBeNull();
+	await user.click(trigger());
+	expect(screen.getByRole("listbox", { name: "Category" })).toBeTruthy();
+});
+
+it("renders one row and saves a category chosen from the icon list", async () => {
 	const user = userEvent.setup();
 	const server = stubTestServer();
 	render(
@@ -35,8 +54,16 @@ it("shows the category source and saves a user choice", async () => {
 			source="bank"
 		/>,
 	);
-	expect(screen.getByText(/From your bank/)).toBeTruthy();
-	await user.selectOptions(screen.getByLabelText("Category"), "MEDICAL");
+	expect(trigger().textContent).toContain("Food & drink");
+	expect(screen.getByText("From your bank")).toBeTruthy();
+	await user.click(trigger());
+	expect(screen.getByRole("listbox", { name: "Category" })).toBeTruthy();
+	expect(
+		screen
+			.getByRole("option", { name: "Food & drink" })
+			.getAttribute("aria-selected"),
+	).toBe("true");
+	await user.click(screen.getByRole("option", { name: "Medical" }));
 	await waitFor(() => expect(categoryCalls(server)).toHaveLength(1));
 	expect(categoryCalls(server)[0]?.body).toEqual({ category: "MEDICAL" });
 });
@@ -47,15 +74,16 @@ it("resets a user override to automatic", async () => {
 	render(
 		<TransactionCategory postingId="charge" category="MEDICAL" source="user" />,
 	);
-	expect(screen.getByText(/Set by you/)).toBeTruthy();
-	await user.click(
-		screen.getByRole("button", { name: "Use automatic category" }),
-	);
+	expect(screen.getByText("Set by you")).toBeTruthy();
+	await user.click(trigger());
+	await user.click(screen.getByRole("button", { name: "Use automatic" }));
 	await waitFor(() => expect(categoryCalls(server)).toHaveLength(1));
 	expect(categoryCalls(server)[0]?.body).toEqual({ category: null });
 });
 
-it("shows an unknown server key instead of a blank select", () => {
+it("shows an unknown server key in the row instead of a blank value", async () => {
+	const user = userEvent.setup();
+	stubTestServer();
 	render(
 		<TransactionCategory
 			postingId="charge"
@@ -63,19 +91,17 @@ it("shows an unknown server key instead of a blank select", () => {
 			source="bank"
 		/>,
 	);
-	const select = screen.getByLabelText("Category") as HTMLSelectElement;
-	expect(select.value).toBe("FUTURE_CATEGORY");
-	expect(select.selectedOptions[0]?.textContent).toBe("FUTURE_CATEGORY");
+	expect(trigger().textContent).toContain("FUTURE_CATEGORY");
+	await user.click(trigger());
+	expect(screen.getByRole("option", { name: "Medical" })).toBeTruthy();
 });
 
 it("stays enabled until app read-only is set", () => {
 	const { rerender } = render(
 		<TransactionCategory postingId="charge" category={null} source={null} />,
 	);
-	expect(
-		(screen.getByLabelText("Category") as HTMLSelectElement).disabled,
-	).toBe(false);
-	expect(screen.getByText(/No category yet/)).toBeTruthy();
+	expect((trigger() as HTMLButtonElement).disabled).toBe(false);
+	expect(trigger().textContent).toContain("Not categorized");
 	rerender(
 		<TransactionCategory
 			postingId="charge"
@@ -84,7 +110,5 @@ it("stays enabled until app read-only is set", () => {
 			readOnly
 		/>,
 	);
-	expect(
-		(screen.getByLabelText("Category") as HTMLSelectElement).disabled,
-	).toBe(true);
+	expect((trigger() as HTMLButtonElement).disabled).toBe(true);
 });

@@ -17,6 +17,7 @@ export async function resetFixture(
 			amount: string;
 			posted: number;
 			pending?: boolean;
+			extra?: Record<string, string>;
 		}[];
 		syncLink?: {
 			bridgeAccountId: string;

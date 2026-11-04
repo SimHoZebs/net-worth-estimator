@@ -443,3 +443,39 @@ test("an intraday time saves through the detail over the real API", async ({
 		.click();
 	await expect(page.getByLabel("Occurred at time (UTC)")).toHaveValue("11:00");
 });
+
+test("category is a field row with an icon picker and bank provenance", async ({
+	page,
+}) => {
+	await resetFixture({
+		bankTransactions: [
+			{
+				id: "category-grocer",
+				description: "WHOLE FOODS MARKET",
+				amount: "-84.20",
+				posted: 1769558400,
+				extra: { category: "FOOD_AND_DRINK_GROCERIES" },
+			},
+		],
+	});
+	const dialog = await openChecking(page);
+	await dialog
+		.getByRole("button", { name: /View WHOLE FOODS MARKET/ })
+		.click();
+	const detail = page.getByRole("dialog", { name: "WHOLE FOODS MARKET" });
+	const bankCategory = detail.getByRole("button", {
+		name: "Category Food & drink From your bank",
+	});
+	await expect(bankCategory).toBeVisible();
+	await bankCategory.click();
+	const menu = page.getByRole("listbox", { name: "Category" });
+	await expect(menu).toBeVisible();
+	await menu.getByRole("option", { name: "Medical" }).click();
+	const userCategory = detail.getByRole("button", {
+		name: "Category Medical Set by you",
+	});
+	await expect(userCategory).toBeVisible();
+	await userCategory.click();
+	await detail.getByRole("button", { name: "Use automatic" }).click();
+	await expect(bankCategory).toBeVisible();
+});

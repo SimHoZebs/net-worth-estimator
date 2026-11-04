@@ -1163,7 +1163,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.getByLabelText("Category")).toBeTruthy();
+	expect(screen.getByRole("button", { name: /Category/ })).toBeTruthy();
 	cleanup();
 	const rule = { ...posting, id: "renovation-rule", kind: "rule" as const };
 	render(
@@ -1175,7 +1175,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.queryByLabelText("Category")).toBeNull();
+	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
 	cleanup();
 	const voided = { ...posting, id: "vanished", void: true };
 	render(
@@ -1187,7 +1187,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 			onClose={() => {}}
 		/>,
 	);
-	expect(screen.queryByLabelText("Category")).toBeNull();
+	expect(screen.queryByRole("button", { name: /Category/ })).toBeNull();
 });
 
 it("keeps category edits enabled on a pending bank row", () => {
@@ -1211,7 +1211,8 @@ it("keeps category edits enabled on a pending bank row", () => {
 		/>,
 	);
 	expect(
-		(screen.getByLabelText("Category") as HTMLSelectElement).disabled,
+		(screen.getByRole("button", { name: /Category/ }) as HTMLButtonElement)
+			.disabled,
 	).toBe(false);
 });
 

@@ -88,9 +88,11 @@ Missing values mean uncategorized.
 an authenticated session on a writable server, and works on pending bank rows.
 It does not replace the posting row and does not touch the financial model.
 
-The transaction detail shows the category, its source, and a reset action when
-the user set it. The control saves immediately, so it stays separate from the
-transaction form.
+The transaction detail shows the category as one row beside the other
+transaction fields. The picker lists each category with a Lucide icon and
+shows a compact source icon in the row. A reset action appears when the user
+set the category. The control saves immediately, so it stays separate from
+the transaction form.
 
 ## Boundaries
 

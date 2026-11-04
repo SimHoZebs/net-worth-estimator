@@ -168,6 +168,7 @@ function MoreOptions({
 	draft,
 	updateDraft,
 	locked,
+	categoryReadOnly,
 	occurrenceOptions,
 }: {
 	savedTransaction: Transaction;
@@ -175,6 +176,7 @@ function MoreOptions({
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
 	locked: boolean;
+	categoryReadOnly: boolean;
 	/** Scheduled dates of the selected rule, closest to the posted day first. */
 	occurrenceOptions: string[];
 }) {
@@ -193,10 +195,19 @@ function MoreOptions({
 	const rowLabel = "w-36 flex-none text-sm font-semibold text-muted";
 	return (
 		<section
-			aria-label="Schedule options"
+			aria-label="Transaction options"
 			className="mt-4 border-t border-line pt-4"
 		>
 			<div className="flex flex-col">
+				{savedTransaction.kind === "posting" && !savedTransaction.void && (
+					<TransactionCategory
+						postingId={savedTransaction.id}
+						category={savedTransaction.category}
+						source={savedTransaction.categorySource}
+						readOnly={categoryReadOnly}
+						labelClassName={rowLabel}
+					/>
+				)}
 				<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
 					<label htmlFor={frequencyId} className={rowLabel}>
 						Frequency
@@ -1464,14 +1475,6 @@ export function TransactionDetail({
 							</div>
 						)}
 					</div>
-					{once && !transaction.void && (
-						<TransactionCategory
-							postingId={savedTransaction.id}
-							category={savedTransaction.category}
-							source={savedTransaction.categorySource}
-							readOnly={readOnly}
-						/>
-					)}
 					{kind === "transfer" && (
 						<div className="mt-5">
 							<h3 className="mb-3 text-sm font-semibold">Transfer details</h3>
@@ -1583,6 +1586,7 @@ export function TransactionDetail({
 						draft={edit.draft}
 						updateDraft={edit.updateDraft}
 						locked={!canEdit}
+						categoryReadOnly={Boolean(readOnly)}
 						occurrenceOptions={occurrenceOptions}
 					/>
 					{transaction.void && !readOnly && (
