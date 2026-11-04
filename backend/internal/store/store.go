@@ -45,6 +45,14 @@ type Store interface {
 	// does the same for an account edit plus a moved observation.
 	CreateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error)
 	UpdateAccountWithBalance(account types.Account, balance *float64, observedAt int64) (types.Account, error)
+	// SupersedeAccount retires one manual account in favor of the synced
+	// account linked to bridgeAccountID. The synced account inherits the
+	// manual account's profile and account-scoped configuration, while its
+	// bank rows and bridge link stay authoritative. The manual account, its
+	// postings, and its checkpoints are deleted in the same transaction. A
+	// candidate that fails model validation is not persisted and reports
+	// Issues. The exact bridge link is rechecked inside the transaction.
+	SupersedeAccount(manualAccountID, syncedAccountID, bridgeAccountID string) (AccountSupersedeResult, error)
 	CreatePosting(posting types.Posting) (types.Posting, error)
 	UpdatePosting(posting types.Posting) (types.Posting, error)
 	// SetPostingClaims replaces occurrence claims for the named postings in

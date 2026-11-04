@@ -4590,6 +4590,63 @@
 				],
 				"type": "object"
 			},
+			"SupersedeInputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/SupersedeInputBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"manualAccountId": {
+						"type": "string"
+					}
+				},
+				"required": ["manualAccountId"],
+				"type": "object"
+			},
+			"SupersedeOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SupersedeOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"manualAccountId": {
+						"type": "string"
+					},
+					"persisted": {
+						"type": "boolean"
+					},
+					"revision": {
+						"type": "string"
+					},
+					"syncedAccountId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"manualAccountId",
+					"syncedAccountId",
+					"issues",
+					"persisted",
+					"revision"
+				],
+				"type": "object"
+			},
 			"SyncCardsInputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -8095,6 +8152,54 @@
 					}
 				},
 				"summary": "Link one bridge account"
+			}
+		},
+		"/v1/sync/simplefin/accounts/{bridgeAccountId}/supersede": {
+			"post": {
+				"operationId": "supersede-simplefin-account",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "bridgeAccountId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/SupersedeInputBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SupersedeOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace a manual account with a linked synced account"
 			}
 		},
 		"/v1/sync/simplefin/cards": {

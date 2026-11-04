@@ -70,6 +70,12 @@ var ErrSharingConflict = errors.New("the sharing request conflicts with a commit
 // payment linked to more than one settlement. Handlers map it to 409.
 var ErrSettlementConflict = errors.New("settlement conflicts with a recorded settlement")
 
+// ErrAccountSupersedeInvalid reports a manual account that cannot be
+// replaced by a synced account: already bank-owned, linked to a bridge,
+// missing payment-term routing, or otherwise not a manual account. Handlers
+// map it to 422 and may show its message.
+var ErrAccountSupersedeInvalid = errors.New("account cannot be replaced by a synced account")
+
 var (
 	ErrReceiptNotFound   = errors.New("receipt or posting not found")
 	ErrReceiptConflict   = errors.New("receipt changed; reload before retrying")

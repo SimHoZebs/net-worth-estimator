@@ -33,6 +33,15 @@ const (
 
 const ReceiptStorageLimit = 100 << 20
 
+// AccountSupersedeResult reports one manual-to-synced account replacement.
+// Persisted is false when model validation rejected the candidate; Issues
+// carries the reasons and the stored model is unchanged.
+type AccountSupersedeResult struct {
+	SyncedAccount types.Account
+	Issues        []types.ModelValidationIssue
+	Persisted     bool
+}
+
 // AccountLink binds one SimpleFIN bridge account to one model account.
 // Links are sync metadata: owner payloads never carry them, model saves
 // never rewrite them, and a vanished bridge account leaves its link and

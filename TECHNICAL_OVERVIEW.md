@@ -134,7 +134,7 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 
 `GET /v1/status` returns `readOnly`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed). Session and resource discovery use `/v1/auth/session`.
 
-The frontend displays these provider-neutral sync signals. Provider setup, account linking, and sync execution remain server concerns. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
+The frontend displays these provider-neutral sync signals. Provider setup and raw account-link management remain server concerns. Sync execution also stays server-side. The only user-facing mapping action retires one manual account in favor of the synced account already linked to a bridge account. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
 
 ### Deterministic projection
 
@@ -777,6 +777,7 @@ the user correction overlay.
 - Account links live in the `account_links` table.
 - Card selection is stored per user in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.
+- The synced-account list offers one account-mapping action: `POST /v1/sync/simplefin/accounts/{bridgeAccountId}/supersede` retires one manual account in favor of the synced account already linked to that bridge account. The synced account keeps its link and bank facts. The manual account's list slot, name, color, kind, balance limits, payment terms, recurrence routes, planned-purchase funding, safe-spending selections, card selections, evaluation references, and sharing-policy account selections move to it. The manual account, its owner postings, and its checkpoints are deleted. A manual account that already carries bank checkpoints or bank postings is rejected, as is a stale bridge link. The candidate is validated before commit; a rejected candidate returns issues with `persisted: false` and changes nothing.
 - A bridge account that vanishes keeps its link, rows, and data (stale, never deleted by sync).
 
 `Runner.Sync` delegates to the ingest orchestrator with the SimpleFIN adapter. The orchestrator requests account data for the previous 90 days through tomorrow with pending data included. It resolves bridge accounts through stored links, provisions unmapped USD accounts, then `Translate` preserves the bridge balance-date as the observation instant (falling back to arrival time when the bridge reports none) and emits every instant as its own checkpoint row plus pending and posted transactions on every mapped USD account. Unmapped, non-USD, and invalid-amount rows are counted by reason without logging descriptions or amounts.
