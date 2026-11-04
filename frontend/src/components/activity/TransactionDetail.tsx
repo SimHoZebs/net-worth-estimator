@@ -6,7 +6,6 @@ import {
 	ArrowUpRight,
 	Check,
 	Clock3,
-	Ellipsis,
 	Eye,
 	EyeOff,
 	Link2,
@@ -20,7 +19,6 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import {
-	useEffect,
 	useId,
 	useMemo,
 	useRef,
@@ -43,6 +41,7 @@ import {
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { serverQueryClient } from "../../state/serverQuery.ts";
 import { AccountIcon } from "../AccountIcon.tsx";
+import { ActionMenu, type ActionMenuItem } from "../ActionMenu.tsx";
 import { Badge } from "../Badge.tsx";
 import { ConfirmDialog } from "../ConfirmDialog.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
@@ -955,7 +954,6 @@ export function TransactionDetail({
 		locked: !canEdit,
 		onDone: onClose,
 	});
-	const menuAvailable = canEdit || subscription.available || canDelete;
 	// Claim options and name lookups use the canonical saved list, so the
 	// detail never depends on which rows the entry point happened to pass.
 	// The prop (or the row itself) covers loading and test fixtures.
@@ -1021,16 +1019,6 @@ export function TransactionDetail({
 	};
 	const fullAccounts = accounts as Account[];
 	const [insightsOpen, setInsightsOpen] = useState(false);
-	const [menuOpen, setMenuOpen] = useState(false);
-	const menuButtonRef = useRef<HTMLButtonElement>(null);
-	const menuRef = useRef<HTMLDivElement>(null);
-	useEffect(() => {
-		if (menuOpen) menuRef.current?.focus();
-	}, [menuOpen]);
-	const closeMenu = (restoreFocus: boolean) => {
-		setMenuOpen(false);
-		if (restoreFocus) menuButtonRef.current?.focus();
-	};
 	// Sharing lives in its own sheet above the detail, mirroring the
 	// suggestions sheet: the footer status reports the state and opens it.
 	const [sharingOpen, setSharingOpen] = useState(false);
@@ -1111,6 +1099,41 @@ export function TransactionDetail({
 			)}
 		</span>
 	);
+	const menuItems: ActionMenuItem[] = [];
+	if (canEdit) {
+		menuItems.push({
+			id: "toggle-enabled",
+			label: edit.draft.enabled
+				? "Exclude from projections"
+				: "Include in projections",
+			icon: edit.draft.enabled ? EyeOff : Eye,
+			checked: edit.draft.enabled,
+			onSelect: () =>
+				edit.updateDraft({ enabled: !edit.draft.enabled }, "schedule"),
+		});
+	}
+	if (subscription.available) {
+		menuItems.push({
+			id: "mark-subscription",
+			label: subscription.marking ? "Marking…" : "Mark as subscription",
+			icon: Repeat,
+			disabled: subscription.marking,
+			onSelect: () => void subscription.mark(),
+		});
+	}
+	if (canDelete) {
+		menuItems.push({
+			id: "delete",
+			label: "Delete transaction",
+			icon: Trash2,
+			tone: "danger",
+			restoreFocus: false,
+			onSelect: () => {
+				setDeleteError(null);
+				setConfirmingDelete(true);
+			},
+		});
+	}
 	return (
 		<DetailPortal>
 			<Modal
@@ -1118,105 +1141,14 @@ export function TransactionDetail({
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
 				className="scroll-smooth max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
-				onCloseRequest={() => {
-					if (menuOpen) {
-						closeMenu(true);
-						return false;
-					}
-					return edit.requestClose();
-				}}
+				onCloseRequest={edit.requestClose}
 				actions={
 					<>
-						{menuAvailable && (
-							<span className="relative inline-flex">
-								<IconButton
-									ref={menuButtonRef}
-									icon={Ellipsis}
-									label="More options"
-									aria-haspopup="menu"
-									aria-expanded={menuOpen}
-									onClick={() => setMenuOpen((open) => !open)}
-								/>
-								{menuOpen && (
-									<>
-										<button
-											type="button"
-											aria-label="Close menu"
-											onClick={() => closeMenu(true)}
-											className="fixed inset-0 z-40 cursor-default border-0 bg-transparent p-0"
-										/>
-										<div
-											ref={menuRef}
-											tabIndex={-1}
-											role="menu"
-											aria-label="Transaction actions"
-											className="absolute top-full right-0 z-50 mt-1 w-60 rounded-surface border border-solid border-line bg-surface p-1 shadow-overlay focus:outline-none"
-										>
-											{canEdit && (
-												<button
-													type="button"
-													role="menuitemcheckbox"
-													aria-checked={edit.draft.enabled}
-													onClick={() => {
-														edit.updateDraft(
-															{ enabled: !edit.draft.enabled },
-															"schedule",
-														);
-														closeMenu(true);
-													}}
-													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover"
-												>
-													{edit.draft.enabled ? (
-														<EyeOff size={14} aria-hidden="true" />
-													) : (
-														<Eye size={14} aria-hidden="true" />
-													)}
-													<span>
-														{edit.draft.enabled
-															? "Exclude from projections"
-															: "Include in projections"}
-													</span>
-												</button>
-											)}
-											{subscription.available && (
-												<button
-													type="button"
-													role="menuitem"
-													onClick={() => {
-														closeMenu(true);
-														void subscription.mark();
-													}}
-													disabled={subscription.marking}
-													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-hover disabled:opacity-60"
-												>
-													<Repeat size={14} aria-hidden="true" />
-													<span>
-														{subscription.marking
-															? "Marking…"
-															: "Mark as subscription"}
-													</span>
-												</button>
-											)}
-											{canDelete && (
-												<button
-													type="button"
-													role="menuitem"
-													onClick={() => {
-														setDeleteError(null);
-														setConfirmingDelete(true);
-														closeMenu(false);
-													}}
-													className="flex w-full items-center gap-3 border-0 bg-transparent px-3 py-2 text-left text-sm text-danger-text hover:bg-hover"
-												>
-													<Trash2 size={14} aria-hidden="true" />
-													<span>Delete transaction</span>
-												</button>
-											)}
-										</div>
-									</>
-								)}
-							</span>
-						)}
+						<ActionMenu
+							label="More options"
+							menuLabel="Transaction actions"
+							items={menuItems}
+						/>
 						{edit.actions}
 					</>
 				}

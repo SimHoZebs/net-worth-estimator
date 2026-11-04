@@ -68,6 +68,36 @@ test("clicking an account opens its recorded history and projected transactions"
 	).toBeFocused();
 });
 
+test("the transaction actions menu closes on Escape without closing the detail", async ({
+	page,
+}) => {
+	const dialog = await openChecking(page);
+	await dialog
+		.getByRole("button", { name: "View Household payroll on Jan 15, 2026" })
+		.click();
+	const detail = page.getByRole("dialog", { name: "Household payroll" });
+	await page.getByLabel("Amount (USD)").fill("999");
+	await expect(
+		page.getByRole("button", { name: "Save changes" }),
+	).toBeVisible();
+	await detail.getByRole("button", { name: "More options" }).click();
+	await expect(
+		page.getByRole("menu", { name: "Transaction actions" }),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(
+		page.getByRole("menu", { name: "Transaction actions" }),
+	).toBeHidden();
+	await page.waitForTimeout(600);
+	await expect(detail).toBeVisible();
+	await expect(
+		page.getByRole("heading", { name: "Discard the changes in this form?" }),
+	).toHaveCount(0);
+	await expect(
+		detail.getByRole("button", { name: "More options" }),
+	).toBeFocused();
+});
+
 test("account names in the model open incoming transfers with the correct other account", async ({
 	page,
 }) => {
