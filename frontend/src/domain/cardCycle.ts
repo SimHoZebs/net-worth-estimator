@@ -76,7 +76,9 @@ export function resolveStatementCycle({
 
 export function isCycleOutflow(transaction: AccountTransaction): boolean {
 	// Pending charges commit spending even while disabled for projections.
+	// Void holds never settled, so they never count as spending.
 	return (
+		!transaction.void &&
 		transaction.direction === "out" &&
 		(!transaction.excluded || transaction.pending)
 	);

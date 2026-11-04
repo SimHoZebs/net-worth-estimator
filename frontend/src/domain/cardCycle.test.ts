@@ -55,7 +55,7 @@ function charge(
 }
 
 describe("cycle card charges", () => {
-	it("counts pending charges without including user-excluded charges or card payments", () => {
+	it("counts pending charges without including user-excluded charges, card payments, or void holds", () => {
 		const recorded = charge();
 		const pending = charge({ id: "pending", pending: true, excluded: true });
 		const input = {
@@ -65,6 +65,9 @@ describe("cycle card charges", () => {
 				charge({ id: "excluded", excluded: true }),
 				charge({ id: "payment", direction: "in", category: "transfer" }),
 				charge({ id: "pending-refund", direction: "in", pending: true }),
+				// Bank lifecycle rows are not exclusions, so the count must
+				// reject a void hold on its own state, not on `excluded`.
+				charge({ id: "void-hold", void: true }),
 			],
 			cycleStart: "2026-10-20",
 			todayIso: "2026-10-22",

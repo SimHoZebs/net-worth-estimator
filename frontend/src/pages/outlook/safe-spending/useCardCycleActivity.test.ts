@@ -167,6 +167,40 @@ describe("useCardCycleActivity", () => {
 		expect(input.projection).toEqual(projectionBefore);
 	});
 
+	it("excludes void holds from card spending and both cycle lists", () => {
+		const voidCurrent = purchase("void-current", "2026-10-20", 30, {
+			enabled: false,
+			pending: false,
+			void: true,
+			syncOwned: true,
+			readOnly: true,
+		});
+		const voidClosed = purchase("void-closed", "2026-10-19", 40, {
+			enabled: false,
+			pending: false,
+			void: true,
+			syncOwned: true,
+			readOnly: true,
+		});
+		const { result } = renderHook(() =>
+			useCardCycleActivity({
+				...input,
+				transactions: [...sourceTransactions, voidCurrent, voidClosed],
+			}),
+		);
+		expect(result.current.perAccount[0]!.derived).toBe(75);
+		expect(
+			result.current.chargeCycles.cycle.transactions.map(
+				(row) => row.transactionId,
+			),
+		).toEqual(["new-start", "today"]);
+		expect(
+			result.current.chargeCycles["last-cycle"].transactions.map(
+				(row) => row.transactionId,
+			),
+		).toEqual(["closed-start", "closed-end"]);
+	});
+
 	it("resolves a closed cycle across a year boundary and a custom statement day", () => {
 		const { result } = renderHook(() =>
 			useCardCycleActivity({
