@@ -118,6 +118,10 @@ export function SafeSpendingBillsPanel({
 	const cardLabel = closed ? labels.closedCardBalances : labels.cardSpending;
 	const amountText = (value: number | null) =>
 		value === null ? "—" : money(value);
+	const reserveUsed = Math.max(
+		0,
+		allocation.reserve - cashNow.cushion,
+	);
 	const dailyFoot = !allocation.available
 		? undefined
 		: closed
@@ -170,6 +174,11 @@ export function SafeSpendingBillsPanel({
 						<div className="text-xl font-bold tracking-tight text-ink tabular-nums">
 							{money(allocation.reserve)}
 						</div>
+						{reserveUsed > 0 && (
+							<div className="text-xs text-warning-text">
+								{money(reserveUsed)} used
+							</div>
+						)}
 					</div>
 				</div>
 				{allocation.available ? (

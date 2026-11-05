@@ -220,6 +220,44 @@ describe("SafeSpendingBillsPanel funding foot", () => {
 		expect(within(region).getByText("No projected paycheck")).toBeTruthy();
 	});
 
+	it("names the reserve amount used when cash is below the target", () => {
+		render(
+			<SafeSpendingBillsPanel
+				heroes={heroes}
+				cashNow={{ ...cashNow, cushion: 108 }}
+				allocation={{ ...allocation, reserve: 725 }}
+				funding={currentFunding}
+				section={section}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				readOnly={financialModelFixture.readOnly}
+				transactionOrder="newest"
+				onTransactionOrderChange={noop}
+				closed
+			/>,
+		);
+		expect(screen.getByText("$617 used")).toBeTruthy();
+	});
+
+	it("does not name reserve usage when cash covers the target", () => {
+		render(
+			<SafeSpendingBillsPanel
+				heroes={heroes}
+				cashNow={{ ...cashNow, cushion: 1200 }}
+				allocation={{ ...allocation, reserve: 725 }}
+				funding={currentFunding}
+				section={section}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				readOnly={financialModelFixture.readOnly}
+				transactionOrder="newest"
+				onTransactionOrderChange={noop}
+				closed
+			/>,
+		);
+		expect(screen.queryByText(/used$/)).toBeNull();
+	});
+
 	it("does not invent an allowance when a closed balance is missing", () => {
 		render(
 			<SafeSpendingBillsPanel
