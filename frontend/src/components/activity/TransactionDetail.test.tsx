@@ -1302,6 +1302,58 @@ it("keeps one-time transactions free of recurrence controls", () => {
 	expect(screen.getByLabelText("Records an occurrence of")).toBeTruthy();
 });
 
+it("shows the account route only inside the transfer details", () => {
+	const posting = {
+		...financialModelFixture.transactions.find(
+			(item) => item.id === "renovation",
+		)!,
+		id: "renovation-transfer",
+		kind: "posting" as const,
+		fromId: "checking",
+		toId: "mortgage",
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(posting)}
+			savedTransaction={posting}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	expect(screen.getByText("FROM ACCOUNT")).toBeTruthy();
+	expect(screen.getByText("TO ACCOUNT")).toBeTruthy();
+	// The route is stated by the labeled account rows. Do not repeat it as a
+	// joined line under the amount.
+	expect(
+		screen.queryByText("Everyday checking → Home mortgage"),
+	).toBeNull();
+});
+
+it("names the single account under the amount on income and spending rows", () => {
+	const posting = {
+		...financialModelFixture.transactions.find(
+			(item) => item.id === "renovation",
+		)!,
+		id: "renovation-spending",
+		kind: "posting" as const,
+		fromId: "checking",
+		toId: null,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(posting)}
+			savedTransaction={posting}
+			accounts={financialModelFixture.accounts}
+			transactions={financialModelFixture.transactions}
+			onClose={() => {}}
+		/>,
+	);
+	// No transfer details render here, so the header keeps the only account
+	// display for the row.
+	expect(screen.getByText("Everyday checking")).toBeTruthy();
+});
+
 it("keeps cadence and growth on schedules", () => {
 	const posting = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",

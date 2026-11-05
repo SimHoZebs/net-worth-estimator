@@ -1090,6 +1090,13 @@ export function TransactionDetail({
 		showShortfall ||
 		savedTransaction.amountKnown === false ||
 		(!savedTransaction.enabled && !transaction.pending && !showExcluded);
+	// Transfer details already state the route with labeled account rows.
+	// Other flows keep the single account under the amount because nothing
+	// else names it.
+	const accountRoute =
+		kind === "transfer"
+			? ""
+			: associatedAccountLabel({ fromAccount, toAccount, transaction });
 	// Formula-driven rules without a resolved figure carry no amount to show:
 	// the Calculated badge says it all. Real zero-amount occurrences always
 	// carry a requested figure or shortfall, so they still render.
@@ -1438,18 +1445,16 @@ export function TransactionDetail({
 								{savedTransaction.amountKnown === false && (
 									<Badge tone="neutral">Calculated</Badge>
 								)}
-								{hasStatusPill && (
-									<span className="text-muted" aria-hidden="true">
-										·
-									</span>
+								{accountRoute && (
+									<>
+										{hasStatusPill && (
+											<span className="text-muted" aria-hidden="true">
+												·
+											</span>
+										)}
+										<span className="text-sm text-muted">{accountRoute}</span>
+									</>
 								)}
-								<span className="text-sm text-muted">
-									{associatedAccountLabel({
-										fromAccount,
-										toAccount,
-										transaction,
-									})}
-								</span>
 							</div>
 						</div>
 						{(once || transaction.pending || postedDiffers) && (
