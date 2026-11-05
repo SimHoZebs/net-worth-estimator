@@ -25,6 +25,27 @@ test("money flows render labeled nodes with width-encoded flows", async ({
 	await expect(diagram.getByText("Outside accounts").first()).toBeVisible();
 });
 
+test("the mobile diagram scrolls sideways instead of squeezing the plot", async ({
+	page,
+}) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await openFlows(page);
+	const region = page.getByRole("region", {
+		name: "Scrollable money-flow diagram",
+	});
+	const metrics = await region.evaluate((element) => ({
+		clientWidth: element.clientWidth,
+		scrollWidth: element.scrollWidth,
+	}));
+	// The chart keeps a readable plot width and overflows its viewport.
+	expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+	const scrolled = await region.evaluate((element) => {
+		element.scrollLeft = element.scrollWidth;
+		return element.scrollLeft;
+	});
+	expect(scrolled).toBeGreaterThan(0);
+});
+
 test("hovering a flow shows its amount and top transactions", async ({
 	page,
 }) => {

@@ -45,6 +45,13 @@ const UNSELECTED_FLOW_OPACITY = 0.86;
 const LABEL_LIMIT = 30;
 const LABEL_CHAR_WIDTH = 6.8;
 const LABEL_BACKGROUND_HEIGHT = 20;
+// One label column, at minimum, so a short name still has breathing room.
+const MIN_LABEL_ROOM = 84;
+// The plot keeps this much width between its two label columns. Below it,
+// ribbons collapse into near-vertical strips and the flow direction stops
+// reading, so the chart scrolls sideways instead of squeezing further.
+const MIN_CHART_WIDTH = 640;
+const MIN_PLOT_WIDTH = 280;
 
 function truncateLabel(label: string): string {
 	return label.length > LABEL_LIMIT
@@ -52,7 +59,20 @@ function truncateLabel(label: string): string {
 		: label;
 }
 
-function labelX(node: SankeyNode<SankeyFlowNode, SankeyFlowLane, string>): number {
+/** Side room for the widest painted label: its paper halo plus the gap
+ * beside the node bar. The inset and the scroll floor share this value. */
+function labelRoomFor(nodes: SankeyFlowNode[]): number {
+	const widest = nodes.reduce(
+		(widestLabel, node) =>
+			Math.max(widestLabel, truncateLabel(node.label).length),
+		0,
+	);
+	return Math.max(MIN_LABEL_ROOM, Math.ceil(widest * LABEL_CHAR_WIDTH) + 34);
+}
+
+function labelX(
+	node: SankeyNode<SankeyFlowNode, SankeyFlowLane, string>,
+): number {
 	return node.depth === 0 ? node.x0 - 8 : node.x1 + 8;
 }
 
@@ -89,6 +109,11 @@ export function FlowSankey({
 	nameOf: (id: string) => string;
 	onSelectLane: (laneId: string | null) => void;
 }) {
+	const labelRoom = labelRoomFor(nodes);
+	const chartMinWidth = Math.max(
+		MIN_CHART_WIDTH,
+		labelRoom * 2 + MIN_PLOT_WIDTH,
+	);
 	const definition = useMemo(() => {
 		const selection = keyedSelection<FlowSankeyLink, string>({
 			selected: controlledSignal<
@@ -99,11 +124,6 @@ export function FlowSankey({
 			}),
 			key: (datum) => datum.data.laneId,
 		});
-		const widestLabel = nodes.reduce(
-			(widest, node) => Math.max(widest, truncateLabel(node.label).length),
-			0,
-		);
-		const labelRoom = Math.ceil(widestLabel * LABEL_CHAR_WIDTH) + 34;
 		return defineChart(
 			{
 				marks: [
@@ -121,9 +141,8 @@ export function FlowSankey({
 						nodeWidth: ({ width }) => Math.max(10, Math.min(20, width * 0.028)),
 						nodePadding: 12,
 						inset: ({ width }) => {
-							const room = Math.max(84, labelRoom);
 							const maxSide = Math.max(72, Math.floor((width - 120) / 2));
-							const side = Math.min(room, maxSide);
+							const side = Math.min(labelRoom, maxSide);
 							return { left: side, right: side, top: 10, bottom: 10 };
 						},
 						marks: ({ nodes: layoutNodes, links: layoutLinks }) =>
@@ -154,8 +173,12 @@ export function FlowSankey({
 									inset: 0,
 								}),
 								rect(layoutNodes, {
-									x1: (node) => labelX(node) - (node.depth === 0 ? labelWidth(node.data.label) : 6),
-									x2: (node) => labelX(node) + (node.depth === 0 ? 6 : labelWidth(node.data.label)),
+									x1: (node) =>
+										labelX(node) -
+										(node.depth === 0 ? labelWidth(node.data.label) : 6),
+									x2: (node) =>
+										labelX(node) +
+										(node.depth === 0 ? 6 : labelWidth(node.data.label)),
 									y1: (node) => node.y - LABEL_BACKGROUND_HEIGHT / 2,
 									y2: (node) => node.y + LABEL_BACKGROUND_HEIGHT / 2,
 									key: (node) => `${node.key}-label`,
@@ -206,15 +229,29 @@ export function FlowSankey({
 			},
 			{ keyboard: true },
 		);
-	}, [nodes, lanes, selectedLaneId, nameOf, onSelectLane]);
+	}, [nodes, lanes, labelRoom, selectedLaneId, nameOf, onSelectLane]);
 	return (
 		<div className="grid gap-2">
-			<Chart
-				definition={definition}
-				ariaLabel={ariaLabel}
-				ariaDescription={ariaDescription}
-				height={height}
-			/>
+			{/* oxlint-disable jsx-a11y/no-noninteractive-tabindex -- A scroll region must accept focus so keyboard users can pan the diagram. */}
+			<div
+				className="overflow-x-auto"
+				role="region"
+				aria-label="Scrollable money-flow diagram"
+				tabIndex={0}
+			>
+				<div style={{ minWidth: chartMinWidth }}>
+					<Chart
+						definition={definition}
+						ariaLabel={ariaLabel}
+						ariaDescription={ariaDescription}
+						height={height}
+					/>
+				</div>
+			</div>
+			{/* oxlint-enable jsx-a11y/no-noninteractive-tabindex */}
+			<p className="text-xs text-muted sm:hidden">
+				Scroll sideways to see the whole diagram.
+			</p>
 			{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes semantics from unstyled flex lists. */}
 			<ul
 				className="m-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1 p-0 text-xs text-muted"
