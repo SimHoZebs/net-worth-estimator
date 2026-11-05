@@ -65,7 +65,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install Chromium
         working-directory: frontend
-        run: bunx --no-install playwright install --with-deps chromium
+        # The hosted Ubuntu image already carries Chromium's libraries.
+        # Avoiding --with-deps prevents a slow font download from dominating.
+        run: bunx --no-install playwright install chromium
       - name: Run the disposable end-to-end gate
         run: E2E_TEST_MUTATIONS=1 scripts/test --e2e
       - name: Upload failure artifacts

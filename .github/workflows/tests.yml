@@ -134,7 +134,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install Chromium
         working-directory: frontend
-        run: bunx --no-install playwright install --with-deps chromium
+        # The hosted Ubuntu image already carries Chromium's libraries.
+        # Avoiding --with-deps prevents a slow font download from dominating.
+        run: bunx --no-install playwright install chromium
       - name: Run integration shard
         run: bun --filter ./frontend test:integration -- --shard=${{ matrix.shard }}/4
       - name: Upload failure artifacts
@@ -177,7 +179,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Install Chromium
         working-directory: extension
-        run: bunx --no-install playwright install --with-deps chromium
+        # The hosted Ubuntu image already carries Chromium's libraries.
+        # Avoiding --with-deps prevents a slow font download from dominating.
+        run: bunx --no-install playwright install chromium
       - name: Run extension browser tests
         run: bun --filter ./extension test:browser
       - name: Upload failure artifacts
