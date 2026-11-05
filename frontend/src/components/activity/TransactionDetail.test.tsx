@@ -1164,9 +1164,7 @@ it("shows the account route only inside the transfer details", () => {
 	expect(screen.getByText("TO ACCOUNT")).toBeTruthy();
 	// The route is stated by the labeled account rows. Do not repeat it as a
 	// joined line under the amount.
-	expect(
-		screen.queryByText("Everyday checking → Home mortgage"),
-	).toBeNull();
+	expect(screen.queryByText("Everyday checking → Home mortgage")).toBeNull();
 });
 
 it("names the single account under the amount on income and spending rows", () => {
@@ -1214,6 +1212,130 @@ it("keeps cadence and growth on schedules", () => {
 	expect(screen.getByLabelText("Frequency")).toBeTruthy();
 	expect(screen.getByLabelText("Annual amount increase (%)")).toBeTruthy();
 	expect(screen.queryByLabelText("Records an occurrence of")).toBeNull();
+});
+
+it("lists recorded transactions that claim the schedule's occurrences", () => {
+	stubTestServer();
+	const base = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const rule = {
+		...base,
+		id: "renovation-rule",
+		name: "Monthly renovation",
+		kind: "schedule" as const,
+	};
+	const march = {
+		...base,
+		id: "march-renovation",
+		name: "March renovation",
+		kind: "posting" as const,
+		startDate: "2026-03-02",
+		postedDate: "2026-03-02",
+		claimScheduleId: rule.id,
+		claimOccurrenceDate: "2026-03-01",
+	};
+	const february = {
+		...base,
+		id: "february-renovation",
+		name: "February renovation",
+		kind: "posting" as const,
+		startDate: "2026-02-02",
+		postedDate: "2026-02-02",
+		claimScheduleId: rule.id,
+		claimOccurrenceDate: "2026-02-01",
+	};
+	const unrelated = {
+		...base,
+		id: "unrelated-renovation",
+		name: "Unrelated renovation",
+		claimScheduleId: "salary",
+		claimOccurrenceDate: "2026-03-01",
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(rule)}
+			savedTransaction={rule}
+			accounts={financialModelFixture.accounts}
+			transactions={[rule, february, march, unrelated]}
+			onClose={() => {}}
+		/>,
+	);
+	const history = screen.getByRole("region", {
+		name: "Recorded transactions",
+	});
+	expect(within(history).getByText("March renovation")).toBeTruthy();
+	expect(within(history).getByText("February renovation")).toBeTruthy();
+	expect(within(history).queryByText("Unrelated renovation")).toBeNull();
+	fireEvent.click(
+		within(history).getByRole("button", {
+			name: "View March renovation recorded for Mar 1, 2026",
+		}),
+	);
+	expect(screen.getByRole("dialog", { name: /March renovation/ })).toBeTruthy();
+});
+
+it("keeps pending and void lifecycle badges ahead of excluded", () => {
+	stubTestServer();
+	const base = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const rule = {
+		...base,
+		id: "pending-rule",
+		kind: "schedule" as const,
+	};
+	const pending = {
+		...base,
+		id: "pending-claim",
+		name: "Pending renovation",
+		kind: "posting" as const,
+		pending: true,
+		enabled: false,
+		postedDate: null,
+		claimScheduleId: rule.id,
+		claimOccurrenceDate: "2026-03-01",
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(rule)}
+			savedTransaction={rule}
+			accounts={financialModelFixture.accounts}
+			transactions={[rule, pending]}
+			onClose={() => {}}
+		/>,
+	);
+	const history = screen.getByRole("region", {
+		name: "Recorded transactions",
+	});
+	expect(within(history).getByText("Pending")).toBeTruthy();
+	expect(within(history).queryByText("Excluded")).toBeNull();
+});
+
+it("says when a schedule has no recorded transactions", () => {
+	stubTestServer();
+	const posting = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const rule = {
+		...posting,
+		id: "empty-rule",
+		kind: "schedule" as const,
+	};
+	render(
+		<TransactionDetail
+			transaction={occurrence(rule)}
+			savedTransaction={rule}
+			accounts={financialModelFixture.accounts}
+			transactions={[rule]}
+			onClose={() => {}}
+		/>,
+	);
+	expect(
+		screen.getByText(
+			"No transactions record an occurrence of this schedule yet.",
+		),
+	).toBeTruthy();
 });
 
 it("ends a schedule by recording one transaction", async () => {

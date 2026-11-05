@@ -26,7 +26,10 @@ import {
 	type FormEvent,
 	type ReactNode,
 } from "react";
-import type { AccountTransaction } from "../../domain/accountActivity.ts";
+import {
+	scheduleTransaction,
+	type AccountTransaction,
+} from "../../domain/accountActivity.ts";
 import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
 import { dateLabel, todayIso } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
@@ -86,6 +89,8 @@ import {
 import type { Frequency } from "@/api/contracts.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
+import { scheduleHistoryTransactions } from "../../domain/scheduleHistory.ts";
+import { ScheduleHistory } from "./ScheduleHistory.tsx";
 import { TransactionCategory } from "./TransactionCategory.tsx";
 import { TransactionSharing } from "./TransactionSharing.tsx";
 import {
@@ -1013,6 +1018,16 @@ export function TransactionDetail({
 		const byId = new Map(rows.map((row) => [row.id, row]));
 		return [...byId.values()];
 	}, [savedTransactions, transactions, savedTransaction, savedRules]);
+	const scheduleHistory = useMemo(
+		() =>
+			savedTransaction.kind === "schedule"
+				? scheduleHistoryTransactions({
+						scheduleId: savedTransaction.id,
+						transactions: allTransactions,
+					})
+				: [],
+		[allTransactions, savedTransaction.kind, savedTransaction.id],
+	);
 	// Claim candidates: the selected schedule's dates through today,
 	// closest to the day the transaction actually happened first, already
 	// claimed dates removed. The row's own saved claim always stays listed.
@@ -1178,6 +1193,9 @@ export function TransactionDetail({
 		return ok;
 	};
 	const fullAccounts = accounts as Account[];
+	const [historySelection, setHistorySelection] = useState<Transaction | null>(
+		null,
+	);
 	const [insightsOpen, setInsightsOpen] = useState(false);
 	// Sharing lives in its own sheet above the detail, mirroring the
 	// suggestions sheet: the footer status reports the state and opens it.
@@ -1604,6 +1622,12 @@ export function TransactionDetail({
 						categoryReadOnly={Boolean(readOnly)}
 						occurrenceOptions={occurrenceOptions}
 					/>
+					{savedTransaction.kind === "schedule" && (
+						<ScheduleHistory
+							transactions={scheduleHistory}
+							onSelect={setHistorySelection}
+						/>
+					)}
 					{edit.error && <ErrorNotice message={edit.error} />}
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">
@@ -1716,6 +1740,23 @@ export function TransactionDetail({
 						readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 					/>
 				</Modal>
+			)}
+			{historySelection && (
+				<TransactionDetail
+					key={historySelection.id}
+					// The schedule start is only the adapter's display horizon;
+					// the posting detail reads the posting's own fields.
+					transaction={scheduleTransaction({
+						transaction: historySelection,
+						accounts: fullAccounts,
+						startDate: savedTransaction.startDate,
+					})}
+					savedTransaction={historySelection}
+					accounts={accounts}
+					transactions={allTransactions}
+					readOnly={readOnly}
+					onClose={() => setHistorySelection(null)}
+				/>
 			)}
 			{confirmingDelete && (
 				<ConfirmDialog

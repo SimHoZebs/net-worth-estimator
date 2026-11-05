@@ -368,6 +368,42 @@ test("growth-only accounts have an honest empty state and retain account details
 	expect(home?.minBalance).toBe(5000);
 });
 
+test("a recurring schedule lists transactions that record its occurrences", async ({
+	page,
+}) => {
+	const claim = await page.request.post(
+		`${FIXTURE_API}/v1/transactions/c9cc20ed-121a-565b-86a4-b576b5c71e6f/claim`,
+		{ data: { scheduleId: "spend", occurrenceDate: "2026-03-05" } },
+	);
+	expect(claim.ok()).toBe(true);
+	await page.goto("/#accounts");
+	await page
+		.getByRole("button", { name: "Open Everyday checking transactions" })
+		.click();
+	const dialog = page.getByRole("dialog", { name: "Everyday checking" });
+	await dialog.getByRole("tab", { name: /Recurring/ }).click();
+	await dialog.getByRole("button", { name: /View Housing and living/ }).click();
+	const schedule = page.getByRole("dialog", {
+		name: /Housing and living/,
+	});
+	await expect(schedule).toBeVisible();
+	const history = schedule.getByRole("region", {
+		name: "Recorded transactions",
+	});
+	await expect(history).toContainText("Home renovation");
+	await expect(history).toContainText("Occurrence Mar 5, 2026");
+	await expect(history).toContainText("Posted Mar 8, 2026");
+	await expect(history).toContainText("−$9,000.00");
+	await history
+		.getByRole("button", {
+			name: "View Home renovation recorded for Mar 5, 2026",
+		})
+		.click();
+	await expect(
+		page.getByRole("dialog", { name: /Home renovation/ }),
+	).toBeVisible();
+});
+
 test("account transactions and editor evidence are accessible on desktop and mobile", async ({
 	page,
 }) => {
