@@ -31,7 +31,7 @@
 # closed before any backup or mutation. A complete target (final checkpoints
 # plus the full Analysis schema) repeats read-only checks only and never
 # reactivates a post-upgrade owner disable. An absent database file fails:
-# provisioning fresh storage is `setupdb` and `render-free-boot.sh`, not
+# provisioning fresh storage is `setupdb` and `api-boot.sh`, not
 # this hook.
 #
 # The published `<database>.analysis-migration-pending` interlock from an

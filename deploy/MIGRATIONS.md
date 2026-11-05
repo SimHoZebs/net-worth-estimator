@@ -49,7 +49,7 @@ resumes the API and this body never restores over the data file. The private
 is recognized fail-closed. Retain this body until both supported targets
 verify it. No provider edits belong to this migration.
 
-`render-free-boot.sh` provisions or validates current schema on hosts configured
+`api-boot.sh` provisions or validates current schema on hosts configured
 for that command. It does not provision users. Guest and signed-in workspaces
 use the shared authorized-access path. This is fresh/current schema setup,
 not the deployment migration hook. Keep the two separate.
@@ -182,7 +182,7 @@ maintenance process serves only `/tmp/waypoint-maintenance`, never `/data`.
 The API and scheduler are absent. Its `/readyz` body says `maintenance`, not
 `ok`. The workflow deploys the target image and runs `/app/migrate.sh` as
 UID/GID `10001`, with `dispatchOnly: false` to wait for its exit status.
-Only success restores `/app/render-free-boot.sh` and waits for service health.
+Only success restores `/app/api-boot.sh` and waits for service health.
 
 Postgres dumps precede identity-image replacement. They do not back up SQLite.
 A pending migration must take and verify the financial backup in its shared

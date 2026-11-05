@@ -54,7 +54,7 @@ Repeat setup preserves existing database and user rows:
 /app/setupdb --db "$NET_WORTH_ESTIMATOR_DB" --issuer "$ISSUER" --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
 ```
 
-Hosts configured to use `/app/render-free-boot.sh` run schema setup only before
+Hosts configured to use `/app/api-boot.sh` run schema setup only before
 the server. That wrapper never provisions guest or other user workspaces.
 Casdoor's initial deployment seed still creates the guest identity.
 

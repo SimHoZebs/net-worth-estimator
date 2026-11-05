@@ -29,7 +29,7 @@ busybox-extras httpd -p 18000 -h /tmp/provider
 /app/setupdb --db /tmp/explicit-setup.db
 /app/setupdb --db /tmp/explicit-setup.db
 test ! -f "$NET_WORTH_ESTIMATOR_DB"
-exec /app/render-free-boot.sh
+exec /app/api-boot.sh
 `;
   await run("docker", [
     "run", "--detach", "--network", "none", "--name", name,

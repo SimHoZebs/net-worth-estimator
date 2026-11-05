@@ -719,7 +719,7 @@ test("shared hook stays shell plus setupdb/sqlite3 and outside server startup", 
     assert.doesNotMatch(body, new RegExp(runtime));
   }
   assert.doesNotMatch(body, /rm .*pending|rm "\$pending"/);
-  const startup = await readFile(new URL("../backend/render-free-boot.sh", import.meta.url), "utf8");
+  const startup = await readFile(new URL("../backend/api-boot.sh", import.meta.url), "utf8");
   assert.doesNotMatch(startup, /migrate\.sh/);
 });
 
@@ -758,7 +758,7 @@ test("Northflank serializes exact builds and gates API startup on the shared scr
   assert.equal(migration.user, "10001");
   assert.equal(migration.group, "10001");
   assert.match(migration.command, /test -f.*NET_WORTH_ESTIMATOR_DB.*exec \/app\/migrate\.sh/);
-  assert.equal(steps[7].spec.arguments.variables[0].value, "/app/render-free-boot.sh");
+  assert.equal(steps[7].spec.arguments.variables[0].value, "/app/api-boot.sh");
 });
 
 test("Northflank release waits for a green main Tests run and rejects unsafe calls", async () => {
