@@ -1,4 +1,4 @@
-import { defineChart, link, rect, text } from "@tanstack/charts";
+import { defineChart, link, rect, text, type ChartCurve } from "@tanstack/charts";
 import { controlledSignal } from "@tanstack/charts/interaction/signal";
 import {
 	sankeyDiagram,
@@ -43,8 +43,10 @@ const KIND_LABEL: Record<SankeyFlowLane["edge"]["kind"], string> = {
 const UNSELECTED_FLOW_OPACITY = 0.86;
 
 const LABEL_LIMIT = 30;
-const LABEL_CHAR_WIDTH = 6.8;
+const LABEL_CHAR_WIDTH = 7.6;
 const LABEL_BACKGROUND_HEIGHT = 20;
+const LABEL_SIDE_GAP = 8;
+const LABEL_HALO_PAD = 22;
 // One label column, at minimum, so a short name still has breathing room.
 const MIN_LABEL_ROOM = 84;
 // The plot keeps this much width between its two label columns. Below it,
@@ -67,17 +69,39 @@ function labelRoomFor(nodes: SankeyFlowNode[]): number {
 			Math.max(widestLabel, truncateLabel(node.label).length),
 		0,
 	);
-	return Math.max(MIN_LABEL_ROOM, Math.ceil(widest * LABEL_CHAR_WIDTH) + 34);
+	return Math.max(
+		MIN_LABEL_ROOM,
+		Math.ceil(widest * LABEL_CHAR_WIDTH) + LABEL_HALO_PAD + LABEL_SIDE_GAP,
+	);
 }
+
+/** Horizontal S-curve for flow ribbons. Straight rules fan into crossing
+ * diamonds when one source feeds many depths; the mid-x cubic keeps each
+ * ribbon horizontal at its endpoints so direction still reads. */
+const sankeyCurve: ChartCurve = {
+	line: (points) => {
+		if (points.length !== 2) return "";
+		const start = points[0];
+		const end = points[1];
+		if (!start || !end) return "";
+		const [x1, y1] = start;
+		const [x2, y2] = end;
+		const midX = (x1 + x2) / 2;
+		return `M${x1},${y1}C${midX},${y1} ${midX},${y2} ${x2},${y2}`;
+	},
+	area: () => "",
+};
 
 function labelX(
 	node: SankeyNode<SankeyFlowNode, SankeyFlowLane, string>,
 ): number {
-	return node.depth === 0 ? node.x0 - 8 : node.x1 + 8;
+	return node.depth === 0 ? node.x0 - LABEL_SIDE_GAP : node.x1 + LABEL_SIDE_GAP;
 }
 
 function labelWidth(label: string): number {
-	return Math.ceil(truncateLabel(label).length * LABEL_CHAR_WIDTH) + 12;
+	return (
+		Math.ceil(truncateLabel(label).length * LABEL_CHAR_WIDTH) + LABEL_HALO_PAD
+	);
 }
 
 /** Money-flow diagram on the shared chart setup: the library owns the
@@ -136,8 +160,7 @@ export function FlowSankey({
 						value: (lane) => Math.abs(lane.amount),
 						linkKey: "laneId",
 						align: "justify",
-						nodeSort: null,
-						linkSort: null,
+						iterations: 32,
 						nodeWidth: ({ width }) => Math.max(10, Math.min(20, width * 0.028)),
 						nodePadding: 12,
 						inset: ({ width }) => {
@@ -162,6 +185,7 @@ export function FlowSankey({
 												: 0.35,
 									strokeWidth: (flow) => Math.max(2, flow.width),
 									lineCap: "butt",
+									curve: sankeyCurve,
 								}),
 								rect(layoutNodes, {
 									x1: "x0",

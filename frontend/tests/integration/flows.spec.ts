@@ -52,8 +52,9 @@ test("hovering a flow shows its amount and top transactions", async ({
 	await openFlows(page);
 	const diagram = page.getByRole("img", { name: /Money-flow diagram/ });
 	// Target the thickest band by geometry: its box middle sits on the
-	// stroke however the layout orders lanes.
-	const lines = await diagram.locator("line").all();
+	// stroke however the layout orders lanes. Curved ribbons render as
+	// paths; keep the line fallback for straight-rule output.
+	const lines = await diagram.locator("path,line").all();
 	let widest = null;
 	for (const line of lines) {
 		const box = await line.boundingBox();
@@ -150,7 +151,7 @@ test("touch tap selects a flow through the same inspector", async ({
 		await page.goto("/#flows");
 		const diagram = page.getByRole("img", { name: /Money-flow diagram/ });
 		await expect(diagram).toBeVisible();
-		const lines = await diagram.locator("line").all();
+		const lines = await diagram.locator("path,line").all();
 		let widest = null;
 		for (const line of lines) {
 			const box = await line.boundingBox();
