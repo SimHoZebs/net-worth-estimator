@@ -15,7 +15,7 @@ COPY frontend/ ./frontend/
 # Frontend scripts carry no pre-hooks: generate the API client explicitly so
 # the image never uses a stale generated tree. Refresh the snapshot itself
 # with `bun --filter ./frontend openapi:pull` whenever the backend API changes.
-RUN bun --filter ./frontend api:generate && bun --filter ./frontend build
+RUN bun --filter ./frontend api:generate && bun --filter ./frontend typecheck && bun --filter ./frontend build
 
 FROM nginx:alpine
 

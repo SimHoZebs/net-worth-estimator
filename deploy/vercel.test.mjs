@@ -68,7 +68,7 @@ test("Vercel installs with bun and builds the frontend workspace", () => {
   assert.equal(config.installCommand, "bun install --frozen-lockfile");
   assert.equal(
     config.buildCommand,
-    "bun --filter ./frontend api:generate && bun --filter ./frontend build",
+    "bun --filter ./frontend api:generate && bun --filter ./frontend typecheck && bun --filter ./frontend build",
   );
   assert.equal(config.devCommand, "bun --filter ./frontend dev");
 });

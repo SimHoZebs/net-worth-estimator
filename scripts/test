@@ -181,24 +181,27 @@ run_gate() {
   }
   trap cleanup_logs EXIT
 
-  local names=() pids=()
+  local names=() pids=() started=()
   local failed=0
 
   start() {
     local name="$1"
     shift
     names+=("$name")
+    started+=("$SECONDS")
     "$@" >"$logs/$name.log" 2>&1 &
     pids+=("$!")
   }
 
   report() {
-    local name="$1" code="$2"
+    local index="$1" code="$2"
+    local name="${names[$index]}"
+    local elapsed=$((SECONDS - started[$index]))
     if [ "$code" -eq 0 ]; then
-      printf '  ok    %s\n' "$name"
+      printf '  ok    %s (%ss)\n' "$name" "$elapsed"
       return
     fi
-    printf '  FAIL  %s\n' "$name"
+    printf '  FAIL  %s (%ss)\n' "$name" "$elapsed"
     tail -40 "$logs/$name.log" | sed 's/^/        /'
     failed=1
   }
@@ -218,9 +221,9 @@ run_gate() {
   local index
   for index in "${!pids[@]}"; do
     if wait "${pids[$index]}"; then
-      report "${names[$index]}" 0
+      report "$index" 0
     else
-      report "${names[$index]}" 1
+      report "$index" 1
     fi
   done
 
@@ -232,10 +235,15 @@ run_gate() {
       if [ -n "$shards" ]; then
         export TEST_BROWSER_SHARDS="$shards"
       fi
+      local integration_started=$SECONDS
       if ! bun --filter ./frontend test:integration >"$logs/integration.log" 2>&1; then
-        report integration 1
+        names+=(integration)
+        started+=("$integration_started")
+        report "$((${#names[@]} - 1))" 1
       else
-        report integration 0
+        names+=(integration)
+        started+=("$integration_started")
+        report "$((${#names[@]} - 1))" 0
       fi
     fi
   fi

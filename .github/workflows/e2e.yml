@@ -11,13 +11,18 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: false
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  # Only a new commit supersedes a pull request run. Label edits must not
+  # cancel a disposable stack that is already running.
+  cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 
 jobs:
   e2e:
     name: Disposable end-to-end gate
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e')
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'e2e') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'e2e'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -45,6 +50,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: playwright-${{ runner.os }}-
       - name: Report disk space
         run: df -h /
       - name: Install dependencies

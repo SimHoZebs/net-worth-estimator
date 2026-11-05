@@ -94,8 +94,8 @@ explicitly and once; before running scripts directly, generate it yourself
 with `bun --filter ./frontend api:generate`.
 
 `typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
-It runs on `bun check` for both projects; `build` runs the same `bun check` pass before `vite build`, so the
-artifact path keeps type safety without a separate checker. Both configs avoid
+It runs on `bun check` for both projects; `build` runs `vite build` only, so the
+artifact path keeps one complete typecheck without repeating it. Both configs avoid
 `baseUrl`, which current checkers removed. TypeScript 7 provides the native
 `tsc` binary, which also serves the editor LSP.
 
@@ -151,7 +151,7 @@ The integration suite drives the real Go engine over real HTTP. `frontend/playwr
 bun --filter ./frontend test:integration
 ```
 
-`test:integration` (the sharding runner) is the entry point. It runs the suite in shards. Each shard starts its own fixture API and Vite server on its own random ports. The default is half the available CPUs, at most four. Set `TEST_BROWSER_SHARDS` to change it. If a port is taken between selection and startup, the shard retries with new ports. Each invocation writes its own blobs under `test-results/run-<pid>/`, so concurrent runs never share trace files. Running `playwright test` directly skips sharding, retry, and output isolation.
+`test:integration` (the sharding runner) is the entry point. It runs the suite in shards. Each shard starts its own fixture API and Vite server on its own random ports. The default is half the available CPUs, at most four. Set `TEST_BROWSER_SHARDS` to change it. CI gives each of the four Playwright shards its own GitHub runner, so shards never compete for CPU or memory. Pass an explicit Playwright shard from a matrix job with `bun --filter ./frontend test:integration -- --shard=N/4`; the runner then starts one isolated shard. If a port is taken between selection and startup, the shard retries with new ports. Each invocation writes its own blobs under `test-results/run-<pid>/`, so concurrent runs never share trace files. Running `playwright test` directly skips sharding, retry, and output isolation.
 
 Each run merges the per-shard blobs into one HTML report at `test-results/run-<pid>/html/index.html` with the failing traces, plus per-shard machine-readable `results.json` at `test-results/run-<pid>/shard-N/results.json`. Open the HTML report to inspect a failure; parse the shard JSON for the exact locator and line. The suite fixes `locale: en-US` and `timezoneId: America/Los_Angeles`, and every spec fails on an unexpected browser console error or uncaught exception.
 
@@ -200,12 +200,15 @@ TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 ## Completion Gate
 
 GitHub Actions is the full completion gate. Agents run the narrowest local check
-for their change, push the branch, and watch the `Tests` workflow. It runs
-`scripts/test --gate --no-browser` and `scripts/test --integration` on every
-branch push and every pull request. The `End-to-end tests` workflow runs
-`E2E_TEST_MUTATIONS=1 scripts/test --e2e` nightly, on manual dispatch, and on
-pull requests carrying the `e2e` label. Per-branch work stays in the first two
-jobs because the e2e gate carries the [30-minute
+for their change, push the branch, and watch the `Tests` workflow. On every
+branch push it runs `scripts/test --gate --no-browser`, four independent
+Playwright shard jobs with
+`bun --filter ./frontend test:integration -- --shard=N/4`, and one
+`bun --filter ./extension test:browser` job. Same-repository pull requests reuse
+that push run; fork pull requests get their own run. The `End-to-end tests`
+workflow runs `E2E_TEST_MUTATIONS=1 scripts/test --e2e` nightly, on manual
+dispatch, and on pull requests carrying the `e2e` label. Per-branch work stays
+in the Tests workflow because the e2e gate carries the [30-minute
 budget](docs/e2e-gate.md#cadence-and-budget); add the label to gate a risky change.
 The Northflank GitHub workflow only requests a gated deployment for the pushed SHA.
 The image publisher does not replace the test gates either. Validate the workflows

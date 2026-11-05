@@ -40,8 +40,8 @@ production deployment through the Vercel REST API only after the `Tests`
 workflow succeeds for the pushed `main` commit. Preview branches keep their Git
 deployments.
 
-The config pins Bun `1.4.x`. The frontend build runs `bun check`, which needs
-Bun 1.4.
+The config pins Bun `1.4.x`. The frontend build runs `typecheck` once before
+`vite build`, which needs Bun 1.4.
 
 Set these repository settings in GitHub:
 

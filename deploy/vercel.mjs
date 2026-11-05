@@ -12,7 +12,7 @@ export function vercelConfig(env) {
     framework: null,
     bunVersion: "1.4.x",
     installCommand: "bun install --frozen-lockfile",
-    buildCommand: "bun --filter ./frontend api:generate && bun --filter ./frontend build",
+    buildCommand: "bun --filter ./frontend api:generate && bun --filter ./frontend typecheck && bun --filter ./frontend build",
     outputDirectory: "frontend/dist",
     devCommand: "bun --filter ./frontend dev",
     // Production deploys come from the gated workflow, not a Git push.
