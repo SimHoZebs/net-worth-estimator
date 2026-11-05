@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import {
@@ -18,6 +18,10 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 	// re-runs the effect without requiring the caller to rerender.
 	const scope = useSyncExternalStore(subscribeUserScope, getUserScope);
 	const scopeKey = scope.status === "ready" ? scope.key : "pending";
+	// Reentrancy guard for the poll below. A ref survives effect re-runs, so
+	// the in-flight check's finally clears it after a scope switch instead
+	// of leaving a stale guard for the new scope.
+	const checking = useRef(false);
 	useEffect(() => {
 		if (!enabled) return;
 		const active = getUserScope();
@@ -30,11 +34,12 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 			markSyncApplied(active, getServerStatus(active)?.lastSyncAt ?? null);
 		const cache = serverQueryClient();
 		// Effect-local lifecycle: cleanup on disable, unmount, or scope change
-		// cancels in-flight work so it can never apply to a new scope.
-		let cancelled = false;
-		let checking = false;
+		// cancels in-flight work so it can never apply to a new scope. The
+		// token is one object per run so the cleanup cancels exactly this
+		// run's in-flight check.
+		const lifecycle = { cancelled: false };
 		const check = async () => {
-			if (cancelled || checking) return;
+			if (lifecycle.cancelled || checking.current) return;
 			const current = getUserScope();
 			if (current.status !== "ready" || current !== active) return;
 			if (document.visibilityState === "hidden") return;
@@ -43,7 +48,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 			if (workspaceIsBusy()) return;
 			if (cache.isFetching({ queryKey: userResourceKey("status", current) }))
 				return;
-			checking = true;
+			checking.current = true;
 			try {
 				if (getAppliedSyncStamp(current) === undefined)
 					markSyncApplied(
@@ -57,7 +62,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 					})
 					.catch(() => null);
 				if (
-					cancelled ||
+					lifecycle.cancelled ||
 					!status ||
 					current !== active ||
 					current !== getUserScope()
@@ -69,7 +74,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 				if (workspaceIsBusy()) return;
 				await refreshWorkspaceAfterSync(current, next);
 			} finally {
-				checking = false;
+				checking.current = false;
 			}
 		};
 		const onResume = () => void check();
@@ -77,7 +82,7 @@ export function useWorkspaceSyncMonitor(enabled: boolean): void {
 		window.addEventListener("online", onResume);
 		document.addEventListener("visibilitychange", onResume);
 		return () => {
-			cancelled = true;
+			lifecycle.cancelled = true;
 			window.clearInterval(timer);
 			window.removeEventListener("online", onResume);
 			document.removeEventListener("visibilitychange", onResume);
