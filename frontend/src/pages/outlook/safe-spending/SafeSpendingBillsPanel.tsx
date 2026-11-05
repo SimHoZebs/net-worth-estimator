@@ -87,6 +87,7 @@ export function SafeSpendingBillsPanel({
 	transactionOrder,
 	onTransactionOrderChange,
 	showHeaders = false,
+	closed = false,
 }: {
 	heroes: SafeSpendingHeroes;
 	cashNow: CashNowDecomposition;
@@ -102,6 +103,8 @@ export function SafeSpendingBillsPanel({
 	transactionOrder: TransactionOrder;
 	onTransactionOrderChange: (order: TransactionOrder) => void;
 	showHeaders?: boolean;
+	/** The statement already closed; the payday and pace are historical. */
+	closed?: boolean;
 }) {
 	const savedById = useMemo(
 		() => new Map(transactions.map((saved) => [saved.id, saved])),
@@ -112,10 +115,18 @@ export function SafeSpendingBillsPanel({
 		savedById,
 	);
 	const dayUnit = heroes.fullDaysLeft === 1 ? "day" : "days";
-	const dailyFoot =
-		allocation.allowance >= 0
-			? `${money(heroes.dailySafe)} a day · ${heroes.fullDaysLeft} full ${dayUnit} left`
-			: `${money(-heroes.dailySafe)} a day over · ${heroes.fullDaysLeft} full ${dayUnit} left`;
+	const cardLabel = closed ? labels.closedCardBalances : labels.cardSpending;
+	const amountText = (value: number | null) =>
+		value === null ? "—" : money(value);
+	const dailyFoot = !allocation.available
+		? undefined
+		: closed
+			? allocation.allowance >= 0
+				? `${money(heroes.dailySafe)} a day across the cycle`
+				: `${money(-heroes.dailySafe)} a day over the cycle`
+			: allocation.allowance >= 0
+				? `${money(heroes.dailySafe)} a day · ${heroes.fullDaysLeft} full ${dayUnit} left`
+				: `${money(-heroes.dailySafe)} a day over · ${heroes.fullDaysLeft} full ${dayUnit} left`;
 	// The funding payday for this statement lands after it closes, so the
 	// foot names it as the settler — never as cash that is already here.
 	const fundingDates = bundleDatesText(funding);
@@ -123,8 +134,8 @@ export function SafeSpendingBillsPanel({
 		fundingDates === null
 			? "No projected paycheck"
 			: funding.endDate !== null && funding.endDate !== funding.date
-				? `The ${fundingDates} paychecks pay this statement`
-				: `The ${fundingDates} paycheck pays this statement`;
+				? `The ${fundingDates} paychecks ${closed ? "paid" : "pay"} this statement`
+				: `The ${fundingDates} paycheck ${closed ? "paid" : "pays"} this statement`;
 	return (
 		<div className="grid content-start gap-4">
 			<div className="grid grid-cols-2 gap-3">
@@ -137,17 +148,21 @@ export function SafeSpendingBillsPanel({
 				<HouseholdMetricCard
 					label={labels.allowance}
 					icon={<CreditCard size={16} aria-hidden="true" />}
-					value={money(allocation.allowance)}
-					tone={allocation.allowance < 0 ? "normal" : "positive"}
+					value={amountText(allocation.available ? allocation.allowance : null)}
+					tone={
+						allocation.available && allocation.allowance < 0
+							? "normal"
+							: "positive"
+					}
 					foot={dailyFoot}
 				/>
 			</div>
 			<section className={householdPanelStyles()}>
 				<div className="flex items-center justify-between">
 					<div className="min-w-0">
-						<div className="text-xs text-muted">{labels.cardSpending}</div>
+						<div className="text-xs text-muted">{cardLabel}</div>
 						<div className={householdValueStyles({ size: "metric" })}>
-							{money(heroes.committedTotal)}
+							{amountText(heroes.committedTotal)}
 						</div>
 					</div>
 					<div className="min-w-0 text-right">
@@ -157,53 +172,64 @@ export function SafeSpendingBillsPanel({
 						</div>
 					</div>
 				</div>
-				<SegmentedBar
-					showDetails={false}
-					caption={`${labels.cardSpending} ${money(heroes.committedTotal)} · ${labels.allowance} ${money(allocation.allowance)} · ${labels.reserve} ${money(allocation.reserve)}`}
-					segments={[
-						{
-							label: labels.cardSpending,
-							amount: heroes.committedTotal,
-							pattern: "solid",
-							tone: "tan",
-						} as BarSegment,
-						...(allocation.allowance > 0
-							? [
-									{
-										label: labels.allowance,
-										amount: allocation.allowance,
-										pattern: "solid",
-										tone: "plum",
-									} as BarSegment,
-								]
-							: []),
-						{
-							label: labels.reserve,
-							amount: allocation.reserve,
-							pattern: "dots",
-							tone: "blue",
-						} as BarSegment,
-					]}
-					ariaLabel={`${labels.cardSpending} ${money(heroes.committedTotal)}, ${labels.allowance} ${money(allocation.allowance)}, ${labels.reserve} ${money(allocation.reserve)}`}
-				/>
+				{allocation.available ? (
+					<SegmentedBar
+						showDetails={false}
+						caption={`${cardLabel} ${amountText(heroes.committedTotal)} · ${labels.allowance} ${money(allocation.allowance)} · ${labels.reserve} ${money(allocation.reserve)}`}
+						segments={[
+							{
+								label: cardLabel,
+								amount: heroes.committedTotal ?? 0,
+								pattern: "solid",
+								tone: "tan",
+							} as BarSegment,
+							...(allocation.allowance > 0
+								? [
+										{
+											label: labels.allowance,
+											amount: allocation.allowance,
+											pattern: "solid",
+											tone: "plum",
+										} as BarSegment,
+									]
+								: []),
+							{
+								label: labels.reserve,
+								amount: allocation.reserve,
+								pattern: "dots",
+								tone: "blue",
+							} as BarSegment,
+						]}
+						ariaLabel={`${cardLabel} ${amountText(heroes.committedTotal)}, ${labels.allowance} ${money(allocation.allowance)}, ${labels.reserve} ${money(allocation.reserve)}`}
+					/>
+				) : (
+					<p className="m-0 text-xs text-muted">
+						Closed card balance unavailable
+					</p>
+				)}
 				<div className="h-px w-full bg-line" />
-				<div className="flex items-center justify-between">
+				{/* oxlint-disable jsx-a11y/no-redundant-roles -- Safari removes native list semantics for list-style:none grids. */}
+				<ul
+					role="list"
+					aria-label={cardLabel}
+					className="m-0 flex list-none items-center justify-between gap-2 p-0"
+				>
 					{heroes.committedByCard.map((card, index) => {
 						const Icon =
 							index === 0 ? CreditCard : index === 1 ? ShoppingBag : Wallet;
 						return (
-							<div key={card.id} className="flex min-w-0 items-center gap-2">
+							<li key={card.id} className="flex min-w-0 items-center gap-2">
 								<Icon size={20} aria-hidden="true" />
 								<div className="flex flex-col gap-1">
 									<span className="text-xs text-muted">{card.name}</span>
 									<strong className="text-sm text-ink">
-										{money(card.amount)}
+										{amountText(card.amount)}
 									</strong>
 								</div>
-							</div>
+							</li>
 						);
 					})}
-				</div>
+				</ul>
 				{trend && (
 					<div className="border-t border-line pt-3">
 						<SafeSpendingTrendChart trend={trend} />
@@ -225,6 +251,11 @@ export function SafeSpendingBillsPanel({
 					</span>
 					<strong>{exactMoney(cashNow.checking)}</strong>
 				</div>
+				{cashNow.provisional && (
+					<p className="m-0 text-xs text-muted">
+						Latest balance, not at close
+					</p>
+				)}
 				<SegmentedBar
 					showDetails={false}
 					caption={`${labels.cashBalance} ${exactMoney(cashNow.checking)} · ${labels.remainingBills} ${exactMoney(cashNow.bills)} · ${labels.cashAfterBills} ${exactMoney(cashNow.cushion)}`}

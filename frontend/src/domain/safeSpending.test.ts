@@ -6,12 +6,10 @@ import {
 	checkingAccountId,
 	checkingShortfall,
 	cycleAllowance,
-	filterTransactionsById,
 	groupMandatorySpending,
 	monthEndIso,
 	nextMonthObligations,
 	nextMonthRange,
-	paycheckBeforeReserve,
 	realizedCheckingOutflows,
 	remainingMonthlyObligations,
 	spendingBalance,
@@ -275,28 +273,6 @@ describe("cycleAllowance", () => {
 	});
 });
 
-describe("paycheckBeforeReserve", () => {
-	it("subtracts fixed bills and the closed balance from the paycheck", () => {
-		expect(
-			paycheckBeforeReserve({
-				paycheck: 7579.4,
-				fixedObligations: 4181.87,
-				closedTotal: 2601.55,
-			}),
-		).toBeCloseTo(795.98, 2);
-	});
-
-	it("returns null without a closing observation", () => {
-		expect(
-			paycheckBeforeReserve({
-				paycheck: 7579.4,
-				fixedObligations: 4181.87,
-				closedTotal: null,
-			}),
-		).toBeNull();
-	});
-});
-
 describe("projection-derived safe spending", () => {
 	const transactions = [
 		transactionFixture({
@@ -475,22 +451,5 @@ describe("spendingBalance", () => {
 				: account,
 		);
 		expect(spendingBalance(accounts, ["checking"])).toBe(9000);
-	});
-});
-
-describe("filterTransactionsById", () => {
-	const transactions = [
-		transactionFixture({ transactionId: "housing", date: "2026-10-10" }),
-		transactionFixture({ transactionId: "living", date: "2026-10-11" }),
-	];
-
-	it("keeps every transaction when no selection exists", () => {
-		expect(filterTransactionsById(transactions, null)).toHaveLength(2);
-	});
-
-	it("keeps only selected bills", () => {
-		const filtered = filterTransactionsById(transactions, ["living"]);
-		expect(filtered).toHaveLength(1);
-		expect(filtered[0]!.transactionId).toBe("living");
 	});
 });

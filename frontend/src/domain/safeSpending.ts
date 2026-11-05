@@ -170,51 +170,12 @@ export function cycleAllowance({
 	return paycheck - fixedObligations - spent - reserve;
 }
 
-/**
- * Incoming before reserve: what remains of the next paycheck after it
- * covers next month's fixed bills and the closed card balance. Future
- * money, never part of cash now. Null when no closing observation exists.
- */
-export function paycheckBeforeReserve({
-	paycheck,
-	fixedObligations,
-	closedTotal,
-}: {
-	paycheck: number;
-	fixedObligations: number;
-	closedTotal: number | null;
-}): number | null {
-	if (closedTotal === null) return null;
-	return cycleAllowance({
-		paycheck,
-		fixedObligations,
-		spent: closedTotal,
-		reserve: 0,
-	});
-}
-
 export interface MandatorySpendingGroup {
 	transactionId: string;
 	name: string;
 	total: number;
 	count: number;
 	dates: string[];
-}
-
-/**
- * Narrow projection transactions to a selected bill set. Null keeps every
- * transaction, so the safe spending card counts all spendable-account outflows by
- * default.
- */
-export function filterTransactionsById(
-	transactions: TransactionResult[],
-	transactionIds: string[] | null,
-): TransactionResult[] {
-	if (!transactionIds) return transactions;
-	const selected = new Set(transactionIds);
-	return transactions.filter((transaction) =>
-		selected.has(transaction.transactionId),
-	);
 }
 
 /**

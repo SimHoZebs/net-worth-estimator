@@ -78,6 +78,8 @@ export interface CashNowDecomposition {
 	directSpentSinceStart?: number;
 	bills: number;
 	cushion: number;
+	/** True when the closed balance is the latest balance, not a close checkpoint. */
+	provisional?: boolean;
 	/** Projection-start date anchoring spentSinceStart, for caption context. */
 	since: string;
 	/** Last day of the calendar-month bills window, for caption context. */
@@ -92,13 +94,13 @@ export interface CashNowDecomposition {
 export interface CycleAllocation {
 	reserve: number;
 	allowance: number;
+	/** False when a closed card balance is missing and no allowance can be stated. */
+	available: boolean;
 }
 
 export interface SafeSpendingHeroes {
 	cushion: number;
-	cushionProvisional: boolean;
 	checkingAmount: number;
-	checkingObservedOn: string | null;
 	safe: number;
 	theoretical: number;
 	dailySafe: number;
@@ -107,9 +109,102 @@ export interface SafeSpendingHeroes {
 	cycleStart: string;
 	cycleEnd: string;
 	closedCycle: SafeSpendingClosedCycle;
-	committedTotal: number;
-	recordedTotal: number;
-	committedByCard: { id: string; name: string; amount: number }[];
+	committedTotal: number | null;
+	committedByCard: { id: string; name: string; amount: number | null }[];
+}
+
+export interface CycleView {
+	heroes: SafeSpendingHeroes;
+	cashNow: CashNowDecomposition;
+	allocation: CycleAllocation;
+	funding: StatementFunding;
+}
+
+/**
+ * Assemble one statement tab from the shared cash and allowance formulas.
+ * The open tab and the closed tab differ only in their inputs.
+ */
+export function buildCycleView({
+	cycleStart,
+	cycleEnd,
+	closedCycle,
+	checking,
+	spentSinceStart,
+	directSpentSinceStart,
+	bills,
+	cushion,
+	since,
+	monthEnd,
+	short,
+	firstShort,
+	funding,
+	cardSpent,
+	cardSpentByCard,
+	reserve,
+	fullDaysLeft,
+	provisional = false,
+}: {
+	cycleStart: string;
+	cycleEnd: string;
+	closedCycle: SafeSpendingClosedCycle;
+	checking: number;
+	spentSinceStart: number;
+	directSpentSinceStart: number;
+	bills: number;
+	cushion: number;
+	since: string;
+	monthEnd: string;
+	short: number;
+	firstShort: string | null;
+	funding: StatementFunding;
+	cardSpent: number | null;
+	cardSpentByCard: { id: string; name: string; amount: number | null }[];
+	reserve: number;
+	fullDaysLeft: number;
+	provisional?: boolean;
+}): CycleView {
+	const available = cardSpent !== null;
+	const closedCards = cardSpent ?? 0;
+	const paycheck = funding.paycheck;
+	const allowance = available
+		? paycheck - funding.fixedBills - closedCards - reserve
+		: 0;
+	const theoretical = available
+		? paycheck - funding.fixedBills - closedCards
+		: 0;
+	const days = Math.max(1, fullDaysLeft);
+	const dailySafe = allowance / days;
+	const dailyTheoretical = theoretical / days;
+	return {
+		heroes: {
+			cushion,
+			checkingAmount: checking,
+			safe: allowance,
+			theoretical,
+			dailySafe,
+			dailyTheoretical,
+			fullDaysLeft: days,
+			cycleStart,
+			cycleEnd,
+			closedCycle,
+			committedTotal: cardSpent,
+			committedByCard: cardSpentByCard,
+		},
+		cashNow: {
+			checking,
+			spentSinceStart,
+			directSpentSinceStart,
+			bills,
+			cushion,
+			provisional,
+			since,
+			monthEnd,
+			short,
+			firstShort,
+		},
+		allocation: { reserve, allowance, available },
+		funding,
+	};
 }
 
 export interface SafeSpendingConfigHints {

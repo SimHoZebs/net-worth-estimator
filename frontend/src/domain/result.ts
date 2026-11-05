@@ -33,6 +33,10 @@ export interface TransactionResult {
 	accountDeltas: TransactionAccountDelta[];
 	constraintTypes?: string[];
 	fulfillment?: TransactionFulfillment;
+	/** Adapter-only: the row came from saved posted history. */
+	posted?: boolean;
+	/** Adapter-only: the posted row claimed a schedule occurrence. */
+	claimed?: boolean;
 }
 export interface EvaluationResult {
 	evaluation: Evaluation;

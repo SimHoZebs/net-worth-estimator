@@ -9,8 +9,8 @@ import {
 } from "@/domain/transactionSort.ts";
 import {
 	dateLabel,
+	daysBetweenInclusive,
 	money,
-	monthDay,
 	shiftDate,
 	sum,
 	todayIso,
@@ -18,16 +18,9 @@ import {
 import { Skeleton } from "@/components/Skeleton.tsx";
 import { Card } from "@/components/Card.tsx";
 import {
-	cashCushion,
 	checkingAccountId,
-	checkingShortfall,
-	cycleAllowance,
-	filterTransactionsById,
 	mandatoryTransactions,
-	monthEndIso,
-	nextMonthObligations,
-	realizedCheckingOutflows,
-	remainingMonthlyObligations,
+	nextMonthRange,
 	spendingBalance,
 } from "@/domain/safeSpending.ts";
 
@@ -35,7 +28,8 @@ import {
 	safeSpendingIncome,
 	incomeBundleAfter,
 } from "@/domain/safeSpendingIncome.ts";
-import { safeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
+import { safeSpendingResults, selectObligationResults } from "@/domain/safeSpendingHistory.ts";
+import { latestCheckpointsThrough } from "@/api/checkpoints.ts";
 import { visibleAccounts } from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
@@ -56,15 +50,14 @@ import {
 	type SafeSpendingChargeCycle,
 	type SafeSpendingCycleTab,
 	type SafeSpendingDetailTab,
-	type StatementFunding,
 } from "@/pages/outlook/safe-spending/safeSpendingDetailModel.ts";
+import { cycleView } from "@/pages/outlook/safe-spending/cycleView.ts";
 import {
 	resolveEffectiveIds,
 	useSafeSpendingSettings,
 } from "@/state/useSafeSpendingSettings.ts";
 import { useCardCycleActivity } from "@/pages/outlook/safe-spending/useCardCycleActivity.ts";
 import { useOutlookProjection } from "@/pages/outlook/useOutlookProjection.ts";
-import { HouseholdBudgetSummary } from "@/pages/outlook/safe-spending/HouseholdBudgetSummary.tsx";
 import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
 
 // Stable empty input so pending derivations stay null-safe without
@@ -182,33 +175,60 @@ export function SafeSpendingPreview({
 		() => spendingBalance(accounts ?? [], spendingIds),
 		[accounts, spendingIds],
 	);
+	const billCandidates = useMemo(() => {
+		if (!spendingIds.length) return [];
+		return rules
+			.filter(
+				(rule) => rule.fromId !== null && spendingIds.includes(rule.fromId),
+			)
+			.map((rule) => ({
+				id: rule.id,
+				name: rule.name,
+				amount: rule.amount,
+			}));
+	}, [rules, spendingIds]);
+
+	const trackedBillIds = useMemo(() => {
+		const knownIds = billCandidates.map((bill) => bill.id);
+		return resolveEffectiveIds(settings.transactionIds, knownIds);
+	}, [settings.transactionIds, billCandidates]);
+	// Posted rows join the projection under the same rule identities. Both
+	// cycle tabs read this one stream, so the closed tab sees the paycheck
+	// and bills that already happened.
+	const historyResults = useMemo(
+		() =>
+			safeSpendingResults({
+				transactions: transactions ?? [],
+				rules,
+				schedules: savedRules ?? [],
+				incomeAccountIds: incomeIds,
+				incomeScheduleIds: settings.incomeScheduleIds,
+				billScheduleIds: trackedBillIds,
+				billWindowStart: closedCycle.start,
+				billWindowEnd: nextMonthRange(cycle.cycleEnd).end,
+				projectionTransactions,
+			}),
+		[
+			transactions,
+			rules,
+			savedRules,
+			incomeIds,
+			settings.incomeScheduleIds,
+			trackedBillIds,
+			closedCycle.start,
+			cycle.cycleEnd,
+			projectionTransactions,
+		],
+	);
 	const obligationTransactions = useMemo(
 		() =>
-			filterTransactionsById(projectionTransactions, settings.transactionIds),
-		[projectionTransactions, settings.transactionIds],
+			selectObligationResults(
+				historyResults,
+				settings.transactionIds,
+				trackedBillIds,
+			),
+		[historyResults, settings.transactionIds, trackedBillIds],
 	);
-	const remainingDerived = useMemo(() => {
-		if (!spendingIds.length)
-			return { total: 0, monthEnd: monthEndIso(displayToday) };
-		return remainingMonthlyObligations({
-			transactions: obligationTransactions,
-			checkingIds: spendingIds,
-			todayIso: displayToday,
-		});
-	}, [obligationTransactions, spendingIds, displayToday]);
-	// Bills the settling paycheck covers: the calendar month after the
-	// statement's close month — December's bills for the Nov 20 statement,
-	// November's for the Oct 20 statement. Anchored to the cycle, never to
-	// the viewing day, so the figure does not drift between month-ends.
-	const fixedDerived = useMemo(() => {
-		if (!spendingIds.length)
-			return { total: 0, start: cycle.cycleEnd, end: cycle.cycleEnd };
-		return nextMonthObligations({
-			transactions: obligationTransactions,
-			checkingIds: spendingIds,
-			todayIso: cycle.cycleEnd,
-		});
-	}, [obligationTransactions, spendingIds, cycle.cycleEnd]);
 	const income = useMemo(
 		() =>
 			safeSpendingIncome({
@@ -228,23 +248,15 @@ export function SafeSpendingPreview({
 			displayToday,
 		],
 	);
-	// Each statement names the payday that settles it: the earliest selected
-	// income after the statement closes. The closed statement is settled by
-	// its own bundle (already arrived), not the upcoming one.
-	const closedFixedDerived = useMemo(() => {
-		if (!spendingIds.length) return 0;
-		return nextMonthObligations({
-			transactions: obligationTransactions,
-			checkingIds: spendingIds,
-			todayIso: closedCycle.end,
-		}).total;
-	}, [obligationTransactions, spendingIds, closedCycle.end]);
+	// Each statement names the payday that settles it. Both tabs read the
+	// same posted-plus-projected stream, so the closed statement finds its
+	// own payday instead of the upcoming one.
 	const currentFunding = useMemo(
 		() =>
 			incomeBundleAfter({
 				accounts: accounts ?? [],
 				rules,
-				transactions: projectionTransactions,
+				transactions: historyResults,
 				incomeAccountIds: incomeIds,
 				incomeScheduleIds: settings.incomeScheduleIds,
 				afterIso: cycle.cycleEnd,
@@ -253,7 +265,7 @@ export function SafeSpendingPreview({
 		[
 			accounts,
 			rules,
-			projectionTransactions,
+			historyResults,
 			incomeIds,
 			settings.incomeScheduleIds,
 			cycle.cycleEnd,
@@ -265,7 +277,7 @@ export function SafeSpendingPreview({
 			incomeBundleAfter({
 				accounts: accounts ?? [],
 				rules,
-				transactions: projectionTransactions,
+				transactions: historyResults,
 				incomeAccountIds: incomeIds,
 				incomeScheduleIds: settings.incomeScheduleIds,
 				afterIso: closedCycle.end,
@@ -274,81 +286,13 @@ export function SafeSpendingPreview({
 		[
 			accounts,
 			rules,
-			projectionTransactions,
+			historyResults,
 			incomeIds,
 			settings.incomeScheduleIds,
 			closedCycle.end,
 			displayToday,
 		],
 	);
-	// Past cash outflow stays filter-proof: bill toggles shape the bills
-	// list only, never the cushion. Direct checking spend always counts here.
-	const spentSinceStart = useMemo(
-		() =>
-			spendingIds.length
-				? realizedCheckingOutflows({
-						transactions: projectionTransactions,
-						checkingIds: spendingIds,
-						after: startDate ?? displayToday,
-						through: displayToday,
-					})
-				: 0,
-		[projectionTransactions, spendingIds, startDate, displayToday],
-	);
-	const shortWindow = useMemo(
-		() =>
-			spendingIds.length
-				? checkingShortfall({
-						transactions: obligationTransactions,
-						checkingIds: spendingIds,
-						after: displayToday,
-						through: remainingDerived.monthEnd,
-					})
-				: { total: 0, firstDate: null as string | null },
-		[
-			obligationTransactions,
-			spendingIds,
-			displayToday,
-			remainingDerived.monthEnd,
-		],
-	);
-	const spendingTrend = useMemo(() => {
-		const limit = (currentFunding?.amount ?? 0) - fixedDerived.total;
-		return safeSpendingTrend({
-			transactions: perAccount.flatMap((item) => item.inCycle),
-			cycleStart: cycle.cycleStart,
-			cycleEnd: cycle.cycleEnd,
-			todayIso: displayToday,
-			limit,
-			safetyNet: limit - settings.reserve,
-		});
-	}, [
-		perAccount,
-		cycle.cycleStart,
-		cycle.cycleEnd,
-		displayToday,
-		currentFunding,
-		fixedDerived.total,
-		settings.reserve,
-	]);
-
-	const billCandidates = useMemo(() => {
-		if (!spendingIds.length) return [];
-		return rules
-			.filter(
-				(rule) => rule.fromId !== null && spendingIds.includes(rule.fromId),
-			)
-			.map((rule) => ({
-				id: rule.id,
-				name: rule.name,
-				amount: rule.amount,
-			}));
-	}, [rules, spendingIds]);
-
-	const trackedBillIds = useMemo(() => {
-		const knownIds = billCandidates.map((bill) => bill.id);
-		return resolveEffectiveIds(settings.transactionIds, knownIds);
-	}, [settings.transactionIds, billCandidates]);
 
 	const billsStart = shiftDate({ date: displayToday, days: 1 });
 
@@ -358,35 +302,10 @@ export function SafeSpendingPreview({
 	// obligationTransactions and is unchanged.
 	const billBaseTransactions = useMemo(() => {
 		const bills = new Set(trackedBillIds);
-		return projectionTransactions.filter((transaction) =>
+		return historyResults.filter((transaction) =>
 			bills.has(transaction.transactionId),
 		);
-	}, [projectionTransactions, trackedBillIds]);
-	const billTransactions = useMemo(() => {
-		if (!spendingIds.length) return [];
-		return sortTransactionsByDate({
-			items: mandatoryTransactions({
-				transactions: billBaseTransactions,
-				checkingIds: spendingIds,
-				start: billsStart,
-				end: cycle.cycleEnd,
-				accounts: accounts ?? [],
-				savedTransactions: transactions ?? [],
-			}),
-			getDate: (transaction) => transaction.date,
-			getId: (transaction) => transaction.id,
-			order: transactionOrder,
-		});
-	}, [
-		billBaseTransactions,
-		spendingIds,
-		accounts,
-		transactions,
-		billsStart,
-		cycle.cycleEnd,
-		transactionOrder,
-	]);
-
+	}, [historyResults, trackedBillIds]);
 	// Direct cash spend: checking outflows outside the tracked bill set.
 	// Only genuine one-time postings belong here; occurrences owned by a
 	// recurrence rule stay out even when the rule is deselected, since the
@@ -400,27 +319,14 @@ export function SafeSpendingPreview({
 		const bills = new Set(trackedBillIds);
 		const ruleIds = new Set(rules.map((rule) => rule.id));
 		const sources = new Set(spendingIds);
-		return projectionTransactions.filter(
+		return historyResults.filter(
 			(transaction) =>
 				transaction.fromId !== null &&
 				sources.has(transaction.fromId) &&
 				!bills.has(transaction.transactionId) &&
 				!ruleIds.has(transaction.transactionId),
 		);
-	}, [projectionTransactions, spendingIds, trackedBillIds, rules]);
-
-	const directSpentSinceStart = useMemo(
-		() =>
-			spendingIds.length
-				? realizedCheckingOutflows({
-						transactions: directBaseTransactions,
-						checkingIds: spendingIds,
-						after: startDate ?? displayToday,
-						through: displayToday,
-					})
-				: 0,
-		[directBaseTransactions, spendingIds, startDate, displayToday],
-	);
+	}, [historyResults, spendingIds, trackedBillIds, rules]);
 
 	const directTransactions = useMemo(() => {
 		if (!spendingIds.length) return [];
@@ -451,6 +357,89 @@ export function SafeSpendingPreview({
 	// as two ledgers. Cards contribute recorded outflows since the cycle
 	// start; direct cash covers the whole statement cycle. Funding stays
 	// split (allowance for cards, cushion for cash); only the rows merge.
+	const lastAtClose = latestCheckpointsThrough(checkpoints, closedCycle.end);
+	const lastComplete =
+		spendingIds.length > 0 &&
+		spendingIds.every((id) => lastAtClose.has(id));
+	const lastChecking = lastComplete
+		? sum(spendingIds.map((id) => lastAtClose.get(id)?.Balance ?? 0))
+		: spendingDerived;
+	const currentCardTransactions = perAccount.flatMap((item) => item.inCycle);
+	const lastCardTransactions = perAccount.flatMap((item) => item.lastCycle);
+	const currentCardByCard = perAccount.map((item) => ({
+		id: item.accountId,
+		name: item.name,
+		amount: sum(item.inCycle.map((transaction) => transaction.amount)),
+	}));
+	const currentCardSpent = sum(
+		currentCardByCard.map((card) => card.amount),
+	);
+	const currentView = cycleView({
+		cycle: { start: cycle.cycleStart, end: cycle.cycleEnd },
+		referenceDay: displayToday,
+		checking: spendingDerived,
+		spentSince: (startDate ?? displayToday).slice(0, 10),
+		spentThrough: displayToday,
+		spendingIds,
+		results: historyResults,
+		obligationResults: obligationTransactions,
+		directResults: directBaseTransactions,
+		billResults: billBaseTransactions,
+		billWindowStart: billsStart,
+		cardTransactions: currentCardTransactions,
+		cardSpent: currentCardSpent,
+		cardSpentByCard: currentCardByCard,
+		funding: {
+			paycheck: currentFunding?.amount ?? 0,
+			date: currentFunding?.date ?? null,
+			endDate: currentFunding?.endDate ?? null,
+			fixedBills: 0,
+		},
+		reserve: settings.reserve,
+		accounts: accounts ?? [],
+		savedTransactions: transactions ?? [],
+		transactionOrder,
+		closedCycle,
+		fullDaysLeft: Math.max(1, cycle.daysLeft - 1),
+	});
+	const lastView = cycleView({
+		cycle: { start: closedCycle.start, end: closedCycle.end },
+		referenceDay: closedCycle.end,
+		checking: lastChecking,
+		spentSince: closedCycle.end,
+		spentThrough: closedCycle.end,
+		spendingIds,
+		results: historyResults,
+		obligationResults: obligationTransactions,
+		directResults: directBaseTransactions,
+		billResults: billBaseTransactions,
+		billWindowStart: closedCycle.start,
+		cardTransactions: lastCardTransactions,
+		cardSpent: closedCycle.total,
+		cardSpentByCard: closedCycle.cards.map((card) => ({
+			id: card.id,
+			name: card.name,
+			amount: card.amount,
+		})),
+		funding: {
+			paycheck: closedFunding?.amount ?? 0,
+			date: closedFunding?.date ?? null,
+			endDate: closedFunding?.endDate ?? null,
+			fixedBills: 0,
+		},
+		reserve: settings.reserve,
+		accounts: accounts ?? [],
+		savedTransactions: transactions ?? [],
+		transactionOrder,
+		closedCycle,
+		provisional: !lastComplete,
+		fullDaysLeft: daysBetweenInclusive(
+			closedCycle.start,
+			closedCycle.end,
+		),
+		closed: true,
+	});
+
 	const tabChargeCycles = useMemo<
 		Record<SafeSpendingCycleTab, SafeSpendingChargeCycle>
 	>(() => {
@@ -469,17 +458,19 @@ export function SafeSpendingPreview({
 				transactions: spending,
 				thresholds: {
 					safetyNetDate:
-						spendingTrend.safetyNetHit && !spendingTrend.safetyNetHit.projected
-							? spendingTrend.safetyNetHit.date
+						currentView.trend.safetyNetHit &&
+						!currentView.trend.safetyNetHit.projected
+							? currentView.trend.safetyNetHit.date
 							: null,
 					limitDate:
-						spendingTrend.limitHit && !spendingTrend.limitHit.projected
-							? spendingTrend.limitHit.date
+						currentView.trend.limitHit &&
+						!currentView.trend.limitHit.projected
+							? currentView.trend.limitHit.date
 							: null,
 				},
 			},
 		};
-	}, [chargeCycles, directTransactions, transactionOrder, spendingTrend]);
+	}, [chargeCycles, directTransactions, transactionOrder, currentView.trend]);
 	// Saved rows gate rendering, not hooks: every subscription above stays
 	// mounted while rows load.
 	if (!accounts || !transactions || savedRules === null || !startDate)
@@ -505,75 +496,12 @@ export function SafeSpendingPreview({
 		);
 	}
 
-	const derivedSpent = perAccount.reduce((sum, item) => sum + item.derived, 0);
-
-	const checking = spendingDerived;
-	const remainingObligations = remainingDerived.total;
-	const cushion = cashCushion({
-		checking,
-		spentSinceStart,
-		remainingObligations,
-	});
-
-	const paycheck = currentFunding?.amount ?? 0;
-	const fixedObligations = fixedDerived.total;
-	const spent = derivedSpent;
-	const allowance = cycleAllowance({
-		paycheck,
-		fixedObligations,
-		spent,
-		reserve: settings.reserve,
-	});
-	const theoretical = paycheck - fixedObligations - spent;
-	const fullDaysLeft = Math.max(1, cycle.daysLeft - 1);
-	const dailySafe = allowance / fullDaysLeft;
-	const dailyTheoretical = theoretical / fullDaysLeft;
-
-	const spendingAccounts = spendingIds
-		.map((id) => accounts.find((account) => account.id === id))
-		.filter((account) => account !== undefined);
-	const observedOn = spendingAccounts
-		.map((account) => account.observedOn)
-		.sort();
-	const heroes = {
-		cushion,
-		cushionProvisional: false,
-		checkingAmount: checking,
-		checkingObservedOn: observedOn.at(-1) ?? null,
-		safe: allowance,
-		theoretical,
-		dailySafe,
-		dailyTheoretical,
-		fullDaysLeft,
-		cycleStart: cycle.cycleStart,
-		cycleEnd: cycle.cycleEnd,
-		closedCycle,
-		committedTotal: spent,
-		recordedTotal: derivedSpent,
-		committedByCard: perAccount.map((item) => ({
-			id: item.accountId,
-			name: item.name,
-			amount: item.derived,
-		})),
-	};
-	const statementFunding: Record<SafeSpendingCycleTab, StatementFunding> = {
-		cycle: {
-			paycheck,
-			date: currentFunding?.date ?? null,
-			endDate: currentFunding?.endDate ?? null,
-			fixedBills: fixedObligations,
-		},
-		"last-cycle": {
-			paycheck: closedFunding?.amount ?? 0,
-			date: closedFunding?.date ?? null,
-			endDate: closedFunding?.endDate ?? null,
-			fixedBills: closedFixedDerived,
-		},
-	};
-	const cycleAllocation = {
-		reserve: settings.reserve,
-		allowance,
-	};
+	const checking = currentView.view.cashNow.checking;
+	const remainingObligations = currentView.view.cashNow.bills;
+	const cushion = currentView.view.cashNow.cushion;
+	const allowance = currentView.view.allocation.allowance;
+	const heroes = currentView.view.heroes;
+	const { fullDaysLeft, dailySafe } = heroes;
 
 	const toggleAccount = (accountId: string) => {
 		const cardLike = cards
@@ -621,13 +549,6 @@ export function SafeSpendingPreview({
 			? explicit.filter((id) => id !== accountId)
 			: [...explicit, accountId];
 		updateSettings({ incomeAccountIds: next.length ? next : null });
-	};
-
-	const billsSection = {
-		title: labels.scheduledBills,
-		subtitle: `Scheduled amounts · ${monthDay(billsStart)} – ${monthDay(cycle.cycleEnd)}`,
-		total: sum(billTransactions.map((transaction) => transaction.requested)),
-		transactions: billTransactions,
 	};
 
 	// Saved-data frame (header, cycle dates) renders regardless; only the
@@ -708,12 +629,16 @@ export function SafeSpendingPreview({
 				</div>
 				<div className="flex min-w-0 flex-col border-l border-line pl-4 max-sm:pl-3">
 					<span className="mb-2 text-xs text-muted">
-						{shortWindow.total > 0
+						{currentView.view.cashNow.short > 0
 							? labels.billShortfall
 							: labels.cashAfterBills}
 					</span>
 					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
-						{money(shortWindow.total > 0 ? -shortWindow.total : cushion)}
+						{money(
+							currentView.view.cashNow.short > 0
+								? -currentView.view.cashNow.short
+								: cushion,
+						)}
 					</strong>
 				</div>
 			</div>
@@ -753,37 +678,40 @@ export function SafeSpendingPreview({
 				>
 					{isSafeSpendingCycleTab(detail) && (
 						<div className="grid content-start gap-4">
-							{detail === "cycle" ? (
-								<SafeSpendingBillsPanel
-									heroes={heroes}
-									cashNow={{
-										checking,
-										spentSinceStart,
-										directSpentSinceStart,
-										bills: remainingObligations,
-										cushion,
-										since: startDate.slice(0, 10),
-										monthEnd: remainingDerived.monthEnd,
-										short: shortWindow.total,
-										firstShort: shortWindow.firstDate,
-									}}
-									allocation={cycleAllocation}
-									funding={statementFunding.cycle}
-									trend={spendingTrend}
-									section={billsSection}
-									accounts={accounts}
-									transactions={savedState}
-									readOnly={readOnly}
-									transactionOrder={transactionOrder}
-									onTransactionOrderChange={setTransactionOrder}
-								/>
-							) : (
-								<HouseholdBudgetSummary
-									heroes={heroes}
-									reserve={settings.reserve}
-									funding={statementFunding["last-cycle"]}
-								/>
-							)}
+							<SafeSpendingBillsPanel
+								heroes={
+									detail === "cycle"
+										? currentView.view.heroes
+										: lastView.view.heroes
+								}
+								cashNow={
+									detail === "cycle"
+										? currentView.view.cashNow
+										: lastView.view.cashNow
+								}
+								allocation={
+									detail === "cycle"
+										? currentView.view.allocation
+										: lastView.view.allocation
+								}
+								funding={
+									detail === "cycle"
+										? currentView.view.funding
+										: lastView.view.funding
+								}
+								trend={
+									detail === "cycle" ? currentView.trend : lastView.trend
+								}
+								section={
+									detail === "cycle" ? currentView.section : lastView.section
+								}
+								closed={detail === "last-cycle"}
+								accounts={accounts}
+								transactions={savedState}
+								readOnly={readOnly}
+								transactionOrder={transactionOrder}
+								onTransactionOrderChange={setTransactionOrder}
+							/>
 							<SafeSpendingCyclePanel
 								key={detail}
 								cycle={tabChargeCycles[detail]}

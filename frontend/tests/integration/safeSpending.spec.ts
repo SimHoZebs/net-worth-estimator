@@ -82,41 +82,35 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	await expect(
 		page.getByRole("tab", { name: "Bills", exact: true }),
 	).toHaveCount(0);
-	await expect(
-		drawer.getByRole("region", { name: labels.paycheckAllocation }),
-	).toHaveCount(0);
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
-	const budget = drawer.getByRole("region", {
-		name: labels.paycheckAllocation,
-	});
-	await expect(budget).toBeVisible();
-	await expect(budget.getByRole("heading")).toHaveCount(0);
-	await expect(budget).toHaveCSS("padding", "0px");
-	await expect(budget).toHaveCSS("border-top-width", "0px");
-	await expect(budget).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-	await expect(budget).toContainText("Paid by · Feb 1");
 	await expect(
 		drawer.getByText("Dec 20, 2025 – Jan 19, 2026", { exact: true }),
 	).toHaveCount(1);
 	await expect(
-		budget.getByRole("list", { name: "Closed card balances" }),
-	).toContainText("$4,321.00");
-	await expect(budget).toContainText("Saved balances at close");
-	await expect(budget).not.toContainText("New · Jan 20 – Feb 19");
+		drawer.getByRole("region", { name: labels.cashAfterBills }),
+	).toContainText("The Feb 1 paycheck paid this statement");
 	await expect(
-		budget.getByText(labels.unallocated, { exact: true }),
+		drawer.getByRole("region", { name: labels.allowance, exact: true }),
+	).toContainText("-$4,696");
+	await expect(
+		drawer.getByRole("list", { name: labels.closedCardBalances }),
+	).toContainText("$4,321");
+	await expect(
+		drawer.getByText(labels.billsThisCycle, { exact: true }),
 	).toBeVisible();
-	await expect(drawer.getByText(labels.allowance, { exact: true })).toHaveCount(
-		0,
-	);
+	await expect(
+		drawer.getByText("No bills due in this period."),
+	).toBeVisible();
+	await expect(
+		drawer.getByRole("region", { name: "Paycheck allocation" }),
+	).toHaveCount(0);
 	await page.getByRole("tab", { name: /This cycle/ }).click();
 	await expect(
 		drawer.getByText("Jan 20, 2026 – Feb 19, 2026", { exact: true }),
 	).toHaveCount(1);
 	await expect(drawer.getByRole("list", { name: / details$/ })).toHaveCount(0);
-	await expect(budget).toHaveCount(0);
 	await expect(
-		drawer.getByRole("list", { name: "Closed card balances" }),
+		drawer.getByRole("list", { name: labels.closedCardBalances }),
 	).toHaveCount(0);
 	await expect(
 		drawer.getByRole("toolbar", { name: "Bills window" }),
@@ -195,8 +189,8 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		exact: true,
 	});
 	await expect(
-		last.getByRole("list", { name: "Closed card balances" }),
-	).toContainText("$4,321.00");
+		last.getByRole("list", { name: labels.closedCardBalances }),
+	).toContainText("$4,321");
 	const lastCharges = last.getByRole("table", {
 		name: new RegExp(labels.recordedCharges),
 	});
@@ -207,10 +201,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	await expect(currentTab).toBeFocused();
 	await expect(currentTab).toHaveAttribute("aria-selected", "true");
 	await expect(
-		page.getByRole("list", { name: "Closed card balances" }),
-	).toHaveCount(0);
-	await expect(
-		page.getByRole("region", { name: labels.paycheckAllocation }),
+		page.getByRole("list", { name: labels.closedCardBalances }),
 	).toHaveCount(0);
 	await expect(
 		page.getByRole("dialog").getByText(labels.allowance, { exact: true }),
@@ -270,6 +261,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 	const partner = sources.getByRole("button", {
 		name: /^Partner take-home pay/,
 	});
+	await expect(salary).toBeVisible({ timeout: 30_000 });
 	await expect(salary).toHaveAttribute("aria-pressed", "false");
 	await expect(partner).toHaveAttribute("aria-pressed", "false");
 	await salary.click();
@@ -295,21 +287,14 @@ test("income sources combine independent recurrence rules and persist explicit d
 	).toHaveText("-$7,975");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
 	await expect(
-		page.getByRole("region", { name: labels.paycheckAllocation }),
-	).toContainText("Paid by · Feb 1 – Feb 10");
-	await expect(
-		page
-			.getByRole("region", { name: labels.paycheckAllocation })
-			.getByText("$7,000.00", { exact: true }),
-	).toBeVisible();
+		page.getByRole("region", { name: labels.cashAfterBills }),
+	).toContainText("The Jan 29 – Feb 1 paychecks paid this statement");
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
 	await salary.click();
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
 	await expect(
-		page
-			.getByRole("region", { name: labels.paycheckAllocation })
-			.getByText("$1,400.00", { exact: true }),
-	).toBeVisible();
+		page.getByRole("region", { name: labels.cashAfterBills }),
+	).toContainText("The Jan 29 paycheck paid this statement");
 	await page.getByRole("tab", { name: "Configure", exact: true }).click();
 	const deselectionSaved = page.waitForResponse(
 		(response) =>
@@ -515,9 +500,7 @@ for (const theme of ["light", "dark"] as const) {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.emulateMedia({ colorScheme: theme });
 		await page.goto("/#outlook/safe-spending-detail/last-cycle");
-		const budget = page.getByRole("region", {
-			name: labels.paycheckAllocation,
-		});
+		const budget = page.getByRole("region", { name: labels.cashAfterBills });
 		await expect(budget).toBeVisible();
 		const overflowing = await budget.evaluate((root) =>
 			[root, ...Array.from(root.querySelectorAll("*"))]
@@ -526,7 +509,7 @@ for (const theme of ["light", "dark"] as const) {
 		);
 		expect(overflowing).toEqual([]);
 		const accessibility = await new AxeBuilder({ page })
-			.include(`[aria-label="${labels.paycheckAllocation}"]`)
+			.include(`[aria-label="${labels.cashAfterBills}"]`)
 			.analyze();
 		expect(accessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: /Last cycle/ }).click();
@@ -544,9 +527,6 @@ for (const theme of ["light", "dark"] as const) {
 			.analyze();
 		expect(cycleAccessibility.violations).toEqual([]);
 		await page.getByRole("tab", { name: /This cycle/ }).click();
-		await expect(
-			page.getByRole("region", { name: labels.paycheckAllocation }),
-		).toHaveCount(0);
 		const currentAccessibility = await new AxeBuilder({ page })
 			.include("dialog")
 			.analyze();

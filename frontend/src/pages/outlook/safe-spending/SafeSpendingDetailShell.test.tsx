@@ -10,7 +10,6 @@ import { financialModelFixture } from "../../../mocks/financialModel.ts";
 import { SafeSpendingBillsPanel } from "./SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "./SafeSpendingConfigurePanel.tsx";
 import { SafeSpendingDetailShell } from "./SafeSpendingDetailShell.tsx";
-import { HouseholdBudgetSummary } from "./HouseholdBudgetSummary.tsx";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import type {
 	CashNowDecomposition,
@@ -40,9 +39,7 @@ afterEach(() => {
 
 const heroes: SafeSpendingHeroes = {
 	cushion: 1200,
-	cushionProvisional: false,
 	checkingAmount: 5000,
-	checkingObservedOn: "2026-09-24",
 	safe: 300,
 	theoretical: 400,
 	dailySafe: 30,
@@ -64,7 +61,6 @@ const heroes: SafeSpendingHeroes = {
 		],
 	},
 	committedTotal: 800,
-	recordedTotal: 800,
 	committedByCard: [],
 };
 
@@ -89,6 +85,7 @@ const cashNow: CashNowDecomposition = {
 const allocation: CycleAllocation = {
 	reserve: 200,
 	allowance: 300,
+	available: true,
 };
 
 const section: SafeSpendingMandatorySection = {
@@ -222,167 +219,34 @@ describe("SafeSpendingBillsPanel funding foot", () => {
 		});
 		expect(within(region).getByText("No projected paycheck")).toBeTruthy();
 	});
-});
 
-describe("HouseholdBudgetSummary", () => {
-	it("allocates the settling paycheck to closed cards, not new-cycle charges", () => {
+	it("does not invent an allowance when a closed balance is missing", () => {
 		render(
-			<HouseholdBudgetSummary
+			<SafeSpendingBillsPanel
 				heroes={{
 					...heroes,
-					cycleStart: "2026-10-20",
-					cycleEnd: "2026-11-19",
-					closedCycle: {
-						start: "2026-09-20",
-						end: "2026-10-19",
-						total: 2601.55,
-						cards: [
-							{
-								id: "a",
-								name: "Card A",
-								amount: 1000,
-								observedOn: "2026-10-19",
-							},
-							{
-								id: "b",
-								name: "Card B",
-								amount: 1601.55,
-								observedOn: "2026-10-19",
-							},
-						],
-					},
-					committedTotal: 500,
-					recordedTotal: 125.25,
+					committedTotal: null,
+					committedByCard: [
+						{ id: "card", name: "Household card", amount: null },
+					],
 				}}
-				reserve={725}
-				funding={{
-					paycheck: 7579.4,
-					date: "2026-10-30",
-					endDate: "2026-10-30",
-					fixedBills: 4181.87,
-				}}
-			/>,
-		);
-		const summary = screen.getByRole("region", {
-			name: labels.paycheckAllocation,
-		});
-		expect(within(summary).queryByRole("heading")).toBeNull();
-		expect(
-			within(summary).queryByText("Oct 20 – Nov 19", { exact: true }),
-		).toBeNull();
-		expect(within(summary).getByText("Oct 30").getAttribute("datetime")).toBe(
-			"2026-10-30",
-		);
-		const amount = (label: string) =>
-			within(summary).getByText(label).closest("div")!.querySelector("dd")!
-				.textContent;
-		expect(amount(labels.paycheckBeforeReserve)).toBe("$795.98");
-		expect(amount(labels.unallocated)).toBe("$70.98");
-		expect(within(summary).queryByText("Closed · Sep 20 – Oct 19")).toBeNull();
-		expect(within(summary).queryByText("New · Oct 20 – Nov 19")).toBeNull();
-		expect(within(summary).queryByText("$125.25")).toBeNull();
-		const balances = within(summary).getByRole("list", {
-			name: "Closed card balances",
-		});
-		expect(within(balances).getAllByRole("listitem")).toHaveLength(2);
-		expect(within(balances).getByText("$1,601.55")).toBeTruthy();
-		expect(within(summary).getByText("Saved balances at close")).toBeTruthy();
-	});
-
-	it("shows negative amounts and an unavailable paycheck date", () => {
-		render(
-			<HouseholdBudgetSummary
-				heroes={heroes}
-				reserve={200}
-				funding={{
-					paycheck: 1000,
-					date: null,
-					endDate: null,
-					fixedBills: 1500,
-				}}
-			/>,
-		);
-		expect(screen.getByText("Date not available")).toBeTruthy();
-		expect(screen.getByText("-$1,100.00")).toBeTruthy();
-		expect(screen.getByText("-$1,300.00")).toBeTruthy();
-		expect(screen.getByRole("img").getAttribute("aria-label")).toContain(
-			`${labels.paycheckBeforeReserve} -$1,100.00`,
-		);
-	});
-
-	it("shows the paycheck date range for multiple income sources", () => {
-		render(
-			<HouseholdBudgetSummary
-				heroes={heroes}
-				reserve={allocation.reserve}
-				funding={{
-					...currentFunding,
-					date: "2026-09-30",
-					endDate: "2026-10-05",
-				}}
-			/>,
-		);
-		expect(screen.getByText("Sep 30").getAttribute("datetime")).toBe(
-			"2026-09-30",
-		);
-		expect(screen.getByText("Oct 5").getAttribute("datetime")).toBe(
-			"2026-10-05",
-		);
-	});
-
-	it("does not show a spendable remainder when a card has no closing observation", () => {
-		render(
-			<HouseholdBudgetSummary
-				heroes={{
-					...heroes,
-					closedCycle: {
-						...heroes.closedCycle,
-						total: null,
-						cards: [
-							{
-								id: "missing",
-								name: "Missing card",
-								amount: null,
-								observedOn: null,
-							},
-						],
-					},
-				}}
-				reserve={allocation.reserve}
+				cashNow={{ ...cashNow, provisional: true }}
+				allocation={{ ...allocation, allowance: 0, available: false }}
 				funding={currentFunding}
+				section={section}
+				accounts={financialModelFixture.accounts}
+				transactions={financialModelFixture.transactions}
+				readOnly={financialModelFixture.readOnly}
+				transactionOrder="newest"
+				onTransactionOrderChange={noop}
+				closed
 			/>,
 		);
-		expect(screen.getByText("Saved balance unavailable")).toBeTruthy();
-		expect(screen.getByText("No saved balance")).toBeTruthy();
-		expect(
-			screen.getByText(labels.unallocated).closest("div")!.textContent,
-		).toBe(`${labels.unallocated}—`);
-		expect(screen.queryByRole("img")).toBeNull();
-	});
-
-	it("labels an older observation without calling it a closing balance", () => {
-		render(
-			<HouseholdBudgetSummary
-				heroes={{
-					...heroes,
-					closedCycle: {
-						...heroes.closedCycle,
-						cards: [
-							{
-								id: "card",
-								name: "Household card",
-								amount: 600,
-								observedOn: "2026-09-18",
-							},
-						],
-					},
-				}}
-				reserve={allocation.reserve}
-				funding={currentFunding}
-			/>,
-		);
-		expect(screen.getByText("Latest saved balances before close")).toBeTruthy();
-		expect(screen.getByText("Saved Sep 18")).toBeTruthy();
+		expect(screen.getByText(labels.closedCardBalances)).toBeTruthy();
+		expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+		expect(screen.getByText("Closed card balance unavailable")).toBeTruthy();
+		expect(screen.getByText("Latest balance, not at close")).toBeTruthy();
+		expect(screen.queryByText("$0")).toBeNull();
 	});
 });
 
@@ -430,8 +294,6 @@ describe("SafeSpendingConfigurePanel", () => {
 		for (const label of [
 			labels.cashBalance,
 			labels.remainingBills,
-			labels.paidBy,
-			labels.fixedBills,
 			labels.cardSpending,
 		]) {
 			expect(screen.queryByLabelText(`${label} ($)`)).toBeNull();
