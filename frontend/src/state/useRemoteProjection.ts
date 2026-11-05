@@ -72,9 +72,14 @@ async function fetchDeterministicResult(
 	years: number,
 	range: ProjectionDateRange,
 	signal: AbortSignal,
+	pinModel = false,
 ): Promise<ProjectionResult> {
 	const request: DeterministicProjectionRequest = {
 		...projectionRequest(model, years),
+		// A request-local overlay must describe the same model the UI
+		// rendered. Without the pinned model, a concurrent row write can
+		// answer with a different queue and stale dates.
+		...(pinModel ? { model } : {}),
 		range,
 	};
 	const response = (await projectDeterministic(request as never, { signal }))
@@ -577,12 +582,16 @@ export function useRemoteProjection({
 			const current = activeModel;
 			if (!current) throw new Error(MISSING_MODEL_MESSAGE);
 			const range = effectiveRange ?? resolveProjectionRange(current, years);
-			return fetchDeterministicResult(current, years, range, signal).catch(
-				(cause: unknown) => {
-					notifyDeterministicError(queryKey, cause);
-					throw cause;
-				},
-			);
+			return fetchDeterministicResult(
+				current,
+				years,
+				range,
+				signal,
+				true,
+			).catch((cause: unknown) => {
+				notifyDeterministicError(queryKey, cause);
+				throw cause;
+			});
 		},
 		enabled: enabled && hasModel && overlayNeeded,
 		placeholderData: keepPreviousData,

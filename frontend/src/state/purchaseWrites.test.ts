@@ -131,19 +131,13 @@ it("removes one wishlist row without touching the rest", async () => {
 	).toBe(false);
 });
 
-it("moves one row with priority updates and a single reorder", async () => {
+it("moves one row with a single reorder", async () => {
 	const server = stubTestServer(undefined, seedPurchases());
 	const purchases = [wish("laptop"), wish("chair")];
 	const built = movePurchaseOperations(purchases, "chair", -1);
 	expect(built?.next.map((item) => item.id)).toEqual(["chair", "laptop"]);
-	// Both rows changed queue index, so both carry a new priority.
-	expect(
-		built?.operations.filter((operation) => operation.action === "update")
-			.length,
-	).toBe(2);
-	expect(
-		built?.operations.filter((operation) => operation.action === "move"),
-	).toEqual([
+	// The server move renumbers every priority, so no extra update writes.
+	expect(built?.operations).toEqual([
 		{
 			kind: "plannedPurchase",
 			action: "move",

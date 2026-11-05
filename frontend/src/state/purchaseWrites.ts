@@ -83,11 +83,9 @@ export interface PurchaseReorder {
 }
 
 /**
- * Targeted reorder operations for one queue move. Every row whose queue
- * index changed gets a priority update, plus one move for the relocated
- * row so row position tracks priority. Returns null when the move is a
- * no-op. The returned operations run sequentially and are not atomic:
- * callers must refresh authoritative state after a partial failure.
+ * One reorder operation for one queue move. The server move renumbers every
+ * priority from row position, so separate priority updates would only add
+ * writes and projection rebuilds. Returns null when the move is a no-op.
  */
 export function movePurchaseOperations(
 	purchases: PlannedPurchase[],
@@ -96,21 +94,15 @@ export function movePurchaseOperations(
 ): PurchaseReorder | null {
 	const next = movePurchase(purchases, id, direction);
 	if (next === purchases) return null;
-	const previousIndex = new Map(
-		purchases.map((purchase, index) => [purchase.id, index]),
-	);
-	const operations: PurchaseOperation[] = [];
-	next.forEach((purchase, index) => {
-		if (previousIndex.get(purchase.id) !== index)
-			operations.push(updatePurchaseOperation(purchase, index));
-	});
 	const at = next.findIndex((purchase) => purchase.id === id);
-	operations.push({
-		kind: "plannedPurchase",
-		action: "move",
-		id,
-		beforeId: next[at + 1]?.id ?? null,
-	});
+	const operations: PurchaseOperation[] = [
+		{
+			kind: "plannedPurchase",
+			action: "move",
+			id,
+			beforeId: next[at + 1]?.id ?? null,
+		},
+	];
 	return { operations, next };
 }
 
