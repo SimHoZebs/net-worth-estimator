@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { acceptUserScope, suspendUserScope } from "../auth/resourceScope.ts";
+import {
+	acceptUserScope,
+	canonicalApiBaseUrl,
+	suspendUserScope,
+} from "../auth/resourceScope.ts";
 import {
 	clearResourceQueryCache,
 	cancelResourceQueries,
 	deterministicQueryKey,
 	resetServerQueryCache,
 	serverQueryClient,
+	sessionQueryKey,
 	stochasticQueryKey,
 	currentPositionQueryKey,
 	financialQueryFilter,
@@ -109,6 +114,19 @@ describe("resource-scoped projection cache", () => {
 		expect(deterministicQueryKey("same-model", 10, "..2028-01-31")).toEqual(
 			full,
 		);
+	});
+
+	it("clears user data without retiring identity discovery", async () => {
+		owner("users/a");
+		const client = serverQueryClient();
+		const discovery = sessionQueryKey(canonicalApiBaseUrl(""));
+		client.setQueryData(discovery, "session-body");
+		client.setQueryData(deterministicQueryKey("doc", 10), "private-result");
+		await clearResourceQueryCache();
+		expect(
+			client.getQueryData(deterministicQueryKey("doc", 10)),
+		).toBeUndefined();
+		expect(client.getQueryData(discovery)).toBe("session-body");
 	});
 
 	it("aborts old fetches, removes data, and ignores late non-cooperative results", async () => {

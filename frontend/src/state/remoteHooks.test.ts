@@ -39,7 +39,8 @@ import {
 	stochasticResultToLocal,
 	useRemoteProjection,
 } from "./useRemoteProjection.ts";
-import { useWorkspaceStartup } from "./useWorkspaceStartup.ts";
+import { useUserScope } from "./useUserScope.ts";
+import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 import { useSavedAccounts } from "./savedState.ts";
 import {
 	useServerModel,
@@ -61,10 +62,20 @@ import {
 } from "./workspaceWrites.ts";
 import { modelFixture, stubTestServer } from "../mocks/waypointServer.ts";
 
+// Mirrors the app's startup activation so these hook tests exercise the
+// same verified-scope gate without mounting the whole workspace.
+function useWorkspaceQueries(): void {
+	const enabled = useUserScope().status === "ready";
+	useServerModel({ enabled });
+	useServerStatus({ enabled });
+	useAmountPresets({ enabled });
+	useWorkspaceSyncMonitor(enabled);
+}
+
 // Test observations read the canonical saved state. Query owns every
 // request lifecycle.
 function useRemoteWorkspace() {
-	useWorkspaceStartup();
+	useWorkspaceQueries();
 	const query = useServerModel();
 	const status = useServerStatus();
 	const presets = useAmountPresets();
@@ -509,7 +520,7 @@ describe("remote workspace state", () => {
 				resolveModel = resolve;
 			}),
 		);
-		const rendered = renderHookRTL(() => useWorkspaceStartup());
+		const rendered = renderHookRTL(() => useWorkspaceQueries());
 		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
 		const signal = (
 			server.fetcher.mock.calls.find(([url]) =>
@@ -532,7 +543,7 @@ describe("remote workspace state", () => {
 
 	it("keeps session credentials out of workspace and UI state", async () => {
 		const server = stubTestServer();
-		const rendered = renderHookRTL(() => useWorkspaceStartup());
+		const rendered = renderHookRTL(() => useWorkspaceQueries());
 		await waitFor(() =>
 			expect(
 				serverQueryClient().isFetching({
@@ -559,7 +570,7 @@ describe("remote workspace state", () => {
 
 	it("uses a replacement client on an explicit Query refresh", async () => {
 		const server = stubTestServer();
-		const rendered = renderHookRTL(() => useWorkspaceStartup());
+		const rendered = renderHookRTL(() => useWorkspaceQueries());
 		await waitFor(() => expect(getServerModel()?.model).toBeDefined());
 		expect(server.modelFetches()).toHaveLength(1);
 		(server.model as FinancialModel).accounts[0]!.name = "Replacement cash";
@@ -577,7 +588,7 @@ describe("remote workspace state", () => {
 				resolveModel = resolve;
 			}),
 		);
-		const rendered = renderHookRTL(() => useWorkspaceStartup());
+		const rendered = renderHookRTL(() => useWorkspaceQueries());
 		const pending = serverQueryClient().fetchQuery(modelOptions());
 		await waitFor(() => expect(server.modelFetches()).not.toHaveLength(0));
 		const signal = (

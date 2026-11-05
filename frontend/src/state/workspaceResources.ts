@@ -173,13 +173,17 @@ export function getServerStatus(scope = getUserScope()) {
 			)
 		: undefined;
 }
+// Startup activation, not subscription: readers omit `enabled` and observe
+// the cache without fetching. The activating caller derives `enabled` from
+// the verified scope, and scopedRequest still rejects an identity-less or
+// retired request at the network boundary.
 export function useServerModel(options: { enabled?: boolean } = {}) {
 	const scope = useUserScope();
 	return useQuery(
 		{
 			...modelOptions(scope),
 			refetchOnMount: "always",
-			enabled: scope.status === "ready" && (options.enabled ?? false),
+			enabled: options.enabled ?? false,
 		},
 		serverQueryClient(),
 	);
@@ -190,7 +194,7 @@ export function useServerStatus(options: { enabled?: boolean } = {}) {
 		{
 			...statusOptions(scope),
 			refetchOnMount: "always",
-			enabled: scope.status === "ready" && (options.enabled ?? false),
+			enabled: options.enabled ?? false,
 		},
 		serverQueryClient(),
 	);
@@ -201,7 +205,7 @@ export function useAmountPresets(options: { enabled?: boolean } = {}) {
 		{
 			...presetsOptions(scope),
 			refetchOnMount: "always",
-			enabled: scope.status === "ready" && (options.enabled ?? false),
+			enabled: options.enabled ?? false,
 		},
 		serverQueryClient(),
 	);

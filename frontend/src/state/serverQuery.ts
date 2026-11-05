@@ -9,8 +9,20 @@ import { getUserScope } from "../auth/resourceScope.ts";
  * across remounts while fresh. User identity belongs in each key:
  * identical inputs from different users never share
  * data or in-flight requests. Mutable resources define their own freshness
- * and mutation policy. Session discovery belongs to its own hook.
+ * and mutation policy. Identity discovery shares this cache under its own
+ * eviction policy, so clearing user data never retires a running check.
  */
+
+/** Identity discovery root. It is not user data and outlives its eviction. */
+const SESSION_QUERY_ROOT = "auth-session";
+
+export function sessionQueryKey(baseUrl: string) {
+	return [SESSION_QUERY_ROOT, baseUrl] as const;
+}
+
+function isResourceOwned(query: { queryKey: readonly unknown[] }): boolean {
+	return query.queryKey[0] !== SESSION_QUERY_ROOT;
+}
 
 export function deterministicQueryKey(
 	modelKey: string,
@@ -113,12 +125,15 @@ export function resetServerQueryCache(): void {
 
 /** Cancel first, then remove both data and in-flight projection identities. */
 export async function clearResourceQueryCache(): Promise<void> {
-	if (!shared) return;
+	const cache = shared;
+	if (!cache) return;
 	await cancelResourceQueries();
-	shared.clear();
+	// Discovery can still be in flight during logout or an owner switch.
+	// Keep it in the cache; its own signal and gcTime own its lifetime.
+	cache.removeQueries({ predicate: isResourceOwned });
 }
 
 /** Verification cancels old requests without evicting this owner's results. */
 export async function cancelResourceQueries(): Promise<void> {
-	await shared?.cancelQueries();
+	await shared?.cancelQueries({ predicate: isResourceOwned });
 }

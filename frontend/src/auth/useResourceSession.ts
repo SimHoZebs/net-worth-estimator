@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiBaseUrl } from "../api/runtime.ts";
 import { logout as logoutRequest } from "../api/generated/endpoints.ts";
-import { sessionQueryClient } from "./sessionQuery.ts";
 import { isRecord } from "../domain/guards.ts";
 import {
 	cancelResourceQueries,
 	clearResourceQueryCache,
+	serverQueryClient,
 } from "../state/serverQuery.ts";
 import { hydrateFinancialPreferences } from "../state/useSafeSpendingSettings.ts";
 import {
@@ -231,14 +231,19 @@ export function useResourceSession() {
 		setStatus((previous) => ({ ...previous, error: "" }));
 		dismissKey("session-logout");
 		try {
-			const response = await sessionQueryClient
+			const cache = serverQueryClient();
+			const response = await cache
 				.getMutationCache()
-				.build(sessionQueryClient, {
+				.build(cache, {
 					mutationKey: [
 						"auth-logout",
 						attempt.apiBaseUrl,
 						attempt.session.user?.subject,
 					],
+					// A logout response carries a redirect body. Retire it with
+					// the attempt instead of retaining it in the shared cache.
+					gcTime: 0,
+					retry: false,
 					mutationFn: () => {
 						if (signingOut.current !== attempt)
 							throw new Error("The active session changed.");

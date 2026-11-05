@@ -12,7 +12,7 @@ import {
 	useSyncCredential,
 } from "../../state/syncSettings.ts";
 import { useServerStatus } from "../../state/workspaceResources.ts";
-import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { useUserReadOnly, useUserScope } from "../../state/useUserScope.ts";
 import { SyncConnectedAccounts } from "./SyncConnectedAccounts.tsx";
 import { SyncConnectForm } from "./SyncConnectForm.tsx";
 import { SyncHelp } from "./SyncHelp.tsx";
@@ -36,7 +36,8 @@ export function SyncProviderPanel() {
 	const configured = credential.data?.configured === true;
 	// Status owns read-only gating, so it loads even before sync is
 	// configured; the credential gate only controls sync-specific UI.
-	const status = useServerStatus({ enabled: true });
+	const enabled = useUserScope().status === "ready";
+	const status = useServerStatus({ enabled });
 	const readOnly = useUserReadOnly();
 	const [busy, setBusy] = useState(false);
 	const [syncing, setSyncing] = useState(false);

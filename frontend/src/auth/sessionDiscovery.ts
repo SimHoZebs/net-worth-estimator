@@ -1,7 +1,7 @@
 import { getApiBaseUrl } from "@/api/runtime.ts";
 import { getAuthSession } from "@/api/generated/endpoints.ts";
 import { ApiHttpError, ApiNetworkError } from "@/api/http.ts";
-import { sessionQueryClient } from "./sessionQuery.ts";
+import { serverQueryClient, sessionQueryKey } from "@/state/serverQuery.ts";
 import { isRecord } from "@/domain/guards.ts";
 import type { Session } from "@/auth/sessionContext.ts";
 import {
@@ -24,15 +24,22 @@ export async function discoverSession(
 	signal: AbortSignal,
 	baseUrl = getApiBaseUrl(),
 ): Promise<Session> {
-	const queryKey = ["auth-session", canonicalApiBaseUrl(baseUrl)] as const;
+	const queryKey = sessionQueryKey(canonicalApiBaseUrl(baseUrl));
+	const cache = serverQueryClient();
 	const cancel = () => {
-		void sessionQueryClient.cancelQueries({ queryKey, exact: true });
+		void cache.cancelQueries({ queryKey, exact: true });
 	};
 	signal.throwIfAborted();
 	signal.addEventListener("abort", cancel, { once: true });
 	try {
-		return await sessionQueryClient.fetchQuery({
+		return await cache.fetchQuery({
 			queryKey,
+			// One check, no retry, and no retained session body. Resource-cache
+			// eviction skips this root, so discovery survives logout and owner
+			// changes while its caller owns the abort.
+			gcTime: 0,
+			staleTime: 0,
+			retry: false,
 			queryFn: ({ signal: querySignal }) =>
 				readSession(AbortSignal.any([signal, querySignal]), baseUrl),
 		});

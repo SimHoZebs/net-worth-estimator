@@ -1,6 +1,11 @@
 import { useUiStore } from "../state/uiStore.ts";
-import { useWorkspaceStartup } from "../state/useWorkspaceStartup.ts";
-import { useServerModel } from "../state/workspaceResources.ts";
+import { useUserScope } from "../state/useUserScope.ts";
+import {
+	useAmountPresets,
+	useServerModel,
+	useServerStatus,
+} from "../state/workspaceResources.ts";
+import { useWorkspaceSyncMonitor } from "../state/useWorkspaceSyncMonitor.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { ServerLoadingShell } from "./ServerLoadingShell.tsx";
@@ -9,9 +14,12 @@ import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 export function ServerApp() {
 	// Startup enables resource queries. Screens subscribe to their own data.
 	// No fetched data travels as props anywhere in this tree.
-	useWorkspaceStartup();
+	const enabled = useUserScope().status === "ready";
+	const model = useServerModel({ enabled });
+	useServerStatus({ enabled });
+	useAmountPresets({ enabled });
+	useWorkspaceSyncMonitor(enabled);
 	const navigation = useWorkspaceNavigation();
-	const model = useServerModel();
 	const hasModel = model.data?.model != null;
 	const loading = model.isPending;
 	const importing = useUiStore((state) => state.importing);

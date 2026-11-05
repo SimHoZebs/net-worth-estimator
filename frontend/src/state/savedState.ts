@@ -13,6 +13,7 @@ import type {
 } from "../domain/model.ts";
 import { summaryEvaluations } from "./evaluationQueries.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
+import { useUserScope } from "./useUserScope.ts";
 import {
 	useAccountBalances,
 	useEvaluationSummary,
@@ -73,7 +74,8 @@ export function useSavedEvaluations(): Evaluation[] | null {
 
 /** Saved purchases as display rows. */
 export function useSavedPurchases(): PlannedPurchase[] | null {
-	const model = useServerModel({ enabled: true }).data?.model;
+	const enabled = useUserScope().status === "ready";
+	const model = useServerModel({ enabled }).data?.model;
 	return useMemo(() => {
 		if (model === undefined) return null;
 		return savedPurchasesToDisplay(model);
@@ -82,6 +84,7 @@ export function useSavedPurchases(): PlannedPurchase[] | null {
 
 /** Saved projection start date from the financial model. */
 export function useSavedStartDate(): string | null {
-	const model = useServerModel({ enabled: true }).data?.model;
+	const enabled = useUserScope().status === "ready";
+	const model = useServerModel({ enabled }).data?.model;
 	return useMemo(() => (model ? projectionStartDate(model) : null), [model]);
 }
