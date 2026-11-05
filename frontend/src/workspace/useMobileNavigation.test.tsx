@@ -8,13 +8,17 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Drawer } from "../components/Drawer.tsx";
 import { stubMatchMedia } from "../mocks/testScope.tsx";
-import { useMobileNavigation } from "./useMobileNavigation.ts";
+import {
+	resetMobileNavigationState,
+	useMobileNavigation,
+} from "./useMobileNavigation.ts";
 
 beforeEach(() => {
 	stubMatchMedia(true);
 });
 
 afterEach(() => {
+	resetMobileNavigationState();
 	cleanup();
 	vi.unstubAllGlobals();
 });
@@ -54,6 +58,15 @@ describe("mobile navigation guard", () => {
 	it("opens when no dialog is present", () => {
 		render(<Harness />);
 		fireEvent.click(screen.getByRole("button", { name: "Open nav" }));
+		expect(screen.getByTestId("nav-open").textContent).toBe("true");
+	});
+
+	it("keeps the sheet open when the boot layout swaps for the loaded one", () => {
+		const boot = render(<Harness />);
+		fireEvent.click(screen.getByRole("button", { name: "Open nav" }));
+		expect(screen.getByTestId("nav-open").textContent).toBe("true");
+		boot.unmount();
+		render(<Harness />);
 		expect(screen.getByTestId("nav-open").textContent).toBe("true");
 	});
 
