@@ -391,12 +391,11 @@ test("a recurring schedule lists transactions that record its occurrences", asyn
 		name: "Recorded transactions",
 	});
 	await expect(history).toContainText("Home renovation");
-	await expect(history).toContainText("Occurrence Mar 5, 2026");
-	await expect(history).toContainText("Posted Mar 8, 2026");
+	await expect(history).toContainText("Mar 5, 2026");
 	await expect(history).toContainText("−$9,000.00");
 	await history
 		.getByRole("button", {
-			name: "View Home renovation recorded for Mar 5, 2026",
+			name: /View Home renovation on Mar 5, 2026/,
 		})
 		.click();
 	await expect(

@@ -1625,6 +1625,8 @@ export function TransactionDetail({
 					{savedTransaction.kind === "schedule" && (
 						<ScheduleHistory
 							transactions={scheduleHistory}
+							accounts={fullAccounts}
+							startDate={savedTransaction.startDate}
 							onSelect={setHistorySelection}
 						/>
 					)}

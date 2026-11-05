@@ -1,22 +1,25 @@
 import { History } from "lucide-react";
-import type { Transaction } from "../../domain/model.ts";
-import { dateLabel, exactMoney } from "../../domain/format.ts";
+import { scheduleTransaction } from "../../domain/accountActivity.ts";
+import type { Account, Transaction } from "../../domain/model.ts";
 import { Badge } from "../Badge.tsx";
-import {
-	transactionAmountStyles,
-	transactionBadgeStyles,
-} from "./activityStyles.ts";
+import { TransactionRow } from "./TransactionRow.tsx";
+import { TransactionTable } from "./TransactionTable.tsx";
 
 /**
  * Postings that record an occurrence of one schedule, newest first. The
  * claim is the association, so this reads saved postings rather than the
- * projected occurrence list. Selecting a row opens the posting detail.
+ * projected occurrence list. The shared transaction table owns the row
+ * layout, status badges, and click-through.
  */
 export function ScheduleHistory({
 	transactions,
+	accounts,
+	startDate,
 	onSelect,
 }: {
 	transactions: Transaction[];
+	accounts: Account[];
+	startDate: string;
 	onSelect: (transaction: Transaction) => void;
 }) {
 	return (
@@ -36,101 +39,27 @@ export function ScheduleHistory({
 					No transactions record an occurrence of this schedule yet.
 				</p>
 			) : (
-				<ul className="mt-3 flex list-none flex-col border-t border-line p-0">
+				<TransactionTable caption="Transactions that record occurrences of this schedule, newest first.">
 					{transactions.map((transaction) => (
-						<li
+						<TransactionRow
 							key={transaction.id}
-							className="border-b border-line last:border-b-0"
-						>
-							<ScheduleHistoryRow
-								transaction={transaction}
-								onSelect={onSelect}
-							/>
-						</li>
+							transaction={scheduleTransaction({
+								transaction,
+								accounts,
+								startDate,
+								resolved: {
+									amount: transaction.amount,
+									requested: transaction.amount,
+									date:
+										transaction.claimOccurrenceDate ?? transaction.startDate,
+								},
+							})}
+							savedTransaction={transaction}
+							onEdit={onSelect}
+						/>
 					))}
-				</ul>
+				</TransactionTable>
 			)}
 		</section>
-	);
-}
-
-function ScheduleHistoryRow({
-	transaction,
-	onSelect,
-}: {
-	transaction: Transaction;
-	onSelect: (transaction: Transaction) => void;
-}) {
-	const occurrenceDate =
-		transaction.claimOccurrenceDate ?? transaction.startDate;
-	const direction =
-		transaction.fromId && transaction.toId
-			? "transfer"
-			: transaction.fromId
-				? "out"
-				: "in";
-	const sign = direction === "in" ? "+" : direction === "out" ? "−" : "";
-	return (
-		<button
-			type="button"
-			className="flex w-full flex-wrap items-center gap-3 rounded-control border-0 bg-transparent px-2 py-3 text-left hover:bg-surface-2"
-			aria-label={`View ${transaction.name} recorded for ${dateLabel(occurrenceDate, true)}`}
-			onClick={() => onSelect(transaction)}
-		>
-			<span className="flex min-w-0 flex-1 flex-col gap-1">
-				<strong className="text-sm font-semibold [overflow-wrap:anywhere]">
-					{transaction.name}
-				</strong>
-				<span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-					<span>
-						Occurrence{" "}
-						<time dateTime={occurrenceDate}>
-							{dateLabel(occurrenceDate, true)}
-						</time>
-					</span>
-					{transaction.postedDate && (
-						<>
-							<span aria-hidden="true">·</span>
-							<span>
-								Posted{" "}
-								<time dateTime={transaction.postedDate}>
-									{dateLabel(transaction.postedDate, true)}
-								</time>
-							</span>
-						</>
-					)}
-				</span>
-				{(transaction.pending || transaction.void || !transaction.enabled) && (
-					<span className="flex flex-wrap gap-1">
-						{transaction.void ? (
-							<Badge tone="neutral" className={transactionBadgeStyles()}>
-								Did not post
-							</Badge>
-						) : (
-							transaction.pending && (
-								<Badge tone="warning" className={transactionBadgeStyles()}>
-									Pending
-								</Badge>
-							)
-						)}
-						{!transaction.enabled &&
-							!transaction.pending &&
-							!transaction.void && (
-								<Badge tone="warning" className={transactionBadgeStyles()}>
-									Excluded
-								</Badge>
-							)}
-					</span>
-				)}
-			</span>
-			<strong
-				className={transactionAmountStyles({
-					positive: direction === "in",
-				})}
-			>
-				{sign}
-				{exactMoney(transaction.amount)}
-			</strong>
-		</button>
 	);
 }
