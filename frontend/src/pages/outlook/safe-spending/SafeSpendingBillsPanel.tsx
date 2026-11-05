@@ -15,7 +15,6 @@ import {
 	SegmentedBar,
 } from "../../../components/SegmentedBar.tsx";
 import { exactMoney, money, monthDay } from "../../../domain/format.ts";
-import { paycheckBeforeReserve } from "../../../domain/safeSpending.ts";
 import type { Account, Transaction } from "../../../domain/model.ts";
 import type { TransactionOrder } from "../../../domain/transactionSort.ts";
 import {
@@ -24,10 +23,12 @@ import {
 } from "./TransactionSectionView.tsx";
 import type {
 	CashNowDecomposition,
-	PaycheckDecomposition,
+	CycleAllocation,
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
+	StatementFunding,
 } from "./safeSpendingDetailModel.ts";
+import { bundleDatesText } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import { SafeSpendingTrendChart } from "./SafeSpendingTrendChart.tsx";
 import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
@@ -76,9 +77,10 @@ function HouseholdMetricCard({
 export function SafeSpendingBillsPanel({
 	heroes,
 	cashNow,
-	paycheck,
+	allocation,
 	trend,
 	section,
+	funding,
 	accounts,
 	transactions,
 	readOnly,
@@ -88,9 +90,11 @@ export function SafeSpendingBillsPanel({
 }: {
 	heroes: SafeSpendingHeroes;
 	cashNow: CashNowDecomposition;
-	paycheck: PaycheckDecomposition;
+	allocation: CycleAllocation;
 	trend?: SafeSpendingTrend;
 	section: SafeSpendingMandatorySection;
+	/** The payday bundle that settles this statement. */
+	funding: StatementFunding;
 	accounts: Account[];
 	/** Saved rules, for the detail view's rule lookups and edit controls. */
 	transactions: Transaction[];
@@ -107,27 +111,20 @@ export function SafeSpendingBillsPanel({
 		section.transactions,
 		savedById,
 	);
-	const incoming = paycheckBeforeReserve({
-		paycheck: paycheck.paycheck,
-		fixedObligations: paycheck.fixed,
-		closedTotal: heroes.closedCycle.total,
-	});
 	const dayUnit = heroes.fullDaysLeft === 1 ? "day" : "days";
 	const dailyFoot =
-		paycheck.allowance >= 0
+		allocation.allowance >= 0
 			? `${money(heroes.dailySafe)} a day · ${heroes.fullDaysLeft} full ${dayUnit} left`
 			: `${money(-heroes.dailySafe)} a day over · ${heroes.fullDaysLeft} full ${dayUnit} left`;
-	// The next paycheck arrives inside this statement cycle, so name its
-	// date here. This cycle funds spending from it; Last cycle shows the
-	// full allocation against the closed balance. Mirror the Last-cycle
-	// date range when several income sources span many days.
-	const incomingDate =
-		heroes.paycheckDate === null
-			? ""
-			: heroes.paycheckEndDate !== null &&
-				  heroes.paycheckEndDate !== heroes.paycheckDate
-				? ` · ${monthDay(heroes.paycheckDate)} – ${monthDay(heroes.paycheckEndDate)}`
-				: ` · ${monthDay(heroes.paycheckDate)}`;
+	// The funding payday for this statement lands after it closes, so the
+	// foot names it as the settler — never as cash that is already here.
+	const fundingDates = bundleDatesText(funding);
+	const fundingFoot =
+		fundingDates === null
+			? "No projected paycheck"
+			: funding.endDate !== null && funding.endDate !== funding.date
+				? `The ${fundingDates} paychecks pay this statement`
+				: `The ${fundingDates} paycheck pays this statement`;
 	return (
 		<div className="grid content-start gap-4">
 			<div className="grid grid-cols-2 gap-3">
@@ -135,19 +132,13 @@ export function SafeSpendingBillsPanel({
 					label={labels.cashAfterBills}
 					icon={<Landmark size={16} aria-hidden="true" />}
 					value={money(cashNow.cushion)}
-					foot={
-						incoming === null
-							? paycheck.paycheck
-								? `${exactMoney(paycheck.paycheck)} incoming${incomingDate}`
-								: "No incoming paycheck"
-							: `${exactMoney(incoming)} incoming before reserve${incomingDate}`
-					}
+					foot={fundingFoot}
 				/>
 				<HouseholdMetricCard
 					label={labels.allowance}
 					icon={<CreditCard size={16} aria-hidden="true" />}
-					value={money(paycheck.allowance)}
-					tone={paycheck.allowance < 0 ? "normal" : "positive"}
+					value={money(allocation.allowance)}
+					tone={allocation.allowance < 0 ? "normal" : "positive"}
 					foot={dailyFoot}
 				/>
 			</div>
@@ -162,13 +153,13 @@ export function SafeSpendingBillsPanel({
 					<div className="min-w-0 text-right">
 						<div className="text-xs text-muted">{labels.reserve}</div>
 						<div className="text-xl font-bold tracking-tight text-ink tabular-nums">
-							{money(paycheck.reserve)}
+							{money(allocation.reserve)}
 						</div>
 					</div>
 				</div>
 				<SegmentedBar
 					showDetails={false}
-					caption={`${labels.cardSpending} ${money(heroes.committedTotal)} · ${labels.allowance} ${money(paycheck.allowance)} · ${labels.reserve} ${money(paycheck.reserve)}`}
+					caption={`${labels.cardSpending} ${money(heroes.committedTotal)} · ${labels.allowance} ${money(allocation.allowance)} · ${labels.reserve} ${money(allocation.reserve)}`}
 					segments={[
 						{
 							label: labels.cardSpending,
@@ -176,11 +167,11 @@ export function SafeSpendingBillsPanel({
 							pattern: "solid",
 							tone: "tan",
 						} as BarSegment,
-						...(paycheck.allowance > 0
+						...(allocation.allowance > 0
 							? [
 									{
 										label: labels.allowance,
-										amount: paycheck.allowance,
+										amount: allocation.allowance,
 										pattern: "solid",
 										tone: "plum",
 									} as BarSegment,
@@ -188,12 +179,12 @@ export function SafeSpendingBillsPanel({
 							: []),
 						{
 							label: labels.reserve,
-							amount: paycheck.reserve,
+							amount: allocation.reserve,
 							pattern: "dots",
 							tone: "blue",
 						} as BarSegment,
 					]}
-					ariaLabel={`${labels.cardSpending} ${money(heroes.committedTotal)}, ${labels.allowance} ${money(paycheck.allowance)}, ${labels.reserve} ${money(paycheck.reserve)}`}
+					ariaLabel={`${labels.cardSpending} ${money(heroes.committedTotal)}, ${labels.allowance} ${money(allocation.allowance)}, ${labels.reserve} ${money(allocation.reserve)}`}
 				/>
 				<div className="h-px w-full bg-line" />
 				<div className="flex items-center justify-between">

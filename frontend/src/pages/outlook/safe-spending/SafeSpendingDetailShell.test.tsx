@@ -14,10 +14,11 @@ import { HouseholdBudgetSummary } from "./HouseholdBudgetSummary.tsx";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 import type {
 	CashNowDecomposition,
-	PaycheckDecomposition,
+	CycleAllocation,
 	SafeSpendingConfigHints,
 	SafeSpendingHeroes,
 	SafeSpendingMandatorySection,
+	StatementFunding,
 } from "./safeSpendingDetailModel.ts";
 
 beforeEach(() => {
@@ -65,13 +66,15 @@ const heroes: SafeSpendingHeroes = {
 	committedTotal: 800,
 	recordedTotal: 800,
 	committedByCard: [],
-	paycheckAmount: 3000,
-	paycheckDate: "2026-09-30",
-	paycheckEndDate: "2026-09-30",
-	fixedAmount: 1500,
-	reserveAmount: 200,
 };
 
+// Fixture bundle for the open statement the panel shows.
+const currentFunding: StatementFunding = {
+	paycheck: 3000,
+	date: "2026-09-30",
+	endDate: "2026-09-30",
+	fixedBills: 1500,
+};
 const cashNow: CashNowDecomposition = {
 	checking: 5000,
 	spentSinceStart: 0,
@@ -83,11 +86,8 @@ const cashNow: CashNowDecomposition = {
 	firstShort: null,
 };
 
-const paycheck: PaycheckDecomposition = {
-	paycheck: 3000,
-	fixed: 1500,
+const allocation: CycleAllocation = {
 	reserve: 200,
-	spent: 800,
 	allowance: 300,
 };
 
@@ -146,7 +146,8 @@ describe("SafeSpendingDetailShell", () => {
 				<SafeSpendingBillsPanel
 					heroes={heroes}
 					cashNow={cashNow}
-					paycheck={paycheck}
+					allocation={allocation}
+					funding={currentFunding}
 					section={section}
 					accounts={financialModelFixture.accounts}
 					transactions={financialModelFixture.transactions}
@@ -174,13 +175,14 @@ describe("SafeSpendingDetailShell", () => {
 	});
 });
 
-describe("SafeSpendingBillsPanel incoming foot", () => {
-	function renderBills(overrides: Partial<SafeSpendingHeroes> = {}) {
+describe("SafeSpendingBillsPanel funding foot", () => {
+	function renderBills(funding: StatementFunding = currentFunding) {
 		render(
 			<SafeSpendingBillsPanel
-				heroes={{ ...heroes, ...overrides }}
+				heroes={heroes}
 				cashNow={cashNow}
-				paycheck={paycheck}
+				allocation={allocation}
+				funding={funding}
 				section={section}
 				accounts={financialModelFixture.accounts}
 				transactions={financialModelFixture.transactions}
@@ -191,31 +193,39 @@ describe("SafeSpendingBillsPanel incoming foot", () => {
 		);
 	}
 
-	it("names the single incoming paycheck date", () => {
+	it("names the paycheck that settles this statement", () => {
 		renderBills();
 		const region = screen.getByRole("region", {
 			name: labels.cashAfterBills,
 		});
 		expect(
-			within(region).getByText("$900.00 incoming before reserve · Sep 30"),
+			within(region).getByText("The Sep 30 paycheck pays this statement"),
 		).toBeTruthy();
 	});
 
-	it("names the paycheck date range for several income sources", () => {
-		renderBills({ paycheckEndDate: "2026-10-05" });
+	it("names the bundle date range for several income sources", () => {
+		renderBills({ ...currentFunding, endDate: "2026-10-05" });
 		const region = screen.getByRole("region", {
 			name: labels.cashAfterBills,
 		});
 		expect(
 			within(region).getByText(
-				"$900.00 incoming before reserve · Sep 30 – Oct 5",
+				"The Sep 30 – Oct 5 paychecks pay this statement",
 			),
 		).toBeTruthy();
+	});
+
+	it("says so when no paycheck settles this statement", () => {
+		renderBills({ ...currentFunding, date: null, endDate: null, paycheck: 0 });
+		const region = screen.getByRole("region", {
+			name: labels.cashAfterBills,
+		});
+		expect(within(region).getByText("No projected paycheck")).toBeTruthy();
 	});
 });
 
 describe("HouseholdBudgetSummary", () => {
-	it("allocates the next paycheck to closed cards, not new-cycle charges", () => {
+	it("allocates the settling paycheck to closed cards, not new-cycle charges", () => {
 		render(
 			<HouseholdBudgetSummary
 				heroes={{
@@ -241,16 +251,15 @@ describe("HouseholdBudgetSummary", () => {
 							},
 						],
 					},
-					paycheckDate: "2026-10-30",
-					paycheckEndDate: "2026-10-30",
 					committedTotal: 500,
 					recordedTotal: 125.25,
 				}}
-				paycheck={{
-					...paycheck,
+				reserve={725}
+				funding={{
 					paycheck: 7579.4,
-					fixed: 4181.87,
-					reserve: 725,
+					date: "2026-10-30",
+					endDate: "2026-10-30",
+					fixedBills: 4181.87,
 				}}
 			/>,
 		);
@@ -283,8 +292,14 @@ describe("HouseholdBudgetSummary", () => {
 	it("shows negative amounts and an unavailable paycheck date", () => {
 		render(
 			<HouseholdBudgetSummary
-				heroes={{ ...heroes, paycheckDate: null, paycheckEndDate: null }}
-				paycheck={{ ...paycheck, paycheck: 1000 }}
+				heroes={heroes}
+				reserve={200}
+				funding={{
+					paycheck: 1000,
+					date: null,
+					endDate: null,
+					fixedBills: 1500,
+				}}
 			/>,
 		);
 		expect(screen.getByText("Date not available")).toBeTruthy();
@@ -295,11 +310,16 @@ describe("HouseholdBudgetSummary", () => {
 		);
 	});
 
-	it("shows the payment date range for multiple income sources", () => {
+	it("shows the paycheck date range for multiple income sources", () => {
 		render(
 			<HouseholdBudgetSummary
-				heroes={{ ...heroes, paycheckEndDate: "2026-10-05" }}
-				paycheck={paycheck}
+				heroes={heroes}
+				reserve={allocation.reserve}
+				funding={{
+					...currentFunding,
+					date: "2026-09-30",
+					endDate: "2026-10-05",
+				}}
 			/>,
 		);
 		expect(screen.getByText("Sep 30").getAttribute("datetime")).toBe(
@@ -328,7 +348,8 @@ describe("HouseholdBudgetSummary", () => {
 						],
 					},
 				}}
-				paycheck={paycheck}
+				reserve={allocation.reserve}
+				funding={currentFunding}
 			/>,
 		);
 		expect(screen.getByText("Saved balance unavailable")).toBeTruthy();
@@ -356,7 +377,8 @@ describe("HouseholdBudgetSummary", () => {
 						],
 					},
 				}}
-				paycheck={paycheck}
+				reserve={allocation.reserve}
+				funding={currentFunding}
 			/>,
 		);
 		expect(screen.getByText("Latest saved balances before close")).toBeTruthy();
@@ -408,7 +430,7 @@ describe("SafeSpendingConfigurePanel", () => {
 		for (const label of [
 			labels.cashBalance,
 			labels.remainingBills,
-			labels.nextPaycheck,
+			labels.paidBy,
 			labels.fixedBills,
 			labels.cardSpending,
 		]) {
