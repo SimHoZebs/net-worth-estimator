@@ -3,7 +3,7 @@
 **Status:** Backlog  
 **Area:** Integrations  
 **Source:** [https://app.notion.com/p/40bee37bd028817998e3cbecfc61e6fc](https://app.notion.com/p/40bee37bd028817998e3cbecfc61e6fc)  
-**Depends on:** [INT-03](./INT-03.md)
+**Depends on:** INT-03 (complete)
 
 **User story:** As a user, I want bank transactions associated with the right email receipts.
 

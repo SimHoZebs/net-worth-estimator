@@ -3,7 +3,7 @@
 **Status:** Backlog  
 **Area:** Recurring & financial health  
 **Source:** [https://app.notion.com/p/40bee37bd02881c7bf62ffd3cc5cdf65](https://app.notion.com/p/40bee37bd02881c7bf62ffd3cc5cdf65)  
-**Depends on:** [FIN-03](./FIN-03.md)
+**Depends on:** FIN-03 (complete)
 
 **User story:** As a user, I want the highest-risk financial-health issues displayed first.
 

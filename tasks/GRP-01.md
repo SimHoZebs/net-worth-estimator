@@ -3,7 +3,7 @@
 **Status:** Backlog  
 **Area:** Groups & sharing  
 **Source:** [https://app.notion.com/p/40bee37bd02881e89007c673c2e1b0a3](https://app.notion.com/p/40bee37bd02881e89007c673c2e1b0a3)  
-**Depends on:** [SOC-01](./SOC-01.md)
+**Depends on:** SOC-01 (complete)
 
 **User story:** As an administrator, I want friends-only or link-enabled group admission.
 

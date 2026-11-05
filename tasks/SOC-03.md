@@ -3,7 +3,7 @@
 **Status:** Backlog  
 **Area:** Friends & shared expenses  
 **Source:** [https://app.notion.com/p/40bee37bd02881c2a77ef6b7cb192bb5](https://app.notion.com/p/40bee37bd02881c2a77ef6b7cb192bb5)  
-**Depends on:** [SOC-01](./SOC-01.md), [SOC-02](./SOC-02.md), [FND-03](./FND-03.md)
+**Depends on:** SOC-01 (complete), SOC-02 (complete), FND-03 (complete)
 
 **User story:** As a user, I want to send a friend an assigned share while showing the original total.
 

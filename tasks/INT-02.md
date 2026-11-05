@@ -3,7 +3,7 @@
 **Status:** Backlog  
 **Area:** Integrations  
 **Source:** [https://app.notion.com/p/40bee37bd028816bb131ee35bbbfefd4](https://app.notion.com/p/40bee37bd028816bb131ee35bbbfefd4)  
-**Depends on:** [INT-01](./INT-01.md)
+**Depends on:** INT-01 (complete)
 
 **User story:** As a user, I want to authorize read-only Gmail access for receipt discovery.
 
