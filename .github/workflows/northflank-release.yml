@@ -75,7 +75,7 @@ jobs:
           const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
           const names = [`${repository}-backend`, `${repository}-casdoor`];
           const tag = `sha-${sha}`;
-          const interval = Number(process.env.IMAGE_POLL_INTERVAL_MS ?? 15000);
+          const interval = Number(process.env.IMAGE_POLL_INTERVAL_MS ?? 5000);
           const deadline = Date.now() + Number(process.env.IMAGE_POLL_TIMEOUT_MS ?? 30 * 60 * 1000);
 
           async function manifest(name) {

@@ -50,6 +50,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          # Reuse compares the release commit with the last commit that has a
+          # published image for this component.
+          fetch-depth: 0
           persist-credentials: false
       - name: Image reference
         id: image
@@ -62,8 +65,63 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Select a reusable image
+        id: reuse
+        if: github.event_name == 'workflow_run'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          COMPONENT: ${{ matrix.image }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          case "$COMPONENT" in
+            backend)
+              paths=(backend deploy/migrate.sh deploy/analysis-schema.sql)
+              ;;
+            frontend)
+              paths=(frontend package.json bun.lock extension/package.json)
+              ;;
+            casdoor|casdoor-upstream)
+              paths=(auth/casdoor)
+              ;;
+            *)
+              echo "unknown image component: $COMPONENT" >&2
+              exit 1
+              ;;
+          esac
+
+          source=""
+          commits="$(git rev-list --max-count=20 "$HEAD_SHA^" 2>/dev/null || true)"
+          while read -r commit; do
+            [ -n "$commit" ] || continue
+            if docker buildx imagetools inspect "$IMAGE:sha-$commit" >/dev/null 2>&1; then
+              source="$commit"
+              break
+            fi
+          done <<< "$commits"
+
+          if [ -n "$source" ] && [ -z "$(git diff --name-only "$source" "$HEAD_SHA" -- "${paths[@]}")" ]; then
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "source=$source" >> "$GITHUB_OUTPUT"
+            echo "Reusing \`${IMAGE}:sha-${source}\` for \`${HEAD_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Reuse the unchanged image
+        id: reused
+        if: steps.reuse.outputs.reuse == 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_SHA: ${{ steps.reuse.outputs.source }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create --tag "$IMAGE:sha-$HEAD_SHA" "$IMAGE:sha-$SOURCE_SHA"
+          digest="$(docker buildx imagetools inspect --raw "$IMAGE:sha-$HEAD_SHA" | sha256sum | cut -d' ' -f1)"
+          echo "digest=sha256:$digest" >> "$GITHUB_OUTPUT"
       - name: Build and publish
         id: publish
+        if: steps.reuse.outputs.reuse != 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ${{ matrix.context }}
@@ -80,5 +138,5 @@ jobs:
       - name: Record immutable image
         env:
           IMAGE: ${{ steps.image.outputs.name }}
-          DIGEST: ${{ steps.publish.outputs.digest }}
+          DIGEST: ${{ steps.publish.outputs.digest || steps.reused.outputs.digest }}
         run: echo "\`${IMAGE}@${DIGEST}\`" >> "$GITHUB_STEP_SUMMARY"

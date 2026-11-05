@@ -1,9 +1,13 @@
 # GHCR container images
 
-`.github/workflows/images.yml` builds each tested `main` commit once on GitHub
-Actions, after the `Tests` workflow succeeds. It publishes Linux AMD64 images
-with `sha-<full commit>` tags and OCI source/revision labels. The workflow uses
-its short-lived `GITHUB_TOKEN`, not a personal token. Every action is pinned to a
+`.github/workflows/images.yml` publishes each tested `main` commit on GitHub
+Actions, after the `Tests` workflow succeeds. It builds a Linux AMD64 image only
+when that component changed since the last published image; otherwise it retags
+the previous immutable digest. Every component still receives a
+`sha-<full commit>` tag and OCI source/revision labels. A retagged image keeps
+the original build's revision label while its tag records the release commit.
+The workflow uses its
+short-lived `GITHUB_TOKEN`, not a personal token. Every action is pinned to a
 commit. No deployment credentials enter the build.
 
 | Image | Runtime |

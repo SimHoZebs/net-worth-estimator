@@ -21,6 +21,18 @@ test("publishes commit-addressed images only after a green main Tests run", () =
   for (const [, ref] of workflow.matchAll(/uses: (\S+)/g)) assert.match(ref, /@[a-f0-9]{40}$/);
 });
 
+test("reuses the last immutable image when a component did not change", () => {
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /git rev-list --max-count=20/);
+  assert.match(workflow, /docker buildx imagetools inspect/);
+  assert.match(workflow, /git diff --name-only/);
+  assert.match(workflow, /docker buildx imagetools create --tag/);
+  assert.match(workflow, /steps\.reuse\.outputs\.reuse != 'true'/);
+  assert.match(workflow, /paths=\(backend deploy\/migrate\.sh deploy\/analysis-schema\.sql\)/);
+  assert.match(workflow, /paths=\(frontend package\.json bun\.lock extension\/package\.json\)/);
+  assert.match(workflow, /paths=\(auth\/casdoor\)/);
+});
+
 test("publishes both app images, the identity runtime, and the upstream mirror", () => {
   for (const image of ["backend", "frontend", "casdoor", "casdoor-upstream"]) {
     assert.match(workflow, new RegExp(`image: ${image}\\n`));
