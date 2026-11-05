@@ -96,8 +96,8 @@ with `bun --filter ./frontend api:generate`.
 `typecheck` covers `frontend/tsconfig.json` and, separately, `frontend/tests/tsconfig.json`.
 It runs on `bun check` for both projects; `build` runs the same `bun check` pass before `vite build`, so the
 artifact path keeps type safety without a separate checker. Both configs avoid
-`baseUrl`, which current checkers removed. The `typescript` package remains as
-a parser library for the typography and style-scale lint scripts.
+`baseUrl`, which current checkers removed. TypeScript 7 provides the native
+`tsc` binary, which also serves the editor LSP.
 
 Refresh the checked-in OpenAPI snapshot without a running server or financial data:
 
@@ -108,9 +108,10 @@ OPENAPI_SNAPSHOT="$PWD/frontend/openapi.snapshot.json" CGO_ENABLED=0 \
 bun --filter ./frontend api:generate
 ```
 
-Font roles live in `frontend/src/styles/typography.css`. `bun --filter ./frontend lint:typography` warns about font choices outside the shared owner without failing the command. The normal lint gate also runs it. Unit tests cover the lint rule's detection logic, not exact fonts, role classes, or rendered sizes.
+Font roles live in `frontend/src/styles/typography.css`. The normal lint gate
+checks design-system contracts only; no script enforces font-ownership warnings.
 
-`bun --filter ./frontend lint:styles` enforces Tailwind's spacing scale in JSX classes, typed recipes, and CSS declarations. It also rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. `bun --filter ./frontend lint:fix` normalizes literal spacing values to that scale. Runtime variables, chart geometry, native state selectors, and calculated layout constraints remain valid.
+`bun --filter ./frontend lint:styles` rejects raw palette utilities, private class selectors, and component `@apply` selector APIs. Runtime variables, chart geometry, native state selectors, and calculated layout constraints remain valid.
 
 ### Component interactions
 

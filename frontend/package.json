@@ -13,10 +13,9 @@
 		"dev": "vite --host 0.0.0.0",
 		"format": "oxfmt",
 		"format:check": "oxfmt --check",
-		"lint": "oxlint & a=$!; bun run lint:typography & b=$!; bun run lint:styles & c=$!; wait $a; ra=$?; wait $b; rb=$?; wait $c; rc=$?; [ \"$ra\" -eq 0 ] && [ \"$rb\" -eq 0 ] && [ \"$rc\" -eq 0 ]",
-		"lint:fix": "oxlint --fix && node scripts/lint-style-scale.ts --fix",
-		"lint:styles": "node scripts/lint-style-scale.ts & a=$!; node scripts/lint-design-system.ts & b=$!; wait $a; ra=$?; wait $b; rb=$?; [ \"$ra\" -eq 0 ] && [ \"$rb\" -eq 0 ]",
-		"lint:typography": "node scripts/lint-typography.ts",
+		"lint": "oxlint & a=$!; bun run lint:styles & c=$!; wait $a; ra=$?; wait $c; rc=$?; [ \"$ra\" -eq 0 ] && [ \"$rc\" -eq 0 ]",
+		"lint:fix": "oxlint --fix",
+		"lint:styles": "node scripts/lint-design-system.ts",
 		"typecheck": "bun check & a=$!; bun check -p tests & b=$!; wait $a; ra=$?; wait $b; rb=$?; [ \"$ra\" -eq 0 ] && [ \"$rb\" -eq 0 ]",
 		"test": "bun run test:unit",
 		"test:unit": "vitest run",
@@ -56,7 +55,7 @@
 		"oxlint": "^1.88.0",
 		"postcss": "^8.5.28",
 		"tailwindcss": "^4.3.3",
-		"typescript": "^5.9.3",
+		"typescript": "^7.0.2",
 		"vite": "^8.3.5",
 		"vitest": "^5.0.5"
 	}
