@@ -12,6 +12,7 @@ export function ConfirmDialog({
 	onConfirm,
 	cancelLabel,
 	confirmLabel,
+	confirmVariant = "danger",
 	busyLabel,
 	busy = false,
 	error,
@@ -23,6 +24,8 @@ export function ConfirmDialog({
 	onConfirm: () => void;
 	cancelLabel: string;
 	confirmLabel: string;
+	/** Danger for destructive removal; primary for record-and-close actions. */
+	confirmVariant?: "primary" | "danger";
 	busyLabel?: string;
 	busy?: boolean;
 	error?: string | null;
@@ -47,7 +50,7 @@ export function ConfirmDialog({
 				</Button>
 				<Button
 					type="button"
-					variant="danger"
+					variant={confirmVariant}
 					disabled={busy}
 					onClick={onConfirm}
 				>

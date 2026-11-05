@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 /** Local edits override current values. Only edited fields retain a conflict baseline. */
-export function useEditDraft<T extends Record<string, string | boolean>>(
+export function useEditDraft<T extends Record<string, string | boolean | null>>(
 	key: string,
 	source: T,
 ) {

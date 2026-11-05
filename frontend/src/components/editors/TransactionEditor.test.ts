@@ -14,12 +14,9 @@ describe("timestamped actual authoring", () => {
 		const body = postingBody({
 			name: "Expense",
 			amount: 100,
-			annualIncrease: 0,
 			fromId: "checking",
 			toId: null,
-			frequency: "once",
 			startDate: "2026-03-10",
-			endDate: null,
 			postedDate: null,
 			enabled: true,
 			claimScheduleId: null,

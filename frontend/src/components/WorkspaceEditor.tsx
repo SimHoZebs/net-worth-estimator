@@ -11,6 +11,7 @@ import { useUserReadOnly } from "../state/useUserScope.ts";
 import { TransactionDetail } from "./activity/TransactionDetail.tsx";
 import { AccountEditor } from "./editors/AccountEditor.tsx";
 import { EvaluationEditor } from "./editors/EvaluationEditor.tsx";
+import { AddScheduleDialog } from "./editors/AddScheduleDialog.tsx";
 import { AddTransactionDialog } from "./editors/AddTransactionDialog.tsx";
 
 export type { EditorTarget } from "../domain/accountEdits.ts";
@@ -74,6 +75,14 @@ export function WorkspaceEditor({
 			) : (
 				<AddTransactionDialog
 					key="new-transaction"
+					onSaved={onClose}
+					onClose={onClose}
+				/>
+			);
+		case "schedule":
+			return (
+				<AddScheduleDialog
+					key="new-schedule"
 					onSaved={onClose}
 					onClose={onClose}
 				/>

@@ -3,12 +3,15 @@ import type { Transaction } from "../../domain/model.ts";
 import {
 	claimUpdate,
 	combineDayTime,
-	detailFormValues,
+	detailPostingValues,
+	detailScheduleValues,
 	postingBody,
 	postingUpdate,
-	ruleBody,
-	ruleUpdate,
+	scheduleBody,
+	scheduleUpdate,
 	timeOfDay,
+	validatePostingValues,
+	validateScheduleValues,
 } from "./transactionBodies.ts";
 
 const baselinePosting: Transaction = {
@@ -50,18 +53,15 @@ const baselineSchedule: Transaction = {
 	void: false,
 };
 
-function values(
+function postingValues(
 	overrides: Partial<Parameters<typeof postingUpdate>[0]["values"]> = {},
 ): Parameters<typeof postingUpdate>[0]["values"] {
 	return {
 		name: baselinePosting.name,
 		amount: baselinePosting.amount,
-		annualIncrease: baselinePosting.annualIncrease,
 		fromId: baselinePosting.fromId,
 		toId: baselinePosting.toId,
-		frequency: "once",
 		startDate: baselinePosting.startDate,
-		endDate: baselinePosting.endDate,
 		postedDate: baselinePosting.postedDate,
 		enabled: baselinePosting.enabled,
 		claimScheduleId: null,
@@ -71,18 +71,35 @@ function values(
 	};
 }
 
-describe("transaction patches", () => {
+function scheduleValues(
+	overrides: Partial<Parameters<typeof scheduleUpdate>[0]["values"]> = {},
+): Parameters<typeof scheduleUpdate>[0]["values"] {
+	return {
+		name: baselineSchedule.name,
+		amount: baselineSchedule.amount,
+		annualIncrease: baselineSchedule.annualIncrease,
+		fromId: baselineSchedule.fromId,
+		toId: baselineSchedule.toId,
+		frequency: "monthly",
+		startDate: baselineSchedule.startDate,
+		endDate: baselineSchedule.endDate,
+		enabled: baselineSchedule.enabled,
+		...overrides,
+	};
+}
+
+describe("posting patches", () => {
 	it("states only the edited member on a rename", () => {
 		const patch = postingUpdate({
 			baseline: baselinePosting,
-			values: values({ name: "Home renovation revised" }),
+			values: postingValues({ name: "Home renovation revised" }),
 		});
 		expect(patch).toEqual({ name: "Home renovation revised" });
 	});
 
 	it("returns an empty patch when nothing changed", () => {
 		expect(
-			postingUpdate({ baseline: baselinePosting, values: values() }),
+			postingUpdate({ baseline: baselinePosting, values: postingValues() }),
 		).toEqual({});
 	});
 
@@ -90,32 +107,26 @@ describe("transaction patches", () => {
 		const changed = combineDayTime(baselinePosting.startDate, "11:00");
 		const patch = postingUpdate({
 			baseline: baselinePosting,
-			values: values({ transactionTime: changed }),
+			values: postingValues({ transactionTime: changed }),
 		});
 		expect(patch).toEqual({ time: "11:00" });
 	});
 
 	it("keeps second precision out of the patch when the time is untouched", () => {
-		const draft = {
-			name: baselinePosting.name,
-			amount: "48000",
-			fromId: "checking",
-			toId: "savings",
-			frequency: "once" as const,
-			startDate: baselinePosting.startDate,
-			endDate: "",
-			noEndDate: true,
-			annualIncrease: "0",
-			enabled: true,
-			claimScheduleId: "",
-			claimOccurrenceDate: "",
-			postedDate: baselinePosting.postedDate ?? "",
-			transactionTime: timeOfDay(baselinePosting.transactionTime),
-		};
-		const formValues = detailFormValues({
-			draft,
+		const formValues = detailPostingValues({
+			draft: {
+				name: baselinePosting.name,
+				amount: "48000",
+				fromId: "checking",
+				toId: "savings",
+				startDate: baselinePosting.startDate,
+				postedDate: baselinePosting.postedDate ?? "",
+				enabled: true,
+				claimScheduleId: "",
+				claimOccurrenceDate: "",
+				transactionTime: timeOfDay(baselinePosting.transactionTime),
+			},
 			item: baselinePosting,
-			isOnce: true,
 		});
 		if (formValues instanceof Error) throw formValues;
 		expect(formValues.transactionTime).toBe(baselinePosting.transactionTime);
@@ -127,7 +138,7 @@ describe("transaction patches", () => {
 	it("clears nullable endpoint members explicitly", () => {
 		const cleared = postingUpdate({
 			baseline: baselinePosting,
-			values: values({ fromId: null, toId: null }),
+			values: postingValues({ fromId: null, toId: null }),
 		});
 		expect(cleared).toEqual({ sourceAccountId: null, destinations: null });
 	});
@@ -139,38 +150,39 @@ describe("transaction patches", () => {
 				claimScheduleId: "salary",
 				claimOccurrenceDate: "2026-02-01",
 			},
-			values: values({ claimScheduleId: null, claimOccurrenceDate: null }),
+			values: postingValues({ claimScheduleId: null, claimOccurrenceDate: null }),
 		});
 		expect(patch).toEqual({});
+	});
+
+	it("carries no cadence, growth, or end date", () => {
+		const body = postingBody(postingValues());
+		expect(body).not.toHaveProperty("frequency");
+		expect(body).not.toHaveProperty("endDate");
+		expect(body.amount).toEqual({ value: 48000 });
+		expect(postingUpdate({ baseline: baselinePosting, values: postingValues() }))
+			.not.toHaveProperty("annualIncrease");
+	});
+
+	it("validates the posting fields without asking for recurrence", () => {
+		expect(validatePostingValues(postingValues())).toBeNull();
+		expect(validatePostingValues(postingValues({ name: "  " }))).toBe(
+			"Give the transaction a name.",
+		);
+		expect(
+			validatePostingValues(
+				postingValues({ claimScheduleId: "salary", claimOccurrenceDate: null }),
+			),
+		).toBe("Choose which occurrence this replaces.");
 	});
 });
 
 describe("schedule patches", () => {
-	function scheduleValues(
-		overrides: Partial<Parameters<typeof ruleUpdate>[0]["values"]> = {},
-	): Parameters<typeof ruleUpdate>[0]["values"] {
-		return {
-			name: baselineSchedule.name,
-			amount: baselineSchedule.amount,
-			annualIncrease: baselineSchedule.annualIncrease,
-			fromId: baselineSchedule.fromId,
-			toId: baselineSchedule.toId,
-			frequency: "yearly",
-			startDate: baselineSchedule.startDate,
-			endDate: baselineSchedule.endDate,
-			postedDate: null,
-			enabled: baselineSchedule.enabled,
-			claimScheduleId: null,
-			claimOccurrenceDate: null,
-			...overrides,
-		};
-	}
-
-	it("keeps a stored cadence the editor never offered", () => {
-		const patch = ruleUpdate({
+	it("keeps the stored cadence when the choice does not change", () => {
+		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
 			values: scheduleValues({ name: "Monthly investing revised" }),
-			storedFrequency: "annual",
+			storedFrequency: "monthly",
 		});
 		expect(patch).toEqual({
 			amend: { name: "Monthly investing revised" },
@@ -179,19 +191,19 @@ describe("schedule patches", () => {
 	});
 
 	it("sends only the cadence when the choice changes", () => {
-		const patch = ruleUpdate({
+		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
-			values: scheduleValues({ frequency: "monthly" }),
-			storedFrequency: "annual",
+			values: scheduleValues({ frequency: "annual" }),
+			storedFrequency: "monthly",
 		});
-		expect(patch).toEqual({ amend: {}, reschedule: { frequency: "monthly" } });
+		expect(patch).toEqual({ amend: {}, reschedule: { frequency: "annual" } });
 	});
 
 	it("sends a semantic amount when the value or growth changes", () => {
-		const patch = ruleUpdate({
+		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
 			values: scheduleValues({ amount: 2000, annualIncrease: 3 }),
-			storedFrequency: "annual",
+			storedFrequency: "monthly",
 		});
 		expect(patch).toEqual({
 			amend: { amount: { value: 2000, annualIncrease: 3 } },
@@ -200,47 +212,80 @@ describe("schedule patches", () => {
 	});
 
 	it("clears the end date with an explicit null", () => {
-		const patch = ruleUpdate({
+		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
-			values: scheduleValues({ endDate: null, frequency: "yearly" }),
-			storedFrequency: "annual",
+			values: scheduleValues({ endDate: null }),
+			storedFrequency: "monthly",
 		});
 		expect(patch).toEqual({ amend: {}, reschedule: { endDate: null } });
 	});
 
 	it("omits frequency when the stored cadence is unknown", () => {
-		const patch = ruleUpdate({
+		const patch = scheduleUpdate({
 			baseline: baselineSchedule,
-			values: scheduleValues({ name: "Renamed" }),
+			values: scheduleValues({ name: "Renamed", frequency: "annual" }),
 		});
 		expect(patch).toEqual({ amend: { name: "Renamed" }, reschedule: {} });
+	});
+
+	it("reads growth and an open end date from the in-place draft", () => {
+		const values = detailScheduleValues({
+			draft: {
+				name: "Monthly investing",
+				amount: "1800",
+				fromId: "checking",
+				toId: "brokerage",
+				frequency: "annual",
+				startDate: "2026-10-03",
+				endDate: "",
+				noEndDate: true,
+				annualIncrease: "2.5",
+				enabled: true,
+			},
+		});
+		if (values instanceof Error) throw values;
+		expect(values.frequency).toBe("annual");
+		expect(values.annualIncrease).toBe(2.5);
+		expect(values.endDate).toBeNull();
+	});
+
+	it("validates recurrence fields on a schedule", () => {
+		expect(validateScheduleValues(scheduleValues())).toBeNull();
+		expect(
+			validateScheduleValues(scheduleValues({ annualIncrease: 60 })),
+		).toBe("Enter a yearly increase between -50 and 50 percent.");
+		expect(
+			validateScheduleValues(
+				scheduleValues({ startDate: "2026-10-03", endDate: "2026-09-01" }),
+			),
+		).toBe("The last occurrence cannot come before the first one.");
 	});
 });
 
 describe("create bodies", () => {
 	it("authors a semantic transaction amount and calendar day", () => {
-		const body = postingBody(values());
+		const body = postingBody(postingValues());
 		expect(body.amount).toEqual({ value: 48000 });
 		expect(body.date).toBe("2028-06-15");
 		expect(body.time).toBe("19:40:12");
 	});
+
 	it("authors a semantic schedule amount with yearly growth", () => {
-		const body = ruleBody({
+		const body = scheduleBody({
 			name: "Invest",
 			amount: 900,
 			annualIncrease: 2.5,
 			fromId: "checking",
 			toId: "brokerage",
-			frequency: "yearly",
+			frequency: "annual",
 			startDate: "2026-01-01",
 			endDate: null,
-			postedDate: null,
 			enabled: true,
-			claimScheduleId: null,
-			claimOccurrenceDate: null,
 		});
 		expect(body.amount).toEqual({ value: 900, annualIncrease: 2.5 });
+		expect(body.frequency).toBe("annual");
 	});
+
 	it("states a claim as its own action body", () => {
 		expect(claimUpdate("salary", "2026-02-01")).toEqual({
 			scheduleId: "salary",

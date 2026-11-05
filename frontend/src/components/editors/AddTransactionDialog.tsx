@@ -1,11 +1,7 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
-import {
-	createSchedule,
-	recordTransaction,
-} from "@/api/generated/endpoints.ts";
+import { recordTransaction } from "@/api/generated/endpoints.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { dateLabel, todayIso } from "../../domain/format.ts";
-import { parseUnion } from "../../domain/guards.ts";
 import { useBeforeUnload } from "../../state/useBeforeUnload.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
@@ -23,10 +19,8 @@ import { parseDisplayNumber } from "./formValues.ts";
 import {
 	combineDayTime,
 	postingBody,
-	ruleBody,
-	validateTransactionValues,
-	type FrequencyChoice,
-	type TransactionFormValues,
+	validatePostingValues,
+	type PostingFormValues,
 } from "./transactionBodies.ts";
 import { Checkbox, InputField, SelectField } from "../Field.tsx";
 import { Button } from "../Button.tsx";
@@ -35,8 +29,9 @@ import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 
 /**
- * Create-only transaction form. Existing rows edit through the shared
- * TransactionDetail so there is one implementation of row editing.
+ * Create-only transaction form. A transaction is one fact: it has a date and
+ * never a cadence. Existing rows edit through the shared TransactionDetail;
+ * schedules have their own form.
  */
 export function AddTransactionDialog({
 	onSaved,
@@ -65,14 +60,9 @@ export function AddTransactionDialog({
 	const savedTransactions = useSavedTransactions();
 	const [name, setName] = useState("");
 	const [amount, setAmount] = useState("500");
-	const [amountKind, setAmountKind] = useState<"fixed" | "growth">("fixed");
-	const [annualIncrease, setAnnualIncrease] = useState("3");
-	const [frequency, setFrequency] = useState<FrequencyChoice>("monthly");
 	const [fromId, setFromId] = useState("");
 	const [toId, setToId] = useState("");
 	const [startDate, setStartDate] = useState(fallbackStart);
-	const [noEndDate, setNoEndDate] = useState(true);
-	const [endDate, setEndDate] = useState("");
 	const [enabled, setEnabled] = useState(true);
 	const [claimScheduleId, setClaimRuleId] = useState("");
 	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState("");
@@ -108,20 +98,13 @@ export function AddTransactionDialog({
 	const [transactionTime, setTransactionTime] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const enabledId = useId();
-	const noEndDateId = useId();
 
-	const isOnce = frequency === "once";
 	const dirty =
 		name !== "" ||
 		amount !== "500" ||
-		amountKind !== "fixed" ||
-		annualIncrease !== "3" ||
-		frequency !== "monthly" ||
 		fromId !== "" ||
 		toId !== "" ||
 		startDate !== fallbackStart ||
-		!noEndDate ||
-		endDate !== "" ||
 		!enabled ||
 		claimScheduleId !== "" ||
 		claimOccurrenceDate !== "" ||
@@ -131,53 +114,34 @@ export function AddTransactionDialog({
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		if (saving) return;
-		const trimmedName = name.trim();
 		const parsedAmount = parseDisplayNumber(amount);
 		if (parsedAmount === null) {
 			setError("Enter an amount of zero or more.");
 			return;
 		}
-		const growth =
-			!isOnce && amountKind === "growth"
-				? (parseDisplayNumber(annualIncrease) ?? Number.NaN)
-				: 0;
-		const values: TransactionFormValues = {
-			name: trimmedName,
+		const values: PostingFormValues = {
+			name: name.trim(),
 			amount: parsedAmount,
-			annualIncrease: growth,
 			fromId: fromId || null,
 			toId: toId || null,
-			frequency,
 			startDate,
-			endDate: !isOnce && !noEndDate && endDate ? endDate : null,
 			postedDate: null,
-			transactionTime: isOnce
-				? combineDayTime(startDate, transactionTime)
-				: null,
+			transactionTime: combineDayTime(startDate, transactionTime),
 			enabled,
-			claimScheduleId: isOnce && claimScheduleId ? claimScheduleId : null,
+			claimScheduleId: claimScheduleId || null,
 			claimOccurrenceDate:
-				isOnce && claimScheduleId && claimOccurrenceDate
-					? claimOccurrenceDate
-					: null,
+				claimScheduleId && claimOccurrenceDate ? claimOccurrenceDate : null,
 		};
-		const invalid = validateTransactionValues(values);
+		const invalid = validatePostingValues(values);
 		if (invalid) {
 			setError(invalid);
-			return;
-		}
-		if (!isOnce && amountKind === "growth" && !Number.isFinite(growth)) {
-			setError("Enter a yearly increase between -50 and 50 percent.");
 			return;
 		}
 		setSaving(true);
 		setError(null);
 		const id = crypto.randomUUID();
 		const ok = await performSave({
-			call: () =>
-				values.frequency === "once"
-					? recordTransaction({ ...postingBody(values), id })
-					: createSchedule({ ...ruleBody(values), id }),
+			call: () => recordTransaction({ ...postingBody(values), id }),
 			refresh: refreshTransactions,
 			failureMessage: "The transaction could not be saved.",
 		});
@@ -207,22 +171,8 @@ export function AddTransactionDialog({
 						maxLength={100}
 						value={name}
 						onChange={(event) => setName(event.target.value)}
-						placeholder="e.g. Monthly investing"
+						placeholder="e.g. Annual insurance"
 					/>
-					{!isOnce && (
-						<SelectField
-							label="How is the amount calculated?"
-							value={amountKind}
-							onChange={(event) =>
-								setAmountKind(
-									event.target.value === "growth" ? "growth" : "fixed",
-								)
-							}
-						>
-							<option value="fixed">Fixed amount</option>
-							<option value="growth">Grows yearly by %</option>
-						</SelectField>
-					)}
 					<InputField
 						label="Amount (USD)"
 						type="number"
@@ -233,34 +183,6 @@ export function AddTransactionDialog({
 						value={amount}
 						onChange={(event) => setAmount(event.target.value)}
 					/>
-					{!isOnce && amountKind === "growth" && (
-						<InputField
-							label="Annual amount increase (%)"
-							type="number"
-							required
-							min="-50"
-							max="50"
-							step="0.1"
-							value={annualIncrease}
-							onChange={(event) => setAnnualIncrease(event.target.value)}
-						/>
-					)}
-					<SelectField
-						label="Frequency"
-						value={frequency}
-						onChange={(event) => {
-							const next = parseUnion(event.target.value, [
-								"monthly",
-								"yearly",
-								"once",
-							] as const);
-							if (next) setFrequency(next);
-						}}
-					>
-						<option value="monthly">Monthly</option>
-						<option value="yearly">Yearly</option>
-						<option value="once">One time</option>
-					</SelectField>
 					<SelectField
 						label="From"
 						value={fromId}
@@ -288,76 +210,51 @@ export function AddTransactionDialog({
 						))}
 					</SelectField>
 					<InputField
-						label={isOnce ? "Date" : "First occurrence"}
+						label="Date"
 						type="date"
 						required
 						value={startDate}
 						onChange={(event) => setStartDate(event.target.value)}
 					/>
-					{isOnce ? (
-						<>
-							<InputField
-								label="Time (UTC, optional)"
-								type="time"
-								step="1"
-								hint="Blank means midnight UTC. Every stored time is an exact instant."
-								value={transactionTime}
-								onChange={(event) => setTransactionTime(event.target.value)}
-							/>
-							<SelectField
-								label="Records an occurrence of"
-								value={claimScheduleId}
-								onChange={(event) => setClaimRuleId(event.target.value)}
-							>
-								<option value="">No link — standalone record</option>
-								{claimSchedules.map((rule) => (
-									<option key={rule.id} value={rule.id}>
-										{rule.name}
-									</option>
-								))}
-							</SelectField>
-							<SelectField
-								label="Replaces occurrence on"
-								value={claimOccurrenceDate}
-								onChange={(event) => setClaimOccurrenceDate(event.target.value)}
-								disabled={!claimScheduleId}
-							>
-								<option value="">
-									{!claimScheduleId
-										? "Choose a schedule first"
-										: occurrenceOptions.length === 0
-											? "No claimable occurrences"
-											: "Choose the occurrence"}
-								</option>
-								{occurrenceOptions.map((date) => (
-									<option key={date} value={date}>
-										{dateLabel(date, true)}
-									</option>
-								))}
-							</SelectField>
-						</>
-					) : (
-						<>
-							<InputField
-								label="Last occurrence"
-								type="date"
-								disabled={noEndDate}
-								value={endDate}
-								onChange={(event) => setEndDate(event.target.value)}
-							/>
-							<label
-								htmlFor={noEndDateId}
-								className="flex min-h-11 items-center gap-3 text-sm text-muted"
-							>
-								<Checkbox
-									id={noEndDateId}
-									checked={noEndDate}
-									onChange={(event) => setNoEndDate(event.target.checked)}
-								/>
-								No end date
-							</label>
-						</>
-					)}
+					<InputField
+						label="Time (UTC, optional)"
+						type="time"
+						step="1"
+						hint="Blank means midnight UTC. Every stored time is an exact instant."
+						value={transactionTime}
+						onChange={(event) => setTransactionTime(event.target.value)}
+					/>
+					<SelectField
+						label="Records an occurrence of"
+						value={claimScheduleId}
+						onChange={(event) => setClaimRuleId(event.target.value)}
+					>
+						<option value="">No link — standalone record</option>
+						{claimSchedules.map((rule) => (
+							<option key={rule.id} value={rule.id}>
+								{rule.name}
+							</option>
+						))}
+					</SelectField>
+					<SelectField
+						label="Replaces occurrence on"
+						value={claimOccurrenceDate}
+						onChange={(event) => setClaimOccurrenceDate(event.target.value)}
+						disabled={!claimScheduleId}
+					>
+						<option value="">
+							{!claimScheduleId
+								? "Choose a schedule first"
+								: occurrenceOptions.length === 0
+									? "No claimable occurrences"
+									: "Choose the occurrence"}
+						</option>
+						{occurrenceOptions.map((date) => (
+							<option key={date} value={date}>
+								{dateLabel(date, true)}
+							</option>
+						))}
+					</SelectField>
 					<label
 						htmlFor={enabledId}
 						className="flex min-h-11 items-center gap-3 text-sm text-muted"

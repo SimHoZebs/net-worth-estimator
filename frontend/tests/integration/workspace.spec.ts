@@ -152,7 +152,7 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 	).toBe("600");
 });
 
-test("a transaction converts across once and recurring in one save each way", async ({
+test("a schedule ends by recording one transaction and a transaction can start a schedule", async ({
 	page,
 }) => {
 	await page.goto("/#transactions/invest/edit");
@@ -160,35 +160,53 @@ test("a transaction converts across once and recurring in one save each way", as
 	await expect(editor.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
 	);
-	await editor.getByLabel("Frequency").selectOption("once");
-	await editor.getByRole("button", { name: "Save changes" }).click();
-	await expect(editor).not.toBeVisible();
+	// Ending a schedule records the one transaction that actually happened.
+	await page.getByRole("button", { name: "More options" }).click();
+	await page
+		.getByRole("menuitem", { name: "End schedule with this transaction" })
+		.click();
+	const confirm = page.getByRole("dialog", {
+		name: "End Monthly investing with a transaction?",
+	});
+	await confirm.getByLabel("Transaction date").fill("2026-02-10");
+	await confirm.getByRole("button", { name: "Record transaction" }).click();
+	// The ending flow closes both dialogs once the recording lands.
+	await expect(confirm).not.toBeVisible();
 	const once = await readSavedServerModel();
 	const recorded = once.postings.find(
 		(posting) => posting.name === "Monthly investing",
 	);
 	expect(recorded).toBeDefined();
 	expect(once.schedules.some((rule) => rule.id === "invest")).toBe(false);
+	// A one-time transaction starts a schedule through the subscription
+	// action; the recorded transaction stays a fact and claims the new
+	// schedule's first occurrence.
 	await page.goto(`/#transactions/${recorded!.id}/edit`);
 	const again = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(again.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
 	);
-	await again.getByLabel("Frequency").selectOption("monthly");
-	await again.getByRole("button", { name: "Save changes" }).click();
+	const againMenu = again.getByRole("button", { name: "More options" });
+	await againMenu.click();
+	await page.getByRole("menuitem", { name: "Mark as subscription" }).click();
 	await expect(again).not.toBeVisible();
+	await expect
+		.poll(async () => {
+			const model = await readSavedServerModel();
+			return (
+				model.schedules.find((schedule) => schedule.name === "Monthly investing") ??
+				null
+			);
+		})
+		.not.toBeNull();
 	const recurring = await readSavedServerModel();
 	const started = recurring.schedules.find(
 		(schedule) => schedule.name === "Monthly investing",
 	);
-	expect(started).toBeDefined();
-	// The recorded transaction stays a fact and now claims the first
-	// occurrence of the new schedule.
 	const kept = recurring.postings.find(
 		(posting) => posting.id === recorded!.id,
 	);
-	expect(kept).toBeDefined();
-	expect(kept?.claim?.scheduleId).toBe(started!.id);
+	expect(kept?.claim?.scheduleId).toBe(started?.id);
 	expect(kept?.claim?.occurrenceDate).toBe("2026-02-10");
 });
 

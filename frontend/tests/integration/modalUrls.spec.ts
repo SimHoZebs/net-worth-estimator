@@ -91,6 +91,12 @@ test("editors have URLs and unknown editor ids normalize", async ({ page }) => {
 		"Monthly investing",
 	);
 
+	await page.goto("/#transactions/edit-schedule/new");
+	const scheduleDialog = page.getByRole("dialog", { name: "Add schedule" });
+	await expect(scheduleDialog).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page).toHaveURL(/#transactions$/);
+
 	await page.goto("/#transactions/no-such-transaction/edit");
 	await expect(page).toHaveURL(/#transactions$/);
 	await expect(page.getByRole("dialog")).not.toBeVisible();

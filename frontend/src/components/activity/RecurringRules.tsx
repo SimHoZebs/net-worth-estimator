@@ -5,6 +5,7 @@ import {
 	ChevronDown,
 	ChevronUp,
 	GripVertical,
+	Plus,
 	Repeat,
 } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
@@ -228,8 +229,8 @@ export function RecurringRules({
 			<EmptyState
 				icon={Repeat}
 				title="No recurring transactions for this account yet"
-				action="Add a planned transaction"
-				onAction={() => onEdit({ kind: "transaction", item: null })}
+				action="Add a schedule"
+				onAction={() => onEdit({ kind: "schedule", item: null })}
 			/>
 		);
 
@@ -287,31 +288,42 @@ export function RecurringRules({
 
 	return (
 		<>
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex flex-wrap items-center justify-between gap-4">
 				<p className="p-0 text-xs leading-[1.8] text-muted">
 					Execution order for this account. Same-day transactions apply in this
 					order.
 				</p>
 				{canEdit && (
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						aria-pressed={editing}
-						aria-label={
-							editing
-								? "Finish reordering recurring transactions"
-								: "Reorder recurring transactions"
-						}
-						onClick={() => {
-							// Leaving edit mode settles like a drop: the draft
-							// returns to saved rows instead of lingering.
-							if (editing) setDraft(null);
-							setEditing((previous) => !previous);
-						}}
-					>
-						{editing ? "Done" : "Edit"}
-					</Button>
+					<div className="flex flex-wrap items-center gap-2">
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							onClick={() => onEdit({ kind: "schedule", item: null })}
+						>
+							<Plus size={16} aria-hidden="true" />
+							Add schedule
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							aria-pressed={editing}
+							aria-label={
+								editing
+									? "Finish reordering recurring transactions"
+									: "Reorder recurring transactions"
+							}
+							onClick={() => {
+								// Leaving edit mode settles like a drop: the draft
+								// returns to saved rows instead of lingering.
+								if (editing) setDraft(null);
+								setEditing((previous) => !previous);
+							}}
+						>
+							{editing ? "Done" : "Edit"}
+						</Button>
+					</div>
 				)}
 			</div>
 			{editing ? (

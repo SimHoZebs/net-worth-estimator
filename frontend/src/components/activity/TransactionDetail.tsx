@@ -47,7 +47,7 @@ import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
-import { Checkbox, Input, Select, SelectField } from "../Field.tsx";
+import { Checkbox, Input, InputField, Select, SelectField } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import {
@@ -77,13 +77,13 @@ import {
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
 	claimUpdate,
-	frequencyChoiceOf,
+	detailPostingValues,
+	detailScheduleValues,
 	postingUpdate,
-	ruleUpdate,
+	scheduleUpdate,
 	timeOfDay,
-	detailFormValues,
-	type FrequencyChoice,
 } from "../editors/transactionBodies.ts";
+import type { Frequency } from "@/api/contracts.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
 import { TransactionAnalysisPanel } from "../analysis/TransactionAnalysis.tsx";
 import { TransactionCategory } from "./TransactionCategory.tsx";
@@ -184,9 +184,6 @@ function MoreOptions({
 	occurrenceOptions: string[];
 }) {
 	const id = useId();
-	const frequency = draft.frequency;
-	const onFrequency = (next: FrequencyChoice) =>
-		updateDraft({ frequency: next }, "schedule");
 	const claimSchedules = transactions.filter(
 		(item) => item.kind === "schedule" && item.id !== savedTransaction.id,
 	);
@@ -196,13 +193,14 @@ function MoreOptions({
 	const claimScheduleId = `${id}-claim-rule`;
 	const claimOccurrenceId = `${id}-claim-occurrence`;
 	const rowLabel = "w-36 flex-none text-sm font-semibold text-muted";
+	const schedule = savedTransaction.kind === "schedule";
 	return (
 		<section
 			aria-label="Transaction options"
 			className="mt-4 border-t border-line pt-4"
 		>
 			<div className="flex flex-col">
-				{savedTransaction.kind === "posting" && !savedTransaction.void && (
+				{!schedule && !savedTransaction.void && (
 					<TransactionCategory
 						postingId={savedTransaction.id}
 						category={savedTransaction.category}
@@ -211,53 +209,62 @@ function MoreOptions({
 						labelClassName={rowLabel}
 					/>
 				)}
-				<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-					<label htmlFor={frequencyId} className={rowLabel}>
-						Frequency
-					</label>
-					<Select
-						id={frequencyId}
-						name="frequency"
-						disabled={locked}
-						value={frequency}
-						onChange={(event) => {
-							const next = parseUnion(event.target.value, [
-								"monthly",
-								"yearly",
-								"once",
-							] as const);
-							if (next) onFrequency(next);
-						}}
-						className="min-w-0 flex-1"
-					>
-						<option value="monthly">Monthly</option>
-						<option value="yearly">Yearly</option>
-						<option value="once">One time</option>
-					</Select>
-				</div>
-				{frequency !== "once" && (
-					<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-						<label htmlFor={annualIncreaseId} className={rowLabel}>
-							Annual amount increase (%)
-						</label>
-						<Input
-							id={annualIncreaseId}
-							name="annualIncrease"
-							type="number"
-							required
-							disabled={locked}
-							min="-50"
-							max="50"
-							step="0.1"
-							value={draft.annualIncrease}
-							onChange={(event) =>
-								updateDraft({ annualIncrease: event.target.value }, "schedule")
-							}
-							className="min-w-0 flex-1"
-						/>
-					</div>
+				{schedule && (
+					<>
+						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+							<label htmlFor={frequencyId} className={rowLabel}>
+								Frequency
+							</label>
+							<Select
+								id={frequencyId}
+								name="frequency"
+								disabled={locked}
+								value={draft.frequency ?? "monthly"}
+								onChange={(event) => {
+									const next = parseUnion(event.target.value, [
+										"daily",
+										"weekly",
+										"monthly",
+										"quarterly",
+										"annual",
+									] as const);
+									if (next) updateDraft({ frequency: next }, "schedule");
+								}}
+								className="min-w-0 flex-1"
+							>
+								<option value="daily">Daily</option>
+								<option value="weekly">Weekly</option>
+								<option value="monthly">Monthly</option>
+								<option value="quarterly">Every 3 months</option>
+								<option value="annual">Yearly</option>
+							</Select>
+						</div>
+						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+							<label htmlFor={annualIncreaseId} className={rowLabel}>
+								Annual amount increase (%)
+							</label>
+							<Input
+								id={annualIncreaseId}
+								name="annualIncrease"
+								type="number"
+								required
+								disabled={locked}
+								min="-50"
+								max="50"
+								step="0.1"
+								value={draft.annualIncrease}
+								onChange={(event) =>
+									updateDraft(
+										{ annualIncrease: event.target.value },
+										"schedule",
+									)
+								}
+								className="min-w-0 flex-1"
+							/>
+						</div>
+					</>
 				)}
-				{frequency === "once" && (
+				{!schedule && (
 					<>
 						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
 							<label htmlFor={claimScheduleId} className={rowLabel}>
@@ -324,13 +331,6 @@ function MoreOptions({
 
 /**
  * Schedule stated only for recurring rules: one-time transactions need no
- * label. Defaults stay silent: yearly change of zero, an open end date, and
- * "included" never render. In edit mode the same sentence carries date
- * controls in the same positions; structural settings live under More
- * options so the collapsed edit view matches the read view line for line.
- */
-/**
- * Schedule stated only for recurring rules: one-time transactions need no
  * label. The sentence is always the same elements: frequency text, date
  * controls, and the growth note. Read mode is an attribute flip
  * (readOnly/disabled/armed styling); only the end-date control collapses
@@ -362,9 +362,8 @@ function ScheduleCapsule({
 	occurrenceOptions: string[];
 }) {
 	const id = useId();
-	const frequency = draft.frequency;
 	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
-	if (frequency === "once") {
+	if (savedTransaction.kind === "posting") {
 		if (!draft.claimScheduleId) return null;
 		return (
 			<p className="mt-4 flex items-center gap-2 text-xs leading-[1.6] text-muted">
@@ -430,10 +429,10 @@ function ScheduleCapsule({
 				<Repeat size={16} aria-hidden="true" />
 				<div className="flex min-w-0 flex-col gap-0.5">
 					<strong className="text-sm font-semibold text-ink">
-						Recurring transaction
+						Recurring schedule
 					</strong>
 					<span className="text-xs text-muted">
-						{scheduleCadence ?? frequencyLabel(frequency)}
+						{scheduleCadence ?? "Recurring schedule"}
 						{growth}
 					</span>
 				</div>
@@ -533,7 +532,8 @@ type TransactionDraft = {
 	amount: string;
 	fromId: string;
 	toId: string;
-	frequency: FrequencyChoice;
+	/** Schedule cadence. Null on a one-time transaction. */
+	frequency: Frequency | null;
 	startDate: string;
 	endDate: string;
 	noEndDate: boolean;
@@ -547,7 +547,7 @@ type TransactionDraft = {
 
 function draftFromTransaction(
 	savedTransaction: Transaction,
-	scheduleFrequencyChoice: FrequencyChoice,
+	scheduleFrequency: Frequency,
 ): TransactionDraft {
 	return {
 		name: savedTransaction.name,
@@ -555,7 +555,7 @@ function draftFromTransaction(
 		fromId: savedTransaction.fromId ?? "",
 		toId: savedTransaction.toId ?? "",
 		frequency:
-			savedTransaction.kind === "posting" ? "once" : scheduleFrequencyChoice,
+			savedTransaction.kind === "schedule" ? scheduleFrequency : null,
 		startDate: savedTransaction.startDate,
 		endDate: savedTransaction.endDate ?? "",
 		noEndDate: savedTransaction.endDate == null,
@@ -586,12 +586,12 @@ function useTransactionEdit({
 	savedTransaction,
 	readOnly: readOnlyProp,
 	onClose,
-	scheduleFrequencyChoice,
+	scheduleFrequency,
 }: {
 	savedTransaction: Transaction;
 	readOnly?: boolean;
 	onClose: () => void;
-	scheduleFrequencyChoice: FrequencyChoice;
+	scheduleFrequency: Frequency;
 }) {
 	// Only the clicked value is editable; null renders the pure read view.
 	const [activeField, setActiveField] = useState<EditField | null>(null);
@@ -601,7 +601,7 @@ function useTransactionEdit({
 	const [saving, setSaving] = useState(false);
 	const edit = useEditDraft(
 		savedTransaction.id,
-		draftFromTransaction(savedTransaction, scheduleFrequencyChoice),
+		draftFromTransaction(savedTransaction, scheduleFrequency),
 	);
 	const draft = edit.value;
 	const formId = useId();
@@ -667,134 +667,107 @@ function useTransactionEdit({
 			);
 			return;
 		}
-		const once = draft.frequency === "once";
-		const values = detailFormValues({
-			draft,
-			item: savedTransaction,
-			isOnce: once,
-		});
-		if (values instanceof Error) {
-			setError(values.message);
-			return;
-		}
-		setSaving(true);
-		setError(null);
-		// A transaction and a schedule are different records. Changing the
-		// frequency either starts a schedule from the recorded transaction or
-		// ends the schedule by recording what actually happened.
-		const wasOnce = savedTransaction.kind === "posting";
-		const nowOnce = values.frequency === "once";
-		if (wasOnce !== nowOnce) {
-			const cadence = values.frequency === "yearly" ? "annual" : "monthly";
-			const ok = await performSave({
-				call: () =>
-					nowOnce
-						? endScheduleWithTransaction(savedTransaction.id, {
-								date: values.startDate,
-								...(values.transactionTime
-									? { time: timeOfDay(values.transactionTime) }
-									: {}),
-								...(values.postedDate ? { postedDate: values.postedDate } : {}),
-								amount: { value: values.amount },
-								sourceAccountId: values.fromId,
-								destinations: values.toId ? [values.toId] : null,
-								enabled: values.enabled,
-							})
-						: scheduleFromTransaction(savedTransaction.id, {
-								name: values.name,
-								amount: { value: values.amount },
-								...(values.annualIncrease
-									? { annualIncrease: values.annualIncrease }
-									: {}),
-								frequency: cadence,
-								startDate: values.startDate,
-								...(values.endDate ? { endDate: values.endDate } : {}),
-								sourceAccountId: values.fromId,
-								destinations: values.toId ? [values.toId] : null,
-								enabled: values.enabled,
-							}),
-				refresh: refreshTransactions,
-				failureMessage: "The transaction could not be saved.",
-			});
+		const finish = (ok: boolean, failureMessage: string) => {
 			setSaving(false);
 			// Keep failed form values; return to the underlying view only
 			// after confirmed save.
 			if (ok) onClose();
 			else
 				setError(
-					"The transaction could not be saved. Review the workspace notice and try again.",
+					`${failureMessage} Review the workspace notice and try again.`,
 				);
+		};
+		setSaving(true);
+		setError(null);
+		if (savedTransaction.kind === "schedule") {
+			if (draft.frequency === null) {
+				setSaving(false);
+				setError(
+					"The saved schedule could not be loaded. Close and try again.",
+				);
+				return;
+			}
+			const values = detailScheduleValues({
+				draft: { ...draft, frequency: draft.frequency },
+			});
+			if (values instanceof Error) {
+				setSaving(false);
+				setError(values.message);
+				return;
+			}
+			const storedFrequency = getServerModel()?.model?.schedules.find(
+				(row) => row.id === savedTransaction.id,
+			)?.frequency;
+			if (storedFrequency === undefined) {
+				// A cadence edit needs the stored value to tell an untouched
+				// choice from a changed one; refuse instead of saving a blind
+				// update the server would ignore.
+				setSaving(false);
+				setError(
+					"The saved schedule could not be loaded. Close and try again.",
+				);
+				return;
+			}
+			const schedule = scheduleUpdate({
+				baseline: savedTransaction,
+				values,
+				storedFrequency,
+			});
+			const ok = await performSave({
+				call: async () => {
+					if (Object.keys(schedule.amend).length) {
+						const amended = await amendSchedule(
+							savedTransaction.id,
+							schedule.amend,
+						);
+						if (amended.data.saved === false) return amended;
+					}
+					if (Object.keys(schedule.reschedule).length) {
+						return rescheduleSchedule(
+							savedTransaction.id,
+							schedule.reschedule,
+						);
+					}
+					return { data: { saved: true, issues: [] } };
+				},
+				refresh: refreshTransactions,
+				failureMessage: "The schedule could not be saved.",
+			});
+			finish(ok, "The schedule could not be saved.");
 			return;
 		}
-		// Updates state only the members the edit changed; absent members
-		// keep their stored values on the server. Kind changes use the
-		// dedicated start and end actions above.
-		const storedFrequency = nowOnce
-			? undefined
-			: getServerModel()?.model?.schedules.find(
-					(row) => row.id === savedTransaction.id,
-				)?.frequency;
-		if (!nowOnce && storedFrequency === undefined) {
-			// A cadence edit needs the stored value to tell an untouched
-			// choice from a changed one; refuse instead of saving a blind
-			// update the server would ignore.
+		const values = detailPostingValues({ draft, item: savedTransaction });
+		if (values instanceof Error) {
 			setSaving(false);
-			setError(
-				"The saved transaction could not be loaded. Close and try again.",
-			);
+			setError(values.message);
 			return;
 		}
 		const claimChanged =
 			(values.claimScheduleId ?? null) !== savedTransaction.claimScheduleId ||
 			(values.claimOccurrenceDate ?? null) !==
 				savedTransaction.claimOccurrenceDate;
-		const schedule = ruleUpdate({
-			baseline: savedTransaction,
-			values,
-			storedFrequency,
-		});
 		const ok = await performSave({
 			call: async () => {
-				if (nowOnce) {
-					const patch = postingUpdate({ baseline: savedTransaction, values });
-					if (Object.keys(patch).length) {
-						const amended = await amendTransaction(savedTransaction.id, patch);
-						if (amended.data.saved === false) return amended;
-					}
-					if (claimChanged) {
-						if (values.claimScheduleId && values.claimOccurrenceDate) {
-							return claimOccurrence(
-								savedTransaction.id,
-								claimUpdate(values.claimScheduleId, values.claimOccurrenceDate),
-							);
-						}
-						return releaseOccurrence(savedTransaction.id);
-					}
-					return { data: { saved: true, issues: [] } };
-				}
-				if (Object.keys(schedule.amend).length) {
-					const amended = await amendSchedule(
-						savedTransaction.id,
-						schedule.amend,
-					);
+				const patch = postingUpdate({ baseline: savedTransaction, values });
+				if (Object.keys(patch).length) {
+					const amended = await amendTransaction(savedTransaction.id, patch);
 					if (amended.data.saved === false) return amended;
 				}
-				if (Object.keys(schedule.reschedule).length) {
-					return rescheduleSchedule(savedTransaction.id, schedule.reschedule);
+				if (claimChanged) {
+					if (values.claimScheduleId && values.claimOccurrenceDate) {
+						return claimOccurrence(
+							savedTransaction.id,
+							claimUpdate(values.claimScheduleId, values.claimOccurrenceDate),
+						);
+					}
+					return releaseOccurrence(savedTransaction.id);
 				}
 				return { data: { saved: true, issues: [] } };
 			},
 			refresh: refreshTransactions,
 			failureMessage: "The transaction could not be saved.",
 		});
-		setSaving(false);
-		// Keep failed form values; return to the underlying view only after
-		// confirmed save.
-		if (ok) onClose();
-		else
-			setError(
-				"The transaction could not be saved. Review the workspace notice and try again.",
-			);
+		finish(ok, "The transaction could not be saved.");
 	};
 	// The submitter only mounts once an edit starts, so no in-flight
 	// activation can ever land on it: read mode renders no actions at all.
@@ -982,8 +955,8 @@ export function TransactionDetail({
 			? ("transfer" as const)
 			: transaction.direction;
 	// Cadence of the schedule this row displays, read from the schedules
-	// endpoint. Display-only; the editor keeps its own
-	// monthly/yearly choice.
+	// endpoint. The editor follows the stored cadence; only a schedule
+	// carries one.
 	const savedRules = useSavedSchedules();
 	const serverModel = useServerModel({ enabled: false });
 	const modelRevision = serverModel.data?.revision;
@@ -995,18 +968,28 @@ export function TransactionDetail({
 	const scheduleCadence = rawSchedule
 		? frequencyLabel(rawSchedule.frequency)
 		: null;
-	const scheduleFrequencyChoice: FrequencyChoice =
-		rawSchedule === undefined
-			? "monthly"
-			: frequencyChoiceOf(rawSchedule.frequency);
+	const scheduleFrequency: Frequency =
+		parseUnion(rawSchedule?.frequency, [
+			"daily",
+			"weekly",
+			"monthly",
+			"quarterly",
+			"annual",
+		] as const) ?? "monthly";
 	const edit = useTransactionEdit({
 		savedTransaction,
 		readOnly,
 		onClose,
-		scheduleFrequencyChoice,
+		scheduleFrequency,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [confirmingVoidRemove, setConfirmingVoidRemove] = useState(false);
+	const [confirmingEndSchedule, setConfirmingEndSchedule] = useState(false);
+	const [endingSchedule, setEndingSchedule] = useState(false);
+	const [endScheduleDate, setEndScheduleDate] = useState(
+		savedTransaction.startDate,
+	);
+	const [endScheduleError, setEndScheduleError] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const once = savedTransaction.kind === "posting";
@@ -1136,7 +1119,35 @@ export function TransactionDetail({
 		else setDeleteError(failureMessage);
 	};
 	const removeTransaction = () =>
-		finishRemoval(refreshTransactions, "The transaction could not be removed.");
+		finishRemoval(
+			refreshTransactions,
+			savedTransaction.kind === "schedule"
+				? "The schedule could not be removed."
+				: "The transaction could not be removed.",
+		);
+	// Ending a schedule records one real transaction and removes the
+	// schedule. The server copies the schedule's amount and accounts; only
+	// the day it actually happened is new input.
+	const endSchedule = async () => {
+		if (endingSchedule) return;
+		if (!endScheduleDate) {
+			setEndScheduleError("Choose the transaction date.");
+			return;
+		}
+		setEndingSchedule(true);
+		setEndScheduleError(null);
+		const ok = await performSave({
+			call: () =>
+				endScheduleWithTransaction(savedTransaction.id, {
+					date: endScheduleDate,
+				}),
+			refresh: refreshTransactions,
+			failureMessage: "The schedule could not be ended.",
+		});
+		setEndingSchedule(false);
+		if (ok) onClose();
+		else setEndScheduleError("The schedule could not be ended.");
+	};
 	// A vanished hold is inert unless an evaluation names it or it supplies
 	// the projection start date. In the common case, drop the row from the
 	// narrow lists and leave the projection model untouched. A failed delete
@@ -1269,8 +1280,8 @@ export function TransactionDetail({
 			/>
 			{savedTransaction.kind === "schedule" && (
 				<span
-					title="Recurring transaction"
-					aria-label="Recurring transaction"
+					title="Schedule"
+					aria-label="Schedule"
 					role="img"
 					className="inline-flex size-9 flex-none items-center justify-center rounded-surface bg-surface-2 text-muted"
 				>
@@ -1301,10 +1312,24 @@ export function TransactionDetail({
 			onSelect: () => void subscription.mark(),
 		});
 	}
+	if (canEdit && savedTransaction.kind === "schedule") {
+		menuItems.push({
+			id: "end-schedule",
+			label: "End schedule with this transaction",
+			icon: Check,
+			onSelect: () => {
+				setEndScheduleError(null);
+				setConfirmingEndSchedule(true);
+			},
+		});
+	}
 	if (canDelete) {
 		menuItems.push({
 			id: "delete",
-			label: "Delete transaction",
+			label:
+				savedTransaction.kind === "schedule"
+					? "Delete schedule"
+					: "Delete transaction",
 			icon: Trash2,
 			tone: "danger",
 			restoreFocus: false,
@@ -1326,7 +1351,11 @@ export function TransactionDetail({
 					<>
 						<ActionMenu
 							label="More options"
-							menuLabel="Transaction actions"
+							menuLabel={
+								savedTransaction.kind === "schedule"
+									? "Schedule actions"
+									: "Transaction actions"
+							}
 							items={menuItems}
 						/>
 						{edit.actions}
@@ -1766,16 +1795,59 @@ export function TransactionDetail({
 						}
 					}}
 					onConfirm={() => void removeTransaction()}
-					cancelLabel="Keep transaction"
-					confirmLabel="Delete transaction"
+					cancelLabel={
+						savedTransaction.kind === "schedule"
+							? "Keep schedule"
+							: "Keep transaction"
+					}
+					confirmLabel={
+						savedTransaction.kind === "schedule"
+							? "Delete schedule"
+							: "Delete transaction"
+					}
 					busyLabel="Deleting…"
 					busy={deleting}
 					error={deleteError}
 				>
 					<p>
-						This deletes the transaction immediately. It is removed from the
-						saved model.
+						{savedTransaction.kind === "schedule"
+							? "This deletes the schedule immediately. Its recorded transactions stay."
+							: "This deletes the transaction immediately. It is removed from the saved model."}
 					</p>
+				</ConfirmDialog>
+			)}
+			{confirmingEndSchedule && (
+				<ConfirmDialog
+					title={`End ${savedTransaction.name} with a transaction?`}
+					eyebrow="Changes"
+					onCancel={() => {
+						if (!endingSchedule) {
+							setConfirmingEndSchedule(false);
+							setEndScheduleError(null);
+						}
+					}}
+					onConfirm={() => void endSchedule()}
+					cancelLabel="Keep schedule"
+					confirmLabel="Record transaction"
+					confirmVariant="primary"
+					busyLabel="Recording…"
+					busy={endingSchedule}
+					error={endScheduleError}
+				>
+					<p>
+						This records one transaction with the schedule amount and accounts.
+						The schedule ends and no further occurrences are planned.
+					</p>
+					<InputField
+						label="Transaction date"
+						containerClassName="mt-3"
+						type="date"
+						name="endScheduleDate"
+						required
+						disabled={endingSchedule}
+						value={endScheduleDate}
+						onChange={(event) => setEndScheduleDate(event.target.value)}
+					/>
 				</ConfirmDialog>
 			)}
 			{confirmingVoidRemove && (

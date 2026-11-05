@@ -4,31 +4,64 @@ import type { ScheduleRescheduleBody } from "@/api/generated/model/scheduleResch
 import type { TransactionAmendBody } from "@/api/generated/model/transactionAmendBody.ts";
 import type { TransactionClaimBody } from "@/api/generated/model/transactionClaimBody.ts";
 import type { TransactionRecordBody } from "@/api/generated/model/transactionRecordBody.ts";
+import type { Frequency } from "../../api/contracts.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 
 /**
- * Editor vocabulary for the recurrence choice on a form. A one-time row, or
- * the monthly/yearly cadence the editor offers. Stored schedules may carry
- * any cadence; edits that leave the choice untouched keep the raw stored
- * value.
+ * A transaction is one fact. Its form carries the day it happened and never a
+ * cadence. Growth and end dates belong to schedules.
  */
-export type FrequencyChoice = "monthly" | "yearly" | "once";
-
-export interface TransactionFormValues {
+export interface PostingFormValues {
 	name: string;
 	amount: number;
-	annualIncrease: number;
 	fromId: string | null;
 	toId: string | null;
-	frequency: FrequencyChoice;
 	startDate: string;
-	endDate: string | null;
 	postedDate: string | null;
 	enabled: boolean;
 	claimScheduleId: string | null;
 	claimOccurrenceDate: string | null;
 	transactionTime?: number | null;
+}
+
+/** A schedule owns recurrence: cadence, growth, and the end date. */
+export interface ScheduleFormValues {
+	name: string;
+	amount: number;
+	annualIncrease: number;
+	fromId: string | null;
+	toId: string | null;
+	frequency: Frequency;
+	startDate: string;
+	endDate: string | null;
+	enabled: boolean;
+}
+
+export interface PostingDraftValues {
+	name: string;
+	amount: string;
+	fromId: string;
+	toId: string;
+	startDate: string;
+	postedDate: string;
+	transactionTime?: string;
+	enabled: boolean;
+	claimScheduleId: string;
+	claimOccurrenceDate: string;
+}
+
+export interface ScheduleDraftValues {
+	name: string;
+	amount: string;
+	fromId: string;
+	toId: string;
+	frequency: Frequency;
+	startDate: string;
+	endDate: string;
+	noEndDate: boolean;
+	annualIncrease: string;
+	enabled: boolean;
 }
 
 export function midnightOfDay(day: string): number {
@@ -60,7 +93,7 @@ function authoredAmount(amount: number, annualIncrease: number) {
  * outright; lifecycle state belongs to the server.
  */
 export function postingBody(
-	values: TransactionFormValues,
+	values: PostingFormValues,
 ): TransactionRecordBody {
 	return {
 		name: values.name,
@@ -84,21 +117,19 @@ export function postingBody(
 	};
 }
 
-/** Editor choice matching a stored schedule cadence: annual reads as yearly. */
-export function frequencyChoiceOf(rawFrequency: string): FrequencyChoice {
-	return rawFrequency === "annual" ? "yearly" : "monthly";
-}
-
 /**
- * Explicit new schedule body for creates. Priority and caps stay omitted so
- * the server appends and defaults them.
+ * Explicit new schedule body for creates. Frequency is stated here because a
+ * schedule owns recurrence. Priority and caps stay omitted so the server
+ * appends and defaults them.
  */
-export function ruleBody(values: TransactionFormValues): ScheduleCreateBody {
+export function scheduleBody(
+	values: ScheduleFormValues,
+): ScheduleCreateBody {
 	return {
 		name: values.name,
 		amount: authoredAmount(values.amount, values.annualIncrease),
 		enabled: values.enabled,
-		frequency: values.frequency === "yearly" ? "annual" : "monthly",
+		frequency: values.frequency,
 		startDate: values.startDate,
 		...(values.endDate ? { endDate: values.endDate } : {}),
 		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
@@ -116,7 +147,7 @@ export function postingUpdate({
 	values,
 }: {
 	baseline: Transaction;
-	values: TransactionFormValues;
+	values: PostingFormValues;
 }): TransactionAmendBody {
 	const patch: TransactionAmendBody = {};
 	if (values.name !== baseline.name) patch.name = values.name;
@@ -145,14 +176,14 @@ export function postingUpdate({
  * display row never carries it; without it the reschedule leg is omitted and
  * the server keeps the stored cadence.
  */
-export function ruleUpdate({
+export function scheduleUpdate({
 	baseline,
 	values,
 	storedFrequency,
 }: {
 	baseline: Transaction;
-	values: TransactionFormValues;
-	storedFrequency?: string;
+	values: ScheduleFormValues;
+	storedFrequency?: Frequency;
 }): { amend: ScheduleAmendBody; reschedule: ScheduleRescheduleBody } {
 	const amend: ScheduleAmendBody = {};
 	const reschedule: ScheduleRescheduleBody = {};
@@ -167,11 +198,8 @@ export function ruleUpdate({
 	if (values.toId !== baseline.toId)
 		amend.destinations = values.toId ? [values.toId] : null;
 	if (values.enabled !== baseline.enabled) amend.enabled = values.enabled;
-	if (
-		storedFrequency !== undefined &&
-		values.frequency !== frequencyChoiceOf(storedFrequency)
-	)
-		reschedule.frequency = values.frequency === "yearly" ? "annual" : "monthly";
+	if (storedFrequency !== undefined && values.frequency !== storedFrequency)
+		reschedule.frequency = values.frequency;
 	if (values.startDate !== baseline.startDate)
 		reschedule.startDate = values.startDate;
 	if ((values.endDate ?? null) !== baseline.endDate)
@@ -187,9 +215,9 @@ export function claimUpdate(
 	return { scheduleId, occurrenceDate };
 }
 
-/** Shared client-side validation for row transaction forms. */
-export function validateTransactionValues(
-	values: TransactionFormValues,
+/** Shared client-side validation for one-time transaction forms. */
+export function validatePostingValues(
+	values: PostingFormValues,
 ): string | null {
 	if (!values.name.trim()) return "Give the transaction a name.";
 	if (
@@ -203,18 +231,28 @@ export function validateTransactionValues(
 	if (!values.startDate) return "Choose a date.";
 	if (values.claimScheduleId && !values.claimOccurrenceDate)
 		return "Choose which occurrence this replaces.";
+	return null;
+}
+
+/** Shared client-side validation for schedule forms. */
+export function validateScheduleValues(
+	values: ScheduleFormValues,
+): string | null {
+	if (!values.name.trim()) return "Give the schedule a name.";
 	if (
-		values.frequency !== "once" &&
-		values.endDate &&
-		values.endDate < values.startDate
+		!Number.isFinite(values.amount) ||
+		values.amount < 0 ||
+		values.amount > 1e10
 	)
+		return "Enter an amount of zero or more.";
+	if (!values.fromId && !values.toId)
+		return "Choose a source or destination account.";
+	if (!values.startDate) return "Choose a date.";
+	if (values.endDate && values.endDate < values.startDate)
 		return "The last occurrence cannot come before the first one.";
-	if (
-		values.frequency !== "once" &&
-		(!Number.isFinite(values.annualIncrease) ||
-			values.annualIncrease < -50 ||
-			values.annualIncrease > 50)
-	)
+	if (!Number.isFinite(values.annualIncrease))
+		return "Enter a yearly increase between -50 and 50 percent.";
+	if (values.annualIncrease < -50 || values.annualIncrease > 50)
 		return "Enter a yearly increase between -50 and 50 percent.";
 	return null;
 }
@@ -223,31 +261,14 @@ export function parseAmountInput(raw: string): number | null {
 	return parseDisplayNumber(raw);
 }
 
-/** Form values from the in-place detail draft. */
-export function detailFormValues({
+/** Form values from the in-place one-time transaction draft. */
+export function detailPostingValues({
 	draft,
 	item,
-	isOnce,
 }: {
-	draft: {
-		name: string;
-		amount: string;
-		fromId: string;
-		toId: string;
-		frequency: FrequencyChoice;
-		startDate: string;
-		endDate: string;
-		noEndDate: boolean;
-		annualIncrease: string;
-		enabled: boolean;
-		claimScheduleId: string;
-		claimOccurrenceDate: string;
-		postedDate: string;
-		transactionTime?: string;
-	};
+	draft: PostingDraftValues;
 	item: Transaction;
-	isOnce: boolean;
-}): TransactionFormValues | Error {
+}): PostingFormValues | Error {
 	const name = draft.name.trim();
 	const amount = parseDisplayNumber(draft.amount);
 	if (name === "") return new Error("Give the transaction a name.");
@@ -258,45 +279,64 @@ export function detailFormValues({
 	if (!fromId && !toId)
 		return new Error("Choose a source or destination account.");
 	if (!draft.startDate) return new Error("Choose a date.");
-	const growth =
-		!isOnce && draft.annualIncrease.trim() !== ""
-			? (parseDisplayNumber(draft.annualIncrease) ?? Number.NaN)
-			: 0;
-	if (!isOnce && (!Number.isFinite(growth) || growth < -50 || growth > 50))
-		return new Error("Enter a yearly increase between -50 and 50 percent.");
-	if (
-		!isOnce &&
-		!draft.noEndDate &&
-		draft.endDate &&
-		draft.endDate < draft.startDate
-	)
-		return new Error("The last occurrence cannot come before the first one.");
-	if (isOnce && draft.claimScheduleId && !draft.claimOccurrenceDate)
+	if (draft.claimScheduleId && !draft.claimOccurrenceDate)
 		return new Error("Choose which occurrence this replaces.");
 	return {
 		name,
 		amount,
-		annualIncrease: isOnce ? 0 : growth,
 		fromId,
 		toId,
-		frequency: draft.frequency,
 		startDate: draft.startDate,
-		endDate:
-			!isOnce && !draft.noEndDate && draft.endDate ? draft.endDate : null,
 		postedDate: draft.postedDate || item.postedDate,
 		transactionTime:
-			isOnce && draft.transactionTime !== undefined
+			draft.transactionTime !== undefined
 				? draft.startDate === item.startDate &&
 					draft.transactionTime === timeOfDay(item.transactionTime)
 					? (item.transactionTime ?? null)
 					: combineDayTime(draft.startDate, draft.transactionTime)
 				: undefined,
 		enabled: draft.enabled,
-		claimScheduleId:
-			isOnce && draft.claimScheduleId ? draft.claimScheduleId : null,
+		claimScheduleId: draft.claimScheduleId || null,
 		claimOccurrenceDate:
-			isOnce && draft.claimScheduleId && draft.claimOccurrenceDate
+			draft.claimScheduleId && draft.claimOccurrenceDate
 				? draft.claimOccurrenceDate
 				: null,
+	};
+}
+
+/** Form values from the in-place schedule draft. */
+export function detailScheduleValues({
+	draft,
+}: {
+	draft: ScheduleDraftValues;
+}): ScheduleFormValues | Error {
+	const name = draft.name.trim();
+	const amount = parseDisplayNumber(draft.amount);
+	if (name === "") return new Error("Give the schedule a name.");
+	if (amount === null || amount < 0 || amount > 1e10)
+		return new Error("Enter an amount of zero or more.");
+	const fromId = draft.fromId || null;
+	const toId = draft.toId || null;
+	if (!fromId && !toId)
+		return new Error("Choose a source or destination account.");
+	if (!draft.startDate) return new Error("Choose a date.");
+	const growth =
+		draft.annualIncrease.trim() !== ""
+			? (parseDisplayNumber(draft.annualIncrease) ?? Number.NaN)
+			: 0;
+	if (!Number.isFinite(growth) || growth < -50 || growth > 50)
+		return new Error("Enter a yearly increase between -50 and 50 percent.");
+	if (!draft.noEndDate && draft.endDate && draft.endDate < draft.startDate)
+		return new Error("The last occurrence cannot come before the first one.");
+	return {
+		name,
+		amount,
+		annualIncrease: growth,
+		fromId,
+		toId,
+		frequency: draft.frequency,
+		startDate: draft.startDate,
+		endDate: !draft.noEndDate && draft.endDate ? draft.endDate : null,
+		enabled: draft.enabled,
 	};
 }

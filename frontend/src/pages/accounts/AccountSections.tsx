@@ -324,15 +324,27 @@ function TransactionsView({
 				/>
 				<div className="flex shrink-0 flex-wrap items-center gap-3">
 					<TransactionSortButton order={order} onChange={changeOrder} />
-					<Button
-						type="button"
-						variant="primary"
-						size="sm"
-						onClick={() => onEdit({ kind: "transaction", item: null })}
-					>
-						<Plus size={16} />
-						Add transaction
-					</Button>
+					{schedule === "recurring" ? (
+						<Button
+							type="button"
+							variant="primary"
+							size="sm"
+							onClick={() => onEdit({ kind: "schedule", item: null })}
+						>
+							<Plus size={16} />
+							Add schedule
+						</Button>
+					) : (
+						<Button
+							type="button"
+							variant="primary"
+							size="sm"
+							onClick={() => onEdit({ kind: "transaction", item: null })}
+						>
+							<Plus size={16} />
+							Add transaction
+						</Button>
+					)}
 				</div>
 			</div>
 			<div id={listId}>

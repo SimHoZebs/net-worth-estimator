@@ -22,6 +22,7 @@ export type OverlayRoute =
 	| { type: "account"; key: string }
 	| { type: "accountEdit"; key: string }
 	| { type: "transactionEdit"; key: string }
+	| { type: "scheduleEdit"; key: string }
 	| { type: "evaluationEdit"; key: string }
 	| { type: "group"; key: string }
 	| { type: "position" }
@@ -78,6 +79,7 @@ const RESERVED_SLUGS = new Set([
 	"evaluations",
 	"edit-account",
 	"edit-transaction",
+	"edit-schedule",
 	"edit-evaluation",
 ]);
 
@@ -214,6 +216,8 @@ function parseOverlaySegments(rest: string[], page: Page): OverlayRoute | null {
 			return { type: "accountEdit", key: second ?? "" };
 		case "edit-transaction":
 			return { type: "transactionEdit", key: second ?? "" };
+		case "edit-schedule":
+			return { type: "scheduleEdit", key: second ?? "" };
 		case "edit-evaluation":
 			return { type: "evaluationEdit", key: second ?? "" };
 		case "account":
@@ -315,6 +319,14 @@ export function resolveOverlayRoute(
 						target: { kind: "transaction", item: transaction },
 					})
 				: unknown();
+		}
+		case "scheduleEdit": {
+			if (overlay.key === "new")
+				return ready({
+					kind: "editor",
+					target: { kind: "schedule", item: null },
+				});
+			return unknown();
 		}
 		case "evaluationEdit": {
 			if (overlay.key === "new")
@@ -418,6 +430,8 @@ export function editorHash(page: Page, target: EditorTarget): string {
 			return page === "transactions"
 				? `#${page}/${encode(target.item.id)}/edit`
 				: `#${page}/edit-transaction/${encode(target.item.id)}`;
+		case "schedule":
+			return `#${page}/edit-schedule/new`;
 		case "evaluation":
 			if (!target.item)
 				return page === "evaluations"

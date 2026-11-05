@@ -1282,7 +1282,7 @@ it("keeps category edits enabled on a pending bank row", () => {
 	).toBe(false);
 });
 
-it("offers frequency conversion and keeps growth on recurrence rules", () => {
+it("keeps one-time transactions free of recurrence controls", () => {
 	const posting = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
@@ -1295,18 +1295,17 @@ it("offers frequency conversion and keeps growth on recurrence rules", () => {
 			onClose={() => {}}
 		/>,
 	);
-	// A posting can become a rule through Frequency. Growth applies only
-	// once the draft is recurring; the claim controls stay on one-time rows.
-	expect(screen.getByLabelText("Frequency")).toBeTruthy();
+	// A transaction happens once. Frequency, growth, and end dates belong to
+	// schedules, so a posting offers only its occurrence claim.
+	expect(screen.queryByLabelText("Frequency")).toBeNull();
 	expect(screen.queryByLabelText("Annual amount increase (%)")).toBeNull();
 	expect(screen.getByLabelText("Records an occurrence of")).toBeTruthy();
-	fireEvent.change(screen.getByLabelText("Frequency"), {
-		target: { value: "monthly" },
-	});
-	expect(screen.getByLabelText("Annual amount increase (%)")).toBeTruthy();
-	expect(screen.queryByLabelText("Records an occurrence of")).toBeNull();
-	expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
-	cleanup();
+});
+
+it("keeps cadence and growth on schedules", () => {
+	const posting = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
 	const rule = {
 		...posting,
 		id: "renovation-rule",
@@ -1324,4 +1323,55 @@ it("offers frequency conversion and keeps growth on recurrence rules", () => {
 	expect(screen.getByLabelText("Frequency")).toBeTruthy();
 	expect(screen.getByLabelText("Annual amount increase (%)")).toBeTruthy();
 	expect(screen.queryByLabelText("Records an occurrence of")).toBeNull();
+});
+
+it("ends a schedule by recording one transaction", async () => {
+	const server = stubTestServer();
+	setServerModelFixture(financialModelFixture);
+	const posting = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const rule = {
+		...posting,
+		id: "01900000-0000-7000-8000-0000000000aa",
+		name: "Monthly investing",
+		kind: "schedule" as const,
+		startDate: "2026-10-03",
+		endDate: null,
+		readOnly: false,
+	};
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(rule)}
+			savedTransaction={rule}
+			accounts={financialModelFixture.accounts}
+			transactions={[rule]}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "More options" }));
+	fireEvent.click(
+		screen.getByRole("menuitem", { name: "End schedule with this transaction" }),
+	);
+	const confirm = screen.getByRole("dialog", {
+		name: "End Monthly investing with a transaction?",
+	});
+	fireEvent.change(within(confirm).getByLabelText("Transaction date"), {
+		target: { value: "2026-11-05" },
+	});
+	fireEvent.click(
+		within(confirm).getByRole("button", { name: "Record transaction" }),
+	);
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "POST" &&
+					call.url ===
+						"/v1/schedules/01900000-0000-7000-8000-0000000000aa/end-with-transaction",
+			),
+		).toBe(true),
+	);
+	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 });

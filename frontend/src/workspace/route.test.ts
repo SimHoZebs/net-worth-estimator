@@ -167,6 +167,14 @@ describe("parseHash", () => {
 			page: "outlook",
 			overlay: { type: "evaluationEdit", key: "goal-1" },
 		});
+		expect(parseHash("#transactions/edit-schedule/new")).toEqual({
+			page: "transactions",
+			overlay: { type: "scheduleEdit", key: "new" },
+		});
+		expect(parseHash("#accounts/edit-schedule/new")).toEqual({
+			page: "accounts",
+			overlay: { type: "scheduleEdit", key: "new" },
+		});
 	});
 
 	test("outlook evidence and safe spending detail parse", () => {
@@ -391,7 +399,23 @@ describe("resolveOverlayRoute", () => {
 		expect(
 			resolveOverlayRoute(
 				{
-					page: "evaluations",
+					page: "transactions",
+					overlay: { type: "scheduleEdit", key: "new" },
+				},
+				{ accounts: [], transactions: [], evaluations: [] },
+			),
+		).toEqual({
+			state: "ready",
+			overlay: {
+				kind: "editor",
+				target: { kind: "schedule", item: null },
+			},
+		});
+
+		expect(
+			resolveOverlayRoute(
+				{
+					page: "transactions",
 					overlay: { type: "evaluationEdit", key: "new" },
 				},
 				model,
@@ -403,6 +427,18 @@ describe("resolveOverlayRoute", () => {
 				target: { kind: "evaluation", item: null },
 			},
 		});
+	});
+
+	test("unknown schedule ids do not resolve", () => {
+		expect(
+			resolveOverlayRoute(
+				{
+					page: "transactions",
+					overlay: { type: "scheduleEdit", key: "invest" },
+				},
+				model,
+			),
+		).toEqual({ state: "unknown" });
 	});
 
 	test("outlook single segments resolve account evidence", () => {
@@ -512,6 +548,15 @@ describe("hash builders round-trip through the parser", () => {
 		expect(
 			editorHash("transactions", { kind: "transaction", item: null }),
 		).toBe("#transactions/new");
+		expect(editorHash("accounts", { kind: "schedule", item: null })).toBe(
+			"#accounts/edit-schedule/new",
+		);
+		expect(
+			parseHash(editorHash("transactions", { kind: "schedule", item: null })),
+		).toEqual({
+			page: "transactions",
+			overlay: { type: "scheduleEdit", key: "new" },
+		});
 		expect(editorHash("accounts", { kind: "account", item: null })).toBe(
 			"#accounts/new",
 		);
