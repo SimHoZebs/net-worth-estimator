@@ -51,7 +51,7 @@ export function modelFixture(): FinancialModel {
 			postingFulfillment: [],
 		},
 		postings: [],
-		recurrenceRules: [
+		schedules: [
 			{
 				id: "salary",
 				name: "Salary",
@@ -213,7 +213,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		const query = new URLSearchParams(queryString ?? "");
 		const narrowRevision = revisionValue;
 		const settleRoute = route?.match(
-			/^\/v1\/postings\/([^/]+)\/settle-candidates$/,
+			/^\/v1\/transactions\/([^/]+)\/settle-candidates$/,
 		);
 		if (settleRoute && method === "GET") {
 			const postingId = settleRoute[1]!;
@@ -317,23 +317,23 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 			}
 			return ok({ transactions, revision: narrowRevision });
 		}
-		if (route === "/v1/recurrence-rules" && method === "GET") {
+		if (route === "/v1/schedules" && method === "GET") {
 			const accountId = query.get("accountId") ?? "";
 			const touches = (source: unknown, destinations: unknown) => {
 				if (!accountId) return true;
 				if (source === accountId) return true;
 				return Array.isArray(destinations) && destinations.includes(accountId);
 			};
-			const recurrenceRules = (
-				current.recurrenceRules as unknown as Record<string, unknown>[]
+			const schedules = (
+				current.schedules as unknown as Record<string, unknown>[]
 			).filter((rule) => touches(rule.sourceAccountId, rule.destinations));
-			return ok({ recurrenceRules, revision: narrowRevision });
+			return ok({ schedules, revision: narrowRevision });
 		}
 		if (route === "/v1/transactions/catalog" && method === "GET") {
 			const items = [
-				...(
-					current.recurrenceRules as unknown as Record<string, unknown>[]
-				).map((rule) => ({ id: rule.id, kind: "rule", name: rule.name })),
+				...(current.schedules as unknown as Record<string, unknown>[]).map(
+					(rule) => ({ id: rule.id, kind: "schedule", name: rule.name }),
+				),
 				...(current.postings as unknown as Record<string, unknown>[]).map(
 					(posting) => ({
 						id: posting.id,
@@ -451,12 +451,36 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 					(body as { beforeId: string | null }).beforeId ?? null,
 				);
 			}, undefined);
-		if (path === "/v1/postings" && method === "POST")
+		if (path === "/v1/transactions" && method === "POST")
 			return write(() => {
-				(current.postings as unknown[]).push(structuredClone(body));
+				const row = structuredClone(body) as Record<string, unknown>;
+				const time =
+					typeof row.time === "string" && row.time ? row.time : "00:00:00";
+				const clock = time.length === 5 ? `${time}:00` : time;
+				const stamp = Math.floor(
+					new Date(`${String(row.date)}T${clock}Z`).getTime() / 1000,
+				);
+				row.transactionTime = stamp;
+				row.postedTime = Math.floor(
+					new Date(
+						`${String(row.postedDate ?? row.date)}T00:00:00Z`,
+					).getTime() / 1000,
+				);
+				(current.postings as unknown[]).push(row);
 			}, body);
-		const categoryMatch = path.match(/^\/v1\/postings\/([^/]+)\/category$/);
-		if (categoryMatch && method === "PATCH") {
+		if (path === "/v1/model/import" && method === "POST") {
+			const document = structuredClone(
+				(body as { model: FinancialModel }).model,
+			);
+			return write(() => {
+				for (const key of Object.keys(current)) delete current[key];
+				Object.assign(current, document);
+			}, document);
+		}
+		const categoryMatch = path.match(
+			/^\/v1\/transactions\/([^/]+)\/categorize$/,
+		);
+		if (categoryMatch && method === "POST") {
 			const [, id] = categoryMatch;
 			const category = (body as { category?: string | null }).category ?? null;
 			current.postings = (current.postings as unknown[]).map((item) => {
@@ -466,75 +490,107 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				return category ? { ...rest, category, categorySource: "user" } : rest;
 			}) as typeof current.postings;
 			return ok({
-				postingId: id,
+				transactionId: id,
 				...(category ? { category, categorySource: "user" } : {}),
 			});
 		}
-		match = path.match(/^\/v1\/postings\/([^/]+)$/);
-		if (match) {
+		match = path.match(/^\/v1\/transactions\/([^/]+)$/);
+		if (match && method === "DELETE") {
 			const [, id] = match;
-			if (method === "PATCH")
-				return write(() => {
-					const postings = current.postings as unknown[];
-					const next = structuredClone(body) as Record<string, unknown>;
-					current.postings = postings.map((item) => {
-						const row = item as {
-							id: string;
-							category?: string;
-							categorySource?: string;
-						};
-						if (row.id !== id) return item;
-						return {
-							...next,
-							id,
-							...(row.category
-								? { category: row.category, categorySource: row.categorySource }
-								: {}),
-						};
-					}) as typeof current.postings;
-				}, body);
-			current.postings = (current.postings as unknown[]).filter(
-				(item) => (item as { id: string }).id !== id,
-			) as typeof current.postings;
-			return write(() => {}, undefined);
-		}
-		const convertMatch = path.match(/^\/v1\/transactions\/([^/]+)\/convert$/);
-		if (convertMatch && method === "POST") {
-			const [, id] = convertMatch;
-			const kind = (body as { kind?: string }).kind;
-			const payload = body as {
-				posting?: Record<string, unknown>;
-				rule?: Record<string, unknown>;
-			};
 			return write(() => {
-				if (kind === "posting") {
-					current.recurrenceRules = (
-						current.recurrenceRules as unknown[]
-					).filter(
-						(item) => (item as { id: string }).id !== id,
-					) as typeof current.recurrenceRules;
-					(current.postings as unknown[]).push({
-						...structuredClone(payload.posting),
-						id,
-					});
-				} else if (kind === "rule") {
-					current.postings = (current.postings as unknown[]).filter(
-						(item) => (item as { id: string }).id !== id,
-					) as typeof current.postings;
-					(current.recurrenceRules as unknown[]).push({
-						...structuredClone(payload.rule),
-						id,
-					});
-				}
+				current.postings = (current.postings as unknown[]).filter(
+					(item) => (item as { id: string }).id !== id,
+				) as typeof current.postings;
 			}, undefined);
 		}
-		if (path === "/v1/postings/reorder" && method === "POST")
+		const claimMatch = path.match(
+			/^\/v1\/transactions\/([^/]+)\/(claim|release)$/,
+		);
+		if (claimMatch && method === "POST") {
+			const [, id, action] = claimMatch;
+			return write(() => {
+				current.postings = (current.postings as unknown[]).map((item) => {
+					const row = item as Record<string, unknown>;
+					if (row.id !== id) return item;
+					if (action === "release") {
+						const { claim: _claim, ...rest } = row;
+						return rest;
+					}
+					return {
+						...row,
+						claim: {
+							scheduleId: (body as { scheduleId: string }).scheduleId,
+							occurrenceDate: (body as { occurrenceDate: string })
+								.occurrenceDate,
+						},
+					};
+				}) as typeof current.postings;
+			}, body);
+		}
+		const amendTransactionMatch = path.match(
+			/^\/v1\/transactions\/([^/]+)\/amend$/,
+		);
+		if (amendTransactionMatch && method === "POST") {
+			const [, id] = amendTransactionMatch;
+			return write(() => {
+				current.postings = (current.postings as unknown[]).map((item) => {
+					const row = item as Record<string, unknown>;
+					if (row.id !== id) return item;
+					return {
+						...row,
+						...(structuredClone(body) as Record<string, unknown>),
+					};
+				}) as typeof current.postings;
+			}, body);
+		}
+		const moveTransactionMatch = path.match(
+			/^\/v1\/transactions\/([^/]+)\/move$/,
+		);
+		if (moveTransactionMatch && method === "POST") {
+			const [, id] = moveTransactionMatch;
 			return write(() => {
 				moveIn(current.postings as { id?: string; instanceId?: string }[])(
-					(body as { id: string }).id,
+					id!,
 					(body as { beforeId: string | null }).beforeId ?? null,
 				);
 			}, undefined);
+		}
+		const startMatch = path.match(/^\/v1\/transactions\/([^/]+)\/schedule$/);
+		if (startMatch && method === "POST") {
+			const [, id] = startMatch;
+			const source = (current.postings as unknown[]).find(
+				(item) => (item as { id: string }).id === id,
+			) as Record<string, unknown> | undefined;
+			const payload = structuredClone(body) as Record<string, unknown>;
+			return write(() => {
+				const schedule = {
+					id: (payload.id as string) || `schedule-${id}`,
+					name: payload.name ?? source?.name,
+					sourceAccountId:
+						payload.sourceAccountId ?? source?.sourceAccountId ?? null,
+					destinations: payload.destinations ?? source?.destinations ?? null,
+					amount: payload.amount ?? source?.amount,
+					frequency: payload.frequency,
+					startDate: payload.startDate,
+					endDate: payload.endDate ?? null,
+					annualCap: null,
+					priority: (current.schedules as unknown[]).length,
+					enabled: payload.enabled ?? source?.enabled ?? true,
+				};
+				(current.schedules as unknown[]).push(schedule);
+				current.postings = (current.postings as unknown[]).map((item) => {
+					const row = item as Record<string, unknown>;
+					if (row.id !== id) return item;
+					return {
+						...row,
+						claim: {
+							scheduleId: schedule.id,
+							occurrenceDate: schedule.startDate,
+						},
+					};
+				}) as typeof current.postings;
+			}, body);
+		}
 		if (path === "/v1/planned-purchases" && method === "POST")
 			return write(() => {
 				const rows = (current.plannedPurchases ??= []);
@@ -575,12 +631,9 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				method === "PATCH" ? body : undefined,
 			);
 		}
-		if (path === "/v1/recurrence-rules" && method === "POST")
+		if (path === "/v1/schedules" && method === "POST")
 			return write(() => {
-				const rules = current.recurrenceRules as unknown as Record<
-					string,
-					unknown
-				>[];
+				const rules = current.schedules as unknown as Record<string, unknown>[];
 				const next = structuredClone(body) as Record<string, unknown>;
 				if (typeof next.priority !== "number") {
 					let max = -1;
@@ -592,37 +645,88 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				}
 				rules.push(next);
 			}, body);
-		match = path.match(/^\/v1\/recurrence-rules\/([^/]+)$/);
-		if (match) {
+		match = path.match(/^\/v1\/schedules\/([^/]+)$/);
+		if (match && method === "DELETE") {
 			const [, id] = match;
-			if (method === "PATCH")
-				return write(() => {
-					const rules = current.recurrenceRules as unknown[];
-					const stored = rules.find(
-						(item) => (item as { id: string }).id === id,
-					) as Record<string, unknown> | undefined;
-					const next = structuredClone(body) as Record<string, unknown>;
-					// Omitted optionals keep their stored values.
-					if (next.priority === undefined) next.priority = stored?.priority;
-					if (next.annualCap === undefined) next.annualCap = stored?.annualCap;
-					current.recurrenceRules = rules.map((item) =>
-						(item as { id: string }).id === id ? { ...next, id } : item,
-					) as typeof current.recurrenceRules;
-				}, body);
-			current.recurrenceRules = (current.recurrenceRules as unknown[]).filter(
-				(item) => (item as { id: string }).id !== id,
-			) as typeof current.recurrenceRules;
-			return write(() => {}, undefined);
-		}
-		if (path === "/v1/recurrence-rules/reorder" && method === "POST")
 			return write(() => {
-				moveIn(
-					current.recurrenceRules as { id?: string; instanceId?: string }[],
-				)(
-					(body as { id: string }).id,
+				current.schedules = (current.schedules as unknown[]).filter(
+					(item) => (item as { id: string }).id !== id,
+				) as typeof current.schedules;
+			}, undefined);
+		}
+		const amendScheduleMatch = path.match(/^\/v1\/schedules\/([^/]+)\/amend$/);
+		if (amendScheduleMatch && method === "POST") {
+			const [, id] = amendScheduleMatch;
+			return write(() => {
+				current.schedules = (current.schedules as unknown[]).map((item) =>
+					(item as { id: string }).id === id
+						? { ...(item as object), ...(structuredClone(body) as object), id }
+						: item,
+				) as typeof current.schedules;
+			}, body);
+		}
+		const rescheduleMatch = path.match(
+			/^\/v1\/schedules\/([^/]+)\/reschedule$/,
+		);
+		if (rescheduleMatch && method === "POST") {
+			const [, id] = rescheduleMatch;
+			return write(() => {
+				current.schedules = (current.schedules as unknown[]).map((item) =>
+					(item as { id: string }).id === id
+						? { ...(item as object), ...(structuredClone(body) as object), id }
+						: item,
+				) as typeof current.schedules;
+			}, body);
+		}
+		const moveScheduleMatch = path.match(/^\/v1\/schedules\/([^/]+)\/move$/);
+		if (moveScheduleMatch && method === "POST") {
+			const [, id] = moveScheduleMatch;
+			return write(() => {
+				moveIn(current.schedules as { id?: string; instanceId?: string }[])(
+					id!,
 					(body as { beforeId: string | null }).beforeId ?? null,
 				);
 			}, undefined);
+		}
+		const endMatch = path.match(
+			/^\/v1\/schedules\/([^/]+)\/end-with-transaction$/,
+		);
+		if (endMatch && method === "POST") {
+			const [, id] = endMatch;
+			const schedule = (current.schedules as unknown[]).find(
+				(item) => (item as { id: string }).id === id,
+			) as Record<string, unknown> | undefined;
+			const payload = structuredClone(body) as Record<string, unknown>;
+			return write(() => {
+				current.schedules = (current.schedules as unknown[]).filter(
+					(item) => (item as { id: string }).id !== id,
+				) as typeof current.schedules;
+				const time =
+					typeof payload.time === "string" && payload.time
+						? payload.time
+						: "00:00:00";
+				const clock = time.length === 5 ? `${time}:00` : time;
+				const stamp = Math.floor(
+					new Date(`${String(payload.date)}T${clock}Z`).getTime() / 1000,
+				);
+				const posting = {
+					id: (payload.id as string) || `transaction-${id}`,
+					name: schedule?.name,
+					sourceAccountId:
+						payload.sourceAccountId ?? schedule?.sourceAccountId ?? null,
+					destinations: payload.destinations ?? schedule?.destinations ?? null,
+					amount: payload.amount ?? schedule?.amount,
+					postedTime: Math.floor(
+						new Date(
+							`${String(payload.postedDate ?? payload.date)}T00:00:00Z`,
+						).getTime() / 1000,
+					),
+					transactionTime: stamp,
+					enabled: payload.enabled ?? schedule?.enabled ?? true,
+				};
+				(current.postings as unknown[]).push(posting);
+			}, undefined);
+		}
 		if (path === "/v1/checkpoints" && method === "POST") {
 			const checkpoint = structuredClone(body);
 			const same = (item: unknown) => {

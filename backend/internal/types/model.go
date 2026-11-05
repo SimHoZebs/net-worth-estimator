@@ -119,14 +119,14 @@ type CheckpointCorrection struct {
 	Adjustment      float64 `json:"adjustment"`
 }
 
-type RecurrenceFrequency string
+type Frequency string
 
 const (
-	FrequencyDaily     RecurrenceFrequency = "daily"
-	FrequencyWeekly    RecurrenceFrequency = "weekly"
-	FrequencyMonthly   RecurrenceFrequency = "monthly"
-	FrequencyQuarterly RecurrenceFrequency = "quarterly"
-	FrequencyAnnual    RecurrenceFrequency = "annual"
+	FrequencyDaily     Frequency = "daily"
+	FrequencyWeekly    Frequency = "weekly"
+	FrequencyMonthly   Frequency = "monthly"
+	FrequencyQuarterly Frequency = "quarterly"
+	FrequencyAnnual    Frequency = "annual"
 )
 
 // AmountInputBinding is a literal value or provider binding for one input.
@@ -186,10 +186,10 @@ type PostingAmountResolution struct {
 }
 
 type PostingClaim struct {
-	// RuleID names the recurrence rule whose scheduled occurrence this
+	// ScheduleID names the schedule whose occurrence this
 	// posting records. Always paired with OccurrenceDate; both are set
 	// manually, never inferred.
-	RuleID string `json:"ruleId"`
+	ScheduleID string `json:"scheduleId"`
 	// OccurrenceDate is the scheduled occurrence this posting replaces.
 	// It is independent of posted and transaction times, so an early or
 	// late actual can still claim its occurrence.
@@ -199,7 +199,7 @@ type PostingClaim struct {
 // Posting is a single transaction with two times: posted time is when the
 // bank posts it, transaction time is when the money moves. Both are Unix
 // seconds. The UTC day of transaction time groups the transaction. Postings
-// never repeat; repetition is owned by RecurrenceRule, which expands into
+// never repeat; repetition is owned by Schedule, which expands into
 // occurrences at projection time. A posting with a Claim is an actual
 // recorded against one scheduled occurrence of its rule.
 type Posting struct {
@@ -230,20 +230,20 @@ type Posting struct {
 	Void bool `json:"void,omitempty"`
 }
 
-// RecurrenceRule owns repetition. Its transaction fields are the template
+// Schedule owns repetition. Its transaction fields are the template
 // expanded into one occurrence per scheduled date; its schedule fields say
 // when. Rules never move money themselves; expansion at projection time
 // produces occurrences that execute exactly like postings. Rate behavior
 // (occurrence-rate, growth-factor, volatility) lives in the amount inputs,
 // the same descriptors one-time postings use; the rule contributes only
 // schedule context (frequency divisor, start date).
-type RecurrenceRule struct {
+type Schedule struct {
 	ID              string                  `json:"id"`
 	Name            string                  `json:"name"`
 	SourceAccountID *string                 `json:"sourceAccountId"`
 	Destinations    []string                `json:"destinations"`
 	Amount          PostingAmountResolution `json:"amount"`
-	Frequency       RecurrenceFrequency     `json:"frequency"`
+	Frequency       Frequency               `json:"frequency"`
 	StartDate       IsoDate                 `json:"startDate"`
 	EndDate         *IsoDate                `json:"endDate"`
 	AnnualCap       *float64                `json:"annualCap"`
@@ -258,7 +258,7 @@ type FinancialModel struct {
 	Checkpoints      []Checkpoint      `json:"checkpoints"`
 	Evaluations      EvaluationTables  `json:"evaluations"`
 	Postings         []Posting         `json:"postings"`
-	RecurrenceRules  []RecurrenceRule  `json:"recurrenceRules"`
+	Schedules        []Schedule        `json:"schedules"`
 	PaymentTerms     []PaymentTerms    `json:"paymentTerms"`
 	PlannedPurchases []PlannedPurchase `json:"plannedPurchases,omitempty"`
 }
@@ -279,22 +279,22 @@ type PaymentTerms struct {
 }
 
 type ModelOverrides struct {
-	AddedAccounts      []Account        `json:"addedAccounts"`
-	AddedPostings      []Posting        `json:"addedPostings"`
-	AddedRules         []RecurrenceRule `json:"addedRules"`
-	DisabledAccountIDs []string         `json:"disabledAccountIds"`
-	DisabledPostingIDs []string         `json:"disabledPostingIds"`
-	DisabledRuleIDs    []string         `json:"disabledRuleIds"`
+	AddedAccounts       []Account  `json:"addedAccounts"`
+	AddedPostings       []Posting  `json:"addedPostings"`
+	AddedRules          []Schedule `json:"addedSchedules"`
+	DisabledAccountIDs  []string   `json:"disabledAccountIds"`
+	DisabledPostingIDs  []string   `json:"disabledPostingIds"`
+	DisabledScheduleIDs []string   `json:"disabledScheduleIds"`
 }
 
 func EmptyModelOverrides() ModelOverrides {
 	return ModelOverrides{
-		AddedAccounts:      []Account{},
-		AddedPostings:      []Posting{},
-		AddedRules:         []RecurrenceRule{},
-		DisabledAccountIDs: []string{},
-		DisabledPostingIDs: []string{},
-		DisabledRuleIDs:    []string{},
+		AddedAccounts:       []Account{},
+		AddedPostings:       []Posting{},
+		AddedRules:          []Schedule{},
+		DisabledAccountIDs:  []string{},
+		DisabledPostingIDs:  []string{},
+		DisabledScheduleIDs: []string{},
 	}
 }
 
@@ -309,8 +309,8 @@ func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) Financi
 	for _, id := range overrides.DisabledPostingIDs {
 		disabledPostings[id] = true
 	}
-	disabledRules := make(map[string]bool, len(overrides.DisabledRuleIDs))
-	for _, id := range overrides.DisabledRuleIDs {
+	disabledRules := make(map[string]bool, len(overrides.DisabledScheduleIDs))
+	for _, id := range overrides.DisabledScheduleIDs {
 		disabledRules[id] = true
 	}
 	accounts := make([]Account, 0, len(model.Accounts)+len(overrides.AddedAccounts))
@@ -337,8 +337,8 @@ func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) Financi
 		}
 	}
 	postings = append(postings, overrides.AddedPostings...)
-	rules := make([]RecurrenceRule, 0, len(model.RecurrenceRules)+len(overrides.AddedRules))
-	for _, rule := range model.RecurrenceRules {
+	rules := make([]Schedule, 0, len(model.Schedules)+len(overrides.AddedRules))
+	for _, rule := range model.Schedules {
 		if !disabledRules[rule.ID] {
 			rules = append(rules, rule)
 		}
@@ -350,7 +350,7 @@ func ApplyModelOverrides(model FinancialModel, overrides ModelOverrides) Financi
 		Checkpoints:      checkpoints,
 		Evaluations:      model.Evaluations,
 		Postings:         postings,
-		RecurrenceRules:  rules,
+		Schedules:        rules,
 		PaymentTerms:     model.PaymentTerms,
 		PlannedPurchases: model.PlannedPurchases,
 	}

@@ -118,7 +118,7 @@ connection with a two-second deadline. See [the deployment contract](deploy/READ
 
 Each issue contains `severity`, `code`, `message`, and `path`. The stored model is loaded in one read transaction. The response always includes a non-null issue array; `model` is null when the store has no canonical model. `revision` in the body identifies canonical content for reads and caching.
 
-Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/postings`, `/v1/recurrence-rules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{value, issues, saved, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/postings/{id}/receipts`) and Analysis feedback (`/v1/analysis-findings...`, `/v1/analysis-feedback`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
+Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under `/v1/accounts`, `/v1/transactions`, `/v1/schedules`, `/v1/checkpoints`, `/v1/evaluations`, `/v1/payment-terms`, `/v1/amount-presets`, `/v1/pinned-evaluations`, `/v1/planned-purchases`, `/v1/safe-spending-settings`, and `/v1/sync/simplefin/accounts` validates the resulting model and returns `{value, issues, saved, revision}` (or `{deletedId, ...}` / `{revision}` for deletes and moves). Last write wins; there are no preconditions. Receipt evidence (`/v1/receipts...`, `/v1/transactions/{id}/receipts`) and Analysis feedback (`/v1/analysis-findings...`, `/v1/analysis-feedback`) mutate their own stores with the same one-change-per-request shape; per-route details live in [receipts](docs/receipts.md), [Analysis](docs/analyses.md), and the [purchase queue](docs/purchase-queue.md).
 
 - Error-severity issues from the write's validation boundary prevent persistence.
   Ordinary finance writes validate financial records and protect existing valid
@@ -356,7 +356,7 @@ The authenticated user router initializes a blank private workspace on first aut
 
 ### Row writes and ownership
 
-Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, conversions, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
+Each row write validates the resulting state at its finance or evaluation boundary, then inserts, replaces, deletes, or reorders one row. There is no whole-model replace at runtime; `replaceModel` survives only as the private seed/import path. Creates use the new row's instant and checkpoints use their instant; updates, deletes, moves, schedule starts and endings, claims, accounts, and payment terms dirty from projection start with no preceding read, so an early date is never missed. Account moves (position order only), evaluation writes, pins, presets, links, and safe-spending settings do not dirty. Generated `projected` rows carry a slice id and never appear in model, sync, or analysis reads; every one of those reads filters them by null slice.
 
 1. Creates claim the row ID in `entity_ids` (server-generated UUIDv7 when omitted); duplicates return 409.
 2. Updates replace one owner row by ID; deletes remove it; moves rewrite positions.
@@ -474,7 +474,7 @@ Postings are single timed transactions: one record of money moved, carrying
 posted time (when the bank posts it) and transaction time (when the money
 moves), both Unix seconds. Repetition is owned by recurrence rules, which
 expand into occurrences at projection time. A posting with a `claim`
-(`ruleId` plus `occurrenceDate`, both set manually) records the actual for
+(`scheduleId` plus `occurrenceDate`, both set manually) records the actual for
 one scheduled occurrence; history replays the actual and skips the generated
 occurrence.
 
@@ -796,7 +796,7 @@ cost of the repair, and operator release notes should call it out.
 Post-upgrade owner disables remain honored: the script only converts
 legacy date-shaped databases and only verifies already-converted ones,
 so a repeat run never re-enables an explicit disable. Delete-plus-
-tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. The settlement matcher reads merchant behavior classes from `backend/internal/simplefin/profiles.json`. `GET /v1/postings/{id}/settle-candidates` exposes the same ranked candidates to the browser, so the frontend keeps no matching rule. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
+tombstone exclusions are preserved in both cases. Backdated observations are retained as distinct instant-keyed rows while an owner row at the same instant keeps precedence and a same-instant sync row replaces idempotently. Exact provider/account/transaction keys map to store-allocated UUIDs, so repeat feeds refresh the same rows. Vanished pending rows void in place; nothing the bank reported is ever deleted. The settlement matcher reads merchant behavior classes from `backend/internal/simplefin/profiles.json`. `GET /v1/transactions/{id}/settle-candidates` exposes the same ranked candidates to the browser, so the frontend keeps no matching rule. Summary counters distinguish `pendingInserted`, `pendingUpdated`, `pendingDeleted`, `settledConverted`, and `settledInserted`.
 
 The scheduler calls `Runner.Sync` every 6 hours at the next 6-hour boundary (00, 06, 12, 18 local) plus a random minute offset. Manual triggers use `Runner.Trigger`, which rejects concurrent and too-recent successful runs. Successful runs persist their completion time; `GET /v1/status` exposes it as `lastSyncAt` alongside `syncConfigured`.
 

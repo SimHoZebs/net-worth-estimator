@@ -63,7 +63,7 @@
             "transactionTime": 1781524800
           }
         ],
-        "recurrenceRules": []
+        "schedules": []
       }
     }
   ]

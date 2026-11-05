@@ -25,27 +25,27 @@ var ErrNotFound = errors.New("not found")
 var ErrAnalysisFeedbackConflict = errors.New("the finding changed; review it again")
 var ErrAnalysisFeedbackInvalid = errors.New("invalid analysis feedback")
 
-// ErrPatternToNewRuleInvalid reports a pattern that cannot become a
+// ErrPatternToNewScheduleInvalid reports a pattern that cannot become a
 // forecast rule: a non-recurring finding or incoherent evidence. Handlers
 // map it to 422 and may show its message.
-var ErrPatternToNewRuleInvalid = errors.New("recurring pattern cannot become a forecast rule")
+var ErrPatternToNewScheduleInvalid = errors.New("recurring pattern cannot become a forecast rule")
 
-// ErrPatternToNewRuleConflict reports a pattern whose state changed since
+// ErrPatternToNewScheduleConflict reports a pattern whose state changed since
 // confirmation, or that already has an active generated rule. Handlers map
 // it to 409 and may show its message.
-var ErrPatternToNewRuleConflict = errors.New("recurring pattern changed or already has a forecast rule")
+var ErrPatternToNewScheduleConflict = errors.New("recurring pattern changed or already has a forecast rule")
 
-// ErrPatternToExistingRuleInvalid reports an add request that cannot be honored:
+// ErrPatternToExistingScheduleInvalid reports an add request that cannot be honored:
 // a non-recurring finding, incoherent evidence, a missing rule, or a claim
 // update naming no posting, rule, or date. Handlers map it to 422 and may
 // show its message. Disabled rules, routing mismatches, and off-schedule
 // patterns instead preview as Claimable=false with a plain-language reason.
-var ErrPatternToExistingRuleInvalid = errors.New("recurring pattern cannot claim that forecast rule")
+var ErrPatternToExistingScheduleInvalid = errors.New("recurring pattern cannot claim that forecast rule")
 
-// ErrPatternToExistingRuleConflict reports a pattern whose state changed since
+// ErrPatternToExistingScheduleConflict reports a pattern whose state changed since
 // confirmation, or whose occurrences are already claimed elsewhere.
 // Handlers map it to 409 and may show its message.
-var ErrPatternToExistingRuleConflict = errors.New("recurring pattern changed or already claimed")
+var ErrPatternToExistingScheduleConflict = errors.New("recurring pattern changed or already claimed")
 
 // ErrGroupForbidden reports a group action the caller's role may not perform.
 // It distinguishes denial (403) from unknown groups or members (404,

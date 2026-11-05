@@ -22,10 +22,11 @@ describe("timestamped actual authoring", () => {
 			endDate: null,
 			postedDate: null,
 			enabled: true,
-			claimRuleId: null,
+			claimScheduleId: null,
 			claimOccurrenceDate: null,
 			transactionTime: 1773140400,
 		});
-		expect(body.transactionTime).toBe(1773140400);
+		expect(body.date).toBe("2026-03-10");
+		expect(body.time).toBe("11:00");
 	});
 });

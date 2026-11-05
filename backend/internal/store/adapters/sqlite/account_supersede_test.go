@@ -46,7 +46,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed manual checkpoint: %v", err)
 	}
-	if _, err := scoped.CreateRule(types.RecurrenceRule{
+	if _, err := scoped.CreateSchedule(types.Schedule{
 		ID: "01900000-0000-7000-8000-0000000000b4", Name: "Rent", SourceAccountID: supersedeStringPtr("manual"),
 		Destinations: []string{"savings"},
 		Amount: types.PostingAmountResolution{
@@ -89,7 +89,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 		AccountIDs:         []string{"manual"},
 		SpendingAccountIDs: []string{"manual"},
 		IncomeAccountIDs:   []string{"manual"},
-		IncomeRuleIDs:      []string{"01900000-0000-7000-8000-0000000000b4"},
+		IncomeScheduleIDs:  []string{"01900000-0000-7000-8000-0000000000b4"},
 		TransactionIDs:     []string{sharingPostingA},
 		StatementDaySet:    true,
 	}); err != nil {
@@ -158,11 +158,11 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	if len(model.Checkpoints) != 1 || model.Checkpoints[0].AccountID != "synced" || model.Checkpoints[0].Source != store.SourceBankSync {
 		t.Fatalf("synced bank checkpoint changed: %+v", model.Checkpoints)
 	}
-	if len(model.RecurrenceRules) != 1 || model.RecurrenceRules[0].SourceAccountID == nil ||
-		*model.RecurrenceRules[0].SourceAccountID != "synced" || !supersedeContains(model.RecurrenceRules[0].Destinations, "savings") {
-		t.Fatalf("rule route did not move: %+v", model.RecurrenceRules)
+	if len(model.Schedules) != 1 || model.Schedules[0].SourceAccountID == nil ||
+		*model.Schedules[0].SourceAccountID != "synced" || !supersedeContains(model.Schedules[0].Destinations, "savings") {
+		t.Fatalf("rule route did not move: %+v", model.Schedules)
 	}
-	if got := model.RecurrenceRules[0].Amount.Inputs["manual"].Arguments["id"]; got != "synced" {
+	if got := model.Schedules[0].Amount.Inputs["manual"].Arguments["id"]; got != "synced" {
 		t.Fatalf("rule amount reference = %v, want synced", got)
 	}
 	var sweep *types.Posting
@@ -195,7 +195,7 @@ func TestSupersedeAccountMovesProfileAndConfiguration(t *testing.T) {
 	if len(settings.AccountIDs) != 1 || settings.AccountIDs[0] != "synced" ||
 		len(settings.SpendingAccountIDs) != 1 || settings.SpendingAccountIDs[0] != "synced" ||
 		len(settings.IncomeAccountIDs) != 1 || settings.IncomeAccountIDs[0] != "synced" ||
-		len(settings.TransactionIDs) != 0 || len(settings.IncomeRuleIDs) != 1 || settings.IncomeRuleIDs[0] != "01900000-0000-7000-8000-0000000000b4" {
+		len(settings.TransactionIDs) != 0 || len(settings.IncomeScheduleIDs) != 1 || settings.IncomeScheduleIDs[0] != "01900000-0000-7000-8000-0000000000b4" {
 		t.Fatalf("safe spending settings did not move: %+v", settings)
 	}
 	cards, err := scoped.GetSyncCards()

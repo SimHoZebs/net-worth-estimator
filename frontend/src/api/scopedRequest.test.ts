@@ -6,7 +6,6 @@ import {
 	suspendUserScope,
 } from "../auth/resourceScope.ts";
 import { ApiHttpError } from "./http.ts";
-import { applyModelChanges } from "./modelChanges.ts";
 import { requestStochasticProjection } from "./sse.ts";
 import {
 	UserScopeError,
@@ -66,48 +65,6 @@ afterEach(() => {
 });
 
 describe("resource assertion at the API boundary", () => {
-	it("stops a multi-row save after its resource changes between writes", async () => {
-		const fetcher = stubFetch(async () => {
-			owner(B);
-			return response(
-				JSON.stringify({ saved: true, issues: [], revision: "r1" }),
-			);
-		});
-		const result = await applyModelChanges([
-			{
-				kind: "account",
-				action: "create",
-				value: {
-					id: "a",
-					name: "A",
-					kind: "cash",
-					enabled: true,
-					minBalance: null,
-					maxBalance: null,
-					color: null,
-				},
-			},
-			{
-				kind: "account",
-				action: "create",
-				value: {
-					id: "b",
-					name: "B",
-					kind: "cash",
-					enabled: true,
-					minBalance: null,
-					maxBalance: null,
-					color: null,
-				},
-			},
-		]);
-		expect(result).toBeInstanceOf(UserScopeError);
-		// The first write sends while scope A is current. The scope switch
-		// retires the second write before it sends, so nothing computed for
-		// user A can land in user B's workspace.
-		expect(fetcher).toHaveBeenCalledTimes(1);
-	});
-
 	it.each(["json", "sse"] as const)(
 		"does not retarget an old %s request to a different user",
 		async (kind) => {

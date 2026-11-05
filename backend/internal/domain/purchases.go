@@ -31,7 +31,7 @@ func purchasesCandidateRequest(path *types.ProjectionPath, sample *types.MonteCa
 		Model: types.SimulationInputs{
 			Accounts:         model.Accounts,
 			Postings:         model.Postings,
-			RecurrenceRules:  model.RecurrenceRules,
+			Schedules:        model.Schedules,
 			PaymentTerms:     model.PaymentTerms,
 			PlannedPurchases: model.PlannedPurchases,
 		},
@@ -106,7 +106,7 @@ func simulatePurchases(request types.SimulationRequest) (types.SimulationRun, er
 	if firstDate <= request.EndDate {
 		dateSet[firstDate] = true
 	}
-	resolved := ResolveOccurrences(request.Model.RecurrenceRules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
+	resolved := ResolveOccurrences(request.Model.Schedules, request.Model.Postings, request.StartDate, request.EndDate, request.IncludeStartDateEvents)
 	for date := range resolved.ByDate {
 		dateSet[date] = true
 	}
@@ -175,7 +175,7 @@ func simulationPath(run *types.SimulationRun) *types.ProjectionPath {
 	return BuildStochasticSamplePath(&types.PreparedProjection{
 		EffectiveModel: types.FinancialModel{
 			Accounts: run.Request.Model.Accounts, Postings: run.Request.Model.Postings,
-			RecurrenceRules:  run.Request.Model.RecurrenceRules,
+			Schedules:        run.Request.Model.Schedules,
 			PaymentTerms:     run.Request.Model.PaymentTerms,
 			PlannedPurchases: run.Request.Model.PlannedPurchases,
 		},

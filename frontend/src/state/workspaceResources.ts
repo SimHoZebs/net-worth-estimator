@@ -12,14 +12,14 @@ import {
 	listAmountPresets,
 	listCheckpoints,
 	listEvaluationSummary,
-	listRecurrenceRules,
+	listSchedules,
 	listTransactionCatalog,
 	listTransactions,
 } from "@/api/generated/endpoints.ts";
 import type { AccountBalanceRow } from "@/api/generated/model/accountBalanceRow.ts";
 import type { Checkpoint } from "@/api/generated/model/checkpoint.ts";
 import type { ListCheckpointsParams } from "@/api/generated/model/listCheckpointsParams.ts";
-import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
+import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import {
@@ -278,8 +278,8 @@ export interface TransactionList {
 	revision: string | null;
 }
 
-export interface RuleList {
-	recurrenceRules: RecurrenceRule[];
+export interface ScheduleList {
+	schedules: Schedule[];
 	revision: string | null;
 }
 
@@ -346,7 +346,7 @@ export function transactionsOptions(
 	});
 }
 
-export function rulesOptions(
+export function schedulesOptions(
 	scope = getUserScope(),
 	filters: { accountId?: string } = {},
 ) {
@@ -354,19 +354,16 @@ export function rulesOptions(
 	return queryOptions({
 		...defaults,
 		queryKey: [...userResourceKey("rules", scope), accountId ?? ""],
-		queryFn: async ({ signal }): Promise<RuleList> => {
+		queryFn: async ({ signal }): Promise<ScheduleList> => {
 			const result = (
-				await listRecurrenceRules(
-					accountId ? { accountId } : {},
-					{ signal },
-				)
+				await listSchedules(accountId ? { accountId } : {}, { signal })
 			).data as unknown as {
-				recurrenceRules?: RecurrenceRule[] | null;
+				schedules?: Schedule[] | null;
 				revision?: string;
 			};
 			current(scope, signal);
 			return {
-				recurrenceRules: result.recurrenceRules ?? [],
+				schedules: result.schedules ?? [],
 				revision: result.revision ?? null,
 			};
 		},
@@ -457,11 +454,11 @@ export function useTransactions(filters: { accountId?: string } = {}) {
 	);
 }
 
-export function useRecurrenceRules(filters: { accountId?: string } = {}) {
+export function useSchedules(filters: { accountId?: string } = {}) {
 	const scope = useUserScope();
 	return useQuery(
 		{
-			...rulesOptions(scope, filters),
+			...schedulesOptions(scope, filters),
 			refetchOnMount: "always",
 			enabled: scope.status === "ready",
 		},
@@ -510,7 +507,7 @@ export async function refreshTransactions(): Promise<void> {
 	// failure throws so a save refresh reports it instead of swallowing it.
 	const settled = await Promise.allSettled([
 		cache.fetchQuery(transactionsOptions(scope)),
-		cache.fetchQuery(rulesOptions(scope)),
+		cache.fetchQuery(schedulesOptions(scope)),
 		cache.fetchQuery(modelOptions(scope)),
 	]);
 	for (const result of settled)

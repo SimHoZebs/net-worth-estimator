@@ -127,8 +127,8 @@ func bulkAccountID(seed int64, index int) string {
 	return fmt.Sprintf("%sacct-%d-%04d", SeedPrefix, seed, index)
 }
 
-// bulkRuleID scopes one rule index by seed for the same reason.
-func bulkRuleID(seed int64, index int) string {
+// bulkScheduleID scopes one rule index by seed for the same reason.
+func bulkScheduleID(seed int64, index int) string {
 	return fmt.Sprintf("%srule-%d-%04d", SeedPrefix, seed, index)
 }
 
@@ -189,8 +189,8 @@ func BuildBulkModel(spec BulkSpec) *types.FinancialModel {
 			})
 		}
 		if i%4 == 0 {
-			model.RecurrenceRules = append(model.RecurrenceRules, types.RecurrenceRule{
-				ID:              bulkRuleID(spec.Seed, i),
+			model.Schedules = append(model.Schedules, types.Schedule{
+				ID:              bulkScheduleID(spec.Seed, i),
 				Name:            fmt.Sprintf("Seed rule %02d", i),
 				SourceAccountID: ptr(accountID),
 				Frequency:       types.FrequencyMonthly,
@@ -225,8 +225,8 @@ func InjectBulk(scoped store.Store, spec BulkSpec) (BulkResult, error) {
 			return result, fmt.Errorf("integrationfixtures: bulk checkpoint %q: %w", checkpoint.AccountID, err)
 		}
 	}
-	for _, rule := range model.RecurrenceRules {
-		if _, err := scoped.CreateRule(rule); err != nil {
+	for _, rule := range model.Schedules {
+		if _, err := scoped.CreateSchedule(rule); err != nil {
 			return result, fmt.Errorf("integrationfixtures: bulk create rule %q: %w", rule.ID, err)
 		}
 		result.Rules++
@@ -268,11 +268,11 @@ func ClearSeed(scoped store.Store) (BulkResult, error) {
 		}
 		result.Postings++
 	}
-	for _, rule := range model.RecurrenceRules {
+	for _, rule := range model.Schedules {
 		if rule.SourceAccountID == nil || !seedAccounts[*rule.SourceAccountID] {
 			continue
 		}
-		if err := scoped.DeleteRule(rule.ID); err != nil {
+		if err := scoped.DeleteSchedule(rule.ID); err != nil {
 			return result, fmt.Errorf("integrationfixtures: clear seed rule %q: %w", rule.ID, err)
 		}
 		result.Rules++

@@ -82,14 +82,14 @@ func TestQA03FlowDrilldownTotalsAgreeAndTransfersCountOnce(t *testing.T) {
 
 	// One inflow, one outflow, one account-to-account transfer in June, and
 	// a second outflow in July so window narrowing has something to drop.
-	outflowJune := qa03CreateRow(t, handler, "/v1/postings",
-		`{"name":"Groceries","sourceAccountId":"`+checking+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1781524800,"transactionTime":1781524800,"enabled":true}`)
-	inflowJune := qa03CreateRow(t, handler, "/v1/postings",
-		`{"name":"Salary","sourceAccountId":null,"destinations":["`+checking+`"],"amount":{"resolver":"expression","config":{"expression":"2000"},"inputs":{}},"postedTime":1781524800,"transactionTime":1781524800,"enabled":true}`)
-	transferJune := qa03CreateRow(t, handler, "/v1/postings",
-		`{"name":"Save","sourceAccountId":"`+checking+`","destinations":["`+savings+`"],"amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"postedTime":1781524800,"transactionTime":1781524800,"enabled":true}`)
-	outflowJuly := qa03CreateRow(t, handler, "/v1/postings",
-		`{"name":"Fuel","sourceAccountId":"`+checking+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"40"},"inputs":{}},"postedTime":1784116800,"transactionTime":1784116800,"enabled":true}`)
+	outflowJune := qa03CreateRow(t, handler, "/v1/transactions",
+		`{"name":"Groceries","sourceAccountId":"`+checking+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-06-15","enabled":true}`)
+	inflowJune := qa03CreateRow(t, handler, "/v1/transactions",
+		`{"name":"Salary","sourceAccountId":null,"destinations":["`+checking+`"],"amount":{"resolver":"expression","config":{"expression":"2000"},"inputs":{}},"date":"2026-06-15","enabled":true}`)
+	transferJune := qa03CreateRow(t, handler, "/v1/transactions",
+		`{"name":"Save","sourceAccountId":"`+checking+`","destinations":["`+savings+`"],"amount":{"resolver":"expression","config":{"expression":"500"},"inputs":{}},"date":"2026-06-15","enabled":true}`)
+	outflowJuly := qa03CreateRow(t, handler, "/v1/transactions",
+		`{"name":"Fuel","sourceAccountId":"`+checking+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"40"},"inputs":{}},"date":"2026-07-15","enabled":true}`)
 
 	model, err := database.LoadModel()
 	if err != nil {

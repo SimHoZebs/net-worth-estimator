@@ -9,7 +9,7 @@ export function projectionStartDate(model: FinancialModel): string {
 	const posting = model.postings[0];
 	return (
 		latest ??
-		(model.recurrenceRules ?? [])[0]?.startDate ??
+		(model.schedules ?? [])[0]?.startDate ??
 		(posting
 			? new Date(
 					(posting.transactionTime > 0

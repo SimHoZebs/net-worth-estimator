@@ -109,12 +109,12 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 	validateUniqueIDs(&issues, postingIDList, "posting.id", func(index int, field string) []any {
 		return pathWithField([]any{"postings", index}, field)
 	})
-	ruleIDList := make([]string, len(model.RecurrenceRules))
-	for i, rule := range model.RecurrenceRules {
+	ruleIDList := make([]string, len(model.Schedules))
+	for i, rule := range model.Schedules {
 		ruleIDList[i] = rule.ID
 	}
 	validateUniqueIDs(&issues, ruleIDList, "rule.id", func(index int, field string) []any {
-		return pathWithField([]any{"recurrenceRules", index}, field)
+		return pathWithField([]any{"schedules", index}, field)
 	})
 	purchaseIDList := make([]string, len(model.PlannedPurchases))
 	for i, purchase := range model.PlannedPurchases {
@@ -129,22 +129,22 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 
 	// Transaction identity checks: posting, rule, and planned-purchase IDs share
 	// one namespace with account IDs.
-	transactionIDs := make(map[string]bool, len(model.Postings)+len(model.RecurrenceRules)+len(model.PlannedPurchases))
+	transactionIDs := make(map[string]bool, len(model.Postings)+len(model.Schedules)+len(model.PlannedPurchases))
 	for _, posting := range model.Postings {
 		transactionIDs[posting.ID] = true
 	}
-	for index, rule := range model.RecurrenceRules {
+	for index, rule := range model.Schedules {
 		if transactionIDs[rule.ID] {
 			addIssue(&issues, types.SeverityError, "rule.id.collision",
-				fmt.Sprintf("Rule ID '%s' collides with a posting ID. Posting and rule IDs share one namespace.", rule.ID),
-				pathWithField([]any{"recurrenceRules", index}, "id")...)
+				fmt.Sprintf("Schedule ID '%s' collides with a transaction ID. Transaction and schedule IDs share one namespace.", rule.ID),
+				pathWithField([]any{"schedules", index}, "id")...)
 		}
 		transactionIDs[rule.ID] = true
 	}
 	for index, purchase := range model.PlannedPurchases {
 		if transactionIDs[purchase.ID] {
 			addIssue(&issues, types.SeverityError, "plannedPurchase.id.collision",
-				fmt.Sprintf("Planned purchase ID '%s' collides with a posting or rule ID. IDs must be unique across transactions and purchases.", purchase.ID),
+				fmt.Sprintf("Planned purchase ID '%s' collides with a transaction or schedule ID. IDs must be unique across transactions and purchases.", purchase.ID),
 				pathWithField([]any{"plannedPurchases", index}, "id")...)
 		}
 		transactionIDs[purchase.ID] = true
@@ -154,7 +154,7 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 	for index, account := range model.Accounts {
 		if transactionIDs[account.ID] {
 			addIssue(&issues, types.SeverityError, "account.id.collision",
-				fmt.Sprintf("Account ID '%s' collides with a posting or rule ID. IDs must be unique across accounts, postings, and rules.", account.ID),
+				fmt.Sprintf("Account ID '%s' collides with a transaction or schedule ID. IDs must be unique across accounts, transactions, and schedules.", account.ID),
 				pathWithField([]any{"accounts", index}, "id")...)
 		}
 		if account.Enabled && account.Color == nil {
@@ -196,7 +196,7 @@ func validateModel(model *types.FinancialModel, includeEvaluation bool) []types.
 	validatePurchases(&issues, model, dependencies)
 	validatePostingDependencies(&issues, model, dependencies)
 	validatePostingRoutes(&issues, model.Postings, accountIDs)
-	validateRuleSchedules(&issues, model, accountIDs)
+	validateSchedules(&issues, model, accountIDs)
 	validatePostingClaims(&issues, model)
 	validateAccountBounds(&issues, model.Accounts)
 	if includeEvaluation {
@@ -280,7 +280,7 @@ func validateEvaluationAccountReferences(issues *[]types.ModelValidationIssue, m
 }
 
 // validateTransactionAmounts validates amount descriptors for manual postings
-// and rule templates together. References may name posting or rule IDs, so
+// and schedule templates together. References may name transaction or schedule IDs, so
 // the dependency graph spans both.
 func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool, transactionIDsSet map[string]bool) map[string][]string {
 	dependencies := map[string][]string{}
@@ -313,13 +313,13 @@ func validateTransactionAmounts(issues *[]types.ModelValidationIssue, model *typ
 				pathWithField([]any{"postings", index}, "amount")...)
 		}
 	}
-	for index := range model.RecurrenceRules {
-		rule := &model.RecurrenceRules[index]
-		validateAmount(rule.ID, rule.Amount, []any{"recurrenceRules", index})
+	for index := range model.Schedules {
+		rule := &model.Schedules[index]
+		validateAmount(rule.ID, rule.Amount, []any{"schedules", index})
 		if CountVolatileRateInputs(rule.Amount) > 1 {
 			addIssue(issues, types.SeverityError, "posting.amount.multiple_volatile_rates",
 				"Amounts carry at most one volatile provider input: one transaction shares one pre-sampled annual rate.",
-				pathWithField([]any{"recurrenceRules", index}, "amount")...)
+				pathWithField([]any{"schedules", index}, "amount")...)
 		}
 	}
 	return dependencies
@@ -362,14 +362,14 @@ func validatePostingDependencies(issues *[]types.ModelValidationIssue, model *ty
 			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", posting.ID),
 			pathWithField([]any{"postings", index}, "amount")...)
 	}
-	for index := range model.RecurrenceRules {
-		rule := &model.RecurrenceRules[index]
+	for index := range model.Schedules {
+		rule := &model.Schedules[index]
 		if !visit(rule.ID) {
 			continue
 		}
 		addIssue(issues, types.SeverityError, "posting.amount.circular",
 			fmt.Sprintf("Amount resolution for '%s' creates a circular posting dependency.", rule.ID),
-			pathWithField([]any{"recurrenceRules", index}, "amount")...)
+			pathWithField([]any{"schedules", index}, "amount")...)
 	}
 }
 
@@ -378,7 +378,7 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 		posting := &postings[index]
 		if posting.SourceAccountID != nil && !accountIDs[*posting.SourceAccountID] {
 			addIssue(issues, types.SeverityError, "posting.source.missing",
-				fmt.Sprintf("Posting source account '%s' does not exist.", *posting.SourceAccountID),
+				fmt.Sprintf("Transaction source account '%s' does not exist.", *posting.SourceAccountID),
 				pathWithField([]any{"postings", index}, "sourceAccountId")...)
 		}
 		if posting.Destinations != nil {
@@ -386,11 +386,11 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 			for _, destinationID := range posting.Destinations {
 				if !accountIDs[destinationID] {
 					addIssue(issues, types.SeverityError, "posting.destination.missing",
-						fmt.Sprintf("Posting destination account '%s' does not exist.", destinationID),
+						fmt.Sprintf("Transaction destination account '%s' does not exist.", destinationID),
 						pathWithField([]any{"postings", index}, "destinations")...)
 				}
 				if seen[destinationID] {
-					addIssue(issues, types.SeverityError, "posting.destinations.duplicate",
+					addIssue(issues, types.SeverityError, "schedule.destinations.duplicate",
 						fmt.Sprintf("Destination account '%s' appears more than once.", destinationID),
 						pathWithField([]any{"postings", index}, "destinations")...)
 				}
@@ -399,49 +399,49 @@ func validatePostingRoutes(issues *[]types.ModelValidationIssue, postings []type
 		}
 		if posting.SourceAccountID == nil && len(posting.Destinations) == 0 {
 			addIssue(issues, types.SeverityError, "posting.accounts.empty",
-				"Postings must set sourceAccountId, destinations, or both.",
+				"Transactions must set sourceAccountId, destinations, or both.",
 				[]any{"postings", index}...)
 		}
 		if posting.SourceAccountID != nil && containsString(posting.Destinations, *posting.SourceAccountID) {
 			addIssue(issues, types.SeverityError, "posting.accounts.same",
-				"Posting sourceAccountId must not appear in destinations.",
+				"Transaction sourceAccountId must not appear in destinations.",
 				[]any{"postings", index}...)
 		}
 		// Pending seeds and void holds carry no posted date: the bridge
 		// reports Posted == 0 until a charge posts.
 		if posting.PostedTime <= 0 && !posting.Pending && !posting.Void {
 			addIssue(issues, types.SeverityError, "posting.postedTime.invalid",
-				fmt.Sprintf("Posting '%s' posted time must be positive Unix seconds.", posting.ID),
+				fmt.Sprintf("Transaction '%s' posted time must be positive Unix seconds.", posting.ID),
 				pathWithField([]any{"postings", index}, "postedTime")...)
 		}
 		if posting.TransactionTime <= 0 {
 			addIssue(issues, types.SeverityError, "posting.transactionTime.invalid",
-				fmt.Sprintf("Posting '%s' transaction time must be positive Unix seconds.", posting.ID),
+				fmt.Sprintf("Transaction '%s' transaction time must be positive Unix seconds.", posting.ID),
 				pathWithField([]any{"postings", index}, "transactionTime")...)
 		}
 	}
 }
 
-// validateRuleSchedules checks rule routes, frequencies, and schedule bounds.
-func validateRuleSchedules(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) {
-	for index := range model.RecurrenceRules {
-		rule := &model.RecurrenceRules[index]
-		base := []any{"recurrenceRules", index}
+// validateSchedules checks schedule routes, frequencies, and bounds.
+func validateSchedules(issues *[]types.ModelValidationIssue, model *types.FinancialModel, accountIDs map[string]bool) {
+	for index := range model.Schedules {
+		rule := &model.Schedules[index]
+		base := []any{"schedules", index}
 		if rule.SourceAccountID != nil && !accountIDs[*rule.SourceAccountID] {
-			addIssue(issues, types.SeverityError, "posting.source.missing",
-				fmt.Sprintf("Rule source account '%s' does not exist.", *rule.SourceAccountID),
+			addIssue(issues, types.SeverityError, "schedule.source.missing",
+				fmt.Sprintf("Schedule source account '%s' does not exist.", *rule.SourceAccountID),
 				pathWithField(base, "sourceAccountId")...)
 		}
 		if rule.Destinations != nil {
 			seen := map[string]bool{}
 			for _, destinationID := range rule.Destinations {
 				if !accountIDs[destinationID] {
-					addIssue(issues, types.SeverityError, "posting.destination.missing",
-						fmt.Sprintf("Rule destination account '%s' does not exist.", destinationID),
+					addIssue(issues, types.SeverityError, "schedule.destination.missing",
+						fmt.Sprintf("Schedule destination account '%s' does not exist.", destinationID),
 						pathWithField(base, "destinations")...)
 				}
 				if seen[destinationID] {
-					addIssue(issues, types.SeverityError, "posting.destinations.duplicate",
+					addIssue(issues, types.SeverityError, "schedule.destinations.duplicate",
 						fmt.Sprintf("Destination account '%s' appears more than once.", destinationID),
 						pathWithField(base, "destinations")...)
 				}
@@ -449,50 +449,50 @@ func validateRuleSchedules(issues *[]types.ModelValidationIssue, model *types.Fi
 			}
 		}
 		if rule.SourceAccountID == nil && len(rule.Destinations) == 0 {
-			addIssue(issues, types.SeverityError, "posting.accounts.empty",
-				"Rules must set sourceAccountId, destinations, or both.",
+			addIssue(issues, types.SeverityError, "schedule.accounts.empty",
+				"Schedules must set sourceAccountId, destinations, or both.",
 				base...)
 		}
 		if rule.SourceAccountID != nil && containsString(rule.Destinations, *rule.SourceAccountID) {
-			addIssue(issues, types.SeverityError, "posting.accounts.same",
-				"Rule sourceAccountId must not appear in destinations.",
+			addIssue(issues, types.SeverityError, "schedule.accounts.same",
+				"Schedule sourceAccountId must not appear in destinations.",
 				base...)
 		}
 		switch rule.Frequency {
 		case types.FrequencyDaily, types.FrequencyWeekly, types.FrequencyMonthly, types.FrequencyQuarterly, types.FrequencyAnnual:
 		default:
-			addIssue(issues, types.SeverityError, "rule.frequency.invalid",
-				fmt.Sprintf("Rule '%s' has frequency '%s'. Expected daily, weekly, monthly, quarterly, or annual.", rule.ID, rule.Frequency),
+			addIssue(issues, types.SeverityError, "schedule.frequency.invalid",
+				fmt.Sprintf("Schedule '%s' has frequency '%s'. Expected daily, weekly, monthly, quarterly, or annual.", rule.ID, rule.Frequency),
 				pathWithField(base, "frequency")...)
 		}
 		if !IsValidIsoDate(rule.StartDate) {
-			addIssue(issues, types.SeverityError, "rule.start-date.format",
-				fmt.Sprintf("Rule '%s' startDate must be a YYYY-MM-DD calendar date.", rule.ID),
+			addIssue(issues, types.SeverityError, "schedule.start-date.format",
+				fmt.Sprintf("Schedule '%s' startDate must be a YYYY-MM-DD calendar date.", rule.ID),
 				pathWithField(base, "startDate")...)
 		}
 		if rule.EndDate != nil && !IsValidIsoDate(*rule.EndDate) {
-			addIssue(issues, types.SeverityError, "rule.end-date.format",
-				fmt.Sprintf("Rule '%s' endDate must be a YYYY-MM-DD calendar date.", rule.ID),
+			addIssue(issues, types.SeverityError, "schedule.end-date.format",
+				fmt.Sprintf("Schedule '%s' endDate must be a YYYY-MM-DD calendar date.", rule.ID),
 				pathWithField(base, "endDate")...)
 		}
 		if rule.EndDate != nil &&
 			IsValidIsoDate(rule.StartDate) &&
 			IsValidIsoDate(*rule.EndDate) &&
 			CompareIsoDates(*rule.EndDate, rule.StartDate) < 0 {
-			addIssue(issues, types.SeverityError, "rule.schedule.invalid",
-				"Rule endDate must be the same as or later than startDate.",
+			addIssue(issues, types.SeverityError, "schedule.window.invalid",
+				"Schedule endDate must be the same as or later than startDate.",
 				pathWithField(base, "endDate")...)
 		}
 	}
 }
 
 // validatePostingClaims checks that each claim names a real scheduled
-// occurrence of its rule, and that no occurrence is claimed twice. Claims
+// occurrence of its schedule, and that no occurrence is claimed twice. Claims
 // are manual: validation only verifies the named occurrence exists.
 func validatePostingClaims(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
-	rulesByID := make(map[string]*types.RecurrenceRule, len(model.RecurrenceRules))
-	for index := range model.RecurrenceRules {
-		rule := &model.RecurrenceRules[index]
+	rulesByID := make(map[string]*types.Schedule, len(model.Schedules))
+	for index := range model.Schedules {
+		rule := &model.Schedules[index]
 		rulesByID[rule.ID] = rule
 	}
 	claimed := map[string]bool{}
@@ -503,39 +503,39 @@ func validatePostingClaims(issues *[]types.ModelValidationIssue, model *types.Fi
 		}
 		base := []any{"postings", index, "claim"}
 		claim := posting.Claim
-		rule, ok := rulesByID[claim.RuleID]
+		rule, ok := rulesByID[claim.ScheduleID]
 		if !ok {
-			addIssue(issues, types.SeverityError, "posting.claim.rule.missing",
-				fmt.Sprintf("Posting '%s' claims rule '%s', which does not exist.", posting.ID, claim.RuleID),
-				append(base, "ruleId")...)
+			addIssue(issues, types.SeverityError, "posting.claim.schedule.missing",
+				fmt.Sprintf("Transaction '%s' claims schedule '%s', which does not exist.", posting.ID, claim.ScheduleID),
+				append(base, "scheduleId")...)
 			continue
 		}
 		if !IsValidIsoDate(claim.OccurrenceDate) {
 			addIssue(issues, types.SeverityError, "posting.claim.date.format",
-				fmt.Sprintf("Posting '%s' claim occurrenceDate must be a YYYY-MM-DD calendar date.", posting.ID),
+				fmt.Sprintf("Transaction '%s' claim occurrenceDate must be a YYYY-MM-DD calendar date.", posting.ID),
 				append(base, "occurrenceDate")...)
 			continue
 		}
 		if !IsValidIsoDate(rule.StartDate) {
-			continue // reported by validateRuleSchedules
+			continue // reported by validateSchedules
 		}
 		if CompareIsoDates(claim.OccurrenceDate, rule.StartDate) < 0 {
 			addIssue(issues, types.SeverityError, "posting.claim.date.range",
-				fmt.Sprintf("Posting '%s' claims %s, which is before rule '%s' starts.", posting.ID, claim.OccurrenceDate, rule.ID),
+				fmt.Sprintf("Transaction '%s' claims %s, which is before schedule '%s' starts.", posting.ID, claim.OccurrenceDate, rule.ID),
 				append(base, "occurrenceDate")...)
 			continue
 		}
 		scheduled := ruleOccursOn(rule, claim.OccurrenceDate)
 		if !scheduled {
 			addIssue(issues, types.SeverityError, "posting.claim.date.unscheduled",
-				fmt.Sprintf("Posting '%s' claims %s, which is not a scheduled occurrence of rule '%s'.", posting.ID, claim.OccurrenceDate, rule.ID),
+				fmt.Sprintf("Transaction '%s' claims %s, which is not a scheduled occurrence of schedule '%s'.", posting.ID, claim.OccurrenceDate, rule.ID),
 				append(base, "occurrenceDate")...)
 			continue
 		}
-		key := claim.RuleID + "\x00" + claim.OccurrenceDate
+		key := claim.ScheduleID + "\x00" + claim.OccurrenceDate
 		if claimed[key] {
 			addIssue(issues, types.SeverityError, "posting.claim.duplicate",
-				fmt.Sprintf("Rule '%s' occurrence on %s is claimed more than once.", claim.RuleID, claim.OccurrenceDate),
+				fmt.Sprintf("Schedule '%s' occurrence on %s is claimed more than once.", claim.ScheduleID, claim.OccurrenceDate),
 				base...)
 			continue
 		}

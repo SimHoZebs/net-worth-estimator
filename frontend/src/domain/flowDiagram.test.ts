@@ -217,13 +217,20 @@ describe("hasFlowCycle", () => {
 describe("describeNodeTooltip", () => {
 	it("names inflow and outflow totals with flow counts", () => {
 		expect(
-			describeNodeTooltip("Everyday checking", [5000, 200], [300], (v) => `$${v}`),
-		).toBe("Everyday checking: $5200 in across 2 flows, $300 out across 1 flow");
+			describeNodeTooltip(
+				"Everyday checking",
+				[5000, 200],
+				[300],
+				(v) => `$${v}`,
+			),
+		).toBe(
+			"Everyday checking: $5200 in across 2 flows, $300 out across 1 flow",
+		);
 	});
 	it("weighs absolute flow and reads empty sides as zero", () => {
-		expect(describeNodeTooltip("Outside accounts", [], [-50], (v) => `$${v}`)).toBe(
-			"Outside accounts: $0 in across 0 flows, $50 out across 1 flow",
-		);
+		expect(
+			describeNodeTooltip("Outside accounts", [], [-50], (v) => `$${v}`),
+		).toBe("Outside accounts: $0 in across 0 flows, $50 out across 1 flow");
 	});
 });
 
@@ -235,13 +242,30 @@ describe("describeLaneTooltip", () => {
 		movement: "actual",
 		amount: 300,
 		sources: [
-			{ postingId: "a", date: "2026-01-05", sequence: 0, requestedAmount: 100, realizedAmount: 100 },
-			{ postingId: "b", date: "2026-02-05", sequence: 0, requestedAmount: 200, realizedAmount: 200 },
+			{
+				postingId: "a",
+				date: "2026-01-05",
+				sequence: 0,
+				requestedAmount: 100,
+				realizedAmount: 100,
+			},
+			{
+				postingId: "b",
+				date: "2026-02-05",
+				sequence: 0,
+				requestedAmount: 200,
+				realizedAmount: 200,
+			},
 		],
 	});
 	it("lists every source transaction on short lists", () => {
 		expect(
-			describeLaneTooltip(short, (id) => id, (v) => `$${v}`, (d) => d),
+			describeLaneTooltip(
+				short,
+				(id) => id,
+				(v) => `$${v}`,
+				(d) => d,
+			),
 		).toBe(
 			"Money in of $300 from external to checking (recorded) Transactions: 2026-02-05 $200 · 2026-01-05 $100.",
 		);
@@ -261,7 +285,12 @@ describe("describeLaneTooltip", () => {
 		expect(topLaneSources(long)).toHaveLength(3);
 		expect(topLaneSources(long)[0]?.postingId).toBe("p5");
 		expect(
-			describeLaneTooltip(long, (id) => id, (v) => `$${v}`, (d) => d),
+			describeLaneTooltip(
+				long,
+				(id) => id,
+				(v) => `$${v}`,
+				(d) => d,
+			),
 		).toBe(
 			"Money in of $1000 from external to checking (recorded) Top transactions: 2026-05-01 $500 · 2026-04-01 $400 · 2026-03-01 $300 · +2 more — select this flow to inspect all 5.",
 		);

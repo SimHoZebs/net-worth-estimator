@@ -394,7 +394,7 @@ try {
   assert.ok(blank, "Signup activates a usable blank model without an import");
   assert.deepEqual(blank.accounts, []);
   assert.deepEqual(blank.postings, []);
-  assert.deepEqual(blank.recurrenceRules, []);
+  assert.deepEqual(blank.schedules, []);
   await expect(secondPage.getByRole("heading", { name: "Your workspace is ready" })).toBeVisible();
   await secondPage.goto(`${origin.origin}/#sources`);
   await secondPage.getByRole("tab", { name: "Account", exact: true }).click();

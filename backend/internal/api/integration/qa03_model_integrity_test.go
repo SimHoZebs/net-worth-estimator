@@ -32,7 +32,7 @@ func qa03CanonicalModel(t *testing.T, scoped store.Store) string {
 }
 
 func qa03CountRows(model *types.FinancialModel) (accounts, postings, rules int) {
-	return len(model.Accounts), len(model.Postings), len(model.RecurrenceRules)
+	return len(model.Accounts), len(model.Postings), len(model.Schedules)
 }
 
 func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
@@ -109,7 +109,7 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 	// A genuine model edit — a new forecast rule — moves the forecast, and
 	// only by the rule's own occurrences.
 	preRule, _ := json.Marshal(qa03StoredProjection(t, handler))
-	ruleID := qa03CreateRow(t, handler, "/v1/recurrence-rules",
+	ruleID := qa03CreateRow(t, handler, "/v1/schedules",
 		`{"name":"Dues","sourceAccountId":"`+model.Accounts[0].ID+`","destinations":null,"amount":{"resolver":"expression","config":{"expression":"5"},"inputs":{}},"frequency":"monthly","startDate":"2026-07-15","enabled":true,"priority":1}`)
 	changed, _ := json.Marshal(qa03StoredProjection(t, handler))
 	if string(changed) == string(preRule) {
@@ -125,7 +125,7 @@ func TestQA03ModelIntegrityAcrossReviewSharingAndForecast(t *testing.T) {
 
 	// Deleting the rule restores the pre-rule forecast byte-for-byte: the
 	// simulation depends on current model inputs alone.
-	if response := doRowRequest(t, handler, http.MethodDelete, "/v1/recurrence-rules/"+ruleID, ""); response.Code != http.StatusOK {
+	if response := doRowRequest(t, handler, http.MethodDelete, "/v1/schedules/"+ruleID, ""); response.Code != http.StatusOK {
 		t.Fatalf("delete rule = %d %s", response.Code, response.Body.String())
 	}
 	restored, _ := json.Marshal(qa03StoredProjection(t, handler))

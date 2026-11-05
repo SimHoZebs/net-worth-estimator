@@ -184,4 +184,24 @@ describe("transaction rows", () => {
 			postedDate: null,
 		});
 	});
+
+	it("reads the occurrence claim from its wire member", () => {
+		const row = transactionToDisplay({
+			id: "rent",
+			name: "Rent",
+			sourceAccountId: "cash",
+			destinations: null,
+			amount: {
+				resolver: "expression",
+				config: { expression: "100" },
+				inputs: {},
+			},
+			startDate: "2026-02-01",
+			endDate: null,
+			enabled: true,
+			claim: { scheduleId: "housing", occurrenceDate: "2026-02-01" },
+		} as never);
+		expect(row.claimScheduleId).toBe("housing");
+		expect(row.claimOccurrenceDate).toBe("2026-02-01");
+	});
 });

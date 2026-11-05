@@ -116,7 +116,7 @@ export function serverModelFingerprint(model: FinancialModel): string {
 				...(source === undefined ? {} : { source }),
 			}),
 		),
-		recurrenceRules: (model.recurrenceRules ?? []).map(
+		schedules: (model.schedules ?? []).map(
 			({
 				id,
 				name,

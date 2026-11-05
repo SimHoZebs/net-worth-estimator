@@ -30,7 +30,7 @@ import {
 	useState,
 	type KeyboardEvent,
 } from "react";
-import { setPostingCategory } from "@/api/generated/endpoints.ts";
+import { categorizeTransaction } from "@/api/generated/endpoints.ts";
 import {
 	transactionCategoryLabel,
 	transactionCategoryOptions,
@@ -213,7 +213,7 @@ export function TransactionCategory({
 		setSaving(true);
 		setError(null);
 		const ok = await performSave({
-			call: () => setPostingCategory(postingId, { category: next }),
+			call: () => categorizeTransaction(postingId, { category: next }),
 			refresh: refreshTransactions,
 			failureMessage: "The category could not be saved.",
 		});

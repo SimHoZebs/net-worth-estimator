@@ -38,11 +38,11 @@ import type { Projection } from "@/domain/result.ts";
 import { useCheckpoints } from "@/state/workspaceResources.ts";
 import {
 	useSavedAccounts,
-	useSavedRules,
+	useSavedSchedules,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "@/state/savedState.ts";
-import { ruleToDisplay } from "@/domain/transactionRows.ts";
+import { scheduleToDisplay } from "@/domain/transactionRows.ts";
 import { useUserReadOnly } from "@/state/useUserScope.ts";
 import { SafeSpendingBillsPanel } from "@/pages/outlook/safe-spending/SafeSpendingBillsPanel.tsx";
 import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSpendingConfigurePanel.tsx";
@@ -81,7 +81,7 @@ export function SafeSpendingPreview({
 	// Outlook forecast instead of receiving it as props.
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
-	const savedRules = useSavedRules();
+	const savedRules = useSavedSchedules();
 	const startDate = useSavedStartDate();
 	const readOnly = useUserReadOnly();
 	const checkpoints = useCheckpoints().data?.checkpoints ?? EMPTY_CHECKPOINTS;
@@ -89,7 +89,7 @@ export function SafeSpendingPreview({
 	// Rules are their own rows; bills and income read them through the same
 	// display shape as the posting rows.
 	const rules = useMemo(
-		() => (savedRules ?? []).map(ruleToDisplay),
+		() => (savedRules ?? []).map(scheduleToDisplay),
 		[savedRules],
 	);
 	// Detail mapping spans both row kinds: projected occurrences of a rule
@@ -208,7 +208,7 @@ export function SafeSpendingPreview({
 				rules,
 				transactions: projectionTransactions,
 				incomeAccountIds: incomeIds,
-				incomeRuleIds: settings.incomeRuleIds,
+				incomeScheduleIds: settings.incomeScheduleIds,
 				todayIso: displayToday,
 			}),
 		[
@@ -216,7 +216,7 @@ export function SafeSpendingPreview({
 			rules,
 			projectionTransactions,
 			incomeIds,
-			settings.incomeRuleIds,
+			settings.incomeScheduleIds,
 			displayToday,
 		],
 	);
@@ -276,8 +276,7 @@ export function SafeSpendingPreview({
 		if (!spendingIds.length) return [];
 		return rules
 			.filter(
-				(rule) =>
-					rule.fromId !== null && spendingIds.includes(rule.fromId),
+				(rule) => rule.fromId !== null && spendingIds.includes(rule.fromId),
 			)
 			.map((rule) => ({
 				id: rule.id,

@@ -116,10 +116,10 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		if _, err := s.CreatePosting(testPostingFixture(postingID)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.CreateRule(testRuleFixture("same-rule")); err != nil {
+		if _, err := s.CreateSchedule(testRuleFixture("same-rule")); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.CreateRule(testRuleFixture("second-rule")); err != nil {
+		if _, err := s.CreateSchedule(testRuleFixture("second-rule")); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.CreateEvaluation(eval); err != nil {
@@ -190,10 +190,10 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error {
 			r := testRuleFixture("same-rule")
 			r.Name = "A only"
-			_, err := a.UpdateRule(r)
+			_, err := a.UpdateSchedule(r)
 			return err
 		},
-		func() error { return a.MoveRule("second-rule", "same-rule") },
+		func() error { return a.MoveSchedule("second-rule", "same-rule") },
 		func() error { e := eval; e.Name = "A only"; _, err := a.UpdateEvaluation(e); return err },
 		func() error { return a.MoveEvaluation(eval.Type, "second-evaluation", eval.InstanceID) },
 		func() error {
@@ -224,7 +224,7 @@ func TestSharedDatabaseSameIDsStayIsolated(t *testing.T) {
 		func() error { return a.SetLastSyncTime("after") },
 		func() error { _, err := a.ApplySync(nil, nil); return err },
 		func() error { return a.DeletePosting(postingID) },
-		func() error { return a.DeleteRule("same-rule") },
+		func() error { return a.DeleteSchedule("same-rule") },
 		func() error { return a.DeleteEvaluation(eval.InstanceID) },
 		func() error { return a.DeleteCheckpointAt("checking", 1767311999) },
 		func() error { return a.DeletePaymentTerms("checking") },

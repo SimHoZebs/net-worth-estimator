@@ -1,4 +1,4 @@
-import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
+import type { Schedule } from "@/api/generated/model/schedule.ts";
 import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import type { Transaction } from "./model.ts";
 
@@ -56,7 +56,7 @@ export function growthPercentOf(amount: TransactionRow["amount"]): number {
 }
 
 type TransactionQueryExtras = {
-	claim?: { ruleId?: unknown; occurrenceDate?: unknown } | null;
+	claim?: { scheduleId?: unknown; occurrenceDate?: unknown } | null;
 	pending?: unknown;
 	void?: unknown;
 	postedTime?: unknown;
@@ -114,8 +114,10 @@ export function transactionToDisplay(
 		annualIncrease: growthPercentOf(row.amount),
 		enabled: row.enabled,
 		readOnly: row.readOnly,
-		claimRuleId:
-			typeof claim?.ruleId === "string" && claim.ruleId ? claim.ruleId : null,
+		claimScheduleId:
+			typeof claim?.scheduleId === "string" && claim.scheduleId
+				? claim.scheduleId
+				: null,
 		claimOccurrenceDate:
 			typeof claim?.occurrenceDate === "string" && claim.occurrenceDate
 				? claim.occurrenceDate
@@ -143,10 +145,10 @@ export function transactionToDisplay(
  * A rule is not a posting: kind marks the source table, cadence stays on
  * the rule row itself, and no posting lifecycle fields apply.
  */
-export function ruleToDisplay(rule: RecurrenceRule): Transaction {
+export function scheduleToDisplay(rule: Schedule): Transaction {
 	const literal = literalAmountOf(rule.amount);
 	return {
-		kind: "rule",
+		kind: "schedule",
 		id: rule.id,
 		name: rule.name || rule.id,
 		amount: Math.max(0, literal ?? 0),
@@ -158,7 +160,7 @@ export function ruleToDisplay(rule: RecurrenceRule): Transaction {
 		annualIncrease: growthPercentOf(rule.amount),
 		enabled: rule.enabled,
 		readOnly: false,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,

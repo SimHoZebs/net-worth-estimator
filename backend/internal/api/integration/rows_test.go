@@ -68,8 +68,8 @@ func TestRowWriteValidationRejectsDanglingReference(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 
-	response := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Ghost","sourceAccountId":"ghost","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
+	response := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Ghost","sourceAccountId":"ghost","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, body %s", response.Code, response.Body.String())
 	}
@@ -141,15 +141,15 @@ func TestWriteGuardCoversRowOperations(t *testing.T) {
 		{http.MethodPatch, "/v1/accounts/x", `{"name":"x"}`},
 		{http.MethodDelete, "/v1/accounts/x", ""},
 		{http.MethodPost, "/v1/accounts/reorder", `{"id":"x"}`},
-		{http.MethodPost, "/v1/postings", `{"name":"x"}`},
-		{http.MethodPatch, "/v1/postings/x", `{"name":"x"}`},
-		{http.MethodDelete, "/v1/postings/x", ""},
-		{http.MethodPost, "/v1/postings/reorder", `{"id":"x"}`},
-		{http.MethodPost, "/v1/transactions/x/convert", `{"kind":"posting"}`},
-		{http.MethodPost, "/v1/recurrence-rules", `{"name":"x"}`},
-		{http.MethodPatch, "/v1/recurrence-rules/x", `{"name":"x"}`},
-		{http.MethodDelete, "/v1/recurrence-rules/x", ""},
-		{http.MethodPost, "/v1/recurrence-rules/reorder", `{"id":"x"}`},
+		{http.MethodPost, "/v1/transactions", `{"name":"x"}`},
+		{http.MethodPost, "/v1/transactions/x/amend", `{"name":"x"}`},
+		{http.MethodDelete, "/v1/transactions/x", ""},
+		{http.MethodPost, "/v1/transactions/x/move", `{"id":"x"}`},
+		{http.MethodPost, "/v1/transactions/x/claim", `{"scheduleId":"x","occurrenceDate":"2026-01-01"}`},
+		{http.MethodPost, "/v1/schedules", `{"name":"x"}`},
+		{http.MethodPost, "/v1/schedules/x/amend", `{"name":"x"}`},
+		{http.MethodDelete, "/v1/schedules/x", ""},
+		{http.MethodPost, "/v1/schedules/x/move", `{"id":"x"}`},
 		{http.MethodPost, "/v1/checkpoints", `{"accountId":"x","balance":1,"observedAt":1767311999}`},
 		{http.MethodDelete, "/v1/checkpoints?accountId=x&observedAt=1767311999", ""},
 		{http.MethodPost, "/v1/evaluations", `{"type":"netWorthThreshold","name":"x"}`},

@@ -153,7 +153,7 @@ func TestSharingRoutesClaimedByIdentity(t *testing.T) {
 		}
 	}
 	for _, path := range []string{
-		"/v1/postings", "/v1/accounts", "/v1/financial-model",
+		"/v1/transactions", "/v1/accounts", "/v1/financial-model",
 		"/v1/groups", "/v1/groups/abc", "/v1/invites/accept",
 		"/v1/shared", "/v1/shared/accounts",
 	} {

@@ -16,7 +16,7 @@ export function IncomeSourcesFieldset({
 			{income.candidates.length ? (
 				<div className="flex flex-wrap gap-2">
 					{income.candidates.map((rule) => {
-						const checked = income.selectedRuleIds.includes(rule.id);
+						const checked = income.selectedScheduleIds.includes(rule.id);
 						return (
 							<TogglePill
 								key={rule.id}
@@ -26,10 +26,10 @@ export function IncomeSourcesFieldset({
 								onToggle={() =>
 									onChange(
 										checked
-											? income.selectedRuleIds.filter(
+											? income.selectedScheduleIds.filter(
 													(item) => item !== rule.id,
 												)
-											: [...income.selectedRuleIds, rule.id],
+											: [...income.selectedScheduleIds, rule.id],
 									)
 								}
 							/>

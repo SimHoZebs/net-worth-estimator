@@ -13,18 +13,13 @@ const sample = fileURLToPath(
 test.beforeEach(async () => resetFixture());
 
 async function seedExpense(page: Page) {
-	const response = await page.request.post("/v1/postings", {
+	const response = await page.request.post("/v1/transactions", {
 		data: {
 			name: "Receipt purchase",
 			sourceAccountId: "checking",
 			destinations: [],
-			amount: {
-				resolver: "expression",
-				config: { expression: "12.34" },
-				inputs: {},
-			},
-			postedTime: Date.UTC(2026, 0, 20) / 1000,
-			transactionTime: Date.UTC(2026, 0, 20) / 1000,
+			amount: { value: 12.34 },
+			date: "2026-01-20",
 			enabled: true,
 		},
 	});
@@ -106,7 +101,7 @@ test("private receipt upload, extraction, corrections, and reload preserve the s
 	const after = await (await page.request.get("/v1/financial-model")).json();
 	expect(after.revision).toBe(before.revision);
 	const list = await (
-		await page.request.get(`/v1/postings/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${postingId}/receipts`)
 	).json();
 	expect(list.receipts).toHaveLength(1);
 	expect(list.receipts[0].confirmed.merchant).toBe("Reviewed market");
@@ -147,7 +142,7 @@ test("reopened extraction polls only reads and exposes interrupted recovery", as
 		.getByRole("button", { name: "Close dialog", exact: true })
 		.click();
 	const collection = await (
-		await page.request.get(`/v1/postings/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${postingId}/receipts`)
 	).json();
 	const id = collection.receipts[0].id as string;
 	let phase = "extracting";
@@ -318,7 +313,7 @@ test("unknown images recover through manual review and drafts survive reload", a
 		.click();
 	await expect(receipt).toHaveCount(0);
 	const list = await (
-		await page.request.get(`/v1/postings/${id}/receipts`)
+		await page.request.get(`/v1/transactions/${id}/receipts`)
 	).json();
 	expect(list.receipts).toHaveLength(0);
 });
@@ -412,7 +407,7 @@ test("image controls replace all receipt content and delete it without changing 
 		.click();
 	await expect(receipt.getByText("Receipt details saved.")).toBeVisible();
 	const original = await (
-		await page.request.get(`/v1/postings/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${postingId}/receipts`)
 	).json();
 	const id = original.receipts[0].id as string;
 	const oldPixels = await receipt.getByRole("img").getAttribute("src");
@@ -474,7 +469,7 @@ test("image controls replace all receipt content and delete it without changing 
 		receipt.getByText("Original extracted values", { exact: true }),
 	).toHaveCount(0);
 	const updated = await (
-		await page.request.get(`/v1/postings/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${postingId}/receipts`)
 	).json();
 	expect(updated.receipts).toHaveLength(1);
 	expect(updated.receipts[0].id).toBe(id);
@@ -513,7 +508,7 @@ test("image controls replace all receipt content and delete it without changing 
 		404,
 	);
 	const list = await (
-		await page.request.get(`/v1/postings/${postingId}/receipts`)
+		await page.request.get(`/v1/transactions/${postingId}/receipts`)
 	).json();
 	expect(list.receipts).toHaveLength(0);
 	const after = await (await page.request.get("/v1/financial-model")).json();

@@ -1,14 +1,17 @@
-import type { PostingBody } from "@/api/generated/model/postingBody.ts";
-import type { PostingUpdateBody } from "@/api/generated/model/postingUpdateBody.ts";
-import type { RuleBody } from "@/api/generated/model/ruleBody.ts";
-import type { RuleUpdateBody } from "@/api/generated/model/ruleUpdateBody.ts";
+import type { ScheduleAmendBody } from "@/api/generated/model/scheduleAmendBody.ts";
+import type { ScheduleCreateBody } from "@/api/generated/model/scheduleCreateBody.ts";
+import type { ScheduleRescheduleBody } from "@/api/generated/model/scheduleRescheduleBody.ts";
+import type { TransactionAmendBody } from "@/api/generated/model/transactionAmendBody.ts";
+import type { TransactionClaimBody } from "@/api/generated/model/transactionClaimBody.ts";
+import type { TransactionRecordBody } from "@/api/generated/model/transactionRecordBody.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { parseDisplayNumber } from "./formValues.ts";
 
 /**
  * Editor vocabulary for the recurrence choice on a form. A one-time row, or
- * the monthly/yearly cadence the editor offers. Stored rules may carry any
- * cadence; edits that leave the choice untouched keep the raw stored value.
+ * the monthly/yearly cadence the editor offers. Stored schedules may carry
+ * any cadence; edits that leave the choice untouched keep the raw stored
+ * value.
  */
 export type FrequencyChoice = "monthly" | "yearly" | "once";
 
@@ -23,7 +26,7 @@ export interface TransactionFormValues {
 	endDate: string | null;
 	postedDate: string | null;
 	enabled: boolean;
-	claimRuleId: string | null;
+	claimScheduleId: string | null;
 	claimOccurrenceDate: string | null;
 	transactionTime?: number | null;
 }
@@ -46,32 +49,34 @@ export function combineDayTime(day: string, time: string): number {
 }
 
 /** Authored amount in the API's semantic form: a literal value and, for
- * rules, an optional yearly growth percent. The server compiles the stored
- * resolution descriptor, so the client never authors resolver input. */
+ * schedules, an optional yearly growth percent. The server compiles the
+ * stored resolution descriptor, so the client never authors resolver input. */
 function authoredAmount(amount: number, annualIncrease: number) {
-	return annualIncrease
-		? { value: amount, annualIncrease }
-		: { value: amount };
+	return annualIncrease ? { value: amount, annualIncrease } : { value: amount };
 }
 
 /**
- * Explicit new posting body for creates and posting conversions. Every
- * authored field is stated outright; nothing is preserved.
+ * Explicit new transaction body for creates. Every authored field is stated
+ * outright; lifecycle state belongs to the server.
  */
-export function postingBody(values: TransactionFormValues): PostingBody {
+export function postingBody(
+	values: TransactionFormValues,
+): TransactionRecordBody {
 	return {
 		name: values.name,
 		amount: authoredAmount(values.amount, 0),
 		enabled: values.enabled,
+		date: values.startDate,
+		...(values.transactionTime
+			? { time: timeOfDay(values.transactionTime) }
+			: {}),
+		...(values.postedDate ? { postedDate: values.postedDate } : {}),
 		...(values.fromId ? { sourceAccountId: values.fromId } : {}),
 		destinations: values.toId ? [values.toId] : null,
-		postedTime: midnightOfDay(values.postedDate ?? values.startDate),
-		transactionTime: values.transactionTime ?? midnightOfDay(values.startDate),
-		// Pending is server-owned bank metadata and is never authored here.
-		...(values.claimRuleId && values.claimOccurrenceDate
+		...(values.claimScheduleId && values.claimOccurrenceDate
 			? {
 					claim: {
-						ruleId: values.claimRuleId,
+						scheduleId: values.claimScheduleId,
 						occurrenceDate: values.claimOccurrenceDate,
 					},
 				}
@@ -79,16 +84,16 @@ export function postingBody(values: TransactionFormValues): PostingBody {
 	};
 }
 
-/** Editor choice matching a stored rule cadence: annual reads as yearly. */
+/** Editor choice matching a stored schedule cadence: annual reads as yearly. */
 export function frequencyChoiceOf(rawFrequency: string): FrequencyChoice {
 	return rawFrequency === "annual" ? "yearly" : "monthly";
 }
 
 /**
- * Explicit new rule body for creates and rule conversions. Priority and caps
- * stay omitted so the server appends and defaults them.
+ * Explicit new schedule body for creates. Priority and caps stay omitted so
+ * the server appends and defaults them.
  */
-export function ruleBody(values: TransactionFormValues): RuleBody {
+export function ruleBody(values: TransactionFormValues): ScheduleCreateBody {
 	return {
 		name: values.name,
 		amount: authoredAmount(values.amount, values.annualIncrease),
@@ -102,9 +107,9 @@ export function ruleBody(values: TransactionFormValues): RuleBody {
 }
 
 /**
- * Posting update: only the members the edit changed. Absent members keep
- * their stored values on the server, so exact timestamps, amount
- * descriptors, and extra destinations never need to be restated.
+ * Transaction amend: only the members the edit changed. Absent members keep
+ * their stored values on the server, so exact timestamps, amount descriptors,
+ * and extra destinations never need to be restated.
  */
 export function postingUpdate({
 	baseline,
@@ -112,8 +117,8 @@ export function postingUpdate({
 }: {
 	baseline: Transaction;
 	values: TransactionFormValues;
-}): PostingUpdateBody {
-	const patch: PostingUpdateBody = {};
+}): TransactionAmendBody {
+	const patch: TransactionAmendBody = {};
 	if (values.name !== baseline.name) patch.name = values.name;
 	if (values.fromId !== baseline.fromId)
 		patch.sourceAccountId = values.fromId ?? null;
@@ -121,32 +126,24 @@ export function postingUpdate({
 		patch.destinations = values.toId ? [values.toId] : null;
 	if (values.amount !== baseline.amount)
 		patch.amount = authoredAmount(values.amount, 0);
+	if (values.startDate !== baseline.startDate) patch.date = values.startDate;
+	const storedTime = timeOfDay(baseline.transactionTime);
+	const editedTime =
+		typeof values.transactionTime === "number"
+			? timeOfDay(values.transactionTime)
+			: storedTime;
+	if (editedTime !== storedTime)
+		patch.time = editedTime === "" ? null : editedTime;
 	if ((values.postedDate ?? null) !== baseline.postedDate)
-		patch.postedTime = midnightOfDay(values.postedDate ?? values.startDate);
-	if (
-		typeof values.transactionTime === "number" &&
-		values.transactionTime !== baseline.transactionTime
-	)
-		patch.transactionTime = values.transactionTime;
-	if (
-		(values.claimRuleId ?? null) !== baseline.claimRuleId ||
-		(values.claimOccurrenceDate ?? null) !== baseline.claimOccurrenceDate
-	)
-		patch.claim =
-			values.claimRuleId && values.claimOccurrenceDate
-				? {
-						ruleId: values.claimRuleId,
-						occurrenceDate: values.claimOccurrenceDate,
-					}
-				: null;
+		patch.postedDate = values.postedDate ?? null;
 	if (values.enabled !== baseline.enabled) patch.enabled = values.enabled;
 	return patch;
 }
 
 /**
- * Rule update: only the members the edit changed. The stored cadence is
- * passed in because the display row never carries it; without it the update
- * omits frequency and the server keeps the stored value.
+ * Schedule terms an edit changes. The stored cadence is passed in because the
+ * display row never carries it; without it the reschedule leg is omitted and
+ * the server keeps the stored cadence.
  */
 export function ruleUpdate({
 	baseline,
@@ -156,37 +153,38 @@ export function ruleUpdate({
 	baseline: Transaction;
 	values: TransactionFormValues;
 	storedFrequency?: string;
-}): RuleUpdateBody {
-	const patch: RuleUpdateBody = {};
-	if (values.name !== baseline.name) patch.name = values.name;
+}): { amend: ScheduleAmendBody; reschedule: ScheduleRescheduleBody } {
+	const amend: ScheduleAmendBody = {};
+	const reschedule: ScheduleRescheduleBody = {};
+	if (values.name !== baseline.name) amend.name = values.name;
 	if (
 		values.amount !== baseline.amount ||
 		values.annualIncrease !== baseline.annualIncrease
 	)
-		patch.amount = authoredAmount(values.amount, values.annualIncrease);
+		amend.amount = authoredAmount(values.amount, values.annualIncrease);
+	if (values.fromId !== baseline.fromId)
+		amend.sourceAccountId = values.fromId ?? null;
+	if (values.toId !== baseline.toId)
+		amend.destinations = values.toId ? [values.toId] : null;
+	if (values.enabled !== baseline.enabled) amend.enabled = values.enabled;
 	if (
 		storedFrequency !== undefined &&
 		values.frequency !== frequencyChoiceOf(storedFrequency)
 	)
-		patch.frequency = values.frequency === "yearly" ? "annual" : "monthly";
+		reschedule.frequency = values.frequency === "yearly" ? "annual" : "monthly";
 	if (values.startDate !== baseline.startDate)
-		patch.startDate = values.startDate;
+		reschedule.startDate = values.startDate;
 	if ((values.endDate ?? null) !== baseline.endDate)
-		patch.endDate = values.endDate ?? null;
-	if (values.fromId !== baseline.fromId)
-		patch.sourceAccountId = values.fromId ?? null;
-	if (values.toId !== baseline.toId)
-		patch.destinations = values.toId ? [values.toId] : null;
-	if (values.enabled !== baseline.enabled) patch.enabled = values.enabled;
-	return patch;
+		reschedule.endDate = values.endDate ?? null;
+	return { amend, reschedule };
 }
 
-/** Claim update: one member changes, every other stored value stays. */
+/** Occurrence claim: one link changes, every other stored value stays. */
 export function claimUpdate(
-	ruleId: string,
+	scheduleId: string,
 	occurrenceDate: string,
-): PostingUpdateBody {
-	return { claim: { ruleId, occurrenceDate } };
+): TransactionClaimBody {
+	return { scheduleId, occurrenceDate };
 }
 
 /** Shared client-side validation for row transaction forms. */
@@ -203,7 +201,7 @@ export function validateTransactionValues(
 	if (!values.fromId && !values.toId)
 		return "Choose a source or destination account.";
 	if (!values.startDate) return "Choose a date.";
-	if (values.claimRuleId && !values.claimOccurrenceDate)
+	if (values.claimScheduleId && !values.claimOccurrenceDate)
 		return "Choose which occurrence this replaces.";
 	if (
 		values.frequency !== "once" &&
@@ -242,7 +240,7 @@ export function detailFormValues({
 		noEndDate: boolean;
 		annualIncrease: string;
 		enabled: boolean;
-		claimRuleId: string;
+		claimScheduleId: string;
 		claimOccurrenceDate: string;
 		postedDate: string;
 		transactionTime?: string;
@@ -273,7 +271,7 @@ export function detailFormValues({
 		draft.endDate < draft.startDate
 	)
 		return new Error("The last occurrence cannot come before the first one.");
-	if (isOnce && draft.claimRuleId && !draft.claimOccurrenceDate)
+	if (isOnce && draft.claimScheduleId && !draft.claimOccurrenceDate)
 		return new Error("Choose which occurrence this replaces.");
 	return {
 		name,
@@ -290,13 +288,14 @@ export function detailFormValues({
 			isOnce && draft.transactionTime !== undefined
 				? draft.startDate === item.startDate &&
 					draft.transactionTime === timeOfDay(item.transactionTime)
-					? item.transactionTime
+					? (item.transactionTime ?? null)
 					: combineDayTime(draft.startDate, draft.transactionTime)
 				: undefined,
 		enabled: draft.enabled,
-		claimRuleId: isOnce && draft.claimRuleId ? draft.claimRuleId : null,
+		claimScheduleId:
+			isOnce && draft.claimScheduleId ? draft.claimScheduleId : null,
 		claimOccurrenceDate:
-			isOnce && draft.claimRuleId && draft.claimOccurrenceDate
+			isOnce && draft.claimScheduleId && draft.claimOccurrenceDate
 				? draft.claimOccurrenceDate
 				: null,
 	};

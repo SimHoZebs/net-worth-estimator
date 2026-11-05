@@ -112,5 +112,5 @@ func (s *handler) projectDeterministic(ctx context.Context, input *struct {
 func isEmptyOverrides(overrides types.ModelOverrides) bool {
 	return len(overrides.AddedAccounts) == 0 && len(overrides.AddedPostings) == 0 &&
 		len(overrides.AddedRules) == 0 && len(overrides.DisabledAccountIDs) == 0 &&
-		len(overrides.DisabledPostingIDs) == 0 && len(overrides.DisabledRuleIDs) == 0
+		len(overrides.DisabledPostingIDs) == 0 && len(overrides.DisabledScheduleIDs) == 0
 }

@@ -285,9 +285,7 @@ export function GroupsPage() {
 							</ul>
 						)}
 
-						{detail && (
-							<GroupSharingSection groupId={detail.id} />
-						)}
+						{detail && <GroupSharingSection groupId={detail.id} />}
 
 						{detail && (
 							<div className="flex gap-2">

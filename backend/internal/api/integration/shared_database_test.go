@@ -74,7 +74,7 @@ func TestSharedDatabaseAPICanonicalReadsRemainUserScoped(t *testing.T) {
 	if _, err := stores[1].CreateAccount(types.Account{ID: "bob-only", Name: "Private destination", Kind: "cash", Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	request = httptest.NewRequest(http.MethodPost, "/v1/postings", bytes.NewBufferString(`{"id":"01900000-0000-7000-8000-000000000099","name":"Cross-plan transfer","sourceAccountId":"same-id","destinations":["bob-only"],"amount":{"resolver":"expression","config":{"expression":"5"},"inputs":{}},"postedTime":1785628800,"transactionTime":1785628800,"enabled":true}`))
+	request = httptest.NewRequest(http.MethodPost, "/v1/transactions", bytes.NewBufferString(`{"id":"01900000-0000-7000-8000-000000000099","name":"Cross-plan transfer","sourceAccountId":"same-id","destinations":["bob-only"],"amount":{"resolver":"expression","config":{"expression":"5"},"inputs":{}},"date":"2026-08-02","enabled":true}`))
 	request.Header.Set("Content-Type", "application/json")
 	response = httptest.NewRecorder()
 	handlers[0].ServeHTTP(response, request)

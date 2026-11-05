@@ -2,18 +2,20 @@
 
 One name per concept. This file is normative: when another document or a string in the interface disagrees, this file wins. `PRODUCT_INTENT.md` §4 defines the concepts; the names live only here.
 
-Use these names in product copy and documentation. Code and API contracts use `FinancialModel` for the complete financial model and `model` for its value. The engine uses `posting`, `recurrence-rule`, and `checkpoint` for stored financial rows.
+Use these names in product copy and documentation. Code and API contracts use `FinancialModel` for the complete financial model and `model` for its value. The engine stores **transactions** and **schedules**; the physical tables keep their established storage names.
 
 ## A. Transaction
 
-A planned or recorded transfer of money into, out of, or between accounts.
+A recorded movement of money into, out of, or between accounts.
 
-Use **transaction**, qualified as **planned** or **recorded**. The saved model's "Transactions" tab holds the rules and dated entries you edit. An account's activity view holds the rows the engine computed from those rules.
+Use **transaction** for a recorded movement. The saved model's "Transactions" tab holds schedules and transactions you edit. An account's activity view holds the entries the engine computed from those records.
 
-- A recurring rule is **scheduled**; a dated single entry is **one-time**.
+- A standing instruction is a **schedule**; a dated single movement is **one-time**.
 - A record supplied by a source is a **deposit** or **withdrawal**.
-- A one-time record linked to a rule's scheduled date records an
-  **occurrence** of that rule.
+- A transaction linked to a schedule's date records an **occurrence** of that schedule.
+- The link is a **claim**: the transaction claims that occurrence. A schedule never points at a transaction.
+- Starting a schedule from a transaction creates a separate schedule and claims the transaction's date as its first occurrence. The transaction stays recorded and unchanged.
+- Ending a schedule with a transaction records the one-time movement that happened and removes the schedule.
 
 ## B. Balance check
 
@@ -75,15 +77,15 @@ Use **income evidence**. Its parts stay distinct: **deposit** (the record), **ca
 
 ## G. Financial model and user scope
 
-The **financial model** is the collection of accounts, transactions, balance checks, rules, payment terms, planned purchases, and evaluations. The **saved model** is its saved state, used for calculation and import/export.
+The **financial model** is the collection of accounts, transactions, balance checks, schedules, payment terms, planned purchases, and evaluations. The **saved model** is its saved state, used for calculation and import/export.
 
-The **user** owns those rows. **Account** means a financial account.
+The **user** owns those records. **Account** means a financial account.
 
 The financial model is the combined input for calculation and import/export. It does not make account maintenance or recorded activity part of the simulation lifecycle. Forecast outcomes and evidence Analysis each have their own lifecycle.
 
 A **guest** is a provisioned user with limited assigned permissions. Guest access uses the same user resource and data tables as other users.
 
-Base forms save row changes directly. Failed submissions retain their fields in the form for retry.
+Base forms save changes directly. Failed submissions retain their fields in the form for retry.
 
 ## Evaluation and income evidence are different things
 

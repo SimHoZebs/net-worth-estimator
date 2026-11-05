@@ -53,19 +53,14 @@ export function setServerModelFixture(
 		asOf: data.startDate,
 		revision: response.revision,
 	});
-	serverQueryClient().setQueryData(
-		[...userResourceKey("rules"), ""],
-		{
-			recurrenceRules: model.recurrenceRules,
-			revision: response.revision,
-		},
-	);
-	serverQueryClient().setQueryData(
-		[...userResourceKey("transactions"), ""],
-		{
-			transactions: data.transactions
-				.filter((row) => row.kind === "posting")
-				.map((row) => ({
+	serverQueryClient().setQueryData([...userResourceKey("rules"), ""], {
+		schedules: model.schedules,
+		revision: response.revision,
+	});
+	serverQueryClient().setQueryData([...userResourceKey("transactions"), ""], {
+		transactions: data.transactions
+			.filter((row) => row.kind === "posting")
+			.map((row) => ({
 				...row,
 				sourceAccountId: row.fromId,
 				destinations: row.toId ? [row.toId] : null,
@@ -73,9 +68,9 @@ export function setServerModelFixture(
 				annualCap: null,
 				source: row.readOnly ? "banksync" : "user",
 				claim:
-					row.claimRuleId && row.claimOccurrenceDate
+					row.claimScheduleId && row.claimOccurrenceDate
 						? {
-								ruleId: row.claimRuleId,
+								scheduleId: row.claimScheduleId,
 								occurrenceDate: row.claimOccurrenceDate,
 							}
 						: null,
@@ -86,9 +81,8 @@ export function setServerModelFixture(
 					Date.parse(`${row.startDate}T00:00:00Z`) / 1000,
 				),
 			})),
-			revision: response.revision,
-		},
-	);
+		revision: response.revision,
+	});
 	serverQueryClient().setQueryData(userResourceKey("eval-summary"), {
 		evaluations: model.evaluations,
 		revision: response.revision,

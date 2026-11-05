@@ -115,7 +115,7 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	for rowID := range rows {
 		id = rowID
 	}
-	if _, err := database.CreateRule(types.RecurrenceRule{
+	if _, err := database.CreateSchedule(types.Schedule{
 		ID: "corner", Name: "Corner Store", Frequency: types.FrequencyMonthly,
 		StartDate: "2026-08-01", Enabled: true,
 		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "42.10"}, Inputs: map[string]types.AmountInputBinding{}},
@@ -124,7 +124,7 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	}
 	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
 		PostingID: id,
-		Claim:     types.PostingClaim{RuleID: "corner", OccurrenceDate: "2026-08-01"},
+		Claim:     types.PostingClaim{ScheduleID: "corner", OccurrenceDate: "2026-08-01"},
 	}}); err != nil {
 		t.Fatalf("claim = %v", err)
 	}
@@ -146,7 +146,7 @@ func TestSyncFlowClaimedHoldSettlesInPlace(t *testing.T) {
 	if row.Pending || !row.Enabled {
 		t.Fatalf("settled row = %+v", row)
 	}
-	if row.Claim == nil || row.Claim.RuleID != "corner" {
+	if row.Claim == nil || row.Claim.ScheduleID != "corner" {
 		t.Fatalf("claim lost on settle: %+v", row)
 	}
 }

@@ -54,21 +54,22 @@ export const transactionSchema = z.object({
 	amountKnown: z.boolean().default(true),
 	fromId: id.nullable(),
 	toId: id.nullable(),
-	// Which row this is: a one-time posting or a recurrence rule. The
-	// schedule itself lives on the rule; the row only carries the tag.
-	kind: z.enum(["posting", "rule"]),
+	// Which record this is: a one-time transaction or a schedule. The
+	// schedule itself lives on the schedule record; the row only carries
+	// the tag.
+	kind: z.enum(["posting", "schedule"]),
 	startDate: date,
 	endDate: date.nullable(),
 	annualIncrease: z.number().min(-50).max(50),
 	enabled: z.boolean(),
 	readOnly: z.boolean(),
-	// Manual link to a recurrence rule occurrence. Only meaningful for
+	// Manual link to a schedule occurrence. Only meaningful for
 	// one-time transactions; the server validates the named occurrence.
-	claimRuleId: id.nullable().default(null),
+	claimScheduleId: id.nullable().default(null),
 	claimOccurrenceDate: date.nullable().default(null),
-	// Display-only day the one-time posting settled, when it differs from
-	// the transaction day (startDate). Recurring rules never carry one.
-	// Editors preserve exact timestamps from the canonical raw posting.
+	// Display-only day the one-time transaction settled, when it differs
+	// from the transaction day (startDate). Schedules never carry one.
+	// Editors preserve exact timestamps from the canonical stored row.
 	postedDate: date.nullable().default(null),
 	// Server-owned bank lifecycle metadata. Missing means not pending.
 	pending: z.boolean().optional(),
@@ -92,7 +93,7 @@ export const transactionSchema = z.object({
 
 /**
  * A transaction is historical when it is a one-time dated record at or before the
- * projection start. Recurring rules and later-dated transactions are projected.
+ * projection start. Schedules and later-dated transactions are projected.
  * Planned purchases live in their own slice and never count as history.
  */
 export function isHistoricalTransaction(

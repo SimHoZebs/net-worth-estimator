@@ -24,7 +24,7 @@ var (
 
 // existingRuleIntervalDays converts a rule frequency to nominal days for drift
 // tolerance. It mirrors the detector cadences plus daily.
-func existingRuleIntervalDays(frequency types.RecurrenceFrequency) (float64, bool) {
+func existingRuleIntervalDays(frequency types.Frequency) (float64, bool) {
 	switch frequency {
 	case types.FrequencyDaily:
 		return 1, true
@@ -41,14 +41,14 @@ func existingRuleIntervalDays(frequency types.RecurrenceFrequency) (float64, boo
 	}
 }
 
-// PatternToExistingRuleInput carries everything adding needs: the confirmed anchor
+// PatternToExistingScheduleInput carries everything adding needs: the confirmed anchor
 // finding, all saved postings (for routing, taken dates, and validation),
 // the immutable source facts for display amounts, and the target rule.
-type PatternToExistingRuleInput struct {
+type PatternToExistingScheduleInput struct {
 	Anchor        types.AnalysisFinding
 	Postings      []types.Posting
 	Facts         map[string]types.TransactionFacts
-	Rule          types.RecurrenceRule
+	Rule          types.Schedule
 	OccurrenceIDs []string
 }
 
@@ -80,7 +80,7 @@ func parsePatternAmount(raw string) (string, error) {
 	return strconv.FormatFloat(math.Round(amount*100)/100, 'f', 2, 64), nil
 }
 
-func existingRuleMatchesPosting(rule types.RecurrenceRule, posting types.Posting) bool {
+func existingRuleMatchesPosting(rule types.Schedule, posting types.Posting) bool {
 	if (rule.SourceAccountID == nil) != (posting.SourceAccountID == nil) {
 		return false
 	}
@@ -98,11 +98,11 @@ func existingRuleMatchesPosting(rule types.RecurrenceRule, posting types.Posting
 	return true
 }
 
-// BuildPatternToExistingRule maps each recorded movement in a confirmed recurring
+// BuildPatternToExistingSchedule maps each recorded movement in a confirmed recurring
 // pattern onto one unused scheduled occurrence of an existing rule. It never
 // writes; callers validate the candidate model and persist claims through
 // the ordinary finance boundary.
-func BuildPatternToExistingRule(input PatternToExistingRuleInput) ([]types.PatternOccurrence, error) {
+func BuildPatternToExistingSchedule(input PatternToExistingScheduleInput) ([]types.PatternOccurrence, error) {
 	anchor := input.Anchor
 	if anchor.Kind != "recurring" {
 		return nil, ErrNotRecurring
@@ -170,7 +170,7 @@ func BuildPatternToExistingRule(input PatternToExistingRuleInput) ([]types.Patte
 	// Disabled postings claim nothing in projections, so their dates stay free.
 	taken := map[string]bool{}
 	for _, posting := range input.Postings {
-		if posting.Claim == nil || posting.Claim.RuleID != rule.ID {
+		if posting.Claim == nil || posting.Claim.ScheduleID != rule.ID {
 			continue
 		}
 		if !posting.Enabled {
@@ -231,7 +231,7 @@ func BuildPatternToExistingRule(input PatternToExistingRuleInput) ([]types.Patte
 	}
 	for _, item := range occurrences {
 		current := byID[item.id]
-		if current.Claim != nil && current.Claim.RuleID == rule.ID && !used[current.Claim.OccurrenceDate] {
+		if current.Claim != nil && current.Claim.ScheduleID == rule.ID && !used[current.Claim.OccurrenceDate] {
 			// Keep an already-correct claim without re-matching when the
 			// stored date is still a scheduled occurrence. Dates past maxDay
 			// cannot appear in the prefix schedule, so expand to the claim

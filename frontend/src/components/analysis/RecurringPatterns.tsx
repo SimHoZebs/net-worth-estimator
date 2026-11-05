@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import type { PatternToNewRulePreview } from "@/api/generated/model/patternToNewRulePreview.ts";
+import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
 import {
 	cadenceLabel,
 	directionLabel,
@@ -11,11 +11,11 @@ import {
 	type RecurringPattern,
 } from "@/domain/recurringPatterns.ts";
 import {
-	useAddPatternToExistingRule,
-	useCreatePatternToNewRule,
+	useAddPatternToExistingSchedule,
+	useCreatePatternToNewSchedule,
 	useDismissAnalysisFinding,
-	usePatternToExistingRulePreview,
-	usePatternToNewRulePreview,
+	usePatternToExistingSchedulePreview,
+	usePatternToNewSchedulePreview,
 	useReviewAnalysisFinding,
 } from "@/state/analyses.ts";
 import { useSavedAccounts } from "@/state/savedState.ts";
@@ -39,7 +39,7 @@ function answerInput(finding: AnalysisFinding, action: "confirm" | "reject") {
 	};
 }
 
-export function NewRuleDialog({
+export function NewScheduleDialog({
 	findingId,
 	title,
 	readOnly,
@@ -50,8 +50,8 @@ export function NewRuleDialog({
 	readOnly: boolean;
 	onClose: () => void;
 }) {
-	const preview = usePatternToNewRulePreview(findingId);
-	const create = useCreatePatternToNewRule();
+	const preview = usePatternToNewSchedulePreview(findingId);
+	const create = useCreatePatternToNewSchedule();
 	const accounts = useSavedAccounts();
 	const [created, setCreated] = useState<string | null>(null);
 	const [failed, setFailed] = useState(false);
@@ -73,8 +73,10 @@ export function NewRuleDialog({
 			) : created ? (
 				<div className="space-y-3">
 					<p className="m-0 text-sm">
-						Forecast rule “{created}” created. Future{" "}
-						{plan.rule ? frequencyLabel(plan.rule.frequency).toLowerCase() : ""}{" "}
+						Forecast schedule “{created}” created. Future{" "}
+						{plan.schedule
+							? frequencyLabel(plan.schedule.frequency).toLowerCase()
+							: ""}{" "}
 						movements will appear in projections. The recorded payments below
 						stay unchanged.
 					</p>
@@ -85,25 +87,25 @@ export function NewRuleDialog({
 			) : (
 				<div className="space-y-4">
 					<dl className="m-0 space-y-2">
-						<DetailRow label="Suggested rule">
-							{plan.rule?.name ?? title}
+						<DetailRow label="Suggested schedule">
+							{plan.schedule?.name ?? title}
 						</DetailRow>
 						<DetailRow label="Amount">
-							{plan.rule
-								? `${plan.rule.amount} ${plan.currency}`
+							{plan.schedule
+								? `${plan.schedule.amount} ${plan.currency}`
 								: `${plan.typicalAmount} ${plan.currency}`}
 						</DetailRow>
-						{plan.rule && (
+						{plan.schedule && (
 							<>
 								<DetailRow label="Repeats">
-									{frequencyLabel(plan.rule.frequency)}
+									{frequencyLabel(plan.schedule.frequency)}
 								</DetailRow>
-								<DetailRow label="Starts">{plan.rule.startDate}</DetailRow>
+								<DetailRow label="Starts">{plan.schedule.startDate}</DetailRow>
 								<DetailRow label="Account">{accountName}</DetailRow>
 							</>
 						)}
 					</dl>
-					{plan.rule && plan.upcoming && plan.upcoming.length > 0 && (
+					{plan.schedule && plan.upcoming && plan.upcoming.length > 0 && (
 						<div>
 							<h3 className="text-sm font-semibold">Upcoming</h3>
 							<ul className="mb-0 mt-1 space-y-1 pl-4 text-sm text-muted">
@@ -125,7 +127,7 @@ export function NewRuleDialog({
 						<p className="m-0 text-sm text-muted">{plan.reason}</p>
 					)}
 					{failed && (
-						<ErrorNotice message="The rule could not be created. The plan above is current; review it and try again." />
+						<ErrorNotice message="The schedule could not be created. The plan above is current; review it and try again." />
 					)}
 					<div className="flex gap-2">
 						<Button type="button" variant="secondary" onClick={onClose}>
@@ -149,7 +151,7 @@ export function NewRuleDialog({
 									)
 								}
 							>
-								{create.isPending ? "Creating…" : "Approve and create rule"}
+								{create.isPending ? "Creating…" : "Approve and create schedule"}
 							</Button>
 						)}
 					</div>
@@ -159,7 +161,7 @@ export function NewRuleDialog({
 	);
 }
 
-function evidenceSummary(plan: PatternToNewRulePreview): string {
+function evidenceSummary(plan: PatternToNewSchedulePreview): string {
 	const occurrences = plan.occurrences ?? [];
 	const dates = occurrences.map((item) => item.date).sort();
 	const range =
@@ -169,7 +171,7 @@ function evidenceSummary(plan: PatternToNewRulePreview): string {
 	return `${occurrences.length} recorded ${occurrences.length === 1 ? "payment" : "payments"} · ${plan.typicalAmount} ${plan.currency} typical · ${range}`;
 }
 
-export function ExistingRuleDialog({
+export function ExistingScheduleDialog({
 	findingId,
 	title,
 	names,
@@ -183,50 +185,50 @@ export function ExistingRuleDialog({
 	onClose: () => void;
 }) {
 	const catalog = useTransactionCatalog();
-	const rules = (catalog.data?.items ?? []).filter(
-		(item) => item.kind === "rule",
+	const schedules = (catalog.data?.items ?? []).filter(
+		(item) => item.kind === "schedule",
 	);
-	const [ruleId, setRuleId] = useState("");
-	const selected = ruleId || rules[0]?.id || "";
-	const preview = usePatternToExistingRulePreview(
+	const [scheduleId, setScheduleId] = useState("");
+	const selected = scheduleId || schedules[0]?.id || "";
+	const preview = usePatternToExistingSchedulePreview(
 		findingId,
 		selected ? selected : undefined,
 	);
-	const add = useAddPatternToExistingRule();
+	const add = useAddPatternToExistingSchedule();
 	const [added, setAdded] = useState<number | null>(null);
-	const [addedRule, setAddedRule] = useState<string | null>(null);
+	const [addedSchedule, setAddedSchedule] = useState<string | null>(null);
 	const [failed, setFailed] = useState(false);
 	const plan = preview.data;
 	return (
 		<Modal
-			title={`Link repeating payments to a rule`}
+			title={`Link repeating payments to a schedule`}
 			eyebrow={title}
 			onClose={onClose}
 		>
 			<div className="space-y-4">
 				<SelectField
-					label="Existing forecast rule"
+					label="Existing forecast schedule"
 					value={selected}
 					onChange={(event) => {
-						setRuleId(event.target.value);
+						setScheduleId(event.target.value);
 						setAdded(null);
-						setAddedRule(null);
+						setAddedSchedule(null);
 						setFailed(false);
 					}}
 				>
-					<option value="">Choose a rule…</option>
-					{rules.map((rule) => (
-						<option key={rule.id} value={rule.id}>
-							{rule.name}
+					<option value="">Choose a schedule…</option>
+					{schedules.map((schedule) => (
+						<option key={schedule.id} value={schedule.id}>
+							{schedule.name}
 						</option>
 					))}
 				</SelectField>
 				{!selected ? (
 					<p className="m-0 text-sm text-muted">
-						Choose the forecast rule these recorded payments belong to.
+						Choose the forecast schedule these recorded payments belong to.
 					</p>
 				) : preview.isPending ? (
-					<p className="text-sm text-muted">Checking the rule schedule…</p>
+					<p className="text-sm text-muted">Checking the forecast schedule…</p>
 				) : preview.isError || !plan ? (
 					<ErrorNotice message="The link preview could not be loaded. Try again." />
 				) : added !== null ? (
@@ -234,7 +236,8 @@ export function ExistingRuleDialog({
 						<p className="m-0 text-sm">
 							{added} recorded {added === 1 ? "payment" : "payments"} now{" "}
 							{added === 1 ? "records" : "record"} an occurrence of “
-							{addedRule ?? plan.ruleName}”. Future movements stay on that rule.
+							{addedSchedule ?? plan.scheduleName}”. Future movements stay on
+							that schedule.
 						</p>
 						<Button type="button" variant="secondary" onClick={onClose}>
 							Close
@@ -273,19 +276,19 @@ export function ExistingRuleDialog({
 									disabled={add.isPending}
 									onClick={() =>
 										add.mutate(
-											{ id: findingId, ruleId: plan.ruleId },
+											{ id: findingId, scheduleId: plan.scheduleId },
 											{
 												onSuccess: (result) => {
 													setFailed(false);
 													setAdded((result.matches ?? []).length);
-													setAddedRule(plan.ruleName);
+													setAddedSchedule(plan.scheduleName);
 												},
 												onError: () => setFailed(true),
 											},
 										)
 									}
 								>
-									{add.isPending ? "Linking…" : "Link payments to rule"}
+									{add.isPending ? "Linking…" : "Link payments to schedule"}
 								</Button>
 							)}
 						</div>
@@ -383,14 +386,14 @@ function PatternCard({
 					type="button"
 					size="sm"
 					variant="secondary"
-					aria-label={`Link repeating pattern for ${title} to an existing rule`}
+					aria-label={`Link repeating pattern for ${title} to an existing schedule`}
 					onClick={() => setLinkOpen(true)}
 				>
-					Link to existing rule
+					Link to existing schedule
 				</Button>
 			</div>
 			{planOpen && (
-				<NewRuleDialog
+				<NewScheduleDialog
 					findingId={actionable.id}
 					title={title}
 					readOnly={readOnly}
@@ -398,7 +401,7 @@ function PatternCard({
 				/>
 			)}
 			{linkOpen && (
-				<ExistingRuleDialog
+				<ExistingScheduleDialog
 					findingId={actionable.id}
 					title={title}
 					names={names}
@@ -427,10 +430,10 @@ export function RecurringPatterns({
 				<h2 className="m-0 text-lg font-semibold">Repeating payments</h2>
 				<p className="m-0 text-sm text-muted">
 					Analysis groups saved bank records that repeat on a steady rhythm.
-					Confirm a pattern, then create its forecast rule or link its payments
-					to an existing rule. Created plans start after the last recorded
-					payment; linked payments record an occurrence, so history is never
-					duplicated.
+					Confirm a pattern, then create its forecast schedule or link its
+					payments to an existing schedule. Created plans start after the last
+					recorded payment; linked payments record an occurrence, so history is
+					never duplicated.
 				</p>
 			</header>
 			{patterns.map((pattern) => (

@@ -45,7 +45,7 @@ export function transactionRemovalNeedsProjectionRefresh(id: string): boolean {
 		)
 			return true;
 	}
-	if (model.checkpoints.length > 0 || (model.recurrenceRules ?? []).length > 0)
+	if (model.checkpoints.length > 0 || (model.schedules ?? []).length > 0)
 		return false;
 	return model.postings[0]?.id === id;
 }

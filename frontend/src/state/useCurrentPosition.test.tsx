@@ -22,7 +22,7 @@ function model(balance = 100): FinancialModel {
 		sourcePath: "",
 		accounts: [],
 		postings: [],
-		recurrenceRules: [],
+		schedules: [],
 		checkpoints: [
 			{ AccountId: "cash", Balance: balance, observedAt: 1767311999 },
 		],

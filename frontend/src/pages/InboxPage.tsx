@@ -32,7 +32,10 @@ const tabs: Array<{ id: InboxStatus; label: string }> = [
 	{ id: "canceled", label: "Canceled" },
 ];
 
-const statusTone: Record<InboxStatus, "outline" | "success" | "neutral" | "warning"> = {
+const statusTone: Record<
+	InboxStatus,
+	"outline" | "success" | "neutral" | "warning"
+> = {
 	pending: "outline",
 	accepted: "success",
 	declined: "neutral",
@@ -82,14 +85,19 @@ function InboxItemCard({
 	const posting = item.posting;
 	const amount = posting ? previewAmount(posting) : null;
 	return (
-		<article aria-label={`Shared transaction ${item.postingId}`} className="grid gap-2 rounded-surface border border-solid border-line bg-surface p-4">
+		<article
+			aria-label={`Shared transaction ${item.postingId}`}
+			className="grid gap-2 rounded-surface border border-solid border-line bg-surface p-4"
+		>
 			<div className="flex flex-wrap items-center gap-2">
 				<Badge tone={statusTone[item.status]}>{item.status}</Badge>
 				{item.unread && <Badge tone="success">New</Badge>}
 				{item.dismissed && <Badge tone="neutral">Hidden</Badge>}
 			</div>
 			<div>
-				<h3 className="m-0 text-base">{posting?.name ?? "Shared transaction"}</h3>
+				<h3 className="m-0 text-base">
+					{posting?.name ?? "Shared transaction"}
+				</h3>
 				<p className="mt-1 mb-0 text-sm text-muted">
 					{item.senderDisplayName
 						? `Shared by ${item.senderDisplayName}`
@@ -118,7 +126,12 @@ function InboxItemCard({
 			<div className="flex flex-wrap gap-2">
 				{item.status === "pending" && posting && (
 					<>
-						<Button size="sm" variant="primary" disabled={busy} onClick={onAccept}>
+						<Button
+							size="sm"
+							variant="primary"
+							disabled={busy}
+							onClick={onAccept}
+						>
 							Accept and save a copy
 						</Button>
 						<Button size="sm" disabled={busy} onClick={onDecline}>
@@ -127,7 +140,12 @@ function InboxItemCard({
 					</>
 				)}
 				{item.dismissed ? (
-					<Button size="sm" variant="ghost" disabled={busy} onClick={onUndismiss}>
+					<Button
+						size="sm"
+						variant="ghost"
+						disabled={busy}
+						onClick={onUndismiss}
+					>
 						Unhide
 					</Button>
 				) : (
@@ -136,11 +154,21 @@ function InboxItemCard({
 					</Button>
 				)}
 				{item.unread ? (
-					<Button size="sm" variant="ghost" disabled={busy} onClick={onMarkRead}>
+					<Button
+						size="sm"
+						variant="ghost"
+						disabled={busy}
+						onClick={onMarkRead}
+					>
 						Mark read
 					</Button>
 				) : (
-					<Button size="sm" variant="ghost" disabled={busy} onClick={onMarkUnread}>
+					<Button
+						size="sm"
+						variant="ghost"
+						disabled={busy}
+						onClick={onMarkUnread}
+					>
 						Mark unread
 					</Button>
 				)}
@@ -175,7 +203,10 @@ export function InboxPage() {
 	async function onAccept(item: InboxShareItem) {
 		try {
 			await acceptMutation.mutateAsync(target(item));
-			notifySuccess("inbox-notice", "Share accepted and saved to your records.");
+			notifySuccess(
+				"inbox-notice",
+				"Share accepted and saved to your records.",
+			);
 		} catch {
 			notifyError("inbox", "Share could not be accepted.");
 		}
@@ -231,15 +262,20 @@ export function InboxPage() {
 			<div>
 				<h2 className="m-0 text-xl">Inbox</h2>
 				<p className="mb-0 text-sm text-muted">
-					One place for transactions shared with you. Accepting saves your
-					own copy; declining removes you from the sender&apos;s list.
+					One place for transactions shared with you. Accepting saves your own
+					copy; declining removes you from the sender&apos;s list.
 				</p>
 			</div>
 			{inboxQuery.isError ? (
 				<ErrorNotice message="Inbox could not be loaded." />
 			) : (
 				<>
-					<Tabs items={tabs} value={filter} onChange={setFilter} label="Inbox status">
+					<Tabs
+						items={tabs}
+						value={filter}
+						onChange={setFilter}
+						label="Inbox status"
+					>
 						<div>
 							<label className="mb-4 flex items-center gap-2 text-sm text-muted">
 								<input

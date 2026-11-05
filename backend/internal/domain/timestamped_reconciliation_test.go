@@ -103,7 +103,7 @@ func TestDayCloseRuleAbsentAtIntradayCut(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints = model.Checkpoints[:1]
 	model.Postings = nil
-	model.RecurrenceRules = []types.RecurrenceRule{
+	model.Schedules = []types.Schedule{
 		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
 	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})
@@ -454,7 +454,7 @@ func TestHistoricalRulesKeepFundingClamps(t *testing.T) {
 		Checkpoints: []types.Checkpoint{
 			{AccountID: account, Balance: 1000, Source: "user", ObservedAt: unixAt(10, 9)},
 		},
-		RecurrenceRules: []types.RecurrenceRule{
+		Schedules: []types.Schedule{
 			{ID: "payout", Name: "Payout", SourceAccountID: &account, Amount: expenseAmount("100"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true, AnnualCap: &cap},
 		},
 		Evaluations: types.EmptyEvaluationTables(),
@@ -482,7 +482,7 @@ func TestExactCutDoesNotExecuteDayCloseRuleEarly(t *testing.T) {
 	model := observerFixture()
 	model.Checkpoints = model.Checkpoints[:1]
 	model.Postings = nil
-	model.RecurrenceRules = []types.RecurrenceRule{
+	model.Schedules = []types.Schedule{
 		{ID: "income", Name: "Income", Destinations: []string{"checking"}, Amount: expenseAmount("10"), Frequency: types.FrequencyMonthly, StartDate: "2026-03-10", Priority: 1, Enabled: true},
 	}
 	position, err := ResolveCurrentPosition(model, "2026-03-10T10:00:00Z", types.ModelOverrides{})

@@ -50,15 +50,14 @@ export function ReceiptPanel({
 	};
 	const receipts = collection.data?.receipts ?? [];
 	return (
-		<section
-			className="mt-4 flex flex-col gap-4"
-			aria-label="Receipt evidence"
-		>
+		<section className="mt-4 flex flex-col gap-4" aria-label="Receipt evidence">
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div className="flex items-center gap-2">
 					<ReceiptText size={17} aria-hidden="true" />
 					<h3 className="text-sm font-semibold">Receipts</h3>
-					{receipts.length > 0 && <Badge tone="neutral">{receipts.length}</Badge>}
+					{receipts.length > 0 && (
+						<Badge tone="neutral">{receipts.length}</Badge>
+					)}
 				</div>
 				{saved && !locked && eligible && (
 					<div className="flex items-center gap-2">

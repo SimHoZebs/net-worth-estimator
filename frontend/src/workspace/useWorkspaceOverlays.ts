@@ -4,11 +4,11 @@ import type { EditorTarget } from "../components/WorkspaceEditor.tsx";
 import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import {
 	useSavedAccounts,
-	useSavedRules,
+	useSavedSchedules,
 	useSavedTransactions,
 	useSavedEvaluations,
 } from "../state/savedState.ts";
-import { ruleToDisplay } from "../domain/transactionRows.ts";
+import { scheduleToDisplay } from "../domain/transactionRows.ts";
 import {
 	editorHash,
 	evidenceHash,
@@ -33,9 +33,9 @@ export function useWorkspaceOverlays({
 }) {
 	const accounts = useSavedAccounts();
 	const transactions = useSavedTransactions();
-	const savedRules = useSavedRules();
+	const savedRules = useSavedSchedules();
 	const ruleRows = useMemo(
-		() => (savedRules ?? []).map(ruleToDisplay),
+		() => (savedRules ?? []).map(scheduleToDisplay),
 		[savedRules],
 	);
 	// Deep links resolve against every saved row. Wait for both row

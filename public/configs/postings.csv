@@ -1,4 +1,4 @@
-id,name,sourceAccountId,destinations,amount,postedTime,transactionTime,ruleId,occurrenceDate,enabled
+id,name,sourceAccountId,destinations,amount,postedTime,transactionTime,scheduleId,occurrenceDate,enabled
 554176fc-daf9-58b0-b7cb-fcd0f2c72afe,Opening RSU balance,,rsu,"{""resolver"":""expression"",""config"":{""expression"":""140383.66""},""inputs"":{}}",1775433600,1775433600,,,true
 e91a656d-add6-518d-87fd-48e6655764cf,Opening checking balance,,checking,"{""resolver"":""expression"",""config"":{""expression"":""23182.42""},""inputs"":{}}",1777507200,1777507200,,,true
 ce1c1878-2024-51c7-aa2d-78cee87a396b,Opening brokerage balance,,brokerage,"{""resolver"":""expression"",""config"":{""expression"":""234.54""},""inputs"":{}}",1777507200,1777507200,,,true

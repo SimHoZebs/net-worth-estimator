@@ -6,7 +6,7 @@ package types
 type SimulationInputs struct {
 	Accounts         []Account         `json:"accounts"`
 	Postings         []Posting         `json:"postings"`
-	RecurrenceRules  []RecurrenceRule  `json:"recurrenceRules"`
+	Schedules        []Schedule        `json:"schedules"`
 	PaymentTerms     []PaymentTerms    `json:"paymentTerms,omitempty"`
 	PlannedPurchases []PlannedPurchase `json:"plannedPurchases,omitempty"`
 }

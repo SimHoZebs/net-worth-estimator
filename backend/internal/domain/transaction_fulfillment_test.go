@@ -58,7 +58,7 @@ func TestPublicTransactionFulfillmentMatchesEvaluation(t *testing.T) {
 			}
 			if tc.capped {
 				cap := tc.realized
-				model.RecurrenceRules = []types.RecurrenceRule{{
+				model.Schedules = []types.Schedule{{
 					ID: posting.ID, Name: posting.Name, SourceAccountID: posting.SourceAccountID,
 					AnnualCap: &cap, Enabled: true,
 				}}

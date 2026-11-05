@@ -41,15 +41,10 @@ export function TransactionSharing({
 
 	const intents = useMemo(
 		() =>
-			(grantsQuery.data ?? []).filter(
-				(grant) => grant.postingId === postingId,
-			),
+			(grantsQuery.data ?? []).filter((grant) => grant.postingId === postingId),
 		[grantsQuery.data, postingId],
 	);
-	const groups = useMemo(
-		() => groupsQuery.data ?? [],
-		[groupsQuery.data],
-	);
+	const groups = useMemo(() => groupsQuery.data ?? [], [groupsQuery.data]);
 	const groupName = useMemo(() => {
 		const names = new Map(groups.map((group) => [group.id, group.name]));
 		return (id: string) => names.get(id) ?? "A group";
@@ -68,8 +63,7 @@ export function TransactionSharing({
 	);
 	const hideOptions = groups.filter(
 		(group) =>
-			!usedAudience.has(`group:${group.id}`) &&
-			!usedAudience.has("all:"),
+			!usedAudience.has(`group:${group.id}`) && !usedAudience.has("all:"),
 	);
 	const wildcardHidden = usedAudience.has("all:");
 	// A wildcard exclusion denies before any grant is considered, so
@@ -199,31 +193,22 @@ export function TransactionSharing({
 							<span>
 								{intent.intent === "shared" ? (
 									<>
-										Shared with{" "}
-										<strong>
-											{groupName(intent.audienceId)}
-										</strong>
+										Shared with <strong>{groupName(intent.audienceId)}</strong>
 										{wildcardHidden && (
 											<span className="text-muted">
 												{" "}
-												— hidden while the everyone
-												exclusion lasts
+												— hidden while the everyone exclusion lasts
 											</span>
 										)}
 									</>
 								) : intent.audienceType === "all" ? (
 									<>
 										Hidden from{" "}
-										<strong>
-											everyone, including future groups
-										</strong>
+										<strong>everyone, including future groups</strong>
 									</>
 								) : (
 									<>
-										Hidden from{" "}
-										<strong>
-											{groupName(intent.audienceId)}
-										</strong>
+										Hidden from <strong>{groupName(intent.audienceId)}</strong>
 									</>
 								)}
 							</span>
@@ -234,19 +219,14 @@ export function TransactionSharing({
 									disabled={busy}
 									onClick={() =>
 										intent.intent === "shared"
-											? onRevoke(
-													intent.audienceType,
-													intent.audienceId,
-												)
+											? onRevoke(intent.audienceType, intent.audienceId)
 											: onRemoveExclusion(
 													intent.audienceType,
 													intent.audienceId,
 												)
 									}
 								>
-									{intent.intent === "shared"
-										? "Stop sharing"
-										: "Remove"}
+									{intent.intent === "shared" ? "Stop sharing" : "Remove"}
 								</Button>
 							)}
 						</li>
@@ -261,24 +241,17 @@ export function TransactionSharing({
 							className="grid gap-1 text-sm"
 							htmlFor={`share-group-${postingId}`}
 						>
-							<span className="font-medium">
-								Share with a group
-							</span>
+							<span className="font-medium">Share with a group</span>
 							<span className="text-muted">
-								The group sees this transaction in its usual
-								shape. Works with or without automatic
-								sharing.
+								The group sees this transaction in its usual shape. Works with
+								or without automatic sharing.
 							</span>
 						</label>
 						<div className="flex flex-wrap gap-2">
 							<select
 								id={`share-group-${postingId}`}
 								value={shareTarget}
-								disabled={
-									busy ||
-									wildcardHidden ||
-									shareOptions.length === 0
-								}
+								disabled={busy || wildcardHidden || shareOptions.length === 0}
 								onChange={(event) => {
 									setError(null);
 									setShareTarget(event.target.value);
@@ -297,9 +270,7 @@ export function TransactionSharing({
 							</select>
 							<Button
 								size="sm"
-								disabled={
-									busy || wildcardHidden || !shareTarget
-								}
+								disabled={busy || wildcardHidden || !shareTarget}
 								onClick={onShare}
 							>
 								{busy ? "Sharing…" : "Share"}
@@ -307,9 +278,8 @@ export function TransactionSharing({
 						</div>
 						{wildcardHidden && (
 							<p className="m-0 text-sm text-muted">
-								Sharing is paused while this transaction is
-								hidden from everyone. Remove that exclusion
-								to share again.
+								Sharing is paused while this transaction is hidden from
+								everyone. Remove that exclusion to share again.
 							</p>
 						)}
 					</div>
@@ -319,23 +289,17 @@ export function TransactionSharing({
 							className="grid gap-1 text-sm"
 							htmlFor={`hide-group-${postingId}`}
 						>
-							<span className="font-medium">
-								Hide from a group or everyone
-							</span>
+							<span className="font-medium">Hide from a group or everyone</span>
 							<span className="text-muted">
-								Hiding wins over sharing. Hiding from everyone
-								also covers groups you join later and stays
-								until removed.
+								Hiding wins over sharing. Hiding from everyone also covers
+								groups you join later and stays until removed.
 							</span>
 						</label>
 						<div className="flex flex-wrap gap-2">
 							<select
 								id={`hide-group-${postingId}`}
 								value={hideTarget}
-								disabled={
-									busy ||
-									(wildcardHidden && hideOptions.length === 0)
-								}
+								disabled={busy || (wildcardHidden && hideOptions.length === 0)}
 								onChange={(event) => {
 									setError(null);
 									setHideTarget(event.target.value);
@@ -352,9 +316,7 @@ export function TransactionSharing({
 									</option>
 								))}
 								{!wildcardHidden && (
-									<option value="all">
-										Everyone, including future groups
-									</option>
+									<option value="all">Everyone, including future groups</option>
 								)}
 							</select>
 							<Button

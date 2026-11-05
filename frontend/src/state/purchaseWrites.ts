@@ -1,5 +1,12 @@
 import type { BackendPlannedPurchase } from "@/api/contracts.ts";
-import { applyModelChanges, type ModelChange } from "@/api/modelChanges.ts";
+import { ApiHttpError } from "@/api/http.ts";
+import { UserScopeError } from "@/api/scopedRequest.ts";
+import {
+	createPlannedPurchase,
+	deletePlannedPurchase,
+	movePlannedPurchase,
+	updatePlannedPurchase,
+} from "@/api/generated/endpoints.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import type { PlannedPurchase } from "@/domain/model.ts";
 import { movePurchase } from "@/domain/purchases.ts";
@@ -27,10 +34,26 @@ export function purchaseRow(
 	};
 }
 
+export type PurchaseOperation =
+	| { kind: "plannedPurchase"; action: "create"; value: BackendPlannedPurchase }
+	| {
+			kind: "plannedPurchase";
+			action: "update";
+			id: string;
+			value: BackendPlannedPurchase;
+	  }
+	| { kind: "plannedPurchase"; action: "delete"; id: string }
+	| {
+			kind: "plannedPurchase";
+			action: "move";
+			id: string;
+			beforeId: string | null;
+	  };
+
 export function createPurchaseOperation(
 	purchase: PlannedPurchase,
 	priority: number,
-): ModelChange {
+): PurchaseOperation {
 	return {
 		kind: "plannedPurchase",
 		action: "create",
@@ -41,7 +64,7 @@ export function createPurchaseOperation(
 export function updatePurchaseOperation(
 	purchase: PlannedPurchase,
 	priority: number,
-): ModelChange {
+): PurchaseOperation {
 	return {
 		kind: "plannedPurchase",
 		action: "update",
@@ -50,12 +73,12 @@ export function updatePurchaseOperation(
 	};
 }
 
-export function deletePurchaseOperation(id: string): ModelChange {
+export function deletePurchaseOperation(id: string): PurchaseOperation {
 	return { kind: "plannedPurchase", action: "delete", id };
 }
 
 export interface PurchaseReorder {
-	operations: ModelChange[];
+	operations: PurchaseOperation[];
 	next: PlannedPurchase[];
 }
 
@@ -76,7 +99,7 @@ export function movePurchaseOperations(
 	const previousIndex = new Map(
 		purchases.map((purchase, index) => [purchase.id, index]),
 	);
-	const operations: ModelChange[] = [];
+	const operations: PurchaseOperation[] = [];
 	next.forEach((purchase, index) => {
 		if (previousIndex.get(purchase.id) !== index)
 			operations.push(updatePurchaseOperation(purchase, index));
@@ -89,6 +112,48 @@ export function movePurchaseOperations(
 		beforeId: next[at + 1]?.id ?? null,
 	});
 	return { operations, next };
+}
+
+function runOperation(operation: PurchaseOperation): Promise<unknown> {
+	switch (operation.action) {
+		case "create":
+			return createPlannedPurchase(operation.value);
+		case "update":
+			return updatePlannedPurchase(operation.id, operation.value);
+		case "delete":
+			return deletePlannedPurchase(operation.id);
+		case "move":
+			return movePlannedPurchase({
+				id: operation.id,
+				beforeId: operation.beforeId ?? "",
+			});
+	}
+}
+
+/**
+ * Persist operations in order. A scope change retires every remaining write
+ * instead of sending a request computed for one user against another user's
+ * workspace.
+ */
+type WriteEnvelope = {
+	saved?: boolean;
+	issues?: { severity: string; message?: string | null }[];
+};
+
+async function runOperations(
+	operations: PurchaseOperation[],
+): Promise<WriteEnvelope> {
+	const scope = getUserScope();
+	for (const operation of operations) {
+		if (scope !== getUserScope()) throw new UserScopeError();
+		const response = (await runOperation(operation)) as {
+			data?: WriteEnvelope;
+		};
+		if (response.data?.saved === false) {
+			return { saved: false, issues: response.data.issues ?? [] };
+		}
+	}
+	return { saved: true, issues: [] };
 }
 
 /** Refetch the authoritative model after a purchase save attempt. */
@@ -112,16 +177,18 @@ export async function refreshPurchases(): Promise<void> {
  * every operation and the refresh confirmed it for the same resource.
  */
 export async function persistPurchaseOperations(
-	operations: ModelChange[],
+	operations: PurchaseOperation[],
 	failureMessage: string,
 ): Promise<boolean> {
 	if (!operations.length) return true;
 	return performSave({
 		call: async () => {
-			const result = await applyModelChanges(operations);
-			// A thrown result surfaces through performSave's failure path.
-			if (result instanceof Error) throw result;
-			return { data: { saved: result.ok, issues: result.issues } };
+			try {
+				return { data: await runOperations(operations) };
+			} catch (cause) {
+				if (cause instanceof UserScopeError) throw cause;
+				throw cause instanceof ApiHttpError ? cause : new Error(failureMessage);
+			}
 		},
 		refresh: refreshPurchases,
 		failureMessage,

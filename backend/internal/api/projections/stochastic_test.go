@@ -21,7 +21,7 @@ import (
 func volatileStochasticBody(t *testing.T, runCount int, seed *int64) []byte {
 	t.Helper()
 	model := apitest.StochasticModel()
-	model.RecurrenceRules[0].Amount = types.PostingAmountResolution{
+	model.Schedules[0].Amount = types.PostingAmountResolution{
 		Resolver: "expression",
 		Config:   map[string]any{"expression": "(base) * (1 + rate)"},
 		Inputs: map[string]types.AmountInputBinding{

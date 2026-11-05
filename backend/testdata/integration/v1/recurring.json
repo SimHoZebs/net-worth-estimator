@@ -35,7 +35,7 @@
             },
             "claim": {
               "occurrenceDate": "2026-01-01",
-              "ruleId": "edge-rule-rent"
+              "scheduleId": "edge-rule-rent"
             },
             "destinations": [],
             "enabled": true,
@@ -54,7 +54,7 @@
             },
             "claim": {
               "occurrenceDate": "2026-02-01",
-              "ruleId": "edge-rule-rent"
+              "scheduleId": "edge-rule-rent"
             },
             "destinations": [],
             "enabled": true,
@@ -73,7 +73,7 @@
             },
             "claim": {
               "occurrenceDate": "2026-04-01",
-              "ruleId": "edge-rule-rent"
+              "scheduleId": "edge-rule-rent"
             },
             "destinations": [],
             "enabled": true,
@@ -92,7 +92,7 @@
             },
             "claim": {
               "occurrenceDate": "2026-05-01",
-              "ruleId": "edge-rule-rent"
+              "scheduleId": "edge-rule-rent"
             },
             "destinations": [],
             "enabled": true,
@@ -103,7 +103,7 @@
             "transactionTime": 1777594800
           }
         ],
-        "recurrenceRules": [
+        "schedules": [
           {
             "amount": {
               "config": {

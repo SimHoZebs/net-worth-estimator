@@ -178,8 +178,8 @@ for (const width of [320, 390, 768, 1440]) {
 			page.getByRole("row", { name: /Sizing regression/ }),
 		).toBeVisible();
 		// A rejected row save retains its form and shows the server error.
-		await page.route("**/v1/recurrence-rules/*", async (route) => {
-			if (route.request().method() !== "PATCH") return route.continue();
+		await page.route("**/v1/schedules/**", async (route) => {
+			if (route.request().method() !== "POST") return route.continue();
 			return route.fulfill({
 				status: 409,
 				contentType: "application/problem+json",
@@ -204,7 +204,7 @@ for (const width of [320, 390, 768, 1440]) {
 			.filter({ hasText: "Sizing check holds" });
 		await expect(notice).toBeVisible();
 		// Retry from the same form, with the original edited fields intact.
-		await page.unroute("**/v1/recurrence-rules/*");
+		await page.unroute("**/v1/schedules/**");
 		await page.getByRole("button", { name: "Save changes" }).click();
 		await expect(page.getByText("Changes saved.")).toBeVisible();
 		await expect(detail).not.toBeVisible();

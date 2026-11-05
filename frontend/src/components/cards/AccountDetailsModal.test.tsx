@@ -110,7 +110,7 @@ describe("AccountDetailsModal", () => {
 			/>,
 		);
 		const filters = within(
-			view.getByRole("group", { name: "Filter by posting status" }),
+			view.getByRole("group", { name: "Filter by transaction status" }),
 		);
 		const all = filters.getByRole("button", {
 			name: "all",

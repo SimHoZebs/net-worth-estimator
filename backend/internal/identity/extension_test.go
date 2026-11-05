@@ -33,7 +33,7 @@ func TestExtensionTokenTransportAndOriginBoundary(t *testing.T) {
 		{"purchase", testExtensionOrigin, "/v1/planned-purchases", "access-device", "none", 204},
 		{"without token", testExtensionOrigin, "/v1/planned-purchases", "", "none", 401},
 		{"invalid token", testExtensionOrigin, "/v1/planned-purchases", "retired-token", "none", 401},
-		{"posting", testExtensionOrigin, "/v1/postings", "access-device", "none", 403},
+		{"posting", testExtensionOrigin, "/v1/transactions", "access-device", "none", 403},
 		{"unrelated route", testExtensionOrigin, "/v1/accounts", "access-device", "none", 403},
 		{"website", "https://attacker.test", "/v1/planned-purchases", "access-device", "cross-site", 403},
 		{"lookalike", testExtensionOrigin + ".evil.test", "/v1/planned-purchases", "access-device", "none", 403},

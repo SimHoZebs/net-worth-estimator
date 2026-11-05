@@ -11,11 +11,11 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// PreviewPatternToExistingRule describes how one confirmed recurring pattern would
+// PreviewPatternToExistingSchedule describes how one confirmed recurring pattern would
 // claim occurrences of one existing rule. It reads evidence, findings, and
 // saved rows only; it never writes.
-func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (types.PatternToExistingRulePreview, error) {
-	var preview types.PatternToExistingRulePreview
+func (s *sqliteStore) PreviewPatternToExistingSchedule(findingID, ruleID string) (types.PatternToExistingSchedulePreview, error) {
+	var preview types.PatternToExistingSchedulePreview
 	var anchor types.AnalysisFinding
 	var detectionJSON, reviewJSON string
 	err := s.db.QueryRow(`SELECT f.id, f.analysis_type, f.detection_json, f.run_id, r.version, r.input_revision,
@@ -38,7 +38,7 @@ func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (ty
 		return preview, err
 	}
 	if anchor.Kind != "recurring" {
-		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToExistingRuleInvalid, anchor.Kind)
+		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToExistingScheduleInvalid, anchor.Kind)
 	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
@@ -58,15 +58,15 @@ func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (ty
 	if err != nil {
 		return preview, err
 	}
-	var rule *types.RecurrenceRule
-	for i := range model.RecurrenceRules {
-		if model.RecurrenceRules[i].ID == ruleID {
-			rule = &model.RecurrenceRules[i]
+	var rule *types.Schedule
+	for i := range model.Schedules {
+		if model.Schedules[i].ID == ruleID {
+			rule = &model.Schedules[i]
 			break
 		}
 	}
 	if rule == nil {
-		return preview, fmt.Errorf("%w: rule %s not found", store.ErrPatternToExistingRuleInvalid, ruleID)
+		return preview, fmt.Errorf("%w: rule %s not found", store.ErrPatternToExistingScheduleInvalid, ruleID)
 	}
 	facts := map[string]types.TransactionFacts{}
 	if len(occurrenceIDs) > 0 {
@@ -99,14 +99,14 @@ func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (ty
 			return preview, err
 		}
 	}
-	preview = types.PatternToExistingRulePreview{
-		FindingID:  anchor.ID,
-		PatternKey: analysis.RecurringPatternKey(anchor.Kind, anchor.Product, occurrenceIDs),
-		RuleID:     rule.ID,
-		RuleName:   rule.Name,
-		Merchant:   anchor.Provider,
-		Cadence:    anchor.Product,
-		AccountID:  accountOfPattern(model.Postings, occurrenceIDs),
+	preview = types.PatternToExistingSchedulePreview{
+		FindingID:    anchor.ID,
+		PatternKey:   analysis.RecurringPatternKey(anchor.Kind, anchor.Product, occurrenceIDs),
+		ScheduleID:   rule.ID,
+		ScheduleName: rule.Name,
+		Merchant:     anchor.Provider,
+		Cadence:      anchor.Product,
+		AccountID:    accountOfPattern(model.Postings, occurrenceIDs),
 	}
 	if anchor.Status != "active" {
 		preview.Claimable = false
@@ -118,7 +118,7 @@ func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (ty
 		preview.Reason = "Confirm this repeating pattern before adding its payments to a forecast rule."
 		return preview, nil
 	}
-	assignments, err := analysis.BuildPatternToExistingRule(analysis.PatternToExistingRuleInput{
+	assignments, err := analysis.BuildPatternToExistingSchedule(analysis.PatternToExistingScheduleInput{
 		Anchor: anchor, Postings: model.Postings, Facts: facts, Rule: *rule, OccurrenceIDs: occurrenceIDs,
 	})
 	if err != nil {
@@ -131,15 +131,15 @@ func (s *sqliteStore) PreviewPatternToExistingRule(findingID, ruleID string) (ty
 		case errors.Is(err, analysis.ErrNoScheduleMatch):
 			preview.Reason = "The recorded payments do not fall on that rule's schedule: " + err.Error()
 		case errors.Is(err, analysis.ErrRuleNotFound):
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingScheduleInvalid, err)
 		case errors.Is(err, analysis.ErrPatternStale):
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleConflict, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingScheduleConflict, err)
 		case errors.Is(err, analysis.ErrPatternIncoherent):
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingScheduleInvalid, err)
 		case errors.Is(err, analysis.ErrNotRecurring):
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingScheduleInvalid, err)
 		default:
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingRuleInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToExistingScheduleInvalid, err)
 		}
 		return preview, nil
 	}

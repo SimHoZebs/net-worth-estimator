@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnalysisFinding } from "@/api/generated/model/analysisFinding.ts";
-import type { PatternToExistingRulePreview } from "@/api/generated/model/patternToExistingRulePreview.ts";
-import type { PatternToNewRulePreview } from "@/api/generated/model/patternToNewRulePreview.ts";
+import type { PatternToExistingSchedulePreview } from "@/api/generated/model/patternToExistingSchedulePreview.ts";
+import type { PatternToNewSchedulePreview } from "@/api/generated/model/patternToNewSchedulePreview.ts";
 import { RecurringPatterns } from "./RecurringPatterns.tsx";
 
 const reviewMutate = vi.hoisted(() => vi.fn());
@@ -10,12 +10,12 @@ const dismissMutate = vi.hoisted(() => vi.fn());
 const createMutate = vi.hoisted(() => vi.fn());
 const addMutate = vi.hoisted(() => vi.fn());
 const previewState = vi.hoisted(() => ({
-	data: undefined as PatternToNewRulePreview | undefined,
+	data: undefined as PatternToNewSchedulePreview | undefined,
 	isPending: false,
 	isError: false,
 }));
 const existingRulePreviewState = vi.hoisted(() => ({
-	data: undefined as PatternToExistingRulePreview | undefined,
+	data: undefined as PatternToExistingSchedulePreview | undefined,
 	isPending: false,
 	isError: false,
 }));
@@ -31,13 +31,13 @@ vi.mock("@/state/analyses.ts", () => ({
 		isPending: false,
 		isError: false,
 	}),
-	usePatternToNewRulePreview: () => previewState,
-	useCreatePatternToNewRule: () => ({
+	usePatternToNewSchedulePreview: () => previewState,
+	useCreatePatternToNewSchedule: () => ({
 		mutate: createMutate,
 		isPending: false,
 	}),
-	usePatternToExistingRulePreview: () => existingRulePreviewState,
-	useAddPatternToExistingRule: () => ({
+	usePatternToExistingSchedulePreview: () => existingRulePreviewState,
+	useAddPatternToExistingSchedule: () => ({
 		mutate: addMutate,
 		isPending: false,
 	}),
@@ -45,7 +45,7 @@ vi.mock("@/state/analyses.ts", () => ({
 
 vi.mock("@/state/workspaceResources.ts", () => ({
 	useTransactionCatalog: () => ({
-		data: { items: [{ id: "rent", kind: "rule", name: "Rent" }] },
+		data: { items: [{ id: "rent", kind: "schedule", name: "Rent" }] },
 	}),
 }));
 
@@ -73,7 +73,7 @@ function recurringFinding(id: string, postingId: string): AnalysisFinding {
 	} as AnalysisFinding;
 }
 
-function creatablePreview(): PatternToNewRulePreview {
+function creatablePreview(): PatternToNewSchedulePreview {
 	return {
 		findingId: "one",
 		patternKey: "key",
@@ -89,7 +89,7 @@ function creatablePreview(): PatternToNewRulePreview {
 		accountId: "checking",
 		creatable: true,
 		reason: "",
-		rule: {
+		schedule: {
 			name: "Grocer",
 			sourceAccountId: "checking",
 			destinations: [],
@@ -102,7 +102,7 @@ function creatablePreview(): PatternToNewRulePreview {
 			{ date: "2026-03-15", amount: "30.00" },
 			{ date: "2026-04-15", amount: "30.00" },
 		],
-	} as PatternToNewRulePreview;
+	} as PatternToNewSchedulePreview;
 }
 
 const names = new Map([
@@ -172,22 +172,24 @@ describe("repeating-payment patterns", () => {
 			},
 		);
 		fireEvent.click(
-			screen.getByRole("button", { name: "Approve and create rule" }),
+			screen.getByRole("button", { name: "Approve and create schedule" }),
 		);
 		expect(createMutate).toHaveBeenCalledWith(
 			{ id: "one" },
 			expect.objectContaining({}),
 		);
-		expect(screen.getByText(/Forecast rule “Grocer” created/)).toBeDefined();
+		expect(
+			screen.getByText(/Forecast schedule “Grocer” created/),
+		).toBeDefined();
 	});
 	it("explains plans that cannot become rules yet", () => {
 		previewState.data = {
 			...creatablePreview(),
 			creatable: false,
-			rule: undefined,
+			schedule: undefined,
 			upcoming: [],
 			reason:
-				"Patterns that repeat every 2 weeks cannot become forecast rules yet.",
+				"Patterns that repeat every 2 weeks cannot become forecast schedules yet.",
 		};
 		render(
 			<RecurringPatterns
@@ -199,9 +201,11 @@ describe("repeating-payment patterns", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
 		);
-		expect(screen.getByText(/cannot become forecast rules yet/)).toBeDefined();
 		expect(
-			screen.queryByRole("button", { name: "Approve and create rule" }),
+			screen.getByText(/cannot become forecast schedules yet/),
+		).toBeDefined();
+		expect(
+			screen.queryByRole("button", { name: "Approve and create schedule" }),
 		).toBeNull();
 	});
 	it("hides answers and approval in read-only mode", () => {
@@ -217,12 +221,12 @@ describe("repeating-payment patterns", () => {
 			screen.getByRole("button", { name: "Review forecast plan for Grocer" }),
 		).toBeDefined();
 	});
-	it("adds confirmed payments to an existing rule", () => {
+	it("adds confirmed payments to an existing schedule", () => {
 		existingRulePreviewState.data = {
 			findingId: "one",
 			patternKey: "key",
-			ruleId: "rent",
-			ruleName: "Rent",
+			scheduleId: "rent",
+			scheduleName: "Rent",
 			merchant: "grocer",
 			cadence: "monthly",
 			accountId: "checking",
@@ -242,7 +246,7 @@ describe("repeating-payment patterns", () => {
 		);
 		fireEvent.click(
 			screen.getByRole("button", {
-				name: "Link repeating pattern for Grocer to an existing rule",
+				name: "Link repeating pattern for Grocer to an existing schedule",
 			}),
 		);
 		expect(screen.getByText("Matched occurrences")).toBeDefined();
@@ -255,20 +259,22 @@ describe("repeating-payment patterns", () => {
 			},
 		);
 		fireEvent.click(
-			screen.getByRole("button", { name: "Link payments to rule" }),
+			screen.getByRole("button", { name: "Link payments to schedule" }),
 		);
 		expect(addMutate).toHaveBeenCalledWith(
-			expect.objectContaining({ ruleId: "rent" }),
+			expect.objectContaining({ scheduleId: "rent" }),
 			expect.objectContaining({}),
 		);
-		expect(screen.getByText(/2 recorded payments now record an occurrence/)).toBeDefined();
+		expect(
+			screen.getByText(/2 recorded payments now record an occurrence/),
+		).toBeDefined();
 	});
 	it("hides the link action in a read-only dialog", () => {
 		existingRulePreviewState.data = {
 			findingId: "one",
 			patternKey: "key",
-			ruleId: "rent",
-			ruleName: "Rent",
+			scheduleId: "rent",
+			scheduleName: "Rent",
 			merchant: "grocer",
 			cadence: "monthly",
 			accountId: "checking",
@@ -285,12 +291,12 @@ describe("repeating-payment patterns", () => {
 		);
 		fireEvent.click(
 			screen.getByRole("button", {
-				name: "Link repeating pattern for Grocer to an existing rule",
+				name: "Link repeating pattern for Grocer to an existing schedule",
 			}),
 		);
 		expect(screen.getByText("Matched occurrences")).toBeDefined();
 		expect(
-			screen.queryByRole("button", { name: "Link payments to rule" }),
+			screen.queryByRole("button", { name: "Link payments to schedule" }),
 		).toBeNull();
 	});
 });

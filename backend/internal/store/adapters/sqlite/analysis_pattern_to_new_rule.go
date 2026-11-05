@@ -12,12 +12,12 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-// PreviewPatternToNewRule describes the forecast rule one confirmed
+// PreviewPatternToNewSchedule describes the forecast rule one confirmed
 // recurring pattern would create. It reads evidence, findings, and saved
 // rows only; it never writes. The active generated rule for the pattern, if
 // one still exists and is enabled, is reported so approval stays singular.
-func (s *sqliteStore) PreviewPatternToNewRule(findingID string) (types.PatternToNewRulePreview, error) {
-	var preview types.PatternToNewRulePreview
+func (s *sqliteStore) PreviewPatternToNewSchedule(findingID string) (types.PatternToNewSchedulePreview, error) {
+	var preview types.PatternToNewSchedulePreview
 	var anchor types.AnalysisFinding
 	var detectionJSON, reviewJSON string
 	err := s.db.QueryRow(`SELECT f.id, f.analysis_type, f.detection_json, f.run_id, r.version, r.input_revision,
@@ -40,7 +40,7 @@ func (s *sqliteStore) PreviewPatternToNewRule(findingID string) (types.PatternTo
 		return preview, err
 	}
 	if anchor.Kind != "recurring" {
-		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToNewRuleInvalid, anchor.Kind)
+		return preview, fmt.Errorf("%w: finding is %s", store.ErrPatternToNewScheduleInvalid, anchor.Kind)
 	}
 	occurrenceIDs := []string{}
 	for _, evidence := range anchor.Evidence {
@@ -51,11 +51,11 @@ func (s *sqliteStore) PreviewPatternToNewRule(findingID string) (types.PatternTo
 	if err != nil {
 		return preview, err
 	}
-	existingRuleID := ""
-	if record, err := s.FindPatternToNewRule(patternKey); err == nil {
-		for _, rule := range model.RecurrenceRules {
-			if rule.ID == record.RuleID && rule.Enabled {
-				existingRuleID = record.RuleID
+	existingScheduleID := ""
+	if record, err := s.FindPatternToNewSchedule(patternKey); err == nil {
+		for _, rule := range model.Schedules {
+			if rule.ID == record.ScheduleID && rule.Enabled {
+				existingScheduleID = record.ScheduleID
 				break
 			}
 		}
@@ -93,7 +93,7 @@ func (s *sqliteStore) PreviewPatternToNewRule(findingID string) (types.PatternTo
 			return preview, err
 		}
 	}
-	preview, err = analysis.BuildPatternToNewRulePreview(analysis.PatternToNewRuleInput{
+	preview, err = analysis.BuildPatternToNewSchedulePreview(analysis.PatternToNewScheduleInput{
 		Anchor:   anchor,
 		Postings: model.Postings,
 		Facts:    facts,
@@ -104,51 +104,51 @@ func (s *sqliteStore) PreviewPatternToNewRule(findingID string) (types.PatternTo
 			}
 			return ids
 		}(),
-		ExistingRuleID: existingRuleID,
+		ExistingScheduleID: existingScheduleID,
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, analysis.ErrPatternStale):
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToNewRuleConflict, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToNewScheduleConflict, err)
 		default:
-			return preview, fmt.Errorf("%w: %v", store.ErrPatternToNewRuleInvalid, err)
+			return preview, fmt.Errorf("%w: %v", store.ErrPatternToNewScheduleInvalid, err)
 		}
 	}
 	return preview, nil
 }
 
-// FindPatternToNewRule returns the recorded pattern-to-rule entry.
+// FindPatternToNewSchedule returns the recorded pattern-to-rule entry.
 // A missing record reports ErrNotFound; a record whose rule was deleted or
 // disabled is still returned so callers can decide what active means.
-func (s *sqliteStore) FindPatternToNewRule(patternKey string) (types.PatternToNewRule, error) {
-	var record types.PatternToNewRule
-	err := s.db.QueryRow(`SELECT pattern_key, rule_id, created_at FROM analysis_promotions WHERE pattern_key = ? AND user_id = :user_id`, patternKey).Scan(&record.PatternKey, &record.RuleID, &record.CreatedAt)
+func (s *sqliteStore) FindPatternToNewSchedule(patternKey string) (types.PatternToNewSchedule, error) {
+	var record types.PatternToNewSchedule
+	err := s.db.QueryRow(`SELECT pattern_key, rule_id, created_at FROM analysis_promotions WHERE pattern_key = ? AND user_id = :user_id`, patternKey).Scan(&record.PatternKey, &record.ScheduleID, &record.CreatedAt)
 	if err == sql.ErrNoRows {
 		return record, store.ErrNotFound
 	}
 	return record, err
 }
 
-// RecordPatternToNewRule saves the pattern-to-rule record, replacing any
+// RecordPatternToNewSchedule saves the pattern-to-rule record, replacing any
 // previous record for the same pattern. Recording happens before the rule
 // row is created: a record without a rule reads as inactive, so a retry
 // replaces it instead of creating a second rule.
-func (s *sqliteStore) RecordPatternToNewRule(record types.PatternToNewRule) error {
-	if record.PatternKey == "" || record.RuleID == "" {
-		return fmt.Errorf("%w: pattern and rule are required", store.ErrPatternToNewRuleInvalid)
+func (s *sqliteStore) RecordPatternToNewSchedule(record types.PatternToNewSchedule) error {
+	if record.PatternKey == "" || record.ScheduleID == "" {
+		return fmt.Errorf("%w: pattern and rule are required", store.ErrPatternToNewScheduleInvalid)
 	}
 	created := record.CreatedAt
 	if created <= 0 {
 		created = time.Now().Unix()
 	}
 	_, err := s.db.Exec(`INSERT INTO analysis_promotions(pattern_key, rule_id, created_at, user_id) VALUES (?, ?, ?, :user_id)
-		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at`, record.PatternKey, record.RuleID, created)
+		ON CONFLICT(user_id, pattern_key) DO UPDATE SET rule_id = excluded.rule_id, created_at = excluded.created_at`, record.PatternKey, record.ScheduleID, created)
 	return err
 }
 
-// RemovePatternToNewRule clears the record only when it still names the
+// RemovePatternToNewSchedule clears the record only when it still names the
 // given rule, so a failed approval never removes a concurrent winner.
-func (s *sqliteStore) RemovePatternToNewRule(patternKey, ruleID string) error {
+func (s *sqliteStore) RemovePatternToNewSchedule(patternKey, ruleID string) error {
 	_, err := s.db.Exec(`DELETE FROM analysis_promotions WHERE pattern_key = ? AND rule_id = ? AND user_id = :user_id`, patternKey, ruleID)
 	return err
 }

@@ -221,7 +221,7 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 
 	// With its posting gone the account deletes, the policy strips to the
 	// survivor, and the feed follows.
-	if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/postings/"+savingsPosting, ""); response.Code != http.StatusOK {
+	if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+savingsPosting, ""); response.Code != http.StatusOK {
 		t.Fatalf("delete posting = %d %s", response.Code, response.Body.String())
 	}
 	qa03DeleteOwnerAccount(t, social, "savings", true)
@@ -243,7 +243,7 @@ func TestQA03PolicyLifecycleAppliesImmediately(t *testing.T) {
 	// Deleting the last selected account keeps the enabled row with zero
 	// accounts, and it matches nothing.
 	for _, id := range []string{qa03SharedGroceries, qa03SharedFuel} {
-		if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/postings/"+id, ""); response.Code != http.StatusOK {
+		if response := doRowRequest(t, qa03OwnerPlan(t, social), http.MethodDelete, "/v1/transactions/"+id, ""); response.Code != http.StatusOK {
 			t.Fatalf("delete posting %s = %d %s", id, response.Code, response.Body.String())
 		}
 	}

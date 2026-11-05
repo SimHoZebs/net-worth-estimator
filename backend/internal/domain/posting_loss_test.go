@@ -21,7 +21,7 @@ func lossTestModel(minBalance *float64) types.SimulationInputs {
 			{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true},
 		},
 		Postings: []types.Posting{},
-		RecurrenceRules: []types.RecurrenceRule{
+		Schedules: []types.Schedule{
 			{
 				ID:   "growth",
 				Name: "Growth",
@@ -57,10 +57,10 @@ func lossTestRuntime(t *testing.T, model types.SimulationInputs, balances map[st
 
 func executeLossOccurrence(t *testing.T, runtime *TransitionRuntime, model *types.SimulationInputs, date string) PostingExecutionTransition {
 	t.Helper()
-	if len(model.RecurrenceRules) == 0 {
+	if len(model.Schedules) == 0 {
 		t.Fatalf("loss test model has no rules")
 	}
-	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, model.RecurrenceRules[0].ID, date), date, false)
+	transition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, model.Schedules[0].ID, date), date, false)
 	if err != nil {
 		t.Fatalf("execute posting: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 			{ID: "vault", Name: "Vault", Kind: types.AccountKindInvestment, Enabled: true},
 		},
 		Postings: []types.Posting{},
-		RecurrenceRules: []types.RecurrenceRule{
+		Schedules: []types.Schedule{
 			{
 				ID:   "capgrowth",
 				Name: "Capped growth",
@@ -199,8 +199,8 @@ func TestLossDoesNotInflateAnnualCapHeadroom(t *testing.T) {
 	// A later gain in the same year requests 6000 * (12 / 12) = 6000 but
 	// must see only 1000 of cap headroom. If the loss had accrued to the
 	// ledger, headroom would be 7000 and the gain would realize in full.
-	model.RecurrenceRules[0].Amount.Inputs["rate"] = types.AmountInputBinding{Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 12.0}}
-	gainTransition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.RecurrenceRules, "capgrowth", "2026-03-01"), "2026-03-01", false)
+	model.Schedules[0].Amount.Inputs["rate"] = types.AmountInputBinding{Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 12.0}}
+	gainTransition, err := runtime.ExecutePosting(resolveTestRuleOccurrence(t, model.Schedules, "capgrowth", "2026-03-01"), "2026-03-01", false)
 	if err != nil {
 		t.Fatalf("execute gain posting: %v", err)
 	}

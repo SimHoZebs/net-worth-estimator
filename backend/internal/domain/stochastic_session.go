@@ -53,7 +53,7 @@ type stochasticSession struct {
 	onProgress              StochasticProgressCallback
 }
 
-func buildSampleCountsByPostingId(rules []types.RecurrenceRule, postings []types.Posting, horizonYears int, startDate, endDate string, includeStartDateEvents bool) map[string]int {
+func buildSampleCountsByPostingId(rules []types.Schedule, postings []types.Posting, horizonYears int, startDate, endDate string, includeStartDateEvents bool) map[string]int {
 	sampleCounts := map[string]int{}
 	// Rules first in stored order, then manual postings: the LCG is
 	// order-sensitive, so discovery order is part of the seeded contract.
@@ -93,7 +93,7 @@ func buildSampleCountsByPostingId(rules []types.RecurrenceRule, postings []types
 // samplingParamsByID indexes volatile sampling parameters by transaction ID:
 // rules in stored order, then manual postings. The sampler draws in this
 // order, so iteration order is part of the seeded contract.
-func samplingParamsByID(rules []types.RecurrenceRule, postings []types.Posting) []struct {
+func samplingParamsByID(rules []types.Schedule, postings []types.Posting) []struct {
 	id     string
 	params VolatileRateParams
 } {
@@ -128,7 +128,7 @@ func samplingParamsByID(rules []types.RecurrenceRule, postings []types.Posting) 
 	return ordered
 }
 
-func buildStochasticRates(rules []types.RecurrenceRule, postings []types.Posting, sampleCounts map[string]int, sampler StochasticSampler) map[string][]float64 {
+func buildStochasticRates(rules []types.Schedule, postings []types.Posting, sampleCounts map[string]int, sampler StochasticSampler) map[string][]float64 {
 	rates := map[string][]float64{}
 	for _, entry := range samplingParamsByID(rules, postings) {
 		count := sampleCounts[entry.id]
@@ -177,7 +177,7 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 	session.deterministic = &deterministic
 
 	session.sampleCountsByPostingID = buildSampleCountsByPostingId(
-		prepared.Request.Model.RecurrenceRules,
+		prepared.Request.Model.Schedules,
 		prepared.Request.Model.Postings,
 		settings.HorizonYears,
 		prepared.Request.StartDate,
@@ -212,7 +212,7 @@ func newStochasticSession(model *types.FinancialModel, settings *types.Projectio
 
 func (s *stochasticSession) createSample() *types.MonteCarloSample {
 	return &types.MonteCarloSample{
-		AnnualRatesByPostingID: buildStochasticRates(s.prepared.Request.Model.RecurrenceRules, s.prepared.Request.Model.Postings, s.sampleCountsByPostingID, s.sampler),
+		AnnualRatesByPostingID: buildStochasticRates(s.prepared.Request.Model.Schedules, s.prepared.Request.Model.Postings, s.sampleCountsByPostingID, s.sampler),
 	}
 }
 

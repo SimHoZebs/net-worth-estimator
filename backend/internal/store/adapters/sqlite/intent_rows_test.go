@@ -81,67 +81,6 @@ func TestAccountWithBalanceWritesCheckpointAtomically(t *testing.T) {
 	_ = created
 }
 
-func TestConvertPostingToRuleKeepsIdentity(t *testing.T) {
-	store := openTestStore(t)
-	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
-		t.Fatalf("seed account: %v", err)
-	}
-	posting := testPostingFixture("01900000-0000-7000-8000-000000000001")
-	if _, err := store.CreatePosting(posting); err != nil {
-		t.Fatalf("seed posting: %v", err)
-	}
-	rule, err := store.ConvertPostingToRule("01900000-0000-7000-8000-000000000001", testRuleFixture("ignored"))
-	if err != nil {
-		t.Fatalf("convert: %v", err)
-	}
-	if rule.ID != "01900000-0000-7000-8000-000000000001" {
-		t.Fatalf("converted rule id = %q, want the posting id", rule.ID)
-	}
-	loaded, err := store.LoadModel()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if len(loaded.Postings) != 0 {
-		t.Fatalf("postings = %+v, want none", loaded.Postings)
-	}
-	if len(loaded.RecurrenceRules) != 1 || loaded.RecurrenceRules[0].ID != "01900000-0000-7000-8000-000000000001" {
-		t.Fatalf("rules = %+v", loaded.RecurrenceRules)
-	}
-	if _, err := store.ConvertPostingToRule("ghost", testRuleFixture("ghost")); !IsNotFound(err) {
-		t.Fatalf("convert missing err = %v, want not-found", err)
-	}
-}
-
-func TestConvertRuleToPostingAppendsOwnerRow(t *testing.T) {
-	store := openTestStore(t)
-	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {
-		t.Fatalf("seed account: %v", err)
-	}
-	if _, err := store.CreateRule(testRuleFixture("once-day")); err != nil {
-		t.Fatalf("seed rule: %v", err)
-	}
-	posting, err := store.ConvertRuleToPosting("once-day", testPostingFixture("ignored"))
-	if err != nil {
-		t.Fatalf("convert: %v", err)
-	}
-	if posting.ID != "once-day" || posting.Source != SourceUser || posting.Pending {
-		t.Fatalf("converted posting = %+v", posting)
-	}
-	loaded, err := store.LoadModel()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if len(loaded.RecurrenceRules) != 0 {
-		t.Fatalf("rules = %+v, want none", loaded.RecurrenceRules)
-	}
-	if len(loaded.Postings) != 1 || loaded.Postings[0].ID != "once-day" {
-		t.Fatalf("postings = %+v", loaded.Postings)
-	}
-	if _, err := store.ConvertRuleToPosting("ghost", testPostingFixture("ghost")); !IsNotFound(err) {
-		t.Fatalf("convert missing err = %v, want not-found", err)
-	}
-}
-
 func TestPostingEditLeavesStandalonePurchasesUntouched(t *testing.T) {
 	store := openTestStore(t)
 	if _, err := store.CreateAccount(types.Account{ID: "checking", Name: "Checking", Enabled: true}); err != nil {

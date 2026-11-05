@@ -356,8 +356,8 @@ func (s *handler) writeDeterministicRows(path *types.ProjectionPath, result type
 	for _, posting := range path.EffectiveModel.Postings {
 		modelByID[posting.ID] = posting
 	}
-	modelRuleByID := map[string]types.RecurrenceRule{}
-	for _, rule := range path.EffectiveModel.RecurrenceRules {
+	modelRuleByID := map[string]types.Schedule{}
+	for _, rule := range path.EffectiveModel.Schedules {
 		modelRuleByID[rule.ID] = rule
 	}
 	var rows []store.ProjectionRowPayload

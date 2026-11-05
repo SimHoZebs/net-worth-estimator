@@ -59,9 +59,7 @@ it("saves a copy through the recipient copy flow", async () => {
 	const posting = { id: "p1", name: "Groceries" };
 	const fetcher = vi.fn(async () => ok({ posting }));
 	vi.stubGlobal("fetch", fetcher);
-	await expect(saveSharedCopy("user:abc123", "p1")).resolves.toEqual(
-		posting,
-	);
+	await expect(saveSharedCopy("user:abc123", "p1")).resolves.toEqual(posting);
 	const [url, options] = fetcher.mock.calls[0] as unknown as [
 		string,
 		RequestInit,
@@ -102,10 +100,7 @@ it("reuses the caller's key for one share action", async () => {
 		"p1",
 		"11111111-2222-4333-8444-555555555555",
 	);
-	const [, options] = fetcher.mock.calls[0] as unknown as [
-		string,
-		RequestInit,
-	];
+	const [, options] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(JSON.parse(String(options.body))).toEqual({
 		owner: "users/abc123",
 		postingId: "p1",

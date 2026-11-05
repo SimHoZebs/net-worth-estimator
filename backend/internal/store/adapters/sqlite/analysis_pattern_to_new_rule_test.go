@@ -79,16 +79,16 @@ func confirmFinding(t *testing.T, s *sqliteStore, finding types.AnalysisFinding)
 	return types.AnalysisFinding{}
 }
 
-func TestPatternToNewRulePreviewDerivesRuleAfterEvidence(t *testing.T) {
+func TestPatternToNewSchedulePreviewDerivesRuleAfterEvidence(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
 	findings := completePatternAnalysis(t, s, ids, "monthly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewPatternToNewRule(anchor.ID)
+	preview, err := s.PreviewPatternToNewSchedule(anchor.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Creatable || preview.Reason != "" || preview.Rule == nil {
+	if !preview.Creatable || preview.Reason != "" || preview.Schedule == nil {
 		t.Fatalf("preview=%+v", preview)
 	}
 	if preview.Cadence != "monthly" || preview.Direction != "outflow" || preview.AccountID != "checking" || preview.TypicalAmount != "30.00" || preview.Currency != "USD" {
@@ -97,7 +97,7 @@ func TestPatternToNewRulePreviewDerivesRuleAfterEvidence(t *testing.T) {
 	if len(preview.Occurrences) != 3 || preview.Occurrences[0].Date != "2026-01-15" || preview.Occurrences[2].Date != "2026-03-15" {
 		t.Fatalf("occurrences=%+v", preview.Occurrences)
 	}
-	rule := preview.Rule
+	rule := preview.Schedule
 	if rule.Frequency != types.FrequencyMonthly || rule.StartDate != "2026-04-15" || rule.Amount != "30.00" || !rule.Enabled || rule.Name != "Grocer weekly shop" {
 		t.Fatalf("rule=%+v", rule)
 	}
@@ -115,9 +115,9 @@ func TestPatternToNewRulePreviewDerivesRuleAfterEvidence(t *testing.T) {
 	}
 }
 
-func TestPatternToNewRulePreviewGuards(t *testing.T) {
+func TestPatternToNewSchedulePreviewGuards(t *testing.T) {
 	s := openSQLiteStore(t)
-	if _, err := s.PreviewPatternToNewRule("missing"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.PreviewPatternToNewSchedule("missing"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("missing=%v", err)
 	}
 	ids := seedRecurringEvidence(t, s)
@@ -135,37 +135,37 @@ func TestPatternToNewRulePreviewGuards(t *testing.T) {
 	}
 	for _, item := range bnpl {
 		if item.Kind == "bnpl" {
-			if _, err := s.PreviewPatternToNewRule(item.ID); !errors.Is(err, store.ErrPatternToNewRuleInvalid) {
+			if _, err := s.PreviewPatternToNewSchedule(item.ID); !errors.Is(err, store.ErrPatternToNewScheduleInvalid) {
 				t.Fatalf("bnpl=%v", err)
 			}
 		}
 	}
-	unconfirmed, err := s.PreviewPatternToNewRule(findings[0].ID)
+	unconfirmed, err := s.PreviewPatternToNewSchedule(findings[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if unconfirmed.Creatable || unconfirmed.Rule == nil || unconfirmed.Reason == "" {
+	if unconfirmed.Creatable || unconfirmed.Schedule == nil || unconfirmed.Reason == "" {
 		t.Fatalf("unconfirmed=%+v", unconfirmed)
 	}
 	anchor := confirmFinding(t, s, findings[0])
 	if _, err := s.db.Exec(`UPDATE postings SET void=1 WHERE id=? AND user_id=:user_id`, ids[0]); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.PreviewPatternToNewRule(anchor.ID); !errors.Is(err, store.ErrPatternToNewRuleConflict) {
+	if _, err := s.PreviewPatternToNewSchedule(anchor.ID); !errors.Is(err, store.ErrPatternToNewScheduleConflict) {
 		t.Fatalf("voided=%v", err)
 	}
 }
 
-func TestPatternToNewRulePreviewLeavesBiweeklyVisible(t *testing.T) {
+func TestPatternToNewSchedulePreviewLeavesBiweeklyVisible(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
 	findings := completePatternAnalysis(t, s, ids, "biweekly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewPatternToNewRule(anchor.ID)
+	preview, err := s.PreviewPatternToNewSchedule(anchor.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preview.Creatable || preview.Rule != nil || len(preview.Upcoming) != 0 || preview.Reason == "" {
+	if preview.Creatable || preview.Schedule != nil || len(preview.Upcoming) != 0 || preview.Reason == "" {
 		t.Fatalf("preview=%+v", preview)
 	}
 	if len(preview.Occurrences) != 3 {
@@ -173,70 +173,70 @@ func TestPatternToNewRulePreviewLeavesBiweeklyVisible(t *testing.T) {
 	}
 }
 
-func TestPatternToNewRuleTracksOneActiveRule(t *testing.T) {
+func TestPatternToNewScheduleTracksOneActiveRule(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
 	findings := completePatternAnalysis(t, s, ids, "monthly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewPatternToNewRule(anchor.ID)
+	preview, err := s.PreviewPatternToNewSchedule(anchor.ID)
 	if err != nil || !preview.Creatable {
 		t.Fatalf("preview=%+v err=%v", preview, err)
 	}
-	if _, err := s.FindPatternToNewRule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.FindPatternToNewSchedule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("record=%v", err)
 	}
-	rule, err := s.CreateRule(types.RecurrenceRule{Name: "Grocer", SourceAccountID: &[]string{"checking"}[0], Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true})
+	rule, err := s.CreateSchedule(types.Schedule{Name: "Grocer", SourceAccountID: &[]string{"checking"}[0], Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "30.00"}, Inputs: map[string]types.AmountInputBinding{}}, Frequency: types.FrequencyMonthly, StartDate: "2026-04-15", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
+	if err := s.RecordPatternToNewSchedule(types.PatternToNewSchedule{PatternKey: preview.PatternKey, ScheduleID: rule.ID}); err != nil {
 		t.Fatal(err)
 	}
-	blocked, err := s.PreviewPatternToNewRule(anchor.ID)
-	if err != nil || blocked.Creatable || blocked.ExistingRuleID != rule.ID || blocked.Reason == "" {
+	blocked, err := s.PreviewPatternToNewSchedule(anchor.ID)
+	if err != nil || blocked.Creatable || blocked.ExistingScheduleID != rule.ID || blocked.Reason == "" {
 		t.Fatalf("blocked=%+v err=%v", blocked, err)
 	}
 	rule.Enabled = false
-	if _, err := s.UpdateRule(rule); err != nil {
+	if _, err := s.UpdateSchedule(rule); err != nil {
 		t.Fatal(err)
 	}
-	freed, err := s.PreviewPatternToNewRule(anchor.ID)
-	if err != nil || !freed.Creatable || freed.ExistingRuleID != "" {
+	freed, err := s.PreviewPatternToNewSchedule(anchor.ID)
+	if err != nil || !freed.Creatable || freed.ExistingScheduleID != "" {
 		t.Fatalf("freed=%+v err=%v", freed, err)
 	}
-	if err := s.RemovePatternToNewRule(preview.PatternKey, "other-rule"); err != nil {
+	if err := s.RemovePatternToNewSchedule(preview.PatternKey, "other-rule"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindPatternToNewRule(preview.PatternKey); err != nil {
+	if _, err := s.FindPatternToNewSchedule(preview.PatternKey); err != nil {
 		t.Fatalf("conditional remove cleared a live record: %v", err)
 	}
-	if err := s.RemovePatternToNewRule(preview.PatternKey, rule.ID); err != nil {
+	if err := s.RemovePatternToNewSchedule(preview.PatternKey, rule.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindPatternToNewRule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.FindPatternToNewSchedule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("record=%v", err)
 	}
-	if err := s.DeleteRule(rule.ID); err != nil {
+	if err := s.DeleteSchedule(rule.ID); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestPatternToNewRuleClearRemovesLinks(t *testing.T) {
+func TestPatternToNewScheduleClearRemovesLinks(t *testing.T) {
 	s := openSQLiteStore(t)
 	ids := seedRecurringEvidence(t, s)
 	findings := completePatternAnalysis(t, s, ids, "monthly")
 	anchor := confirmFinding(t, s, findings[0])
-	preview, err := s.PreviewPatternToNewRule(anchor.ID)
+	preview, err := s.PreviewPatternToNewSchedule(anchor.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: "rule-1"}); err != nil {
+	if err := s.RecordPatternToNewSchedule(types.PatternToNewSchedule{PatternKey: preview.PatternKey, ScheduleID: "rule-1"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Clear(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.FindPatternToNewRule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
+	if _, err := s.FindPatternToNewSchedule(preview.PatternKey); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("record=%v", err)
 	}
 }

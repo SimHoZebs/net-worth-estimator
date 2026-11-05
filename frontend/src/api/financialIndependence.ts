@@ -168,7 +168,7 @@ function mapAnalysis(
 	const transactions = new Map(
 		[
 			...(model?.postings ?? []),
-			...(model?.recurrenceRules ?? []),
+			...(model?.schedules ?? []),
 			...(model?.plannedPurchases ?? []),
 		].map((item) => [item.id, item.name]),
 	);

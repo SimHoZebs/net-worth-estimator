@@ -83,7 +83,7 @@ func TestPurchasesProtectFuturePayments(t *testing.T) {
 			rent := establishedPosting("rent", "2026-02-02", "900", false)
 			if recurring {
 				end := "2026-02-02"
-				request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: rent.ID, Name: rent.Name,
+				request.Model.Schedules = []types.Schedule{{ID: rent.ID, Name: rent.Name,
 					SourceAccountID: rent.SourceAccountID, Amount: rent.Amount, Frequency: types.FrequencyMonthly,
 					StartDate: "2026-02-02", EndDate: &end, Enabled: true}}
 			} else {
@@ -142,7 +142,7 @@ func TestPurchasesExecuteAfterEstablishedSameDayPayments(t *testing.T) {
 	request.Model.Postings[1].TransactionTime++ // Pay arrives before the one-time bill.
 	source := "cash"
 	end := request.StartDate
-	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "rent", SourceAccountID: &source,
+	request.Model.Schedules = []types.Schedule{{ID: "rent", SourceAccountID: &source,
 		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "600"}},
 		Frequency: types.FrequencyMonthly, StartDate: request.StartDate, EndDate: &end, Enabled: true}}
 	run, err := simulatePurchases(request)
@@ -314,7 +314,7 @@ func TestPurchaseProtectsDownstreamTransferAndLaterRecurringBill(t *testing.T) {
 	request.Model.Postings[0].Destinations = []string{"bills"}
 	account := "bills"
 	end := "2026-02-03"
-	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "bill", SourceAccountID: &account,
+	request.Model.Schedules = []types.Schedule{{ID: "bill", SourceAccountID: &account,
 		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "900"}},
 		Frequency: types.FrequencyMonthly, StartDate: end, EndDate: &end, Enabled: true}}
 	run, err := simulatePurchases(request)
@@ -348,7 +348,7 @@ func TestPurchaseUsesCanonicalDestinationLimitDistinction(t *testing.T) {
 func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "50", 0))
 	end := "2026-03-01"
-	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
+	request.Model.Schedules = []types.Schedule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
 		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
 		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
@@ -373,7 +373,7 @@ func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 			t.Fatalf("purchase ignored sampled income %v: %v", rate, purchaseEvents(run))
 		}
 	}
-	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, Schedules: request.Model.Schedules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	seed := int64(42)
 	config := types.StochasticConfig{RunCount: 10, Seed: &seed}
@@ -393,7 +393,7 @@ func TestPurchaseSamplePathsShareDatesAndRespectSampledIncome(t *testing.T) {
 func TestPurchaseBranchPreservesSameDayPriority(t *testing.T) {
 	wish := plannedPurchase("wish", "2026-02-01", "500", 0)
 	schedule := []scheduledPurchase{{purchase: &wish, date: "2026-02-05"}}
-	byDate := map[string][]DatedPostingOccurrence{"2026-02-05": {{Posting: &types.Posting{ID: "bill"}, Rule: &types.RecurrenceRule{}}}}
+	byDate := map[string][]DatedPostingOccurrence{"2026-02-05": {{Posting: &types.Posting{ID: "bill"}, Rule: &types.Schedule{}}}}
 	appendScheduledPurchases(byDate, schedule)
 	sortOccurrences(byDate["2026-02-05"])
 	if byDate["2026-02-05"][1].Posting.ID != wish.ID {

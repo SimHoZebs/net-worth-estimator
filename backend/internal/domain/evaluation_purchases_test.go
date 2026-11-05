@@ -60,7 +60,7 @@ func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 	model := decodeModel(t, fixture["model"])
 	settings := decodeSettings(t, fixture["settings"])
 	// Exercise actual sampled income as well as the existing FI branch.
-	model.RecurrenceRules[0].Amount = types.PostingAmountResolution{Resolver: "expression",
+	model.Schedules[0].Amount = types.PostingAmountResolution{Resolver: "expression",
 		Config: map[string]any{"expression": "rate * 12"},
 		Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate",
 			Arguments: map[string]any{"annualRate": 100.0, "volatility": 10.0}}}}
@@ -110,12 +110,12 @@ func TestPlannedPurchasesLeaveProjectionBandsAndFIUnchanged(t *testing.T) {
 func TestPlannedPurchasesSampleUsesTheBaselineSample(t *testing.T) {
 	request := purchaseRequest(0, plannedPurchase("want", "2026-02-01", "50", 0))
 	end := "2026-03-01"
-	request.Model.RecurrenceRules = []types.RecurrenceRule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
+	request.Model.Schedules = []types.Schedule{{ID: "pay", Destinations: []string{"cash"}, Enabled: true,
 		Frequency: types.FrequencyMonthly, StartDate: "2026-02-02", EndDate: &end,
 		Amount: types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "rate * 12"},
 			Inputs: map[string]types.AmountInputBinding{"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 100.0, "volatility": 1.0}}}},
 	}}
-	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, RecurrenceRules: request.Model.RecurrenceRules, PlannedPurchases: request.Model.PlannedPurchases}
+	model := types.FinancialModel{Accounts: request.Model.Accounts, Postings: request.Model.Postings, Schedules: request.Model.Schedules, PlannedPurchases: request.Model.PlannedPurchases}
 	settings := types.ProjectionRuntimeSettings{FallbackProjectionStartDate: request.StartDate, HorizonYears: 1}
 	for _, rate := range []float64{0, 100} {
 		sample := &types.MonteCarloSample{AnnualRatesByPostingID: map[string][]float64{"pay": {rate}}}

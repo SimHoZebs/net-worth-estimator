@@ -219,26 +219,28 @@ describe("unified persisted prefs", () => {
 	it("persists explicit income sources and an empty selection across reloads", async () => {
 		useSafeSpendingSettings
 			.getState()
-			.updateSettings({ incomeRuleIds: ["salary", "partner"] });
+			.updateSettings({ incomeScheduleIds: ["salary", "partner"] });
 		await refreshSafeSpendingSettings();
-		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([
+		expect(useSafeSpendingSettings.getState().incomeScheduleIds).toEqual([
 			"salary",
 			"partner",
 		]);
-		useSafeSpendingSettings.getState().updateSettings({ incomeRuleIds: [] });
+		useSafeSpendingSettings
+			.getState()
+			.updateSettings({ incomeScheduleIds: [] });
 		await refreshSafeSpendingSettings();
-		expect(useSafeSpendingSettings.getState().incomeRuleIds).toEqual([]);
+		expect(useSafeSpendingSettings.getState().incomeScheduleIds).toEqual([]);
 	});
 
 	it("sanitizes income rule IDs without an automatic fallback", () => {
 		expect(
 			sanitizeSafeSpendingSettings({
-				incomeRuleIds: ["salary", 123, "", "salary", "partner"],
-			}).incomeRuleIds,
+				incomeScheduleIds: ["salary", 123, "", "salary", "partner"],
+			}).incomeScheduleIds,
 		).toEqual(["salary", "partner"]);
-		for (const incomeRuleIds of [null, undefined, [], "salary", [123]]) {
+		for (const incomeScheduleIds of [null, undefined, [], "salary", [123]]) {
 			expect(
-				sanitizeSafeSpendingSettings({ incomeRuleIds }).incomeRuleIds,
+				sanitizeSafeSpendingSettings({ incomeScheduleIds }).incomeScheduleIds,
 			).toEqual([]);
 		}
 	});
@@ -277,7 +279,7 @@ describe("financial preference owner isolation", () => {
 			reserve: 12345,
 			accountIds: ["private-a-card"],
 			spendingAccountIds: ["private-a-cash"],
-			incomeRuleIds: ["private-a-income", "private-a-partner"],
+			incomeScheduleIds: ["private-a-income", "private-a-partner"],
 			transactionIds: ["private-a-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsA);
@@ -292,7 +294,7 @@ describe("financial preference owner isolation", () => {
 			reserve: 678,
 			accountIds: ["private-b-card"],
 			spendingAccountIds: ["private-b-cash"],
-			incomeRuleIds: [],
+			incomeScheduleIds: [],
 			transactionIds: ["private-b-bill"],
 		};
 		useSafeSpendingSettings.getState().updateSettings(settingsB);
@@ -303,7 +305,7 @@ describe("financial preference owner isolation", () => {
 		);
 		useSafeSpendingSettings
 			.getState()
-			.updateSettings({ reserve: 42, incomeRuleIds: ["sample-income"] });
+			.updateSettings({ reserve: 42, incomeScheduleIds: ["sample-income"] });
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject(settingsA);
@@ -312,13 +314,13 @@ describe("financial preference owner isolation", () => {
 		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 42,
-			incomeRuleIds: ["sample-income"],
+			incomeScheduleIds: ["sample-income"],
 		});
 	});
 
 	it("resets synchronously during verification and rejects stale actions without overwriting saved preferences", async () => {
 		const oldAction = useSafeSpendingSettings.getState().updateSettings;
-		oldAction({ reserve: 123, incomeRuleIds: ["private-a-income"] });
+		oldAction({ reserve: 123, incomeScheduleIds: ["private-a-income"] });
 		await refreshSafeSpendingSettings();
 		suspendUserScope();
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
@@ -330,14 +332,14 @@ describe("financial preference owner isolation", () => {
 			defaultSafeSpendingSettings(),
 		);
 		await verifyOwner(B);
-		oldAction({ reserve: 999, incomeRuleIds: ["stale-a-income"] });
+		oldAction({ reserve: 999, incomeScheduleIds: ["stale-a-income"] });
 		expect(useSafeSpendingSettings.getState()).toMatchObject(
 			defaultSafeSpendingSettings(),
 		);
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 123,
-			incomeRuleIds: ["private-a-income"],
+			incomeScheduleIds: ["private-a-income"],
 		});
 	});
 
@@ -359,14 +361,14 @@ describe("financial preference owner isolation", () => {
 		await verifyOwner(GUEST_USER_ID);
 		useSafeSpendingSettings
 			.getState()
-			.updateSettings({ reserve: 200, incomeRuleIds: ["sample-income"] });
+			.updateSettings({ reserve: 200, incomeScheduleIds: ["sample-income"] });
 		await refreshSafeSpendingSettings();
 		await verifyOwner(A);
 		expect(useSafeSpendingSettings.getState().reserve).toBe(100);
 		await verifyOwner(GUEST_USER_ID);
 		expect(useSafeSpendingSettings.getState()).toMatchObject({
 			reserve: 200,
-			incomeRuleIds: ["sample-income"],
+			incomeScheduleIds: ["sample-income"],
 		});
 		suspendUserScope();
 		expect(useThemeStore.getState().preference).toBe("dark");

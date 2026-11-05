@@ -327,22 +327,40 @@ export async function secondUserSignup(ctx, hooks) {
   return { second, page, other };
 }
 
-function postingPayload(name, sourceAccountId) {
+function transactionPayload(row) {
+  const transaction = new Date((row.transactionTime ?? row.postedTime) * 1000).toISOString();
+  const posted = new Date(row.postedTime * 1000).toISOString();
   return {
+    id: row.id,
+    name: row.name,
+    sourceAccountId: row.sourceAccountId ?? null,
+    destinations: row.destinations ?? [],
+    amount: row.amount?.resolver
+      ? row.amount
+      : { resolver: "expression", config: { expression: "25.00" }, inputs: {} },
+    date: transaction.slice(0, 10),
+    time: transaction.slice(11, 19),
+    postedDate: posted.slice(0, 10),
+    enabled: row.enabled ?? true,
+  };
+}
+
+function postingPayload(name, sourceAccountId) {
+  return transactionPayload({
     name,
     sourceAccountId,
     destinations: [],
-    amount: { resolver: "expression", config: { expression: "25.00" }, inputs: {} },
+    amount: 25,
     postedTime: E2E_SEED.postedTime,
     transactionTime: E2E_SEED.postedTime,
     enabled: true,
-  };
+  });
 }
 
 async function createPosting(ctx, ownerBundle, name, accountId = E2E_SEED.accountId) {
   const { origin } = ctx;
   const { owner, own } = ownerBundle;
-  const response = await api(owner, origin, own, "POST", "/v1/postings", postingPayload(name, accountId));
+  const response = await api(owner, origin, own, "POST", "/v1/transactions", postingPayload(name, accountId));
   assert.equal(response.status(), 200, `create posting ${name}: ${await response.text()}`);
   const body = await response.json();
   assert.equal(body.saved, true);
@@ -535,7 +553,7 @@ export async function receiptUpload(ctx, ownerBundle, secondBundle, pngPath) {
   const receipt = (await attached.json()).receipt;
   assert.ok(receipt?.id, "attached receipt must carry an id");
 
-  const listed = await (await api(owner, origin, own, "GET", `/v1/postings/${postingId}/receipts`)).json();
+  const listed = await (await api(owner, origin, own, "GET", `/v1/transactions/${postingId}/receipts`)).json();
   assert.ok(listed.receipts?.some((row) => row.id === receipt.id), "receipt must list under its posting");
 
   const pixels = await api(owner, origin, own, "GET", `/v1/receipts/${receipt.id}/image`);
@@ -687,23 +705,14 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
   }
 
   async function createPosting(row) {
-    const response = await api(owner, origin, own, "POST", "/v1/postings", {
-      id: row.id,
-      name: row.name,
-      sourceAccountId: row.sourceAccountId ?? null,
-      destinations: row.destinations ?? [],
-      amount: expressionAmount(row.amount),
-      postedTime: row.postedTime,
-      transactionTime: row.transactionTime ?? row.postedTime,
-      enabled: row.enabled ?? true,
-    });
+    const response = await api(owner, origin, own, "POST", "/v1/transactions", transactionPayload(row));
     assert.equal(response.status(), 200, `seed posting ${row.id}: ${await response.text()}`);
     assert.equal((await response.json()).saved, true);
     addedPostings += 1;
   }
 
   async function createRule(row) {
-    const response = await api(owner, origin, own, "POST", "/v1/recurrence-rules", {
+    const response = await api(owner, origin, own, "POST", "/v1/schedules", {
       id: row.id,
       name: row.name,
       sourceAccountId: row.sourceAccountId ?? null,
@@ -740,7 +749,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
       assert.equal(response.status(), 200, `seed checkpoint: ${await response.text()}`);
     }
     for (const posting of model.postings ?? []) await createPosting(posting);
-    for (const rule of model.recurrenceRules ?? []) await createRule(rule);
+    for (const rule of model.schedules ?? []) await createRule(rule);
   }
 
   if (bulk) {

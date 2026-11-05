@@ -5,7 +5,7 @@ import { EmptyState } from "../../components/EmptyState.tsx";
 import { TransactionItemRow } from "../../components/activity/TransactionItem.tsx";
 import { TransactionDetail } from "../../components/activity/TransactionDetail.tsx";
 import { TransactionTable } from "../../components/activity/TransactionTable.tsx";
-import { ruleTransaction } from "../../domain/accountActivity.ts";
+import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import {
 	transactionAmountStyles,
 	transactionBadgeStyles,
@@ -48,9 +48,9 @@ export function TransactionsPanel({
 	const selectedResolved = selected
 		? resolvedAmounts?.get(selected.id)
 		: undefined;
-	const selectedClaimRuleName = selected?.claimRuleId
+	const selectedClaimRuleName = selected?.claimScheduleId
 		? (transactions.find(
-				(transaction) => transaction.id === selected.claimRuleId,
+				(transaction) => transaction.id === selected.claimScheduleId,
 			)?.name ?? null)
 		: null;
 	return (
@@ -145,7 +145,7 @@ export function TransactionsPanel({
 										transaction={transaction}
 										resolved={resolvedAmounts?.get(transaction.id)}
 									/>
-									{transaction.claimRuleId && (
+									{transaction.claimScheduleId && (
 										<Badge tone="neutral">
 											Records {transaction.claimOccurrenceDate}
 										</Badge>
@@ -160,7 +160,7 @@ export function TransactionsPanel({
 			</TransactionTable>
 			{selected && (
 				<TransactionDetail
-					transaction={ruleTransaction({
+					transaction={scheduleTransaction({
 						transaction: selected,
 						accounts,
 						startDate,
@@ -170,7 +170,7 @@ export function TransactionsPanel({
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}
-					claimRuleName={selectedClaimRuleName}
+					claimScheduleName={selectedClaimRuleName}
 					onClose={() => setSelectedId(null)}
 				/>
 			)}

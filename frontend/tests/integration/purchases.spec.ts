@@ -111,9 +111,9 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 	expect(pending.id).toMatch(
 		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 	);
-	const disabled = await request.patch(
-		`${FIXTURE_API}/v1/postings/${pending.id}`,
-		{ data: { ...pending, enabled: false } },
+	const disabled = await request.post(
+		`${FIXTURE_API}/v1/transactions/${pending.id}/amend`,
+		{ data: { enabled: false } },
 	);
 	expect(disabled.ok()).toBe(true);
 	expect((await disabled.json()).saved).toBe(true);
@@ -161,8 +161,8 @@ test("an editor can save a purchase with a synced account and pending UUID posti
 		if (
 			/^(POST|PUT|PATCH|DELETE)$/.test(request.method()) &&
 			(/^\/v1\/(accounts|checkpoints)(\/|$)/.test(path) ||
-				(path === `/v1/postings/${pending.id}` &&
-					/^(PATCH|DELETE)$/.test(request.method())))
+				(path === `/v1/transactions/${pending.id}/amend` &&
+					request.method() === "POST"))
 		)
 			unexpectedWrites.push(`${request.method()} ${path}`);
 	});
@@ -236,7 +236,7 @@ test("standalone purchase CRUD and priority survive reload without posting write
 		const path = new URL(event.url()).pathname;
 		if (path.startsWith("/v1/planned-purchases"))
 			purchaseWrites.push(event.method());
-		if (path.startsWith("/v1/postings")) postingWrites.push(path);
+		if (path.startsWith("/v1/transactions")) postingWrites.push(path);
 	});
 	await openPurchases(page);
 	await addPurchase(page, "API desk", "500");

@@ -126,7 +126,7 @@ describe("projection transaction evidence", () => {
 					enabled: true,
 				},
 			],
-			recurrenceRules: [
+			schedules: [
 				{
 					id: "bill",
 					name: "Stale rule bill",

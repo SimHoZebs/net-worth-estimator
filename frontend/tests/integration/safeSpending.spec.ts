@@ -8,16 +8,9 @@ test.beforeEach(async ({ page, request }) => {
 	await page.clock.setFixedTime(new Date("2026-01-31T12:00:00Z"));
 	// Make salary current, rather than a future-start rule, without changing
 	// any projected amounts after the January balance checkpoint.
-	const modelResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
-	const { model } = await modelResponse.json();
-	const salary = model.recurrenceRules.find(
-		(rule: { id: string }) => rule.id === "salary",
-	);
-	const response = await request.patch(
-		`${FIXTURE_API}/v1/recurrence-rules/salary`,
-		{
-			data: { ...salary, startDate: "2026-01-01" },
-		},
+	const response = await request.post(
+		`${FIXTURE_API}/v1/schedules/salary/reschedule`,
+		{ data: { startDate: "2026-01-01" } },
 	);
 	expect((await response.json()).saved).toBe(true);
 });
@@ -180,20 +173,14 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 			25,
 		],
 	] as const) {
-		const time = new Date(`${day}T12:00:00Z`).getTime() / 1000;
-		const response = await request.post(`${FIXTURE_API}/v1/postings`, {
+		const response = await request.post(`${FIXTURE_API}/v1/transactions`, {
 			data: {
 				id,
 				name,
 				sourceAccountId: "loan",
 				destinations: null,
-				amount: {
-					resolver: "expression",
-					config: { expression: String(amount) },
-					inputs: {},
-				},
-				postedTime: time,
-				transactionTime: time,
+				amount: { value: amount },
+				date: day,
 				enabled: true,
 			},
 		});
@@ -257,7 +244,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 	page,
 	request,
 }) => {
-	const response = await request.post(`${FIXTURE_API}/v1/recurrence-rules`, {
+	const response = await request.post(`${FIXTURE_API}/v1/schedules`, {
 		data: {
 			id: "partner-income",
 			name: "Partner take-home pay",
@@ -291,7 +278,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 		(response) =>
 			response.url().endsWith("/v1/safe-spending-settings") &&
 			response.request().method() === "PUT" &&
-			response.request().postDataJSON().incomeRuleIds.length === 2,
+			response.request().postDataJSON().incomeScheduleIds.length === 2,
 	);
 	await page.keyboard.press("Space");
 	expect((await sourcesSaved).ok()).toBe(true);
@@ -326,7 +313,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 		(response) =>
 			response.url().endsWith("/v1/safe-spending-settings") &&
 			response.request().method() === "PUT" &&
-			response.request().postDataJSON().incomeRuleIds.length === 0,
+			response.request().postDataJSON().incomeScheduleIds.length === 0,
 	);
 	await partner.click();
 	expect((await deselectionSaved).ok()).toBe(true);
@@ -345,7 +332,7 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	page,
 	request,
 }) => {
-	const partner = await request.post(`${FIXTURE_API}/v1/recurrence-rules`, {
+	const partner = await request.post(`${FIXTURE_API}/v1/schedules`, {
 		data: {
 			id: "partner-income",
 			name: "Partner take-home pay",
@@ -374,7 +361,7 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 				accountIds: null,
 				spendingAccountIds: null,
 				incomeAccountIds: null,
-				incomeRuleIds: ["salary", "partner-income"],
+				incomeScheduleIds: ["salary", "partner-income"],
 				transactionIds: null,
 				statementDaySet: false,
 			},
@@ -401,20 +388,14 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 			700,
 		],
 	] as const) {
-		const time = new Date(`${day}T12:00:00Z`).getTime() / 1000;
-		const response = await request.post(`${FIXTURE_API}/v1/postings`, {
+		const response = await request.post(`${FIXTURE_API}/v1/transactions`, {
 			data: {
 				id,
 				name,
 				sourceAccountId: "loan",
 				destinations: null,
-				amount: {
-					resolver: "expression",
-					config: { expression: String(amount) },
-					inputs: {},
-				},
-				postedTime: time,
-				transactionTime: time,
+				amount: { value: amount },
+				date: day,
 				enabled: true,
 			},
 		});
@@ -486,14 +467,13 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 	await page.clock.setFixedTime(new Date("2026-02-10T12:00:00Z"));
 	const modelResponse = await request.get(`${FIXTURE_API}/v1/financial-model`);
 	const { model } = await modelResponse.json();
-	const contribution = model.recurrenceRules.find(
+	const contribution = model.schedules.find(
 		(rule: { id: string }) => rule.id === "savings_contribution",
 	);
-	const contributionResponse = await request.patch(
-		`${FIXTURE_API}/v1/recurrence-rules/savings_contribution`,
+	const contributionResponse = await request.post(
+		`${FIXTURE_API}/v1/schedules/savings_contribution/amend`,
 		{
 			data: {
-				...contribution,
 				amount: {
 					...contribution.amount,
 					config: { ...contribution.amount.config, expression: "10000" },
@@ -509,7 +489,7 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 			accountIds: null,
 			spendingAccountIds: null,
 			incomeAccountIds: null,
-			incomeRuleIds: ["salary"],
+			incomeScheduleIds: ["salary"],
 			transactionIds: null,
 			statementDaySet: false,
 		},

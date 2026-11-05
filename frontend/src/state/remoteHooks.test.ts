@@ -769,7 +769,7 @@ describe("remote workspace state", () => {
 		await rendered.settle();
 		expect(
 			server.calls.filter(
-				(call) => call.method === "POST" && call.url === "/v1/accounts",
+				(call) => call.method === "POST" && call.url === "/v1/model/import",
 			),
 		).not.toHaveLength(0);
 		expect(rendered.result().serverModel).not.toBeNull();
@@ -798,7 +798,7 @@ describe("remote workspace state", () => {
 		);
 		expect(
 			server.calls.filter(
-				(call) => call.method === "POST" && call.url === "/v1/accounts",
+				(call) => call.method === "POST" && call.url === "/v1/model/import",
 			),
 		).toHaveLength(2);
 		rendered.unmount();
@@ -816,7 +816,7 @@ describe("remote workspace state", () => {
 		expect(await importServerModel(modelFixture())).toBe(false);
 		expect(
 			server.calls.filter(
-				(call) => call.method === "POST" && call.url === "/v1/accounts",
+				(call) => call.method === "POST" && call.url === "/v1/model/import",
 			),
 		).toHaveLength(0);
 		expect(
@@ -1994,15 +1994,15 @@ describe("saved-state resource scope", () => {
 		const model = modelFixture();
 		const reordered = {
 			postings: model.postings,
-			recurrenceRules: model.recurrenceRules,
+			schedules: model.schedules,
 			evaluations: model.evaluations,
 			checkpoints: model.checkpoints,
 			accounts: model.accounts,
 			sourcePath: model.sourcePath,
 		};
 		const changed = modelFixture();
-		changed.recurrenceRules[0] = {
-			...changed.recurrenceRules[0]!,
+		changed.schedules[0] = {
+			...changed.schedules[0]!,
 			amount: {
 				resolver: "expression",
 				config: { expression: "200" },

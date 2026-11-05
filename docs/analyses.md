@@ -80,7 +80,7 @@ are qualitative, not calibrated probabilities. No accuracy guarantee exists.
 The first version does not reconstruct plans, allocate bundled repayments, infer
 remaining balances, or require equal payments for every BNPL product.
 
-Findings only annotate transactions. They never create recurrence rules, enable
+Findings only annotate transactions. They never create schedules, enable
 imported transactions, create debt accounts, change account values, or change
 projection identities. A future model-editing action requires explicit review
 and save.
@@ -88,7 +88,7 @@ and save.
 ## Recurring first release
 
 Recurring means repeated payments and deposits with an approximately regular
-cadence. Merchant identity, cadence evidence, and forecast rules remain distinct.
+cadence. Merchant identity, cadence evidence, and forecast schedules remain distinct.
 
 - Weekly, biweekly, monthly, quarterly, and annual patterns are detected from
   settled bank evidence grouped by source, account, currency, direction, and a
@@ -110,34 +110,34 @@ cadence. Merchant identity, cadence evidence, and forecast rules remain distinct
   biweekly recurring claim on the same transactions. Withdrawing, confirming,
   or rejecting one producer's claim never disturbs the independent claim.
 
-Like BNPL, recurring findings never create recurrence rules or change the
-financial model. Creating a forecast rule from a confirmed pattern is a
+Like BNPL, recurring findings never create schedules or change the
+financial model. Creating a forecast schedule from a confirmed pattern is a
 separate explicit action with its own review.
 
-## Pattern to new rule
+## Pattern to new schedule
 
 A confirmed repeating pattern becomes planned cash flow only through
 explicit approval in two steps: preview, then approve. Observed patterns
 and forecast definitions stay different resources: findings and feedback
-remain the evidence, recurrence rules remain the forecast.
+remain the evidence, schedules remain the forecast.
 
-- `GET /v1/analysis-findings/{id}/pattern-to-new-rule-preview` describes the rule the
+- `GET /v1/analysis-findings/{id}/pattern-to-new-schedule-preview` describes the schedule the
   pattern would create (name, amount, schedule, start) plus the forecast
   movements behind it and the recorded evidence. The plan stays visible
   before confirmation, with approval waiting on it. Patterns that repeat
-  every two weeks stay visible with a plain-language reason: rules expand
+  every two weeks stay visible with a plain-language reason: schedules expand
   weekly, monthly, quarterly, or yearly, and no biweekly schedule exists
   yet.
-- `POST /v1/analysis-findings/{id}/pattern-to-new-rule` creates the approved
-  rule through the ordinary finance row-write contract (validation,
+- `POST /v1/analysis-findings/{id}/pattern-to-new-schedule` creates the approved
+  schedule through the ordinary finance row-write contract (validation,
   revision, last-write-wins). It requires a confirmed finding and refuses a
-  second active rule for the same pattern with 409.
-- One active generated rule belongs to one confirmed source pattern. The
+  second active schedule for the same pattern with 409.
+- One active generated schedule belongs to one confirmed source pattern. The
   record lives in `analysis_promotions` beside the evidence, never inside the
-  financial rows. Disabling or deleting the rule leaves findings and
-  feedback intact; a disabled or deleted rule frees the pattern for a
+  financial rows. Disabling or deleting the schedule leaves findings and
+  feedback intact; a disabled or deleted schedule frees the pattern for a
   replacement.
-- The generated rule always starts one full interval after the latest
+- The generated schedule always starts one full interval after the latest
   recorded movement, so approval never duplicates bank facts as forecast
   movements. Creation reads evidence only; preview is available in
   read-only mode while approval requires write permission.
@@ -147,22 +147,22 @@ remain the evidence, recurrence rules remain the forecast.
 Setup installs `analysis_promotions` alongside the other Analysis tables;
 runtime rejects an incomplete schema. The deployment body provisions the
 record table for sources that predate it and verifies it on candidates. A
-user clear removes pattern-to-new-rule records with the model rows they name.
+user clear removes pattern-to-new-schedule records with the model rows they name.
 
-## Pattern to existing rule
+## Pattern to existing schedule
 
-A confirmed pattern can also claim an existing rule's occurrences instead
-of creating a new rule. Each recorded movement becomes a manual
+A confirmed pattern can also claim an existing schedule's occurrences instead
+of creating a new schedule. Each recorded movement becomes a manual
 `PostingClaim` against its nearest free scheduled occurrence, so the
 projection stops double-counting and the recorded rows stay intact.
 
-- `GET /v1/analysis-findings/{id}/pattern-to-existing-rule-preview?ruleId=...`
+- `GET /v1/analysis-findings/{id}/pattern-to-existing-schedule-preview?scheduleId=...`
   maps every occurrence to its nearest unused scheduled date (oldest
   first, skipped months stay skipped) with a plain-language reason when
-  the rule is disabled, routing differs, or no date falls within
+  the schedule is disabled, routing differs, or no date falls within
   tolerance (15% of the nominal interval, at least one day). Preview is
-  available in read-only mode, like new-rule preview.
-- `POST /v1/analysis-findings/{id}/pattern-to-existing-rule` with `{ruleId}`
+  available in read-only mode, like new-schedule preview.
+- `POST /v1/analysis-findings/{id}/pattern-to-existing-schedule` with `{scheduleId}`
   requires a confirmed finding and applies all claims through the
   ordinary finance validation boundary in one atomic store write
   (concurrent additions serialize on a process-wide mutex). Already-correct
@@ -170,8 +170,8 @@ projection stops double-counting and the recorded rows stay intact.
   never reused (disabled rows claim nothing, so their dates stay free).
   Success returns the claimed rows, finance warnings, and the
   model revision. Retries are idempotent.
-- Adding never creates rules or rewrites amounts, names, or dates. It
-  only sets `claim.ruleId` plus `claim.occurrenceDate`, exactly as the
+- Adding never creates schedules or rewrites amounts, names, or dates. It
+  only sets `claim.scheduleId` plus `claim.occurrenceDate`, exactly as the
   manual occurrence link in TransactionDetail does, but for the whole
   pattern at once with schedule guidance. Clearing a claim stays a manual
   single-row edit.

@@ -65,7 +65,7 @@ func TestTransactionCategoryRoundTrip(t *testing.T) {
 		t.Fatalf("list=%+v", listBody.Transactions)
 	}
 
-	updated := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+postingID+"/category", `{"category":"MEDICAL"}`)
+	updated := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+postingID+"/categorize", `{"category":"MEDICAL"}`)
 	if updated.Code != http.StatusOK {
 		t.Fatalf("update status=%d body=%s", updated.Code, updated.Body.String())
 	}
@@ -73,7 +73,7 @@ func TestTransactionCategoryRoundTrip(t *testing.T) {
 		t.Fatalf("updated row=%+v", got)
 	}
 
-	reset := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+postingID+"/category", `{"category":null}`)
+	reset := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+postingID+"/categorize", `{"category":null}`)
 	if reset.Code != http.StatusOK {
 		t.Fatalf("reset status=%d body=%s", reset.Code, reset.Body.String())
 	}
@@ -81,15 +81,15 @@ func TestTransactionCategoryRoundTrip(t *testing.T) {
 		t.Fatalf("reset row=%+v", got)
 	}
 
-	invalid := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+postingID+"/category", `{"category":"GROCERIES"}`)
+	invalid := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+postingID+"/categorize", `{"category":"GROCERIES"}`)
 	if invalid.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid status=%d body=%s", invalid.Code, invalid.Body.String())
 	}
-	empty := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+postingID+"/category", `{}`)
+	empty := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+postingID+"/categorize", `{}`)
 	if empty.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("empty body status=%d body=%s, want explicit null to clear", empty.Code, empty.Body.String())
 	}
-	missing := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/missing/category", `{"category":"MEDICAL"}`)
+	missing := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/missing/categorize", `{"category":"MEDICAL"}`)
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing status=%d body=%s", missing.Code, missing.Body.String())
 	}
@@ -99,7 +99,7 @@ func TestTransactionCategoryWriteHonorsReadOnly(t *testing.T) {
 	scoped := openAPIStore(t)
 	postingID := seedCategoryBankPosting(t, scoped, "")
 	handler := New(scoped, Config{ReadOnly: true})
-	response := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+postingID+"/category", `{"category":"MEDICAL"}`)
+	response := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+postingID+"/categorize", `{"category":"MEDICAL"}`)
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("read-only status=%d body=%s", response.Code, response.Body.String())
 	}

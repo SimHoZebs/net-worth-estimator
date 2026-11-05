@@ -42,14 +42,14 @@ const input = {
 		payment("salary", "2026-11-15", 3300),
 	],
 	incomeAccountIds: ["checking"],
-	incomeRuleIds: ["salary", "partner"],
+	incomeScheduleIds: ["salary", "partner"],
 	todayIso: "2026-10-08",
 };
 
 describe("safeSpendingIncome", () => {
 	it("adds the next projected payment from each selected source on different dates", () => {
 		const result = safeSpendingIncome(input);
-		expect(result.selectedRuleIds).toEqual(["salary", "partner"]);
+		expect(result.selectedScheduleIds).toEqual(["salary", "partner"]);
 		expect(result.paycheck).toEqual({
 			date: "2026-10-15",
 			endDate: "2026-10-20",
@@ -63,7 +63,7 @@ describe("safeSpendingIncome", () => {
 
 	it("counts arbitrary selected transfer sources without an account-name convention", () => {
 		expect(
-			safeSpendingIncome({ ...input, incomeRuleIds: ["partner"] }).paycheck,
+			safeSpendingIncome({ ...input, incomeScheduleIds: ["partner"] }).paycheck,
 		).toEqual({ date: "2026-10-20", endDate: "2026-10-20", amount: 2000 });
 	});
 
@@ -71,7 +71,7 @@ describe("safeSpendingIncome", () => {
 		"does not infer income for selection $ids",
 		({ ids }) => {
 			expect(
-				safeSpendingIncome({ ...input, incomeRuleIds: ids }).paycheck,
+				safeSpendingIncome({ ...input, incomeScheduleIds: ids }).paycheck,
 			).toBeNull();
 		},
 	);
@@ -80,7 +80,7 @@ describe("safeSpendingIncome", () => {
 		expect(
 			safeSpendingIncome({
 				...input,
-				incomeRuleIds: ["salary", "salary", "partner"],
+				incomeScheduleIds: ["salary", "salary", "partner"],
 				transactions: [
 					payment("salary", "2026-10-15", 1000),
 					payment("partner", "2026-10-15", 2000),
@@ -93,7 +93,7 @@ describe("safeSpendingIncome", () => {
 		expect(
 			safeSpendingIncome({
 				...input,
-				incomeRuleIds: ["salary"],
+				incomeScheduleIds: ["salary"],
 				transactions: [
 					payment("salary", "2026-10-15", 1000),
 					payment("salary", "2026-11-15", 9000),
@@ -118,18 +118,18 @@ describe("safeSpendingIncome", () => {
 		const result = safeSpendingIncome({
 			...input,
 			rules: regulated,
-			incomeRuleIds: regulated.map((item) => item.id),
+			incomeScheduleIds: regulated.map((item) => item.id),
 			transactions: regulated.map((item) =>
 				payment(item.id, "2026-10-15", 100),
 			),
 		});
-		expect(result.selectedRuleIds).toEqual([
+		expect(result.selectedScheduleIds).toEqual([
 			"active",
 			"starts-today",
 			"ends-today",
 		]);
 		expect(result.candidates.map((item) => item.id)).toEqual(
-			result.selectedRuleIds,
+			result.selectedScheduleIds,
 		);
 		expect(result.paycheck?.amount).toBe(200);
 	});
@@ -140,7 +140,7 @@ describe("safeSpendingIncome", () => {
 			incomeAccountIds: ["brokerage"],
 		});
 		expect(result.candidates).toEqual([]);
-		expect(result.selectedRuleIds).toEqual([]);
+		expect(result.selectedScheduleIds).toEqual([]);
 		expect(result.paycheck).toBeNull();
 	});
 
@@ -160,14 +160,14 @@ describe("safeSpendingIncome", () => {
 			...input,
 			incomeAccountIds: ["checking", "savings"],
 		});
-		expect(result.selectedRuleIds).toEqual(["salary"]);
+		expect(result.selectedScheduleIds).toEqual(["salary"]);
 		expect(result.paycheck?.amount).toBe(3000);
 	});
 
 	it("ignores stale IDs but retains valid sources", () => {
 		expect(
-			safeSpendingIncome({ ...input, incomeRuleIds: ["deleted", "salary"] })
-				.selectedRuleIds,
+			safeSpendingIncome({ ...input, incomeScheduleIds: ["deleted", "salary"] })
+				.selectedScheduleIds,
 		).toEqual(["salary"]);
 	});
 

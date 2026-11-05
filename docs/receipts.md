@@ -111,7 +111,7 @@ The mock proves workflow contracts, not OCR accuracy or provider reliability.
 | Endpoint | Behavior |
 | --- | --- |
 | `GET /v1/financial-model` | Financial model, issues, revision, and stored `receiptLinks` (posting ID to receipt IDs). |
-| `GET /v1/postings/{id}/receipts` | Metadata and extraction availability. |
+| `GET /v1/transactions/{id}/receipts` | Metadata and extraction availability. |
 | `POST /v1/receipts` | Multipart `postingId` string and `image` file. No automatic extraction. |
 | `GET /v1/receipts/{id}` | Extraction, drafts, confirmed values, provenance, diagnostics, revision. |
 | `GET /v1/receipts/{id}/image` | Private pixels. `download=true` adds a safe attachment filename. |
@@ -187,7 +187,7 @@ replacement resets it with the new rows.
 The financial-model response exposes it as `receiptLinks`, mapping each
 posting ID to its receipt IDs. The transaction list renders its receipt badge
 from that map; opening a receipt still fetches full details through
-`GET /v1/postings/{id}/receipts`. Receipt mutations invalidate the cached
+`GET /v1/transactions/{id}/receipts`. Receipt mutations invalidate the cached
 model so badges follow attach, replace, review, extraction, and delete.
 
 SQLite free pages, WAL files, and backups can contain deleted data. Receipt

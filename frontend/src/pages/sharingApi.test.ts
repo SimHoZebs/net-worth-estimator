@@ -50,10 +50,7 @@ it("saves the preference with the member's own values", async () => {
 			startDate: "2026-01-01",
 		}),
 	).resolves.toEqual(policy());
-	const [url, init] = fetcher.mock.calls[0] as unknown as [
-		string,
-		RequestInit,
-	];
+	const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(url).toBe("/v1/shared/policies/g1");
 	expect(init.method).toBe("PUT");
 	expect(JSON.parse(String(init.body))).toEqual({
@@ -78,10 +75,7 @@ it("previews unsaved values without persisting", async () => {
 			startDate: "2026-01-01",
 		}),
 	).resolves.toEqual(preview);
-	const [url, init] = fetcher.mock.calls[0] as unknown as [
-		string,
-		RequestInit,
-	];
+	const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
 	expect(url).toBe("/v1/shared/policies/g1/preview");
 	expect(init.method).toBe("POST");
 });
@@ -111,9 +105,7 @@ it("lists grants and shares, revokes, excludes, and removes", async () => {
 		}),
 	);
 	await expect(listSharingGrants()).resolves.toEqual([grant]);
-	await expect(grantSharedPosting("p1", "group", "g1")).resolves.toEqual(
-		grant,
-	);
+	await expect(grantSharedPosting("p1", "group", "g1")).resolves.toEqual(grant);
 	await revokeSharedPosting("p1", "group", "g1");
 	await excludeSharedPosting("p1", "group", "g1");
 	await removeSharedExclusion("p1", "group", "g1");
@@ -156,8 +148,7 @@ it("reuses one key for one share action and mints fresh keys per action", async 
 		"fetch",
 		vi.fn(async (_url: unknown, init?: RequestInit) => {
 			keys.push(
-				(JSON.parse(String(init?.body)) as Record<string, unknown>)
-					.requestId,
+				(JSON.parse(String(init?.body)) as Record<string, unknown>).requestId,
 			);
 			return ok({ grant });
 		}),

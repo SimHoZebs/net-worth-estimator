@@ -50,11 +50,11 @@ func (s *sqliteStore) SupersedeAccount(manualID, syncedID, bridgeID string) (sto
 		}
 		deletedPostingIDs := supersedePostingsTouching(baseline, manualID)
 		deletedPostingSet := stringSet(deletedPostingIDs)
-		deletedRuleIDs, err := supersedeRules(tx, baseline, manualID, syncedID)
+		deletedScheduleIDs, err := supersedeRules(tx, baseline, manualID, syncedID)
 		if err != nil {
 			return err
 		}
-		deletedRuleSet := stringSet(deletedRuleIDs)
+		deletedRuleSet := stringSet(deletedScheduleIDs)
 		if err := supersedeAccountProfile(tx, manual, syncedID); err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ func supersedeDeleteCheckpoints(tx *userTx, accountID string) error {
 // untouched because they are local variables, not account IDs.
 func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID string) ([]string, error) {
 	var deleted []string
-	for _, rule := range model.RecurrenceRules {
+	for _, rule := range model.Schedules {
 		if !supersedeRuleTouches(rule, manualID) {
 			continue
 		}
@@ -265,7 +265,7 @@ func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID 
 		}
 		destinations := supersedeReplaceIDs(rule.Destinations, manualID, syncedID)
 		if source != nil && supersedeContains(destinations, *source) {
-			if err := supersedeDeleteRule(tx, rule.ID); err != nil {
+			if err := supersedeDeleteSchedule(tx, rule.ID); err != nil {
 				return nil, err
 			}
 			deleted = append(deleted, rule.ID)
@@ -287,7 +287,7 @@ func supersedeRules(tx *userTx, model *types.FinancialModel, manualID, syncedID 
 	return deleted, nil
 }
 
-func supersedeDeleteRule(tx *userTx, ruleID string) error {
+func supersedeDeleteSchedule(tx *userTx, ruleID string) error {
 	if _, err := tx.Exec(`DELETE FROM posting_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, ruleID); err != nil {
 		return fmt.Errorf("delete claims for rule %s: %w", ruleID, err)
 	}
@@ -297,7 +297,7 @@ func supersedeDeleteRule(tx *userTx, ruleID string) error {
 	return releaseRowID(tx, ruleID)
 }
 
-func supersedeRuleTouches(rule types.RecurrenceRule, accountID string) bool {
+func supersedeRuleTouches(rule types.Schedule, accountID string) bool {
 	if rule.SourceAccountID != nil && *rule.SourceAccountID == accountID {
 		return true
 	}

@@ -85,7 +85,9 @@ export function patternTitle(
 	}
 	if (best) return best;
 	const merchant = pattern.merchant.trim();
-	return merchant ? merchant.charAt(0).toUpperCase() + merchant.slice(1) : "Repeating payment";
+	return merchant
+		? merchant.charAt(0).toUpperCase() + merchant.slice(1)
+		: "Repeating payment";
 }
 
 export function cadenceLabel(cadence: string): string {

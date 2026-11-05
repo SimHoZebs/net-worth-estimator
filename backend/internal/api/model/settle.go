@@ -17,7 +17,7 @@ type settleCandidateRow struct {
 	AmountDeltaCents    int64   `json:"amountDeltaCents"`
 	DescriptorChanged   bool    `json:"descriptorChanged"`
 	Recommended         bool    `json:"recommended"`
-	ClaimRuleID         *string `json:"claimRuleId,omitempty"`
+	ClaimScheduleID     *string `json:"claimScheduleId,omitempty"`
 	ClaimOccurrenceDate *string `json:"claimOccurrenceDate,omitempty"`
 }
 
@@ -74,9 +74,9 @@ func (s *handler) listSettleCandidates(_ context.Context, input *struct {
 			Recommended:       index == 0,
 		}
 		if candidate.Posting.Claim != nil {
-			ruleID := candidate.Posting.Claim.RuleID
+			ruleID := candidate.Posting.Claim.ScheduleID
 			occurrenceDate := candidate.Posting.Claim.OccurrenceDate
-			row.ClaimRuleID = &ruleID
+			row.ClaimScheduleID = &ruleID
 			row.ClaimOccurrenceDate = &occurrenceDate
 		}
 		rows = append(rows, row)

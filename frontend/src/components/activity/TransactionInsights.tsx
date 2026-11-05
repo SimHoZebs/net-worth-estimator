@@ -21,8 +21,8 @@ import { Button, TextButton } from "../Button.tsx";
 import { ErrorNotice } from "../ErrorNotice.tsx";
 import { InputField, SelectField } from "../Field.tsx";
 import {
-	ExistingRuleDialog,
-	NewRuleDialog,
+	ExistingScheduleDialog,
+	NewScheduleDialog,
 } from "../analysis/RecurringPatterns.tsx";
 
 export type InsightSuggestion =
@@ -327,9 +327,9 @@ export function TransactionInsightsPanel({
 			: null;
 	const movesVoidClaim = Boolean(
 		shown.kind === "void" &&
-		shown.voidRow.claimRuleId &&
+		shown.voidRow.claimScheduleId &&
 		shown.voidRow.claimOccurrenceDate &&
-		!selectedVoid?.claimRuleId,
+		!selectedVoid?.claimScheduleId,
 	);
 
 	const answer = (action: "confirm" | "reject") => {
@@ -461,16 +461,16 @@ export function TransactionInsightsPanel({
 							))}
 						</SelectField>
 					)}
-					{movesVoidClaim && shown.voidRow.claimRuleId && (
+					{movesVoidClaim && shown.voidRow.claimScheduleId && (
 						<p className="m-0 text-[11px] leading-relaxed text-muted">
 							The posted charge records the occurrence of{" "}
-							{names.get(shown.voidRow.claimRuleId) ?? "its rule"} on{" "}
+							{names.get(shown.voidRow.claimScheduleId) ?? "its rule"} on{" "}
 							{dateLabel(shown.voidRow.claimOccurrenceDate ?? "", true)}.
 						</p>
 					)}
 					{!movesVoidClaim &&
-						shown.voidRow.claimRuleId &&
-						selectedVoid?.claimRuleId && (
+						shown.voidRow.claimScheduleId &&
+						selectedVoid?.claimScheduleId && (
 							<p className="m-0 text-[11px] leading-relaxed text-muted">
 								The posted charge already records an occurrence. Its claim
 								stays; this hold's claim is cleared with the hold.
@@ -535,8 +535,8 @@ export function TransactionInsightsPanel({
 			) : (
 				<div className="grid gap-2">
 					<p className="m-0 text-xs leading-relaxed text-muted">
-						Confirmed as repeating. Create its forecast rule or link its
-						payments to an existing rule. Recorded payments stay unchanged.
+						Confirmed as repeating. Create its forecast schedule or link its
+						payments to an existing schedule. Recorded payments stay unchanged.
 					</p>
 					<div className="flex flex-wrap gap-2">
 						<Button
@@ -552,10 +552,10 @@ export function TransactionInsightsPanel({
 							type="button"
 							variant="secondary"
 							size="sm"
-							aria-label={`Link repeating pattern for ${patternTitleText} to an existing rule`}
+							aria-label={`Link repeating pattern for ${patternTitleText} to an existing schedule`}
 							onClick={() => setRuleDialog("existing")}
 						>
-							Link to existing rule
+							Link to existing schedule
 						</Button>
 					</div>
 				</div>
@@ -650,7 +650,7 @@ export function TransactionInsightsPanel({
 			</div>
 
 			{ruleDialog === "new" && detailsPattern && (
-				<NewRuleDialog
+				<NewScheduleDialog
 					findingId={detailsPattern.anchor.id}
 					title={patternTitleText}
 					readOnly={readOnly}
@@ -658,7 +658,7 @@ export function TransactionInsightsPanel({
 				/>
 			)}
 			{ruleDialog === "existing" && detailsPattern && (
-				<ExistingRuleDialog
+				<ExistingScheduleDialog
 					findingId={detailsPattern.anchor.id}
 					title={patternTitleText}
 					names={names}

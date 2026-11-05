@@ -116,7 +116,7 @@ it("refreshes projections when the posting supplies the start date", () => {
 	setServerModelOnly();
 	editCachedModel((model) => {
 		model.checkpoints = [];
-		model.recurrenceRules = [];
+		model.schedules = [];
 		model.postings = [{ ...model.postings[0]!, id: "vanished-hold" }];
 	});
 	expect(transactionRemovalNeedsProjectionRefresh("vanished-hold")).toBe(true);

@@ -72,8 +72,8 @@ test("account and transaction edits survive a failed forecast", async ({
 	await expect
 		.poll(async () => {
 			const saved = await readSavedServerModel();
-			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
-				.config.expression;
+			return saved.schedules.find((rule) => rule.id === "invest")?.amount.config
+				.expression;
 		})
 		.toBe("900");
 	await page.keyboard.press("Escape");

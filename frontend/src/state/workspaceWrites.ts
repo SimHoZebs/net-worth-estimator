@@ -5,7 +5,7 @@ import {
 	moveAmountPreset,
 	updateAmountPreset,
 } from "@/api/generated/endpoints.ts";
-import { applyModelChanges, diffFinancialModels } from "@/api/modelChanges.ts";
+import { importModel as importModelRequest } from "@/api/generated/endpoints.ts";
 import {
 	ApiHttpError,
 	type AmountPreset,
@@ -244,11 +244,15 @@ export async function importServerModel(
 					status: 403,
 					message: READ_ONLY_IMPORT_MESSAGE,
 				});
-			const result = await applyModelChanges(diffFinancialModels(null, model));
+			const result = await importModelRequest({ model: model as never });
 			if (scope !== getUserScope()) return false;
-			if (result instanceof Error) throw result;
-			if (!result.ok)
-				throw new Error(result.issues.map((issue) => issue.message).join(" "));
+			if (result.data.saved === false)
+				throw new Error(
+					(result.data.issues ?? [])
+						.map((issue) => issue.message)
+						.filter(Boolean)
+						.join(" "),
+				);
 			const cache = serverQueryClient();
 			await cache.invalidateQueries({
 				queryKey: userResourceKey("model", scope),

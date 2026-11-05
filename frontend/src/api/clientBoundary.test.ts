@@ -336,9 +336,7 @@ it("scans template interpolations but not template text", () => {
 
 it("tells division from regular expressions", () => {
 	expect(networkReferences("const ratio = total / count;")).toEqual([]);
-	expect(networkReferences("const ratio = total / fetch;")).toEqual([
-		"fetch",
-	]);
+	expect(networkReferences("const ratio = total / fetch;")).toEqual(["fetch"]);
 	expect(networkReferences("const hit = /fetch/.test(path);")).toEqual([]);
 	expect(networkReferences("return /fetch/.test(path);")).toEqual([]);
 	expect(networkReferences("if (ready) /fetch/.test(path);")).toEqual([]);

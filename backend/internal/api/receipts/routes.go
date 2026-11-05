@@ -20,7 +20,7 @@ type handler struct {
 func Register(api huma.API, service *receipts.Service, st store.Store) {
 	s := &handler{service: service, store: st}
 	upload := huma.Middlewares{receiptUploadLimit(api)}
-	huma.Register(api, huma.Operation{OperationID: "list-receipts", Method: "GET", Path: "/v1/postings/{id}/receipts", Summary: "List private receipt evidence for a saved posting"}, s.listReceipts)
+	huma.Register(api, huma.Operation{OperationID: "list-receipts", Method: "GET", Path: "/v1/transactions/{id}/receipts", Summary: "List private receipt evidence for a recorded transaction"}, s.listReceipts)
 	huma.Register(api, huma.Operation{OperationID: "attach-receipt", Method: "POST", Path: "/v1/receipts", Summary: "Attach a private receipt image", MaxBodyBytes: receipts.MaxUploadBytes + (64 << 10), Middlewares: upload}, s.attachReceipt)
 	receiptMultipartSpec(api.OpenAPI().Paths["/v1/receipts"].Post)
 	huma.Register(api, huma.Operation{OperationID: "replace-receipt-image", Method: "PUT", Path: "/v1/receipts/{id}/image", Summary: "Replace receipt image and clear receipt content", MaxBodyBytes: receipts.MaxUploadBytes + (64 << 10), Middlewares: upload}, s.replaceReceiptImage)

@@ -14,15 +14,15 @@ func TestSafeSpendingSettingsHTTP(t *testing.T) {
 	if empty.Code != 200 || !json.Valid(empty.Body.Bytes()) {
 		t.Fatalf("GET = %d %s", empty.Code, empty.Body.String())
 	}
-	const valid = `{"statementDay":15,"statementDaySet":true,"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeAccountIds":null,"incomeRuleIds":[],"transactionIds":["rent"]}`
+	const valid = `{"statementDay":15,"statementDaySet":true,"reserve":725.25,"accountIds":["card"],"spendingAccountIds":null,"incomeAccountIds":null,"incomeScheduleIds":[],"transactionIds":["rent"]}`
 	saved := doRowRequest(t, handler, http.MethodPut, path, valid)
 	if saved.Code != 200 {
 		t.Fatalf("PUT = %d %s", saved.Code, saved.Body.String())
 	}
 	for _, invalid := range []string{
-		`{"statementDay":0,"reserve":0,"incomeRuleIds":[]}`,
-		`{"statementDay":29,"reserve":0,"incomeRuleIds":[]}`,
-		`{"statementDay":20,"reserve":-1,"incomeRuleIds":[]}`,
+		`{"statementDay":0,"reserve":0,"incomeScheduleIds":[]}`,
+		`{"statementDay":29,"reserve":0,"incomeScheduleIds":[]}`,
+		`{"statementDay":20,"reserve":-1,"incomeScheduleIds":[]}`,
 	} {
 		response := doRowRequest(t, handler, http.MethodPut, path, invalid)
 		if response.Code != 422 {

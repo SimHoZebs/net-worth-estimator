@@ -25,7 +25,7 @@ var (
 // schedules. Biweekly has no rule schedule: rules expand weekly, monthly,
 // quarterly, or longer, so biweekly patterns stay visible without creation
 // until the product decides how they should repeat.
-func recurringCadenceFrequency(cadence string) (types.RecurrenceFrequency, bool) {
+func recurringCadenceFrequency(cadence string) (types.Frequency, bool) {
 	switch cadence {
 	case "weekly":
 		return types.FrequencyWeekly, true
@@ -62,31 +62,31 @@ func formatCents(value float64) string {
 	return strconv.FormatFloat(math.Round(value*100)/100, 'f', 2, 64)
 }
 
-// PatternToNewRuleInput carries everything creation needs: the confirmed
+// PatternToNewScheduleInput carries everything creation needs: the confirmed
 // anchor finding, the saved model rows behind its evidence, the immutable
 // source facts for those rows, the known model account IDs, and the active
 // generated rule for the pattern when one already exists.
-type PatternToNewRuleInput struct {
-	Anchor         types.AnalysisFinding
-	Postings       []types.Posting
-	Facts          map[string]types.TransactionFacts
-	AccountIDs     []string
-	ExistingRuleID string
+type PatternToNewScheduleInput struct {
+	Anchor             types.AnalysisFinding
+	Postings           []types.Posting
+	Facts              map[string]types.TransactionFacts
+	AccountIDs         []string
+	ExistingScheduleID string
 }
 
-// BuildPatternToNewRulePreview derives the forecast rule one confirmed recurring
+// BuildPatternToNewSchedulePreview derives the forecast rule one confirmed recurring
 // pattern would create, plus the forecast movements behind it. The proposed
 // rule always starts one full interval after the latest recorded movement,
 // so approving never duplicates bank facts as forecast movements.
 // Biweekly and unknown cadences return a visible preview with
 // Creatable=false instead of an error, so the interface can explain why.
-func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToNewRulePreview, error) {
+func BuildPatternToNewSchedulePreview(input PatternToNewScheduleInput) (types.PatternToNewSchedulePreview, error) {
 	anchor := input.Anchor
 	if anchor.Kind != "recurring" {
-		return types.PatternToNewRulePreview{}, ErrNotRecurring
+		return types.PatternToNewSchedulePreview{}, ErrNotRecurring
 	}
 	if anchor.Status != "active" {
-		return types.PatternToNewRulePreview{}, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
+		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: finding is %s", ErrPatternStale, anchor.Status)
 	}
 	confirmed := anchor.Review != nil && anchor.Review.Decision == "confirmed"
 	occurrenceIDs := []string{}
@@ -104,7 +104,7 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 	}
 	occurrenceIDs = ordered
 	if len(occurrenceIDs) == 0 {
-		return types.PatternToNewRulePreview{}, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
+		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: pattern names no recorded movements", ErrPatternStale)
 	}
 	byID := make(map[string]types.Posting, len(input.Postings))
 	for _, posting := range input.Postings {
@@ -114,22 +114,22 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 	for _, id := range occurrenceIDs {
 		posting, ok := byID[id]
 		if !ok || posting.Pending || posting.Void {
-			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		facts, ok := input.Facts[id]
 		if !ok {
-			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		amount, err := strconv.ParseFloat(facts.Amount, 64)
 		if err != nil || math.IsNaN(amount) || math.IsInf(amount, 0) || amount == 0 {
-			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		stamp := posting.TransactionTime
 		if stamp <= 0 {
 			stamp = posting.PostedTime
 		}
 		if stamp <= 0 {
-			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
+			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: a recorded movement changed", ErrPatternStale)
 		}
 		occurrences = append(occurrences, recurringOccurrence{id: id, day: time.Unix(stamp, 0).UTC().Format("2006-01-02"), stamp: stamp, amount: amount})
 	}
@@ -137,7 +137,7 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 	for _, item := range occurrences {
 		posting := byID[item.id]
 		if !equalRouting(posting, first) {
-			return types.PatternToNewRulePreview{}, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
+			return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: recorded movements span accounts", ErrPatternIncoherent)
 		}
 	}
 	account := accountOf(first)
@@ -149,7 +149,7 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 		}
 	}
 	if !known {
-		return types.PatternToNewRulePreview{}, fmt.Errorf("%w: the pattern account is gone", ErrPatternStale)
+		return types.PatternToNewSchedulePreview{}, fmt.Errorf("%w: the pattern account is gone", ErrPatternStale)
 	}
 	magnitudes := make([]float64, 0, len(occurrences))
 	for _, item := range occurrences {
@@ -159,15 +159,15 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].stamp < occurrences[j].stamp })
 	lastDay := occurrences[len(occurrences)-1].day
 	cadence := anchor.Product
-	preview := types.PatternToNewRulePreview{
-		FindingID:      anchor.ID,
-		PatternKey:     RecurringPatternKey(anchor.Kind, cadence, occurrenceIDs),
-		Merchant:       anchor.Provider,
-		Cadence:        cadence,
-		TypicalAmount:  formatCents(typical),
-		Currency:       input.Facts[occurrenceIDs[0]].Currency,
-		AccountID:      account,
-		ExistingRuleID: input.ExistingRuleID,
+	preview := types.PatternToNewSchedulePreview{
+		FindingID:          anchor.ID,
+		PatternKey:         RecurringPatternKey(anchor.Kind, cadence, occurrenceIDs),
+		Merchant:           anchor.Provider,
+		Cadence:            cadence,
+		TypicalAmount:      formatCents(typical),
+		Currency:           input.Facts[occurrenceIDs[0]].Currency,
+		AccountID:          account,
+		ExistingScheduleID: input.ExistingScheduleID,
 	}
 	if occurrences[0].amount > 0 {
 		preview.Direction = "inflow"
@@ -183,7 +183,7 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 		preview.Reason = fmt.Sprintf("Patterns that repeat %s cannot become forecast rules yet. The evidence stays saved for review.", cadenceLabel(cadence))
 		return preview, nil
 	}
-	rule := &types.RecurrenceRule{
+	rule := &types.Schedule{
 		Name:            ruleName(occurrences, byID, anchor.Provider),
 		SourceAccountID: first.SourceAccountID,
 		Destinations:    append([]string(nil), first.Destinations...),
@@ -193,18 +193,18 @@ func BuildPatternToNewRulePreview(input PatternToNewRuleInput) (types.PatternToN
 		Enabled:         true,
 	}
 	preview.Creatable = true
-	preview.Rule = &types.ProposedNewRule{
+	preview.Schedule = &types.ProposedNewSchedule{
 		Name: rule.Name, SourceAccountID: rule.SourceAccountID, Destinations: rule.Destinations,
 		Amount: formatCents(typical), Frequency: frequency, StartDate: rule.StartDate, Enabled: true,
 	}
 	for _, date := range domain.RuleScheduleDates(rule, domain.AdvanceRuleDate(rule.StartDate, frequency, 5)) {
-		preview.Upcoming = append(preview.Upcoming, types.UpcomingNewRuleOccurrence{Date: date, Amount: formatCents(typical)})
+		preview.Upcoming = append(preview.Upcoming, types.UpcomingNewScheduleOccurrence{Date: date, Amount: formatCents(typical)})
 	}
 	if !confirmed {
 		preview.Creatable = false
 		preview.Reason = "Confirm this repeating pattern before creating its forecast rule."
 	}
-	if input.ExistingRuleID != "" {
+	if input.ExistingScheduleID != "" {
 		preview.Creatable = false
 		preview.Reason = "This pattern already has an active forecast rule. Disable or delete that rule to create a replacement."
 	}

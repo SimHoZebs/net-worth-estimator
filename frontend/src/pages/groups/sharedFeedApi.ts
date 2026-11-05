@@ -75,8 +75,7 @@ export async function fetchGroupFeed(
 	const params = new URLSearchParams();
 	if (filters.startDate) params.set("startDate", filters.startDate);
 	if (filters.endDate) params.set("endDate", filters.endDate);
-	for (const member of filters.members ?? [])
-		params.append("member", member);
+	for (const member of filters.members ?? []) params.append("member", member);
 	for (const direction of filters.directions ?? [])
 		params.append("direction", direction);
 	if (filters.limit) params.set("limit", String(filters.limit));

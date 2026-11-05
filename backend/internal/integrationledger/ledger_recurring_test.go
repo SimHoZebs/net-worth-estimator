@@ -90,19 +90,19 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	if confirmResp.Code != http.StatusOK {
 		t.Fatalf("confirm = %d %s", confirmResp.Code, confirmResp.Body.String())
 	}
-	previewReq := httptest.NewRequest(http.MethodGet, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule-preview", nil)
+	previewReq := httptest.NewRequest(http.MethodGet, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-schedule-preview", nil)
 	previewResp := httptest.NewRecorder()
 	world.plan.ServeHTTP(previewResp, previewReq)
 	var preview struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}
-	if err := json.Unmarshal(previewResp.Body.Bytes(), &preview); err != nil || !preview.Preview.Creatable || preview.Preview.Rule == nil {
+	if err := json.Unmarshal(previewResp.Body.Bytes(), &preview); err != nil || !preview.Preview.Creatable || preview.Preview.Schedule == nil {
 		t.Fatalf("preview = %d %+v, want a creatable rule", previewResp.Code, preview)
 	}
-	if math.Abs(ledgerParseAmount(preview.Preview.Rule.Amount)-want.DetectAmount) > 0.001 || preview.Preview.Rule.Frequency != types.FrequencyMonthly {
-		t.Fatalf("preview rule = %+v, want monthly %v from the seed charge", preview.Preview.Rule, want.DetectAmount)
+	if math.Abs(ledgerParseAmount(preview.Preview.Schedule.Amount)-want.DetectAmount) > 0.001 || preview.Preview.Schedule.Frequency != types.FrequencyMonthly {
+		t.Fatalf("preview rule = %+v, want monthly %v from the seed charge", preview.Preview.Schedule, want.DetectAmount)
 	}
-	createReq := httptest.NewRequest(http.MethodPost, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule", nil)
+	createReq := httptest.NewRequest(http.MethodPost, "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-schedule", nil)
 	createResp := httptest.NewRecorder()
 	world.plan.ServeHTTP(createResp, createReq)
 	if createResp.Code != http.StatusOK {
@@ -112,8 +112,8 @@ func TestLedgerRecurringProposesMonthlyCharge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(model.RecurrenceRules) != 1 {
-		t.Fatalf("rules = %d, want the single created rule", len(model.RecurrenceRules))
+	if len(model.Schedules) != 1 {
+		t.Fatalf("rules = %d, want the single created rule", len(model.Schedules))
 	}
 }
 

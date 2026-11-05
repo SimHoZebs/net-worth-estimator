@@ -20,7 +20,7 @@ function syncRow(overrides: Partial<Transaction>): Transaction {
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,

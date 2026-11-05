@@ -369,7 +369,7 @@ describe("SafeSpendingConfigurePanel", () => {
 		render(
 			<SafeSpendingConfigurePanel
 				config={config}
-				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
+				income={{ candidates: [], selectedScheduleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
 				accounts={financialModelFixture.accounts}
@@ -394,7 +394,7 @@ describe("SafeSpendingConfigurePanel", () => {
 		render(
 			<SafeSpendingConfigurePanel
 				config={config}
-				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
+				income={{ candidates: [], selectedScheduleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
 				accounts={financialModelFixture.accounts}
@@ -435,7 +435,7 @@ describe("SafeSpendingConfigurePanel", () => {
 		render(
 			<SafeSpendingConfigurePanel
 				config={config}
-				income={{ candidates: [], selectedRuleIds: [], paycheck: null }}
+				income={{ candidates: [], selectedScheduleIds: [], paycheck: null }}
 				billCandidates={[]}
 				trackedBillIds={[]}
 				accounts={financialModelFixture.accounts}

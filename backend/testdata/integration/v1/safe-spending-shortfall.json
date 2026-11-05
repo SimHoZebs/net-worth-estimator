@@ -98,7 +98,7 @@
           "whatIf": []
         },
         "postings": [],
-        "recurrenceRules": [
+        "schedules": [
           {
             "id": "salary",
             "name": "Salary",
@@ -215,7 +215,7 @@
         "accountIds": null,
         "spendingAccountIds": null,
         "incomeAccountIds": null,
-        "incomeRuleIds": [
+        "incomeScheduleIds": [
           "salary"
         ],
         "transactionIds": null,

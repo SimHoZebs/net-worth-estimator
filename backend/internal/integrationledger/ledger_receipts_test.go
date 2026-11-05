@@ -283,7 +283,7 @@ func TestLedgerImageReceiptLinksChargeAcrossResync(t *testing.T) {
 	}
 
 	// The charge's link list and the model links both name the receipt.
-	listReq := httptest.NewRequest(http.MethodGet, "/v1/postings/"+charge+"/receipts", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/v1/transactions/"+charge+"/receipts", nil)
 	listResp := httptest.NewRecorder()
 	world.plan.ServeHTTP(listResp, listReq)
 	var links struct {
@@ -318,7 +318,7 @@ func TestLedgerImageReceiptLinksChargeAcrossResync(t *testing.T) {
 	if len(before.Postings) != len(after.Postings) {
 		t.Fatalf("postings = %d after re-sync, want %d", len(after.Postings), len(before.Postings))
 	}
-	stillReq := httptest.NewRequest(http.MethodGet, "/v1/postings/"+charge+"/receipts", nil)
+	stillReq := httptest.NewRequest(http.MethodGet, "/v1/transactions/"+charge+"/receipts", nil)
 	stillResp := httptest.NewRecorder()
 	world.plan.ServeHTTP(stillResp, stillReq)
 	var still struct {

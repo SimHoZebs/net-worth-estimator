@@ -132,9 +132,9 @@ func BuildFlowGraph(model *types.FinancialModel, events []types.TransactionEvent
 	for index := range transactions {
 		postingByID[transactions[index].ID] = &transactions[index]
 	}
-	ruleIDs := make(map[string]bool, len(model.RecurrenceRules))
-	for index := range model.RecurrenceRules {
-		ruleIDs[model.RecurrenceRules[index].ID] = true
+	ruleIDs := make(map[string]bool, len(model.Schedules))
+	for index := range model.Schedules {
+		ruleIDs[model.Schedules[index].ID] = true
 	}
 
 	graph := &types.FlowGraph{StartDate: startDate, EndDate: endDate}

@@ -96,7 +96,7 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 		t.Fatalf("settled charge missing in %+v", model.Postings)
 	}
 
-	response := doRowRequest(t, handler, http.MethodGet, "/v1/postings/"+holdID+"/settle-candidates", "")
+	response := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/"+holdID+"/settle-candidates", "")
 	if response.Code != http.StatusOK {
 		t.Fatalf("settle candidates status = %d, body %s", response.Code, response.Body.String())
 	}
@@ -130,11 +130,11 @@ func TestSettleCandidatesEndpoint(t *testing.T) {
 		t.Fatalf("candidate evidence = %+v, want delta 628, changed, recommended", candidate)
 	}
 
-	notHold := doRowRequest(t, handler, http.MethodGet, "/v1/postings/"+settledID+"/settle-candidates", "")
+	notHold := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/"+settledID+"/settle-candidates", "")
 	if notHold.Code != http.StatusBadRequest {
 		t.Fatalf("settled posting status = %d, want 400", notHold.Code)
 	}
-	missing := doRowRequest(t, handler, http.MethodGet, "/v1/postings/missing/settle-candidates", "")
+	missing := doRowRequest(t, handler, http.MethodGet, "/v1/transactions/missing/settle-candidates", "")
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing status = %d, want 404", missing.Code)
 	}

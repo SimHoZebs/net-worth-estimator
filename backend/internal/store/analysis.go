@@ -14,11 +14,11 @@ type AnalysisStore interface {
 	DismissAnalysisFinding(id string, dismissed bool, actor string) error
 	ReviewAnalysisFinding(id string, input types.AnalysisFeedbackInput) (types.AnalysisFeedback, error)
 	ListAnalysisFeedback(filter types.AnalysisFeedbackFilter) ([]types.AnalysisFeedback, error)
-	PreviewPatternToNewRule(findingID string) (types.PatternToNewRulePreview, error)
-	FindPatternToNewRule(patternKey string) (types.PatternToNewRule, error)
-	RecordPatternToNewRule(record types.PatternToNewRule) error
-	RemovePatternToNewRule(patternKey, ruleID string) error
-	PreviewPatternToExistingRule(findingID, ruleID string) (types.PatternToExistingRulePreview, error)
+	PreviewPatternToNewSchedule(findingID string) (types.PatternToNewSchedulePreview, error)
+	FindPatternToNewSchedule(patternKey string) (types.PatternToNewSchedule, error)
+	RecordPatternToNewSchedule(record types.PatternToNewSchedule) error
+	RemovePatternToNewSchedule(patternKey, ruleID string) error
+	PreviewPatternToExistingSchedule(findingID, ruleID string) (types.PatternToExistingSchedulePreview, error)
 }
 
 // BankObservation refreshes evidence for an already mapped bank transaction.

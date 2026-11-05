@@ -350,46 +350,6 @@ func TestRowWriteNotFoundAndConflict(t *testing.T) {
 	}
 }
 
-func TestRowWriteIgnoresEchoedSourceField(t *testing.T) {
-	database := openAPIStore(t)
-	handler := New(database, Config{})
-
-	account := httptest.NewRecorder()
-	accountRequest := httptest.NewRequest(http.MethodPost, "/v1/accounts", bytes.NewReader([]byte(
-		`{"id":"checking","name":"Checking","kind":"cash","enabled":true}`,
-	)))
-	accountRequest.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(account, accountRequest)
-	if account.Code != http.StatusOK {
-		t.Fatalf("account status = %d, body %s", account.Code, account.Body.String())
-	}
-
-	// Frontend drafts echo stored rows verbatim, including the
-	// server-computed source flag. Writes must accept and ignore it.
-	post := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/v1/postings", bytes.NewReader([]byte(
-		`{"id":"01900000-0000-7000-8000-000000000023","name":"Echo","destinations":["checking"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true,"source":"banksync","pending":true,"claim":null}`,
-	)))
-	request.Header.Set("Content-Type", "application/json")
-	handler.ServeHTTP(post, request)
-	if post.Code != http.StatusOK {
-		t.Fatalf("POST status = %d, body %s", post.Code, post.Body.String())
-	}
-	var created struct {
-		Result struct {
-			Source  string `json:"source"`
-			Pending bool   `json:"pending"`
-		} `json:"value"`
-		Saved bool `json:"saved"`
-	}
-	if err := json.Unmarshal(post.Body.Bytes(), &created); err != nil {
-		t.Fatalf("decode POST response: %v", err)
-	}
-	if !created.Saved || created.Result.Source != "user" || created.Result.Pending {
-		t.Fatalf("echoed source response = %+v", created)
-	}
-}
-
 // Claiming a pending bank seed promotes it to a recorded occurrence in one
 // row write: the claim lands, pending clears, and the row participates.
 // The finance boundary validates the request before the store runs, so a
@@ -410,7 +370,7 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 	}
 
 	rule := httptest.NewRecorder()
-	ruleRequest := httptest.NewRequest(http.MethodPost, "/v1/recurrence-rules", bytes.NewReader([]byte(
+	ruleRequest := httptest.NewRequest(http.MethodPost, "/v1/schedules", bytes.NewReader([]byte(
 		`{"id":"housing","name":"Housing","sourceAccountId":"checking","amount":{"resolver":"expression","config":{"expression":"2970"},"inputs":{}},"frequency":"monthly","startDate":"2026-05-01","enabled":true}`,
 	)))
 	ruleRequest.Header.Set("Content-Type", "application/json")
@@ -442,8 +402,8 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 	id := model.Postings[0].ID
 
 	patch := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPatch, "/v1/postings/"+id, bytes.NewReader([]byte(
-		`{"name":"BILTRENT","sourceAccountId":"checking","amount":{"resolver":"expression","config":{"expression":"2970.25"},"inputs":{}},"postedTime":1788220800,"transactionTime":1788220800,"enabled":false,"claim":{"ruleId":"housing","occurrenceDate":"2026-09-01"}}`,
+	request := httptest.NewRequest(http.MethodPost, "/v1/transactions/"+id+"/claim", bytes.NewReader([]byte(
+		`{"scheduleId":"housing","occurrenceDate":"2026-09-01"}`,
 	)))
 	request.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(patch, request)
@@ -465,7 +425,7 @@ func TestPostingClaimOnPendingSeedPersists(t *testing.T) {
 	if !saved.Saved || hasErrorIssues(saved.Issues) {
 		t.Fatalf("claim response = %+v", saved)
 	}
-	if saved.Result.Claim == nil || saved.Result.Claim.RuleID != "housing" {
+	if saved.Result.Claim == nil || saved.Result.Claim.ScheduleID != "housing" {
 		t.Fatalf("claim missing: %+v", saved.Result)
 	}
 	if saved.Result.Pending || !saved.Result.Enabled {
@@ -705,9 +665,9 @@ func TestDeterministicTransactionEvidenceReportsAnnualCapAvailability(t *testing
 		t.Fatalf("decode projection fixture: %v", err)
 	}
 	cap := 500.0
-	for index := range fixture.Model.RecurrenceRules {
-		if fixture.Model.RecurrenceRules[index].ID == "invest" {
-			fixture.Model.RecurrenceRules[index].AnnualCap = &cap
+	for index := range fixture.Model.Schedules {
+		if fixture.Model.Schedules[index].ID == "invest" {
+			fixture.Model.Schedules[index].AnnualCap = &cap
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
@@ -756,11 +716,11 @@ func TestDeterministicTransactionEvidenceCarriesHistoricalAnnualCapUsage(t *test
 	}
 	cap := 500.0
 	endDate := types.IsoDate("2026-03-31")
-	for index := range fixture.Model.RecurrenceRules {
-		if fixture.Model.RecurrenceRules[index].ID == "invest" {
-			fixture.Model.RecurrenceRules[index].StartDate = "2026-01-31"
-			fixture.Model.RecurrenceRules[index].EndDate = &endDate
-			fixture.Model.RecurrenceRules[index].AnnualCap = &cap
+	for index := range fixture.Model.Schedules {
+		if fixture.Model.Schedules[index].ID == "invest" {
+			fixture.Model.Schedules[index].StartDate = "2026-01-31"
+			fixture.Model.Schedules[index].EndDate = &endDate
+			fixture.Model.Schedules[index].AnnualCap = &cap
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})
@@ -816,10 +776,10 @@ func TestDeterministicTransactionEvidenceReportsDestinationHeadroom(t *testing.T
 			fixture.Model.Accounts[index].MaxBalance = &ceiling
 		}
 	}
-	for index := range fixture.Model.RecurrenceRules {
-		if fixture.Model.RecurrenceRules[index].ID == "paydown" {
-			fixture.Model.RecurrenceRules[index].Amount.Config = map[string]any{"expression": "711"}
-			fixture.Model.RecurrenceRules[index].Amount.Inputs = map[string]types.AmountInputBinding{}
+	for index := range fixture.Model.Schedules {
+		if fixture.Model.Schedules[index].ID == "paydown" {
+			fixture.Model.Schedules[index].Amount.Config = map[string]any{"expression": "711"}
+			fixture.Model.Schedules[index].Amount.Inputs = map[string]types.AmountInputBinding{}
 		}
 	}
 	body, err := json.Marshal(projectionRequestBody{Model: fixture.Model, Settings: fixture.Settings, Range: fullSpanRange()})

@@ -35,8 +35,7 @@ export function isFinancialModel(value: unknown): value is FinancialModel {
 		!Array.isArray(value.accounts) ||
 		!Array.isArray(value.checkpoints) ||
 		!Array.isArray(value.postings) ||
-		(value.recurrenceRules !== undefined &&
-			!Array.isArray(value.recurrenceRules))
+		(value.schedules !== undefined && !Array.isArray(value.schedules))
 	)
 		return false;
 	const accountsValid = value.accounts.every(
@@ -61,8 +60,8 @@ export function isFinancialModel(value: unknown): value is FinancialModel {
 			typeof item.enabled === "boolean",
 	);
 	const rulesValid =
-		value.recurrenceRules === undefined ||
-		value.recurrenceRules.every(
+		value.schedules === undefined ||
+		value.schedules.every(
 			(item) =>
 				isRecord(item) &&
 				typeof item.id === "string" &&

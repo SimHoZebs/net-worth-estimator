@@ -18,7 +18,7 @@ func TestSafeSpendingSettingsPersistAndClear(t *testing.T) {
 	if err != nil || empty != nil {
 		t.Fatalf("fresh = %v, %v", empty, err)
 	}
-	settings := types.SafeSpendingSettings{StatementDay: 15, Reserve: 725.25, AccountIDs: []string{"card"}, IncomeRuleIDs: []string{}, StatementDaySet: true}
+	settings := types.SafeSpendingSettings{StatementDay: 15, Reserve: 725.25, AccountIDs: []string{"card"}, IncomeScheduleIDs: []string{}, StatementDaySet: true}
 	if err := database.SetSafeSpendingSettings(settings); err != nil {
 		t.Fatal(err)
 	}

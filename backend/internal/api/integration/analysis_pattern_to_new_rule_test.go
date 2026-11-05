@@ -79,15 +79,15 @@ func callAPI(t *testing.T, handler http.Handler, method, path, body string) *htt
 	return res
 }
 
-func TestPatternToNewRuleHTTPContract(t *testing.T) {
+func TestPatternToNewScheduleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
 	handler := New(scoped, Config{})
-	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule-preview"
-	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule"
+	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule-preview"
+	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule"
 
 	var preview struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}
 	res := callAPI(t, handler, "GET", previewPath, "")
 	if res.Code != 200 || res.Header().Get("Cache-Control") != "private, no-store" {
@@ -108,12 +108,12 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 		t.Fatalf("preview=%d %s", res.Code, res.Body.String())
 	}
 	preview = struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}{}
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Preview.Creatable || preview.Preview.Rule == nil || preview.Preview.Rule.Frequency != types.FrequencyMonthly || preview.Preview.Rule.StartDate != "2026-04-15" {
+	if !preview.Preview.Creatable || preview.Preview.Schedule == nil || preview.Preview.Schedule.Frequency != types.FrequencyMonthly || preview.Preview.Schedule.StartDate != "2026-04-15" {
 		t.Fatalf("preview=%+v", preview.Preview)
 	}
 	if len(preview.Preview.Upcoming) != 6 || preview.Preview.Upcoming[0].Date != "2026-04-15" {
@@ -125,7 +125,7 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 		}
 	}
 	var created struct {
-		Result     types.RecurrenceRule         `json:"value"`
+		Result     types.Schedule               `json:"value"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
 		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
@@ -142,27 +142,23 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 		t.Fatalf("created=%+v", created)
 	}
 	model, err := scoped.LoadModel()
-	if err != nil || len(model.RecurrenceRules) != 1 {
+	if err != nil || len(model.Schedules) != 1 {
 		t.Fatalf("model=%+v err=%v", model, err)
 	}
 	res = callAPI(t, handler, "GET", previewPath, "")
 	preview = struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}{}
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if preview.Preview.Creatable || preview.Preview.ExistingRuleID != created.Result.ID {
+	if preview.Preview.Creatable || preview.Preview.ExistingScheduleID != created.Result.ID {
 		t.Fatalf("second preview=%+v", preview.Preview)
 	}
 	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
 		t.Fatalf("second create=%d %s", res.Code, res.Body.String())
 	}
-	disable, _ := json.Marshal(map[string]any{
-		"name": created.Result.Name, "sourceAccountId": "checking", "amount": created.Result.Amount,
-		"frequency": created.Result.Frequency, "startDate": created.Result.StartDate, "enabled": false,
-	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Result.ID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "POST", "/v1/schedules/"+created.Result.ID+"/amend", `{"enabled":false}`); res.Code != 200 {
 		t.Fatalf("disable=%d %s", res.Code, res.Body.String())
 	}
 	res = callAPI(t, handler, "POST", createPath, "")
@@ -170,8 +166,8 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 		t.Fatalf("recreate=%d %s", res.Code, res.Body.String())
 	}
 	var second struct {
-		Result types.RecurrenceRule `json:"value"`
-		Saved  bool                 `json:"saved"`
+		Result types.Schedule `json:"value"`
+		Saved  bool           `json:"saved"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &second); err != nil {
 		t.Fatal(err)
@@ -179,7 +175,7 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 	if !second.Saved || second.Result.ID == created.Result.ID {
 		t.Fatalf("recreate=%+v", second)
 	}
-	if res := callAPI(t, handler, "DELETE", "/v1/recurrence-rules/"+second.Result.ID, ""); res.Code != 200 {
+	if res := callAPI(t, handler, "DELETE", "/v1/schedules/"+second.Result.ID, ""); res.Code != 200 {
 		t.Fatalf("delete=%d %s", res.Code, res.Body.String())
 	}
 	findingsAfter, err := scoped.ListAnalysisFindings(types.AnalysisFindingFilter{})
@@ -198,22 +194,22 @@ func TestPatternToNewRuleHTTPContract(t *testing.T) {
 			t.Fatalf("read-only preview=%d %s", res.Code, res.Body.String())
 		}
 	}
-	if res := callAPI(t, handler, "GET", "/v1/analysis-findings/missing/pattern-to-new-rule-preview", ""); res.Code != 404 {
+	if res := callAPI(t, handler, "GET", "/v1/analysis-findings/missing/pattern-to-new-schedule-preview", ""); res.Code != 404 {
 		t.Fatalf("missing=%d %s", res.Code, res.Body.String())
 	}
 }
 
-func TestPatternToNewRuleRejectsBiweekly(t *testing.T) {
+func TestPatternToNewScheduleRejectsBiweekly(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "biweekly")
 	handler := New(scoped, Config{})
 	confirmAPIFinding(t, handler, findings[0])
-	res := callAPI(t, handler, "GET", "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule-preview", "")
+	res := callAPI(t, handler, "GET", "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-schedule-preview", "")
 	if res.Code != 200 {
 		t.Fatalf("preview=%d %s", res.Code, res.Body.String())
 	}
 	var preview struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
@@ -221,11 +217,11 @@ func TestPatternToNewRuleRejectsBiweekly(t *testing.T) {
 	if preview.Preview.Creatable || preview.Preview.Reason == "" {
 		t.Fatalf("preview=%+v", preview.Preview)
 	}
-	if res := callAPI(t, handler, "POST", "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-rule", ""); res.Code != 422 {
+	if res := callAPI(t, handler, "POST", "/v1/analysis-findings/"+findings[0].ID+"/pattern-to-new-schedule", ""); res.Code != 422 {
 		t.Fatalf("create=%d %s", res.Code, res.Body.String())
 	}
 	model, err := scoped.LoadModel()
-	if err != nil || len(model.RecurrenceRules) != 0 {
-		t.Fatalf("rules=%d err=%v", len(model.RecurrenceRules), err)
+	if err != nil || len(model.Schedules) != 0 {
+		t.Fatalf("rules=%d err=%v", len(model.Schedules), err)
 	}
 }

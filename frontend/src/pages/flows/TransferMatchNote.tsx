@@ -38,14 +38,13 @@ export function TransferMatchNote({
 		postingIds,
 	);
 	const matched = findings.filter((finding) => finding.strength === "strong");
-	const ambiguous = findings.filter(
-		(finding) => finding.strength !== "strong",
-	);
+	const ambiguous = findings.filter((finding) => finding.strength !== "strong");
 	return (
 		<div className="mt-3 border-t border-line pt-3">
 			<p className="text-xs text-muted">
-				Counted once as a transfer{transferCount > 1 ? ` across ${transferCount} transactions` : ""},
-				not as income plus spending.
+				Counted once as a transfer
+				{transferCount > 1 ? ` across ${transferCount} transactions` : ""}, not
+				as income plus spending.
 			</p>
 			{query.isError ? (
 				<p className="mt-1 text-xs text-muted">
@@ -57,8 +56,8 @@ export function TransferMatchNote({
 				</p>
 			) : ambiguous.length > 0 ? (
 				<p className="mt-1 text-xs text-warning-text">
-					Several possible matching transfers were found; the true
-					opposite side is not settled yet.
+					Several possible matching transfers were found; the true opposite side
+					is not settled yet.
 				</p>
 			) : (
 				<p className="mt-1 text-xs text-muted">

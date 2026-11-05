@@ -19,8 +19,8 @@ func testPostingFixture(id string) types.Posting {
 	}
 }
 
-func testRuleFixture(id string) types.RecurrenceRule {
-	return types.RecurrenceRule{
+func testRuleFixture(id string) types.Schedule {
+	return types.Schedule{
 		ID:        id,
 		Name:      "Rule " + id,
 		Frequency: types.FrequencyMonthly,
@@ -94,7 +94,7 @@ func TestRowIDRegistrySpansTables(t *testing.T) {
 	if _, err := store.CreatePosting(testPostingFixture(shared)); !IsIDConflict(err) {
 		t.Fatalf("posting over account id err = %v, want id-conflict", err)
 	}
-	if _, err := store.CreateRule(testRuleFixture(shared)); !IsIDConflict(err) {
+	if _, err := store.CreateSchedule(testRuleFixture(shared)); !IsIDConflict(err) {
 		t.Fatalf("rule over account id err = %v, want id-conflict", err)
 	}
 	if _, err := store.CreateEvaluation(EvaluationUpdate{Type: "netWorthThreshold", InstanceID: shared, Name: "Eval"}); !IsIDConflict(err) {
@@ -116,12 +116,12 @@ func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
 	if _, err := store.CreatePosting(testPostingFixture("")); err != nil {
 		t.Fatalf("create generated posting: %v", err)
 	}
-	rule, err := store.CreateRule(testRuleFixture("rent"))
+	rule, err := store.CreateSchedule(testRuleFixture("rent"))
 	if err != nil {
 		t.Fatalf("create rule: %v", err)
 	}
 	rule.Priority = 9
-	if _, err := store.UpdateRule(rule); err != nil {
+	if _, err := store.UpdateSchedule(rule); err != nil {
 		t.Fatalf("update rule: %v", err)
 	}
 	saved, err := store.SaveCheckpoint(types.Checkpoint{AccountID: "checking", Balance: 100, ObservedAt: 1785974399})
@@ -145,14 +145,14 @@ func TestRowPostingRuleCheckpointCRUD(t *testing.T) {
 	if err := store.DeletePaymentTerms("checking"); err != nil {
 		t.Fatalf("delete terms: %v", err)
 	}
-	if err := store.DeleteRule("rent"); err != nil {
+	if err := store.DeleteSchedule("rent"); err != nil {
 		t.Fatalf("delete rule: %v", err)
 	}
 	loaded, err := store.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(loaded.Checkpoints) != 0 || len(loaded.RecurrenceRules) != 0 || len(loaded.PaymentTerms) != 0 {
+	if len(loaded.Checkpoints) != 0 || len(loaded.Schedules) != 0 || len(loaded.PaymentTerms) != 0 {
 		t.Fatalf("residual rows: %+v", loaded)
 	}
 	if len(loaded.Postings) != 1 {

@@ -173,8 +173,7 @@ export function IndependenceTimeline({
 						ticks: {
 							values: [startTime, endTime],
 							size: 0,
-							format: (value: number) =>
-								dateLabel(isoDate(new Date(value))),
+							format: (value: number) => dateLabel(isoDate(new Date(value))),
 						},
 					},
 				},

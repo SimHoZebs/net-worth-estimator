@@ -7,9 +7,9 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func existingRuleTestRule() types.RecurrenceRule {
+func existingRuleTestRule() types.Schedule {
 	account := "checking"
-	return types.RecurrenceRule{
+	return types.Schedule{
 		ID:              "rent",
 		Name:            "Rent",
 		SourceAccountID: &account,
@@ -46,8 +46,8 @@ func existingRuleTestFinding() types.AnalysisFinding {
 	}
 }
 
-func TestBuildPatternToExistingRuleMapsToSchedule(t *testing.T) {
-	assignments, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+func TestBuildPatternToExistingScheduleMapsToSchedule(t *testing.T) {
+	assignments, err := BuildPatternToExistingSchedule(PatternToExistingScheduleInput{
 		Anchor: existingRuleTestFinding(), Postings: existingRuleTestPostings(), Facts: map[string]types.TransactionFacts{
 			"p1": {Amount: "-1200.00", Currency: "USD"},
 			"p2": {Amount: "-1200.00", Currency: "USD"},
@@ -68,37 +68,37 @@ func TestBuildPatternToExistingRuleMapsToSchedule(t *testing.T) {
 	}
 }
 
-func TestBuildPatternToExistingRuleRejectsRoutingMismatch(t *testing.T) {
+func TestBuildPatternToExistingScheduleRejectsRoutingMismatch(t *testing.T) {
 	rule := existingRuleTestRule()
 	other := "savings"
 	rule.SourceAccountID = &other
-	if _, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+	if _, err := BuildPatternToExistingSchedule(PatternToExistingScheduleInput{
 		Anchor: existingRuleTestFinding(), Postings: existingRuleTestPostings(), Rule: rule, OccurrenceIDs: []string{"p1", "p2", "p3"},
 	}); err == nil {
 		t.Fatal("expected routing mismatch")
 	}
 }
 
-func TestBuildPatternToExistingRuleRejectsDisabledRule(t *testing.T) {
+func TestBuildPatternToExistingScheduleRejectsDisabledRule(t *testing.T) {
 	rule := existingRuleTestRule()
 	rule.Enabled = false
-	if _, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+	if _, err := BuildPatternToExistingSchedule(PatternToExistingScheduleInput{
 		Anchor: existingRuleTestFinding(), Postings: existingRuleTestPostings(), Rule: rule, OccurrenceIDs: []string{"p1", "p2", "p3"},
 	}); err == nil {
 		t.Fatal("expected disabled rule")
 	}
 }
 
-func TestBuildPatternToExistingRuleIgnoresDisabledTakers(t *testing.T) {
+func TestBuildPatternToExistingScheduleIgnoresDisabledTakers(t *testing.T) {
 	postings := existingRuleTestPostings()
 	// A disabled outsider claims 2026-02-01, but projections ignore disabled
 	// claims, so the pattern may still take that date.
 	outsider := postings[0]
 	outsider.ID = "other"
 	outsider.Enabled = false
-	outsider.Claim = &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"}
+	outsider.Claim = &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
 	postings = append(postings, outsider)
-	assignments, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+	assignments, err := BuildPatternToExistingSchedule(PatternToExistingScheduleInput{
 		Anchor: existingRuleTestFinding(), Postings: postings, Facts: map[string]types.TransactionFacts{
 			"p1": {Amount: "-1200.00", Currency: "USD"},
 			"p2": {Amount: "-1200.00", Currency: "USD"},
@@ -115,10 +115,10 @@ func TestBuildPatternToExistingRuleIgnoresDisabledTakers(t *testing.T) {
 	}
 }
 
-func TestBuildPatternToExistingRuleKeepsCorrectClaims(t *testing.T) {
+func TestBuildPatternToExistingScheduleKeepsCorrectClaims(t *testing.T) {
 	postings := existingRuleTestPostings()
-	postings[0].Claim = &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-01-01"}
-	assignments, err := BuildPatternToExistingRule(PatternToExistingRuleInput{
+	postings[0].Claim = &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-01-01"}
+	assignments, err := BuildPatternToExistingSchedule(PatternToExistingScheduleInput{
 		Anchor: existingRuleTestFinding(), Postings: postings, Rule: existingRuleTestRule(), OccurrenceIDs: []string{"p1", "p2", "p3"},
 	})
 	if err != nil {

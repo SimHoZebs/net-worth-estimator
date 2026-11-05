@@ -83,7 +83,7 @@ func isNonFinite(value float64) bool {
 // saveable while refusing silent no-ops.
 func validatePaymentTermsCoverage(issues *[]types.ModelValidationIssue, model *types.FinancialModel) {
 	covered := map[string]bool{}
-	for _, rule := range model.RecurrenceRules {
+	for _, rule := range model.Schedules {
 		if !rule.Enabled {
 			continue
 		}

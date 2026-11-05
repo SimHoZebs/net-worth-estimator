@@ -22,7 +22,7 @@ function transactionSourceIndex(
 				destinations: item.destinations,
 			});
 	}
-	for (const item of model.recurrenceRules ?? []) {
+	for (const item of model.schedules ?? []) {
 		if (!index.has(item.id))
 			index.set(item.id, {
 				name: item.name,

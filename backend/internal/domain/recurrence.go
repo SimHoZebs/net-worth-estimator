@@ -16,11 +16,11 @@ import (
 
 // DatedPostingOccurrence binds a posting to its declaration order. Rule is
 // non-nil for rule-generated instances; DocPath is the validation-style path
-// identifying the owning row (["postings", i] or ["recurrenceRules", i]).
+// identifying the owning row (["postings", i] or ["schedules", i]).
 type DatedPostingOccurrence struct {
 	Posting  *types.Posting
 	Index    int
-	Rule     *types.RecurrenceRule
+	Rule     *types.Schedule
 	Purchase *types.PlannedPurchase // Set only by the isolated purchase simulation.
 	DocPath  []any
 }
@@ -100,7 +100,7 @@ func midnightUnix(date string) int64 {
 }
 
 // FrequencyDivisor converts annual rates to per-occurrence rates.
-func FrequencyDivisor(frequency types.RecurrenceFrequency) int {
+func FrequencyDivisor(frequency types.Frequency) int {
 	switch frequency {
 	case types.FrequencyDaily:
 		return 365
@@ -120,11 +120,11 @@ func FrequencyDivisor(frequency types.RecurrenceFrequency) int {
 // AdvanceRuleDate moves a calendar day forward by whole schedule periods.
 // Pattern-to-new-rule creation uses it to start a generated rule one full interval after the
 // latest recorded movement.
-func AdvanceRuleDate(date string, frequency types.RecurrenceFrequency, periodCount int) string {
+func AdvanceRuleDate(date string, frequency types.Frequency, periodCount int) string {
 	return advanceDate(date, frequency, periodCount)
 }
 
-func advanceDate(date string, frequency types.RecurrenceFrequency, periodCount int) string {
+func advanceDate(date string, frequency types.Frequency, periodCount int) string {
 	switch frequency {
 	case types.FrequencyDaily, types.FrequencyWeekly:
 		days := 7
@@ -148,7 +148,7 @@ func advanceDate(date string, frequency types.RecurrenceFrequency, periodCount i
 // frequencies never reach expansion past validation, but expansion must
 // still terminate on them: advanceDate returns unknown frequencies
 // unchanged, which would otherwise loop forever.
-func validScheduleFrequency(frequency types.RecurrenceFrequency) bool {
+func validScheduleFrequency(frequency types.Frequency) bool {
 	switch frequency {
 	case types.FrequencyDaily, types.FrequencyWeekly, types.FrequencyMonthly, types.FrequencyQuarterly, types.FrequencyAnnual:
 		return true
@@ -160,7 +160,7 @@ func validScheduleFrequency(frequency types.RecurrenceFrequency) bool {
 // RuleScheduleDates lists every scheduled date of a rule up to endDate
 // (inclusive), unfiltered by projection windows. Validation uses it to check
 // that a claim names a real scheduled occurrence.
-func RuleScheduleDates(rule *types.RecurrenceRule, endDate string) []string {
+func RuleScheduleDates(rule *types.Schedule, endDate string) []string {
 	dates := []string{}
 	if !validScheduleFrequency(rule.Frequency) {
 		return dates
@@ -182,7 +182,7 @@ func RuleScheduleDates(rule *types.RecurrenceRule, endDate string) []string {
 // ruleOccursOn tests one date without expanding the whole prefix: advance
 // until reaching or passing the date. Daily rules with hundreds of claims
 // no longer re-expand the shared prefix per claim.
-func ruleOccursOn(rule *types.RecurrenceRule, date string) bool {
+func ruleOccursOn(rule *types.Schedule, date string) bool {
 	if !validScheduleFrequency(rule.Frequency) {
 		return false
 	}
@@ -222,10 +222,10 @@ func claimsByRule(postings []types.Posting) map[string]map[string]bool {
 		if !posting.Enabled || posting.Claim == nil {
 			continue
 		}
-		dates, ok := claims[posting.Claim.RuleID]
+		dates, ok := claims[posting.Claim.ScheduleID]
 		if !ok {
 			dates = map[string]bool{}
-			claims[posting.Claim.RuleID] = dates
+			claims[posting.Claim.ScheduleID] = dates
 		}
 		dates[posting.Claim.OccurrenceDate] = true
 	}
@@ -237,7 +237,7 @@ func claimsByRule(postings []types.Posting) map[string]map[string]bool {
 // window. Window inclusivity of the start follows includeStartDate. Claimed
 // rule occurrences are skipped; the claiming posting executes on its own
 // date. Index values are global resolution order for stable sorting.
-func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, windowStart, windowEnd string, includeStartDate bool) ResolvedOccurrences {
+func ResolveOccurrences(rules []types.Schedule, postings []types.Posting, windowStart, windowEnd string, includeStartDate bool) ResolvedOccurrences {
 	claims := claimsByRule(postings)
 	inWindow := func(date string) bool {
 		if includeStartDate {
@@ -298,7 +298,7 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 			Posting: instance,
 			Index:   sequence,
 			Rule:    rule,
-			DocPath: []any{"recurrenceRules", spec.ruleIndex},
+			DocPath: []any{"schedules", spec.ruleIndex},
 		})
 		sequence++
 	}
@@ -329,10 +329,10 @@ func ResolveOccurrences(rules []types.RecurrenceRule, postings []types.Posting, 
 // which side an ID came from. Caps are not carried: they live on rules and
 // resolve through RuleCapsByID.
 func ResolvedTransactionPostings(model *types.FinancialModel) []types.Posting {
-	out := make([]types.Posting, 0, len(model.Postings)+len(model.RecurrenceRules))
+	out := make([]types.Posting, 0, len(model.Postings)+len(model.Schedules))
 	out = append(out, model.Postings...)
-	for index := range model.RecurrenceRules {
-		rule := &model.RecurrenceRules[index]
+	for index := range model.Schedules {
+		rule := &model.Schedules[index]
 		out = append(out, types.Posting{
 			ID:              rule.ID,
 			Name:            rule.Name,
@@ -349,9 +349,9 @@ func ResolvedTransactionPostings(model *types.FinancialModel) []types.Posting {
 // RuleCapsByID indexes enabled-or-not rule annual caps by rule ID. Caps
 // live on rules only; manual postings are uncapped single transactions.
 func RuleCapsByID(model *types.FinancialModel) map[string]float64 {
-	caps := make(map[string]float64, len(model.RecurrenceRules))
-	for index := range model.RecurrenceRules {
-		rule := &model.RecurrenceRules[index]
+	caps := make(map[string]float64, len(model.Schedules))
+	for index := range model.Schedules {
+		rule := &model.Schedules[index]
 		if rule.AnnualCap != nil {
 			caps[rule.ID] = *rule.AnnualCap
 		}
@@ -367,8 +367,8 @@ func TransactionIDExists(model *types.FinancialModel, id string) bool {
 			return true
 		}
 	}
-	for index := range model.RecurrenceRules {
-		if model.RecurrenceRules[index].ID == id {
+	for index := range model.Schedules {
+		if model.Schedules[index].ID == id {
 			return true
 		}
 	}
@@ -383,12 +383,12 @@ func TransactionIDExists(model *types.FinancialModel, id string) bool {
 // TransactionIDs returns every transaction identity in a model: manual posting
 // IDs, rule IDs, and planned-purchase IDs.
 func TransactionIDs(model *types.FinancialModel) map[string]bool {
-	ids := make(map[string]bool, len(model.Postings)+len(model.RecurrenceRules)+len(model.PlannedPurchases))
+	ids := make(map[string]bool, len(model.Postings)+len(model.Schedules)+len(model.PlannedPurchases))
 	for index := range model.Postings {
 		ids[model.Postings[index].ID] = true
 	}
-	for index := range model.RecurrenceRules {
-		ids[model.RecurrenceRules[index].ID] = true
+	for index := range model.Schedules {
+		ids[model.Schedules[index].ID] = true
 	}
 	for index := range model.PlannedPurchases {
 		ids[model.PlannedPurchases[index].ID] = true

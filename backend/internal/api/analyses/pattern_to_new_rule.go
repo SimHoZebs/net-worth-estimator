@@ -27,42 +27,42 @@ func patternToNewRuleErrorAs(err error, unavailable string) error {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return huma.Error404NotFound("Finding not found")
-	case errors.Is(err, store.ErrPatternToNewRuleInvalid):
+	case errors.Is(err, store.ErrPatternToNewScheduleInvalid):
 		return huma.Error422UnprocessableEntity(err.Error())
-	case errors.Is(err, store.ErrPatternToNewRuleConflict):
+	case errors.Is(err, store.ErrPatternToNewScheduleConflict):
 		return huma.Error409Conflict(err.Error())
 	default:
 		return huma.Error500InternalServerError(unavailable)
 	}
 }
 
-func (s *handler) previewPatternToNewRule(_ context.Context, input *struct {
+func (s *handler) previewPatternToNewSchedule(_ context.Context, input *struct {
 	ID string `path:"id"`
 }) (*struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}
 }, error) {
-	preview, err := s.store.PreviewPatternToNewRule(input.ID)
+	preview, err := s.store.PreviewPatternToNewSchedule(input.ID)
 	if err != nil {
 		return nil, patternToNewRuleError(err)
 	}
 	output := &struct {
 		CacheControl string `header:"Cache-Control"`
 		Body         struct {
-			Preview types.PatternToNewRulePreview `json:"preview"`
+			Preview types.PatternToNewSchedulePreview `json:"preview"`
 		}
 	}{CacheControl: "private, no-store"}
 	output.Body.Preview = preview
 	return output, nil
 }
 
-func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
+func (s *handler) createPatternToNewSchedule(ctx context.Context, input *struct {
 	ID string `path:"id"`
 }) (*struct {
 	Body struct {
-		Result     types.RecurrenceRule         `json:"value"`
+		Result     types.Schedule               `json:"value"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
 		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
@@ -74,7 +74,7 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	}
 	patternToNewRuleMu.Lock()
 	defer patternToNewRuleMu.Unlock()
-	preview, err := s.store.PreviewPatternToNewRule(input.ID)
+	preview, err := s.store.PreviewPatternToNewSchedule(input.ID)
 	if err != nil {
 		return nil, patternToNewRuleErrorAs(err, "The forecast rule could not be saved.")
 	}
@@ -82,7 +82,7 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 		// A visible plan without a rule cannot become one yet. A visible
 		// plan with a rule waits on approval state: confirmation first,
 		// then at most one active rule per pattern.
-		if preview.Rule == nil {
+		if preview.Schedule == nil {
 			return nil, huma.Error422UnprocessableEntity(preview.Reason)
 		}
 		return nil, huma.Error409Conflict(preview.Reason)
@@ -91,26 +91,26 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
 	}
-	rule := types.RecurrenceRule{
+	rule := types.Schedule{
 		ID:              ruleID.String(),
-		Name:            preview.Rule.Name,
-		SourceAccountID: preview.Rule.SourceAccountID,
-		Destinations:    append([]string(nil), preview.Rule.Destinations...),
-		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": preview.Rule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
-		Frequency:       preview.Rule.Frequency,
-		StartDate:       preview.Rule.StartDate,
+		Name:            preview.Schedule.Name,
+		SourceAccountID: preview.Schedule.SourceAccountID,
+		Destinations:    append([]string(nil), preview.Schedule.Destinations...),
+		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": preview.Schedule.Amount}, Inputs: map[string]types.AmountInputBinding{}},
+		Frequency:       preview.Schedule.Frequency,
+		StartDate:       preview.Schedule.StartDate,
 		Enabled:         true,
 	}
 	// Record the pattern-to-rule link before creating the rule row. A link
 	// without a rule reads as inactive, so a retry after an interrupted
 	// approval replaces the link instead of creating a second rule.
-	if err := s.store.RecordPatternToNewRule(types.PatternToNewRule{PatternKey: preview.PatternKey, RuleID: rule.ID}); err != nil {
+	if err := s.store.RecordPatternToNewSchedule(types.PatternToNewSchedule{PatternKey: preview.PatternKey, ScheduleID: rule.ID}); err != nil {
 		return nil, huma.Error500InternalServerError("The forecast rule could not be saved.")
 	}
-	row, issues, saved, revision, err := model.PersistFinanceRule(s.store, rule)
+	row, issues, saved, revision, err := model.PersistFinanceSchedule(s.store, rule)
 	if err != nil || !saved {
 		// Leave a concurrent winner's link alone: remove only our own.
-		_ = s.store.RemovePatternToNewRule(preview.PatternKey, rule.ID)
+		_ = s.store.RemovePatternToNewSchedule(preview.PatternKey, rule.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +118,7 @@ func (s *handler) createPatternToNewRule(ctx context.Context, input *struct {
 	}
 	output := &struct {
 		Body struct {
-			Result     types.RecurrenceRule         `json:"value"`
+			Result     types.Schedule               `json:"value"`
 			Issues     []types.ModelValidationIssue `json:"issues"`
 			Saved      bool                         `json:"saved"`
 			Revision   string                       `json:"revision"`

@@ -56,24 +56,24 @@ func runFinanceRowWrite[T any](s *handler, mutate func(model *types.FinancialMod
 	}, domain.ValidateFinanceModel)
 }
 
-// PersistFinanceRule validates and persists one generated recurrence rule
+// PersistFinanceSchedule validates and persists one generated recurrence rule
 // through the ordinary finance write boundary, so pattern-to-new-rule
 // creation shares the manual row-write contract: validation, revision, and
 // last-write-wins.
 // Generated rules append after the current maximum priority.
-func PersistFinanceRule(st store.Store, rule types.RecurrenceRule) (types.RecurrenceRule, []types.ModelValidationIssue, bool, string, error) {
+func PersistFinanceSchedule(st store.Store, rule types.Schedule) (types.Schedule, []types.ModelValidationIssue, bool, string, error) {
 	resolved := rule
 	return runFinanceRowWriteWithStore(st, func(model *types.FinancialModel) {
 		max := -1
-		for _, existing := range model.RecurrenceRules {
+		for _, existing := range model.Schedules {
 			if existing.Priority > max {
 				max = existing.Priority
 			}
 		}
 		resolved.Priority = max + 1
-		model.RecurrenceRules = replaceByID(model.RecurrenceRules, resolved.ID, ruleID, resolved)
-	}, func() (types.RecurrenceRule, error) {
-		return st.CreateRule(resolved)
+		model.Schedules = replaceByID(model.Schedules, resolved.ID, scheduleID, resolved)
+	}, func() (types.Schedule, error) {
+		return st.CreateSchedule(resolved)
 	})
 }
 

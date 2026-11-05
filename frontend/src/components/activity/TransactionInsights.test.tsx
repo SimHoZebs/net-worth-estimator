@@ -30,18 +30,21 @@ vi.mock("@/state/analyses.ts", () => ({
 		isPending: false,
 		isError: false,
 	}),
-	usePatternToNewRulePreview: () => ({
+	usePatternToNewSchedulePreview: () => ({
 		data: undefined,
 		isPending: false,
 		isError: false,
 	}),
-	usePatternToExistingRulePreview: () => ({
+	usePatternToExistingSchedulePreview: () => ({
 		data: undefined,
 		isPending: false,
 		isError: false,
 	}),
-	useCreatePatternToNewRule: () => ({ mutate: vi.fn(), isPending: false }),
-	useAddPatternToExistingRule: () => ({ mutate: vi.fn(), isPending: false }),
+	useCreatePatternToNewSchedule: () => ({ mutate: vi.fn(), isPending: false }),
+	useAddPatternToExistingSchedule: () => ({
+		mutate: vi.fn(),
+		isPending: false,
+	}),
 }));
 
 vi.mock("@/state/workspaceResources.ts", () => ({
@@ -119,7 +122,7 @@ function bankRow(overrides: Partial<Transaction> = {}): Transaction {
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,
@@ -317,7 +320,7 @@ describe("TransactionInsightsPanel", () => {
 
 	it("states when a recorded occurrence moves with the merge", () => {
 		const hold = bankRow({
-			claimRuleId: "living",
+			claimScheduleId: "living",
 			claimOccurrenceDate: "2026-10-01",
 		});
 		render(
@@ -341,11 +344,11 @@ describe("TransactionInsightsPanel", () => {
 
 	it("states when the posted charge already records an occurrence", () => {
 		const hold = bankRow({
-			claimRuleId: "living",
+			claimScheduleId: "living",
 			claimOccurrenceDate: "2026-10-01",
 		});
 		const settled = settleCandidate({
-			claimRuleId: "living",
+			claimScheduleId: "living",
 			claimOccurrenceDate: "2026-10-01",
 		});
 		render(

@@ -459,9 +459,7 @@ test("category is a field row with an icon picker and bank provenance", async ({
 		],
 	});
 	const dialog = await openChecking(page);
-	await dialog
-		.getByRole("button", { name: /View WHOLE FOODS MARKET/ })
-		.click();
+	await dialog.getByRole("button", { name: /View WHOLE FOODS MARKET/ }).click();
 	const detail = page.getByRole("dialog", { name: "WHOLE FOODS MARKET" });
 	const bankCategory = detail.getByRole("button", {
 		name: "Category Food & drink From your bank",

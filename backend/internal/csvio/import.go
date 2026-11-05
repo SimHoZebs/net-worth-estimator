@@ -235,9 +235,9 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 			return nil, fmt.Errorf("posting %s amount: %w", rawID, err)
 		}
 		posting.Amount = amount
-		if ruleID := field(record, index, "ruleId"); ruleID != "" {
+		if ruleID := field(record, index, "scheduleId"); ruleID != "" {
 			occurrenceDate := field(record, index, "occurrenceDate")
-			posting.Claim = &types.PostingClaim{RuleID: ruleID, OccurrenceDate: occurrenceDate}
+			posting.Claim = &types.PostingClaim{ScheduleID: ruleID, OccurrenceDate: occurrenceDate}
 		}
 		model.Postings = append(model.Postings, posting)
 	}
@@ -256,12 +256,12 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 			if len(strings.Join(record, "")) == 0 {
 				continue
 			}
-			rule := types.RecurrenceRule{
+			rule := types.Schedule{
 				ID:              field(record, index, "id"),
 				Name:            field(record, index, "name"),
 				SourceAccountID: parseOptionalString(field(record, index, "sourceAccountId")),
 				Destinations:    parseDestinations(field(record, index, "destinations")),
-				Frequency:       types.RecurrenceFrequency(field(record, index, "frequency")),
+				Frequency:       types.Frequency(field(record, index, "frequency")),
 				StartDate:       field(record, index, "startDate"),
 				EndDate:         parseOptionalDate(field(record, index, "endDate")),
 				Priority:        int(parseNumberOr(field(record, index, "priority"), 1)),
@@ -274,7 +274,7 @@ func ImportModel(csvPath string) (*types.FinancialModel, error) {
 			}
 			rule.Amount = amount
 			rule.AnnualCap = parseOptionalFloat(field(record, index, "annualCap"))
-			model.RecurrenceRules = append(model.RecurrenceRules, rule)
+			model.Schedules = append(model.Schedules, rule)
 		}
 	}
 

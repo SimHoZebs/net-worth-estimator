@@ -394,12 +394,12 @@ func (s *sqliteStore) MoveAccount(id, beforeID string) error {
 	})
 }
 
-// CreateRule inserts one recurrence rule. Empty IDs get a UUIDv7.
-func (s *sqliteStore) CreateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error) {
+// CreateSchedule inserts one recurrence rule. Empty IDs get a UUIDv7.
+func (s *sqliteStore) CreateSchedule(rule types.Schedule) (types.Schedule, error) {
 	if rule.ID == "" {
 		id, err := newRowID()
 		if err != nil {
-			return types.RecurrenceRule{}, err
+			return types.Schedule{}, err
 		}
 		rule.ID = id
 	}
@@ -414,18 +414,18 @@ func (s *sqliteStore) CreateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 		return insertRule(tx, position, &rule)
 	})
 	if err != nil {
-		return types.RecurrenceRule{}, err
+		return types.Schedule{}, err
 	}
 	if err := s.markDirty(dirtyDay(string(rule.StartDate))); err != nil {
-		return types.RecurrenceRule{}, err
+		return types.Schedule{}, err
 	}
 	return rule, nil
 }
 
-// UpdateRule replaces one recurrence rule by ID.
-func (s *sqliteStore) UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error) {
+// UpdateSchedule replaces one recurrence rule by ID.
+func (s *sqliteStore) UpdateSchedule(rule types.Schedule) (types.Schedule, error) {
 	if rule.ID == "" {
-		return types.RecurrenceRule{}, NotFound("")
+		return types.Schedule{}, NotFound("")
 	}
 	err := withRowTx(s.db, func(tx *userTx) error {
 		var position int
@@ -441,17 +441,20 @@ func (s *sqliteStore) UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRul
 		return insertRule(tx, position, &rule)
 	})
 	if err != nil {
-		return types.RecurrenceRule{}, err
+		return types.Schedule{}, err
 	}
 	if err := s.markDirtyStart(); err != nil {
-		return types.RecurrenceRule{}, err
+		return types.Schedule{}, err
 	}
 	return rule, nil
 }
 
-// DeleteRule removes one recurrence rule.
-func (s *sqliteStore) DeleteRule(id string) error {
+// DeleteSchedule removes one recurrence rule.
+func (s *sqliteStore) DeleteSchedule(id string) error {
 	err := withRowTx(s.db, func(tx *userTx) error {
+		if _, err := tx.Exec(`DELETE FROM posting_claims WHERE fulfills_rule_id = ? AND user_id = :user_id`, id); err != nil {
+			return fmt.Errorf("release claims for rule %s: %w", id, err)
+		}
 		result, err := tx.Exec(`DELETE FROM recurrence_rules WHERE id = ? AND user_id = :user_id`, id)
 		if err != nil {
 			return fmt.Errorf("delete rule %s: %w", id, err)
@@ -471,8 +474,8 @@ func (s *sqliteStore) DeleteRule(id string) error {
 	return s.markDirtyStart()
 }
 
-// MoveRule positions one rule before another (or appends).
-func (s *sqliteStore) MoveRule(id, beforeID string) error {
+// MoveSchedule positions one rule before another (or appends).
+func (s *sqliteStore) MoveSchedule(id, beforeID string) error {
 	if err := withRowTx(s.db, func(tx *userTx) error {
 		return moveRow(tx, RowRule, "", id, beforeID)
 	}); err != nil {

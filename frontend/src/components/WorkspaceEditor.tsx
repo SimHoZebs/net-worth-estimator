@@ -1,5 +1,5 @@
 import type { EditorTarget } from "../domain/accountEdits.ts";
-import { ruleTransaction } from "../domain/accountActivity.ts";
+import { scheduleTransaction } from "../domain/accountActivity.ts";
 import { todayIso } from "../domain/format.ts";
 import type { Transaction } from "../domain/model.ts";
 import {
@@ -32,7 +32,7 @@ function ExistingTransactionDetail({
 	return (
 		<TransactionDetail
 			key={item.id}
-			transaction={ruleTransaction({
+			transaction={scheduleTransaction({
 				transaction: item,
 				accounts: accountList,
 				startDate: startDate ?? todayIso(),

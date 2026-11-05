@@ -144,12 +144,7 @@ export interface AmountCatalogResponse extends HumaMetadata {
 	providers: AmountProviderSpec[];
 }
 
-export type RecurrenceFrequency =
-	| "daily"
-	| "weekly"
-	| "monthly"
-	| "quarterly"
-	| "annual";
+export type Frequency = "daily" | "weekly" | "monthly" | "quarterly" | "annual";
 
 export interface BackendPlannedPurchase extends HumaMetadata {
 	id: string;
@@ -162,7 +157,7 @@ export interface BackendPlannedPurchase extends HumaMetadata {
 }
 
 export interface PostingClaim extends HumaMetadata {
-	ruleId: string;
+	scheduleId: string;
 	occurrenceDate: IsoDate;
 }
 
@@ -183,20 +178,20 @@ export interface BackendPosting extends HumaMetadata {
 }
 export type Posting = BackendPosting;
 
-export interface BackendRecurrenceRule extends HumaMetadata {
+export interface BackendSchedule extends HumaMetadata {
 	id: string;
 	name: string;
 	sourceAccountId: string | null;
 	destinations: string[] | null;
 	amount: PostingAmountResolution;
-	frequency: RecurrenceFrequency;
+	frequency: Frequency;
 	startDate: IsoDate;
 	endDate: IsoDate | null;
 	annualCap: number | null;
 	priority: number;
 	enabled: boolean;
 }
-export type RecurrenceRule = BackendRecurrenceRule;
+export type Schedule = BackendSchedule;
 
 export type EvaluationConfig = JsonValue;
 export type EvaluationResultPayload = JsonValue;
@@ -236,23 +231,32 @@ export interface EvaluationTables extends HumaMetadata {
 	whatIf?: EvaluationInstance[];
 }
 
+export interface BackendPaymentTerms extends HumaMetadata {
+	accountId: string;
+	dueDay: number;
+	minimumFixed: number;
+	minimumPercent?: number;
+	statementDay?: number;
+}
+
 export interface FinancialModel extends HumaMetadata {
 	sourcePath: string;
 	accounts: BackendAccount[];
 	checkpoints: BackendCheckpoint[];
 	evaluations: EvaluationTables;
 	postings: BackendPosting[];
-	recurrenceRules: BackendRecurrenceRule[];
+	schedules: BackendSchedule[];
+	paymentTerms?: BackendPaymentTerms[];
 	plannedPurchases?: BackendPlannedPurchase[];
 }
 
 export interface ModelOverrides extends HumaMetadata {
 	addedAccounts: BackendAccount[];
 	addedPostings: BackendPosting[];
-	addedRules: BackendRecurrenceRule[];
+	addedSchedules: BackendSchedule[];
 	disabledAccountIds: string[];
 	disabledPostingIds: string[];
-	disabledRuleIds: string[];
+	disabledScheduleIds: string[];
 }
 
 export interface ProjectionRuntimeSettings extends HumaMetadata {
@@ -574,7 +578,7 @@ export interface SafeSpendingSettings {
 	/** Null uses the detected checking account. */
 	incomeAccountIds: string[] | null;
 	/** Explicit recurrence rule sources. Empty means no automatic income. */
-	incomeRuleIds: string[];
+	incomeScheduleIds: string[];
 	/** Null includes all recurring outflows. */
 	transactionIds: string[] | null;
 	/** Explicitly chosen day. */

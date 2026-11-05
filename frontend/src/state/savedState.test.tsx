@@ -11,7 +11,7 @@ import {
 	useSavedAccounts,
 	useSavedEvaluations,
 	useSavedPurchases,
-	useSavedRules,
+	useSavedSchedules,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "./savedState.ts";
@@ -29,7 +29,7 @@ function emptyModel(): FinancialModel {
 			cycleFulfillment: [],
 		},
 		postings: [],
-		recurrenceRules: [],
+		schedules: [],
 		plannedPurchases: [],
 	};
 }
@@ -51,7 +51,7 @@ describe("saved rows", () => {
 		stubTestServer();
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
-		const rules = renderHook(() => useSavedRules());
+		const rules = renderHook(() => useSavedSchedules());
 		const evaluations = renderHook(() => useSavedEvaluations());
 		const purchases = renderHook(() => useSavedPurchases());
 		const startDate = renderHook(() => useSavedStartDate());
@@ -87,7 +87,7 @@ describe("saved rows", () => {
 		stubTestServer();
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
-		const rules = renderHook(() => useSavedRules());
+		const rules = renderHook(() => useSavedSchedules());
 		const evaluations = renderHook(() => useSavedEvaluations());
 		const purchases = renderHook(() => useSavedPurchases());
 		const startDate = renderHook(() => useSavedStartDate());
@@ -119,7 +119,7 @@ describe("saved rows", () => {
 		stubTestServer(undefined, emptyModel());
 		const accounts = renderHook(() => useSavedAccounts());
 		const transactions = renderHook(() => useSavedTransactions());
-		const rules = renderHook(() => useSavedRules());
+		const rules = renderHook(() => useSavedSchedules());
 		const evaluations = renderHook(() => useSavedEvaluations());
 		const purchases = renderHook(() => useSavedPurchases());
 		await waitFor(() => expect(accounts.result.current).not.toBeNull());

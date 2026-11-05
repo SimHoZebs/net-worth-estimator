@@ -26,45 +26,45 @@ func patternToExistingRuleErrorAs(err error, unavailable string) error {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		return huma.Error404NotFound("Finding not found")
-	case errors.Is(err, store.ErrPatternToExistingRuleInvalid):
+	case errors.Is(err, store.ErrPatternToExistingScheduleInvalid):
 		return huma.Error422UnprocessableEntity(err.Error())
-	case errors.Is(err, store.ErrPatternToExistingRuleConflict):
+	case errors.Is(err, store.ErrPatternToExistingScheduleConflict):
 		return huma.Error409Conflict(err.Error())
 	default:
 		return huma.Error500InternalServerError(unavailable)
 	}
 }
 
-func (s *handler) previewPatternToExistingRule(_ context.Context, input *struct {
-	ID     string `path:"id"`
-	RuleID string `query:"ruleId" maxLength:"100"`
+func (s *handler) previewPatternToExistingSchedule(_ context.Context, input *struct {
+	ID         string `path:"id"`
+	ScheduleID string `query:"scheduleId" maxLength:"100"`
 }) (*struct {
 	CacheControl string `header:"Cache-Control"`
 	Body         struct {
-		Preview types.PatternToExistingRulePreview `json:"preview"`
+		Preview types.PatternToExistingSchedulePreview `json:"preview"`
 	}
 }, error) {
-	if input.RuleID == "" {
-		return nil, huma.Error422UnprocessableEntity("ruleId is required")
+	if input.ScheduleID == "" {
+		return nil, huma.Error422UnprocessableEntity("scheduleId is required")
 	}
-	preview, err := s.store.PreviewPatternToExistingRule(input.ID, input.RuleID)
+	preview, err := s.store.PreviewPatternToExistingSchedule(input.ID, input.ScheduleID)
 	if err != nil {
 		return nil, patternToExistingRuleError(err)
 	}
 	output := &struct {
 		CacheControl string `header:"Cache-Control"`
 		Body         struct {
-			Preview types.PatternToExistingRulePreview `json:"preview"`
+			Preview types.PatternToExistingSchedulePreview `json:"preview"`
 		}
 	}{CacheControl: "private, no-store"}
 	output.Body.Preview = preview
 	return output, nil
 }
 
-func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
+func (s *handler) addPatternToExistingSchedule(ctx context.Context, input *struct {
 	ID   string `path:"id"`
 	Body struct {
-		RuleID string `json:"ruleId" maxLength:"100"`
+		ScheduleID string `json:"scheduleId" maxLength:"100"`
 	}
 }) (*struct {
 	Body struct {
@@ -73,18 +73,18 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 		Saved      bool                         `json:"saved"`
 		Revision   string                       `json:"revision"`
 		PatternKey string                       `json:"patternKey"`
-		RuleID     string                       `json:"ruleId"`
+		ScheduleID string                       `json:"scheduleId"`
 	}
 }, error) {
 	if s.canWrite != nil && !s.canWrite(ctx) {
 		return nil, huma.Error403Forbidden("Write permission is required")
 	}
-	if input.Body.RuleID == "" {
-		return nil, huma.Error422UnprocessableEntity("ruleId is required")
+	if input.Body.ScheduleID == "" {
+		return nil, huma.Error422UnprocessableEntity("scheduleId is required")
 	}
 	patternToExistingRuleMu.Lock()
 	defer patternToExistingRuleMu.Unlock()
-	preview, err := s.store.PreviewPatternToExistingRule(input.ID, input.Body.RuleID)
+	preview, err := s.store.PreviewPatternToExistingSchedule(input.ID, input.Body.ScheduleID)
 	if err != nil {
 		return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
 	}
@@ -112,9 +112,9 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 	// preview calls un-claimable. A deleted rule falls through to finance
 	// validation, which reports the missing rule as 422.
 	ruleFound, ruleEnabled := false, false
-	for i := range model.RecurrenceRules {
-		if model.RecurrenceRules[i].ID == preview.RuleID {
-			ruleFound, ruleEnabled = true, model.RecurrenceRules[i].Enabled
+	for i := range model.Schedules {
+		if model.Schedules[i].ID == preview.ScheduleID {
+			ruleFound, ruleEnabled = true, model.Schedules[i].Enabled
 			break
 		}
 	}
@@ -133,7 +133,7 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 		if !ok {
 			return nil, huma.Error409Conflict("A recorded movement changed. Review the pattern again.")
 		}
-		claim := types.PostingClaim{RuleID: preview.RuleID, OccurrenceDate: item.Date}
+		claim := types.PostingClaim{ScheduleID: preview.ScheduleID, OccurrenceDate: item.Date}
 		candidate.Postings[index].Claim = &claim
 		claims = append(claims, types.PostingClaimUpdate{PostingID: item.PostingID, Claim: claim})
 	}
@@ -145,7 +145,7 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 	}
 	rows, err := s.store.SetPostingClaims(claims)
 	if err != nil {
-		if errors.Is(err, store.ErrPatternToExistingRuleInvalid) {
+		if errors.Is(err, store.ErrPatternToExistingScheduleInvalid) {
 			return nil, patternToExistingRuleErrorAs(err, "The forecast addition could not be saved.")
 		}
 		return nil, modelstate.WriteError(err)
@@ -169,9 +169,9 @@ func (s *handler) addPatternToExistingRule(ctx context.Context, input *struct {
 			Saved      bool                         `json:"saved"`
 			Revision   string                       `json:"revision"`
 			PatternKey string                       `json:"patternKey"`
-			RuleID     string                       `json:"ruleId"`
+			ScheduleID string                       `json:"scheduleId"`
 		}
 	}{}
-	output.Body.Matches, output.Body.Issues, output.Body.Saved, output.Body.Revision, output.Body.PatternKey, output.Body.RuleID = rows, warnings, true, revision, preview.PatternKey, preview.RuleID
+	output.Body.Matches, output.Body.Issues, output.Body.Saved, output.Body.Revision, output.Body.PatternKey, output.Body.ScheduleID = rows, warnings, true, revision, preview.PatternKey, preview.ScheduleID
 	return output, nil
 }

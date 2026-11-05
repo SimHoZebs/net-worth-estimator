@@ -131,7 +131,7 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 			if posting.SourceAccountID != nil && supersedeContains(posting.Destinations, *posting.SourceAccountID) {
 				continue
 			}
-			if posting.Claim != nil && deletedRules[posting.Claim.RuleID] {
+			if posting.Claim != nil && deletedRules[posting.Claim.ScheduleID] {
 				posting.Claim = nil
 			}
 			postings = append(postings, posting)
@@ -153,7 +153,7 @@ func supersedeRewriteConfig(evalType, raw, manualID, syncedID string, deletedPos
 		config.AddedRules = rules
 		config.DisabledAccountIDs = supersedeReplaceIDs(config.DisabledAccountIDs, manualID, syncedID)
 		config.DisabledPostingIDs = supersedeRemoveIDs(config.DisabledPostingIDs, deletedPostings)
-		config.DisabledRuleIDs = supersedeRemoveIDs(config.DisabledRuleIDs, deletedRules)
+		config.DisabledScheduleIDs = supersedeRemoveIDs(config.DisabledScheduleIDs, deletedRules)
 		return supersedeMarshal(config)
 	default:
 		// Known types are handled explicitly. Leave an unknown future config

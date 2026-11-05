@@ -225,7 +225,7 @@ func replaceModel(tx *userTx, model *types.FinancialModel) error {
 		return err
 	}
 	position = 0
-	for _, rule := range model.RecurrenceRules {
+	for _, rule := range model.Schedules {
 		if err := insertRule(tx, position, &rule); err != nil {
 			return err
 		}
@@ -294,7 +294,7 @@ func insertPosting(tx *userTx, position int, posting *types.Posting, source stri
 	if posting.Claim != nil {
 		if _, err := tx.Exec(
 			`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)`,
-			posting.ID, posting.Claim.RuleID, posting.Claim.OccurrenceDate,
+			posting.ID, posting.Claim.ScheduleID, posting.Claim.OccurrenceDate,
 		); err != nil {
 			return fmt.Errorf("insert posting claim %s: %w", posting.ID, err)
 		}
@@ -306,7 +306,7 @@ func insertPosting(tx *userTx, position int, posting *types.Posting, source stri
 	return refreshVisibilityForPostingTx(tx, posting.ID)
 }
 
-func insertRule(tx *userTx, position int, rule *types.RecurrenceRule) error {
+func insertRule(tx *userTx, position int, rule *types.Schedule) error {
 	destinationsJSON := []byte("null")
 	if rule.Destinations != nil {
 		var err error
@@ -362,12 +362,12 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	// satellites. Callers must select postingSelect with postingJoins so
 	// the column order below holds.
 	var posting types.Posting
-	var sourceAccountID, claimRuleID, claimOccurrenceDate sql.NullString
+	var sourceAccountID, claimScheduleID, claimOccurrenceDate sql.NullString
 	var destinationsJSON, amountJSON string
 	var enabled, executionOrder sql.NullInt64
 	var pending, voided int64
 	var source sql.NullString
-	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimRuleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &executionOrder); err != nil {
+	if err := rows.Scan(&posting.ID, &posting.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &posting.PostedTime, &posting.TransactionTime, &claimScheduleID, &claimOccurrenceDate, &enabled, &source, &pending, &voided, &executionOrder); err != nil {
 		return types.Posting{}, err
 	}
 	if sourceAccountID.Valid {
@@ -384,8 +384,8 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	if err := json.Unmarshal([]byte(amountJSON), &posting.Amount); err != nil {
 		return types.Posting{}, fmt.Errorf("parse amount %s: %w", posting.ID, err)
 	}
-	if claimRuleID.Valid && claimOccurrenceDate.Valid {
-		posting.Claim = &types.PostingClaim{RuleID: claimRuleID.String, OccurrenceDate: claimOccurrenceDate.String}
+	if claimScheduleID.Valid && claimOccurrenceDate.Valid {
+		posting.Claim = &types.PostingClaim{ScheduleID: claimScheduleID.String, OccurrenceDate: claimOccurrenceDate.String}
 	}
 	posting.Enabled = enabled.Valid && enabled.Int64 != 0
 	posting.Pending = pending != 0
@@ -399,15 +399,15 @@ func scanPostingRow(rows *sql.Rows) (types.Posting, error) {
 	return posting, nil
 }
 
-func scanRuleRow(rows *sql.Rows) (types.RecurrenceRule, error) {
-	var rule types.RecurrenceRule
+func scanRuleRow(rows *sql.Rows) (types.Schedule, error) {
+	var rule types.Schedule
 	var sourceAccountID, endDate sql.NullString
 	var destinationsJSON, amountJSON string
 	var frequency string
 	var enabled int64
 	var capNull sql.NullFloat64
 	if err := rows.Scan(&rule.ID, &rule.Name, &sourceAccountID, &destinationsJSON, &amountJSON, &frequency, &rule.StartDate, &endDate, &capNull, &rule.Priority, &enabled); err != nil {
-		return types.RecurrenceRule{}, err
+		return types.Schedule{}, err
 	}
 	if sourceAccountID.Valid {
 		value := sourceAccountID.String
@@ -415,15 +415,15 @@ func scanRuleRow(rows *sql.Rows) (types.RecurrenceRule, error) {
 	}
 	if destinationsJSON != "null" {
 		if err := json.Unmarshal([]byte(destinationsJSON), &rule.Destinations); err != nil {
-			return types.RecurrenceRule{}, fmt.Errorf("parse rule destinations %s: %w", rule.ID, err)
+			return types.Schedule{}, fmt.Errorf("parse rule destinations %s: %w", rule.ID, err)
 		}
 	} else {
 		rule.Destinations = nil
 	}
 	if err := json.Unmarshal([]byte(amountJSON), &rule.Amount); err != nil {
-		return types.RecurrenceRule{}, fmt.Errorf("parse rule amount %s: %w", rule.ID, err)
+		return types.Schedule{}, fmt.Errorf("parse rule amount %s: %w", rule.ID, err)
 	}
-	rule.Frequency = types.RecurrenceFrequency(frequency)
+	rule.Frequency = types.Frequency(frequency)
 	if endDate.Valid {
 		value := endDate.String
 		rule.EndDate = &value
@@ -599,7 +599,7 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		if err != nil {
 			return nil, err
 		}
-		model.RecurrenceRules = append(model.RecurrenceRules, rule)
+		model.Schedules = append(model.Schedules, rule)
 	}
 	if err := ruleRows.Err(); err != nil {
 		ruleRows.Close()
@@ -683,8 +683,8 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 	if model.Postings == nil {
 		model.Postings = []types.Posting{}
 	}
-	if model.RecurrenceRules == nil {
-		model.RecurrenceRules = []types.RecurrenceRule{}
+	if model.Schedules == nil {
+		model.Schedules = []types.Schedule{}
 	}
 	if model.PaymentTerms == nil {
 		model.PaymentTerms = []types.PaymentTerms{}

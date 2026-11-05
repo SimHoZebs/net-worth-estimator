@@ -193,7 +193,7 @@ export function AccountDetailsModal({
 				<div
 					className="inline-flex gap-0.5 rounded-control border border-line bg-surface-2 p-1"
 					role="group"
-					aria-label="Filter by posting status"
+					aria-label="Filter by transaction status"
 				>
 					{(["all", "pending", "posted"] as const).map((key) => (
 						<button

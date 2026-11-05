@@ -145,7 +145,7 @@ export function IndependenceConfigure({ instanceId }: { instanceId: string }) {
 			.map((item) => ({
 				id: item.id,
 				name: item.name,
-				detail: item.kind === "rule" ? "Recurring" : "One-time",
+				detail: item.kind === "schedule" ? "Recurring" : "One-time",
 			}))
 			.filter((item) =>
 				seen.has(item.id) ? false : (seen.add(item.id), true),

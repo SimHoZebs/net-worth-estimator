@@ -78,11 +78,11 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
 	handler := New(scoped, Config{})
-	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule-preview"
-	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-rule"
+	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule-preview"
+	createPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-new-schedule"
 
 	var preview struct {
-		Preview types.PatternToNewRulePreview `json:"preview"`
+		Preview types.PatternToNewSchedulePreview `json:"preview"`
 	}
 	if res := callAPI(t, handler, "GET", previewPath, ""); res.Code != 200 {
 		t.Fatalf("preview = %d %s", res.Code, res.Body.String())
@@ -100,14 +100,14 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	} else if err := json.Unmarshal(res.Body.Bytes(), &preview); err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Preview.Creatable || preview.Preview.Rule == nil {
+	if !preview.Preview.Creatable || preview.Preview.Schedule == nil {
 		t.Fatalf("preview = %+v, want a creatable rule", preview.Preview)
 	}
 
 	var created struct {
-		Result     types.RecurrenceRule `json:"value"`
-		Saved      bool                 `json:"saved"`
-		PatternKey string               `json:"patternKey"`
+		Result     types.Schedule `json:"value"`
+		Saved      bool           `json:"saved"`
+		PatternKey string         `json:"patternKey"`
 	}
 	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 200 {
 		t.Fatalf("create = %d %s", res.Code, res.Body.String())
@@ -143,17 +143,13 @@ func TestQA03RecurringDetectionCreatesRuleIntoForecastAndDisablesCleanly(t *test
 	if res := callAPI(t, handler, "POST", createPath, ""); res.Code != 409 {
 		t.Fatalf("second create = %d %s, want 409", res.Code, res.Body.String())
 	}
-	if model, err := scoped.LoadModel(); err != nil || len(model.RecurrenceRules) != 1 {
+	if model, err := scoped.LoadModel(); err != nil || len(model.Schedules) != 1 {
 		t.Fatalf("rules = %+v err = %v, want exactly one", model, err)
 	}
 
 	// Disabling the rule drops it from the forecast but leaves the
 	// detection evidence — findings and confirmation — intact.
-	disable, _ := json.Marshal(map[string]any{
-		"name": created.Result.Name, "sourceAccountId": "checking", "amount": created.Result.Amount,
-		"frequency": created.Result.Frequency, "startDate": created.Result.StartDate, "enabled": false,
-	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+created.Result.ID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "POST", "/v1/schedules/"+created.Result.ID+"/amend", `{"enabled":false}`); res.Code != 200 {
 		t.Fatalf("disable = %d %s", res.Code, res.Body.String())
 	}
 	clean := qa03StoredProjection(t, handler)

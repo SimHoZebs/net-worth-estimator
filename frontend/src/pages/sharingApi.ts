@@ -183,19 +183,16 @@ export async function excludeSharedPosting(
 	audienceId: string,
 	requestId: string = mintShareRequestId(),
 ): Promise<SharingGrant> {
-	const response = await waypointFetch<GrantResponse>(
-		"/v1/shared/exclusions",
-		{
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				postingId,
-				audienceType,
-				audienceId,
-				requestId,
-			}),
-		},
-	);
+	const response = await waypointFetch<GrantResponse>("/v1/shared/exclusions", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			postingId,
+			audienceType,
+			audienceId,
+			requestId,
+		}),
+	});
 	return response.data.grant;
 }
 

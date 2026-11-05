@@ -20,8 +20,8 @@ afterEach(() => {
 function categoryCalls(server: ReturnType<typeof stubTestServer>) {
 	return server.calls.filter(
 		(call) =>
-			call.method === "PATCH" &&
-			call.url.endsWith("/v1/postings/charge/category"),
+			call.method === "POST" &&
+			call.url.endsWith("/v1/transactions/charge/categorize"),
 	);
 }
 

@@ -280,9 +280,8 @@ export function SyncProviderPanel() {
 								{reconnecting ? (
 									<div>
 										<p className="mt-0 mb-3 text-sm leading-relaxed text-muted">
-											Paste a new setup token to replace the saved
-											connection. Your accounts and imported history stay
-											in Waypoint.
+											Paste a new setup token to replace the saved connection.
+											Your accounts and imported history stay in Waypoint.
 										</p>
 										<SyncConnectForm
 											onConnected={handleReconnected}

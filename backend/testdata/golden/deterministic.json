@@ -86,7 +86,7 @@
         "transactionTime": 1769817600
       }
     ],
-    "recurrenceRules": [
+    "schedules": [
       {
         "name": "salary",
         "sourceAccountId": null,

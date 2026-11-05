@@ -13,7 +13,10 @@ import {
 	useSharingPolicy,
 	useSharingPreview,
 } from "../state/sharing.ts";
-import { mintShareRequestId, revokeSharedPosting } from "../pages/sharingApi.ts";
+import {
+	mintShareRequestId,
+	revokeSharedPosting,
+} from "../pages/sharingApi.ts";
 import type { SharingPolicyInput } from "../pages/sharingApi.ts";
 
 function todayDay(): string {
@@ -21,9 +24,7 @@ function todayDay(): string {
 }
 
 function serverMessage(cause: unknown, fallback: string): string {
-	return cause instanceof Error && cause.message
-		? cause.message
-		: fallback;
+	return cause instanceof Error && cause.message ? cause.message : fallback;
 }
 
 /**
@@ -111,10 +112,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 	);
 
 	const sharedGrants = useMemo(
-		() =>
-			(grantsQuery.data ?? []).filter(
-				(grant) => grant.intent === "shared",
-			),
+		() => (grantsQuery.data ?? []).filter((grant) => grant.intent === "shared"),
 		[grantsQuery.data],
 	);
 
@@ -223,8 +221,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 					// A grant revoked elsewhere reports 404: it is already
 					// removed, so continue with the remainder instead of
 					// aborting the stop.
-					if (cause instanceof ApiError && cause.status === 404)
-						continue;
+					if (cause instanceof ApiError && cause.status === 404) continue;
 					throw cause;
 				}
 			}
@@ -238,10 +235,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			// Refresh every sharing view so the visible state matches the
 			// server and a retry replays from live rows, never a stale list.
 			void refreshSharingViewsFor(groupId);
-			const message = serverMessage(
-				cause,
-				"Sharing could not be stopped.",
-			);
+			const message = serverMessage(cause, "Sharing could not be stopped.");
 			setFormError(message);
 			notifyError("groups", message);
 		} finally {
@@ -291,9 +285,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			{formError && <ErrorNotice message={formError} />}
 
 			<fieldset className="grid gap-2 border-0 p-0">
-				<legend className="px-0 text-sm font-medium">
-					Accounts to share
-				</legend>
+				<legend className="px-0 text-sm font-medium">Accounts to share</legend>
 				{accounts === null ? (
 					<p className="m-0 text-sm text-muted" role="status">
 						Loading accounts…
@@ -320,9 +312,11 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			{staleSelections.length > 0 && (
 				<p className="m-0 text-sm text-muted" role="note">
 					{staleSelections.length} previously selected{" "}
-					{staleSelections.length === 1 ? "account no longer" : "accounts no longer"}{" "}
-					exist, so {staleSelections.length === 1 ? "it was" : "they were"} removed
-					from the selection. Saving keeps it that way.
+					{staleSelections.length === 1
+						? "account no longer"
+						: "accounts no longer"}{" "}
+					exist, so {staleSelections.length === 1 ? "it was" : "they were"}{" "}
+					removed from the selection. Saving keeps it that way.
 				</p>
 			)}
 
@@ -352,11 +346,10 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 			{draftAccounts.length > 0 && (
 				<div className="grid gap-2 rounded-control border border-solid border-line px-3 py-2 text-sm">
 					<p className="m-0">
-						<strong>Before you turn this on.</strong> Sharing
-						covers matching transactions already inside these
-						dates, and later bank imports can add older matching
-						transactions on their own. There is no second review
-						step for those.
+						<strong>Before you turn this on.</strong> Sharing covers matching
+						transactions already inside these dates, and later bank imports can
+						add older matching transactions on their own. There is no second
+						review step for those.
 					</p>
 					{previewQuery.isPending ? (
 						<p className="m-0 text-muted" role="status">
@@ -378,21 +371,15 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 									? "transaction"
 									: "transactions"}{" "}
 								across {preview.accountIds.length}{" "}
-								{preview.accountIds.length === 1
-									? "account"
-									: "accounts"}{" "}
-								from {preview.startDate}
+								{preview.accountIds.length === 1 ? "account" : "accounts"} from{" "}
+								{preview.startDate}
 								{preview.endDate
 									? ` to ${preview.endDate}`
 									: " with no end"}{" "}
-								match this selection for{" "}
-								{preview.memberCount}{" "}
-								{preview.memberCount === 1
-									? "member"
-									: "members"}
-								. Transactions hidden individually still
-								count here but stay hidden. Only counts are
-								shown here, never amounts or payees.
+								match this selection for {preview.memberCount}{" "}
+								{preview.memberCount === 1 ? "member" : "members"}. Transactions
+								hidden individually still count here but stay hidden. Only
+								counts are shown here, never amounts or payees.
 							</p>
 						)
 					)}
@@ -401,11 +388,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 
 			<div className="flex flex-wrap gap-2">
 				{policy?.enabled ? (
-					<Button
-						size="sm"
-						disabled={saving || stopping}
-						onClick={onDisable}
-					>
+					<Button size="sm" disabled={saving || stopping} onClick={onDisable}>
 						{saving ? "Turning off…" : "Turn off automatic sharing"}
 					</Button>
 				) : (
@@ -413,10 +396,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						variant="primary"
 						size="sm"
 						disabled={
-							saving ||
-							stopping ||
-							draftAccounts.length === 0 ||
-							!draftStart
+							saving || stopping || draftAccounts.length === 0 || !draftStart
 						}
 						onClick={onEnable}
 					>
@@ -455,16 +435,15 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 						{saving ? "Saving…" : "Save changes"}
 					</Button>
 					<span className="text-sm text-muted">
-						Narrowing dates or accounts revokes access that no
-						longer matches.
+						Narrowing dates or accounts revokes access that no longer matches.
 					</span>
 				</div>
 			)}
 
 			<p className="m-0 text-sm text-muted">
-				Single transactions can be shared with, or hidden from, a
-				group from their detail view, with or without automatic
-				sharing. Copies a member already accepted stay with them.
+				Single transactions can be shared with, or hidden from, a group from
+				their detail view, with or without automatic sharing. Copies a member
+				already accepted stay with them.
 			</p>
 		</section>
 	);

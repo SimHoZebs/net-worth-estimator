@@ -165,7 +165,7 @@ func TestQA03ImageReceiptReviewSurvivesBankResyncWithHarnessExtraction(t *testin
 		}
 	}
 
-	listed := receiptRequest(handler, "GET", "/v1/postings/"+targetID+"/receipts", nil)
+	listed := receiptRequest(handler, "GET", "/v1/transactions/"+targetID+"/receipts", nil)
 	if listed.Code != http.StatusOK {
 		t.Fatalf("receipt list = %d %s", listed.Code, listed.Body.String())
 	}

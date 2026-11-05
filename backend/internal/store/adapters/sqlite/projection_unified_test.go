@@ -154,7 +154,7 @@ func TestRowWritesMarkDirty(t *testing.T) {
 	}
 	mustClean()
 
-	rule, err := s.CreateRule(types.RecurrenceRule{
+	rule, err := s.CreateSchedule(types.Schedule{
 		Name: "Pay", SourceAccountID: &account.ID,
 		Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
 		Frequency: "monthly", StartDate: "2026-09-01", Priority: 1, Enabled: true,
@@ -166,7 +166,7 @@ func TestRowWritesMarkDirty(t *testing.T) {
 		t.Fatalf("rule must dirty its start, got %d", got)
 	}
 	mustClean()
-	if err := s.DeleteRule(rule.ID); err != nil {
+	if err := s.DeleteSchedule(rule.ID); err != nil {
 		t.Fatalf("delete rule: %v", err)
 	}
 	if got := dirty(); got != dirtyDay("2026-01-01") {

@@ -25,7 +25,7 @@ type RecurrencePreprocessorResult struct {
 // for the projection window. Schedule expansion is preprocessor work: it
 // needs rules, the window, and claims, but no balances, caps, or samples.
 // The engine consumes the dated result without knowing rules exist.
-func ExpandProjectionSchedule(rules []types.RecurrenceRule, postings []types.Posting, windowStart, windowEnd string, includeStartDate bool) ResolvedOccurrences {
+func ExpandProjectionSchedule(rules []types.Schedule, postings []types.Posting, windowStart, windowEnd string, includeStartDate bool) ResolvedOccurrences {
 	return ResolveOccurrences(rules, postings, windowStart, windowEnd, includeStartDate)
 }
 
@@ -38,7 +38,7 @@ func RecurrencePreprocessor(model *types.FinancialModel) RecurrencePreprocessorR
 	if model == nil {
 		return out
 	}
-	for _, rule := range model.RecurrenceRules {
+	for _, rule := range model.Schedules {
 		behavior := RuleBehaviorDeterministic
 		if _, found := VolatileRateInputOf(rule.Amount); found {
 			behavior = RuleBehaviorStochastic

@@ -47,7 +47,10 @@ afterEach(() => {
 			element.remove();
 		});
 	}
-	if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+	if (
+		typeof window !== "undefined" &&
+		typeof window.matchMedia === "function"
+	) {
 		// Motion-driven exit animations outlive their test file and fire
 		// navigation callbacks in the next file. Reduced motion collapses
 		// them, so closes settle inside the test that started them.

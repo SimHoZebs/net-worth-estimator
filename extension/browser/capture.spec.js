@@ -109,6 +109,7 @@ test("installed extension connects, captures, picks, persists drafts, and retrie
               { id: "card", name: "Credit card", kind: "debt", enabled: true },
             ],
             postings: [],
+            schedules: [],
             plannedPurchases: saved ? [saved] : [],
           },
         });
@@ -231,7 +232,7 @@ test("installed extension connects, captures, picks, persists drafts, and retrie
     expect(captureState.captureState.draft.sourceUrl).toBe(base + "/product");
     expect(captureState.captureState.draft.priceMethod).toBe("picker");
     expect(requests.filter((request) => request.path === "/v1/planned-purchases")).toHaveLength(2);
-    expect(requests.some((request) => request.path.startsWith("/v1/postings"))).toBe(false);
+    expect(requests.some((request) => request.path.startsWith("/v1/transactions"))).toBe(false);
     expect(requests.some((request) => request.path.startsWith("/v1/purchase-captures"))).toBe(
       false,
     );

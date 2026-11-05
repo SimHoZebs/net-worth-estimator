@@ -1,10 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { listIntegrations } from "@/api/generated/endpoints.ts";
 import type { ProviderEntry } from "@/api/generated/model/index.ts";
-import {
-	getUserScope,
-	subscribeUserScope,
-} from "@/auth/resourceScope.ts";
+import { getUserScope, subscribeUserScope } from "@/auth/resourceScope.ts";
 import { dismissKey, notifyError } from "@/state/notifications.ts";
 import { serverQueryClient } from "@/state/serverQuery.ts";
 import { useUserScope } from "@/state/useUserScope.ts";

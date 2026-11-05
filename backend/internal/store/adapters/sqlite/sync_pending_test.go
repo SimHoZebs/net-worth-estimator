@@ -54,12 +54,12 @@ func TestClaimedPendingSurvivesBankRefresh(t *testing.T) {
 		t.Fatalf("rows = %+v, err %v", loaded, err)
 	}
 	id := loaded.Postings[0].ID
-	if _, err := database.CreateRule(testRuleFixture("rent")); err != nil {
+	if _, err := database.CreateSchedule(testRuleFixture("rent")); err != nil {
 		t.Fatalf("rule = %v", err)
 	}
 	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
 		PostingID: id,
-		Claim:     types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-08-02"},
+		Claim:     types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-08-02"},
 	}}); err != nil {
 		t.Fatalf("claim = %v", err)
 	}
@@ -79,7 +79,7 @@ func TestClaimedPendingSurvivesBankRefresh(t *testing.T) {
 	if row.Pending || !row.Enabled {
 		t.Fatalf("claimed row demoted by refresh: %+v", row)
 	}
-	if row.Claim == nil || row.Claim.RuleID != "rent" {
+	if row.Claim == nil || row.Claim.ScheduleID != "rent" {
 		t.Fatalf("claim lost on refresh: %+v", row)
 	}
 }
@@ -94,12 +94,12 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 		t.Fatalf("rows = %+v, err %v", loaded, err)
 	}
 	id := loaded.Postings[0].ID
-	if _, err := database.CreateRule(testRuleFixture("rent")); err != nil {
+	if _, err := database.CreateSchedule(testRuleFixture("rent")); err != nil {
 		t.Fatalf("rule = %v", err)
 	}
 	if _, err := database.SetPostingClaims([]types.PostingClaimUpdate{{
 		PostingID: id,
-		Claim:     types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-08-02"},
+		Claim:     types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-08-02"},
 	}}); err != nil {
 		t.Fatalf("claim = %v", err)
 	}
@@ -120,7 +120,7 @@ func TestConvertPreservesOccurrenceClaim(t *testing.T) {
 	if row.ID != id || row.Pending || !row.Enabled {
 		t.Fatalf("converted row = %+v", row)
 	}
-	if row.Claim == nil || row.Claim.RuleID != "rent" {
+	if row.Claim == nil || row.Claim.ScheduleID != "rent" {
 		t.Fatalf("claim lost on convert: %+v", row)
 	}
 	bank, err := database.LoadBankPostings()
@@ -141,11 +141,11 @@ func TestClaimPendingPromotesPostedTime(t *testing.T) {
 	if err != nil || len(loaded.Postings) != 1 {
 		t.Fatalf("rows = %+v, err %v", loaded, err)
 	}
-	if _, err := database.CreateRule(testRuleFixture("dining")); err != nil {
+	if _, err := database.CreateSchedule(testRuleFixture("dining")); err != nil {
 		t.Fatalf("rule = %v", err)
 	}
 	claimed := loaded.Postings[0]
-	claimed.Claim = &types.PostingClaim{RuleID: "dining", OccurrenceDate: "2026-08-02"}
+	claimed.Claim = &types.PostingClaim{ScheduleID: "dining", OccurrenceDate: "2026-08-02"}
 	updated, err := database.UpdatePosting(claimed)
 	if err != nil {
 		t.Fatalf("claim = %v", err)
@@ -158,7 +158,7 @@ func TestClaimPendingPromotesPostedTime(t *testing.T) {
 	if updated.PostedTime != updated.TransactionTime || updated.PostedTime <= 0 {
 		t.Fatalf("posted time not promoted: %+v", updated)
 	}
-	if updated.Claim == nil || updated.Claim.RuleID != "dining" {
+	if updated.Claim == nil || updated.Claim.ScheduleID != "dining" {
 		t.Fatalf("claim lost: %+v", updated)
 	}
 }
@@ -346,27 +346,6 @@ func TestDeleteVoidSuppressesNothingAndSameKeyStillImports(t *testing.T) {
 	}
 	if second := applyDirectives(t, database, []BankDirective{upsert}); second.PendingInserted != 1 {
 		t.Fatalf("re-authorized hold skipped: %+v", second)
-	}
-}
-
-func TestConvertSettledBankRowSuppressesKeys(t *testing.T) {
-	database := openSQLiteStore(t)
-	seedAccount(t, database, "prime_card")
-	upsert := bankUpsertDirective(bankSeedPosting("Corner Store", "prime_card", "42.10", false), ProviderSimpleFIN, "bridge-prime", "post1")
-	applyDirectives(t, database, []BankDirective{upsert})
-	loaded, err := database.LoadModel()
-	if err != nil || len(loaded.Postings) != 1 {
-		t.Fatalf("rows = %+v, err %v", loaded, err)
-	}
-	if _, err := database.ConvertPostingToRule(loaded.Postings[0].ID, testRuleFixture("ignored")); err != nil {
-		t.Fatalf("convert = %v", err)
-	}
-	// The converted-away charge must not come back on the next feed.
-	if second := applyDirectives(t, database, []BankDirective{upsert}); second != (SyncApplySummary{}) {
-		t.Fatalf("resupply counted: %+v", second)
-	}
-	if got := countRows(t, database, "postings", ""); got != 0 {
-		t.Fatalf("resupply resurrected %d rows", got)
 	}
 }
 

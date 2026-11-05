@@ -67,14 +67,16 @@ type Store interface {
 	UpdatePlannedPurchase(purchase types.PlannedPurchase) (types.PlannedPurchase, error)
 	DeletePlannedPurchase(id string) error
 	MovePlannedPurchase(id, beforeID string) error
-	// ConvertPostingToRule and ConvertRuleToPosting move one entry
-	// across the posting/rule tables in one store transaction, keeping its ID.
-	ConvertPostingToRule(postingID string, rule types.RecurrenceRule) (types.RecurrenceRule, error)
-	ConvertRuleToPosting(ruleID string, posting types.Posting) (types.Posting, error)
-	CreateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)
-	UpdateRule(rule types.RecurrenceRule) (types.RecurrenceRule, error)
-	DeleteRule(id string) error
-	MoveRule(id, beforeID string) error
+	// CreateScheduleClaimingPosting creates a schedule and records an
+	// existing transaction as its first occurrence, atomically.
+	CreateScheduleClaimingPosting(schedule types.Schedule, postingID, occurrenceDate string) (types.Schedule, error)
+	// DeleteScheduleCreatingPosting records the one-time transaction that
+	// happened and removes the schedule, atomically.
+	DeleteScheduleCreatingPosting(scheduleID string, posting types.Posting) (types.Posting, error)
+	CreateSchedule(rule types.Schedule) (types.Schedule, error)
+	UpdateSchedule(rule types.Schedule) (types.Schedule, error)
+	DeleteSchedule(id string) error
+	MoveSchedule(id, beforeID string) error
 	SaveCheckpoint(checkpoint types.Checkpoint) (types.Checkpoint, error)
 	DeleteCheckpointAt(accountID string, observedAt int64) error
 	CreateEvaluation(item EvaluationUpdate) (EvaluationUpdate, error)

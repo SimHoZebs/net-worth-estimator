@@ -23,7 +23,7 @@ import {
 import { userResourceKey } from "../../state/workspaceResources.ts";
 import { getUserScope } from "../../auth/resourceScope.ts";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
-import { ruleTransaction } from "../../domain/accountActivity.ts";
+import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import type { Transaction } from "../../domain/model.ts";
 import { TransactionDetail } from "./TransactionDetail.tsx";
 
@@ -32,7 +32,7 @@ function occurrence(
 	transaction: Transaction,
 	resolved?: { amount: number; requested: number; date: string },
 ) {
-	return ruleTransaction({
+	return scheduleTransaction({
 		transaction,
 		accounts: financialModelFixture.accounts,
 		startDate: financialModelFixture.startDate,
@@ -45,7 +45,7 @@ function settleCandidate(transaction: {
 	name: string;
 	amount: number;
 	startDate: string;
-	claimRuleId?: string | null;
+	claimScheduleId?: string | null;
 	claimOccurrenceDate?: string | null;
 }) {
 	return {
@@ -57,7 +57,7 @@ function settleCandidate(transaction: {
 		amountDeltaCents: 800,
 		descriptorChanged: false,
 		recommended: true,
-		claimRuleId: transaction.claimRuleId ?? undefined,
+		claimScheduleId: transaction.claimScheduleId ?? undefined,
 		claimOccurrenceDate: transaction.claimOccurrenceDate ?? undefined,
 	};
 }
@@ -71,13 +71,13 @@ function calculatedTransaction() {
 		amountKnown: false,
 		fromId: "checking",
 		toId: "mortgage",
-		kind: "rule" as const,
+		kind: "schedule" as const,
 		startDate: "2026-10-31",
 		endDate: null,
 		annualIncrease: 0,
 		enabled: true,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 	};
@@ -219,7 +219,7 @@ it("deletes the transaction through the row endpoint", async () => {
 			server.calls.some(
 				(call) =>
 					call.method === "DELETE" &&
-					call.url === "/v1/postings/renovation-once",
+					call.url === "/v1/transactions/renovation-once",
 			),
 		).toBe(true),
 	);
@@ -241,7 +241,7 @@ it("marks holds that did not post instead of posted", () => {
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,
@@ -304,7 +304,7 @@ it("marks a live hold as not yet posted", () => {
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: true,
@@ -359,7 +359,7 @@ it("lets a pending bank row record an occurrence while staying locked", async ()
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: true,
@@ -518,12 +518,15 @@ it("toggles projections from the options menu and saves", async () => {
 		expect(
 			server.calls.some(
 				(call) =>
-					call.method === "PATCH" && call.url === "/v1/postings/renovation",
+					call.method === "POST" &&
+					call.url === "/v1/transactions/renovation/amend",
 			),
 		).toBe(true),
 	);
 	const body = server.calls.find(
-		(call) => call.method === "PATCH" && call.url === "/v1/postings/renovation",
+		(call) =>
+			call.method === "POST" &&
+			call.url === "/v1/transactions/renovation/amend",
 	)?.body as Record<string, unknown>;
 	expect(body.enabled).toBe(false);
 });
@@ -591,7 +594,7 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 		annualIncrease: 0,
 		enabled: true,
 		readOnly: false,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: "2026-10-21",
 		pending: false,
@@ -612,7 +615,7 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,
@@ -652,7 +655,7 @@ it("lets the owner pick the posted charge and remove the vanished hold", async (
 			server.calls.some(
 				(call) =>
 					call.method === "DELETE" &&
-					call.url === "/v1/postings/01900000-0000-7000-8000-000000000096",
+					call.url === "/v1/transactions/01900000-0000-7000-8000-000000000096",
 			),
 		).toBe(true),
 	);
@@ -710,7 +713,7 @@ it("keeps the vanished hold in the lists when the delete fails", async () => {
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,
@@ -719,7 +722,8 @@ it("keeps the vanished hold in the lists when the delete fails", async () => {
 	};
 	const onClose = vi.fn();
 	server.writeOnce(
-		(method, path) => method === "DELETE" && path === `/v1/postings/${holdId}`,
+		(method, path) =>
+			method === "DELETE" && path === `/v1/transactions/${holdId}`,
 		new Error("network down"),
 	);
 	render(
@@ -769,7 +773,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		annualIncrease: 0,
 		enabled: true,
 		readOnly: false,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: "2026-10-21",
 		pending: false,
@@ -790,7 +794,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,
@@ -832,7 +836,7 @@ it("lets the owner merge a vanished hold from the suggestions sheet", async () =
 			server.calls.some(
 				(call) =>
 					call.method === "DELETE" &&
-					call.url === "/v1/postings/01900000-0000-7000-8000-000000000096",
+					call.url === "/v1/transactions/01900000-0000-7000-8000-000000000096",
 			),
 		).toBe(true),
 	);
@@ -855,7 +859,7 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 		startDate: "2028-06-14",
 		enabled: false,
 		readOnly: true,
-		claimRuleId: "living",
+		claimScheduleId: "living",
 		claimOccurrenceDate: "2026-10-01",
 		postedDate: null,
 		void: true,
@@ -889,10 +893,9 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 		expect(
 			server.calls.some(
 				(call) =>
-					call.method === "PATCH" &&
-					call.url === "/v1/postings/renovation" &&
-					(call.body as { claim?: { ruleId?: string } })?.claim?.ruleId ===
-						"living",
+					call.method === "POST" &&
+					call.url === "/v1/transactions/renovation/claim" &&
+					(call.body as { scheduleId?: string })?.scheduleId === "living",
 			),
 		).toBe(true),
 	);
@@ -901,7 +904,7 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 			server.calls.some(
 				(call) =>
 					call.method === "DELETE" &&
-					call.url === "/v1/postings/01900000-0000-7000-8000-000000000095",
+					call.url === "/v1/transactions/01900000-0000-7000-8000-000000000095",
 			),
 		).toBe(true),
 	);
@@ -925,7 +928,7 @@ it("preselects the closest posted charge when several match", async () => {
 		annualIncrease: 0,
 		enabled: false,
 		readOnly: true,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		postedDate: null,
 		pending: false,
@@ -986,7 +989,7 @@ it("saves row edits through the posting endpoint and closes", async () => {
 	const savedTransaction = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
 	)!;
-	const baselinePostedDate = ruleTransaction({
+	const baselinePostedDate = scheduleTransaction({
 		transaction: savedTransaction,
 		accounts: financialModelFixture.accounts,
 		startDate: financialModelFixture.startDate,
@@ -1013,20 +1016,98 @@ it("saves row edits through the posting endpoint and closes", async () => {
 		expect(
 			server.calls.some(
 				(call) =>
-					call.method === "PATCH" && call.url === "/v1/postings/renovation",
+					call.method === "POST" &&
+					call.url === "/v1/transactions/renovation/amend",
 			),
 		).toBe(true),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 	const body = server.calls.find(
-		(call) => call.method === "PATCH" && call.url === "/v1/postings/renovation",
+		(call) =>
+			call.method === "POST" &&
+			call.url === "/v1/transactions/renovation/amend",
 	)?.body as Record<string, unknown>;
 	// A rename patches one member. The stored non-midnight instants are
 	// never restated, so no edit can round them to midnight.
 	expect(body).toEqual({ name: "Home renovation updated" });
 });
 
-it("converts a subscription through row endpoints and preserves the source posting", async () => {
+it("stops a rejected amend before the claim leg and keeps the form", async () => {
+	const server = stubTestServer();
+	acceptTestResource();
+	const base = financialModelFixture.transactions.find(
+		(item) => item.id === "renovation",
+	)!;
+	const claimed = {
+		...base,
+		claimScheduleId: "salary",
+		claimOccurrenceDate: "2026-02-01",
+	};
+	server.writeOnce(
+		(method, path) =>
+			method === "POST" && path === "/v1/transactions/renovation/amend",
+		{
+			value: {},
+			issues: [
+				{
+					severity: "error",
+					code: "posting.claim.duplicate",
+					message: "That occurrence is already claimed.",
+					path: [],
+				},
+			],
+			saved: false,
+			revision: "rejected",
+		},
+	);
+	const onClose = vi.fn();
+	render(
+		<TransactionDetail
+			transaction={occurrence(claimed)}
+			savedTransaction={claimed}
+			accounts={financialModelFixture.accounts}
+			transactions={[claimed]}
+			onClose={onClose}
+		/>,
+	);
+	fireEvent.change(screen.getByLabelText("Transaction name"), {
+		target: { value: "Renovation rejected" },
+	});
+	fireEvent.change(
+		screen.getAllByLabelText("Records an occurrence of").at(-1)!,
+		{ target: { value: "" } },
+	);
+	await waitFor(() =>
+		expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy(),
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+	await waitFor(() =>
+		expect(
+			server.calls.some(
+				(call) =>
+					call.method === "POST" &&
+					call.url === "/v1/transactions/renovation/amend",
+			),
+		).toBe(true),
+	);
+	await waitFor(() =>
+		expect(
+			screen.getByText(
+				"The transaction could not be saved. Review the workspace notice and try again.",
+			),
+		).toBeTruthy(),
+	);
+	expect(onClose).not.toHaveBeenCalled();
+	expect(
+		server.calls.some(
+			(call) =>
+				call.method === "POST" &&
+				call.url === "/v1/transactions/renovation/release",
+		),
+	).toBe(false);
+});
+
+it("starts a subscription from a transaction in one action", async () => {
 	const model = fixtureModel(financialModelFixture);
 	const server = stubTestServer(undefined, model);
 	acceptTestResource();
@@ -1051,55 +1132,47 @@ it("converts a subscription through row endpoints and preserves the source posti
 	await waitFor(() =>
 		expect(
 			server.calls.some(
-				(call) => call.method === "POST" && call.url === "/v1/recurrence-rules",
-			),
-		).toBe(true),
-	);
-	await waitFor(() =>
-		expect(
-			server.calls.some(
 				(call) =>
-					call.method === "PATCH" && call.url === "/v1/postings/renovation",
+					call.method === "POST" &&
+					call.url === "/v1/transactions/renovation/schedule",
 			),
 		).toBe(true),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-	// The source posting is claimed, never deleted.
+	const start = server.calls.find(
+		(call) => call.url === "/v1/transactions/renovation/schedule",
+	);
+	expect(start?.body).toMatchObject({
+		frequency: "monthly",
+		startDate: savedTransaction.startDate,
+	});
+	// The start action claims the transaction atomically; the client never
+	// deletes the source or patches a separate claim.
 	expect(
 		server.calls.some(
 			(call) =>
 				call.method === "DELETE" && String(call.url).includes("renovation"),
 		),
 	).toBe(false);
+	expect(
+		server.calls.some(
+			(call) =>
+				call.method === "POST" &&
+				call.url === "/v1/transactions/renovation/claim",
+		),
+	).toBe(false);
 });
 
-it("retries a rejected claim without creating a second rule", async () => {
-	// Raw source carries non-midnight times, a custom amount resolver with
-	// extra inputs; the claim body must keep
-	// all of them byte-identical.
+it("retries a failed schedule start with the same identity", async () => {
 	const model = fixtureModel(financialModelFixture);
-	const day = Math.floor(Date.parse("2028-06-15T00:00:00Z") / 1000);
-	const raw = model.postings.find((row) => row.id === "renovation")!;
-	raw.postedTime = day + 45245;
-	raw.transactionTime = day + 123;
-	raw.amount = {
-		resolver: "custom-split",
-		config: { expression: "48000" },
-		inputs: {
-			extra: {
-				source: "provider",
-				provider: "fx-rate",
-				arguments: { pair: "USD/EUR" },
-			},
-		},
-	};
 	const server = stubTestServer(undefined, model);
 	acceptTestResource();
 	setServerModelFixture(financialModelFixture, { model });
-	// Reject the claim write once; the rule create still succeeds.
+	// Reject the atomic start once so the first attempt records nothing.
 	server.writeOnce(
-		(method, path) => method === "PATCH" && path === "/v1/postings/renovation",
-		new Error("The claim could not be saved."),
+		(method, path) =>
+			method === "POST" && path === "/v1/transactions/renovation/schedule",
+		new Error("The schedule could not be saved."),
 	);
 	const source = financialModelFixture.transactions.find(
 		(item) => item.id === "renovation",
@@ -1119,34 +1192,27 @@ it("retries a rejected claim without creating a second rule", async () => {
 		screen.getByRole("menuitem", { name: "Mark as subscription" }),
 	);
 	await waitFor(() =>
-		expect(screen.getByText(/could not be claimed/)).toBeTruthy(),
+		expect(screen.getByText(/could not be created/)).toBeTruthy(),
 	);
 	expect(onClose).not.toHaveBeenCalled();
-	const ruleCreates = () =>
+	const starts = () =>
 		server.calls.filter(
-			(call) => call.method === "POST" && call.url === "/v1/recurrence-rules",
+			(call) =>
+				call.method === "POST" &&
+				call.url === "/v1/transactions/renovation/schedule",
 		);
-	expect(ruleCreates()).toHaveLength(1);
-	// Retry: the existing rule is reused, only the claim runs again.
+	expect(starts()).toHaveLength(1);
+	// Retry reuses the pinned identity; the failed attempt saved nothing.
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
 	fireEvent.click(
 		screen.getByRole("menuitem", { name: "Mark as subscription" }),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-	expect(ruleCreates()).toHaveLength(1);
-	const claims = server.calls.filter(
-		(call) => call.method === "PATCH" && call.url === "/v1/postings/renovation",
-	);
-	expect(claims).toHaveLength(2);
-	const claimBody = claims.at(-1)?.body as Record<string, unknown>;
-	// The claim patch states one member; timestamps, descriptor, and
-	// destinations stay exactly as stored.
-	expect(claimBody).toEqual({
-		claim: {
-			ruleId: ruleCreates().map((call) => call.body as { id: string })[0]?.id,
-			occurrenceDate: "2028-06-15",
-		},
-	});
+	expect(starts()).toHaveLength(2);
+	const firstId = (starts()[0]?.body as { id?: string })?.id;
+	const secondId = (starts()[1]?.body as { id?: string })?.id;
+	expect(firstId).toBeTruthy();
+	expect(secondId).toBe(firstId);
 });
 
 it("shows the category control on recordings but not on rules or void holds", () => {
@@ -1165,7 +1231,7 @@ it("shows the category control on recordings but not on rules or void holds", ()
 	);
 	expect(screen.getByRole("button", { name: /Category/ })).toBeTruthy();
 	cleanup();
-	const rule = { ...posting, id: "renovation-rule", kind: "rule" as const };
+	const rule = { ...posting, id: "renovation-rule", kind: "schedule" as const };
 	render(
 		<TransactionDetail
 			transaction={occurrence(rule)}
@@ -1244,7 +1310,7 @@ it("offers frequency conversion and keeps growth on recurrence rules", () => {
 	const rule = {
 		...posting,
 		id: "renovation-rule",
-		kind: "rule" as const,
+		kind: "schedule" as const,
 	};
 	render(
 		<TransactionDetail

@@ -13,7 +13,7 @@ import { acceptTestResource } from "../../mocks/resource.ts";
 import { stubTestServer } from "../../mocks/waypointServer.ts";
 import { resetServerQueryCache } from "../../state/serverQuery.ts";
 import { setServerModelFixture } from "../../mocks/workspace.ts";
-import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
+import type { Schedule } from "@/api/generated/model/schedule.ts";
 import { RecurringRules } from "./RecurringRules.tsx";
 
 vi.mock("./TransactionDetail.tsx", () => ({
@@ -66,14 +66,15 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-function ruleRow(
-	id: string,
-	overrides: Partial<RecurrenceRule> = {},
-): RecurrenceRule {
+function ruleRow(id: string, overrides: Partial<Schedule> = {}): Schedule {
 	return {
 		id,
 		name: id,
-		amount: { resolver: "expression", config: { expression: "100" }, inputs: {} },
+		amount: {
+			resolver: "expression",
+			config: { expression: "100" },
+			inputs: {},
+		},
 		frequency: "monthly",
 		startDate: "2026-01-01",
 		endDate: null,
@@ -86,7 +87,7 @@ function ruleRow(
 	};
 }
 
-function rulesProps(rules: RecurrenceRule[]) {
+function rulesProps(rules: Schedule[]) {
 	const account = financialModelFixture.accounts[0]!;
 	return {
 		account,
@@ -128,7 +129,9 @@ it("returns a rejected drag preview to the server order", async () => {
 		screen.getAllByTestId("drag-row").map((row) => row.dataset.id);
 	server.writeOnce(
 		(method, path) =>
-			method === "POST" && path === "/v1/recurrence-rules/reorder",
+			method === "POST" &&
+			path.startsWith("/v1/schedules/") &&
+			path.endsWith("/move"),
 		new Error("The order could not be saved."),
 	);
 	fireEvent.pointerDown(screen.getAllByTestId("drag-row")[0]!);
@@ -138,8 +141,7 @@ it("returns a rejected drag preview to the server order", async () => {
 	await waitFor(() => expect(ids()).toEqual(["first", "second"]));
 	expect(
 		server.calls.some(
-			(call) =>
-				call.method === "POST" && call.url === "/v1/recurrence-rules/reorder",
+			(call) => call.method === "POST" && String(call.url).endsWith("/move"),
 		),
 	).toBe(true);
 });
@@ -175,8 +177,7 @@ it("settles a saved drag and adopts later independent server reorders", async ()
 		screen.getAllByTestId("drag-row").map((row) => row.dataset.id);
 	const reorderCalls = () =>
 		server.calls.filter(
-			(call) =>
-				call.method === "POST" && call.url === "/v1/recurrence-rules/reorder",
+			(call) => call.method === "POST" && String(call.url).endsWith("/move"),
 		).length;
 	// The gesture previews the drag and persists it on drop.
 	fireEvent.pointerDown(screen.getAllByTestId("drag-row")[0]!);
@@ -218,7 +219,9 @@ it("moves rows with keyboard controls and rolls back a rejected move", async () 
 		screen.getAllByTestId("drag-row").map((row) => row.dataset.id);
 	server.writeOnce(
 		(method, path) =>
-			method === "POST" && path === "/v1/recurrence-rules/reorder",
+			method === "POST" &&
+			path.startsWith("/v1/schedules/") &&
+			path.endsWith("/move"),
 		new Error("The order could not be saved."),
 	);
 	fireEvent.click(screen.getByRole("button", { name: "Move first down" }));

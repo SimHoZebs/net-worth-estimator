@@ -102,7 +102,7 @@ func TestWorkerIsIndependentFromSyncAndRecoversSavedInputs(t *testing.T) {
 	}
 	after, _ := scoped.LoadModel()
 	afterRevision, _ := store.ModelETag(after)
-	if afterRevision != revision || len(after.RecurrenceRules) != 0 {
+	if afterRevision != revision || len(after.Schedules) != 0 {
 		t.Fatal("analysis changed financial state")
 	}
 }

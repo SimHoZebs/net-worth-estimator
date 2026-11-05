@@ -195,9 +195,12 @@ export function projectionResultToLocal(
 		}
 		return endingBalances;
 	};
-	const needsStarting = rows.length === 0 || rows[0]!.accountSnapshots.length === 0;
-	const needsEnding = rows.length > 0 && rows[rows.length - 1]!.accountSnapshots.length === 0;
-	const starting = needsStarting || rows.length === 0 ? balancesFor("starting") : null;
+	const needsStarting =
+		rows.length === 0 || rows[0]!.accountSnapshots.length === 0;
+	const needsEnding =
+		rows.length > 0 && rows[rows.length - 1]!.accountSnapshots.length === 0;
+	const starting =
+		needsStarting || rows.length === 0 ? balancesFor("starting") : null;
 	const ending = needsEnding ? balancesFor("ending") : null;
 	const points = rows.length
 		? rows.map((row, index) => ({

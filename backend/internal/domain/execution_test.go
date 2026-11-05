@@ -24,7 +24,7 @@ func executionTestRuntime(accounts []types.Account, balances map[string]float64)
 	return CreateTransitionRuntime(inputs, state, "2026-01-01", nil)
 }
 
-func fixedOccurrence(posting *types.Posting, rule *types.RecurrenceRule) DatedPostingOccurrence {
+func fixedOccurrence(posting *types.Posting, rule *types.Schedule) DatedPostingOccurrence {
 	return DatedPostingOccurrence{Posting: posting, Rule: rule}
 }
 
@@ -43,7 +43,7 @@ func TestPreparePostingExecutionIsPure(t *testing.T) {
 	}
 	rt := executionTestRuntime([]types.Account{executionTestAccount(account, floor)}, map[string]float64{account: 1000})
 	before := CloneSimulationState(rt.State)
-	occurrence := fixedOccurrence(posting, &types.RecurrenceRule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", Enabled: true})
+	occurrence := fixedOccurrence(posting, &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", Enabled: true})
 	first, err := PreparePostingExecution(occurrence, "2026-02-01", false, rt.snapshotExecutionState(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -76,8 +76,8 @@ func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
 			Amount: expressionAmount(expression), Enabled: true,
 		}
 	}
-	rule := func(cap *float64) *types.RecurrenceRule {
-		return &types.RecurrenceRule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", AnnualCap: cap, Enabled: true}
+	rule := func(cap *float64) *types.Schedule {
+		return &types.Schedule{ID: "r", Frequency: "monthly", StartDate: "2026-01-01", AnnualCap: cap, Enabled: true}
 	}
 	cap := 100.0
 	loss := &types.Posting{
@@ -87,7 +87,7 @@ func TestSplitExecutionMatchesFusedExecution(t *testing.T) {
 	cases := []struct {
 		name       string
 		posting    *types.Posting
-		rule       *types.RecurrenceRule
+		rule       *types.Schedule
 		historical bool
 		balances   map[string]float64
 	}{
@@ -166,8 +166,8 @@ func TestApplyHandlesImpossibleStates(t *testing.T) {
 // rules, claim suppression, and end-date clamping happen before the engine
 // ever sees an occurrence.
 func TestExpandProjectionSchedule(t *testing.T) {
-	rule := func(id, start, end string, enabled bool) types.RecurrenceRule {
-		r := types.RecurrenceRule{ID: id, Name: id, Frequency: types.FrequencyMonthly, StartDate: types.IsoDate(start), Priority: 1, Enabled: enabled}
+	rule := func(id, start, end string, enabled bool) types.Schedule {
+		r := types.Schedule{ID: id, Name: id, Frequency: types.FrequencyMonthly, StartDate: types.IsoDate(start), Priority: 1, Enabled: enabled}
 		if end != "" {
 			r.EndDate = (*types.IsoDate)(&end)
 		}
@@ -175,10 +175,10 @@ func TestExpandProjectionSchedule(t *testing.T) {
 	}
 	claimed := types.Posting{
 		ID: "actual", SourceAccountID: func() *string { s := "checking"; return &s }(),
-		Claim:   &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"},
+		Claim:   &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"},
 		Enabled: true,
 	}
-	rules := []types.RecurrenceRule{
+	rules := []types.Schedule{
 		rule("rent", "2026-01-01", "", true),
 		rule("old", "2025-01-01", "2025-06-01", true),
 		rule("off", "2026-01-01", "", false),
@@ -223,7 +223,7 @@ func TestStochasticShortCircuitMatchesFullRun(t *testing.T) {
 		Evaluations: types.EmptyEvaluationTables(),
 	}
 	settings := &types.ProjectionRuntimeSettings{FallbackProjectionStartDate: "2026-01-01", HorizonYears: 1, Evaluations: types.EmptyEvaluationTables()}
-	if counts := buildSampleCountsByPostingId(model.RecurrenceRules, model.Postings, settings.HorizonYears, "2026-01-01", "2027-01-01", false); len(counts) != 0 {
+	if counts := buildSampleCountsByPostingId(model.Schedules, model.Postings, settings.HorizonYears, "2026-01-01", "2027-01-01", false); len(counts) != 0 {
 		t.Fatalf("fixture must have no volatile inputs, got %v", counts)
 	}
 	seed := int64(7)

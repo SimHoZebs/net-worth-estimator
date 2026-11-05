@@ -91,7 +91,7 @@ func TestAnalysisReadsArePassiveAndReviewDoesNotChangeModel(t *testing.T) {
 	}
 	doc, _ = scoped.LoadModel()
 	after, _ := store.ModelETag(doc)
-	if before != after || len(doc.RecurrenceRules) != 0 {
+	if before != after || len(doc.Schedules) != 0 {
 		t.Fatal("analysis mutated model")
 	}
 	next := rangeRequest(t, handler, deterministic)

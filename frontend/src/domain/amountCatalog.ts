@@ -45,13 +45,13 @@ export const FALLBACK_PROVIDERS: CopyEntry[] = [
 		name: "occurrence-rate",
 		label: "Yearly rate per paycheck",
 		summary:
-			"Turns a yearly percent into one paycheck slice. Example: 7% yearly on a monthly rule pays about 0.58% each month. Add wobble to model uncertainty.",
+			"Turns a yearly percent into one paycheck slice. Example: 7% yearly on a monthly schedule pays about 0.58% each month. Add wobble to model uncertainty.",
 	},
 	{
 		name: "growth-factor",
 		label: "Yearly growth",
 		summary:
-			"Grows over time from the rule start date. A 3% growth on a monthly rule compounds each month automatically.",
+			"Grows over time from the schedule start date. A 3% growth on a monthly schedule compounds each month automatically.",
 	},
 	{
 		name: "terms-minimum",

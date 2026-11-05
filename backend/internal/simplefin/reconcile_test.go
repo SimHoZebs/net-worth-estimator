@@ -160,7 +160,7 @@ func TestReconcileConvertsVanishedClaimedOccurrence(t *testing.T) {
 	row := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false,
 		pendingKey("prime_card", "old-auth"))
 	row.Posting.Enabled = true
-	row.Posting.Claim = &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"}
+	row.Posting.Claim = &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
 	bank := []store.BankRow{row}
 	settled := []store.SyncPosting{reconcilePosting("Corner Store", "prime_card", "42.10", false, 1785715200)}
 	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
@@ -196,7 +196,7 @@ func TestReconcileIgnoresLiveClaimedRowAsConvertTarget(t *testing.T) {
 	row := reconcileBankRow("uuid-claimed", "Corner Store", "prime_card", "42.10", false, false,
 		pendingKey("prime_card", "old-auth"))
 	row.Posting.Enabled = true
-	row.Posting.Claim = &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"}
+	row.Posting.Claim = &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"}
 	stillPending := reconcilePosting("Corner Store", "prime_card", "42.10", true, 1785628800)
 	stillPending.TransactionID = "old-auth"
 	pending := []store.SyncPosting{stillPending}

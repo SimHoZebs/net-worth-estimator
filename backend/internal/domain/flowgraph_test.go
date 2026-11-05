@@ -46,7 +46,7 @@ func flowTestModel() *types.FinancialModel {
 				Enabled:         true,
 			},
 		},
-		RecurrenceRules: []types.RecurrenceRule{
+		Schedules: []types.Schedule{
 			{
 				ID:              "rent",
 				Name:            "Rent",

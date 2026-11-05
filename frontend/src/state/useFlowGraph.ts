@@ -8,7 +8,8 @@ import { serverQueryClient } from "./serverQuery.ts";
 import { useServerModel } from "./workspaceResources.ts";
 import { useUserScope } from "./useUserScope.ts";
 
-export interface FlowWindow {	startDate: string;
+export interface FlowWindow {
+	startDate: string;
 	endDate: string;
 }
 
@@ -28,13 +29,7 @@ function flowGraphQueryKey(
 	modelKey: string,
 	window: FlowWindow,
 ): readonly unknown[] {
-	return [
-		"flow-graph",
-		scopeKey,
-		modelKey,
-		window.startDate,
-		window.endDate,
-	];
+	return ["flow-graph", scopeKey, modelKey, window.startDate, window.endDate];
 }
 
 /** Time-bounded money-flow graph for the saved model. Date-filter changes
@@ -50,11 +45,10 @@ export function useFlowGraph(window: FlowWindow | null) {
 	const endDate = window?.endDate;
 	return useQuery<FlowGraph, Error>(
 		{
-			queryKey: flowGraphQueryKey(
-				scope.key,
-				baseKey,
-				{ startDate: startDate ?? "", endDate: endDate ?? "" },
-			),
+			queryKey: flowGraphQueryKey(scope.key, baseKey, {
+				startDate: startDate ?? "",
+				endDate: endDate ?? "",
+			}),
 			enabled:
 				scope.status === "ready" &&
 				baseModel !== null &&

@@ -1,10 +1,6 @@
 import type { FlowGraph } from "../../api/flows.ts";
 import { flowNodeName } from "../../api/flows.ts";
-import {
-	DataTable,
-	TableCell,
-	TableRow,
-} from "../../components/DataTable.tsx";
+import { DataTable, TableCell, TableRow } from "../../components/DataTable.tsx";
 import {
 	describeFlowEdge,
 	type AggregatedEdge,
@@ -41,8 +37,8 @@ export function FlowEdgePanel({
 			</h3>
 			<p className="mt-1 text-xs text-muted">
 				{edge.sources.length}{" "}
-				{edge.sources.length === 1 ? "transaction" : "transactions"}{" "}
-				behind this flow
+				{edge.sources.length === 1 ? "transaction" : "transactions"} behind this
+				flow
 				{item.aggregated
 					? `, grouped from ${item.members.length} small flows`
 					: ""}
@@ -66,8 +62,7 @@ export function FlowEdgePanel({
 						key={`${member.from} ${member.to} ${member.sources.map((source) => source.postingId).join(",")}`}
 						className="mt-1 text-xs text-muted"
 					>
-						{describeFlowEdge(member, nameOf, money)} —{" "}
-						{member.sources.length}{" "}
+						{describeFlowEdge(member, nameOf, money)} — {member.sources.length}{" "}
 						{member.sources.length === 1 ? "transaction" : "transactions"}
 					</p>
 				))}

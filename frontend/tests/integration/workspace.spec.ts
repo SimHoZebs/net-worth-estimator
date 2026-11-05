@@ -116,15 +116,15 @@ test("edits save immediately and survive a reload", async ({ page }) => {
 	await expect
 		.poll(async () => {
 			const saved = await readSavedServerModel();
-			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
-				.config.expression;
+			return saved.schedules.find((rule) => rule.id === "invest")?.amount.config
+				.expression;
 		})
 		.toBe("900");
 	await page.reload();
 	// The save reached the server, so the reload keeps it.
 	const after = await readSavedServerModel();
 	expect(
-		after.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+		after.schedules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
 	).toBe("900");
 });
@@ -147,7 +147,7 @@ test("discard is explicit and restores the editor value", async ({ page }) => {
 	await page.getByRole("button", { name: "Close dialog" }).click();
 	const saved = await readSavedServerModel();
 	expect(
-		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+		saved.schedules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
 	).toBe("600");
 });
@@ -164,11 +164,12 @@ test("a transaction converts across once and recurring in one save each way", as
 	await editor.getByRole("button", { name: "Save changes" }).click();
 	await expect(editor).not.toBeVisible();
 	const once = await readSavedServerModel();
-	expect(
-		once.postings.some((posting) => posting.name === "Monthly investing"),
-	).toBe(true);
-	expect(once.recurrenceRules.some((rule) => rule.id === "invest")).toBe(false);
-	await page.goto("/#transactions/invest/edit");
+	const recorded = once.postings.find(
+		(posting) => posting.name === "Monthly investing",
+	);
+	expect(recorded).toBeDefined();
+	expect(once.schedules.some((rule) => rule.id === "invest")).toBe(false);
+	await page.goto(`/#transactions/${recorded!.id}/edit`);
 	const again = page.getByRole("dialog", { name: "Monthly investing" });
 	await expect(again.getByLabel("Transaction name")).toHaveValue(
 		"Monthly investing",
@@ -177,12 +178,18 @@ test("a transaction converts across once and recurring in one save each way", as
 	await again.getByRole("button", { name: "Save changes" }).click();
 	await expect(again).not.toBeVisible();
 	const recurring = await readSavedServerModel();
-	expect(recurring.recurrenceRules.some((rule) => rule.id === "invest")).toBe(
-		true,
+	const started = recurring.schedules.find(
+		(schedule) => schedule.name === "Monthly investing",
 	);
-	expect(recurring.postings.some((posting) => posting.id === "invest")).toBe(
-		false,
+	expect(started).toBeDefined();
+	// The recorded transaction stays a fact and now claims the first
+	// occurrence of the new schedule.
+	const kept = recurring.postings.find(
+		(posting) => posting.id === recorded!.id,
 	);
+	expect(kept).toBeDefined();
+	expect(kept?.claim?.scheduleId).toBe(started!.id);
+	expect(kept?.claim?.occurrenceDate).toBe("2026-02-10");
 });
 
 test("account, transaction and evaluation maintenance plus search work", async ({
@@ -232,8 +239,8 @@ test("failed saves retain the intended edit", async ({ page }) => {
 	// The editor saves immediately, so the failure injection must be armed
 	// before pressing Save. The server rejects the write, and the unsaved
 	// fields must stay in the form for retry.
-	await page.route("**/v1/recurrence-rules/*", async (route) => {
-		if (route.request().method() === "PATCH")
+	await page.route("**/v1/schedules/**", async (route) => {
+		if (route.request().method() === "POST")
 			return route.fulfill({
 				status: 500,
 				contentType: "application/json",
@@ -251,14 +258,14 @@ test("failed saves retain the intended edit", async ({ page }) => {
 	).toBeEnabled();
 	const saved = await readSavedServerModel();
 	expect(
-		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+		saved.schedules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
 	).toBe("600");
-	await page.unroute("**/v1/recurrence-rules/*");
+	await page.unroute("**/v1/schedules/**");
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(page.getByText("Changes saved.")).toBeVisible();
 	expect(
-		(await readSavedServerModel()).recurrenceRules.find(
+		(await readSavedServerModel()).schedules.find(
 			(rule) => rule.id === "invest",
 		)?.amount.config.expression,
 	).toBe("900");
@@ -476,7 +483,7 @@ test("read-only models can be explored but not saved", async ({ page }) => {
 	);
 	const saved = await readSavedServerModel();
 	expect(
-		saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+		saved.schedules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
 	).toBe("600");
 });
@@ -495,8 +502,8 @@ test("tabs save independently with last write winning", async ({
 	await expect
 		.poll(async () => {
 			const saved = await readSavedServerModel();
-			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
-				.config.expression;
+			return saved.schedules.find((rule) => rule.id === "invest")?.amount.config
+				.expression;
 		})
 		.toBe("1200");
 	await openInvestingTransactionDetail(page);
@@ -505,8 +512,8 @@ test("tabs save independently with last write winning", async ({
 	await expect
 		.poll(async () => {
 			const saved = await readSavedServerModel();
-			return saved.recurrenceRules.find((rule) => rule.id === "invest")?.amount
-				.config.expression;
+			return saved.schedules.find((rule) => rule.id === "invest")?.amount.config
+				.expression;
 		})
 		.toBe("1300");
 	// Independent saves warn about nothing across tabs.
@@ -515,7 +522,7 @@ test("tabs save independently with last write winning", async ({
 	).toHaveCount(0);
 	const final = await readSavedServerModel();
 	expect(
-		final.recurrenceRules.find((rule) => rule.id === "invest")?.amount.config
+		final.schedules.find((rule) => rule.id === "invest")?.amount.config
 			.expression,
 	).toBe("1300");
 	await other.close();

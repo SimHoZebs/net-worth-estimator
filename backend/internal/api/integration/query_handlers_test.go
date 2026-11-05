@@ -36,12 +36,12 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	}
 	accountID := accountPayload.Result.ID
 
-	posting := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Pay","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
+	posting := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Pay","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
 	if posting.Code != http.StatusOK {
 		t.Fatalf("create posting status = %d, body %s", posting.Code, posting.Body.String())
 	}
-	rule := doRowRequest(t, handler, http.MethodPost, "/v1/recurrence-rules",
+	rule := doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
 		`{"name":"Salary","sourceAccountId":null,"destinations":["`+accountID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true,"priority":1}`)
 	if rule.Code != http.StatusOK {
 		t.Fatalf("create rule status = %d, body %s", rule.Code, rule.Body.String())
@@ -96,10 +96,10 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	if len(decodeQueryBody(t, transactions, "transactions")) != 1 {
 		t.Fatalf("transactions for account = %s, want only the posting", transactions["transactions"])
 	}
-	rules := get("/v1/recurrence-rules?accountId=" + accountID)
-	ruleRows := decodeQueryBody(t, rules, "recurrenceRules")
+	rules := get("/v1/schedules?accountId=" + accountID)
+	ruleRows := decodeQueryBody(t, rules, "schedules")
 	if len(ruleRows) != 1 {
-		t.Fatalf("recurrence rules for account = %s, want 1 row", rules["recurrenceRules"])
+		t.Fatalf("recurrence rules for account = %s, want 1 row", rules["schedules"])
 	}
 	var ruleRow struct {
 		ID        string `json:"id"`
@@ -114,8 +114,8 @@ func TestNarrowQueriesRoundTrip(t *testing.T) {
 	if len(decodeQueryBody(t, get("/v1/transactions"), "transactions")) != 1 {
 		t.Fatal("/v1/transactions returned no rows")
 	}
-	if len(decodeQueryBody(t, get("/v1/recurrence-rules"), "recurrenceRules")) != 1 {
-		t.Fatal("/v1/recurrence-rules returned no rows")
+	if len(decodeQueryBody(t, get("/v1/schedules"), "schedules")) != 1 {
+		t.Fatal("/v1/schedules returned no rows")
 	}
 
 	catalog := get("/v1/transactions/catalog")
@@ -177,8 +177,8 @@ func TestListTransactionsReportsVoid(t *testing.T) {
 	if created.Code != http.StatusOK {
 		t.Fatalf("seed account status = %d, body %s", created.Code, created.Body.String())
 	}
-	owner := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Settled","destinations":["card"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
+	owner := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Settled","destinations":["card"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
 	if owner.Code != http.StatusOK {
 		t.Fatalf("create posting status = %d, body %s", owner.Code, owner.Body.String())
 	}
@@ -279,8 +279,8 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 	if account.Code != http.StatusOK {
 		t.Fatalf("create account status = %d, body %s", account.Code, account.Body.String())
 	}
-	normal := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"id":"01900000-0000-7000-8000-000000000031","name":"Groceries","sourceAccountId":"cash","destinations":[],"amount":{"resolver":"expression","config":{"expression":"42.5"},"inputs":{}},"postedTime":1785542400,"transactionTime":1785542400,"enabled":true}`)
+	normal := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"id":"01900000-0000-7000-8000-000000000031","name":"Groceries","sourceAccountId":"cash","destinations":[],"amount":{"resolver":"expression","config":{"expression":"42.5"},"inputs":{}},"date":"2026-08-01","enabled":true}`)
 	if normal.Code != http.StatusOK {
 		t.Fatalf("create posting status = %d, body %s", normal.Code, normal.Body.String())
 	}
@@ -306,21 +306,21 @@ func TestListTransactionsExcludesPlannedPurchases(t *testing.T) {
 	if len(payload.Transactions) != 1 || payload.Transactions[0].ID != "01900000-0000-7000-8000-000000000031" {
 		t.Fatalf("GET /v1/transactions rows = %+v, want only the non-purchase posting", payload.Transactions)
 	}
-	rulesResponse := doRowRequest(t, handler, http.MethodGet, "/v1/recurrence-rules", "")
+	rulesResponse := doRowRequest(t, handler, http.MethodGet, "/v1/schedules", "")
 	if rulesResponse.Code != http.StatusOK {
-		t.Fatalf("GET /v1/recurrence-rules status = %d, body %s", rulesResponse.Code, rulesResponse.Body.String())
+		t.Fatalf("GET /v1/schedules status = %d, body %s", rulesResponse.Code, rulesResponse.Body.String())
 	}
 	var rulesPayload struct {
-		RecurrenceRules []struct {
+		Schedules []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
-		} `json:"recurrenceRules"`
+		} `json:"schedules"`
 	}
 	if err := json.Unmarshal(rulesResponse.Body.Bytes(), &rulesPayload); err != nil {
-		t.Fatalf("decode /v1/recurrence-rules: %v", err)
+		t.Fatalf("decode /v1/schedules: %v", err)
 	}
-	if len(rulesPayload.RecurrenceRules) != 0 {
-		t.Fatalf("GET /v1/recurrence-rules rows = %+v, want none", rulesPayload.RecurrenceRules)
+	if len(rulesPayload.Schedules) != 0 {
+		t.Fatalf("GET /v1/schedules rows = %+v, want none", rulesPayload.Schedules)
 	}
 
 	// The purchase row stays in the model: planned purchases remain
@@ -393,8 +393,8 @@ func TestAccountBalancesReportAdjustedSeparatelyFromObserved(t *testing.T) {
 	if observed.Code != http.StatusOK {
 		t.Fatalf("save checkpoint status = %d, body %s", observed.Code, observed.Body.String())
 	}
-	spent := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`)
+	spent := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","time":"11:00","enabled":true}`)
 	if spent.Code != http.StatusOK {
 		t.Fatalf("create posting status = %d, body %s", spent.Code, spent.Body.String())
 	}
@@ -474,8 +474,8 @@ func TestExactCutPositionAndAccountListAgree(t *testing.T) {
 	if observed.Code != http.StatusOK {
 		t.Fatalf("save checkpoint status = %d, body %s", observed.Code, observed.Body.String())
 	}
-	spent := doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`)
+	spent := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Spend","sourceAccountId":"`+accountID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","time":"11:00","enabled":true}`)
 	if spent.Code != http.StatusOK {
 		t.Fatalf("create posting status = %d, body %s", spent.Code, spent.Body.String())
 	}

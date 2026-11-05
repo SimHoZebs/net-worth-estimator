@@ -37,8 +37,7 @@ function stubSharing(options?: {
 }) {
 	let policy: Record<string, unknown> | null = options?.policy ?? null;
 	const grants = options?.grants ?? [];
-	const requested: Array<{ method: string; path: string; body: unknown }> =
-		[];
+	const requested: Array<{ method: string; path: string; body: unknown }> = [];
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (url: unknown, init?: RequestInit) => {
@@ -75,8 +74,7 @@ function stubSharing(options?: {
 				return new Response("missing", { status: 404 });
 			}
 			if (path === "/v1/shared/policies/g1/preview") {
-				if (options?.failPreview)
-					return new Response("oops", { status: 500 });
+				if (options?.failPreview) return new Response("oops", { status: 500 });
 				const input = body as Record<string, unknown>;
 				return ok({
 					preview:
@@ -97,11 +95,7 @@ function stubSharing(options?: {
 			if (path === "/v1/shared/grants") {
 				if (method === "DELETE") {
 					const input = body as Record<string, unknown>;
-					if (
-						(options?.failRevoke ?? []).includes(
-							String(input.postingId),
-						)
-					)
+					if ((options?.failRevoke ?? []).includes(String(input.postingId)))
 						return new Response("gone", { status: 404 });
 					const at = grants.findIndex(
 						(grant) =>
@@ -127,7 +121,9 @@ it("shows off-by-default sharing with no admin override", async () => {
 	stubSharing();
 	render(<GroupSharingSection groupId="g1" />, { wrapper });
 	expect(
-		await screen.findByText("Automatic sharing is off. Only you can turn it on."),
+		await screen.findByText(
+			"Automatic sharing is off. Only you can turn it on.",
+		),
 	).toBeTruthy();
 	expect(screen.getByText("Checking")).toBeTruthy();
 });
@@ -141,7 +137,9 @@ it("previews counts with the historical warning before enabling", async () => {
 		await screen.findByText(/later bank imports can add older matching/),
 	).toBeTruthy();
 	expect(
-		await screen.findByText(/4 transactions.*match this selection for 3 members/),
+		await screen.findByText(
+			/4 transactions.*match this selection for 3 members/,
+		),
 	).toBeTruthy();
 	// Counts only: no amounts or payees leak into the preview.
 	expect(screen.queryByText(/\$|Checking balance/)).toBeNull();
@@ -171,9 +169,10 @@ it("drops deleted accounts from the draft but shows them", async () => {
 	expect(
 		await screen.findByText(/1 previously selected account no longer/),
 	).toBeTruthy();
-	expect(
-		screen.getByRole("button", { name: /Checking/ }),
-	).toHaveProperty("ariaPressed", "true");
+	expect(screen.getByRole("button", { name: /Checking/ })).toHaveProperty(
+		"ariaPressed",
+		"true",
+	);
 	// The preview and any save carry only owned accounts: the server
 	// would reject the deleted one.
 	await waitFor(() =>
@@ -181,12 +180,9 @@ it("drops deleted accounts from the draft but shows them", async () => {
 			requested.some(
 				(entry) =>
 					entry.path === "/v1/shared/policies/g1/preview" &&
-					Array.isArray(
-						(entry.body as Record<string, unknown>).accountIds,
-					) &&
+					Array.isArray((entry.body as Record<string, unknown>).accountIds) &&
 					(
-						(entry.body as Record<string, unknown>)
-							.accountIds as Array<string>
+						(entry.body as Record<string, unknown>).accountIds as Array<string>
 					).join(",") === "checking",
 			),
 		).toBe(true),
@@ -200,10 +196,7 @@ it("rejects enabling with no accounts selected", async () => {
 	stubSharing();
 	render(<GroupSharingSection groupId="g1" />, { wrapper });
 	await screen.findByText("Checking");
-	expect(screen.getByText("Turn on sharing")).toHaveProperty(
-		"disabled",
-		true,
-	);
+	expect(screen.getByText("Turn on sharing")).toHaveProperty("disabled", true);
 });
 
 it("shows a preview failure without blocking the form", async () => {
@@ -212,10 +205,7 @@ it("shows a preview failure without blocking the form", async () => {
 	await screen.findByText("Checking");
 	fireEvent.click(screen.getByRole("button", { name: /Checking/ }));
 	expect(await screen.findByText(/Preview unavailable/)).toBeTruthy();
-	expect(screen.getByText("Turn on sharing")).toHaveProperty(
-		"disabled",
-		false,
-	);
+	expect(screen.getByText("Turn on sharing")).toHaveProperty("disabled", false);
 });
 
 it("stops sharing with everyone through the normal revocations", async () => {
@@ -245,9 +235,7 @@ it("stops sharing with everyone through the normal revocations", async () => {
 	await screen.findByText("Automatic sharing is on for this group.");
 	fireEvent.click(screen.getByText("Stop sharing with everyone"));
 	// Two-step confirmation so a stray click cannot revoke everything.
-	fireEvent.click(
-		screen.getByText("Confirm: stop sharing with everyone"),
-	);
+	fireEvent.click(screen.getByText("Confirm: stop sharing with everyone"));
 	await waitFor(() =>
 		expect(
 			screen.getByText("Automatic sharing is off. Only you can turn it on."),
@@ -258,8 +246,7 @@ it("stops sharing with everyone through the normal revocations", async () => {
 		.map((entry) => entry.method);
 	expect(methods).toContain("PUT");
 	const revocations = requested.filter(
-		(entry) =>
-			entry.path === "/v1/shared/grants" && entry.method === "DELETE",
+		(entry) => entry.path === "/v1/shared/grants" && entry.method === "DELETE",
 	);
 	expect(revocations).toHaveLength(1);
 	expect(revocations[0]?.body).toMatchObject({
@@ -304,9 +291,7 @@ it("tolerates an already-revoked grant when stopping", async () => {
 	render(<GroupSharingSection groupId="g1" />, { wrapper });
 	await screen.findByText("Automatic sharing is on for this group.");
 	fireEvent.click(screen.getByText("Stop sharing with everyone"));
-	fireEvent.click(
-		screen.getByText("Confirm: stop sharing with everyone"),
-	);
+	fireEvent.click(screen.getByText("Confirm: stop sharing with everyone"));
 	// The missing grant counts as already removed; the stop still
 	// revokes the remainder and turns the preference off.
 	await waitFor(() =>
@@ -315,8 +300,7 @@ it("tolerates an already-revoked grant when stopping", async () => {
 		).toBeTruthy(),
 	);
 	const revocations = requested.filter(
-		(entry) =>
-			entry.path === "/v1/shared/grants" && entry.method === "DELETE",
+		(entry) => entry.path === "/v1/shared/grants" && entry.method === "DELETE",
 	);
 	expect(revocations).toHaveLength(2);
 });

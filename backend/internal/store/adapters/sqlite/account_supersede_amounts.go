@@ -31,7 +31,7 @@ func supersedePostingAmounts(tx *userTx, model *types.FinancialModel, deleted ma
 // survive the merge, including rules whose route did not touch the manual
 // account.
 func supersedeRuleAmounts(tx *userTx, model *types.FinancialModel, deleted map[string]bool, manualID, syncedID string) error {
-	for _, rule := range model.RecurrenceRules {
+	for _, rule := range model.Schedules {
 		if deleted[rule.ID] {
 			continue
 		}

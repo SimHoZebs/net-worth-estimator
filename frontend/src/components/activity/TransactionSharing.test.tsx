@@ -11,8 +11,7 @@ import { TransactionSharing } from "./TransactionSharing.tsx";
 const wrapper = ServerQueryWrapper;
 
 function stubSharing(grants: Array<Record<string, unknown>>) {
-	const requested: Array<{ method: string; path: string; body?: unknown }> =
-		[];
+	const requested: Array<{ method: string; path: string; body?: unknown }> = [];
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (url: unknown, init?: RequestInit) => {
@@ -86,8 +85,7 @@ function stubSharing(grants: Array<Record<string, unknown>>) {
 						return new Response(
 							JSON.stringify({
 								status: 400,
-								detail:
-									"revoke the grant before excluding this audience",
+								detail: "revoke the grant before excluding this audience",
 							}),
 							{ status: 400 },
 						);
@@ -129,9 +127,7 @@ afterEach(() => teardownQueryScope());
 it("shows the default state when nothing is shared", async () => {
 	stubSharing([]);
 	renderSharing();
-	expect(
-		await screen.findByRole("heading", { name: "Sharing" }),
-	).toBeTruthy();
+	expect(await screen.findByRole("heading", { name: "Sharing" })).toBeTruthy();
 	expect(screen.queryByRole("list")).toBeNull();
 });
 
@@ -143,13 +139,10 @@ it("shares one transaction with one group", async () => {
 		target: { value: "g1" },
 	});
 	fireEvent.click(screen.getByText("Share"));
-	await waitFor(() =>
-		expect(screen.getByText("Household")).toBeTruthy(),
-	);
+	await waitFor(() => expect(screen.getByText("Household")).toBeTruthy());
 	expect(
 		requested.find(
-			(entry) =>
-				entry.path === "/v1/shared/grants" && entry.method === "POST",
+			(entry) => entry.path === "/v1/shared/grants" && entry.method === "POST",
 		)?.body,
 	).toMatchObject({
 		postingId: "p1",
@@ -167,9 +160,7 @@ it("hides one transaction from everyone including future groups", async () => {
 	});
 	fireEvent.click(screen.getByText("Hide"));
 	await waitFor(() =>
-		expect(
-			screen.getByText("everyone, including future groups"),
-		).toBeTruthy(),
+		expect(screen.getByText("everyone, including future groups")).toBeTruthy(),
 	);
 	expect(
 		requested.find(
@@ -224,9 +215,7 @@ it("pauses sharing while hidden from everyone", async () => {
 	});
 	fireEvent.click(screen.getByText("Hide"));
 	await waitFor(() =>
-		expect(
-			screen.getByText("everyone, including future groups"),
-		).toBeTruthy(),
+		expect(screen.getByText("everyone, including future groups")).toBeTruthy(),
 	);
 	// The share control is disabled with the reason: a group grant would
 	// coexist but never take effect while the wildcard exclusion lasts.

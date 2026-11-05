@@ -16,7 +16,7 @@ func StochasticModel() *types.FinancialModel {
 	return &types.FinancialModel{
 		Accounts: []types.Account{{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}},
 		Postings: []types.Posting{},
-		RecurrenceRules: []types.RecurrenceRule{{
+		Schedules: []types.Schedule{{
 			ID: "salary", Name: "Salary", Destinations: []string{"checking"},
 			Amount:    types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "100"}},
 			Frequency: types.FrequencyMonthly, StartDate: "2026-01-01", EndDate: &end, Priority: 1, Enabled: true,

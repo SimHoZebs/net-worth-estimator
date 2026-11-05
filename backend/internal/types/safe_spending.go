@@ -7,7 +7,7 @@ type SafeSpendingSettings struct {
 	AccountIDs         []string `json:"accountIds" nullable:"true"`
 	SpendingAccountIDs []string `json:"spendingAccountIds" nullable:"true"`
 	IncomeAccountIDs   []string `json:"incomeAccountIds" nullable:"true"`
-	IncomeRuleIDs      []string `json:"incomeRuleIds"`
+	IncomeScheduleIDs  []string `json:"incomeScheduleIds"`
 	TransactionIDs     []string `json:"transactionIds" nullable:"true"`
 	StatementDaySet    bool     `json:"statementDaySet"`
 }

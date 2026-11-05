@@ -114,7 +114,7 @@ func TestMultipleVolatileInputsRejected(t *testing.T) {
 		t.Fatalf("volatile count = %d, want 2", CountVolatileRateInputs(amount))
 	}
 	model := &types.FinancialModel{
-		RecurrenceRules: []types.RecurrenceRule{{
+		Schedules: []types.Schedule{{
 			ID: "growth", Name: "Growth", Amount: amount,
 			Frequency: types.FrequencyMonthly, StartDate: "2026-02-01", Enabled: true,
 		}},

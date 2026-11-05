@@ -9,7 +9,7 @@ import (
 
 func TestRecurrencePreprocessor(t *testing.T) {
 	model := &types.FinancialModel{
-		RecurrenceRules: []types.RecurrenceRule{
+		Schedules: []types.Schedule{
 			{ID: "fixed", Amount: types.PostingAmountResolution{Inputs: map[string]types.AmountInputBinding{}}},
 			{ID: "volatile", Amount: types.PostingAmountResolution{Inputs: map[string]types.AmountInputBinding{
 				"rate": {Source: "provider", Provider: "occurrence-rate", Arguments: map[string]any{"annualRate": 0.07, "volatility": 0.12}},

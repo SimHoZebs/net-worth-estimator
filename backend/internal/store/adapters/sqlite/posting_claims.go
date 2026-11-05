@@ -21,8 +21,8 @@ func (s *sqliteStore) SetPostingClaims(claims []types.PostingClaimUpdate) ([]typ
 			if item.PostingID == "" {
 				return store.InvalidID(item.PostingID)
 			}
-			if item.Claim.RuleID == "" || item.Claim.OccurrenceDate == "" {
-				return fmt.Errorf("%w: posting claim requires a rule and date", store.ErrPatternToExistingRuleInvalid)
+			if item.Claim.ScheduleID == "" || item.Claim.OccurrenceDate == "" {
+				return fmt.Errorf("%w: posting claim requires a rule and date", store.ErrPatternToExistingScheduleInvalid)
 			}
 			lifecycle, err := postingLifecycleOf(tx, item.PostingID)
 			if err != nil {
@@ -46,7 +46,7 @@ func (s *sqliteStore) SetPostingClaims(claims []types.PostingClaimUpdate) ([]typ
 			}
 			if _, err := tx.Exec(`INSERT INTO posting_claims (posting_id, fulfills_rule_id, fulfills_occurrence_date, user_id) VALUES (?, ?, ?, :user_id)
 				ON CONFLICT(user_id, posting_id) DO UPDATE SET fulfills_rule_id = excluded.fulfills_rule_id, fulfills_occurrence_date = excluded.fulfills_occurrence_date`,
-				item.PostingID, item.Claim.RuleID, item.Claim.OccurrenceDate); err != nil {
+				item.PostingID, item.Claim.ScheduleID, item.Claim.OccurrenceDate); err != nil {
 				return fmt.Errorf("set posting claim %s: %w", item.PostingID, err)
 			}
 			if err := refreshVisibilityForPostingTx(tx, item.PostingID); err != nil {

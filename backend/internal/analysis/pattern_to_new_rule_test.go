@@ -37,38 +37,38 @@ func newRuleTestFacts() map[string]types.TransactionFacts {
 	}
 }
 
-func newRuleTestInput() PatternToNewRuleInput {
-	return PatternToNewRuleInput{Anchor: newRuleTestFinding(), Postings: newRuleTestPostings(), Facts: newRuleTestFacts(), AccountIDs: []string{"checking"}}
+func newRuleTestInput() PatternToNewScheduleInput {
+	return PatternToNewScheduleInput{Anchor: newRuleTestFinding(), Postings: newRuleTestPostings(), Facts: newRuleTestFacts(), AccountIDs: []string{"checking"}}
 }
 
-func TestBuildPatternToNewRulePreviewRejectsNonRecurring(t *testing.T) {
+func TestBuildPatternToNewSchedulePreviewRejectsNonRecurring(t *testing.T) {
 	finding := newRuleTestFinding()
 	finding.Kind = "bnpl"
 	input := newRuleTestInput()
 	input.Anchor = finding
-	if _, err := BuildPatternToNewRulePreview(input); !errors.Is(err, ErrNotRecurring) {
+	if _, err := BuildPatternToNewSchedulePreview(input); !errors.Is(err, ErrNotRecurring) {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-func TestBuildPatternToNewRulePreviewRejectsSplitEvidence(t *testing.T) {
+func TestBuildPatternToNewSchedulePreviewRejectsSplitEvidence(t *testing.T) {
 	input := newRuleTestInput()
 	other := "savings"
 	input.Postings[1].SourceAccountID = &other
-	if _, err := BuildPatternToNewRulePreview(input); !errors.Is(err, ErrPatternIncoherent) {
+	if _, err := BuildPatternToNewSchedulePreview(input); !errors.Is(err, ErrPatternIncoherent) {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-func TestBuildPatternToNewRulePreviewRejectsMissingAccount(t *testing.T) {
+func TestBuildPatternToNewSchedulePreviewRejectsMissingAccount(t *testing.T) {
 	input := newRuleTestInput()
 	input.AccountIDs = []string{"savings"}
-	if _, err := BuildPatternToNewRulePreview(input); !errors.Is(err, ErrPatternStale) {
+	if _, err := BuildPatternToNewSchedulePreview(input); !errors.Is(err, ErrPatternStale) {
 		t.Fatalf("err=%v", err)
 	}
 }
 
-func TestBuildPatternToNewRulePreviewClampsMonthEnds(t *testing.T) {
+func TestBuildPatternToNewSchedulePreviewClampsMonthEnds(t *testing.T) {
 	account := "checking"
 	amount := func(value string) types.PostingAmountResolution {
 		return types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": value}, Inputs: map[string]types.AmountInputBinding{}}
@@ -79,7 +79,7 @@ func TestBuildPatternToNewRulePreviewClampsMonthEnds(t *testing.T) {
 	}
 	finding := newRuleTestFinding()
 	finding.Evidence = []types.AnalysisEvidence{{Code: "recurring.cadence", Reason: "test", PostingIDs: []string{"p1", "p2"}}}
-	preview, err := BuildPatternToNewRulePreview(PatternToNewRuleInput{
+	preview, err := BuildPatternToNewSchedulePreview(PatternToNewScheduleInput{
 		Anchor: finding, Postings: postings, AccountIDs: []string{"checking"},
 		Facts: map[string]types.TransactionFacts{
 			"p1": {Description: "RENT", Amount: "-1200.00", Currency: "USD", OccurredAt: 1769899200},
@@ -90,7 +90,7 @@ func TestBuildPatternToNewRulePreviewClampsMonthEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 2026-01-31 and 2026-02-28 evidence produce a clamped 2026-03-28 start.
-	if !preview.Creatable || preview.Rule == nil || preview.Rule.StartDate != "2026-03-28" {
+	if !preview.Creatable || preview.Schedule == nil || preview.Schedule.StartDate != "2026-03-28" {
 		t.Fatalf("preview=%+v", preview)
 	}
 	if len(preview.Upcoming) == 0 || preview.Upcoming[0].Date != "2026-03-28" {
@@ -98,17 +98,17 @@ func TestBuildPatternToNewRulePreviewClampsMonthEnds(t *testing.T) {
 	}
 }
 
-func TestBuildPatternToNewRulePreviewStartsAfterLatestEvidence(t *testing.T) {
-	preview, err := BuildPatternToNewRulePreview(newRuleTestInput())
+func TestBuildPatternToNewSchedulePreviewStartsAfterLatestEvidence(t *testing.T) {
+	preview, err := BuildPatternToNewSchedulePreview(newRuleTestInput())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !preview.Creatable || preview.Rule == nil {
+	if !preview.Creatable || preview.Schedule == nil {
 		t.Fatalf("preview=%+v", preview)
 	}
 	// 2026-01-15 and 2026-02-15 evidence produce a 2026-03-15 monthly start.
-	if preview.Rule.StartDate != "2026-03-15" {
-		t.Fatalf("start=%s", preview.Rule.StartDate)
+	if preview.Schedule.StartDate != "2026-03-15" {
+		t.Fatalf("start=%s", preview.Schedule.StartDate)
 	}
 	if len(preview.Upcoming) != 6 || preview.Upcoming[0].Date != "2026-03-15" {
 		t.Fatalf("upcoming=%+v", preview.Upcoming)

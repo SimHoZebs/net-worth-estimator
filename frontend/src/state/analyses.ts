@@ -1,12 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-	addPatternToExistingRule,
-	createPatternToNewRule,
+	addPatternToExistingSchedule,
+	createPatternToNewSchedule,
 	dismissAnalysisFinding,
 	listAnalyses,
 	listAnalysisFindings,
-	previewPatternToExistingRule,
-	previewPatternToNewRule,
+	previewPatternToExistingSchedule,
+	previewPatternToNewSchedule,
 	reviewAnalysisFinding,
 } from "@/api/generated/endpoints.ts";
 import type { AnalysisFeedbackInput } from "@/api/generated/model/analysisFeedbackInput.ts";
@@ -93,20 +93,21 @@ export function useDismissAnalysisFinding() {
 	);
 }
 
-export function usePatternToNewRulePreview(findingId: string | undefined) {
+export function usePatternToNewSchedulePreview(findingId: string | undefined) {
 	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: [
 				...analysisFindingsKey(scope),
-				"pattern-to-new-rule-preview",
+				"pattern-to-new-schedule-preview",
 				findingId ?? "none",
 			],
 			enabled: scope.status === "ready" && !!findingId,
 			queryFn: async ({ signal }) => {
 				if (!findingId) throw new UserScopeError();
-				const result = (await previewPatternToNewRule(findingId, { signal }))
-					.data;
+				const result = (
+					await previewPatternToNewSchedule(findingId, { signal })
+				).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result.preview;
 			},
@@ -116,17 +117,17 @@ export function usePatternToNewRulePreview(findingId: string | undefined) {
 	);
 }
 
-export function useCreatePatternToNewRule() {
+export function useCreatePatternToNewSchedule() {
 	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
-			mutationKey: ["pattern-to-new-rule", scope.key],
+			mutationKey: ["pattern-to-new-schedule", scope.key],
 			retry: false,
 			mutationFn: async ({ id }: { id: string }) => {
 				if (scope !== getUserScope() || scope.status !== "ready")
 					throw new UserScopeError();
-				const result = (await createPatternToNewRule(id)).data;
+				const result = (await createPatternToNewSchedule(id)).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},
@@ -142,24 +143,28 @@ export function useCreatePatternToNewRule() {
 	);
 }
 
-export function usePatternToExistingRulePreview(
+export function usePatternToExistingSchedulePreview(
 	findingId: string | undefined,
-	ruleId: string | undefined,
+	scheduleId: string | undefined,
 ) {
 	const scope = useUserScope();
 	return useQuery(
 		{
 			queryKey: [
 				...analysisFindingsKey(scope),
-				"pattern-to-existing-rule-preview",
+				"pattern-to-existing-schedule-preview",
 				findingId ?? "none",
-				ruleId ?? "none",
+				scheduleId ?? "none",
 			],
-			enabled: scope.status === "ready" && !!findingId && !!ruleId,
+			enabled: scope.status === "ready" && !!findingId && !!scheduleId,
 			queryFn: async ({ signal }) => {
-				if (!findingId || !ruleId) throw new UserScopeError();
+				if (!findingId || !scheduleId) throw new UserScopeError();
 				const result = (
-					await previewPatternToExistingRule(findingId, { ruleId }, { signal })
+					await previewPatternToExistingSchedule(
+						findingId,
+						{ scheduleId },
+						{ signal },
+					)
 				).data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result.preview;
@@ -170,17 +175,24 @@ export function usePatternToExistingRulePreview(
 	);
 }
 
-export function useAddPatternToExistingRule() {
+export function useAddPatternToExistingSchedule() {
 	const scope = useUserScope();
 	const cache = serverQueryClient();
 	return useMutation(
 		{
-			mutationKey: ["pattern-to-existing-rule", scope.key],
+			mutationKey: ["pattern-to-existing-schedule", scope.key],
 			retry: false,
-			mutationFn: async ({ id, ruleId }: { id: string; ruleId: string }) => {
+			mutationFn: async ({
+				id,
+				scheduleId,
+			}: {
+				id: string;
+				scheduleId: string;
+			}) => {
 				if (scope !== getUserScope() || scope.status !== "ready")
 					throw new UserScopeError();
-				const result = (await addPatternToExistingRule(id, { ruleId })).data;
+				const result = (await addPatternToExistingSchedule(id, { scheduleId }))
+					.data;
 				if (scope !== getUserScope()) throw new UserScopeError();
 				return result;
 			},

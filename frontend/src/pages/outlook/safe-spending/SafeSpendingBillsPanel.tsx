@@ -303,10 +303,11 @@ export function SafeSpendingBillsPanel({
 					accounts={accounts}
 					transactions={transactions}
 					readOnly={readOnly}
-					claimRuleName={
-						selected.savedTransaction.claimRuleId
+					claimScheduleName={
+						selected.savedTransaction.claimScheduleId
 							? (transactions.find(
-									(item) => item.id === selected.savedTransaction.claimRuleId,
+									(item) =>
+										item.id === selected.savedTransaction.claimScheduleId,
 								)?.name ?? null)
 							: null
 					}

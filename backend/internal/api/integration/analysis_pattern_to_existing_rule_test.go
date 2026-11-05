@@ -8,7 +8,7 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
 
-func TestPatternToExistingRuleHTTPContract(t *testing.T) {
+func TestPatternToExistingScheduleHTTPContract(t *testing.T) {
 	scoped := openAPIStore(t)
 	findings := seedAPIRecurringPattern(t, scoped, "monthly")
 	handler := New(scoped, Config{})
@@ -18,22 +18,22 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 		"amount":    map[string]any{"resolver": "expression", "config": map[string]any{"expression": "30.00"}, "inputs": map[string]any{}},
 		"frequency": "monthly", "startDate": "2026-01-15", "enabled": true,
 	})
-	res := callAPI(t, handler, "POST", "/v1/recurrence-rules", string(ruleBody))
+	res := callAPI(t, handler, "POST", "/v1/schedules", string(ruleBody))
 	if res.Code != 200 {
 		t.Fatalf("create rule=%d %s", res.Code, res.Body.String())
 	}
 	var created struct {
-		Result types.RecurrenceRule `json:"value"`
+		Result types.Schedule `json:"value"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
 	ruleID := created.Result.ID
-	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-rule-preview?ruleId=" + ruleID
-	addPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-rule"
+	previewPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-schedule-preview?scheduleId=" + ruleID
+	addPath := "/v1/analysis-findings/" + findings[0].ID + "/pattern-to-existing-schedule"
 
 	var preview struct {
-		Preview types.PatternToExistingRulePreview `json:"preview"`
+		Preview types.PatternToExistingSchedulePreview `json:"preview"`
 	}
 	res = callAPI(t, handler, "GET", previewPath, "")
 	if res.Code != 200 {
@@ -45,7 +45,7 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 	if preview.Preview.Claimable {
 		t.Fatalf("unconfirmed preview claimable=%+v", preview.Preview)
 	}
-	addBody, _ := json.Marshal(map[string]any{"ruleId": ruleID})
+	addBody, _ := json.Marshal(map[string]any{"scheduleId": ruleID})
 	// Adding before confirmation is rejected without touching the model.
 	if res := callAPI(t, handler, "POST", addPath, string(addBody)); res.Code != 422 {
 		t.Fatalf("unconfirmed add=%d %s", res.Code, res.Body.String())
@@ -65,7 +65,7 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 	if len(want) != 3 {
 		t.Fatalf("assignments=%+v", preview.Preview.Assignments)
 	}
-	addBody, _ = json.Marshal(map[string]any{"ruleId": ruleID})
+	addBody, _ = json.Marshal(map[string]any{"scheduleId": ruleID})
 	res = callAPI(t, handler, "POST", addPath, string(addBody))
 	if res.Code != 200 {
 		t.Fatalf("add=%d %s", res.Code, res.Body.String())
@@ -74,14 +74,14 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 		Matches    []types.Posting              `json:"matches"`
 		Saved      bool                         `json:"saved"`
 		PatternKey string                       `json:"patternKey"`
-		RuleID     string                       `json:"ruleId"`
+		ScheduleID string                       `json:"scheduleId"`
 		Revision   string                       `json:"revision"`
 		Issues     []types.ModelValidationIssue `json:"issues"`
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &added); err != nil {
 		t.Fatal(err)
 	}
-	if !added.Saved || len(added.Matches) != 3 || added.RuleID != ruleID {
+	if !added.Saved || len(added.Matches) != 3 || added.ScheduleID != ruleID {
 		t.Fatalf("added=%+v", added)
 	}
 	model, err := scoped.LoadModel()
@@ -90,7 +90,7 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 	}
 	claimed := 0
 	for _, posting := range model.Postings {
-		if posting.Claim != nil && posting.Claim.RuleID == ruleID {
+		if posting.Claim != nil && posting.Claim.ScheduleID == ruleID {
 			claimed++
 		}
 	}
@@ -103,17 +103,12 @@ func TestPatternToExistingRuleHTTPContract(t *testing.T) {
 		t.Fatalf("readd=%d %s", res.Code, res.Body.String())
 	}
 	// Unknown rule is invalid.
-	badBody, _ := json.Marshal(map[string]any{"ruleId": "missing-rule"})
+	badBody, _ := json.Marshal(map[string]any{"scheduleId": "missing-rule"})
 	if res := callAPI(t, handler, "POST", addPath, string(badBody)); res.Code != 422 {
 		t.Fatalf("bad rule=%d %s", res.Code, res.Body.String())
 	}
 	// A disabled rule refuses new additions.
-	disable, _ := json.Marshal(map[string]any{
-		"name": "Grocer", "sourceAccountId": "checking",
-		"amount":    map[string]any{"resolver": "expression", "config": map[string]any{"expression": "30.00"}, "inputs": map[string]any{}},
-		"frequency": "monthly", "startDate": "2026-01-15", "enabled": false,
-	})
-	if res := callAPI(t, handler, "PATCH", "/v1/recurrence-rules/"+ruleID, string(disable)); res.Code != 200 {
+	if res := callAPI(t, handler, "POST", "/v1/schedules/"+ruleID+"/amend", `{"enabled":false}`); res.Code != 200 {
 		t.Fatalf("disable=%d %s", res.Code, res.Body.String())
 	}
 	if res := callAPI(t, handler, "POST", addPath, string(addBody)); res.Code != 422 {

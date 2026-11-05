@@ -68,9 +68,7 @@ describe("transferFindingsForEdge", () => {
 		expect(transferFindingsForEdge(candidates, ["leg-1"])).toEqual([kept]);
 	});
 	it("ignores an empty edge", () => {
-		expect(
-			transferFindingsForEdge([finding({})], []),
-		).toEqual([]);
+		expect(transferFindingsForEdge([finding({})], [])).toEqual([]);
 	});
 });
 

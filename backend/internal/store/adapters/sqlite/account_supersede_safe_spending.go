@@ -24,7 +24,7 @@ func supersedeSafeSpending(tx *userTx, manualID, syncedID string, deletedPosting
 	settings.SpendingAccountIDs = supersedeReplaceIDs(settings.SpendingAccountIDs, manualID, syncedID)
 	settings.IncomeAccountIDs = supersedeReplaceIDs(settings.IncomeAccountIDs, manualID, syncedID)
 	settings.TransactionIDs = supersedeRemoveIDs(settings.TransactionIDs, deletedPostings)
-	settings.IncomeRuleIDs = supersedeRemoveIDs(settings.IncomeRuleIDs, deletedRules)
+	settings.IncomeScheduleIDs = supersedeRemoveIDs(settings.IncomeScheduleIDs, deletedRules)
 	encoded, err := json.Marshal(settings)
 	if err != nil {
 		return fmt.Errorf("encode safe spending settings: %w", err)

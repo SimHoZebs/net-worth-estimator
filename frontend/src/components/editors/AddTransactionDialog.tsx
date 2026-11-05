@@ -1,5 +1,8 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
-import { createPosting, createRule } from "@/api/generated/endpoints.ts";
+import {
+	createSchedule,
+	recordTransaction,
+} from "@/api/generated/endpoints.ts";
 import { visibleAccounts } from "../../domain/model.ts";
 import { dateLabel, todayIso } from "../../domain/format.ts";
 import { parseUnion } from "../../domain/guards.ts";
@@ -12,7 +15,7 @@ import {
 import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
 import {
 	useSavedAccounts,
-	useSavedRules,
+	useSavedSchedules,
 	useSavedStartDate,
 	useSavedTransactions,
 } from "../../state/savedState.ts";
@@ -52,8 +55,9 @@ export function AddTransactionDialog({
 	);
 	const fallbackStart = savedStartDate ?? todayIso();
 	const catalog = useTransactionCatalog();
-	const claimRules = useMemo(
-		() => (catalog.data?.items ?? []).filter((rule) => rule.kind === "rule"),
+	const claimSchedules = useMemo(
+		() =>
+			(catalog.data?.items ?? []).filter((item) => item.kind === "schedule"),
 		[catalog.data],
 	);
 	// The create form picks from the same scheduled occurrence list as the
@@ -70,20 +74,22 @@ export function AddTransactionDialog({
 	const [noEndDate, setNoEndDate] = useState(true);
 	const [endDate, setEndDate] = useState("");
 	const [enabled, setEnabled] = useState(true);
-	const [claimRuleId, setClaimRuleId] = useState("");
+	const [claimScheduleId, setClaimRuleId] = useState("");
 	const [claimOccurrenceDate, setClaimOccurrenceDate] = useState("");
-	const savedRules = useSavedRules();
+	const savedSchedules = useSavedSchedules();
 	const occurrenceOptions = useMemo(() => {
-		const rule = (savedRules ?? []).find((row) => row.id === claimRuleId);
-		if (!rule) return [];
+		const schedule = (savedSchedules ?? []).find(
+			(row) => row.id === claimScheduleId,
+		);
+		if (!schedule) return [];
 		const claimed = new Set<string>();
 		for (const row of savedTransactions ?? []) {
-			if (row.claimRuleId === claimRuleId && row.claimOccurrenceDate)
+			if (row.claimScheduleId === claimScheduleId && row.claimOccurrenceDate)
 				claimed.add(row.claimOccurrenceDate);
 		}
 		if (claimOccurrenceDate) claimed.delete(claimOccurrenceDate);
 		const candidates = claimOccurrenceCandidates({
-			rule,
+			schedule,
 			through: todayIso(),
 			postedRef: startDate,
 			claimed,
@@ -92,8 +98,8 @@ export function AddTransactionDialog({
 			? [claimOccurrenceDate, ...candidates]
 			: candidates;
 	}, [
-		savedRules,
-		claimRuleId,
+		savedSchedules,
+		claimScheduleId,
 		startDate,
 		claimOccurrenceDate,
 		savedTransactions,
@@ -117,7 +123,7 @@ export function AddTransactionDialog({
 		!noEndDate ||
 		endDate !== "" ||
 		!enabled ||
-		claimRuleId !== "" ||
+		claimScheduleId !== "" ||
 		claimOccurrenceDate !== "" ||
 		transactionTime !== "";
 	useBeforeUnload(dirty && !saving);
@@ -149,9 +155,9 @@ export function AddTransactionDialog({
 				? combineDayTime(startDate, transactionTime)
 				: null,
 			enabled,
-			claimRuleId: isOnce && claimRuleId ? claimRuleId : null,
+			claimScheduleId: isOnce && claimScheduleId ? claimScheduleId : null,
 			claimOccurrenceDate:
-				isOnce && claimRuleId && claimOccurrenceDate
+				isOnce && claimScheduleId && claimOccurrenceDate
 					? claimOccurrenceDate
 					: null,
 		};
@@ -166,14 +172,12 @@ export function AddTransactionDialog({
 		}
 		setSaving(true);
 		setError(null);
+		const id = crypto.randomUUID();
 		const ok = await performSave({
 			call: () =>
 				values.frequency === "once"
-					? createPosting({
-							...postingBody(values),
-							id: crypto.randomUUID(),
-						})
-					: createRule({ ...ruleBody(values), id: crypto.randomUUID() }),
+					? recordTransaction({ ...postingBody(values), id })
+					: createSchedule({ ...ruleBody(values), id }),
 			refresh: refreshTransactions,
 			failureMessage: "The transaction could not be saved.",
 		});
@@ -302,11 +306,11 @@ export function AddTransactionDialog({
 							/>
 							<SelectField
 								label="Records an occurrence of"
-								value={claimRuleId}
+								value={claimScheduleId}
 								onChange={(event) => setClaimRuleId(event.target.value)}
 							>
 								<option value="">No link — standalone record</option>
-								{claimRules.map((rule) => (
+								{claimSchedules.map((rule) => (
 									<option key={rule.id} value={rule.id}>
 										{rule.name}
 									</option>
@@ -315,14 +319,12 @@ export function AddTransactionDialog({
 							<SelectField
 								label="Replaces occurrence on"
 								value={claimOccurrenceDate}
-								onChange={(event) =>
-									setClaimOccurrenceDate(event.target.value)
-								}
-								disabled={!claimRuleId}
+								onChange={(event) => setClaimOccurrenceDate(event.target.value)}
+								disabled={!claimScheduleId}
 							>
 								<option value="">
-									{!claimRuleId
-										? "Choose a rule first"
+									{!claimScheduleId
+										? "Choose a schedule first"
 										: occurrenceOptions.length === 0
 											? "No claimable occurrences"
 											: "Choose the occurrence"}

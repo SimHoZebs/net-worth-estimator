@@ -83,7 +83,7 @@ the API.
 `GET /v1/transactions` adds `category` and `categorySource` to each posting row.
 Missing values mean uncategorized.
 
-`PATCH /v1/postings/{id}/category` accepts `{"category": "<key>"}` or
+`POST /v1/transactions/{id}/categorize` accepts `{"category": "<key>"}` or
 `{"category": null}` to clear a user override. It validates the key, requires
 an authenticated session on a writable server, and works on pending bank rows.
 It does not replace the posting row and does not touch the financial model.

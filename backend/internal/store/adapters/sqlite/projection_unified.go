@@ -272,7 +272,11 @@ func (s *sqliteStore) SaveGeneratedPostings(rows []GeneratedPosting) error {
 		if _, err := s.db.Exec(`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome, user_id)
 			VALUES (?, ?, ?, ?, '{}', ?, ?, 'projected', 0, 0, ?, ?, ?, ?, :user_id)`,
 			id.String(), row.Name, nullable(row.SourceAccountID), string(destinations), row.PostedTime, row.TransactionTime, row.SliceID, row.EventJSON, row.AppliedAmount, row.Outcome); err != nil {
-			return fmt.Errorf("save generated posting: %w", err)
+			source := "<none>"
+			if row.SourceAccountID != nil {
+				source = *row.SourceAccountID
+			}
+			return fmt.Errorf("save generated posting %q (source %s): %w", row.Name, source, err)
 		}
 	}
 	return nil

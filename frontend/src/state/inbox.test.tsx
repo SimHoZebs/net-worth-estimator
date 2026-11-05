@@ -8,11 +8,7 @@ import {
 	ServerQueryWrapper,
 } from "../mocks/testScope.tsx";
 import type { InboxShareItem } from "../pages/inboxApi.ts";
-import {
-	useAcceptInboxShare,
-	useInbox,
-	useInboxUnreadCount,
-} from "./inbox.ts";
+import { useAcceptInboxShare, useInbox, useInboxUnreadCount } from "./inbox.ts";
 
 const wrapper = ServerQueryWrapper;
 
@@ -88,7 +84,5 @@ it("accepts once and refreshes every inbox entry", async () => {
 		(entry) => entry.url === "/v1/inbox/shares/accept",
 	);
 	expect(posts).toHaveLength(1);
-	await waitFor(() =>
-		expect(both.result.current.list.data?.items).toEqual([]),
-	);
+	await waitFor(() => expect(both.result.current.list.data?.items).toEqual([]));
 });

@@ -30,12 +30,12 @@ func claimTestModel() *types.FinancialModel {
 					Config:   map[string]any{"expression": "950"},
 				},
 				PostedTime: 1770249600, TransactionTime: 1770249600,
-				Claim: &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-01"},
+				Claim: &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-01"},
 
 				Enabled: true,
 			},
 		},
-		RecurrenceRules: []types.RecurrenceRule{
+		Schedules: []types.Schedule{
 			{
 				ID: "rent", Name: "Rent",
 				SourceAccountID: &checking,
@@ -134,10 +134,10 @@ func TestClaimValidation(t *testing.T) {
 		claim *types.PostingClaim
 		code  string
 	}{
-		{"missing rule", &types.PostingClaim{RuleID: "ghost", OccurrenceDate: "2026-02-01"}, "posting.claim.rule.missing"},
-		{"unscheduled date", &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2026-02-15"}, "posting.claim.date.unscheduled"},
-		{"before rule start", &types.PostingClaim{RuleID: "rent", OccurrenceDate: "2025-12-01"}, "posting.claim.date.range"},
-		{"bad date format", &types.PostingClaim{RuleID: "rent", OccurrenceDate: "Feb 1"}, "posting.claim.date.format"},
+		{"missing rule", &types.PostingClaim{ScheduleID: "ghost", OccurrenceDate: "2026-02-01"}, "posting.claim.schedule.missing"},
+		{"unscheduled date", &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2026-02-15"}, "posting.claim.date.unscheduled"},
+		{"before rule start", &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "2025-12-01"}, "posting.claim.date.range"},
+		{"bad date format", &types.PostingClaim{ScheduleID: "rent", OccurrenceDate: "Feb 1"}, "posting.claim.date.format"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -173,14 +173,14 @@ func TestDuplicateClaimRejected(t *testing.T) {
 }
 
 func TestInvalidRuleFrequencyExpandsToNothing(t *testing.T) {
-	rule := types.RecurrenceRule{
-		ID: "bad", Name: "Bad", Frequency: types.RecurrenceFrequency("fortnightly"),
+	rule := types.Schedule{
+		ID: "bad", Name: "Bad", Frequency: types.Frequency("fortnightly"),
 		StartDate: "2026-01-01", Priority: 1, Enabled: true,
 	}
 	if got := RuleScheduleDates(&rule, "2027-01-01"); len(got) != 0 {
 		t.Fatalf("schedule dates for invalid frequency = %v, want none", got)
 	}
-	resolved := ResolveOccurrences([]types.RecurrenceRule{rule}, nil, "2026-01-01", "2027-01-01", true)
+	resolved := ResolveOccurrences([]types.Schedule{rule}, nil, "2026-01-01", "2027-01-01", true)
 	if len(resolved.ByDate) != 0 {
 		t.Fatalf("occurrences for invalid frequency = %v, want none", resolved.ByDate)
 	}

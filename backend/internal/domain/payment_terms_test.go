@@ -37,7 +37,7 @@ func TestValidatePaymentTermsAcceptsCardRow(t *testing.T) {
 	}}
 	checking := "checking"
 	model.Postings = []types.Posting{}
-	model.RecurrenceRules = []types.RecurrenceRule{{
+	model.Schedules = []types.Schedule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,
@@ -118,7 +118,7 @@ func TestValidatePaymentTermsCoverageWarnsWithoutPaymentShell(t *testing.T) {
 	}
 	checking := "checking"
 	model.Postings = []types.Posting{}
-	model.RecurrenceRules = []types.RecurrenceRule{{
+	model.Schedules = []types.Schedule{{
 		ID: "pay-prime", Name: "Prime payment", SourceAccountID: &checking,
 		Destinations: []string{"prime_card"}, Frequency: types.FrequencyMonthly,
 		StartDate: "2026-09-10", Enabled: true,

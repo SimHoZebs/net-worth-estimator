@@ -30,7 +30,7 @@ test("a dropped connection keeps the edit and finishes the save on reconnect", a
 	await expect(page.getByLabel("Amount (USD)")).toHaveValue("910");
 	await expect(page.getByText("Changes saved.")).toHaveCount(0);
 	expect(
-		(await readSavedServerModel()).recurrenceRules.find(
+		(await readSavedServerModel()).schedules.find(
 			(rule) => rule.id === "invest",
 		)?.amount.config.expression,
 	).toBe("600");
@@ -38,7 +38,7 @@ test("a dropped connection keeps the edit and finishes the save on reconnect", a
 	await context.setOffline(false);
 	await expect(page.getByText("Changes saved.")).toBeVisible();
 	expect(
-		(await readSavedServerModel()).recurrenceRules.find(
+		(await readSavedServerModel()).schedules.find(
 			(rule) => rule.id === "invest",
 		)?.amount.config.expression,
 	).toBe("910");

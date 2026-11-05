@@ -24,27 +24,27 @@ const baselinePosting: Transaction = {
 	annualIncrease: 0,
 	enabled: true,
 	readOnly: false,
-	claimRuleId: null,
+	claimScheduleId: null,
 	claimOccurrenceDate: null,
 	postedDate: "2028-06-15",
 	void: false,
 	transactionTime: 1842637212,
 };
 
-const baselineRule: Transaction = {
+const baselineSchedule: Transaction = {
 	id: "invest",
 	name: "Monthly investing",
 	amount: 1800,
 	amountKnown: true,
 	fromId: "checking",
 	toId: "brokerage",
-	kind: "rule",
+	kind: "schedule",
 	startDate: "2026-10-03",
 	endDate: "2028-10-03",
 	annualIncrease: 2.5,
 	enabled: true,
 	readOnly: false,
-	claimRuleId: null,
+	claimScheduleId: null,
 	claimOccurrenceDate: null,
 	postedDate: null,
 	void: false,
@@ -64,14 +64,14 @@ function values(
 		endDate: baselinePosting.endDate,
 		postedDate: baselinePosting.postedDate,
 		enabled: baselinePosting.enabled,
-		claimRuleId: null,
+		claimScheduleId: null,
 		claimOccurrenceDate: null,
 		transactionTime: baselinePosting.transactionTime,
 		...overrides,
 	};
 }
 
-describe("posting patches", () => {
+describe("transaction patches", () => {
 	it("states only the edited member on a rename", () => {
 		const patch = postingUpdate({
 			baseline: baselinePosting,
@@ -86,13 +86,13 @@ describe("posting patches", () => {
 		).toEqual({});
 	});
 
-	it("sends the exact new instant when the time changes", () => {
+	it("sends the wall time when the time changes", () => {
 		const changed = combineDayTime(baselinePosting.startDate, "11:00");
 		const patch = postingUpdate({
 			baseline: baselinePosting,
 			values: values({ transactionTime: changed }),
 		});
-		expect(patch).toEqual({ transactionTime: changed });
+		expect(patch).toEqual({ time: "11:00" });
 	});
 
 	it("keeps second precision out of the patch when the time is untouched", () => {
@@ -107,7 +107,7 @@ describe("posting patches", () => {
 			noEndDate: true,
 			annualIncrease: "0",
 			enabled: true,
-			claimRuleId: "",
+			claimScheduleId: "",
 			claimOccurrenceDate: "",
 			postedDate: baselinePosting.postedDate ?? "",
 			transactionTime: timeOfDay(baselinePosting.transactionTime),
@@ -124,36 +124,43 @@ describe("posting patches", () => {
 		).toEqual({});
 	});
 
-	it("clears nullable claim and endpoint members explicitly", () => {
-		const patch = postingUpdate({
-			baseline: { ...baselinePosting, claimRuleId: "salary", claimOccurrenceDate: "2026-02-01" },
-			values: values({ claimRuleId: null, claimOccurrenceDate: null }),
-		});
-		expect(patch).toEqual({ claim: null });
+	it("clears nullable endpoint members explicitly", () => {
 		const cleared = postingUpdate({
 			baseline: baselinePosting,
 			values: values({ fromId: null, toId: null }),
 		});
 		expect(cleared).toEqual({ sourceAccountId: null, destinations: null });
 	});
+
+	it("leaves claims to the separate claim action", () => {
+		const patch = postingUpdate({
+			baseline: {
+				...baselinePosting,
+				claimScheduleId: "salary",
+				claimOccurrenceDate: "2026-02-01",
+			},
+			values: values({ claimScheduleId: null, claimOccurrenceDate: null }),
+		});
+		expect(patch).toEqual({});
+	});
 });
 
-describe("rule patches", () => {
-	function ruleValues(
+describe("schedule patches", () => {
+	function scheduleValues(
 		overrides: Partial<Parameters<typeof ruleUpdate>[0]["values"]> = {},
 	): Parameters<typeof ruleUpdate>[0]["values"] {
 		return {
-			name: baselineRule.name,
-			amount: baselineRule.amount,
-			annualIncrease: baselineRule.annualIncrease,
-			fromId: baselineRule.fromId,
-			toId: baselineRule.toId,
+			name: baselineSchedule.name,
+			amount: baselineSchedule.amount,
+			annualIncrease: baselineSchedule.annualIncrease,
+			fromId: baselineSchedule.fromId,
+			toId: baselineSchedule.toId,
 			frequency: "yearly",
-			startDate: baselineRule.startDate,
-			endDate: baselineRule.endDate,
+			startDate: baselineSchedule.startDate,
+			endDate: baselineSchedule.endDate,
 			postedDate: null,
-			enabled: baselineRule.enabled,
-			claimRuleId: null,
+			enabled: baselineSchedule.enabled,
+			claimScheduleId: null,
 			claimOccurrenceDate: null,
 			...overrides,
 		};
@@ -161,55 +168,63 @@ describe("rule patches", () => {
 
 	it("keeps a stored cadence the editor never offered", () => {
 		const patch = ruleUpdate({
-			baseline: baselineRule,
-			values: ruleValues({ name: "Monthly investing revised" }),
+			baseline: baselineSchedule,
+			values: scheduleValues({ name: "Monthly investing revised" }),
 			storedFrequency: "annual",
 		});
-		expect(patch).toEqual({ name: "Monthly investing revised" });
+		expect(patch).toEqual({
+			amend: { name: "Monthly investing revised" },
+			reschedule: {},
+		});
 	});
 
 	it("sends only the cadence when the choice changes", () => {
 		const patch = ruleUpdate({
-			baseline: baselineRule,
-			values: ruleValues({ frequency: "monthly" }),
+			baseline: baselineSchedule,
+			values: scheduleValues({ frequency: "monthly" }),
 			storedFrequency: "annual",
 		});
-		expect(patch).toEqual({ frequency: "monthly" });
+		expect(patch).toEqual({ amend: {}, reschedule: { frequency: "monthly" } });
 	});
 
 	it("sends a semantic amount when the value or growth changes", () => {
 		const patch = ruleUpdate({
-			baseline: baselineRule,
-			values: ruleValues({ amount: 2000, annualIncrease: 3 }),
+			baseline: baselineSchedule,
+			values: scheduleValues({ amount: 2000, annualIncrease: 3 }),
 			storedFrequency: "annual",
 		});
-		expect(patch).toEqual({ amount: { value: 2000, annualIncrease: 3 } });
+		expect(patch).toEqual({
+			amend: { amount: { value: 2000, annualIncrease: 3 } },
+			reschedule: {},
+		});
 	});
 
 	it("clears the end date with an explicit null", () => {
 		const patch = ruleUpdate({
-			baseline: baselineRule,
-			values: ruleValues({ endDate: null, frequency: "yearly" }),
+			baseline: baselineSchedule,
+			values: scheduleValues({ endDate: null, frequency: "yearly" }),
 			storedFrequency: "annual",
 		});
-		expect(patch).toEqual({ endDate: null });
+		expect(patch).toEqual({ amend: {}, reschedule: { endDate: null } });
 	});
 
 	it("omits frequency when the stored cadence is unknown", () => {
 		const patch = ruleUpdate({
-			baseline: baselineRule,
-			values: ruleValues({ name: "Renamed" }),
+			baseline: baselineSchedule,
+			values: scheduleValues({ name: "Renamed" }),
 		});
-		expect(patch).toEqual({ name: "Renamed" });
+		expect(patch).toEqual({ amend: { name: "Renamed" }, reschedule: {} });
 	});
 });
 
 describe("create bodies", () => {
-	it("authors a semantic posting amount", () => {
+	it("authors a semantic transaction amount and calendar day", () => {
 		const body = postingBody(values());
 		expect(body.amount).toEqual({ value: 48000 });
+		expect(body.date).toBe("2028-06-15");
+		expect(body.time).toBe("19:40:12");
 	});
-	it("authors a semantic rule amount with yearly growth", () => {
+	it("authors a semantic schedule amount with yearly growth", () => {
 		const body = ruleBody({
 			name: "Invest",
 			amount: 900,
@@ -221,14 +236,15 @@ describe("create bodies", () => {
 			endDate: null,
 			postedDate: null,
 			enabled: true,
-			claimRuleId: null,
+			claimScheduleId: null,
 			claimOccurrenceDate: null,
 		});
 		expect(body.amount).toEqual({ value: 900, annualIncrease: 2.5 });
 	});
-	it("states a claim as one member on the claim patch", () => {
+	it("states a claim as its own action body", () => {
 		expect(claimUpdate("salary", "2026-02-01")).toEqual({
-			claim: { ruleId: "salary", occurrenceDate: "2026-02-01" },
+			scheduleId: "salary",
+			occurrenceDate: "2026-02-01",
 		});
 	});
 });

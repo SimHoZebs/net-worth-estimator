@@ -97,7 +97,7 @@ function FinancialPreferencesProbe() {
 	const settings = useSafeSpendingSettings();
 	return (
 		<p data-testid="financial-preferences">
-			{settings.reserve}:{settings.incomeRuleIds.join(",")}
+			{settings.reserve}:{settings.incomeScheduleIds.join(",")}
 		</p>
 	);
 }
@@ -157,7 +157,7 @@ describe("authentication resource isolation", () => {
 					settings: {
 						...defaultSafeSpendingSettings(),
 						reserve: 123,
-						incomeRuleIds: ["private-a-income"],
+						incomeScheduleIds: ["private-a-income"],
 					},
 				}),
 			),
@@ -182,7 +182,7 @@ describe("authentication resource isolation", () => {
 		act(() =>
 			safeSpendingSettingsObserver.getState().updateSettings({
 				reserve: 123456,
-				incomeRuleIds: ["private-a-income"],
+				incomeScheduleIds: ["private-a-income"],
 			}),
 		);
 		let finish: (value: Response) => void = () => {};

@@ -65,12 +65,13 @@ export async function readSavedServerModel() {
 			id: string;
 			name: string;
 			amount: { config: { expression?: string } };
+			claim?: { scheduleId: string; occurrenceDate: string } | null;
 		};
 		type account = { id: string; minBalance: number };
 		return {
 			accounts: body.model.accounts as account[],
 			postings: body.model.postings as transaction[],
-			recurrenceRules: (body.model.recurrenceRules ?? []) as transaction[],
+			schedules: (body.model.schedules ?? []) as transaction[],
 		};
 	} finally {
 		await api.dispose();

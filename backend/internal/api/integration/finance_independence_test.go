@@ -62,9 +62,9 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 		`{"AccountId":"`+checkingID+`","Balance":1000,"observedAt":1773133200}`); response.Code != http.StatusOK {
 		t.Fatalf("save checkpoint status = %d, body %s", response.Code, response.Body.String())
 	}
-	postingID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/postings",
-		`{"name":"Spend","sourceAccountId":"`+checkingID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`).Body.Bytes())
-	ruleID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/recurrence-rules",
+	postingID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Spend","sourceAccountId":"`+checkingID+`","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","enabled":true}`).Body.Bytes())
+	ruleID := financeIndependenceIDs(t, doRowRequest(t, handler, http.MethodPost, "/v1/schedules",
 		`{"name":"Salary","sourceAccountId":null,"destinations":["`+checkingID+`"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true,"priority":1}`).Body.Bytes())
 
 	// A configured evaluation referencing savings stays valid through the
@@ -124,20 +124,20 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	if len(transactionPayload.Transactions) != 1 {
 		t.Fatalf("transactions = %+v, want only the posting", transactionPayload.Transactions)
 	}
-	rules := doRowRequest(t, handler, http.MethodGet, "/v1/recurrence-rules", "")
+	rules := doRowRequest(t, handler, http.MethodGet, "/v1/schedules", "")
 	if rules.Code != http.StatusOK {
 		t.Fatalf("recurrence rules status = %d, body %s", rules.Code, rules.Body.String())
 	}
 	var rulePayload struct {
-		RecurrenceRules []struct {
+		Schedules []struct {
 			ID string `json:"id"`
-		} `json:"recurrenceRules"`
+		} `json:"schedules"`
 	}
 	if err := json.Unmarshal(rules.Body.Bytes(), &rulePayload); err != nil {
 		t.Fatalf("decode recurrence rules: %v", err)
 	}
-	if len(rulePayload.RecurrenceRules) != 1 {
-		t.Fatalf("recurrence rules = %+v, want only the rule", rulePayload.RecurrenceRules)
+	if len(rulePayload.Schedules) != 1 {
+		t.Fatalf("recurrence rules = %+v, want only the rule", rulePayload.Schedules)
 	}
 
 	position := doRowRequest(t, handler, http.MethodPost, "/v1/position", `{"asOfDate":"2026-03-10"}`)
@@ -158,10 +158,10 @@ func TestFinanceIndependentOfInvalidForecastEvaluation(t *testing.T) {
 	patches := []struct{ method, path, body string }{
 		{http.MethodPatch, "/v1/accounts/" + checkingID,
 			`{"name":"Checking renamed","kind":"cash","enabled":true}`},
-		{http.MethodPatch, "/v1/postings/" + postingID,
-			`{"name":"Spend edited","sourceAccountId":"` + checkingID + `","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"postedTime":1773140400,"transactionTime":1773140400,"enabled":true}`},
-		{http.MethodPatch, "/v1/recurrence-rules/" + ruleID,
-			`{"name":"Salary edited","sourceAccountId":null,"destinations":["` + checkingID + `"],"amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"frequency":"monthly","startDate":"2026-02-01","enabled":true}`},
+		{http.MethodPost, "/v1/transactions/" + postingID + "/amend",
+			`{"name":"Spend edited","sourceAccountId":"` + checkingID + `","destinations":[],"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"date":"2026-03-10","enabled":true}`},
+		{http.MethodPost, "/v1/schedules/" + ruleID + "/amend",
+			`{"name":"Salary edited","enabled":true}`},
 	}
 	for _, patch := range patches {
 		response := doRowRequest(t, handler, patch.method, patch.path, patch.body)

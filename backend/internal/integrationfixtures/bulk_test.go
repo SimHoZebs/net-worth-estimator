@@ -48,8 +48,8 @@ func TestBulkModelDeterministic(t *testing.T) {
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("same spec built different models")
 	}
-	if len(first.Accounts) != 8 || len(first.Postings) != 16 || len(first.RecurrenceRules) != 2 {
-		t.Fatalf("model counts = %d/%d/%d", len(first.Accounts), len(first.Postings), len(first.RecurrenceRules))
+	if len(first.Accounts) != 8 || len(first.Postings) != 16 || len(first.Schedules) != 2 {
+		t.Fatalf("model counts = %d/%d/%d", len(first.Accounts), len(first.Postings), len(first.Schedules))
 	}
 	long := false
 	for _, account := range first.Accounts {

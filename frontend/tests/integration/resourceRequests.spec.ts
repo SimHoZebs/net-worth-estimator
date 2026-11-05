@@ -21,8 +21,8 @@ test("an ordinary save conflict preserves edits without another session check", 
 	page.on("request", (request) => {
 		if (new URL(request.url()).pathname === "/v1/auth/session") sessionChecks++;
 	});
-	await page.route("**/v1/recurrence-rules/*", async (route) => {
-		if (route.request().method() !== "PATCH") return route.continue();
+	await page.route("**/v1/schedules/**", async (route) => {
+		if (route.request().method() !== "POST") return route.continue();
 		writes++;
 		return route.fulfill({
 			status: 409,
@@ -57,8 +57,8 @@ test("a resource-change error restores the workspace without replaying the save"
 	page.on("request", (request) => {
 		if (new URL(request.url()).pathname === "/v1/auth/session") sessionChecks++;
 	});
-	await page.route("**/v1/recurrence-rules/*", async (route) => {
-		if (route.request().method() !== "PATCH") return route.continue();
+	await page.route("**/v1/schedules/**", async (route) => {
+		if (route.request().method() !== "POST") return route.continue();
 		writes++;
 		if (writes > 1) return route.continue();
 		return route.fulfill({
@@ -83,7 +83,7 @@ test("a resource-change error restores the workspace without replaying the save"
 	await expect(page.getByText("Changes saved.")).toBeVisible();
 	expect(writes).toBe(2);
 	expect(
-		(await readSavedServerModel()).recurrenceRules.find(
+		(await readSavedServerModel()).schedules.find(
 			(rule) => rule.id === "invest",
 		)?.amount.config.expression,
 	).toBe("900");

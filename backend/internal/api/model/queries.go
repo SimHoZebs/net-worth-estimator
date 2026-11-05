@@ -208,9 +208,9 @@ type transactionListOutput struct {
 	} `json:"body"`
 }
 
-// listTransactions answers "which postings touch this account" (or all of
-// them). Recurrence rules are not transactions: they answer a different
-// question and travel through listRecurrenceRules. Amount display resolution
+// listTransactions answers "which transactions touch this account" (or all of
+// them). Schedules are not transactions: they answer a different
+// question and travel through listSchedules. Amount display resolution
 // still comes from projection transaction events, which already travel with
 // projection results.
 func (s *handler) listTransactions(_ context.Context, input *struct {
@@ -290,20 +290,20 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 	return output, nil
 }
 
-type recurrenceRuleListOutput struct {
+type scheduleListOutput struct {
 	Body struct {
-		RecurrenceRules []types.RecurrenceRule `json:"recurrenceRules"`
-		Revision        string                 `json:"revision"`
+		Schedules []types.Schedule `json:"schedules"`
+		Revision  string           `json:"revision"`
 	} `json:"body"`
 }
 
-// listRecurrenceRules answers "which standing schedules touch this account"
-// (or all of them). A rule owns repetition; it is not a transaction and never
+// listSchedules answers "which standing schedules touch this account"
+// (or all of them). A schedule owns repetition; it is not a transaction and never
 // appears in the postings list. Rows keep the model's storage order, which is
 // the owner's execution priority order.
-func (s *handler) listRecurrenceRules(_ context.Context, input *struct {
-	AccountID string `query:"accountId" doc:"Only rules touching this account"`
-}) (*recurrenceRuleListOutput, error) {
+func (s *handler) listSchedules(_ context.Context, input *struct {
+	AccountID string `query:"accountId" doc:"Only schedules touching this account"`
+}) (*scheduleListOutput, error) {
 	model, err := s.store.LoadModel()
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
@@ -312,7 +312,7 @@ func (s *handler) listRecurrenceRules(_ context.Context, input *struct {
 	if err != nil {
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
-	rules := []types.RecurrenceRule{}
+	schedules := []types.Schedule{}
 	if model != nil {
 		touches := func(source *string, destinations []string) bool {
 			if input.AccountID == "" {
@@ -328,15 +328,15 @@ func (s *handler) listRecurrenceRules(_ context.Context, input *struct {
 			}
 			return false
 		}
-		for _, rule := range model.RecurrenceRules {
-			if !touches(rule.SourceAccountID, rule.Destinations) {
+		for _, schedule := range model.Schedules {
+			if !touches(schedule.SourceAccountID, schedule.Destinations) {
 				continue
 			}
-			rules = append(rules, rule)
+			schedules = append(schedules, schedule)
 		}
 	}
-	output := &recurrenceRuleListOutput{}
-	output.Body.RecurrenceRules = rules
+	output := &scheduleListOutput{}
+	output.Body.Schedules = schedules
 	output.Body.Revision = revision
 	return output, nil
 }
@@ -371,19 +371,19 @@ func (s *handler) listTransactionCatalog(_ context.Context, _ *struct{}) (*trans
 		Name string `json:"name"`
 	}{}
 	if model != nil {
-		for _, rule := range model.RecurrenceRules {
+		for _, schedule := range model.Schedules {
 			output.Body.Items = append(output.Body.Items, struct {
 				ID   string `json:"id"`
 				Kind string `json:"kind"`
 				Name string `json:"name"`
-			}{ID: rule.ID, Kind: "rule", Name: rule.Name})
+			}{ID: schedule.ID, Kind: "schedule", Name: schedule.Name})
 		}
 		for _, posting := range model.Postings {
 			output.Body.Items = append(output.Body.Items, struct {
 				ID   string `json:"id"`
 				Kind string `json:"kind"`
 				Name string `json:"name"`
-			}{ID: posting.ID, Kind: "posting", Name: posting.Name})
+			}{ID: posting.ID, Kind: "transaction", Name: posting.Name})
 		}
 	}
 	output.Body.Revision = revision

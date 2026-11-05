@@ -40,7 +40,7 @@
       "postingFulfillment": []
     },
     "postings": [],
-    "recurrenceRules": [
+    "schedules": [
       {
         "amount": {
           "config": {

@@ -71,17 +71,17 @@ export function fixtureModel(
 				source: row.readOnly ? "banksync" : "user",
 				pending: row.pending ?? false,
 				void: row.void,
-				...(row.claimRuleId && row.claimOccurrenceDate
+				...(row.claimScheduleId && row.claimOccurrenceDate
 					? {
 							claim: {
-								ruleId: row.claimRuleId,
+								scheduleId: row.claimScheduleId,
 								occurrenceDate: row.claimOccurrenceDate,
 							},
 						}
 					: {}),
 			})),
-		recurrenceRules: data.transactions
-			.filter((row) => row.kind === "rule")
+		schedules: data.transactions
+			.filter((row) => row.kind === "schedule")
 			.map((row, priority) => ({
 				id: row.id,
 				name: row.name,

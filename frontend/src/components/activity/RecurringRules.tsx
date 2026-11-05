@@ -11,16 +11,16 @@ import { Reorder, useDragControls } from "motion/react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { money } from "../../domain/format.ts";
 import type { Account, Transaction } from "../../domain/model.ts";
-import type { RecurrenceRule } from "@/api/generated/model/recurrenceRule.ts";
-import { ruleToDisplay } from "../../domain/transactionRows.ts";
+import type { Schedule } from "@/api/generated/model/schedule.ts";
+import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import type { EditorTarget } from "../../domain/accountEdits.ts";
-import { moveRule } from "@/api/generated/endpoints.ts";
+import { moveSchedule } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshTransactions,
 	useServerStatus,
 } from "../../state/workspaceResources.ts";
-import { ruleTransaction } from "../../domain/accountActivity.ts";
+import { scheduleTransaction } from "../../domain/accountActivity.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import { Badge } from "../Badge.tsx";
 import { EmptyState } from "../EmptyState.tsx";
@@ -49,8 +49,6 @@ function directionLabel(direction: Direction): string {
 			return "Transfer";
 	}
 }
-
-
 
 // One draggable row. The drag starts only from the grip handle
 // (dragListener={false} + drag controls) so the up/down buttons and the
@@ -106,7 +104,7 @@ export function RecurringRules({
 	account: Account;
 	accounts: Account[];
 	/** Rules touching this account, in execution order. */
-	rules: RecurrenceRule[];
+	rules: Schedule[];
 	startDate: string;
 	readOnly: boolean;
 	onEdit: (target: EditorTarget) => void;
@@ -114,16 +112,14 @@ export function RecurringRules({
 	const status = useServerStatus().data;
 	const cadenceById = useMemo(
 		() =>
-			new Map(
-				rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)]),
-			),
+			new Map(rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)])),
 		[rules],
 	);
 	const cadenceOf = (id: string) => cadenceById.get(id) ?? "Recurring";
 	const [editing, setEditing] = useState(false);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
-	const rows = useMemo(() => rules.map(ruleToDisplay), [rules]);
+	const rows = useMemo(() => rules.map(scheduleToDisplay), [rules]);
 	// Local identity only: the rule is resolved from current rows each
 	// render, so updates stay current while a removed rule renders as no
 	// selection and closes the detail.
@@ -139,7 +135,7 @@ export function RecurringRules({
 			const id = orderedIds[index];
 			if (id === undefined) continue;
 			const ok = await performSave({
-				call: () => moveRule({ id, beforeId: orderedIds[index + 1] ?? "" }),
+				call: () => moveSchedule(id, { beforeId: orderedIds[index + 1] ?? "" }),
 				refresh: refreshTransactions,
 				failureMessage: "The order could not be saved.",
 			});
@@ -154,10 +150,7 @@ export function RecurringRules({
 	// re-renders and resets motion's internal order before siblings can
 	// displace. Instead a gesture snapshots a temporary order at drag start,
 	// plays out in that draft, and settles explicitly on drop.
-	const savedIds = useMemo(
-		() => rows.map((row) => row.id),
-		[rows],
-	);
+	const savedIds = useMemo(() => rows.map((row) => row.id), [rows]);
 	const [draftIds, setDraftIds] = useState<string[] | null>(null);
 	const draftRef = useRef<string[] | null>(null);
 	const setDraft = (next: string[] | null) => {
@@ -277,8 +270,7 @@ export function RecurringRules({
 						{transaction.name}
 					</strong>
 					<span className="m-0 text-xs text-muted">
-						{directionLabel(direction)} ·{" "}
-						{cadenceOf(transaction.id)} ·{" "}
+						{directionLabel(direction)} · {cadenceOf(transaction.id)} ·{" "}
 						{transaction.amountKnown ? money(transaction.amount) : "Varies"}
 					</span>
 					{!transaction.enabled && (
@@ -393,7 +385,7 @@ export function RecurringRules({
 			)}
 			{selected && (
 				<TransactionDetail
-					transaction={ruleTransaction({
+					transaction={scheduleTransaction({
 						transaction: selected,
 						accounts,
 						startDate,

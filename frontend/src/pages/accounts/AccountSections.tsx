@@ -23,20 +23,17 @@ import { performSave } from "../../state/workspaceWrites.ts";
 import {
 	refreshAccounts,
 	useAccountBalances,
-	useRecurrenceRules,
+	useSchedules,
 	useTransactions,
 } from "../../state/workspaceResources.ts";
 import {
-	ruleToDisplay,
+	scheduleToDisplay,
 	transactionToDisplay,
 } from "../../domain/transactionRows.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import { deleteAccount } from "@/api/generated/endpoints.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
-import {
-	useSavedAccounts,
-	useSavedStartDate,
-} from "../../state/savedState.ts";
+import { useSavedAccounts, useSavedStartDate } from "../../state/savedState.ts";
 import { AccountsPanel } from "./AccountsPanel.tsx";
 import { TransactionsPanel } from "./TransactionsPanel.tsx";
 
@@ -221,7 +218,7 @@ function TransactionsView({
 	const [page, setPage] = useState(0);
 	const listId = useId();
 	const transactionsQuery = useTransactions();
-	const rulesQuery = useRecurrenceRules();
+	const rulesQuery = useSchedules();
 	// Finance-first: rows render from saved query rows alone. Literal
 	// amounts show directly; formula-derived amounts stay Varies without
 	// a forecast request. Memos stay mounted while rows load, so inputs
@@ -236,15 +233,13 @@ function TransactionsView({
 	// Rules are their own rows from their own endpoint. The table renders
 	// them through the same display shape the shared editor uses.
 	const rules = useMemo(
-		() => rulesQuery.data?.recurrenceRules ?? [],
+		() => rulesQuery.data?.schedules ?? [],
 		[rulesQuery.data],
 	);
-	const ruleRows = useMemo(() => rules.map(ruleToDisplay), [rules]);
+	const ruleRows = useMemo(() => rules.map(scheduleToDisplay), [rules]);
 	const ruleCadence = useMemo(
 		() =>
-			new Map(
-				rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)]),
-			),
+			new Map(rules.map((rule) => [rule.id, frequencyLabel(rule.frequency)])),
 		[rules],
 	);
 	const visible = useMemo(
@@ -256,7 +251,7 @@ function TransactionsView({
 		[rows, ruleRows, accounts],
 	);
 	const recurringCount = visible.filter(
-		(transaction) => transaction.kind === "rule",
+		(transaction) => transaction.kind === "schedule",
 	).length;
 	const transactionsCount = visible.filter(
 		(transaction) => transaction.kind === "posting",
@@ -277,7 +272,7 @@ function TransactionsView({
 						transaction.name.toLowerCase().includes(query.toLowerCase()) &&
 						(schedule === "all"
 							? transaction.kind === "posting"
-							: transaction.kind === "rule"),
+							: transaction.kind === "schedule"),
 				),
 				getDate: (transaction) => transaction.startDate,
 				getId: (transaction) => transaction.id,

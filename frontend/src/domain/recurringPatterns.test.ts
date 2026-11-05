@@ -81,7 +81,9 @@ describe("repeating-payment patterns", () => {
 		expect(patternTitle(patterns[0]!, new Map())).toBe("Grocer");
 	});
 	it("keeps review states distinct from provider labels", () => {
-		const [needsReview] = groupRecurringPatterns([recurringFinding("one", "a")]);
+		const [needsReview] = groupRecurringPatterns([
+			recurringFinding("one", "a"),
+		]);
 		expect(recurringPatternStatus(needsReview!)).toBe("Needs review");
 		const rejected = {
 			...recurringFinding("one", "a"),

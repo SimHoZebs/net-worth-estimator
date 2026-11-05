@@ -1,14 +1,13 @@
 import { isIsoDate } from "./format.ts";
-import { addMonthsClamped } from "./subscriptions.ts";
 
 /**
- * Scheduled occurrence dates of a recurrence rule from its start date
- * through `through` (inclusive), never past the rule's own end date.
+ * Scheduled occurrence dates of a schedule from its start date
+ * through `through` (inclusive), never past the schedule's own end date.
  * The window to today is the claimable range: a posting exists in the
  * past or today, so only occurrences scheduled by then are offered.
- * An open-ended rule stops at `through`.
+ * An open-ended schedule stops at `through`.
  */
-export function ruleOccurrenceDates({
+export function scheduleOccurrenceDates({
 	startDate,
 	endDate,
 	frequency,
@@ -19,7 +18,8 @@ export function ruleOccurrenceDates({
 	frequency: string;
 	through: string;
 }): string[] {
-	const effectiveEnd = endDate !== null && endDate < through ? endDate : through;
+	const effectiveEnd =
+		endDate !== null && endDate < through ? endDate : through;
 	if (!isIsoDate(startDate) || startDate > effectiveEnd) return [];
 	const dates: string[] = [];
 	for (let count = 0; ; count += 1) {
@@ -30,23 +30,23 @@ export function ruleOccurrenceDates({
 }
 
 /**
- * Claim candidates for one rule, ordered by absolute distance to the day
+ * Claim candidates for one schedule, ordered by absolute distance to the day
  * the posting actually happened; ties keep chronological order. Dates
- * another row already claimed for this rule are excluded.
+ * another row already claimed for this schedule are excluded.
  */
 export function claimOccurrenceCandidates({
-	rule,
+	schedule,
 	through,
 	postedRef,
 	claimed,
 }: {
-	rule: { startDate: string; endDate: string | null; frequency: string };
+	schedule: { startDate: string; endDate: string | null; frequency: string };
 	through: string;
 	postedRef: string;
 	claimed: ReadonlySet<string>;
 }): string[] {
 	const anchor = Date.parse(`${postedRef}T00:00:00Z`);
-	return ruleOccurrenceDates({ ...rule, through })
+	return scheduleOccurrenceDates({ ...schedule, through })
 		.filter((date) => !claimed.has(date))
 		.sort((a, b) => {
 			const distance =
@@ -55,6 +55,21 @@ export function claimOccurrenceCandidates({
 			if (distance !== 0) return distance;
 			return a < b ? -1 : a > b ? 1 : 0;
 		});
+}
+
+function daysInMonth(year: number, month: number): number {
+	return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/** Clamped calendar-month addition, mirroring the backend schedule math. */
+function addMonthsClamped(startDate: string, months: number): string {
+	const [year, month, day] = startDate.split("-").map(Number);
+	const total = year! * 12 + (month! - 1) + months;
+	const nextYear = Math.floor(total / 12);
+	const nextMonth = (total % 12) + 1;
+	const nextDay = Math.min(day!, daysInMonth(nextYear, nextMonth));
+	const pad = (value: number) => String(value).padStart(2, "0");
+	return `${nextYear}-${pad(nextMonth)}-${pad(nextDay)}`;
 }
 
 function advanceOccurrence(

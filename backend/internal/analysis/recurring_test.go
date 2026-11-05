@@ -263,7 +263,7 @@ func TestRecurringCoexistsWithBNPLAndLeavesModelAlone(t *testing.T) {
 	}
 	after, _ := scoped.LoadModel()
 	afterRevision, _ := store.ModelETag(after)
-	if beforeRevision != afterRevision || len(after.RecurrenceRules) != 0 {
+	if beforeRevision != afterRevision || len(after.Schedules) != 0 {
 		t.Fatal("analysis changed financial state")
 	}
 }

@@ -152,7 +152,7 @@ func TestReceiptHTTPContractSurvivesAdapterSwap(t *testing.T) {
 			if stale.Code != 409 {
 				t.Fatalf("stale=%d %s", stale.Code, stale.Body.String())
 			}
-			if got := receiptRequest(h, "GET", "/v1/postings/"+receiptAPIPostingID+"/receipts", nil); got.Code != 200 {
+			if got := receiptRequest(h, "GET", "/v1/transactions/"+receiptAPIPostingID+"/receipts", nil); got.Code != 200 {
 				t.Fatal(got.Body.String())
 			}
 			if got := receiptRequest(h, "DELETE", "/v1/receipts/"+r.ID, nil); got.Code != 200 {

@@ -14,7 +14,7 @@ export interface SafeSpendingIncome {
 		amount: number;
 		nextPayment: IncomePayment | null;
 	}[];
-	selectedRuleIds: string[];
+	selectedScheduleIds: string[];
 	paycheck: (IncomePayment & { endDate: string }) | null;
 }
 
@@ -29,14 +29,14 @@ export function safeSpendingIncome({
 	rules,
 	transactions,
 	incomeAccountIds,
-	incomeRuleIds,
+	incomeScheduleIds,
 	todayIso,
 }: {
 	accounts: Account[];
 	rules: Transaction[];
 	transactions: TransactionResult[];
 	incomeAccountIds: string[];
-	incomeRuleIds: string[];
+	incomeScheduleIds: string[];
 	todayIso: string;
 }): SafeSpendingIncome {
 	const today = todayIso.slice(0, 10);
@@ -51,7 +51,7 @@ export function safeSpendingIncome({
 	const eligible = rules.filter(
 		(rule) =>
 			rule.enabled &&
-			rule.kind === "rule" &&
+			rule.kind === "schedule" &&
 			rule.startDate <= today &&
 			(rule.endDate === null || rule.endDate >= today) &&
 			rule.toId !== null &&
@@ -64,11 +64,13 @@ export function safeSpendingIncome({
 		rules: eligible,
 		todayIso,
 	});
-	const selected = new Set(incomeRuleIds);
-	const selectedRuleIds = eligible
+	const selected = new Set(incomeScheduleIds);
+	const selectedScheduleIds = eligible
 		.filter((rule) => selected.has(rule.id))
 		.map((rule) => rule.id);
-	const payments = selectedRuleIds.flatMap((id) => nextPayments.get(id) ?? []);
+	const payments = selectedScheduleIds.flatMap(
+		(id) => nextPayments.get(id) ?? [],
+	);
 	const dates = payments.map((payment) => payment.date).sort();
 	return {
 		candidates: eligible.map((rule) => ({
@@ -77,7 +79,7 @@ export function safeSpendingIncome({
 			amount: rule.amount,
 			nextPayment: nextPayments.get(rule.id) ?? null,
 		})),
-		selectedRuleIds,
+		selectedScheduleIds,
 		paycheck: dates.length
 			? {
 					date: dates[0]!,

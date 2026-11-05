@@ -97,7 +97,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 		}
 	}
 	var history ResolvedOccurrences
-	history = ResolveOccurrences(model.RecurrenceRules, model.Postings, earliestDay, projectionStartDate, true)
+	history = ResolveOccurrences(model.Schedules, model.Postings, earliestDay, projectionStartDate, true)
 
 	events := []historyEvent{}
 	seq := 0
@@ -193,7 +193,7 @@ func replayChronologicalHistoryAt(model *types.FinancialModel, projectionStartDa
 	transitions := CreateTransitionRuntime(types.SimulationInputs{
 		Accounts:         model.Accounts,
 		Postings:         model.Postings,
-		RecurrenceRules:  model.RecurrenceRules,
+		Schedules:        model.Schedules,
 		PaymentTerms:     model.PaymentTerms,
 		PlannedPurchases: model.PlannedPurchases,
 	}, SimulationState{
@@ -375,7 +375,7 @@ func PrepareSimulationRequest(model *types.FinancialModel, settings *types.Proje
 			Model: types.SimulationInputs{
 				Accounts:         effectiveModel.Accounts,
 				Postings:         effectiveModel.Postings,
-				RecurrenceRules:  effectiveModel.RecurrenceRules,
+				Schedules:        effectiveModel.Schedules,
 				PaymentTerms:     effectiveModel.PaymentTerms,
 				PlannedPurchases: effectiveModel.PlannedPurchases,
 			},

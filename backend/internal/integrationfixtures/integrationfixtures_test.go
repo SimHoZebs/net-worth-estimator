@@ -56,8 +56,8 @@ func TestSafeSpendingPackSeedsSettings(t *testing.T) {
 	if settings.StatementDay != 20 || settings.Reserve != 725 {
 		t.Fatalf("settings = %+v, want statement day 20 and reserve 725", settings)
 	}
-	if len(settings.IncomeRuleIDs) != 2 {
-		t.Fatalf("income rule ids = %v, want salary and partner income", settings.IncomeRuleIDs)
+	if len(settings.IncomeScheduleIDs) != 2 {
+		t.Fatalf("income schedule ids = %v, want salary and partner schedule", settings.IncomeScheduleIDs)
 	}
 	if pack.AnchorDate() != "2026-01-31" {
 		t.Fatalf("anchor date = %q, want 2026-01-31", pack.AnchorDate())
@@ -101,8 +101,8 @@ func TestPackSeedRoundTrip(t *testing.T) {
 			if len(model.Postings) != len(seedModel.Postings) {
 				t.Fatalf("postings = %d, want %d", len(model.Postings), len(seedModel.Postings))
 			}
-			if len(model.RecurrenceRules) != len(seedModel.RecurrenceRules) {
-				t.Fatalf("rules = %d, want %d", len(model.RecurrenceRules), len(seedModel.RecurrenceRules))
+			if len(model.Schedules) != len(seedModel.Schedules) {
+				t.Fatalf("rules = %d, want %d", len(model.Schedules), len(seedModel.Schedules))
 			}
 			byID := map[string]string{}
 			for _, posting := range model.Postings {

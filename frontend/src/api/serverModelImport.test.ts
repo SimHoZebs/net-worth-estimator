@@ -19,7 +19,7 @@ const emptyModel: FinancialModel = {
 	accounts: [],
 	checkpoints: [],
 	postings: [],
-	recurrenceRules: [],
+	schedules: [],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
@@ -44,10 +44,6 @@ const model: FinancialModel = {
 	accounts: [account],
 };
 
-function valueResponse(row: unknown) {
-	return { row, issues: [], saved: true, revision: "r1" };
-}
-
 function setup(
 	preconditions: Partial<ServerModelImportOptions["preconditions"]> = {},
 ) {
@@ -62,15 +58,13 @@ function setup(
 		},
 		suspendUserScope(),
 	);
-	const fetcher = vi.fn(async (url: unknown, init?: RequestInit) => {
-		const path = String(url);
-		const method = init?.method ?? "GET";
-		if (path.endsWith("/v1/financial-model"))
-			return ok({ model: emptyModel, issues: [], revision: "r-model" });
-		if (method === "DELETE" || path.endsWith("/reorder"))
-			return ok({ revision: "r1" });
-		return ok(valueResponse(JSON.parse(String(init?.body ?? "{}"))));
-	});
+	const fetcher = vi.fn(async () =>
+		ok({
+			issues: [],
+			saved: true,
+			revision: "r1",
+		}),
+	);
 	vi.stubGlobal("fetch", fetcher);
 	const recover = vi.fn(async () => true);
 	const reload = vi.fn(async () => {});
@@ -99,30 +93,28 @@ afterEach(() => {
 });
 
 describe("server model replacement", () => {
-	it("does not start writes if the resource changes after the initial read", async () => {
+	it("sends one reviewed document to the import action, then reloads", async () => {
+		const { run, fetcher, recover, reload } = setup();
+		expect(await run()).toBe(true);
+		expect(fetcher).toHaveBeenCalledOnce();
+		const [url, init] = fetcher.mock.calls[0] as unknown as [
+			string,
+			RequestInit,
+		];
+		expect(url).toBe("/v1/model/import");
+		expect(init.method).toBe("POST");
+		expect(JSON.parse(String(init.body))).toMatchObject({
+			model: { sourcePath: "models/reviewed-model" },
+		});
+		expect(reload).toHaveBeenCalledOnce();
+		expect(recover).not.toHaveBeenCalled();
+	});
+
+	it("does not reload a different resource after the import", async () => {
 		const { run, fetcher, reload } = setup();
 		fetcher.mockImplementationOnce(async () => {
 			suspendUserScope();
-			return ok({ model: emptyModel, issues: [], revision: "r-model" });
-		});
-		expect(await run()).toBeInstanceOf(UserScopeError);
-		expect(
-			fetcher.mock.calls.filter(([, init]) => init?.method === "POST"),
-		).toHaveLength(0);
-		expect(reload).not.toHaveBeenCalled();
-	});
-
-	it("does not reload a different resource after the last write", async () => {
-		const { run, fetcher, reload } = setup();
-		fetcher.mockImplementation(async (url, init) => {
-			if (
-				String(url).endsWith("/v1/accounts") &&
-				(init?.method ?? "GET") === "POST"
-			) {
-				suspendUserScope();
-				return ok(valueResponse(account));
-			}
-			return ok({ model: emptyModel, issues: [], revision: "r-model" });
+			return ok({ issues: [], saved: true, revision: "r1" });
 		});
 		expect(await run()).toBeInstanceOf(UserScopeError);
 		expect(reload).not.toHaveBeenCalled();
@@ -146,21 +138,6 @@ describe("server model replacement", () => {
 			expect(reload).not.toHaveBeenCalled();
 		},
 	);
-
-	it("creates reviewed rows through generated endpoints, then reloads", async () => {
-		const { run, fetcher, recover, reload } = setup();
-		expect(await run()).toBe(true);
-		const posts = fetcher.mock.calls.filter(
-			([, init]) => (init?.method ?? "GET") === "POST",
-		);
-		expect(posts).toHaveLength(1);
-		expect(posts[0]?.[0]).toBe("/v1/accounts");
-		expect(JSON.parse(String(posts[0]?.[1]?.body))).toMatchObject({
-			id: "checking",
-		});
-		expect(reload).toHaveBeenCalledOnce();
-		expect(recover).not.toHaveBeenCalled();
-	});
 
 	it("waits for authoritative reload before reporting successful activation", async () => {
 		const { run, reload } = setup();
@@ -204,60 +181,48 @@ describe("server model replacement", () => {
 
 	it("reports only validation errors and keeps the existing model without reloading", async () => {
 		const { run, fetcher, reload } = setup();
-		fetcher.mockImplementation(async (url, init) => {
-			if (
-				String(url).endsWith("/v1/accounts") &&
-				(init?.method ?? "GET") === "POST"
-			)
-				return ok({
-					value: account,
-					issues: [
-						{
-							severity: "error",
-							code: "account",
-							path: [],
-							message: "Account is missing.",
-						},
-						{
-							severity: "warning",
-							code: "age",
-							path: [],
-							message: "Checkpoint is old.",
-						},
-					],
-					saved: false,
-					revision: "r1",
-				});
-			return ok({ model: emptyModel, issues: [], revision: "r-model" });
-		});
+		fetcher.mockImplementation(async () =>
+			ok({
+				issues: [
+					{
+						severity: "error",
+						code: "account",
+						path: [],
+						message: "Account is missing.",
+					},
+					{
+						severity: "warning",
+						code: "age",
+						path: [],
+						message: "Checkpoint is old.",
+					},
+				],
+				saved: false,
+				revision: "r1",
+			}),
+		);
 		const result = await run();
 		expect(result).toBeInstanceOf(ServerModelImportError);
 		expect(String((result as Error).message)).toContain("Account is missing.");
 		expect(reload).not.toHaveBeenCalled();
 	});
 
-	it("accepts warning-only rows and reloads", async () => {
+	it("accepts warning-only imports and reloads", async () => {
 		const { run, fetcher, reload } = setup();
-		fetcher.mockImplementation(async (url, init) => {
-			if (
-				String(url).endsWith("/v1/accounts") &&
-				(init?.method ?? "GET") === "POST"
-			)
-				return ok({
-					value: account,
-					issues: [
-						{
-							severity: "warning",
-							code: "age",
-							path: [],
-							message: "Checkpoint is old.",
-						},
-					],
-					saved: true,
-					revision: "r1",
-				});
-			return ok({ model: emptyModel, issues: [], revision: "r-model" });
-		});
+		fetcher.mockImplementation(async () =>
+			ok({
+				issues: [
+					{
+						severity: "warning",
+						code: "age",
+						path: [],
+						message: "Checkpoint is old.",
+					},
+				],
+				saved: true,
+				revision: "r1",
+			}),
+		);
 		expect(await run()).toBe(true);
 		expect(reload).toHaveBeenCalledOnce();
 	});

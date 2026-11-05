@@ -39,10 +39,10 @@ it("updates a controlled checkbox synchronously from the optimistic query value"
 		return createElement("input", {
 			type: "checkbox",
 			"aria-label": "Salary",
-			checked: settings.incomeRuleIds.includes("salary"),
+			checked: settings.incomeScheduleIds.includes("salary"),
 			onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
 				settings.updateSettings({
-					incomeRuleIds: event.target.checked ? ["salary"] : [],
+					incomeScheduleIds: event.target.checked ? ["salary"] : [],
 				}),
 		});
 	}

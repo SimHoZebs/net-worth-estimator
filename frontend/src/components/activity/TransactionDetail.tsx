@@ -32,7 +32,6 @@ import { dateLabel, money, todayIso } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { AccountIconFallback } from "./AccountIconFallback.tsx";
 import { parseUnion } from "../../domain/guards.ts";
-import { buildSubscriptionConversion } from "../../domain/subscriptions.ts";
 import {
 	visibleAccounts,
 	type Account,
@@ -52,12 +51,15 @@ import { Checkbox, Input, Select, SelectField } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import {
-	convertTransaction,
-	createRule,
-	deletePosting,
-	deleteRule,
-	updatePosting,
-	updateRule,
+	amendSchedule,
+	amendTransaction,
+	claimOccurrence,
+	deleteSchedule,
+	deleteTransaction,
+	endScheduleWithTransaction,
+	releaseOccurrence,
+	rescheduleSchedule,
+	scheduleFromTransaction,
 } from "@/api/generated/endpoints.ts";
 import { performSave } from "../../state/workspaceWrites.ts";
 import {
@@ -80,8 +82,6 @@ import {
 	ruleUpdate,
 	timeOfDay,
 	detailFormValues,
-	postingBody,
-	ruleBody,
 	type FrequencyChoice,
 } from "../editors/transactionBodies.ts";
 import { ReceiptPanel } from "../receipts/ReceiptPanel.tsx";
@@ -94,8 +94,11 @@ import {
 	TransactionInsightsTrigger,
 } from "./TransactionInsights.tsx";
 import { useAnalysisFindings } from "../../state/analyses.ts";
-import { useSavedRules, useSavedTransactions } from "../../state/savedState.ts";
-import { ruleToDisplay } from "../../domain/transactionRows.ts";
+import {
+	useSavedSchedules,
+	useSavedTransactions,
+} from "../../state/savedState.ts";
+import { scheduleToDisplay } from "../../domain/transactionRows.ts";
 import { useSharingGrants } from "../../state/sharing.ts";
 import { useSettleCandidates } from "../../state/settleCandidates.ts";
 
@@ -184,13 +187,13 @@ function MoreOptions({
 	const frequency = draft.frequency;
 	const onFrequency = (next: FrequencyChoice) =>
 		updateDraft({ frequency: next }, "schedule");
-	const claimRules = transactions.filter(
-		(item) => item.kind === "rule" && item.id !== savedTransaction.id,
+	const claimSchedules = transactions.filter(
+		(item) => item.kind === "schedule" && item.id !== savedTransaction.id,
 	);
 	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
 	const frequencyId = `${id}-frequency`;
 	const annualIncreaseId = `${id}-annual-increase`;
-	const claimRuleId = `${id}-claim-rule`;
+	const claimScheduleId = `${id}-claim-rule`;
 	const claimOccurrenceId = `${id}-claim-occurrence`;
 	const rowLabel = "w-36 flex-none text-sm font-semibold text-muted";
 	return (
@@ -257,21 +260,24 @@ function MoreOptions({
 				{frequency === "once" && (
 					<>
 						<div className="flex items-center gap-4 border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
-							<label htmlFor={claimRuleId} className={rowLabel}>
+							<label htmlFor={claimScheduleId} className={rowLabel}>
 								Records an occurrence of
 							</label>
 							<Select
-								id={claimRuleId}
-								name="claimRuleId"
+								id={claimScheduleId}
+								name="claimScheduleId"
 								disabled={!claimEditable}
-								value={draft.claimRuleId}
+								value={draft.claimScheduleId}
 								onChange={(event) =>
-									updateDraft({ claimRuleId: event.target.value }, "schedule")
+									updateDraft(
+										{ claimScheduleId: event.target.value },
+										"schedule",
+									)
 								}
 								className="min-w-0 flex-1"
 							>
 								<option value="">No link — standalone record</option>
-								{claimRules.map((rule) => (
+								{claimSchedules.map((rule) => (
 									<option key={rule.id} value={rule.id}>
 										{rule.name}
 									</option>
@@ -285,7 +291,7 @@ function MoreOptions({
 							<Select
 								id={claimOccurrenceId}
 								name="claimOccurrenceDate"
-								disabled={!claimEditable || !draft.claimRuleId}
+								disabled={!claimEditable || !draft.claimScheduleId}
 								value={draft.claimOccurrenceDate}
 								onChange={(event) =>
 									updateDraft(
@@ -296,8 +302,8 @@ function MoreOptions({
 								className="min-w-0 flex-1"
 							>
 								<option value="">
-									{!draft.claimRuleId
-										? "Choose a rule first"
+									{!draft.claimScheduleId
+										? "Choose a schedule first"
 										: occurrenceOptions.length === 0
 											? "No claimable occurrences"
 											: "Choose the occurrence"}
@@ -335,8 +341,8 @@ function ScheduleCapsule({
 	savedTransaction,
 	draft,
 	updateDraft,
-	claimRuleName,
-	ruleCadence,
+	claimScheduleName,
+	scheduleCadence,
 	editing,
 	locked,
 	scheduleControlId,
@@ -345,9 +351,9 @@ function ScheduleCapsule({
 	savedTransaction: Transaction;
 	draft: TransactionDraft;
 	updateDraft: (patch: Partial<TransactionDraft>, field: EditField) => void;
-	claimRuleName?: string | null;
+	claimScheduleName?: string | null;
 	/** Stored cadence from the raw rule, shown while it loads. */
-	ruleCadence?: string | null;
+	scheduleCadence?: string | null;
 	editing: boolean;
 	locked: boolean;
 	/** DOM id for the first schedule control. */
@@ -359,7 +365,7 @@ function ScheduleCapsule({
 	const frequency = draft.frequency;
 	const claimEditable = !locked || canClaimOccurrence(savedTransaction);
 	if (frequency === "once") {
-		if (!draft.claimRuleId) return null;
+		if (!draft.claimScheduleId) return null;
 		return (
 			<p className="mt-4 flex items-center gap-2 text-xs leading-[1.6] text-muted">
 				<Link2 size={15} aria-hidden="true" />
@@ -371,17 +377,17 @@ function ScheduleCapsule({
 							shape: "compact",
 						})}
 						aria-label="Records an occurrence of"
-						name="claimRuleId"
+						name="claimScheduleId"
 						disabled={!claimEditable}
-						value={draft.claimRuleId}
+						value={draft.claimScheduleId}
 						onChange={(event) =>
-							updateDraft({ claimRuleId: event.target.value }, "schedule")
+							updateDraft({ claimScheduleId: event.target.value }, "schedule")
 						}
 					>
 						<option value="">No link</option>
-						{draft.claimRuleId && (
-							<option value={draft.claimRuleId}>
-								{claimRuleName ?? draft.claimRuleId}
+						{draft.claimScheduleId && (
+							<option value={draft.claimScheduleId}>
+								{claimScheduleName ?? draft.claimScheduleId}
 							</option>
 						)}
 					</select>{" "}
@@ -427,7 +433,7 @@ function ScheduleCapsule({
 						Recurring transaction
 					</strong>
 					<span className="text-xs text-muted">
-						{ruleCadence ?? frequencyLabel(frequency)}
+						{scheduleCadence ?? frequencyLabel(frequency)}
 						{growth}
 					</span>
 				</div>
@@ -533,7 +539,7 @@ type TransactionDraft = {
 	noEndDate: boolean;
 	annualIncrease: string;
 	enabled: boolean;
-	claimRuleId: string;
+	claimScheduleId: string;
 	claimOccurrenceDate: string;
 	postedDate: string;
 	transactionTime: string;
@@ -541,7 +547,7 @@ type TransactionDraft = {
 
 function draftFromTransaction(
 	savedTransaction: Transaction,
-	ruleFrequencyChoice: FrequencyChoice,
+	scheduleFrequencyChoice: FrequencyChoice,
 ): TransactionDraft {
 	return {
 		name: savedTransaction.name,
@@ -549,13 +555,13 @@ function draftFromTransaction(
 		fromId: savedTransaction.fromId ?? "",
 		toId: savedTransaction.toId ?? "",
 		frequency:
-			savedTransaction.kind === "posting" ? "once" : ruleFrequencyChoice,
+			savedTransaction.kind === "posting" ? "once" : scheduleFrequencyChoice,
 		startDate: savedTransaction.startDate,
 		endDate: savedTransaction.endDate ?? "",
 		noEndDate: savedTransaction.endDate == null,
 		annualIncrease: String(savedTransaction.annualIncrease),
 		enabled: savedTransaction.enabled,
-		claimRuleId: savedTransaction.claimRuleId ?? "",
+		claimScheduleId: savedTransaction.claimScheduleId ?? "",
 		claimOccurrenceDate: savedTransaction.claimOccurrenceDate ?? "",
 		postedDate: savedTransaction.postedDate ?? "",
 		transactionTime: timeOfDay(savedTransaction.transactionTime),
@@ -580,12 +586,12 @@ function useTransactionEdit({
 	savedTransaction,
 	readOnly: readOnlyProp,
 	onClose,
-	ruleFrequencyChoice,
+	scheduleFrequencyChoice,
 }: {
 	savedTransaction: Transaction;
 	readOnly?: boolean;
 	onClose: () => void;
-	ruleFrequencyChoice: FrequencyChoice;
+	scheduleFrequencyChoice: FrequencyChoice;
 }) {
 	// Only the clicked value is editable; null renders the pure read view.
 	const [activeField, setActiveField] = useState<EditField | null>(null);
@@ -595,7 +601,7 @@ function useTransactionEdit({
 	const [saving, setSaving] = useState(false);
 	const edit = useEditDraft(
 		savedTransaction.id,
-		draftFromTransaction(savedTransaction, ruleFrequencyChoice),
+		draftFromTransaction(savedTransaction, scheduleFrequencyChoice),
 	);
 	const draft = edit.value;
 	const formId = useId();
@@ -613,7 +619,7 @@ function useTransactionEdit({
 			if (
 				keys.length === 0 ||
 				!keys.every(
-					(key) => key === "claimRuleId" || key === "claimOccurrenceDate",
+					(key) => key === "claimScheduleId" || key === "claimOccurrenceDate",
 				)
 			)
 				return;
@@ -673,20 +679,40 @@ function useTransactionEdit({
 		}
 		setSaving(true);
 		setError(null);
-		// Direct row write. Conversions state an explicit new body; updates
-		// carry unedited fields over from the canonical raw row because the
-		// backend replaces the full authored row.
+		// A transaction and a schedule are different records. Changing the
+		// frequency either starts a schedule from the recorded transaction or
+		// ends the schedule by recording what actually happened.
 		const wasOnce = savedTransaction.kind === "posting";
 		const nowOnce = values.frequency === "once";
 		if (wasOnce !== nowOnce) {
+			const cadence = values.frequency === "yearly" ? "annual" : "monthly";
 			const ok = await performSave({
 				call: () =>
-					convertTransaction(savedTransaction.id, {
-						kind: nowOnce ? "posting" : "rule",
-						...(nowOnce
-							? { posting: postingBody(values) }
-							: { rule: ruleBody(values) }),
-					}),
+					nowOnce
+						? endScheduleWithTransaction(savedTransaction.id, {
+								date: values.startDate,
+								...(values.transactionTime
+									? { time: timeOfDay(values.transactionTime) }
+									: {}),
+								...(values.postedDate ? { postedDate: values.postedDate } : {}),
+								amount: { value: values.amount },
+								sourceAccountId: values.fromId,
+								destinations: values.toId ? [values.toId] : null,
+								enabled: values.enabled,
+							})
+						: scheduleFromTransaction(savedTransaction.id, {
+								name: values.name,
+								amount: { value: values.amount },
+								...(values.annualIncrease
+									? { annualIncrease: values.annualIncrease }
+									: {}),
+								frequency: cadence,
+								startDate: values.startDate,
+								...(values.endDate ? { endDate: values.endDate } : {}),
+								sourceAccountId: values.fromId,
+								destinations: values.toId ? [values.toId] : null,
+								enabled: values.enabled,
+							}),
 				refresh: refreshTransactions,
 				failureMessage: "The transaction could not be saved.",
 			});
@@ -701,11 +727,11 @@ function useTransactionEdit({
 			return;
 		}
 		// Updates state only the members the edit changed; absent members
-		// keep their stored values on the server. Conversions state full
-		// new bodies because they create a row in the other table.
+		// keep their stored values on the server. Kind changes use the
+		// dedicated start and end actions above.
 		const storedFrequency = nowOnce
 			? undefined
-			: getServerModel()?.model?.recurrenceRules.find(
+			: getServerModel()?.model?.schedules.find(
 					(row) => row.id === savedTransaction.id,
 				)?.frequency;
 		if (!nowOnce && storedFrequency === undefined) {
@@ -718,21 +744,46 @@ function useTransactionEdit({
 			);
 			return;
 		}
+		const claimChanged =
+			(values.claimScheduleId ?? null) !== savedTransaction.claimScheduleId ||
+			(values.claimOccurrenceDate ?? null) !==
+				savedTransaction.claimOccurrenceDate;
+		const schedule = ruleUpdate({
+			baseline: savedTransaction,
+			values,
+			storedFrequency,
+		});
 		const ok = await performSave({
-			call: () =>
-				nowOnce
-					? updatePosting(
-							savedTransaction.id,
-							postingUpdate({ baseline: savedTransaction, values }),
-						)
-					: updateRule(
-							savedTransaction.id,
-							ruleUpdate({
-								baseline: savedTransaction,
-								values,
-								storedFrequency,
-							}),
-						),
+			call: async () => {
+				if (nowOnce) {
+					const patch = postingUpdate({ baseline: savedTransaction, values });
+					if (Object.keys(patch).length) {
+						const amended = await amendTransaction(savedTransaction.id, patch);
+						if (amended.data.saved === false) return amended;
+					}
+					if (claimChanged) {
+						if (values.claimScheduleId && values.claimOccurrenceDate) {
+							return claimOccurrence(
+								savedTransaction.id,
+								claimUpdate(values.claimScheduleId, values.claimOccurrenceDate),
+							);
+						}
+						return releaseOccurrence(savedTransaction.id);
+					}
+					return { data: { saved: true, issues: [] } };
+				}
+				if (Object.keys(schedule.amend).length) {
+					const amended = await amendSchedule(
+						savedTransaction.id,
+						schedule.amend,
+					);
+					if (amended.data.saved === false) return amended;
+				}
+				if (Object.keys(schedule.reschedule).length) {
+					return rescheduleSchedule(savedTransaction.id, schedule.reschedule);
+				}
+				return { data: { saved: true, issues: [] } };
+			},
 			refresh: refreshTransactions,
 			failureMessage: "The transaction could not be saved.",
 		});
@@ -787,21 +838,24 @@ function useTransactionEdit({
 }
 
 /**
- * Authoritative rule-existence check for subscription retries. The cache may
- * be stale after a saved-but-refresh-failed attempt, so a cache miss falls
- * back to one server read before any create. Never generates a rule.
+ * Authoritative schedule-existence check for subscription retries. The cache
+ * may be stale after a saved-but-refresh-failed attempt, so a cache miss
+ * falls back to one server read before any create. The start action is
+ * atomic: the transaction and its first occurrence claim land together.
  */
-async function ruleExistsAuthoritative(ruleId: string): Promise<boolean> {
-	if (
-		getServerModel()?.model?.recurrenceRules.some((rule) => rule.id === ruleId)
-	)
+async function scheduleExistsAuthoritative(
+	scheduleId: string,
+): Promise<boolean> {
+	const model = getServerModel()?.model;
+	if (model?.schedules.some((schedule) => schedule.id === scheduleId))
 		return true;
 	try {
 		const fresh = await serverQueryClient().fetchQuery(
 			modelOptions(getUserScope()),
 		);
 		return (
-			fresh.model?.recurrenceRules.some((rule) => rule.id === ruleId) ?? false
+			fresh.model?.schedules.some((schedule) => schedule.id === scheduleId) ??
+			false
 		);
 	} catch {
 		return false;
@@ -819,94 +873,49 @@ function useMarkAsSubscription({
 }) {
 	const [error, setError] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
-	// Pinned retry identity: if the rule create succeeded but the claim (or
-	// its refresh) failed, retry reuses the same rule instead of silently
-	// generating a replacement. No global draft or persistent state.
-	const attemptRef = useRef<{ ruleId: string } | null>(null);
+	// Pinned retry identity: a saved-but-refresh-failed attempt already
+	// recorded the occurrence claim with the schedule. Retrying reuses the
+	// same identity and verifies it before creating anything.
+	const attemptRef = useRef<{ scheduleId: string } | null>(null);
 	const canClaimPending = canClaimOccurrence(savedTransaction);
 	const available =
 		savedTransaction.kind === "posting" &&
-		!savedTransaction.claimRuleId &&
+		!savedTransaction.claimScheduleId &&
 		(!locked || canClaimPending);
 	const mark = async () => {
 		if (saving) return;
-		const ruleId = attemptRef.current?.ruleId ?? crypto.randomUUID();
-		attemptRef.current = { ruleId };
-		const conversion = buildSubscriptionConversion(savedTransaction, {
-			ruleId,
-		});
-		if (conversion instanceof Error) {
-			setError(conversion.message);
-			return;
-		}
-		// Pin the original user scope across both writes: a scope change
-		// between the rule create and the claim must not start the old claim
-		// under the new user.
+		const scheduleId = attemptRef.current?.scheduleId ?? crypto.randomUUID();
+		attemptRef.current = { scheduleId };
 		const scope = getUserScope();
 		setSaving(true);
 		setError(null);
-		// Preserve the source posting: create the rule first, then claim the
-		// posting as its occurrence. Refresh even after partial failure so a
-		// created rule is visible while the claim error stays on screen.
-		const ruleValues = {
-			name: conversion.rule.name,
-			amount: conversion.rule.amount,
-			annualIncrease: conversion.rule.annualIncrease,
-			fromId: conversion.rule.fromId,
-			toId: conversion.rule.toId,
-			frequency: conversion.rule.frequency,
-			startDate: conversion.rule.startDate,
-			endDate: conversion.rule.endDate,
-			postedDate: null,
-			enabled: conversion.rule.enabled,
-			claimRuleId: null,
-			claimOccurrenceDate: null,
-		} as const;
-		let ruleOk = await ruleExistsAuthoritative(ruleId);
-		if (!ruleOk) {
-			ruleOk = await performSave({
-				call: () =>
-					createRule({ ...ruleBody(ruleValues), id: conversion.rule.id }),
-				refresh: refreshTransactions,
-				failureMessage: "The subscription rule could not be created.",
-			});
-			if (getUserScope() !== scope) {
-				setSaving(false);
-				setError(
-					"The signed-in user changed. Close and review before retrying.",
-				);
-				return;
-			}
-			if (!ruleOk) {
-				setSaving(false);
-				setError(
-					"The subscription rule could not be created. Review the workspace notice and try again.",
-				);
-				return;
-			}
+		if (await scheduleExistsAuthoritative(scheduleId)) {
+			setSaving(false);
+			attemptRef.current = null;
+			onDone();
+			return;
 		}
-		// Claiming changes one member; every stored timestamp, descriptor,
-		// destination, and purchase policy stays untouched.
-		const claimOk = await performSave({
+		const ok = await performSave({
 			call: () =>
-				updatePosting(
-					savedTransaction.id,
-					claimUpdate(
-						ruleId,
-						conversion.claimed.claimOccurrenceDate ??
-							conversion.claimed.startDate,
-					),
-				),
+				scheduleFromTransaction(savedTransaction.id, {
+					id: scheduleId,
+					frequency: "monthly",
+					startDate: savedTransaction.startDate,
+				}),
 			refresh: refreshTransactions,
-			failureMessage: "The source transaction could not be claimed.",
+			failureMessage: "The subscription schedule could not be created.",
 		});
 		setSaving(false);
-		if (claimOk) {
+		if (getUserScope() !== scope) {
+			setError("The signed-in user changed. Close and review before retrying.");
+			return;
+		}
+		if (ok) {
 			attemptRef.current = null;
 			onDone();
 		} else
 			setError(
-				"The rule was created, but the source transaction could not be claimed. Review the workspace notice and try again.",
+				"The subscription schedule could not be created. Review the workspace notice and try again.",
 			);
 	};
 	return { available, marking: saving, error, mark };
@@ -951,7 +960,7 @@ export function TransactionDetail({
 	accounts,
 	transactions,
 	readOnly,
-	claimRuleName,
+	claimScheduleName,
 	shortfallLabel,
 	onClose,
 }: {
@@ -964,7 +973,7 @@ export function TransactionDetail({
 	 */
 	transactions?: Transaction[];
 	readOnly?: boolean;
-	claimRuleName?: string | null;
+	claimScheduleName?: string | null;
 	shortfallLabel?: string;
 	onClose: () => void;
 }) {
@@ -972,25 +981,29 @@ export function TransactionDetail({
 		transaction.flow === "transfer"
 			? ("transfer" as const)
 			: transaction.direction;
-	// Cadence of the rule this row displays, read from the rule rows the
-	// rules endpoint returns. Display-only; the editor keeps its own
+	// Cadence of the schedule this row displays, read from the schedules
+	// endpoint. Display-only; the editor keeps its own
 	// monthly/yearly choice.
-	const savedRules = useSavedRules();
+	const savedRules = useSavedSchedules();
 	const serverModel = useServerModel({ enabled: false });
 	const modelRevision = serverModel.data?.revision;
-	const rawRules = savedRules ?? undefined;
-	const rawRule =
-		savedTransaction.kind === "rule"
-			? rawRules?.find((rule) => rule.id === savedTransaction.id)
+	const rawSchedules = savedRules ?? undefined;
+	const rawSchedule =
+		savedTransaction.kind === "schedule"
+			? rawSchedules?.find((rule) => rule.id === savedTransaction.id)
 			: undefined;
-	const ruleCadence = rawRule ? frequencyLabel(rawRule.frequency) : null;
-	const ruleFrequencyChoice: FrequencyChoice =
-		rawRule === undefined ? "monthly" : frequencyChoiceOf(rawRule.frequency);
+	const scheduleCadence = rawSchedule
+		? frequencyLabel(rawSchedule.frequency)
+		: null;
+	const scheduleFrequencyChoice: FrequencyChoice =
+		rawSchedule === undefined
+			? "monthly"
+			: frequencyChoiceOf(rawSchedule.frequency);
 	const edit = useTransactionEdit({
 		savedTransaction,
 		readOnly,
 		onClose,
-		ruleFrequencyChoice,
+		scheduleFrequencyChoice,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [confirmingVoidRemove, setConfirmingVoidRemove] = useState(false);
@@ -1017,32 +1030,32 @@ export function TransactionDetail({
 	const allTransactions = useMemo(() => {
 		const rows = [
 			...(savedTransactions ?? transactions ?? [savedTransaction]),
-			...(savedRules ?? []).map(ruleToDisplay),
+			...(savedRules ?? []).map(scheduleToDisplay),
 		];
 		const byId = new Map(rows.map((row) => [row.id, row]));
 		return [...byId.values()];
 	}, [savedTransactions, transactions, savedTransaction, savedRules]);
-	// Claim candidates: the selected rule's scheduled dates through today,
-	// closest to the day the posting actually happened first, already
+	// Claim candidates: the selected schedule's dates through today,
+	// closest to the day the transaction actually happened first, already
 	// claimed dates removed. The row's own saved claim always stays listed.
 	const postedRef = savedTransaction.postedDate ?? savedTransaction.startDate;
 	const occurrenceOptions = useMemo(() => {
-		const ruleId = edit.draft.claimRuleId;
-		const rule = ruleId
-			? rawRules?.find((row) => row.id === ruleId)
+		const scheduleId = edit.draft.claimScheduleId;
+		const schedule = scheduleId
+			? rawSchedules?.find((row) => row.id === scheduleId)
 			: undefined;
-		if (!rule) return [];
+		if (!schedule) return [];
 		const claimed = new Set<string>();
 		for (const row of allTransactions) {
 			if (
 				row.id !== savedTransaction.id &&
-				row.claimRuleId === ruleId &&
+				row.claimScheduleId === scheduleId &&
 				row.claimOccurrenceDate
 			)
 				claimed.add(row.claimOccurrenceDate);
 		}
 		const candidates = claimOccurrenceCandidates({
-			rule,
+			schedule,
 			through: todayIso(),
 			postedRef,
 			claimed,
@@ -1050,9 +1063,9 @@ export function TransactionDetail({
 		const own = edit.draft.claimOccurrenceDate;
 		return own && !candidates.includes(own) ? [own, ...candidates] : candidates;
 	}, [
-		edit.draft.claimRuleId,
+		edit.draft.claimScheduleId,
 		edit.draft.claimOccurrenceDate,
-		rawRules,
+		rawSchedules,
 		allTransactions,
 		savedTransaction.id,
 		postedRef,
@@ -1112,8 +1125,8 @@ export function TransactionDetail({
 		const ok = await performSave({
 			call: () =>
 				savedTransaction.kind === "posting"
-					? deletePosting(savedTransaction.id)
-					: deleteRule(savedTransaction.id),
+					? deleteTransaction(savedTransaction.id)
+					: deleteSchedule(savedTransaction.id),
 			refresh,
 			...(recover ? { recover } : {}),
 			failureMessage,
@@ -1145,16 +1158,16 @@ export function TransactionDetail({
 			(row) => row.postingId === candidateId,
 		);
 		if (!candidate) return false;
-		const claimRuleId = savedTransaction.claimRuleId;
+		const claimScheduleId = savedTransaction.claimScheduleId;
 		const claimOccurrenceDate = savedTransaction.claimOccurrenceDate;
 		setDeleting(true);
 		setDeleteError(null);
-		if (claimRuleId && claimOccurrenceDate && !candidate.claimRuleId) {
+		if (claimScheduleId && claimOccurrenceDate && !candidate.claimScheduleId) {
 			const claimed = await performSave({
 				call: () =>
-					updatePosting(
+					claimOccurrence(
 						candidateId,
-						claimUpdate(claimRuleId, claimOccurrenceDate),
+						claimUpdate(claimScheduleId, claimOccurrenceDate),
 					),
 				refresh: refreshTransactions,
 				failureMessage: "The posted charge could not record the occurrence.",
@@ -1166,7 +1179,7 @@ export function TransactionDetail({
 			}
 		}
 		const ok = await performSave({
-			call: () => deletePosting(savedTransaction.id),
+			call: () => deleteTransaction(savedTransaction.id),
 			refresh: transactionRemovalNeedsProjectionRefresh(savedTransaction.id)
 				? refreshTransactions
 				: () => removeDeletedTransactionFromCache(savedTransaction.id),
@@ -1254,7 +1267,7 @@ export function TransactionDetail({
 				form={edit.formId}
 				className={transactionControlStyles({ shape: "name" })}
 			/>
-			{savedTransaction.kind === "rule" && (
+			{savedTransaction.kind === "schedule" && (
 				<span
 					title="Recurring transaction"
 					aria-label="Recurring transaction"
@@ -1566,14 +1579,14 @@ export function TransactionDetail({
 							savedTransaction={savedTransaction}
 							draft={edit.draft}
 							updateDraft={edit.updateDraft}
-							claimRuleName={
-								savedTransaction.claimRuleId
+							claimScheduleName={
+								savedTransaction.claimScheduleId
 									? (allTransactions.find(
-											(item) => item.id === savedTransaction.claimRuleId,
-										)?.name ?? claimRuleName)
+											(item) => item.id === savedTransaction.claimScheduleId,
+										)?.name ?? claimScheduleName)
 									: null
 							}
-							ruleCadence={ruleCadence}
+							scheduleCadence={scheduleCadence}
 							occurrenceOptions={occurrenceOptions}
 							editing={edit.activeField === "schedule"}
 							locked={!canEdit}
@@ -1679,7 +1692,7 @@ export function TransactionDetail({
 										<span>{sharingLabel}</span>
 									</TextButton>
 								)}
-								{savedTransaction.kind === "rule" && (
+								{savedTransaction.kind === "schedule" && (
 									<TextButton
 										type="button"
 										tone="default"
@@ -1690,13 +1703,13 @@ export function TransactionDetail({
 												?.focus();
 										}}
 										aria-label={
-											ruleCadence
-												? `Recurring rule: ${ruleCadence}. Go to schedule`
-												: "Recurring rule. Go to schedule"
+											scheduleCadence
+												? `Recurring schedule: ${scheduleCadence}. Go to schedule`
+												: "Recurring schedule. Go to schedule"
 										}
 									>
 										<Repeat size={14} aria-hidden="true" />
-										<span>{ruleCadence ?? "Recurring rule"}</span>
+										<span>{scheduleCadence ?? "Recurring schedule"}</span>
 									</TextButton>
 								)}
 							</div>

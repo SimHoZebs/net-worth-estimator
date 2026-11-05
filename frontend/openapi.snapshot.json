@@ -400,33 +400,33 @@
 				"required": ["accountId", "date", "balance", "impacts"],
 				"type": "object"
 			},
-			"Add-pattern-to-existing-ruleRequest": {
+			"Add-pattern-to-existing-scheduleRequest": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/Add-pattern-to-existing-ruleRequest.json"
+							"https://example.com/schemas/Add-pattern-to-existing-scheduleRequest.json"
 						],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
 					},
-					"ruleId": {
+					"scheduleId": {
 						"maxLength": 100,
 						"type": "string"
 					}
 				},
-				"required": ["ruleId"],
+				"required": ["scheduleId"],
 				"type": "object"
 			},
-			"Add-pattern-to-existing-ruleResponse": {
+			"Add-pattern-to-existing-scheduleResponse": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/Add-pattern-to-existing-ruleResponse.json"
+							"https://example.com/schemas/Add-pattern-to-existing-scheduleResponse.json"
 						],
 						"format": "uri",
 						"readOnly": true,
@@ -450,11 +450,11 @@
 					"revision": {
 						"type": "string"
 					},
-					"ruleId": {
-						"type": "string"
-					},
 					"saved": {
 						"type": "boolean"
+					},
+					"scheduleId": {
+						"type": "string"
 					}
 				},
 				"required": [
@@ -463,7 +463,7 @@
 					"saved",
 					"revision",
 					"patternKey",
-					"ruleId"
+					"scheduleId"
 				],
 				"type": "object"
 			},
@@ -1065,72 +1065,13 @@
 				"required": ["checkpoints", "revision"],
 				"type": "object"
 			},
-			"ConvertTransactionBody": {
+			"Create-pattern-to-new-scheduleResponse": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/ConvertTransactionBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"kind": {
-						"type": "string"
-					},
-					"posting": {
-						"$ref": "#/components/schemas/PostingBody"
-					},
-					"rule": {
-						"$ref": "#/components/schemas/RuleBody"
-					}
-				},
-				"required": ["kind"],
-				"type": "object"
-			},
-			"ConvertTransactionOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/ConvertTransactionOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"id": {
-						"type": "string"
-					},
-					"issues": {
-						"items": {
-							"$ref": "#/components/schemas/ModelValidationIssue"
-						},
-						"type": ["array", "null"]
-					},
-					"kind": {
-						"type": "string"
-					},
-					"revision": {
-						"type": "string"
-					},
-					"saved": {
-						"type": "boolean"
-					}
-				},
-				"required": ["id", "kind", "issues", "saved", "revision"],
-				"type": "object"
-			},
-			"Create-pattern-to-new-ruleResponse": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/Create-pattern-to-new-ruleResponse.json"
+							"https://example.com/schemas/Create-pattern-to-new-scheduleResponse.json"
 						],
 						"format": "uri",
 						"readOnly": true,
@@ -1152,7 +1093,7 @@
 						"type": "boolean"
 					},
 					"value": {
-						"$ref": "#/components/schemas/RecurrenceRule"
+						"$ref": "#/components/schemas/Schedule"
 					}
 				},
 				"required": ["value", "issues", "saved", "revision", "patternKey"],
@@ -1756,9 +1697,9 @@
 						},
 						"type": ["array", "null"]
 					},
-					"recurrenceRules": {
+					"schedules": {
 						"items": {
-							"$ref": "#/components/schemas/RecurrenceRule"
+							"$ref": "#/components/schemas/Schedule"
 						},
 						"type": ["array", "null"]
 					},
@@ -1772,7 +1713,7 @@
 					"checkpoints",
 					"evaluations",
 					"postings",
-					"recurrenceRules",
+					"schedules",
 					"paymentTerms"
 				],
 				"type": "object"
@@ -2296,6 +2237,51 @@
 				},
 				"type": "object"
 			},
+			"ImportModelBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ImportModelBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"model": {
+						"$ref": "#/components/schemas/FinancialModel"
+					}
+				},
+				"required": ["model"],
+				"type": "object"
+			},
+			"ImportModelOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ImportModelOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					}
+				},
+				"required": ["issues", "saved", "revision"],
+				"type": "object"
+			},
 			"IntegrationListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -2534,9 +2520,9 @@
 						},
 						"type": ["array", "null"]
 					},
-					"addedRules": {
+					"addedSchedules": {
 						"items": {
-							"$ref": "#/components/schemas/RecurrenceRule"
+							"$ref": "#/components/schemas/Schedule"
 						},
 						"type": ["array", "null"]
 					},
@@ -2552,7 +2538,7 @@
 						},
 						"type": ["array", "null"]
 					},
-					"disabledRuleIds": {
+					"disabledScheduleIds": {
 						"items": {
 							"type": "string"
 						},
@@ -2562,10 +2548,10 @@
 				"required": [
 					"addedAccounts",
 					"addedPostings",
-					"addedRules",
+					"addedSchedules",
 					"disabledAccountIds",
 					"disabledPostingIds",
-					"disabledRuleIds"
+					"disabledScheduleIds"
 				],
 				"type": "object"
 			},
@@ -2655,6 +2641,42 @@
 				"required": ["type", "instanceId"],
 				"type": "object"
 			},
+			"Move-scheduleRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Move-scheduleRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"beforeId": {
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
+			"Move-transactionRequest": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/Move-transactionRequest.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"beforeId": {
+						"type": "string"
+					}
+				},
+				"type": "object"
+			},
 			"PatternOccurrence": {
 				"additionalProperties": false,
 				"properties": {
@@ -2671,7 +2693,7 @@
 				"required": ["postingId", "date", "amount"],
 				"type": "object"
 			},
-			"PatternToExistingRulePreview": {
+			"PatternToExistingSchedulePreview": {
 				"additionalProperties": false,
 				"properties": {
 					"accountId": {
@@ -2701,18 +2723,18 @@
 					"reason": {
 						"type": "string"
 					},
-					"ruleId": {
+					"scheduleId": {
 						"type": "string"
 					},
-					"ruleName": {
+					"scheduleName": {
 						"type": "string"
 					}
 				},
 				"required": [
 					"findingId",
 					"patternKey",
-					"ruleId",
-					"ruleName",
+					"scheduleId",
+					"scheduleName",
 					"merchant",
 					"cadence",
 					"accountId",
@@ -2720,7 +2742,7 @@
 				],
 				"type": "object"
 			},
-			"PatternToNewRulePreview": {
+			"PatternToNewSchedulePreview": {
 				"additionalProperties": false,
 				"properties": {
 					"accountId": {
@@ -2738,7 +2760,7 @@
 					"direction": {
 						"type": "string"
 					},
-					"existingRuleId": {
+					"existingScheduleId": {
 						"type": "string"
 					},
 					"findingId": {
@@ -2759,15 +2781,15 @@
 					"reason": {
 						"type": "string"
 					},
-					"rule": {
-						"$ref": "#/components/schemas/ProposedNewRule"
+					"schedule": {
+						"$ref": "#/components/schemas/ProposedNewSchedule"
 					},
 					"typicalAmount": {
 						"type": "string"
 					},
 					"upcoming": {
 						"items": {
-							"$ref": "#/components/schemas/UpcomingNewRuleOccurrence"
+							"$ref": "#/components/schemas/UpcomingNewScheduleOccurrence"
 						},
 						"type": ["array", "null"]
 					}
@@ -3096,276 +3118,17 @@
 				"required": ["resolver", "config", "inputs"],
 				"type": "object"
 			},
-			"PostingBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/PostingBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"amount": {
-						"anyOf": [
-							{
-								"properties": {
-									"annualIncrease": {
-										"description": "Yearly growth percent applied to the amount.",
-										"maximum": 50,
-										"minimum": -50,
-										"type": "number"
-									},
-									"value": {
-										"description": "Amount in the row currency.",
-										"maximum": 10000000000,
-										"minimum": 0,
-										"type": "number"
-									}
-								},
-								"required": ["value"],
-								"type": "object"
-							},
-							{
-								"additionalProperties": false,
-								"properties": {
-									"config": {
-										"additionalProperties": {},
-										"type": "object"
-									},
-									"inputs": {
-										"additionalProperties": {
-											"$ref": "#/components/schemas/AmountInputBinding"
-										},
-										"type": "object"
-									},
-									"resolver": {
-										"type": "string"
-									}
-								},
-								"required": ["resolver", "config", "inputs"],
-								"type": "object"
-							}
-						],
-						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
-					},
-					"claim": {
-						"$ref": "#/components/schemas/PostingClaim"
-					},
-					"destinations": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"enabled": {
-						"type": "boolean"
-					},
-					"executionOrder": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"id": {
-						"format": "uuid",
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					},
-					"pending": {
-						"type": "boolean"
-					},
-					"postedTime": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"source": {
-						"type": "string"
-					},
-					"sourceAccountId": {
-						"type": "string"
-					},
-					"transactionTime": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"void": {
-						"type": "boolean"
-					}
-				},
-				"required": [
-					"name",
-					"amount",
-					"postedTime",
-					"transactionTime",
-					"enabled"
-				],
-				"type": "object"
-			},
-			"PostingCategoryBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/PostingCategoryBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"category": {
-						"description": "Supported category key; null clears the override",
-						"type": ["string", "null"]
-					}
-				},
-				"required": ["category"],
-				"type": "object"
-			},
-			"PostingCategoryOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/PostingCategoryOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"category": {
-						"type": "string"
-					},
-					"categorySource": {
-						"type": "string"
-					},
-					"postingId": {
-						"type": "string"
-					}
-				},
-				"required": ["postingId"],
-				"type": "object"
-			},
 			"PostingClaim": {
 				"additionalProperties": false,
 				"properties": {
 					"occurrenceDate": {
 						"type": "string"
 					},
-					"ruleId": {
+					"scheduleId": {
 						"type": "string"
 					}
 				},
-				"required": ["ruleId", "occurrenceDate"],
-				"type": "object"
-			},
-			"PostingUpdateBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/PostingUpdateBody.json"],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"amount": {
-						"anyOf": [
-							{
-								"properties": {
-									"annualIncrease": {
-										"description": "Yearly growth percent applied to the amount.",
-										"maximum": 50,
-										"minimum": -50,
-										"type": "number"
-									},
-									"value": {
-										"description": "Amount in the row currency.",
-										"maximum": 10000000000,
-										"minimum": 0,
-										"type": "number"
-									}
-								},
-								"required": ["value"],
-								"type": "object"
-							},
-							{
-								"additionalProperties": false,
-								"properties": {
-									"config": {
-										"additionalProperties": {},
-										"type": "object"
-									},
-									"inputs": {
-										"additionalProperties": {
-											"$ref": "#/components/schemas/AmountInputBinding"
-										},
-										"type": "object"
-									},
-									"resolver": {
-										"type": "string"
-									}
-								},
-								"required": ["resolver", "config", "inputs"],
-								"type": "object"
-							}
-						],
-						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
-					},
-					"claim": {
-						"additionalProperties": false,
-						"properties": {
-							"occurrenceDate": {
-								"type": "string"
-							},
-							"ruleId": {
-								"type": "string"
-							}
-						},
-						"required": ["ruleId", "occurrenceDate"],
-						"type": ["object", "null"]
-					},
-					"destinations": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"enabled": {
-						"type": "boolean"
-					},
-					"executionOrder": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"id": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					},
-					"pending": {
-						"type": "boolean"
-					},
-					"postedTime": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"source": {
-						"type": "string"
-					},
-					"sourceAccountId": {
-						"type": ["string", "null"]
-					},
-					"transactionTime": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"void": {
-						"type": "boolean"
-					}
-				},
+				"required": ["scheduleId", "occurrenceDate"],
 				"type": "object"
 			},
 			"PresetListOutputBody": {
@@ -3416,39 +3179,39 @@
 				"required": ["value", "issues", "saved"],
 				"type": "object"
 			},
-			"Preview-pattern-to-existing-ruleResponse": {
+			"Preview-pattern-to-existing-scheduleResponse": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/Preview-pattern-to-existing-ruleResponse.json"
+							"https://example.com/schemas/Preview-pattern-to-existing-scheduleResponse.json"
 						],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
 					},
 					"preview": {
-						"$ref": "#/components/schemas/PatternToExistingRulePreview"
+						"$ref": "#/components/schemas/PatternToExistingSchedulePreview"
 					}
 				},
 				"required": ["preview"],
 				"type": "object"
 			},
-			"Preview-pattern-to-new-ruleResponse": {
+			"Preview-pattern-to-new-scheduleResponse": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/Preview-pattern-to-new-ruleResponse.json"
+							"https://example.com/schemas/Preview-pattern-to-new-scheduleResponse.json"
 						],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
 					},
 					"preview": {
-						"$ref": "#/components/schemas/PatternToNewRulePreview"
+						"$ref": "#/components/schemas/PatternToNewSchedulePreview"
 					}
 				},
 				"required": ["preview"],
@@ -3721,7 +3484,7 @@
 				],
 				"type": "object"
 			},
-			"ProposedNewRule": {
+			"ProposedNewSchedule": {
 				"additionalProperties": false,
 				"properties": {
 					"amount": {
@@ -4024,88 +3787,6 @@
 				"required": ["producer", "version", "simulated"],
 				"type": "object"
 			},
-			"RecurrenceRule": {
-				"additionalProperties": false,
-				"properties": {
-					"amount": {
-						"$ref": "#/components/schemas/PostingAmountResolution"
-					},
-					"annualCap": {
-						"format": "double",
-						"type": ["number", "null"]
-					},
-					"destinations": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"enabled": {
-						"type": "boolean"
-					},
-					"endDate": {
-						"type": ["string", "null"]
-					},
-					"frequency": {
-						"type": "string"
-					},
-					"id": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					},
-					"priority": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"sourceAccountId": {
-						"type": ["string", "null"]
-					},
-					"startDate": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"id",
-					"name",
-					"sourceAccountId",
-					"destinations",
-					"amount",
-					"frequency",
-					"startDate",
-					"endDate",
-					"annualCap",
-					"priority",
-					"enabled"
-				],
-				"type": "object"
-			},
-			"RecurrenceRuleListOutputBody": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": [
-							"https://example.com/schemas/RecurrenceRuleListOutputBody.json"
-						],
-						"format": "uri",
-						"readOnly": true,
-						"type": "string"
-					},
-					"recurrenceRules": {
-						"items": {
-							"$ref": "#/components/schemas/RecurrenceRule"
-						},
-						"type": ["array", "null"]
-					},
-					"revision": {
-						"type": "string"
-					}
-				},
-				"required": ["recurrenceRules", "revision"],
-				"type": "object"
-			},
 			"ReorderInputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -4189,12 +3870,294 @@
 				"required": ["revision", "details", "confirm"],
 				"type": "object"
 			},
-			"RuleBody": {
+			"SafeSpendingOutputBody": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/RuleBody.json"],
+						"examples": [
+							"https://example.com/schemas/SafeSpendingOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"settings": {
+						"$ref": "#/components/schemas/SafeSpendingSettings"
+					}
+				},
+				"required": ["settings"],
+				"type": "object"
+			},
+			"SafeSpendingSettings": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/SafeSpendingSettings.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"accountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"incomeAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"incomeScheduleIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"reserve": {
+						"format": "double",
+						"minimum": 0,
+						"type": "number"
+					},
+					"spendingAccountIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"statementDay": {
+						"format": "int64",
+						"maximum": 28,
+						"minimum": 1,
+						"type": "integer"
+					},
+					"statementDaySet": {
+						"type": "boolean"
+					},
+					"transactionIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					}
+				},
+				"required": [
+					"statementDay",
+					"reserve",
+					"accountIds",
+					"spendingAccountIds",
+					"incomeAccountIds",
+					"incomeScheduleIds",
+					"transactionIds",
+					"statementDaySet"
+				],
+				"type": "object"
+			},
+			"ScanSummary": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ScanSummary.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"failed": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"incremental": {
+						"type": "boolean"
+					},
+					"listed": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"needsReview": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"receipts": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"refunds": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"skipped": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"triaged": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"truncated": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"incremental",
+					"listed",
+					"triaged",
+					"receipts",
+					"refunds",
+					"needsReview",
+					"skipped",
+					"failed",
+					"truncated"
+				],
+				"type": "object"
+			},
+			"Schedule": {
+				"additionalProperties": false,
+				"properties": {
+					"amount": {
+						"$ref": "#/components/schemas/PostingAmountResolution"
+					},
+					"annualCap": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"endDate": {
+						"type": ["string", "null"]
+					},
+					"frequency": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"id",
+					"name",
+					"sourceAccountId",
+					"destinations",
+					"amount",
+					"frequency",
+					"startDate",
+					"endDate",
+					"annualCap",
+					"priority",
+					"enabled"
+				],
+				"type": "object"
+			},
+			"ScheduleAmendBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ScheduleAmendBody.json"],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
+					},
+					"annualCap": {
+						"format": "double",
+						"type": ["number", "null"]
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"name": {
+						"type": "string"
+					},
+					"priority": {
+						"format": "int64",
+						"type": "integer"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					}
+				},
+				"type": "object"
+			},
+			"ScheduleCreateBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": ["https://example.com/schemas/ScheduleCreateBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -4281,12 +4244,12 @@
 				"required": ["name", "amount", "frequency", "startDate", "enabled"],
 				"type": "object"
 			},
-			"RuleUpdateBody": {
+			"ScheduleEndBody": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/RuleUpdateBody.json"],
+						"examples": ["https://example.com/schemas/ScheduleEndBody.json"],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
@@ -4334,9 +4297,126 @@
 						],
 						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
 					},
-					"annualCap": {
+					"date": {
+						"type": "string"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"id": {
+						"type": "string"
+					},
+					"postedDate": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"time": {
+						"type": "string"
+					}
+				},
+				"required": ["date"],
+				"type": "object"
+			},
+			"ScheduleEndOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ScheduleEndOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"endedScheduleId": {
+						"type": "string"
+					},
+					"issues": {
+						"items": {
+							"$ref": "#/components/schemas/ModelValidationIssue"
+						},
+						"type": ["array", "null"]
+					},
+					"revision": {
+						"type": "string"
+					},
+					"saved": {
+						"type": "boolean"
+					},
+					"value": {
+						"$ref": "#/components/schemas/Posting"
+					}
+				},
+				"required": ["value", "endedScheduleId", "issues", "saved", "revision"],
+				"type": "object"
+			},
+			"ScheduleFromTransactionBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/ScheduleFromTransactionBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
+					},
+					"annualIncrease": {
 						"format": "double",
-						"type": ["number", "null"]
+						"type": "number"
 					},
 					"destinations": {
 						"items": {
@@ -4348,20 +4428,17 @@
 						"type": "boolean"
 					},
 					"endDate": {
-						"type": ["string", "null"]
+						"type": "string"
 					},
 					"frequency": {
 						"type": "string"
 					},
 					"id": {
+						"format": "uuid",
 						"type": "string"
 					},
 					"name": {
 						"type": "string"
-					},
-					"priority": {
-						"format": "int64",
-						"type": "integer"
 					},
 					"sourceAccountId": {
 						"type": ["string", "null"]
@@ -4370,152 +4447,56 @@
 						"type": "string"
 					}
 				},
+				"required": ["frequency", "startDate"],
 				"type": "object"
 			},
-			"SafeSpendingOutputBody": {
+			"ScheduleListOutputBody": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/SafeSpendingOutputBody.json"
+							"https://example.com/schemas/ScheduleListOutputBody.json"
 						],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
 					},
-					"settings": {
-						"$ref": "#/components/schemas/SafeSpendingSettings"
+					"revision": {
+						"type": "string"
+					},
+					"schedules": {
+						"items": {
+							"$ref": "#/components/schemas/Schedule"
+						},
+						"type": ["array", "null"]
 					}
 				},
-				"required": ["settings"],
+				"required": ["schedules", "revision"],
 				"type": "object"
 			},
-			"SafeSpendingSettings": {
+			"ScheduleRescheduleBody": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/SafeSpendingSettings.json"
+							"https://example.com/schemas/ScheduleRescheduleBody.json"
 						],
 						"format": "uri",
 						"readOnly": true,
 						"type": "string"
 					},
-					"accountIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
+					"endDate": {
+						"type": ["string", "null"]
 					},
-					"incomeAccountIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"incomeRuleIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"reserve": {
-						"format": "double",
-						"minimum": 0,
-						"type": "number"
-					},
-					"spendingAccountIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					},
-					"statementDay": {
-						"format": "int64",
-						"maximum": 28,
-						"minimum": 1,
-						"type": "integer"
-					},
-					"statementDaySet": {
-						"type": "boolean"
-					},
-					"transactionIds": {
-						"items": {
-							"type": "string"
-						},
-						"type": ["array", "null"]
-					}
-				},
-				"required": [
-					"statementDay",
-					"reserve",
-					"accountIds",
-					"spendingAccountIds",
-					"incomeAccountIds",
-					"incomeRuleIds",
-					"transactionIds",
-					"statementDaySet"
-				],
-				"type": "object"
-			},
-			"ScanSummary": {
-				"additionalProperties": false,
-				"properties": {
-					"$schema": {
-						"description": "A URL to the JSON Schema for this object.",
-						"examples": ["https://example.com/schemas/ScanSummary.json"],
-						"format": "uri",
-						"readOnly": true,
+					"frequency": {
 						"type": "string"
 					},
-					"failed": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"incremental": {
-						"type": "boolean"
-					},
-					"listed": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"needsReview": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"receipts": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"refunds": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"skipped": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"triaged": {
-						"format": "int64",
-						"type": "integer"
-					},
-					"truncated": {
-						"type": "boolean"
+					"startDate": {
+						"type": "string"
 					}
 				},
-				"required": [
-					"incremental",
-					"listed",
-					"triaged",
-					"receipts",
-					"refunds",
-					"needsReview",
-					"skipped",
-					"failed",
-					"truncated"
-				],
 				"type": "object"
 			},
 			"SessionResource": {
@@ -4591,7 +4572,7 @@
 					"claimOccurrenceDate": {
 						"type": "string"
 					},
-					"claimRuleId": {
+					"claimScheduleId": {
 						"type": "string"
 					},
 					"date": {
@@ -4978,6 +4959,88 @@
 				"required": ["accountId", "minimumFixed", "dueDay"],
 				"type": "object"
 			},
+			"TransactionAmendBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionAmendBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
+					},
+					"date": {
+						"type": "string"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"name": {
+						"type": "string"
+					},
+					"postedDate": {
+						"type": ["string", "null"]
+					},
+					"sourceAccountId": {
+						"type": ["string", "null"]
+					},
+					"time": {
+						"type": ["string", "null"]
+					}
+				},
+				"type": "object"
+			},
 			"TransactionCatalogOutputBody": {
 				"additionalProperties": false,
 				"properties": {
@@ -5001,6 +5064,73 @@
 					}
 				},
 				"required": ["items", "revision"],
+				"type": "object"
+			},
+			"TransactionCategoryBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionCategoryBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"category": {
+						"description": "Supported category key; null clears the override",
+						"type": ["string", "null"]
+					}
+				},
+				"required": ["category"],
+				"type": "object"
+			},
+			"TransactionCategoryOutputBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionCategoryOutputBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"category": {
+						"type": "string"
+					},
+					"categorySource": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": ["transactionId"],
+				"type": "object"
+			},
+			"TransactionClaimBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionClaimBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"occurrenceDate": {
+						"type": "string"
+					},
+					"scheduleId": {
+						"type": "string"
+					}
+				},
+				"required": ["scheduleId", "occurrenceDate"],
 				"type": "object"
 			},
 			"TransactionEvent": {
@@ -5105,6 +5235,96 @@
 				"required": ["type", "postingId"],
 				"type": "object"
 			},
+			"TransactionRecordBody": {
+				"additionalProperties": false,
+				"properties": {
+					"$schema": {
+						"description": "A URL to the JSON Schema for this object.",
+						"examples": [
+							"https://example.com/schemas/TransactionRecordBody.json"
+						],
+						"format": "uri",
+						"readOnly": true,
+						"type": "string"
+					},
+					"amount": {
+						"anyOf": [
+							{
+								"properties": {
+									"annualIncrease": {
+										"description": "Yearly growth percent applied to the amount.",
+										"maximum": 50,
+										"minimum": -50,
+										"type": "number"
+									},
+									"value": {
+										"description": "Amount in the row currency.",
+										"maximum": 10000000000,
+										"minimum": 0,
+										"type": "number"
+									}
+								},
+								"required": ["value"],
+								"type": "object"
+							},
+							{
+								"additionalProperties": false,
+								"properties": {
+									"config": {
+										"additionalProperties": {},
+										"type": "object"
+									},
+									"inputs": {
+										"additionalProperties": {
+											"$ref": "#/components/schemas/AmountInputBinding"
+										},
+										"type": "object"
+									},
+									"resolver": {
+										"type": "string"
+									}
+								},
+								"required": ["resolver", "config", "inputs"],
+								"type": "object"
+							}
+						],
+						"description": "Literal amount with optional yearly growth, or a stored resolution descriptor."
+					},
+					"claim": {
+						"$ref": "#/components/schemas/PostingClaim"
+					},
+					"date": {
+						"type": "string"
+					},
+					"destinations": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
+					},
+					"enabled": {
+						"type": "boolean"
+					},
+					"id": {
+						"format": "uuid",
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"postedDate": {
+						"type": "string"
+					},
+					"sourceAccountId": {
+						"type": "string"
+					},
+					"time": {
+						"type": "string"
+					}
+				},
+				"required": ["name", "amount", "date", "enabled"],
+				"type": "object"
+			},
 			"TransactionRow": {
 				"additionalProperties": false,
 				"properties": {
@@ -5183,7 +5403,7 @@
 				],
 				"type": "object"
 			},
-			"UpcomingNewRuleOccurrence": {
+			"UpcomingNewScheduleOccurrence": {
 				"additionalProperties": false,
 				"properties": {
 					"amount": {
@@ -5378,13 +5598,13 @@
 				"required": ["value", "issues", "saved", "revision"],
 				"type": "object"
 			},
-			"WriteResultRecurrenceRule": {
+			"WriteResultSchedule": {
 				"additionalProperties": false,
 				"properties": {
 					"$schema": {
 						"description": "A URL to the JSON Schema for this object.",
 						"examples": [
-							"https://example.com/schemas/WriteResultRecurrenceRule.json"
+							"https://example.com/schemas/WriteResultSchedule.json"
 						],
 						"format": "uri",
 						"readOnly": true,
@@ -5403,7 +5623,7 @@
 						"type": "boolean"
 					},
 					"value": {
-						"$ref": "#/components/schemas/RecurrenceRule"
+						"$ref": "#/components/schemas/Schedule"
 					}
 				},
 				"required": ["value", "issues", "saved", "revision"],
@@ -6105,9 +6325,9 @@
 				"summary": "Confirm or reject a finding and record plan duration"
 			}
 		},
-		"/v1/analysis-findings/{id}/pattern-to-existing-rule": {
+		"/v1/analysis-findings/{id}/pattern-to-existing-schedule": {
 			"post": {
-				"operationId": "add-pattern-to-existing-rule",
+				"operationId": "add-pattern-to-existing-schedule",
 				"parameters": [
 					{
 						"in": "path",
@@ -6122,7 +6342,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/Add-pattern-to-existing-ruleRequest"
+								"$ref": "#/components/schemas/Add-pattern-to-existing-scheduleRequest"
 							}
 						}
 					},
@@ -6133,7 +6353,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/Add-pattern-to-existing-ruleResponse"
+									"$ref": "#/components/schemas/Add-pattern-to-existing-scheduleResponse"
 								}
 							}
 						},
@@ -6150,12 +6370,12 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Add a confirmed pattern's payments to an existing forecast rule"
+				"summary": "Add a confirmed pattern's payments to an existing schedule"
 			}
 		},
-		"/v1/analysis-findings/{id}/pattern-to-existing-rule-preview": {
+		"/v1/analysis-findings/{id}/pattern-to-existing-schedule-preview": {
 			"get": {
-				"operationId": "preview-pattern-to-existing-rule",
+				"operationId": "preview-pattern-to-existing-schedule",
 				"parameters": [
 					{
 						"in": "path",
@@ -6168,7 +6388,7 @@
 					{
 						"explode": false,
 						"in": "query",
-						"name": "ruleId",
+						"name": "scheduleId",
 						"schema": {
 							"maxLength": 100,
 							"type": "string"
@@ -6180,7 +6400,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/Preview-pattern-to-existing-ruleResponse"
+									"$ref": "#/components/schemas/Preview-pattern-to-existing-scheduleResponse"
 								}
 							}
 						},
@@ -6204,12 +6424,12 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Preview adding a confirmed pattern's payments to an existing forecast rule"
+				"summary": "Preview adding a confirmed pattern's payments to an existing schedule"
 			}
 		},
-		"/v1/analysis-findings/{id}/pattern-to-new-rule": {
+		"/v1/analysis-findings/{id}/pattern-to-new-schedule": {
 			"post": {
-				"operationId": "create-pattern-to-new-rule",
+				"operationId": "create-pattern-to-new-schedule",
 				"parameters": [
 					{
 						"in": "path",
@@ -6225,7 +6445,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/Create-pattern-to-new-ruleResponse"
+									"$ref": "#/components/schemas/Create-pattern-to-new-scheduleResponse"
 								}
 							}
 						},
@@ -6242,12 +6462,12 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Create the approved forecast rule for a confirmed repeating pattern"
+				"summary": "Create the approved schedule for a confirmed repeating pattern"
 			}
 		},
-		"/v1/analysis-findings/{id}/pattern-to-new-rule-preview": {
+		"/v1/analysis-findings/{id}/pattern-to-new-schedule-preview": {
 			"get": {
-				"operationId": "preview-pattern-to-new-rule",
+				"operationId": "preview-pattern-to-new-schedule",
 				"parameters": [
 					{
 						"in": "path",
@@ -6263,7 +6483,7 @@
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/Preview-pattern-to-new-ruleResponse"
+									"$ref": "#/components/schemas/Preview-pattern-to-new-scheduleResponse"
 								}
 							}
 						},
@@ -6287,7 +6507,7 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Preview the forecast rule a confirmed repeating pattern would create"
+				"summary": "Preview the schedule a confirmed repeating pattern would create"
 			}
 		},
 		"/v1/auth/change-password": {
@@ -7168,6 +7388,44 @@
 				"summary": "Scan Gmail for purchase and refund receipts"
 			}
 		},
+		"/v1/model/import": {
+			"post": {
+				"operationId": "import-model",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ImportModelBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ImportModelOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Replace the reviewed model"
+			}
+		},
 		"/v1/payment-terms": {
 			"post": {
 				"operationId": "save-payment-terms",
@@ -7530,297 +7788,6 @@
 					}
 				},
 				"summary": "Resolve current balances without a forecast"
-			}
-		},
-		"/v1/postings": {
-			"post": {
-				"operationId": "create-posting",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/PostingBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/WriteResultPosting"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Create one posting"
-			}
-		},
-		"/v1/postings/reorder": {
-			"post": {
-				"operationId": "move-posting",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/ReorderInputBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Move one posting"
-			}
-		},
-		"/v1/postings/{id}": {
-			"delete": {
-				"operationId": "delete-posting",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Delete one posting"
-			},
-			"patch": {
-				"operationId": "update-posting",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/PostingUpdateBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/WriteResultPosting"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Update the edited fields of one posting"
-			}
-		},
-		"/v1/postings/{id}/category": {
-			"patch": {
-				"operationId": "set-posting-category",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/PostingCategoryBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/PostingCategoryOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Set or clear one transaction category"
-			}
-		},
-		"/v1/postings/{id}/receipts": {
-			"get": {
-				"operationId": "list-receipts",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/List-receiptsResponse"
-								}
-							}
-						},
-						"description": "OK",
-						"headers": {
-							"Cache-Control": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List private receipt evidence for a saved posting"
-			}
-		},
-		"/v1/postings/{id}/settle-candidates": {
-			"get": {
-				"operationId": "list-settle-candidates",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/SettleCandidatesOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List posted charges that could settle a vanished hold"
 			}
 		},
 		"/v1/projections/deterministic": {
@@ -8271,204 +8238,6 @@
 				"summary": "Replace receipt image and clear receipt content"
 			}
 		},
-		"/v1/recurrence-rules": {
-			"get": {
-				"operationId": "list-recurrence-rules",
-				"parameters": [
-					{
-						"description": "Only rules touching this account",
-						"explode": false,
-						"in": "query",
-						"name": "accountId",
-						"schema": {
-							"description": "Only rules touching this account",
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/RecurrenceRuleListOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "List recurrence rules touching an account"
-			},
-			"post": {
-				"operationId": "create-rule",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/RuleBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/WriteResultRecurrenceRule"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Create one recurrence rule"
-			}
-		},
-		"/v1/recurrence-rules/reorder": {
-			"post": {
-				"operationId": "move-rule",
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/ReorderInputBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Move one recurrence rule"
-			}
-		},
-		"/v1/recurrence-rules/{id}": {
-			"delete": {
-				"operationId": "delete-rule",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/ReorderOutputBody"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Delete one recurrence rule"
-			},
-			"patch": {
-				"operationId": "update-rule",
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				],
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/RuleUpdateBody"
-							}
-						}
-					},
-					"required": true
-				},
-				"responses": {
-					"200": {
-						"content": {
-							"application/json": {
-								"schema": {
-									"$ref": "#/components/schemas/WriteResultRecurrenceRule"
-								}
-							}
-						},
-						"description": "OK"
-					},
-					"default": {
-						"content": {
-							"application/problem+json": {
-								"schema": {
-									"$ref": "#/components/schemas/ErrorModel"
-								}
-							}
-						},
-						"description": "Error"
-					}
-				},
-				"summary": "Update the edited fields of one recurrence rule"
-			}
-		},
 		"/v1/safe-spending-settings": {
 			"get": {
 				"operationId": "get-safe-spending-settings",
@@ -8531,6 +8300,312 @@
 					}
 				},
 				"summary": "Save safe card spending settings"
+			}
+		},
+		"/v1/schedules": {
+			"get": {
+				"operationId": "list-schedules",
+				"parameters": [
+					{
+						"description": "Only schedules touching this account",
+						"explode": false,
+						"in": "query",
+						"name": "accountId",
+						"schema": {
+							"description": "Only schedules touching this account",
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ScheduleListOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List schedules touching an account"
+			},
+			"post": {
+				"operationId": "create-schedule",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ScheduleCreateBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultSchedule"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Create one schedule"
+			}
+		},
+		"/v1/schedules/{id}": {
+			"delete": {
+				"operationId": "delete-schedule",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Delete one schedule"
+			}
+		},
+		"/v1/schedules/{id}/amend": {
+			"post": {
+				"operationId": "amend-schedule",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ScheduleAmendBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultSchedule"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Amend the terms of one schedule"
+			}
+		},
+		"/v1/schedules/{id}/end-with-transaction": {
+			"post": {
+				"operationId": "end-schedule-with-transaction",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ScheduleEndBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ScheduleEndOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Record one transaction and remove its schedule"
+			}
+		},
+		"/v1/schedules/{id}/move": {
+			"post": {
+				"operationId": "move-schedule",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Move-scheduleRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one schedule in same-day execution order"
+			}
+		},
+		"/v1/schedules/{id}/reschedule": {
+			"post": {
+				"operationId": "reschedule-schedule",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ScheduleRescheduleBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultSchedule"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Change the cadence or window of one schedule"
 			}
 		},
 		"/v1/status": {
@@ -8940,7 +9015,43 @@
 						"description": "Error"
 					}
 				},
-				"summary": "List postings touching an account"
+				"summary": "List recorded transactions touching an account"
+			},
+			"post": {
+				"operationId": "record-transaction",
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TransactionRecordBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultPosting"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Record one transaction"
 			}
 		},
 		"/v1/transactions/catalog": {
@@ -8968,12 +9079,12 @@
 						"description": "Error"
 					}
 				},
-				"summary": "List transaction reference triples"
+				"summary": "List transaction and schedule references"
 			}
 		},
-		"/v1/transactions/{id}/convert": {
-			"post": {
-				"operationId": "convert-transaction",
+		"/v1/transactions/{id}": {
+			"delete": {
+				"operationId": "delete-transaction",
 				"parameters": [
 					{
 						"in": "path",
@@ -8984,22 +9095,12 @@
 						}
 					}
 				],
-				"requestBody": {
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/ConvertTransactionBody"
-							}
-						}
-					},
-					"required": true
-				},
 				"responses": {
 					"200": {
 						"content": {
 							"application/json": {
 								"schema": {
-									"$ref": "#/components/schemas/ConvertTransactionOutputBody"
+									"$ref": "#/components/schemas/ReorderOutputBody"
 								}
 							}
 						},
@@ -9016,7 +9117,368 @@
 						"description": "Error"
 					}
 				},
-				"summary": "Move one transaction across the posting/rule tables"
+				"summary": "Delete one recorded transaction"
+			}
+		},
+		"/v1/transactions/{id}/amend": {
+			"post": {
+				"operationId": "amend-transaction",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TransactionAmendBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultPosting"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Amend the terms of one transaction"
+			}
+		},
+		"/v1/transactions/{id}/categorize": {
+			"post": {
+				"operationId": "categorize-transaction",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TransactionCategoryBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TransactionCategoryOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Set or clear one transaction category"
+			}
+		},
+		"/v1/transactions/{id}/claim": {
+			"post": {
+				"operationId": "claim-occurrence",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TransactionClaimBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultPosting"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Record which schedule occurrence a transaction fulfils"
+			}
+		},
+		"/v1/transactions/{id}/move": {
+			"post": {
+				"operationId": "move-transaction",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Move-transactionRequest"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReorderOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Move one transaction in same-day execution order"
+			}
+		},
+		"/v1/transactions/{id}/receipts": {
+			"get": {
+				"operationId": "list-receipts",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/List-receiptsResponse"
+								}
+							}
+						},
+						"description": "OK",
+						"headers": {
+							"Cache-Control": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List private receipt evidence for a recorded transaction"
+			}
+		},
+		"/v1/transactions/{id}/release": {
+			"post": {
+				"operationId": "release-occurrence",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultPosting"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Release a transaction from its schedule occurrence"
+			}
+		},
+		"/v1/transactions/{id}/schedule": {
+			"post": {
+				"operationId": "schedule-from-transaction",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ScheduleFromTransactionBody"
+							}
+						}
+					},
+					"required": true
+				},
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/WriteResultSchedule"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "Start a schedule from a recorded transaction"
+			}
+		},
+		"/v1/transactions/{id}/settle-candidates": {
+			"get": {
+				"operationId": "list-settle-candidates",
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SettleCandidatesOutputBody"
+								}
+							}
+						},
+						"description": "OK"
+					},
+					"default": {
+						"content": {
+							"application/problem+json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorModel"
+								}
+							}
+						},
+						"description": "Error"
+					}
+				},
+				"summary": "List posted charges that could settle a vanished hold"
 			}
 		}
 	}

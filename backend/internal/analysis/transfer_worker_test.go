@@ -87,7 +87,7 @@ func TestWorkerPairsCreditCardPaymentLegs(t *testing.T) {
 	if revision, _ := store.ModelETag(model); revision == "" {
 		t.Fatal("missing model")
 	}
-	if len(model.RecurrenceRules) != 0 {
+	if len(model.Schedules) != 0 {
 		t.Fatal("analysis changed financial state")
 	}
 }

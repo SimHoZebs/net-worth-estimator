@@ -2,8 +2,7 @@ import * as errore from "errore";
 import type { FinancialModel } from "@/api/contracts.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { responseScopeError } from "@/api/scopedRequest.ts";
-import { getFinancialModel } from "@/api/generated/endpoints.ts";
-import { applyModelChanges, diffFinancialModels } from "@/api/modelChanges.ts";
+import { importModel } from "@/api/generated/endpoints.ts";
 
 export const READ_ONLY_IMPORT_MESSAGE =
 	"The server is read-only. The selected model was not uploaded.";
@@ -23,9 +22,9 @@ export type ServerModelImportOptions = {
 	reload: () => Promise<void>;
 };
 
-// The recovery callback owns initial activation. Replacement diffs the
-// reviewed model against the current server model and applies model changes
-// operations, then reloads authoritative state.
+// The server owns the import diff: authored fields come from the document,
+// stored lifecycle state stays in place, and row order follows the document.
+// The client sends one document and reloads authoritative state.
 export async function importServerModel({
 	model,
 	preconditions,
@@ -45,21 +44,16 @@ export async function importServerModel({
 			detail:
 				"Wait for the current server operation to finish before importing a model.",
 		});
-	let current: FinancialModel | null;
+	let applied: Awaited<ReturnType<typeof importModel>>;
 	try {
-		current = (await getFinancialModel()).data.model as FinancialModel | null;
+		applied = await importModel({ model: model as never });
 	} catch (cause) {
 		return cause instanceof Error ? cause : new Error(String(cause));
 	}
-	const stale = responseScopeError(scope);
-	if (stale) return stale;
-	const operations = diffFinancialModels(current, model);
-	const applied = await applyModelChanges(operations);
 	const changed = responseScopeError(scope);
 	if (changed) return changed;
-	if (applied instanceof Error) return applied;
-	if (!applied.ok) {
-		const details = applied.issues
+	if (!applied.data.saved) {
+		const details = (applied.data.issues ?? [])
 			.filter((issue) => issue.severity === "error")
 			.map((issue) => issue.message)
 			.filter(Boolean)

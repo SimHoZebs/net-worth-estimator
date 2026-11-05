@@ -59,7 +59,9 @@ function stubInbox(items: InboxShareItem[], unreadCount = items.length) {
 									? "declined"
 									: last.status,
 						copyPostingId:
-							path === "/v1/inbox/shares/accept" ? "copy-1" : last.copyPostingId,
+							path === "/v1/inbox/shares/accept"
+								? "copy-1"
+								: last.copyPostingId,
 						dismissed:
 							path === "/v1/inbox/shares/dismiss" ? true : last.dismissed,
 						unread: path === "/v1/inbox/shares/read" ? false : last.unread,
@@ -112,7 +114,9 @@ it("accepts a share without duplicating the request", async () => {
 	const { requested, bodies } = stubInbox([item()]);
 	render(<InboxPage />, { wrapper });
 	await waitFor(() => expect(screen.getByText("Dinner bill")).toBeTruthy());
-	fireEvent.click(screen.getByRole("button", { name: "Accept and save a copy" }));
+	fireEvent.click(
+		screen.getByRole("button", { name: "Accept and save a copy" }),
+	);
 	await waitFor(() =>
 		expect(
 			requested.filter((entry) => entry === "POST /v1/inbox/shares/accept"),
@@ -131,9 +135,7 @@ it("hides dismissed shares until the toggle reveals them", async () => {
 });
 
 it("explains canceled shares without a preview", async () => {
-	stubInbox([
-		item({ status: "canceled", unread: false, posting: undefined }),
-	]);
+	stubInbox([item({ status: "canceled", unread: false, posting: undefined })]);
 	render(<InboxPage />, { wrapper });
 	fireEvent.click(screen.getByRole("tab", { name: "Canceled" }));
 	await waitFor(() =>

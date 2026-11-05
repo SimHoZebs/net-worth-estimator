@@ -166,11 +166,11 @@ export function Transactions({
 							accounts={accounts}
 							transactions={rows}
 							readOnly={readOnly}
-							claimRuleName={
-								selected.savedTransaction.claimRuleId
+							claimScheduleName={
+								selected.savedTransaction.claimScheduleId
 									? (rows.find(
 											(item) =>
-												item.id === selected.savedTransaction.claimRuleId,
+												item.id === selected.savedTransaction.claimScheduleId,
 										)?.name ?? null)
 									: null
 							}

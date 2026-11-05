@@ -8,8 +8,8 @@ import {
 } from "../domain/model.ts";
 import type { EditorTarget } from "../domain/accountEdits.ts";
 import { useRemoteProjection } from "../state/useRemoteProjection.ts";
-import { useRecurrenceRules } from "../state/workspaceResources.ts";
-import { ruleToDisplay } from "../domain/transactionRows.ts";
+import { useSchedules } from "../state/workspaceResources.ts";
+import { scheduleToDisplay } from "../domain/transactionRows.ts";
 import { AccountIcon } from "./AccountIcon.tsx";
 import { AccountDetails } from "./activity/AccountDetails.tsx";
 import { RecurringRules } from "./activity/RecurringRules.tsx";
@@ -59,8 +59,8 @@ export function AccountDialog({
 			}),
 		[account.id, accounts, transactions, startDate, projection],
 	);
-	const rulesQuery = useRecurrenceRules();
-	const rules = rulesQuery.data?.recurrenceRules ?? null;
+	const rulesQuery = useSchedules();
+	const rules = rulesQuery.data?.schedules ?? null;
 	const accountRules = useMemo(
 		() =>
 			(rules ?? []).filter(
@@ -71,7 +71,7 @@ export function AccountDialog({
 		[rules, account.id],
 	);
 	const recurring = useMemo(
-		() => accountRules.map(ruleToDisplay),
+		() => accountRules.map(scheduleToDisplay),
 		[accountRules],
 	);
 	// The activity tab maps projected occurrences back to their saved

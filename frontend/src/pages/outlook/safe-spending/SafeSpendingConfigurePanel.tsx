@@ -89,7 +89,7 @@ export function SafeSpendingConfigurePanel({
 			</fieldset>
 			<IncomeSourcesFieldset
 				income={income}
-				onChange={(incomeRuleIds) => onUpdateConfig({ incomeRuleIds })}
+				onChange={(incomeScheduleIds) => onUpdateConfig({ incomeScheduleIds })}
 			/>
 			<fieldset className="grid gap-3">
 				<legend className="m-0 mb-1 p-0 text-xs font-semibold text-muted">

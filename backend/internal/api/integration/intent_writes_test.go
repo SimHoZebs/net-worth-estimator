@@ -125,20 +125,20 @@ func TestUpdateAccountWithMovedBalance(t *testing.T) {
 
 func ruleRequestBody(t *testing.T, handler interface {
 	ServeHTTP(http.ResponseWriter, *http.Request)
-}, method, path, body string) writeResult[types.RecurrenceRule] {
+}, method, path, body string) writeResult[types.Schedule] {
 	t.Helper()
 	response := doRowRequest(t, handler, method, path, body)
 	if response.Code != http.StatusOK {
 		t.Fatalf("%s %s status = %d, body %s", method, path, response.Code, response.Body.String())
 	}
-	var result writeResult[types.RecurrenceRule]
+	var result writeResult[types.Schedule]
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	return result
 }
 
-func TestCreateRuleDefaultsPriority(t *testing.T) {
+func TestCreateScheduleDefaultsPriority(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
@@ -147,21 +147,21 @@ func TestCreateRuleDefaultsPriority(t *testing.T) {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
 	base := `{"name":"%s","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true%s}`
-	first := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", fmt.Sprintf(base, "First", ""))
+	first := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules", fmt.Sprintf(base, "First", ""))
 	if !first.Saved || first.Result.Priority != 0 {
 		t.Fatalf("first rule = %+v", first)
 	}
-	second := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", fmt.Sprintf(base, "Second", ""))
+	second := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules", fmt.Sprintf(base, "Second", ""))
 	if second.Result.Priority != 1 {
 		t.Fatalf("second rule priority = %d, want 1", second.Result.Priority)
 	}
-	explicit := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", fmt.Sprintf(base, "Explicit", `,"priority":10`))
+	explicit := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules", fmt.Sprintf(base, "Explicit", `,"priority":10`))
 	if explicit.Result.Priority != 10 {
 		t.Fatalf("explicit rule priority = %d, want 10", explicit.Result.Priority)
 	}
 }
 
-func TestUpdateRuleKeepsUnmodeledFields(t *testing.T) {
+func TestUpdateScheduleKeepsUnmodeledFields(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
@@ -169,13 +169,13 @@ func TestUpdateRuleKeepsUnmodeledFields(t *testing.T) {
 	if seeded.Code != http.StatusOK {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
-	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules",
+	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules",
 		`{"id":"rule-1","name":"Rule","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true,"priority":7,"annualCap":500}`)
 	if created.Result.Priority != 7 || created.Result.AnnualCap == nil || *created.Result.AnnualCap != 500 {
 		t.Fatalf("created rule = %+v", created.Result)
 	}
-	updated := ruleRequestBody(t, handler, http.MethodPatch, "/v1/recurrence-rules/rule-1",
-		`{"name":"Renamed","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"10"},"inputs":{}},"enabled":true}`)
+	updated := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules/rule-1/amend",
+		`{"name":"Renamed"}`)
 	if updated.Result.Name != "Renamed" {
 		t.Fatalf("updated rule = %+v", updated.Result)
 	}
@@ -189,7 +189,7 @@ func TestUpdateRuleKeepsUnmodeledFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	stored := model.RecurrenceRules[0]
+	stored := model.Schedules[0]
 	if stored.Priority != 7 || stored.AnnualCap == nil || *stored.AnnualCap != 500 {
 		t.Fatalf("stored rule = %+v", stored)
 	}
@@ -241,7 +241,66 @@ func TestUpdateEvaluationMovesType(t *testing.T) {
 	}
 }
 
-func TestConvertTransactionAcrossTables(t *testing.T) {
+func TestStartScheduleFromTransactionKeepsFact(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	for _, account := range []string{"checking", "savings"} {
+		seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
+			`{"id":"`+account+`","name":"`+account+`","kind":"cash","enabled":true}`)
+		if seeded.Code != http.StatusOK {
+			t.Fatalf("seed account status = %d", seeded.Code)
+		}
+	}
+	created := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Rent","sourceAccountId":"checking","destinations":["savings"],"amount":{"value":100},"date":"2026-07-02","enabled":true}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("record status = %d, body %s", created.Code, created.Body.String())
+	}
+	recorded := decodeWriteResult[types.Posting](t, created.Code, created.Body.Bytes())
+	if !recorded.Saved {
+		t.Fatalf("record issues = %+v", recorded.Issues)
+	}
+	started := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+recorded.Result.ID+"/schedule",
+		`{"frequency":"monthly","startDate":"2026-07-02"}`)
+	if started.Code != http.StatusOK {
+		t.Fatalf("schedule-from-transaction status = %d, body %s", started.Code, started.Body.String())
+	}
+	schedule := decodeWriteResult[types.Schedule](t, started.Code, started.Body.Bytes())
+	if !schedule.Saved || schedule.Result.Frequency != "monthly" || schedule.Result.StartDate != "2026-07-02" {
+		t.Fatalf("schedule = %+v", schedule)
+	}
+	model, err := database.LoadModel()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(model.Postings) != 1 || model.Postings[0].ID != recorded.Result.ID {
+		t.Fatalf("postings = %+v, want the recorded transaction kept", model.Postings)
+	}
+	if model.Postings[0].Claim == nil || model.Postings[0].Claim.ScheduleID != schedule.Result.ID ||
+		model.Postings[0].Claim.OccurrenceDate != "2026-07-02" {
+		t.Fatalf("claim = %+v, want the first occurrence", model.Postings[0].Claim)
+	}
+	if len(model.Schedules) != 1 || model.Schedules[0].ID != schedule.Result.ID {
+		t.Fatalf("schedules = %+v", model.Schedules)
+	}
+	again := doRowRequest(t, handler, http.MethodPost,
+		"/v1/transactions/"+recorded.Result.ID+"/schedule",
+		`{"frequency":"monthly","startDate":"2026-07-02"}`)
+	if again.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("second start status = %d, want 422, body %s", again.Code, again.Body.String())
+	}
+	after, err := database.LoadModel()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(after.Schedules) != 1 ||
+		after.Postings[0].Claim == nil ||
+		after.Postings[0].Claim.ScheduleID != schedule.Result.ID {
+		t.Fatalf("second start changed the model: schedules=%+v claim=%+v", after.Schedules, after.Postings[0].Claim)
+	}
+}
+
+func TestEndScheduleWithTransactionRecordsFact(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{})
 	seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
@@ -249,60 +308,81 @@ func TestConvertTransactionAcrossTables(t *testing.T) {
 	if seeded.Code != http.StatusOK {
 		t.Fatalf("seed account status = %d", seeded.Code)
 	}
-	ruleBody := `{"name":"Invest","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-01","amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"enabled":true}`
-	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/recurrence-rules", ruleBody)
-	convert := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
-		`{"kind":"posting","posting":{"name":"Invest","sourceAccountId":"checking","postedTime":1782950400,"transactionTime":1782950400,"amount":{"resolver":"expression","config":{"expression":"100"},"inputs":{}},"enabled":true}}`)
-	if convert.Code != http.StatusOK {
-		t.Fatalf("convert status = %d, body %s", convert.Code, convert.Body.String())
+	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules",
+		`{"name":"Gym","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-05","amount":{"value":45},"enabled":true}`)
+	ended := doRowRequest(t, handler, http.MethodPost, "/v1/schedules/"+created.Result.ID+"/end-with-transaction",
+		`{"date":"2026-07-05"}`)
+	if ended.Code != http.StatusOK {
+		t.Fatalf("end status = %d, body %s", ended.Code, ended.Body.String())
+	}
+	var body struct {
+		Result          types.Posting `json:"value"`
+		EndedScheduleID string        `json:"endedScheduleId"`
+		Saved           bool          `json:"saved"`
+	}
+	if err := json.Unmarshal(ended.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !body.Saved || body.EndedScheduleID != created.Result.ID || body.Result.Name != "Gym" {
+		t.Fatalf("ended = %+v", body)
 	}
 	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if len(model.RecurrenceRules) != 0 {
-		t.Fatalf("rules = %+v, want the old row gone", model.RecurrenceRules)
+	if len(model.Schedules) != 0 {
+		t.Fatalf("schedules = %+v, want none", model.Schedules)
 	}
-	if len(model.Postings) != 1 || model.Postings[0].ID != created.Result.ID || model.Postings[0].Name != "Invest" {
-		t.Fatalf("postings = %+v", model.Postings)
-	}
-
-	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
-		`{"kind":"rule","rule":`+ruleBody+`}`)
-	if back.Code != http.StatusOK {
-		t.Fatalf("convert back status = %d, body %s", back.Code, back.Body.String())
-	}
-	model, err = database.LoadModel()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if len(model.Postings) != 0 || len(model.RecurrenceRules) != 1 {
-		t.Fatalf("round trip tables = %+v / %+v", model.Postings, model.RecurrenceRules)
-	}
-
-	sameKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
-		`{"kind":"rule","rule":`+ruleBody+`}`)
-	if sameKind.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("same-kind status = %d, want 422, body %s", sameKind.Code, sameKind.Body.String())
-	}
-	missing := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/ghost/convert",
-		`{"kind":"posting","posting":{"name":"Ghost","sourceAccountId":"checking","postedTime":1,"transactionTime":1,"amount":{"resolver":"expression","config":{"expression":"1"},"inputs":{}},"enabled":true}}`)
-	if missing.Code != http.StatusNotFound {
-		t.Fatalf("missing status = %d, want 404, body %s", missing.Code, missing.Body.String())
-	}
-	badKind := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/convert",
-		`{"kind":"ledger"}`)
-	if badKind.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("bad kind status = %d, want 422, body %s", badKind.Code, badKind.Body.String())
+	if len(model.Postings) != 1 || model.Postings[0].Name != "Gym" || model.Postings[0].TransactionTime <= 0 {
+		t.Fatalf("postings = %+v, want the recorded fact", model.Postings)
 	}
 }
 
-func TestConvertTransactionRespectsReadOnly(t *testing.T) {
+func TestDeleteScheduleReleasesClaims(t *testing.T) {
+	database := openAPIStore(t)
+	handler := New(database, Config{})
+	seeded := doRowRequest(t, handler, http.MethodPost, "/v1/accounts",
+		`{"id":"checking","name":"Checking","kind":"cash","enabled":true}`)
+	if seeded.Code != http.StatusOK {
+		t.Fatalf("seed account status = %d", seeded.Code)
+	}
+	created := ruleRequestBody(t, handler, http.MethodPost, "/v1/schedules",
+		`{"name":"Gym","sourceAccountId":"checking","frequency":"monthly","startDate":"2026-01-05","amount":{"value":45},"enabled":true}`)
+	transaction := doRowRequest(t, handler, http.MethodPost, "/v1/transactions",
+		`{"name":"Gym visit","sourceAccountId":"checking","amount":{"value":45},"date":"2026-01-05","enabled":true,"claim":{"scheduleId":"`+created.Result.ID+`","occurrenceDate":"2026-01-05"}}`)
+	if transaction.Code != http.StatusOK {
+		t.Fatalf("record status = %d, body %s", transaction.Code, transaction.Body.String())
+	}
+	deleted := doRowRequest(t, handler, http.MethodDelete, "/v1/schedules/"+created.Result.ID, "")
+	if deleted.Code != http.StatusOK {
+		t.Fatalf("delete status = %d, body %s", deleted.Code, deleted.Body.String())
+	}
+	model, err := database.LoadModel()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(model.Schedules) != 0 {
+		t.Fatalf("schedules = %+v, want none", model.Schedules)
+	}
+	if len(model.Postings) != 1 || model.Postings[0].Claim != nil {
+		t.Fatalf("postings = %+v, want the fact without a claim", model.Postings)
+	}
+}
+
+func TestActionWritesRespectReadOnly(t *testing.T) {
 	database := openAPIStore(t)
 	handler := New(database, Config{ReadOnly: true})
-	blocked := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/x/convert", `{"kind":"posting"}`)
-	if blocked.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", blocked.Code)
+	for _, target := range []string{
+		"/v1/transactions/x/amend",
+		"/v1/transactions/x/claim",
+		"/v1/transactions/x/schedule",
+		"/v1/schedules/x/amend",
+		"/v1/schedules/x/end-with-transaction",
+	} {
+		blocked := doRowRequest(t, handler, http.MethodPost, target, `{}`)
+		if blocked.Code != http.StatusForbidden {
+			t.Fatalf("%s status = %d, want 403", target, blocked.Code)
+		}
 	}
 }
 
@@ -330,9 +410,9 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	amount := `{"resolver":"expression","config":{"expression":"10"},"inputs":{}}`
 	postingBody := func(destinations string) string {
 		return `{"name":"Split","destinations":` + destinations +
-			`,"postedTime":1782950400,"transactionTime":1782950400,"amount":` + amount + `,"enabled":true}`
+			`,"date":"2026-07-02","amount":` + amount + `,"enabled":true}`
 	}
-	create := doRowRequest(t, handler, http.MethodPost, "/v1/postings", postingBody(`["checking","savings"]`))
+	create := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", postingBody(`["checking","savings"]`))
 	created := decodeWriteResult[types.Posting](t, create.Code, create.Body.Bytes())
 	if len(created.Result.Destinations) != 2 {
 		t.Fatalf("created destinations = %+v, want both legs", created.Result.Destinations)
@@ -340,7 +420,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 	// A patch that omits destinations keeps the stored multi-destination set:
 	// the editor states only the members an edit changes, so an untouched
 	// route can never trim legs it never modeled.
-	renamed := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Result.ID, `{"name":"Split renamed"}`)
+	renamed := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"name":"Split renamed"}`)
 	updated := decodeWriteResult[types.Posting](t, renamed.Code, renamed.Body.Bytes())
 	if updated.Result.Name != "Split renamed" {
 		t.Fatalf("patched name = %q, want Split renamed", updated.Result.Name)
@@ -352,7 +432,7 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 		t.Fatalf("stored destinations = %+v, want stored legs kept", got)
 	}
 	// An explicit destinations member replaces the set verbatim.
-	moved := doRowRequest(t, handler, http.MethodPatch, "/v1/postings/"+created.Result.ID, `{"destinations":["savings"]}`)
+	moved := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+created.Result.ID+"/amend", `{"destinations":["savings"]}`)
 	replaced := decodeWriteResult[types.Posting](t, moved.Code, moved.Body.Bytes())
 	if len(replaced.Result.Destinations) != 1 || replaced.Result.Destinations[0] != "savings" {
 		t.Fatalf("changed destinations = %+v, want [savings]", replaced.Result.Destinations)
@@ -362,10 +442,10 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 		return `{"name":"SplitRule","destinations":` + destinations +
 			`,"frequency":"monthly","startDate":"2026-01-01","amount":` + amount + `,"enabled":true}`
 	}
-	ruleCreate := doRowRequest(t, handler, http.MethodPost, "/v1/recurrence-rules", ruleBody(`["checking","savings"]`))
-	createdRule := decodeWriteResult[types.RecurrenceRule](t, ruleCreate.Code, ruleCreate.Body.Bytes())
-	ruleEcho := doRowRequest(t, handler, http.MethodPatch, "/v1/recurrence-rules/"+createdRule.Result.ID, `{"name":"SplitRule renamed"}`)
-	updatedRule := decodeWriteResult[types.RecurrenceRule](t, ruleEcho.Code, ruleEcho.Body.Bytes())
+	ruleCreate := doRowRequest(t, handler, http.MethodPost, "/v1/schedules", ruleBody(`["checking","savings"]`))
+	createdRule := decodeWriteResult[types.Schedule](t, ruleCreate.Code, ruleCreate.Body.Bytes())
+	ruleEcho := doRowRequest(t, handler, http.MethodPost, "/v1/schedules/"+createdRule.Result.ID+"/amend", `{"name":"SplitRule renamed"}`)
+	updatedRule := decodeWriteResult[types.Schedule](t, ruleEcho.Code, ruleEcho.Body.Bytes())
 	if len(updatedRule.Result.Destinations) != 2 {
 		t.Fatalf("patched rule destinations = %+v, want stored legs kept", updatedRule.Result.Destinations)
 	}
@@ -373,35 +453,22 @@ func TestUpdateKeepsEchoedDestinations(t *testing.T) {
 		t.Fatalf("patched rule amount = %+v, want stored descriptor kept", updatedRule.Result.Amount)
 	}
 
-	// Convert echoes the display destination the same way, in both directions.
-	splitCreate := doRowRequest(t, handler, http.MethodPost, "/v1/postings", postingBody(`["checking","savings"]`))
+	// Starting a schedule from a recorded transaction carries the stored
+	// multi-destination set into the new instruction.
+	splitCreate := doRowRequest(t, handler, http.MethodPost, "/v1/transactions", postingBody(`["checking","savings"]`))
 	split := decodeWriteResult[types.Posting](t, splitCreate.Code, splitCreate.Body.Bytes())
-	toRule := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/convert",
-		`{"kind":"rule","rule":`+ruleBody(`["checking"]`)+`}`)
-	if toRule.Code != http.StatusOK {
-		t.Fatalf("convert status = %d, body %s", toRule.Code, toRule.Body.String())
+	toSchedule := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/schedule",
+		`{"frequency":"monthly","startDate":"2026-04-01"}`)
+	if toSchedule.Code != http.StatusOK {
+		t.Fatalf("start schedule status = %d, body %s", toSchedule.Code, toSchedule.Body.String())
 	}
 	model, err := database.LoadModel()
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	for _, existing := range model.RecurrenceRules {
-		if existing.ID == split.Result.ID && len(existing.Destinations) != 2 {
-			t.Fatalf("converted rule destinations = %+v, want echoed legs kept", existing.Destinations)
-		}
-	}
-	back := doRowRequest(t, handler, http.MethodPost, "/v1/transactions/"+split.Result.ID+"/convert",
-		`{"kind":"posting","posting":`+postingBody(`["checking"]`)+`}`)
-	if back.Code != http.StatusOK {
-		t.Fatalf("convert back status = %d, body %s", back.Code, back.Body.String())
-	}
-	model, err = database.LoadModel()
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	for _, existing := range model.Postings {
-		if existing.ID == split.Result.ID && len(existing.Destinations) != 2 {
-			t.Fatalf("converted posting destinations = %+v, want echoed legs kept", existing.Destinations)
+	for _, existing := range model.Schedules {
+		if existing.Name == split.Result.Name && len(existing.Destinations) != 2 {
+			t.Fatalf("started schedule destinations = %+v, want both legs kept", existing.Destinations)
 		}
 	}
 }

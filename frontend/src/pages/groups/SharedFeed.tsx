@@ -19,7 +19,11 @@ import {
 	transactionAmountStyles,
 	transactionBadgeStyles,
 } from "../../components/activity/activityStyles.ts";
-import { dateLabel, exactMoney, isoDateFromEpochSeconds } from "@/domain/format.ts";
+import {
+	dateLabel,
+	exactMoney,
+	isoDateFromEpochSeconds,
+} from "@/domain/format.ts";
 import { literalAmountOf } from "@/domain/transactionRows.ts";
 import { notifyError, notifySuccess } from "../../state/notifications.ts";
 import { serverQueryClient } from "../../state/serverQuery.ts";
@@ -137,8 +141,7 @@ export function SharedFeed({
 						{exactMoney(totals.totalAmount)} shared
 						{totals.varyingCount > 0 &&
 							` · ${totals.varyingCount} calculated amount${totals.varyingCount === 1 ? "" : "s"} not summed`}
-						{totals.pendingCount > 0 &&
-							` · ${totals.pendingCount} pending`}
+						{totals.pendingCount > 0 && ` · ${totals.pendingCount} pending`}
 					</p>
 				)}
 			</div>
@@ -179,13 +182,11 @@ export function SharedFeed({
 					}
 				>
 					<option value="">All movements</option>
-					{(Object.keys(DIRECTION_LABELS) as FeedDirection[]).map(
-						(value) => (
-							<option key={value} value={value}>
-								{DIRECTION_LABELS[value]}
-							</option>
-						),
-					)}
+					{(Object.keys(DIRECTION_LABELS) as FeedDirection[]).map((value) => (
+						<option key={value} value={value}>
+							{DIRECTION_LABELS[value]}
+						</option>
+					))}
 				</SelectField>
 			</form>
 
@@ -210,9 +211,7 @@ export function SharedFeed({
 					{items.map((item) => {
 						const key = `${item.ownerUserId}/${item.posting.id}`;
 						const literal = literalAmountOf(item.posting.amount);
-						const day = isoDateFromEpochSeconds(
-							item.posting.transactionTime,
-						);
+						const day = isoDateFromEpochSeconds(item.posting.transactionTime);
 						const from = item.posting.sourceAccountId;
 						const to = item.posting.destinations;
 						const tone = from
@@ -231,24 +230,17 @@ export function SharedFeed({
 						return (
 							<TransactionItemRow
 								key={key}
-								date={
-									<time dateTime={day}>{dateLabel(day, true)}</time>
-								}
+								date={<time dateTime={day}>{dateLabel(day, true)}</time>}
 								icon={<DirectionIcon size={16} aria-hidden="true" />}
 								tone={tone}
 								title={item.posting.name}
 								slots={{
 									subtitle: (
 										<span>
-											Shared by {item.sourceDisplayName} ·{" "}
-											{audienceLabel(item)}
+											Shared by {item.sourceDisplayName} · {audienceLabel(item)}
 										</span>
 									),
-									mobile: (
-										<time dateTime={day}>
-											{dateLabel(day, true)}
-										</time>
-									),
+									mobile: <time dateTime={day}>{dateLabel(day, true)}</time>,
 									badges: (item.posting.pending || isSaved) && (
 										<>
 											{item.posting.pending && (
@@ -290,14 +282,14 @@ export function SharedFeed({
 													? `−${exactMoney(literal)}`
 													: exactMoney(literal)}
 										</strong>
-										)
-									}
-									actionLabel={`Save a copy of ${item.posting.name} on ${dateLabel(day, true)}${item.posting.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
-									onSelect={() => void onSave(item)}
-									selectDisabled={isSaved || busy}
-								/>
-							);
-						})}
+									)
+								}
+								actionLabel={`Save a copy of ${item.posting.name} on ${dateLabel(day, true)}${item.posting.pending ? "; pending" : ""}${busy ? "; saving" : ""}`}
+								onSelect={() => void onSave(item)}
+								selectDisabled={isSaved || busy}
+							/>
+						);
+					})}
 				</TransactionTable>
 			)}
 

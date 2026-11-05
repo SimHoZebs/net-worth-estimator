@@ -55,7 +55,7 @@ func ledgerDeletePhantom(t *testing.T, world *ledgerWorld) {
 	if len(ids) != 1 {
 		t.Fatalf("phantom rows = %d, want the 1 synced row before deletion", len(ids))
 	}
-	request := httptest.NewRequest(http.MethodDelete, "/v1/postings/"+ids[0], nil)
+	request := httptest.NewRequest(http.MethodDelete, "/v1/transactions/"+ids[0], nil)
 	response := httptest.NewRecorder()
 	world.plan.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {

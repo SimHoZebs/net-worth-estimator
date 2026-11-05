@@ -49,7 +49,7 @@ describe("isolated purchase evaluation", () => {
 	it("never derives a baseline start date from a planned purchase", () => {
 		const model = fixtureModel();
 		model.checkpoints = [];
-		model.recurrenceRules = [];
+		model.schedules = [];
 		model.postings = [
 			{
 				id: "real",

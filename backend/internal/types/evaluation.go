@@ -69,12 +69,12 @@ type CycleFulfillmentConfig struct {
 // addition with the same identity. The simulator overlays this set in a branch
 // without mutating saved rows. Promote replays it as sequential row writes.
 type WhatIfConfig struct {
-	AddedAccounts      []Account        `json:"addedAccounts,omitempty"`
-	AddedPostings      []Posting        `json:"addedPostings,omitempty"`
-	AddedRules         []RecurrenceRule `json:"addedRules,omitempty"`
-	DisabledAccountIDs []string         `json:"disabledAccountIds,omitempty"`
-	DisabledPostingIDs []string         `json:"disabledPostingIds,omitempty"`
-	DisabledRuleIDs    []string         `json:"disabledRuleIds,omitempty"`
+	AddedAccounts       []Account  `json:"addedAccounts,omitempty"`
+	AddedPostings       []Posting  `json:"addedPostings,omitempty"`
+	AddedRules          []Schedule `json:"addedSchedules,omitempty"`
+	DisabledAccountIDs  []string   `json:"disabledAccountIds,omitempty"`
+	DisabledPostingIDs  []string   `json:"disabledPostingIds,omitempty"`
+	DisabledScheduleIDs []string   `json:"disabledScheduleIds,omitempty"`
 }
 
 // EvaluationInstance is the generic configured evaluation row.

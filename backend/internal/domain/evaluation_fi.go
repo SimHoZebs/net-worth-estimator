@@ -370,7 +370,7 @@ type fiCycleShared struct {
 	accountsByID                 map[string]types.Account
 	dispositions                 map[string]postingDisposition
 	branchPostings               []types.Posting
-	branchRules                  []types.RecurrenceRule
+	branchRules                  []types.Schedule
 	baseRealizedByDateAndPosting map[string]float64
 	baseEventsByDateAndPosting   map[string]*types.TransactionEvent
 }
@@ -397,9 +397,9 @@ func newFICycleShared(path *types.ProjectionPath, plan *types.FIPlan) *fiCycleSh
 			branchPostings = append(branchPostings, *posting)
 		}
 	}
-	branchRules := []types.RecurrenceRule{}
-	for index := range path.EffectiveModel.RecurrenceRules {
-		rule := &path.EffectiveModel.RecurrenceRules[index]
+	branchRules := []types.Schedule{}
+	for index := range path.EffectiveModel.Schedules {
+		rule := &path.EffectiveModel.Schedules[index]
 		if rule.Enabled && dispositions[rule.ID] != dispositionDisabled {
 			branchRules = append(branchRules, *rule)
 		}
@@ -487,10 +487,10 @@ func evaluateCycleWithShared(path *types.ProjectionPath, plan *types.FIPlan, sha
 	baseRealizedByDateAndPosting := shared.baseRealizedByDateAndPosting
 	baseEventsByDateAndPosting := shared.baseEventsByDateAndPosting
 	transitions := CreateTransitionRuntime(types.SimulationInputs{
-		Accounts:        path.EffectiveModel.Accounts,
-		Postings:        branchPostings,
-		RecurrenceRules: branchRules,
-		PaymentTerms:    path.EffectiveModel.PaymentTerms,
+		Accounts:     path.EffectiveModel.Accounts,
+		Postings:     branchPostings,
+		Schedules:    branchRules,
+		PaymentTerms: path.EffectiveModel.PaymentTerms,
 	}, initializeBranchSimulationState(candidateBalances, path.TransactionEvents, candidate.Date, path), path.ProjectionStartDate, monteCarloSample)
 	balances := transitions.State.Balances
 	selectedAccountIDs := assetRateOrder

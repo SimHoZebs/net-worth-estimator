@@ -243,7 +243,7 @@ export function accountTransactions({
  * synthesizes the representative occurrence so every entry point renders
  * the identical modal instead of maintaining a second implementation.
  */
-export function ruleTransaction({
+export function scheduleTransaction({
 	transaction,
 	accounts,
 	startDate,

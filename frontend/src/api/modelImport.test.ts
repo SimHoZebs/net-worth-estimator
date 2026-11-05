@@ -12,7 +12,7 @@ const model = {
 	accounts: [{ id: "cash", name: "Cash", enabled: true }],
 	checkpoints: [{ AccountId: "cash", Balance: 100, observedAt: 1769903999 }],
 	postings: [{ id: "pay", name: "Pay", enabled: true }],
-	recurrenceRules: [{ id: "salary", name: "Salary", enabled: true }],
+	schedules: [{ id: "salary", name: "Salary", enabled: true }],
 	evaluations: {
 		financialIndependence: [],
 		netWorthThreshold: [],
@@ -52,7 +52,7 @@ describe("server model import parsing", () => {
 		{ ...model, postings: [{ id: "pay", name: 1, enabled: true }] },
 		{
 			...model,
-			recurrenceRules: [{ id: "salary", name: 1, enabled: true }],
+			schedules: [{ id: "salary", name: 1, enabled: true }],
 		},
 	])("rejects an unsafe preview envelope: %j", (value) => {
 		expect(isFinancialModel(value)).toBe(false);
@@ -69,7 +69,7 @@ describe("server model import parsing", () => {
 				accounts: [],
 				checkpoints: [],
 				postings: [],
-				recurrenceRules: [],
+				schedules: [],
 			}),
 		).toBe(true);
 	});
