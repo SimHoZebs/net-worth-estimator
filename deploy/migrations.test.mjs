@@ -761,26 +761,81 @@ test("Northflank serializes exact builds and gates API startup on the shared scr
   assert.equal(steps[7].spec.arguments.variables[0].value, "/app/render-free-boot.sh");
 });
 
-test("GitHub dispatch sends only a pinned SHA and rejects unsafe or failed webhook calls", async () => {
+test("Northflank release waits for a green main Tests run and rejects unsafe calls", async () => {
   const workflow = await readFile(new URL("../.github/workflows/northflank-release.yml", import.meta.url), "utf8");
-  assert.match(workflow, /permissions: \{\}/);
-  assert.match(workflow, /if: github.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /workflows: \["Tests"\]/);
+  assert.match(workflow, /types: \[completed\]/);
+  assert.match(workflow, /branches: \[main\]/);
+  assert.match(workflow, /actions: read/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
   assert.doesNotMatch(workflow, /NORTHFLANK_API_TOKEN/);
   const source = workflow.match(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/)[1]
     .split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n");
   const execute = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", source);
   const sha = "a".repeat(40);
   let request;
+  const webhook = "https://webhooks.northflank.com/workflows/private-fixture";
+  const baseEnv = {
+    EVENT_NAME: "workflow_run",
+    RELEASE_SHA: sha,
+    TESTS_CONCLUSION: "success",
+    TESTS_EVENT: "push",
+    TESTS_BRANCH: "main",
+    RELEASE_WEBHOOK: webhook,
+  };
   const fetch = async (url, options) => { request = { url, options }; return { ok: true }; };
-  const process = { env: { RELEASE_SHA: sha, RELEASE_WEBHOOK: "https://webhooks.northflank.com/workflows/private-fixture" } };
-  await execute(process, fetch, { log() {} });
+  await execute({ env: { ...baseEnv } }, fetch, { log() {} });
   assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
   assert.equal(request.options.redirect, "error");
-  for (const webhook of ["", "https://attacker.invalid/workflows/private", "https://webhooks.northflank.com/workflows/private?override=1"]) {
-    await assert.rejects(execute({ env: { RELEASE_SHA: sha, RELEASE_WEBHOOK: webhook } }, () => assert.fail("Unsafe request"), console));
+
+  for (const red of [{ TESTS_CONCLUSION: "failure" }, { TESTS_EVENT: "pull_request" }, { TESTS_BRANCH: "feature" }]) {
+    await assert.rejects(
+      execute({ env: { ...baseEnv, ...red } }, () => assert.fail("Released off the gate"), { log() {} }),
+      /not a green push to main/,
+    );
   }
-  await assert.rejects(execute(process, async () => ({ ok: false, status: 409 }), console), /HTTP 409/);
-  await assert.rejects(execute({ env: { ...process.env, RELEASE_SHA: "latest" } }, fetch, console), /full release SHA/);
+
+  const dispatchEnv = {
+    EVENT_NAME: "workflow_dispatch",
+    RELEASE_SHA: sha,
+    DISPATCH_REF: "refs/heads/main",
+    GH_TOKEN: "fixture-token",
+    GITHUB_REPOSITORY: "owner/repo",
+    GITHUB_API_URL: "https://api.github.test",
+    RELEASE_WEBHOOK: webhook,
+  };
+  let apiQuery;
+  const dispatchFetch = async (url, options) => {
+    if (String(url).startsWith("https://api.github.test/")) {
+      apiQuery = new URL(url);
+      return { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "success", event: "push", head_branch: "main" }] }) };
+    }
+    request = { url, options };
+    return { ok: true };
+  };
+  await execute({ env: { ...dispatchEnv } }, dispatchFetch, { log() {} });
+  assert.equal(apiQuery.searchParams.get("head_sha"), sha);
+  assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
+
+  const redDispatchFetch = async (url) => String(url).startsWith("https://api.github.test/")
+    ? { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "failure", event: "push", head_branch: "main" }] }) }
+    : assert.fail("Released without a green run");
+  await assert.rejects(
+    execute({ env: { ...dispatchEnv } }, redDispatchFetch, { log() {} }),
+    /No successful main Tests run/,
+  );
+  await assert.rejects(
+    execute({ env: { ...dispatchEnv, DISPATCH_REF: "refs/heads/feature" } }, () => assert.fail("Released from a branch"), { log() {} }),
+    /only releases main/,
+  );
+
+  for (const badWebhook of ["", "https://attacker.invalid/workflows/private", "https://webhooks.northflank.com/workflows/private?override=1"]) {
+    await assert.rejects(execute({ env: { ...baseEnv, RELEASE_WEBHOOK: badWebhook } }, () => assert.fail("Unsafe request"), { log() {} }));
+  }
+  await assert.rejects(execute({ env: { ...baseEnv } }, async () => ({ ok: false, status: 409 }), { log() {} }), /HTTP 409/);
+  await assert.rejects(execute({ env: { ...baseEnv, RELEASE_SHA: "latest" } }, fetch, { log() {} }), /full release SHA/);
 });
 
 test("Northflank command adapter patches only the single API process", async () => {

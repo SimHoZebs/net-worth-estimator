@@ -1,25 +1,67 @@
 name: Request Northflank release
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: northflank-release
+  cancel-in-progress: false
 
 jobs:
   request-release:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Request the gated workflow for this exact commit
+      - name: Request the gated workflow for the tested commit
         env:
           RELEASE_WEBHOOK: ${{ secrets.NORTHFLANK_RELEASE_WEBHOOK }}
-          RELEASE_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          TESTS_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          TESTS_EVENT: ${{ github.event.workflow_run.event }}
+          TESTS_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          DISPATCH_REF: ${{ github.ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           node --input-type=module <<'JS'
           const sha = process.env.RELEASE_SHA;
           if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
+
+          if (process.env.EVENT_NAME === "workflow_run") {
+            if (process.env.TESTS_CONCLUSION !== "success" ||
+                process.env.TESTS_EVENT !== "push" ||
+                process.env.TESTS_BRANCH !== "main") {
+              throw new Error("The Tests workflow run is not a green push to main");
+            }
+          } else if (process.env.EVENT_NAME === "workflow_dispatch") {
+            if (process.env.DISPATCH_REF !== "refs/heads/main") throw new Error("Manual dispatch only releases main");
+            const api = process.env.GITHUB_API_URL ?? "https://api.github.com";
+            const query = new URLSearchParams({ head_sha: sha, status: "completed", per_page: "100" });
+            const response = await fetch(`${api}/repos/${process.env.GITHUB_REPOSITORY}/actions/workflows/tests.yml/runs?${query}`, {
+              headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: "application/vnd.github+json" },
+            });
+            if (!response.ok) throw new Error(`Cannot read Tests runs (HTTP ${response.status})`);
+            const runs = (await response.json()).workflow_runs ?? [];
+            const green = runs.some((run) =>
+              run.conclusion === "success" && run.event === "push" && run.head_branch === "main");
+            if (!green) throw new Error(`No successful main Tests run for ${sha}`);
+          } else {
+            throw new Error("Unsupported release event");
+          }
+
           const raw = process.env.RELEASE_WEBHOOK;
           let url;
           try { url = new URL(raw); } catch { throw new Error("Release webhook is not configured"); }
@@ -35,5 +77,5 @@ jobs:
             response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15000) });
           } catch { throw new Error("Northflank release request failed"); }
           if (!response.ok) throw new Error(`Northflank rejected release request (HTTP ${response.status})`);
-          console.log(`Requested Northflank workflow for ${sha}. Track completion in Northflank.`);
+          console.log(`Requested Northflank workflow for ${sha} after its green Tests run. Track completion in Northflank.`);
           JS

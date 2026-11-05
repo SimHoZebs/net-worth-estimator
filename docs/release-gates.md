@@ -5,8 +5,8 @@ CI runs the automated tiers on every branch push and every pull request
 (`.github/workflows/tests.yml`), so the run for the exact `main` SHA is the
 gate of record. A branch run covers the pre-landing content only; after a
 squash or rebase, watch the new `main` run. It also runs the disposable e2e
-gate nightly (`.github/workflows/e2e.yml`). The Northflank workflow only
-requests a gated deployment for the pushed SHA.
+gate nightly (`.github/workflows/e2e.yml`). The Northflank workflow requests a
+deployment only after the `Tests` run for the pushed `main` commit succeeds.
 
 ## 1. Automated test gates
 

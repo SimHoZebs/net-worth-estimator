@@ -161,11 +161,14 @@ to built commits, not `latest`. For a manual **Northflank UI/API** run, override
 requests the current `main` commit. Builds stay sequential: one at a time.
 
 `.github/workflows/northflank-release.yml` requests the workflow with the pushed
-commit SHA. It has no GitHub token permissions or Northflank API credential.
-Its `NORTHFLANK_RELEASE_WEBHOOK` repository secret can only request workflow runs.
-The GitHub job confirms dispatch, not production completion. Check the Northflank
-run separately. This adapter does not depend on Northflank's native Git webhook
-registration, which currently cannot access this repository through its Git link.
+commit SHA only after the `Tests` workflow for that exact `main` push completes
+successfully. A manual dispatch requests the current `main` commit and requires
+a successful `main` push run for it. The release job has read-only repository
+access and no Northflank API credential. Its `NORTHFLANK_RELEASE_WEBHOOK`
+repository secret can only request workflow runs. The GitHub job confirms
+dispatch, not production completion. Check the Northflank run separately. This
+adapter does not depend on Northflank's native Git webhook registration, which
+currently cannot access this repository through its Git link.
 
 At installation, replace `INJECT_PRIVATE_WEBHOOK_TOKEN` with a new private token.
 Keep that value when applying later definition updates. Save the resulting
