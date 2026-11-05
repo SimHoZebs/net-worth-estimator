@@ -259,7 +259,10 @@ export function deriveFundingGaps({
 		const required = failure.requested;
 		return [
 			{
-				id: `${failure.transactionId}-${failure.date}`,
+				// Fragments may share a rule and date (destination limits split
+				// an occurrence), so the execution index keeps ids unique for
+				// list keys and selection state.
+				id: `${failure.transactionId}-${failure.date}-${failureIndex}`,
 				date: failure.date,
 				name: failure.name,
 				fundingAccount: { id: accountId, name: accountName },

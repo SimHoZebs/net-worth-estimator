@@ -27,7 +27,7 @@ describe("derive funding gaps", () => {
 			projection,
 			postingIds: ["other"],
 		});
-		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06"]);
+		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06-1"]);
 		expect(
 			deriveFundingGaps({
 				accounts: financialModelFixture.accounts,
@@ -230,5 +230,27 @@ describe("derive funding gaps", () => {
 			gaps[0]?.transactions.map((transaction) => transaction.amount),
 		).toEqual([500]);
 		expect(summarizeFundingGap(gaps[0]!).shortfall).toBe(2650);
+	});
+});
+
+describe("funding gap identity", () => {
+	it("keeps ids unique when fragments of one occurrence both fall short", () => {
+		const projection = projectionFixture({
+			transactions: [
+				transactionFixture({ transactionId: "split", date: "2026-03-06" }),
+				transactionFixture({ transactionId: "split", date: "2026-03-06" }),
+			],
+		});
+		const gaps = deriveFundingGaps({
+			accounts: financialModelFixture.accounts,
+			transactions: financialModelFixture.transactions,
+			startDate: financialModelFixture.startDate,
+			projection,
+		});
+		expect(gaps.map((gap) => gap.id)).toEqual([
+			"split-2026-03-06-0",
+			"split-2026-03-06-1",
+		]);
+		expect(new Set(gaps.map((gap) => gap.id)).size).toBe(gaps.length);
 	});
 });

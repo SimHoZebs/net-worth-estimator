@@ -90,7 +90,7 @@ describe("FundingGapsCard", () => {
 		const view = render(<FundingGapsCard {...cardProps()} />);
 		fireEvent.click(view.getByRole("button", { name: /Inspect cash flow/ }));
 		expect(view.getByTestId("funding-selection").textContent).toBe(
-			"renovation-2026-03-06",
+			"renovation-2026-03-06-0",
 		);
 		// An unrelated refresh arrives with brand-new identities but the same
 		// gaps: the open inspector stays on its gap.
@@ -101,7 +101,7 @@ describe("FundingGapsCard", () => {
 		savedState.transactions = [...financialModelFixture.transactions];
 		view.rerender(<FundingGapsCard {...cardProps()} projection={refresh} />);
 		expect(view.getByTestId("funding-selection").textContent).toBe(
-			"renovation-2026-03-06",
+			"renovation-2026-03-06-0",
 		);
 		// The gap scope itself empties: the inspector closes instead of
 		// showing a stale gap.
@@ -130,7 +130,7 @@ describe("FundingGapsCard", () => {
 		fireEvent.click(view.getByRole("button", { name: /Inspect cash flow/ }));
 		// Gaps order by date: the March renovation gap is inspected first.
 		expect(view.getByTestId("funding-selection").textContent).toBe(
-			"renovation-2026-03-06",
+			"renovation-2026-03-06-0",
 		);
 		// Narrowing the scope removes the inspected gap while the April gap
 		// remains: the inspector closes instead of falling back to it.
