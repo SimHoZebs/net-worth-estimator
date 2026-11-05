@@ -195,9 +195,7 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 		if err := s.writeEvaluationOutputs(state.ID, "deterministic", result.Evaluations, state.Revision); err != nil {
 			return err
 		}
-		state.DetEvaluationsJSON = evalJSON
-		_, err = s.store.SaveProjectionState(state)
-		return err
+		return s.persistEvaluationFingerprint(state, evalJSON)
 	}
 	preprocessed := domain.RecurrencePreprocessor(model)
 	path, base, err := domain.BaselineEngine(model, settings, types.ModelOverrides{})
@@ -207,6 +205,17 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 	result := *base
 	result.Evaluations = domain.EvaluateProjectionPath(path, settings, nil)
 	log.Printf("deterministic build rules=%d stochastic=%d", len(preprocessed.Deterministic), len(preprocessed.Stochastic))
+	// The computation above can take seconds while a model write is free to
+	// land on another connection. Writing that stale result would publish
+	// rows and outputs for a revision nobody asked for, so re-check the
+	// state right before persisting and let the request fall back instead.
+	currentState, err := s.store.GetProjectionState()
+	if err != nil {
+		return err
+	}
+	if currentState.Revision != state.Revision || currentState.DirtyFrom != state.DirtyFrom {
+		return fmt.Errorf("projection inputs changed while building; skipping the stale write")
+	}
 	prefix, suffix := suffixSlices(slices, state.DirtyFrom)
 	if state.DirtyFrom > 0 && len(slices) > 0 && len(suffix) == 0 {
 		// Dirty beyond the horizon: no projected date changes. Adopt the
@@ -217,8 +226,7 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 		if err := s.adoptSlices(prefix, state.Revision); err != nil {
 			return err
 		}
-		state.DetEvaluationsJSON = evalJSON
-		if _, err := s.store.SaveProjectionState(state); err != nil {
+		if err := s.persistEvaluationFingerprint(state, evalJSON); err != nil {
 			return err
 		}
 		_, err = s.store.PublishProjection(state.Revision)
@@ -256,12 +264,26 @@ func (s *handler) buildDeterministicLocked(model *types.FinancialModel, settings
 	if err := s.adoptSlices(prefix, state.Revision); err != nil {
 		return err
 	}
-	state.DetEvaluationsJSON = evalJSON
-	if _, err := s.store.SaveProjectionState(state); err != nil {
+	if err := s.persistEvaluationFingerprint(state, evalJSON); err != nil {
 		return err
 	}
 	_, err = s.store.PublishProjection(state.Revision)
 	return err
+}
+
+// persistEvaluationFingerprint records the evaluated revision only while it
+// is still the stored revision. A newer model write wins: the build reports
+// an error and its caller falls back to direct computation, and the next
+// request rebuilds against the current inputs.
+func (s *handler) persistEvaluationFingerprint(state types.ProjectionState, evalJSON string) error {
+	ok, err := s.store.SaveDeterministicEvaluations(state.ID, state.Revision, evalJSON)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("projection inputs changed while building; skipping the stale write")
+	}
+	return nil
 }
 
 // currentRevision reports whether every slice was built at the revision.
@@ -1189,7 +1211,10 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 		state.TrialCount = config.RunCount
 	}
 	if state.DirtyFrom > 0 {
-		if err := s.buildDeterministicLocked(model, settings); err != nil {
+		// Route through the shared build flight: the stochastic path and the
+		// deterministic endpoint can request the same rebuild concurrently,
+		// and two interleaved slice writes would append duplicate rows.
+		if err := s.buildDeterministic(model, settings); err != nil {
 			return nil, err
 		}
 		state, err = s.store.GetProjectionState()
@@ -1250,6 +1275,13 @@ func (s *handler) buildStochasticLocked(model *types.FinancialModel, settings *t
 	}
 	if err := s.writeEvaluationOutputs(state.ID, "stochastic", result.Evaluations, state.Revision); err != nil {
 		return nil, err
+	}
+	latest, err := s.store.GetProjectionState()
+	if err != nil {
+		return nil, err
+	}
+	if latest.Revision != state.Revision || latest.DirtyFrom != state.DirtyFrom {
+		return nil, fmt.Errorf("projection inputs changed while building; skipping the stale write")
 	}
 	state.StochEvaluationsJSON = evalJSON
 	if _, err := s.store.SaveProjectionState(state); err != nil {

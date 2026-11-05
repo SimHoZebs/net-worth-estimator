@@ -174,3 +174,100 @@ func TestRowWritesMarkDirty(t *testing.T) {
 	}
 	mustClean()
 }
+
+func generatedPostingFor(sliceID, payload string, source *string) GeneratedPosting {
+	return GeneratedPosting{
+		SliceID:         sliceID,
+		Name:            "Generated",
+		SourceAccountID: source,
+		PostedTime:      dirtyDay("2026-03-06"),
+		TransactionTime: dirtyDay("2026-03-06"),
+		EventJSON:       payload,
+		AppliedAmount:   100,
+		Outcome:         "unfulfilled",
+	}
+}
+
+func TestSaveGeneratedPostingsReplacesSliceOutput(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	s := privateTestPlan(t, d, "generated-replace")
+	slice, err := s.SaveProjectionSlice(newProjectionSlice("2026-01-01", "2027-01-01", 1))
+	if err != nil {
+		t.Fatalf("save slice: %v", err)
+	}
+	payload := `{"date":"2026-03-06","sequence":1}`
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := s.SaveGeneratedPostings([]GeneratedPosting{generatedPostingFor(slice.ID, payload, nil)}); err != nil {
+			t.Fatalf("save generated postings attempt %d: %v", attempt, err)
+		}
+	}
+	stored, err := s.ListGeneratedPostings([]string{slice.ID})
+	if err != nil {
+		t.Fatalf("list generated postings: %v", err)
+	}
+	if len(stored) != 1 {
+		t.Fatalf("rebuild must replace slice output, got %d rows", len(stored))
+	}
+}
+
+func TestSaveGeneratedPostingsRollsBackOnFailure(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	s := privateTestPlan(t, d, "generated-rollback")
+	slice, err := s.SaveProjectionSlice(newProjectionSlice("2026-01-01", "2027-01-01", 1))
+	if err != nil {
+		t.Fatalf("save slice: %v", err)
+	}
+	original := `{"date":"2026-03-06","sequence":1}`
+	if err := s.SaveGeneratedPostings([]GeneratedPosting{generatedPostingFor(slice.ID, original, nil)}); err != nil {
+		t.Fatalf("seed generated postings: %v", err)
+	}
+	missingSource := "missing-account"
+	replacement := []GeneratedPosting{
+		generatedPostingFor(slice.ID, `{"date":"2026-03-06","sequence":2}`, nil),
+		generatedPostingFor(slice.ID, `{"date":"2026-03-07","sequence":3}`, &missingSource),
+	}
+	if err := s.SaveGeneratedPostings(replacement); err == nil {
+		t.Fatal("expected the missing source account to reject the batch")
+	}
+	stored, err := s.ListGeneratedPostings([]string{slice.ID})
+	if err != nil {
+		t.Fatalf("list generated postings: %v", err)
+	}
+	if len(stored) != 1 || stored[0].EventJSON != original {
+		t.Fatalf("failed batch must roll back to the previous output, got %+v", stored)
+	}
+}
+
+func TestSaveDeterministicEvaluationsKeepsNewerRevision(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	s := privateTestPlan(t, d, "fingerprint")
+	state, err := s.SaveProjectionState(types.ProjectionState{ID: "default", ScopeID: "fingerprint", ProjectionStart: "2026-01-01", HorizonEnd: "2056-01-01"})
+	if err != nil {
+		t.Fatalf("seed state: %v", err)
+	}
+	ok, err := s.SaveDeterministicEvaluations(state.ID, state.Revision, `{"first":true}`)
+	if err != nil || !ok {
+		t.Fatalf("current revision must accept the fingerprint, ok=%v err=%v", ok, err)
+	}
+	if _, err := s.MarkProjectionDirty(0); err != nil {
+		t.Fatalf("bump revision: %v", err)
+	}
+	ok, err = s.SaveDeterministicEvaluations(state.ID, state.Revision, `{"stale":true}`)
+	if err != nil {
+		t.Fatalf("stale fingerprint: %v", err)
+	}
+	if ok {
+		t.Fatal("a newer revision must reject the stale fingerprint")
+	}
+	current, err := s.GetProjectionState()
+	if err != nil {
+		t.Fatalf("read state: %v", err)
+	}
+	if current.DetEvaluationsJSON != `{"first":true}` {
+		t.Fatalf("stale write must not replace the fingerprint, got %q", current.DetEvaluationsJSON)
+	}
+	self, err := s.SaveDeterministicEvaluations(current.ID, current.Revision, `{"second":true}`)
+	if err != nil || !self {
+		t.Fatalf("current revision must accept its own fingerprint, ok=%v err=%v", self, err)
+	}
+}

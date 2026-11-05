@@ -60,6 +60,24 @@ func (s *sqliteStore) SaveProjectionState(state types.ProjectionState) (types.Pr
 	return s.GetProjectionState()
 }
 
+// SaveDeterministicEvaluations records the deterministic evaluation
+// fingerprint for one revision. The update is conditional: a newer model
+// write wins, and the caller skips publishing its stale build.
+func (s *sqliteStore) SaveDeterministicEvaluations(stateID string, revision int64, evalJSON string) (bool, error) {
+	if stateID == "" {
+		stateID = defaultProjectionStateID
+	}
+	result, err := s.db.Exec(`UPDATE projection_states SET det_evaluations_json = ? WHERE id = ? AND revision = ? AND user_id = :user_id`, evalJSON, stateID, revision)
+	if err != nil {
+		return false, fmt.Errorf("save deterministic evaluations: %w", err)
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("save deterministic evaluations: %w", err)
+	}
+	return updated > 0, nil
+}
+
 // MarkProjectionDirty moves dirty_from to the earliest affected instant and bumps revision.
 // Unix instants compare directly; 0 means projection start, and a missing
 // start leaves dirty_from at 0 while the revision bump still invalidates.
@@ -254,8 +272,36 @@ func (s *sqliteStore) SaveProviderConnection(conn types.ProviderConnection) (typ
 
 // SaveGeneratedPostings stores engine-output transactions for slices.
 // Generated rows skip the ID registry, simulation satellites, and claims:
-// they are output, never model input.
+// they are output, never model input. The write replaces each touched
+// slice's stored output atomically, so a retried or concurrent rebuild can
+// never accumulate duplicate events for one slice.
 func (s *sqliteStore) SaveGeneratedPostings(rows []GeneratedPosting) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("save generated postings: %w", err)
+	}
+	defer tx.Rollback()
+	sliceIDs := make([]string, 0, len(rows))
+	seenSlices := map[string]struct{}{}
+	for _, row := range rows {
+		if _, ok := seenSlices[row.SliceID]; ok {
+			continue
+		}
+		seenSlices[row.SliceID] = struct{}{}
+		sliceIDs = append(sliceIDs, row.SliceID)
+	}
+	placeholders := make([]string, len(sliceIDs))
+	args := make([]any, len(sliceIDs))
+	for i, id := range sliceIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	if _, err := tx.Exec(`DELETE FROM postings WHERE projection_slice_id IN (`+strings.Join(placeholders, ",")+`) AND user_id = :user_id`, args...); err != nil {
+		return fmt.Errorf("replace generated postings: %w", err)
+	}
 	for _, row := range rows {
 		id, err := uuid.NewV7()
 		if err != nil {
@@ -269,7 +315,7 @@ func (s *sqliteStore) SaveGeneratedPostings(rows []GeneratedPosting) error {
 			}
 			destinations = encoded
 		}
-		if _, err := s.db.Exec(`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome, user_id)
+		if _, err := tx.Exec(`INSERT INTO postings (id, name, source_account_id, destination_account_ids, amount_resolution_json, posted_time, transaction_time, source, pending, void, projection_slice_id, event_json, applied_amount, outcome, user_id)
 			VALUES (?, ?, ?, ?, '{}', ?, ?, 'projected', 0, 0, ?, ?, ?, ?, :user_id)`,
 			id.String(), row.Name, nullable(row.SourceAccountID), string(destinations), row.PostedTime, row.TransactionTime, row.SliceID, row.EventJSON, row.AppliedAmount, row.Outcome); err != nil {
 			source := "<none>"
@@ -279,7 +325,7 @@ func (s *sqliteStore) SaveGeneratedPostings(rows []GeneratedPosting) error {
 			return fmt.Errorf("save generated posting %q (source %s): %w", row.Name, source, err)
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // ListGeneratedPostings returns engine-output transactions for slices in time order.

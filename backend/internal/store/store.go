@@ -161,10 +161,15 @@ type Store interface {
 	ListMonteCarloStatistics(sliceID string) ([]types.MonteCarloStatistic, error)
 	SaveMonteCarloStatistics(stats []types.MonteCarloStatistic) error
 	DeleteMonteCarloStatistics(sliceIDs []string) error
-	// SaveGeneratedPostings stores engine-output transactions for one slice.
-	// Generated rows never enter model reads: every model query filters
-	// them by null slice.
+	// SaveGeneratedPostings replaces every touched slice's stored
+	// engine-output transactions atomically. Generated rows never enter
+	// model reads: every model query filters them by null slice.
 	SaveGeneratedPostings(rows []GeneratedPosting) error
+	// SaveDeterministicEvaluations records the deterministic evaluation
+	// fingerprint for one revision without touching revision or dirty
+	// bookkeeping. Reports false when a newer write already moved the
+	// revision, so the caller can skip publishing a stale build.
+	SaveDeterministicEvaluations(stateID string, revision int64, evalJSON string) (bool, error)
 	ListGeneratedPostings(sliceIDs []string) ([]GeneratedPosting, error)
 	DeleteGeneratedPostings(sliceIDs []string) error
 	SaveProjectionRows(rows []ProjectionRowPayload) error
