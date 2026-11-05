@@ -681,8 +681,18 @@ if [ "$mode" = convert ]; then
     || fail "Cannot verify candidate postings; refusing to publish."
   test "$post_count" = 0 || fail "Candidate changed posting row count. Original unchanged; backup retained at $backup. Keep the API stopped."
   post_same=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
-    SELECT EXISTS (SELECT * FROM main.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0 EXCEPT SELECT * FROM before.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0)
-        OR EXISTS (SELECT * FROM before.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0 EXCEPT SELECT * FROM main.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0);") \
+    SELECT EXISTS (
+      SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
+      FROM main.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0
+      EXCEPT
+      SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
+      FROM before.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0)
+        OR EXISTS (
+      SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
+      FROM before.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0
+      EXCEPT
+      SELECT user_id, id, name, source_account_id, amount_resolution_json, posted_time, transaction_time, source, pending, void
+      FROM main.postings WHERE source IN ('user', 'model', '') OR pending != 0 OR void != 0);") \
     || fail "Cannot verify candidate postings; refusing to publish."
   test "$post_same" = 0 || fail "Candidate changed non-settled postings. Original unchanged; backup retained at $backup. Keep the API stopped."
   post_repair=$(sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before; SELECT EXISTS (
