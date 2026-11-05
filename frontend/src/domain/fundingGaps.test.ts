@@ -27,7 +27,7 @@ describe("derive funding gaps", () => {
 			projection,
 			postingIds: ["other"],
 		});
-		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06-1"]);
+		expect(gaps.map((gap) => gap.id)).toEqual(["other-2026-03-06-0"]);
 		expect(
 			deriveFundingGaps({
 				accounts: financialModelFixture.accounts,

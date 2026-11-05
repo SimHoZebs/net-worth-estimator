@@ -202,7 +202,13 @@ export function deriveFundingGaps({
 			}),
 		);
 	}
+	// Count duplicate failures per transaction and date. The count keeps the
+	// React key unique without renumbering unrelated gaps on a refresh.
+	const occurrenceByKey = new Map<string, number>();
 	return failures.flatMap((failure: TransactionResult): FundingGap[] => {
+		const baseKey = `${failure.transactionId}\u0000${failure.date}`;
+		const occurrence = occurrenceByKey.get(baseKey) ?? 0;
+		occurrenceByKey.set(baseKey, occurrence + 1);
 		const accountId = failure.fromId ?? failure.toId;
 		if (!accountId) return [];
 		const account = accountById.get(accountId);
@@ -260,9 +266,10 @@ export function deriveFundingGaps({
 		return [
 			{
 				// Fragments may share a rule and date (destination limits split
-				// an occurrence), so the execution index keeps ids unique for
-				// list keys and selection state.
-				id: `${failure.transactionId}-${failure.date}-${failureIndex}`,
+				// an occurrence). The per-key count keeps every gap distinct
+				// without renumbering unrelated gaps when an earlier failure
+				// appears.
+				id: `${failure.transactionId}-${failure.date}-${occurrence}`,
 				date: failure.date,
 				name: failure.name,
 				fundingAccount: { id: accountId, name: accountName },
