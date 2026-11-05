@@ -201,8 +201,9 @@ TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 
 GitHub Actions is the full completion gate. Agents run the narrowest local check
 for their change, push the branch, and watch the `Tests` workflow. On every
-branch push it runs `scripts/test --gate --no-browser`, four independent
-Playwright shard jobs with
+branch push it runs the Go suite in its own backend job,
+`scripts/test --gate --no-browser --without-backend` for frontend and static
+checks, four independent Playwright shard jobs with
 `bun --filter ./frontend test:integration -- --shard=N/4`, and one
 `bun --filter ./extension test:browser` job. Same-repository pull requests reuse
 that push run; fork pull requests get their own run. The `End-to-end tests`
