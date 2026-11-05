@@ -80,6 +80,19 @@ const postingCategoriesDDL = `CREATE TABLE IF NOT EXISTS posting_categories (
 	FOREIGN KEY(user_id, posting_id) REFERENCES postings(user_id, id) ON DELETE CASCADE
 )`
 
+// checkpointAvailableBalancesDDL is bank evidence tied to one checkpoint.
+// It is additive metadata: fresh databases get it from schemaStatements,
+// and existing databases self-heal at first model read or sync write. The
+// posted balance stays the financial authority; this table only records the
+// Bridge's separate available figure.
+const checkpointAvailableBalancesDDL = `CREATE TABLE IF NOT EXISTS checkpoint_available_balances (
+	user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	model_account_id TEXT NOT NULL,
+	observed_at INTEGER NOT NULL,
+	available_balance REAL NOT NULL,
+	PRIMARY KEY (user_id, model_account_id, observed_at)
+)`
+
 func schemaStatements() []string {
 	statements := []string{
 		`CREATE TABLE IF NOT EXISTS sessions (
@@ -147,6 +160,7 @@ func schemaStatements() []string {
 			UNIQUE(user_id, model_account_id, observed_at),
 			FOREIGN KEY(user_id, model_account_id) REFERENCES accounts(user_id, id) DEFERRABLE INITIALLY DEFERRED
 		)`,
+		checkpointAvailableBalancesDDL,
 		`CREATE TABLE IF NOT EXISTS postings (
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			id TEXT NOT NULL,
@@ -815,6 +829,7 @@ func expectedSchemaTables() []string {
 		"friendships",
 		"accounts",
 		"checkpoints",
+		"checkpoint_available_balances",
 		"postings",
 		"posting_sim",
 		"posting_claims",

@@ -35,6 +35,15 @@ export const accountSchema = z.object({
 		.nullable()
 		.optional(),
 	observedAt: z.number().int().nullable().optional(),
+	// Bank-reported available cash or available credit. Missing means the
+	// Bridge did not report it; it never replaces the posted balance.
+	availableBalance: z
+		.number()
+		.finite()
+		.min(-1e10)
+		.max(1e10)
+		.nullable()
+		.optional(),
 });
 
 export const plannedPurchaseSchema = z.object({

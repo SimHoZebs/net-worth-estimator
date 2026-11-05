@@ -210,12 +210,12 @@ func TestRecurringCoexistsWithBNPLAndLeavesModelAlone(t *testing.T) {
 	// Three equal fortnightly Klarna withdrawals are both Possible BNPL and a
 	// biweekly recurring pattern on the same transactions.
 	day := int64(1785628800)
-	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", Currency: "USD", Balance: "100", BalanceDate: day, Transactions: []simplefin.Transaction{
+	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", ConnID: "test-conn", Currency: "USD", Balance: "100", BalanceDate: day, Transactions: []simplefin.Transaction{
 		{ID: "one", Description: "KLARNA", Amount: "-25", Posted: day},
 		{ID: "two", Description: "KLARNA", Amount: "-25", Posted: day + 14*86400},
 		{ID: "three", Description: "KLARNA", Amount: "-25", Posted: day + 28*86400},
 	}}}}
-	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Unix(day, 0))
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bank"): "checking"}, time.Unix(day, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,8 +282,8 @@ func TestRecurringSingleTransactionKeepsFindingCount(t *testing.T) {
 	if _, err := scoped.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", Currency: "USD", Balance: "100", BalanceDate: 1785628800, Transactions: []simplefin.Transaction{{ID: "charge", Description: "KLARNA PAY IN 4", Amount: "-25", Posted: 1785628800}}}}}
-	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Unix(1785628800, 0))
+	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", ConnID: "test-conn", Currency: "USD", Balance: "100", BalanceDate: 1785628800, Transactions: []simplefin.Transaction{{ID: "charge", Description: "KLARNA PAY IN 4", Amount: "-25", Posted: 1785628800}}}}}
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bank"): "checking"}, time.Unix(1785628800, 0))
 	if err != nil {
 		t.Fatal(err)
 	}

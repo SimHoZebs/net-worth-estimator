@@ -29,8 +29,8 @@ func seedAPIRecurringPattern(t *testing.T, scoped store.Store, cadence string) [
 	for i, stamp := range posted {
 		transactions = append(transactions, simplefin.Transaction{ID: "grocery-" + string(rune('a'+i)), Description: "GROCER 123", Amount: "-30", Posted: stamp})
 	}
-	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", Currency: "USD", Balance: "100", Transactions: transactions}}}
-	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Unix(posted[2], 0))
+	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "bank", ConnID: "test-conn", Currency: "USD", Balance: "100", Transactions: transactions}}}
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bank"): "checking"}, time.Unix(posted[2], 0))
 	if err != nil {
 		t.Fatal(err)
 	}

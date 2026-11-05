@@ -7,7 +7,9 @@
 package simplefin
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,7 +18,43 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
+
+// ProtocolVersion is the only SimpleFIN protocol version this sync speaks.
+// There is no v1 fallback: a response without errlist and connections is
+// rejected instead of being coerced into the current shape.
+const ProtocolVersion = "2"
+
+const accountKeyPrefix = "sf2"
+
+// AccountKey is the canonical SimpleFIN account identity. Account IDs are
+// only unique within a connection, so the connection ID is part of the key.
+// Raw URL-safe base64 keeps the value safe in API paths and free of the dot
+// separator.
+func AccountKey(connID, accountID string) string {
+	return accountKeyPrefix + "." +
+		base64.RawURLEncoding.EncodeToString([]byte(connID)) + "." +
+		base64.RawURLEncoding.EncodeToString([]byte(accountID))
+}
+
+// ParseAccountKey decodes a canonical account key. A bare v1 account ID is
+// not a valid key, which lets the sync fail closed on an unmigrated store.
+func ParseAccountKey(key string) (connID, accountID string, ok bool) {
+	parts := strings.Split(key, ".")
+	if len(parts) != 3 || parts[0] != accountKeyPrefix || parts[1] == "" || parts[2] == "" {
+		return "", "", false
+	}
+	conn, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil || len(conn) == 0 {
+		return "", "", false
+	}
+	account, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil || len(account) == 0 {
+		return "", "", false
+	}
+	return string(conn), string(account), true
+}
 
 // Transaction mirrors the SimpleFIN protocol transaction object. Only the
 // fields the sync consumes are modeled.
@@ -32,9 +70,22 @@ type Transaction struct {
 	Extra        map[string]json.RawMessage `json:"extra"`
 }
 
+// Connection mirrors the v2 top-level connection object. One connection is
+// one login link to an institution. Two logins to the same bank share
+// organization fields but carry distinct connection IDs.
+type Connection struct {
+	ConnID  string `json:"conn_id"`
+	Name    string `json:"name"`
+	OrgID   string `json:"org_id"`
+	OrgName string `json:"org_name"`
+	OrgURL  string `json:"org_url"`
+	SfinURL string `json:"sfin_url"`
+}
+
 // Account mirrors the SimpleFIN protocol account object.
 type Account struct {
 	ID               string        `json:"id"`
+	ConnID           string        `json:"conn_id"`
 	Name             string        `json:"name"`
 	Currency         string        `json:"currency"`
 	Balance          string        `json:"balance"`
@@ -44,14 +95,13 @@ type Account struct {
 	Transactions     []Transaction `json:"transactions"`
 }
 
-// AccountSet mirrors the top-level GET /accounts response. errlist holds
-// structured protocol errors and errors holds the deprecated string list;
-// both are inspected for Bridge rate-limit signals before accounts are
-// trusted.
+// AccountSet mirrors the top-level GET /accounts response. errlist and
+// connections are required v2 markers; the deprecated errors list is not
+// read.
 type AccountSet struct {
-	ErrList  []ProtocolError `json:"errlist"`
-	Errors   []string        `json:"errors"`
-	Accounts []Account       `json:"accounts"`
+	ErrList     []ProtocolError `json:"errlist"`
+	Connections []Connection    `json:"connections"`
+	Accounts    []Account       `json:"accounts"`
 }
 
 // ProtocolError mirrors one entry of the SimpleFIN errlist array.
@@ -93,10 +143,70 @@ func (t Transaction) ParseAmount() (float64, error) {
 	return amount, nil
 }
 
+// UnsupportedVersionError reports a server that did not return the v2
+// response shape. The host is display-safe; the access URL is never included.
+type UnsupportedVersionError struct {
+	Host string
+}
+
+func (e *UnsupportedVersionError) Error() string {
+	return fmt.Sprintf("simplefin server at %s does not support protocol version %s", e.Host, ProtocolVersion)
+}
+
+// AuthError reports a Bridge or connection authentication failure. The user
+// must reconnect or reauthenticate the named connection.
+type AuthError struct {
+	Host    string
+	Message string
+}
+
+func (e *AuthError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("simplefin authentication failed at %s; reconnect the key", e.Host)
+}
+
+// PaymentRequiredError reports an HTTP 402 from the Bridge.
+type PaymentRequiredError struct {
+	Host    string
+	Message string
+}
+
+func (e *PaymentRequiredError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("simplefin payment is required at %s", e.Host)
+}
+
+// ProtocolErrorsError reports errors that make the whole snapshot unsafe to
+// apply. Connection and account scoped errors are excluded instead.
+type ProtocolErrorsError struct {
+	Host   string
+	Errors []ProtocolError
+}
+
+func (e *ProtocolErrorsError) Error() string {
+	if len(e.Errors) == 0 {
+		return fmt.Sprintf("simplefin protocol error from %s", e.Host)
+	}
+	first := e.Errors[0]
+	code := first.Code
+	if code == "" {
+		code = "unknown"
+	}
+	message := sanitizeMessage(first.Msg)
+	if message == "" {
+		message = code
+	}
+	return fmt.Sprintf("simplefin protocol error from %s: %s", e.Host, message)
+}
+
 // RateLimitedError reports that the Bridge refused a fetch for quota
 // reasons: HTTP 429, or a 200/4xx body carrying a rate-limit message in
-// errors/errlist. Callers must back off instead of retrying immediately so
-// one frontend burst cannot cost the Access Token.
+// errlist. Callers must back off instead of retrying immediately so one
+// frontend burst cannot cost the Access Token.
 type RateLimitedError struct {
 	RetryAfter time.Duration
 	Message    string
@@ -119,19 +229,23 @@ func isRateLimitMessage(value string) bool {
 		strings.Contains(lowered, "rate-limit")
 }
 
-// rateLimitMessage returns the first Bridge rate-limit message found in the
-// deprecated errors list or the structured errlist, or "" when absent.
+func (e ProtocolError) class() string {
+	prefix, _, _ := strings.Cut(strings.TrimSpace(e.Code), ".")
+	return prefix
+}
+
+func (e ProtocolError) isRateLimit() bool {
+	return isRateLimitMessage(e.Msg) || isRateLimitMessage(e.Code)
+}
+
+// rateLimitMessage returns the first Bridge rate-limit message in errlist,
+// or "" when absent. v2 has no deprecated errors list.
 func (s *AccountSet) rateLimitMessage() string {
 	if s == nil {
 		return ""
 	}
-	for _, message := range s.Errors {
-		if isRateLimitMessage(message) {
-			return message
-		}
-	}
 	for _, entry := range s.ErrList {
-		if isRateLimitMessage(entry.Msg) || isRateLimitMessage(entry.Code) {
+		if entry.isRateLimit() {
 			if entry.Msg != "" {
 				return entry.Msg
 			}
@@ -139,6 +253,112 @@ func (s *AccountSet) rateLimitMessage() string {
 		}
 	}
 	return ""
+}
+
+// Exclusions lists connections and accounts whose errors make their rows
+// unsafe to apply. General errors fail the whole fetch before this runs.
+type Exclusions struct {
+	Connections map[string]struct{}
+	Accounts    map[string]struct{}
+}
+
+// Excluded reports whether one bridge account must be skipped.
+func (x Exclusions) Excluded(connID, accountID string) bool {
+	if _, ok := x.Connections[connID]; ok {
+		return true
+	}
+	_, ok := x.Accounts[AccountKey(connID, accountID)]
+	return ok
+}
+
+// Exclusions derives the connection- and account-scoped exclusions.
+func (s *AccountSet) Exclusions() Exclusions {
+	out := Exclusions{Connections: map[string]struct{}{}, Accounts: map[string]struct{}{}}
+	if s == nil {
+		return out
+	}
+	accountsByID := map[string][]Account{}
+	for _, account := range s.Accounts {
+		accountsByID[account.ID] = append(accountsByID[account.ID], account)
+	}
+	for _, entry := range s.ErrList {
+		switch entry.class() {
+		case "con":
+			out.Connections[entry.ConnID] = struct{}{}
+		case "act":
+			connID := entry.ConnID
+			if connID == "" {
+				if matches := accountsByID[entry.AccountID]; len(matches) == 1 {
+					connID = matches[0].ConnID
+				}
+			}
+			out.Accounts[AccountKey(connID, entry.AccountID)] = struct{}{}
+		}
+	}
+	return out
+}
+
+// classifyProtocolErrors returns a whole-run error for general errors,
+// authentication failures, and ambiguous scoped errors. Connection and
+// account errors that can be excluded are left in ErrList for Exclusions.
+func (s *AccountSet) classifyProtocolErrors(host string) error {
+	if s == nil {
+		return nil
+	}
+	accountsByID := map[string][]Account{}
+	for _, account := range s.Accounts {
+		accountsByID[account.ID] = append(accountsByID[account.ID], account)
+	}
+	var general []ProtocolError
+	for _, entry := range s.ErrList {
+		switch entry.class() {
+		case "gen":
+			if entry.Code == "gen.auth" {
+				return &AuthError{Host: host, Message: authMessage(host, entry)}
+			}
+			general = append(general, entry)
+		case "con":
+			if strings.TrimSpace(entry.ConnID) == "" {
+				general = append(general, entry)
+			}
+		case "act":
+			if strings.TrimSpace(entry.AccountID) == "" {
+				general = append(general, entry)
+				continue
+			}
+			if strings.TrimSpace(entry.ConnID) == "" && len(accountsByID[entry.AccountID]) > 1 {
+				general = append(general, entry)
+			}
+		default:
+			general = append(general, entry)
+		}
+	}
+	if len(general) > 0 {
+		return &ProtocolErrorsError{Host: host, Errors: general}
+	}
+	return nil
+}
+
+func authMessage(host string, entry ProtocolError) string {
+	if message := sanitizeMessage(entry.Msg); message != "" && message != "Forbidden" {
+		return fmt.Sprintf("simplefin authentication failed at %s: %s", host, message)
+	}
+	return fmt.Sprintf("simplefin authentication failed at %s; reconnect the key", host)
+}
+
+func sanitizeMessage(value string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, value)
+	cleaned = strings.Join(strings.Fields(cleaned), " ")
+	runes := []rune(cleaned)
+	if len(runes) > 200 {
+		return string(runes[:200])
+	}
+	return cleaned
 }
 
 // parseRetryAfter converts a Retry-After header to a wait duration: integer
@@ -183,7 +403,8 @@ type Client struct {
 }
 
 // Fetch retrieves accounts with transactions in [start, end), including
-// pending transactions. The context aborts hung Bridge requests.
+// pending transactions. It requests protocol version 2 and rejects a v1
+// response instead of silently applying the old shape.
 func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 	endpoint, err := url.Parse(strings.TrimRight(c.AccessURL, "/") + "/accounts")
 	if err != nil {
@@ -193,6 +414,7 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 	query.Set("start-date", strconv.FormatInt(start.Unix(), 10))
 	query.Set("end-date", strconv.FormatInt(end.Unix(), 10))
 	query.Set("pending", "1")
+	query.Set("version", ProtocolVersion)
 	endpoint.RawQuery = query.Encode()
 
 	client := c.HTTPClient
@@ -220,6 +442,20 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 		}
 	}
 	if response.StatusCode != http.StatusOK {
+		if set, decodeErr := decodeErrorAccountSet(body); decodeErr == nil && set != nil {
+			if message := set.rateLimitMessage(); message != "" {
+				return nil, &RateLimitedError{
+					RetryAfter: parseRetryAfter(response.Header, time.Now()),
+					Message:    fmt.Sprintf("simplefin bridge rate limited (status %d from %s): %s", response.StatusCode, endpoint.Host, sanitizeMessage(message)),
+				}
+			}
+			if auth := classifyAuthError(endpoint.Host, set); auth != nil {
+				return nil, auth
+			}
+		}
+		if response.StatusCode == http.StatusPaymentRequired {
+			return nil, &PaymentRequiredError{Host: endpoint.Host, Message: "simplefin payment is required; check the bridge subscription"}
+		}
 		if isRateLimitMessage(string(body)) {
 			return nil, &RateLimitedError{
 				RetryAfter: parseRetryAfter(response.Header, time.Now()),
@@ -228,16 +464,82 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 		}
 		return nil, &StatusError{Host: endpoint.Host, StatusCode: response.StatusCode}
 	}
-	var set AccountSet
-	if err := json.Unmarshal(body, &set); err != nil {
-		return nil, fmt.Errorf("simplefin decode from %s: %w", endpoint.Host, err)
+	set, err := decodeAccountSet(endpoint.Host, body)
+	if err != nil {
+		return nil, err
 	}
 	if message := set.rateLimitMessage(); message != "" {
 		return nil, &RateLimitedError{
-			Message: fmt.Sprintf("simplefin bridge rate limited from %s: %s", endpoint.Host, message),
+			Message: fmt.Sprintf("simplefin bridge rate limited from %s: %s", endpoint.Host, sanitizeMessage(message)),
+		}
+	}
+	if err := set.classifyProtocolErrors(endpoint.Host); err != nil {
+		return nil, err
+	}
+	return set, nil
+}
+
+func decodeAccountSet(host string, body []byte) (*AccountSet, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, fmt.Errorf("simplefin decode from %s: %w", host, err)
+	}
+	errList, hasErrList := fields["errlist"]
+	connections, hasConnections := fields["connections"]
+	if !hasErrList || !hasConnections {
+		return nil, &UnsupportedVersionError{Host: host}
+	}
+	if !jsonArray(errList) || !jsonArray(connections) {
+		return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "errlist and connections must be arrays"}}}
+	}
+	var set AccountSet
+	if err := json.Unmarshal(body, &set); err != nil {
+		return nil, fmt.Errorf("simplefin decode from %s: %w", host, err)
+	}
+	for _, connection := range set.Connections {
+		if strings.TrimSpace(connection.ConnID) == "" {
+			return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "connection is missing conn_id"}}}
+		}
+	}
+	for _, account := range set.Accounts {
+		if strings.TrimSpace(account.ID) == "" || strings.TrimSpace(account.ConnID) == "" {
+			return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "account is missing id or conn_id"}}}
 		}
 	}
 	return &set, nil
+}
+
+// decodeErrorAccountSet reads the structured error list from a non-200 body.
+// Error responses are not required to carry the success-response markers.
+func decodeErrorAccountSet(body []byte) (*AccountSet, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, err
+	}
+	if _, ok := fields["errlist"]; !ok {
+		return nil, nil
+	}
+	var set AccountSet
+	if err := json.Unmarshal(body, &set); err != nil {
+		return nil, err
+	}
+	return &set, nil
+}
+
+// jsonArray reports whether a required protocol marker is a JSON array. A
+// null or object value is not a usable v2 marker.
+func jsonArray(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && trimmed[0] == '['
+}
+
+func classifyAuthError(host string, set *AccountSet) *AuthError {
+	for _, entry := range set.ErrList {
+		if entry.Code == "gen.auth" {
+			return &AuthError{Host: host, Message: authMessage(host, entry)}
+		}
+	}
+	return nil
 }
 
 func redactURLError(endpoint *url.URL, err error) error {

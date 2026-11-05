@@ -55,14 +55,14 @@ do-not-import list self-heals.
 
 ## Bank values
 
-SimpleFIN v1 has no standard category field. `extra.category` is
+SimpleFIN v2 has no standard category field. `extra.category` is
 provider-specific. The adapter keeps it as source evidence and maps only
 supported values or common aliases onto the fixed set. An unknown value falls
 through to the classifier.
 
 SimpleFIN v2 adds structured errors and connections, not categories. The
-planned merchant category code is not available from the Bridge. The sync still
-uses v1.
+planned merchant category code is not available from the Bridge. The sync
+uses protocol version 2 and keeps `extra.category` as provider evidence.
 
 ## Asynchronous classifier
 

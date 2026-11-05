@@ -101,6 +101,10 @@ func (a *Account) MaxBalanceValue() float64 {
 type Checkpoint struct {
 	AccountID string  `json:"AccountId"`
 	Balance   float64 `json:"Balance"`
+	// AvailableBalance is bank-reported available cash or available credit.
+	// Nil means unknown, not zero. It is evidence, never the net-worth
+	// balance.
+	AvailableBalance *float64 `json:"availableBalance,omitempty"`
 	// Source names the row author: "user" for owner-authored rows,
 	// "banksync" for bank-reported rows. Authorship never changes after
 	// creation.

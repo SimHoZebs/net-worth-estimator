@@ -140,7 +140,7 @@ func TestStatusReportsSyncQuota(t *testing.T) {
 
 	bridge := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"accounts":[]}`))
+		_, _ = w.Write([]byte(`{"errlist":[],"connections":[],"accounts":[]}`))
 	}))
 	t.Cleanup(bridge.Close)
 	runner := simplefin.NewRunnerWithProvider(database, simplefin.Config{}, func() (string, map[string]struct{}) {

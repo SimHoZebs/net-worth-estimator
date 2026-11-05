@@ -33,6 +33,10 @@ type Summary struct {
 	SettledInserted     int            `json:"settledInserted"`
 	AccountsProvisioned int            `json:"accountsProvisioned"`
 	Skipped             map[string]int `json:"skipped"`
+	// Partial is true when at least one connection or account was
+	// excluded by a structured Bridge error while other rows applied.
+	Partial bool            `json:"partial"`
+	Errors  []ingest.Notice `json:"errors,omitempty"`
 }
 
 // MinTriggerInterval is the default spacing for successful manual trigger
@@ -68,6 +72,15 @@ type NotConfiguredError struct{}
 
 func (e *NotConfiguredError) Error() string {
 	return "simplefin sync is not configured"
+}
+
+// MigrationRequiredError reports stored bare-account keys from before the
+// connection-scoped key upgrade. The sync fails closed instead of silently
+// provisioning duplicate accounts.
+type MigrationRequiredError struct{}
+
+func (e *MigrationRequiredError) Error() string {
+	return "simplefin sync keys require the one-time simplefin-v2-keys migration"
 }
 
 // CredentialProvider resolves the current per-plan Bridge credential from
@@ -191,6 +204,33 @@ func (r *Runner) IsConfigured() bool {
 	return accessURL != "" && r.store != nil
 }
 
+// validateStoredKeys rejects bare v1 bridge account links. A skipped key
+// conversion would otherwise auto-provision duplicate model accounts.
+func (r *Runner) validateStoredKeys() error {
+	if r == nil || r.store == nil {
+		return nil
+	}
+	links, err := r.store.ListAccountLinks()
+	if err != nil {
+		return fmt.Errorf("read simplefin account links: %w", err)
+	}
+	for _, link := range links {
+		if _, _, ok := ParseAccountKey(link.BridgeAccountID); !ok {
+			return &MigrationRequiredError{}
+		}
+	}
+	keys, err := r.store.ListSyncAccountKeys(store.ProviderSimpleFIN)
+	if err != nil {
+		return fmt.Errorf("read simplefin sync keys: %w", err)
+	}
+	for _, key := range keys {
+		if _, _, ok := ParseAccountKey(key); !ok {
+			return &MigrationRequiredError{}
+		}
+	}
+	return nil
+}
+
 // BridgeHost reports the host of the current access URL for display.
 func (r *Runner) BridgeHost() string {
 	if r == nil {
@@ -249,14 +289,32 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 // orchestrator with no guard checks. Callers own singleflight and blackout
 // handling.
 func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
+	if err := r.validateStoredKeys(); err != nil {
+		r.recordSyncError(syncErrorFromError(err, r.now()))
+		return nil, err
+	}
 	out, err := ingest.Sync(ctx, r.store, bridgeAdapter{runner: r}, r.now())
 	if err != nil {
+		r.recordSyncError(syncErrorFromError(err, r.now()))
 		return nil, err
 	}
 	// Stamp successful runs so /v1/status can report the last
 	// sync time. Failed runs return above unstamped and stay retryable.
 	if err := r.store.SetLastSyncTime(r.now().UTC().Format(time.RFC3339)); err != nil {
 		return nil, fmt.Errorf("record sync time: %w", err)
+	}
+	if len(out.Notices) > 0 {
+		first := out.Notices[0]
+		r.recordSyncError(store.SyncError{
+			Code:         first.Code,
+			Message:      first.Message,
+			Scope:        first.Scope,
+			ConnectionID: first.ConnectionID,
+			AccountID:    first.AccountID,
+			ObservedAt:   r.now().UTC().Format(time.RFC3339),
+		})
+	} else {
+		_ = r.store.ClearSyncError()
 	}
 	skipped := out.Skipped
 	if skipped == nil {
@@ -273,6 +331,8 @@ func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
 		SettledInserted:     out.Applied.SettledInserted,
 		AccountsProvisioned: out.Provisioned,
 		Skipped:             skipped,
+		Partial:             len(out.Notices) > 0,
+		Errors:              out.Notices,
 	}, nil
 }
 
@@ -319,4 +379,60 @@ func (r *Runner) Trigger(ctx context.Context) (*Summary, error) {
 	}
 	r.mu.Unlock()
 	return nil, err
+}
+
+// recordSyncError stores the display-only condition. A persistence failure
+// never changes the sync outcome.
+func (r *Runner) recordSyncError(item store.SyncError) {
+	if r == nil || r.store == nil {
+		return
+	}
+	_ = r.store.SetSyncError(item)
+}
+
+// syncErrorFromError maps a fetch failure to a stored condition. Unknown
+// transport failures stay generic so a wrapped request URL never reaches the
+// status payload.
+func syncErrorFromError(err error, now time.Time) store.SyncError {
+	observedAt := now.UTC().Format(time.RFC3339)
+	if err == nil {
+		return store.SyncError{}
+	}
+	var auth *AuthError
+	if errors.As(err, &auth) {
+		return store.SyncError{Code: "gen.auth", Message: auth.Error(), ObservedAt: observedAt}
+	}
+	var payment *PaymentRequiredError
+	if errors.As(err, &payment) {
+		return store.SyncError{Code: "gen.payment", Message: payment.Error(), ObservedAt: observedAt}
+	}
+	var unsupported *UnsupportedVersionError
+	if errors.As(err, &unsupported) {
+		return store.SyncError{Code: "gen.version", Message: unsupported.Error(), ObservedAt: observedAt}
+	}
+	var protocol *ProtocolErrorsError
+	if errors.As(err, &protocol) {
+		code := "gen."
+		if len(protocol.Errors) > 0 && protocol.Errors[0].Code != "" {
+			code = protocol.Errors[0].Code
+		}
+		return store.SyncError{Code: code, Message: protocol.Error(), Scope: "general", ObservedAt: observedAt}
+	}
+	var rateLimited *RateLimitedError
+	if errors.As(err, &rateLimited) {
+		return store.SyncError{Code: "gen.ratelimit", Message: rateLimited.Error(), ObservedAt: observedAt}
+	}
+	var status *StatusError
+	if errors.As(err, &status) {
+		return store.SyncError{
+			Code:       "gen.status",
+			Message:    fmt.Sprintf("simplefin bridge returned status %d from %s", status.StatusCode, status.Host),
+			ObservedAt: observedAt,
+		}
+	}
+	var migration *MigrationRequiredError
+	if errors.As(err, &migration) {
+		return store.SyncError{Code: "gen.migration", Message: migration.Error(), ObservedAt: observedAt}
+	}
+	return store.SyncError{Code: "gen.sync", Message: "simplefin sync failed", ObservedAt: observedAt}
 }

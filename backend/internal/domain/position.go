@@ -40,6 +40,10 @@ func ResolveCurrentPosition(model *types.FinancialModel, asOfDate string, overri
 			observedInstant := CheckpointInstant(observed)
 			row.ObservedBalance = &observedBalance
 			row.ObservedAt = &observedInstant
+			if observed.AvailableBalance != nil {
+				availableBalance := *observed.AvailableBalance
+				row.AvailableBalance = &availableBalance
+			}
 		}
 		result.Accounts = append(result.Accounts, row)
 	}

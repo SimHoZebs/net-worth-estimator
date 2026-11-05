@@ -25,13 +25,31 @@ await run("go", ["build", "-o", join(tools, "upgrade-planned-purchases"), "./scr
   cwd: new URL("../backend/", import.meta.url).pathname,
   env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "simplefin-v2-keys"), "./scripts/one-time/simplefin-v2-keys"], {
+  cwd: new URL("../backend/", import.meta.url).pathname,
+  env: { ...process.env, CGO_ENABLED: "0" },
+});
 
 const sqlite = (db, sql) => run("sqlite3", [db, sql]);
 const rows = async (db, sql) => (await sqlite(db, sql)).stdout.trim();
 const sha256File = async (path) => createHash("sha256").update(await readFile(path)).digest("hex");
-const migrate = (db, extraEnv) => run("/bin/sh", [script.pathname], {
-  env: { ...process.env, PATH: `${tools}${delimiter}${process.env.PATH}`, ...extraEnv, NET_WORTH_ESTIMATOR_DB: db },
-});
+const migrate = async (db, extraEnv) => {
+  let mapping = "";
+  try {
+    await stat(db);
+    const users = (await run("sqlite3", ["-readonly", db, "SELECT id FROM users ORDER BY id;"])).stdout.trim().split("\n").filter(Boolean);
+    if (users.length > 0) {
+      mapping = join(db + ".simplefin-map.json");
+      const usersMap = Object.fromEntries(users.map((id) => [id, { connections: [{ connId: "CON-TEST", name: "Test Bank" }], accounts: {} }]));
+      await writeFile(mapping, JSON.stringify({ version: 1, users: usersMap }), { mode: 0o600 });
+    }
+  } catch {
+    mapping = "";
+  }
+  return run("/bin/sh", [script.pathname], {
+    env: { ...process.env, PATH: `${tools}${delimiter}${process.env.PATH}`, SIMPLEFIN_V2_MAPPING: mapping, ...extraEnv, NET_WORTH_ESTIMATOR_DB: db },
+  });
+};
 const migrateFails = async (db, extraEnv) => {
   const error = await migrate(db, extraEnv).then(
     () => null,
@@ -194,6 +212,7 @@ test("legacy date checkpoints convert and Analysis provisions on a full base", a
   await seedBankRows(db, owner, guest);
   const metaBefore = await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id; SELECT * FROM model_metadata;");
   const keysBefore = await rows(db, "SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys ORDER BY 1, 2, 3, 4;");
+  const keysBeforeNonKey = await rows(db, "SELECT user_id, provider, transaction_id, posting_id FROM posting_sync_keys ORDER BY 1, 2, 3, 4;");
   const attachmentsBefore = await privateAttachments(db);
 
   const result = await migrate(db);
@@ -212,7 +231,11 @@ test("legacy date checkpoints convert and Analysis provisions on a full base", a
     `${owner}/settled-a|1/1773140400`,
     `${owner}/void-a|0/1773129600`,
   ]);
-  assert.equal(await rows(db, "SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys ORDER BY 1, 2, 3, 4;"), keysBefore);
+  assert.equal(await rows(db, "SELECT user_id, provider, transaction_id, posting_id FROM posting_sync_keys ORDER BY 1, 2, 3, 4;"), keysBeforeNonKey);
+  for (const key of (await rows(db, "SELECT bridge_account_id FROM posting_sync_keys;")).split("\n")) {
+    assert.match(key, /^sf2\./);
+  }
+  assert.notEqual(await rows(db, "SELECT user_id, provider, bridge_account_id, transaction_id, posting_id FROM posting_sync_keys ORDER BY 1, 2, 3, 4;"), keysBefore);
   assert.equal(await privateAttachments(db), attachmentsBefore);
   assert.equal(await rows(db, "SELECT id, issuer, subject FROM users ORDER BY id; SELECT * FROM model_metadata;"), metaBefore);
   assert.equal(await rows(db, "PRAGMA integrity_check;"), "ok");
@@ -878,6 +901,9 @@ sqlite3 "$NET_WORTH_ESTIMATOR_DB" "DROP TRIGGER analysis_posting_lifecycle;
   INSERT INTO checkpoints(user_id, id, position, date, model_account_id, balance, source) VALUES ('$owner', 1, 0, '2026-03-10', 'checking', 100, 'user');
   INSERT INTO postings(user_id, id, position, name, source_account_id, destinations, amount_resolution_json, posted_time, transaction_time, enabled, source, pending, void) VALUES ('$owner', 'settled-a', 0, 'Groceries', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'simplefin', 0, 0), ('$owner', 'manual-a', 1, 'Owner', 'checking', 'null', '{}', 1773140400, 1773129600, 0, 'user', 0, 0);
   INSERT INTO posting_sync_keys(user_id, provider, bridge_account_id, transaction_id, posting_id) VALUES ('$owner', 'simplefin', 'bridge-checking', 'tx1', 'settled-a');"
+export SIMPLEFIN_V2_MAPPING=/tmp/simplefin-map.json
+printf '{"version":1,"users":{"%s":{"connections":[{"connId":"CON-TEST"}],"accounts":{}}}}' "$owner" > "$SIMPLEFIN_V2_MAPPING"
+chmod 600 "$SIMPLEFIN_V2_MAPPING"
 /app/migrate.sh >/dev/null
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" 'SELECT observed_at FROM checkpoints;')" = 1773187199
 test "$(sqlite3 -readonly "$NET_WORTH_ESTIMATOR_DB" "SELECT s.enabled, p.transaction_time FROM postings p JOIN posting_sim s ON s.user_id=p.user_id AND s.posting_id=p.id WHERE p.id = 'settled-a';")" = "1|1773140400"

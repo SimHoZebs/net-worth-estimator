@@ -55,6 +55,9 @@ type accountBalanceRow struct {
 	ObservedBalance *float64 `json:"observedBalance,omitempty"`
 	// ObservedAt is the required observation instant (Unix).
 	ObservedAt *int64 `json:"observedAt,omitempty"`
+	// AvailableBalance is the latest observation's bank-reported available
+	// cash or credit. Nil when the bank reported none.
+	AvailableBalance *float64 `json:"availableBalance,omitempty"`
 }
 
 type accountBalancesOutput struct {
@@ -139,21 +142,22 @@ func (s *handler) listAccountBalances(_ context.Context, input *struct {
 				}
 			}
 			row := accountBalanceRow{
-				ID:              account.ID,
-				Name:            account.Name,
-				Kind:            account.Kind,
-				Enabled:         account.Enabled,
-				Archived:        isArchivedDebt(account, adjusted.ObservedBalance),
-				Color:           account.Color,
-				MinBalance:      account.MinBalance,
-				MaxBalance:      account.MaxBalance,
-				Balance:         adjusted.Balance,
-				ObservedOn:      observedOn,
-				HasCheckpoint:   hasCheckpoint,
-				SyncOwned:       syncOwned,
-				ReadOnly:        s.readOnly || syncOwned,
-				ObservedBalance: adjusted.ObservedBalance,
-				ObservedAt:      adjusted.ObservedAt,
+				ID:               account.ID,
+				Name:             account.Name,
+				Kind:             account.Kind,
+				Enabled:          account.Enabled,
+				Archived:         isArchivedDebt(account, adjusted.ObservedBalance),
+				Color:            account.Color,
+				MinBalance:       account.MinBalance,
+				MaxBalance:       account.MaxBalance,
+				Balance:          adjusted.Balance,
+				ObservedOn:       observedOn,
+				HasCheckpoint:    hasCheckpoint,
+				SyncOwned:        syncOwned,
+				ReadOnly:         s.readOnly || syncOwned,
+				ObservedBalance:  adjusted.ObservedBalance,
+				ObservedAt:       adjusted.ObservedAt,
+				AvailableBalance: adjusted.AvailableBalance,
 			}
 			rows = append(rows, row)
 		}

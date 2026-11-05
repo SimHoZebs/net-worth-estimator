@@ -2,6 +2,7 @@ package simplefin
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,9 @@ const (
 	SkipUnmappedAccount SkipReason = "unmapped-account"
 	SkipNonUSD          SkipReason = "non-usd"
 	SkipBadAmount       SkipReason = "bad-amount"
+	// SkipProviderError counts rows omitted because the Bridge reported a
+	// connection- or account-scoped error for them.
+	SkipProviderError SkipReason = "provider-error"
 	// SkipStaleLink counts bridge accounts whose link points at a
 	// deleted model account. Nothing is written for them; the link
 	// stays for relinking.
@@ -24,15 +28,18 @@ const (
 )
 
 // Checkpoint is a balance observation for one model account.
-// BridgeID carries the source account; AccountID is empty when the bridge
-// account has no resolved model account (the runner drops those before
-// apply). ObservedAt is the required exact Unix instant; a missing bridge
-// balance-date falls back to arrival time.
+// BridgeID carries the canonical source account key; AccountID is empty when
+// the bridge account has no resolved model account (the runner drops those
+// before apply). AvailableBalance is the Bridge's available balance when it
+// reported one, kept separate from the posted balance. ObservedAt is the
+// required exact Unix instant; a missing bridge balance-date falls back to
+// arrival time.
 type Checkpoint struct {
-	AccountID  string
-	BridgeID   string
-	Balance    float64
-	ObservedAt int64
+	AccountID        string
+	BridgeID         string
+	Balance          float64
+	AvailableBalance *float64
+	ObservedAt       int64
 }
 
 // Translation is one sync run's output before applying. Pending holds pending
@@ -49,6 +56,19 @@ type Translation struct {
 // parseBalance parses a bridge balance decimal.
 func parseBalance(raw string) (float64, error) {
 	return strconv.ParseFloat(strings.TrimSpace(raw), 64)
+}
+
+// parseAvailableBalance keeps an absent or invalid available balance as
+// unknown. It never fails the account's posted balance observation.
+func parseAvailableBalance(raw *string) *float64 {
+	if raw == nil {
+		return nil
+	}
+	value, err := parseBalance(*raw)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+		return nil
+	}
+	return &value
 }
 
 // absDecimal returns the absolute decimal value without float formatting.
@@ -108,8 +128,14 @@ func truncateLabel(description string) string {
 func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Translation, error) {
 	translation := &Translation{Skipped: map[SkipReason]int{}}
 	seenCheckpoints := map[string]struct{}{}
+	exclusions := set.Exclusions()
 	for _, account := range set.Accounts {
-		modelAccountID, mapped := resolved[account.ID]
+		bridgeID := AccountKey(account.ConnID, account.ID)
+		if exclusions.Excluded(account.ConnID, account.ID) {
+			translation.Skipped[SkipProviderError] += len(account.Transactions) + 1
+			continue
+		}
+		modelAccountID, mapped := resolved[bridgeID]
 		if !mapped {
 			if account.Currency != "" && account.Currency != "USD" {
 				translation.Skipped[SkipNonUSD] += len(account.Transactions) + 1
@@ -121,11 +147,11 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 			}
 			translation.Skipped[SkipUnmappedAccount] += len(account.Transactions) + 1
 			instant := checkpointInstant(account.BalanceDate, now)
-			key := account.ID + "\x00" + strconv.FormatInt(instant, 10)
+			key := bridgeID + "\x00" + strconv.FormatInt(instant, 10)
 			if _, seen := seenCheckpoints[key]; !seen {
 				seenCheckpoints[key] = struct{}{}
 				balance, _ := parseBalance(account.Balance)
-				translation.Checkpoints = append(translation.Checkpoints, Checkpoint{BridgeID: account.ID, Balance: balance, ObservedAt: instant})
+				translation.Checkpoints = append(translation.Checkpoints, Checkpoint{BridgeID: bridgeID, Balance: balance, AvailableBalance: parseAvailableBalance(account.AvailableBalance), ObservedAt: instant})
 			}
 			continue
 		}
@@ -142,7 +168,7 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 		key := modelAccountID + "\x00" + strconv.FormatInt(instant, 10)
 		if _, seen := seenCheckpoints[key]; !seen {
 			seenCheckpoints[key] = struct{}{}
-			translation.Checkpoints = append(translation.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: account.ID, Balance: balance, ObservedAt: instant})
+			translation.Checkpoints = append(translation.Checkpoints, Checkpoint{AccountID: modelAccountID, BridgeID: bridgeID, Balance: balance, AvailableBalance: parseAvailableBalance(account.AvailableBalance), ObservedAt: instant})
 		}
 
 		for _, transaction := range account.Transactions {
@@ -183,7 +209,7 @@ func Translate(set *AccountSet, resolved map[string]string, now time.Time) (*Tra
 				transactionTime = postedTime
 			}
 			posting := store.SyncPosting{
-				ProviderAccountID: account.ID,
+				ProviderAccountID: bridgeID,
 				TransactionID:     transaction.ID,
 				Facts:             transactionFacts(transaction, account.Currency),
 				Posting: types.Posting{

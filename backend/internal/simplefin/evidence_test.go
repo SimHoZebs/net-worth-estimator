@@ -15,8 +15,8 @@ func TestEvidencePreservesFullSourceAndRefreshesKnownSettledKeys(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"id":"one","description":"`+strings.Repeat("x", 100)+` KLARNA PAY IN 4","amount":"-25","posted":1785628800,"payee":"Klarna","memo":"Installment","extra":{"payment_product":"pay-in-four","secret":"do not retain","category":{"unrecognized":true}}}`), &transaction); err != nil {
 		t.Fatal(err)
 	}
-	set := &AccountSet{Accounts: []Account{{ID: "bank", Currency: "USD", Balance: "100", Transactions: []Transaction{transaction}}}}
-	translation, err := Translate(set, map[string]string{"bank": "checking"}, time.Unix(1785628800, 0))
+	set := &AccountSet{Accounts: []Account{{ID: "bank", ConnID: testConnID, Currency: "USD", Balance: "100", Transactions: []Transaction{transaction}}}}
+	translation, err := Translate(set, map[string]string{testAccountKey("bank"): "checking"}, time.Unix(1785628800, 0))
 	if err != nil || len(translation.Settled) != 1 {
 		t.Fatalf("translation=%+v err=%v", translation, err)
 	}

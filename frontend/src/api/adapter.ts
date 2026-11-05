@@ -36,6 +36,7 @@ export function balanceRowToDisplay(row: AccountBalanceRow): Account {
 		observedOn: row.observedOn,
 		observedAt: row.observedAt ?? null,
 		observedBalance: row.observedBalance ?? null,
+		availableBalance: row.availableBalance ?? null,
 		balanceCheck: row.hasCheckpoint,
 		source: row.syncOwned
 			? "Synced balance check"

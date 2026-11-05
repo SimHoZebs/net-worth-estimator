@@ -29,21 +29,18 @@ func TestFetchMaps429ToRateLimited(t *testing.T) {
 }
 
 func TestFetchDetectsRateLimitBodyOn200(t *testing.T) {
-	for _, body := range []string{
-		`{"errors":["Too many requests. SimpleFIN data is only refreshed once every 24 hours."],"accounts":[]}`,
-		`{"errlist":[{"code":"gen.api","msg":"Too many requests, slow down"}],"accounts":[]}`,
-	} {
-		bridge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(body))
-		}))
-		client := &Client{AccessURL: bridge.URL, HTTPClient: bridge.Client()}
-		_, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
-		var rateLimited *RateLimitedError
-		if !errors.As(err, &rateLimited) {
-			t.Fatalf("body %s: error = %T (%v), want RateLimitedError", body, err, err)
-		}
-		bridge.Close()
+	body := `{"errlist":[{"code":"gen.api","msg":"Too many requests, slow down"}],"connections":[],"accounts":[]}`
+	bridge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(bridge.Close)
+
+	client := &Client{AccessURL: bridge.URL, HTTPClient: bridge.Client()}
+	_, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
+	var rateLimited *RateLimitedError
+	if !errors.As(err, &rateLimited) {
+		t.Fatalf("error = %T (%v), want RateLimitedError", err, err)
 	}
 }
 

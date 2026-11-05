@@ -32,9 +32,9 @@ import (
 func qa03BankSync(t *testing.T, scoped store.Store, transactions []simplefin.Transaction) {
 	t.Helper()
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{
-		ID: "bank", Currency: "USD", Balance: "1000", Transactions: transactions,
+		ID: "bank", ConnID: "test-conn", Currency: "USD", Balance: "1000", Transactions: transactions,
 	}}}
-	translation, err := simplefin.Translate(set, map[string]string{"bank": "checking"}, time.Now())
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bank"): "checking"}, time.Now())
 	if err != nil {
 		t.Fatalf("map bank rows: %v", err)
 	}

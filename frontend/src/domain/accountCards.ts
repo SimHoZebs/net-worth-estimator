@@ -95,6 +95,21 @@ export function toAccountCard({
 		{ label: "Projected ending", value: money(Math.abs(ending)) },
 		{ label: "Observed on", value: dateLabel(account.observedOn, true) },
 	];
+	if (
+		account.availableBalance !== null &&
+		account.availableBalance !== undefined
+	) {
+		metrics.splice(1, 0, {
+			label:
+				account.kind === "debt"
+					? "Available credit at last check"
+					: "Available at last check",
+			value:
+				account.kind === "debt"
+					? money(Math.abs(account.availableBalance))
+					: money(account.availableBalance),
+		});
+	}
 	if (account.maxBalance !== null) {
 		metrics.push({
 			label: account.kind === "debt" ? "Credit limit" : "Balance ceiling",

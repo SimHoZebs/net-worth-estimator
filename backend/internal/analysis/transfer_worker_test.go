@@ -34,10 +34,10 @@ func TestWorkerPairsCreditCardPaymentLegs(t *testing.T) {
 	}
 	arrival := time.Unix(1785628800, 0)
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{
-		{ID: "bridge-checking", Currency: "USD", Balance: "1000", BalanceDate: 1785628800, Transactions: []simplefin.Transaction{{ID: "pay", Description: "CREDIT CARD PAYMENT", Amount: "-500.00", Posted: 1785628800}}},
-		{ID: "bridge-card", Currency: "USD", Balance: "200", BalanceDate: 1785715200, Transactions: []simplefin.Transaction{{ID: "receive", Description: "PAYMENT RECEIVED", Amount: "500.00", Posted: 1785715200}}},
+		{ID: "bridge-checking", ConnID: "test-conn", Currency: "USD", Balance: "1000", BalanceDate: 1785628800, Transactions: []simplefin.Transaction{{ID: "pay", Description: "CREDIT CARD PAYMENT", Amount: "-500.00", Posted: 1785628800}}},
+		{ID: "bridge-card", ConnID: "test-conn", Currency: "USD", Balance: "200", BalanceDate: 1785715200, Transactions: []simplefin.Transaction{{ID: "receive", Description: "PAYMENT RECEIVED", Amount: "500.00", Posted: 1785715200}}},
 	}}
-	translation, err := simplefin.Translate(set, map[string]string{"bridge-checking": "checking", "bridge-card": "card"}, arrival)
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bridge-checking"): "checking", simplefin.AccountKey("test-conn", "bridge-card"): "card"}, arrival)
 	if err != nil {
 		t.Fatal(err)
 	}

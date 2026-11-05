@@ -193,9 +193,9 @@ func ledgerApplyFeeds(t *testing.T, world *ledgerWorld, from, to int) {
 			transactions = append(transactions, txn)
 		}
 		set := &simplefin.AccountSet{Accounts: []simplefin.Account{{
-			ID: "ledger-bank", Currency: "USD", Balance: "10000", Transactions: transactions,
+			ID: "ledger-bank", ConnID: "ledger-conn", Currency: "USD", Balance: "10000", Transactions: transactions,
 		}}}
-		translation, err := simplefin.Translate(set, map[string]string{"ledger-bank": "checking"}, time.Unix(ledgerNow, 0))
+		translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("ledger-conn", "ledger-bank"): "checking"}, time.Unix(ledgerNow, 0))
 		if err != nil {
 			t.Fatalf("map bank feed: %v", err)
 		}

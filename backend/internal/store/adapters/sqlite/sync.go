@@ -46,6 +46,9 @@ type syncedCheckpoint struct {
 }
 
 func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []syncedCheckpoint, startPosition int) (int, error) {
+	if err := ensureAvailableBalanceSchema(tx); err != nil {
+		return 0, fmt.Errorf("ensure available balances: %w", err)
+	}
 	incomingKeys := make(map[string]struct{}, len(incoming))
 	for _, checkpoint := range incoming {
 		incomingKeys[syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)] = struct{}{}
@@ -58,7 +61,7 @@ func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []synced
 	untouchedSyncKeys := make(map[string]struct{})
 	for _, checkpoint := range incoming {
 		key := syncCheckpointKey(checkpoint.AccountID, checkpoint.ObservedAt)
-		if synced, ok := syncedByKey[key]; ok && synced.Balance == checkpoint.Balance {
+		if synced, ok := syncedByKey[key]; ok && synced.Balance == checkpoint.Balance && equalFloatPtr(synced.AvailableBalance, checkpoint.AvailableBalance) {
 			// Byte-identical round-trip of a sync row: leave it sync-owned.
 			untouchedSyncKeys[key] = struct{}{}
 			continue
@@ -68,6 +71,9 @@ func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []synced
 			position, checkpoint.AccountID, checkpoint.Balance, SourceUser, checkpoint.ObservedAt,
 		); err != nil {
 			return 0, fmt.Errorf("insert checkpoint: %w", err)
+		}
+		if err := upsertAvailableBalanceTx(tx, checkpoint.AccountID, checkpoint.ObservedAt, nil); err != nil {
+			return 0, fmt.Errorf("clear available balance: %w", err)
 		}
 		position++
 	}
@@ -84,9 +90,19 @@ func remergeCheckpoints(tx *userTx, incoming []types.Checkpoint, synced []synced
 		); err != nil {
 			return 0, fmt.Errorf("re-merge synced checkpoint: %w", err)
 		}
+		if err := upsertAvailableBalanceTx(tx, checkpoint.AccountID, checkpoint.ObservedAt, checkpoint.AvailableBalance); err != nil {
+			return 0, fmt.Errorf("re-merge available balance: %w", err)
+		}
 		position++
 	}
 	return position, nil
+}
+
+func equalFloatPtr(left, right *float64) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 // remergePostings writes owner postings, then restores authoritative sync rows.
@@ -133,7 +149,19 @@ func loadSyncedCheckpoints(tx *userTx) ([]syncedCheckpoint, error) {
 	// and the provider column names the supplying bridge, so metrics and
 	// debugging can tell bank-data origins apart; the lifecycle treats
 	// them uniformly.
-	rows, err := tx.Query(`SELECT model_account_id, balance, source, provider, observed_at FROM checkpoints WHERE source != ? AND user_id = :user_id ORDER BY position`, SourceUser)
+	query := `SELECT c.model_account_id, c.balance, c.source, c.provider, c.observed_at, NULL
+		FROM checkpoints c WHERE c.source != ? AND c.user_id = :user_id ORDER BY c.position`
+	var availableTables int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'checkpoint_available_balances'`).Scan(&availableTables); err != nil {
+		return nil, err
+	}
+	if availableTables == 1 {
+		query = `SELECT c.model_account_id, c.balance, c.source, c.provider, c.observed_at, a.available_balance
+			FROM checkpoints c LEFT JOIN checkpoint_available_balances a
+			ON a.user_id = c.user_id AND a.model_account_id = c.model_account_id AND a.observed_at = c.observed_at
+			WHERE c.source != ? AND c.user_id = :user_id ORDER BY c.position`
+	}
+	rows, err := tx.Query(query, SourceUser)
 	if err != nil {
 		return nil, err
 	}
@@ -141,9 +169,11 @@ func loadSyncedCheckpoints(tx *userTx) ([]syncedCheckpoint, error) {
 	var checkpoints []syncedCheckpoint
 	for rows.Next() {
 		var checkpoint syncedCheckpoint
-		if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.Provider, &checkpoint.ObservedAt); err != nil {
+		var available sql.NullFloat64
+		if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.Provider, &checkpoint.ObservedAt, &available); err != nil {
 			return nil, err
 		}
+		checkpoint.AvailableBalance = scanAvailableBalance(available)
 		checkpoints = append(checkpoints, checkpoint)
 	}
 	if err := rows.Err(); err != nil {
@@ -329,6 +359,9 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 	}
 	defer tx.Rollback()
 
+	if err := ensureAvailableBalanceSchema(tx); err != nil {
+		return summary, fmt.Errorf("ensure available balances: %w", err)
+	}
 	nextPosition, err := nextTablePosition(tx, "checkpoints")
 	if err != nil {
 		return summary, err
@@ -351,6 +384,9 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 		if updated, err := result.RowsAffected(); err != nil {
 			return summary, fmt.Errorf("sync checkpoint rows: %w", err)
 		} else if updated > 0 {
+			if err := upsertAvailableBalanceTx(tx, checkpoint.AccountID, checkpoint.ObservedAt, checkpoint.AvailableBalance); err != nil {
+				return summary, fmt.Errorf("sync available balance: %w", err)
+			}
 			summary.CheckpointsUpdated++
 			continue
 		}
@@ -366,6 +402,9 @@ func (s *sqliteStore) ApplySync(checkpoints []SyncCheckpoint, directives []BankD
 			return summary, fmt.Errorf("sync checkpoint rows: %w", err)
 		}
 		if inserted > 0 {
+			if err := upsertAvailableBalanceTx(tx, checkpoint.AccountID, checkpoint.ObservedAt, checkpoint.AvailableBalance); err != nil {
+				return summary, fmt.Errorf("sync available balance: %w", err)
+			}
 			summary.CheckpointsInserted++
 			nextPosition++
 			continue

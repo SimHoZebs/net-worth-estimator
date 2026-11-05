@@ -64,6 +64,17 @@ type EvaluationUpdate struct {
 	Config     map[string]any `json:"config,omitempty"`
 }
 
+// SyncError is the last non-fatal or failed SimpleFIN condition stored for
+// display. It never contains the Access URL or raw provider payloads.
+type SyncError struct {
+	Code         string `json:"code"`
+	Message      string `json:"message"`
+	Scope        string `json:"scope,omitempty"`
+	ConnectionID string `json:"connectionId,omitempty"`
+	AccountID    string `json:"accountId,omitempty"`
+	ObservedAt   string `json:"observedAt,omitempty"`
+}
+
 // SyncCredential is the stored per-plan SimpleFIN credential. AccessURL is
 // a secret and must never leave the server in API payloads or logs.
 type SyncCredential struct {
@@ -120,6 +131,9 @@ func (c GmailCredential) Connected() bool { return c.RefreshToken != "" }
 type SyncCheckpoint struct {
 	AccountID string
 	Balance   float64
+	// AvailableBalance is the Bridge's available balance when it reported
+	// one. Nil means unknown, not zero. It never replaces Balance.
+	AvailableBalance *float64
 	// Source is the bank-fact category carried from translation (never
 	// user). The store validates it at the boundary and never defaults
 	// it: owner rows keep collision precedence and repeat writes keep

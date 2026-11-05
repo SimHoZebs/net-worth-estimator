@@ -22,11 +22,11 @@ func seedCategoryBankPosting(t *testing.T, scoped store.Store, category string) 
 		extra["category"] = json.RawMessage(`"` + category + `"`)
 	}
 	set := &simplefin.AccountSet{Accounts: []simplefin.Account{{
-		ID: "bank", Currency: "USD", Balance: "100", Transactions: []simplefin.Transaction{{
+		ID: "bank", ConnID: "test-conn", Currency: "USD", Balance: "100", Transactions: []simplefin.Transaction{{
 			ID: "food", Description: "WHOLE FOODS", Amount: "-42.00", Posted: 1785628800, Extra: extra,
 		}},
 	}}}
-	translation, err := simplefin.Translate(set, map[string]string{"bank": account}, time.Unix(1785628800, 0))
+	translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("test-conn", "bank"): account}, time.Unix(1785628800, 0))
 	if err != nil {
 		t.Fatal(err)
 	}

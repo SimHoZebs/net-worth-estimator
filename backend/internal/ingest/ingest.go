@@ -7,6 +7,24 @@ import (
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 )
 
+// Notice is one provider condition worth reporting without failing the run.
+// Connection and account scopes are provider spellings; callers must not
+// treat them as local row identities.
+type Notice struct {
+	Code         string `json:"code"`
+	Message      string `json:"message"`
+	Scope        string `json:"scope"`
+	ConnectionID string `json:"connectionId,omitempty"`
+	AccountID    string `json:"accountId,omitempty"`
+}
+
+// Notifier is an optional adapter capability. Adapters that can report
+// non-fatal provider conditions implement it; the orchestrator copies the
+// notices into the run result.
+type Notifier interface {
+	Notices(native any) []Notice
+}
+
 // Adapter is one bank provider behind the TransactionProvider interface.
 // Native snapshots stay opaque to the orchestrator: only the adapter
 // interprets them. The orchestrator owns provisioning, apply, last-sync
@@ -30,6 +48,7 @@ type Result struct {
 	Applied     store.SyncApplySummary
 	Provisioned int
 	Skipped     map[string]int
+	Notices     []Notice
 }
 
 // Sync runs fetch, link resolution, provisioning, translation, and apply
@@ -41,6 +60,9 @@ func Sync(ctx context.Context, st store.Store, adapter Adapter, now time.Time) (
 	native, err := adapter.Fetch(ctx, start, end)
 	if err != nil {
 		return out, err
+	}
+	if notifier, ok := adapter.(Notifier); ok {
+		out.Notices = notifier.Notices(native)
 	}
 	resolved, provisioned, stale, err := st.ProvisionSyncAccounts(adapter.Provisions(native))
 	if err != nil {

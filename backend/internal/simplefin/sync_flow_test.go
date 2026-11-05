@@ -18,7 +18,7 @@ func flowPosting(id, name, account, amount string, pending bool, day string) sto
 		stamp = time.Unix(1785628800, 0).UTC()
 	}
 	return store.SyncPosting{
-		ProviderAccountID: "bridge-" + account,
+		ProviderAccountID: testAccountKey("bridge-" + account),
 		TransactionID:     id,
 		Posting: types.Posting{
 			Name:            name,
@@ -271,7 +271,7 @@ func settledFeed(t *testing.T, posted, transacted int64) AccountSet {
 	t.Helper()
 	transactedAt := transacted
 	return AccountSet{Accounts: []Account{{
-		ID: "bridge-checking", Name: "Checking", Currency: "USD",
+		ID: "bridge-checking", ConnID: testConnID, Name: "Checking", Currency: "USD",
 		Balance: "1000.00", BalanceDate: 1773133200, // 09:00 observation
 		Transactions: []Transaction{{
 			ID: "exp1", Posted: posted, Amount: "-100.00",
@@ -285,14 +285,14 @@ func seedFlowChecking(t *testing.T, database store.Store) {
 	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking", Kind: types.AccountKindCash, Enabled: true}); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
-	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual}); err != nil {
+	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: testAccountKey("bridge-checking"), ModelAccountID: "checking", Origin: store.LinkOriginManual}); err != nil {
 		t.Fatalf("seed link: %v", err)
 	}
 }
 
 func applyProviderFeed(t *testing.T, database store.Store, set *AccountSet, now time.Time) (store.SyncApplySummary, *types.FinancialModel) {
 	t.Helper()
-	translation, err := Translate(set, map[string]string{"bridge-checking": "checking"}, now)
+	translation, err := Translate(set, map[string]string{testAccountKey("bridge-checking"): "checking"}, now)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestSettledBankActualEndToEndFromProviderFeed(t *testing.T) {
 	seedFlowChecking(t, database)
 	now := time.Unix(1773140400, 0).UTC()
 	set := settledFeed(t, 1773140400, 1773129600)
-	translation, err := Translate(&set, map[string]string{"bridge-checking": "checking"}, now)
+	translation, err := Translate(&set, map[string]string{testAccountKey("bridge-checking"): "checking"}, now)
 	if err != nil {
 		t.Fatalf("translate: %v", err)
 	}
@@ -443,7 +443,7 @@ func TestPendingSeedConvertsToSettledEndToEnd(t *testing.T) {
 	now := time.Unix(1773133200, 0).UTC()
 	pending := &[]bool{true}[0]
 	feed := &AccountSet{Accounts: []Account{{
-		ID: "bridge-checking", Name: "Checking", Currency: "USD",
+		ID: "bridge-checking", ConnID: testConnID, Name: "Checking", Currency: "USD",
 		Balance: "1000.00", BalanceDate: 1773133200,
 		Transactions: []Transaction{{
 			ID: "auth1", Posted: 0, Amount: "-100.00",

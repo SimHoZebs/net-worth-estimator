@@ -107,6 +107,7 @@ function AccountsView({
 					readOnly: row.readOnly,
 					observedBalance: row.observedBalance ?? null,
 					observedAt: row.observedAt ?? null,
+					availableBalance: row.availableBalance ?? null,
 				})),
 			),
 		[balances.data],

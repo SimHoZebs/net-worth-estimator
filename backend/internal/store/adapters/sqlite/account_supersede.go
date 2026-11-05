@@ -243,6 +243,9 @@ func supersedeDeletePostings(tx *userTx, postingIDs []string) error {
 }
 
 func supersedeDeleteCheckpoints(tx *userTx, accountID string) error {
+	if _, err := tx.Exec(`DELETE FROM checkpoint_available_balances WHERE model_account_id = ? AND user_id = :user_id`, accountID); err != nil {
+		return fmt.Errorf("delete available balances for %s: %w", accountID, err)
+	}
 	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE model_account_id = ? AND user_id = :user_id`, accountID); err != nil {
 		return fmt.Errorf("delete checkpoints for %s: %w", accountID, err)
 	}

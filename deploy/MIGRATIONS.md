@@ -30,12 +30,24 @@ Analysis schemas fail before any backup. It checks integrity and foreign
 keys, creates a private `<database>.analysis-backup.XXXXXX/before.db` with
 the SQLite backup API, and compares every preexisting application table,
 except the schema-marker table, against that backup. Only the checkpoint
-date-to-instant conversion, settled-bank repair, and explicit purchase-row
-conversion and removal of the completed `posting_id_migrations` audit table may
-differ. The audit remains in the verified backup. Purchase conversion preserves all other rows, identities,
+date-to-instant conversion, settled-bank repair, explicit purchase-row
+conversion, the SimpleFIN v2 key rewrite, and removal of the completed
+`posting_id_migrations` audit table may differ. The audit remains in the
+verified backup. Purchase conversion preserves all other rows, identities,
 and Analysis evidence. Unsafe purchase inputs leave the original unchanged. A
 complete target without that audit table repeats read-only checks only and never reactivates
 a post-upgrade owner disable.
+
+The SimpleFIN v2 key conversion is one additional offline step in the same
+candidate. `simplefin-v2-keys` rewrites `account_links`,
+`posting_sync_keys`, and `suppressed_sync_keys` from bare account IDs to
+connection-scoped keys, verifies row counts, and records
+`simplefin-v2-keys`. It is a no-op when no SimpleFIN rows exist. When rows
+exist, the deployment supplies `SIMPLEFIN_V2_MAPPING` as a private runtime
+setting: a mode-0600 JSON map produced by `simplefin-v2-keys
+--write-mapping` before the window. The map tool performs the only provider
+read. A missing, ambiguous, or colliding mapping fails before publication.
+A marked database repeats read-only verification and refuses bare keys.
 
 The old import default and pre-upgrade API-set exclusions share the same
 disabled flag. The conversion enables all legacy settled bank rows once,

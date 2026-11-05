@@ -69,11 +69,15 @@ export function spendingBalance(
 	accountIds: string[],
 ): number {
 	const selected = new Set(accountIds);
+	// The bank's available figure is as of the same observation as the posted
+	// balance. Prefer it when present: it already accounts for live holds.
 	return accounts
 		.filter((account) => selected.has(account.id) && !account.archived)
-		.reduce((sum, account) => sum + account.balance, 0);
+		.reduce(
+			(sum, account) => sum + (account.availableBalance ?? account.balance),
+			0,
+		);
 }
-
 /**
  * Remaining unpaid monthly obligations: requested outflows from the
  * spendable accounts dated after today through the end of the current

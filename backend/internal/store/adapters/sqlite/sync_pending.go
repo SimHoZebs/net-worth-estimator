@@ -44,6 +44,45 @@ func ensureSuppressionSchema(tx *userTx) error {
 	return err
 }
 
+func ensureSuppressionSchemaDB(db *userDB) error {
+	var count int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'suppressed_sync_keys'`).Scan(&count); err != nil {
+		return err
+	}
+	if count == 1 {
+		return nil
+	}
+	_, err := db.DB.Exec(suppressedSyncKeysDDL)
+	return err
+}
+
+// ListSyncAccountKeys returns every distinct account key recorded for one
+// provider, including rows whose account link was removed. The SimpleFIN
+// migration guard uses it before provisioning, so a skipped conversion
+// cannot create duplicate accounts.
+func (s *sqliteStore) ListSyncAccountKeys(provider string) ([]string, error) {
+	if err := ensureSuppressionSchemaDB(s.db); err != nil {
+		return nil, fmt.Errorf("ensure suppressed sync keys: %w", err)
+	}
+	rows, err := s.db.Query(`SELECT bridge_account_id FROM posting_sync_keys WHERE provider = ? AND user_id = :user_id
+		UNION
+		SELECT bridge_account_id FROM suppressed_sync_keys WHERE provider = ? AND user_id = :user_id
+		ORDER BY 1`, provider, provider)
+	if err != nil {
+		return nil, fmt.Errorf("list sync account keys: %w", err)
+	}
+	defer rows.Close()
+	keys := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, rows.Err()
+}
+
 // suppressPostingKeys copies a row's bank ids onto the do-not-import list.
 // Keyless owner rows suppress nothing. All placeholders stay positional:
 // mixing ? with named arguments misbinds on this driver.

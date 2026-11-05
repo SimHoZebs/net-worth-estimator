@@ -505,6 +505,17 @@ export interface ServerStatus extends HumaMetadata {
 	syncQuotaUsed: number;
 	/** Bridge daily allowance. */
 	syncQuotaLimit: number;
+	/** Last non-fatal or failed sync condition for display. */
+	syncError?: SyncError;
+}
+
+export interface SyncError {
+	code: string;
+	message: string;
+	scope?: string;
+	connectionId?: string;
+	accountId?: string;
+	observedAt?: string;
 }
 
 export interface SyncCredentialStatus extends HumaMetadata {

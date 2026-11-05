@@ -195,8 +195,8 @@ func main() {
 			}
 		}
 		if len(bankTransactions) > 0 {
-			set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "fixture-bank", Currency: "USD", Balance: "0", Transactions: bankTransactions}}}
-			translation, err := simplefin.Translate(set, map[string]string{"fixture-bank": "checking"}, time.Now())
+			set := &simplefin.AccountSet{Accounts: []simplefin.Account{{ID: "fixture-bank", ConnID: "fixture-conn", Currency: "USD", Balance: "0", Transactions: bankTransactions}}}
+			translation, err := simplefin.Translate(set, map[string]string{simplefin.AccountKey("fixture-conn", "fixture-bank"): "checking"}, time.Now())
 			if err != nil {
 				return err
 			}

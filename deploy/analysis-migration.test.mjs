@@ -20,11 +20,28 @@ await run("go", ["build", "-o", join(tools, "upgrade-posting-sim-split"), "./scr
 await run("go", ["build", "-o", join(tools, "upgrade-planned-purchases"), "./scripts/one-time/planned-purchases"], {
   cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
 });
+await run("go", ["build", "-o", join(tools, "simplefin-v2-keys"), "./scripts/one-time/simplefin-v2-keys"], {
+  cwd: join(root, "backend"), env: { ...process.env, CGO_ENABLED: "0" },
+});
 const sql = async (db, query) => (await run("sqlite3", [db, query])).stdout.trim();
 const sha256File = async (path) => (await run("sha256sum", [path])).stdout.trim().split(/\s+/)[0];
-const migrate = (db, env = {}) => run("/bin/sh", [script], {
-  env: { ...process.env, PATH: tools + delimiter + process.env.PATH, NET_WORTH_ESTIMATOR_DB: db, ...env },
-});
+const migrate = async (db, env = {}) => {
+  let mapping = "";
+  try {
+    await stat(db);
+    const users = (await run("sqlite3", ["-readonly", db, "SELECT id FROM users ORDER BY id;"])).stdout.trim().split("\n").filter(Boolean);
+    if (users.length > 0) {
+      mapping = join(db + ".simplefin-map.json");
+      const usersMap = Object.fromEntries(users.map((id) => [id, { connections: [{ connId: "CON-TEST", name: "Test Bank" }], accounts: {} }]));
+      await writeFile(mapping, JSON.stringify({ version: 1, users: usersMap }), { mode: 0o600 });
+    }
+  } catch {
+    mapping = "";
+  }
+  return run("/bin/sh", [script], {
+    env: { ...process.env, PATH: tools + delimiter + process.env.PATH, SIMPLEFIN_V2_MAPPING: mapping, NET_WORTH_ESTIMATOR_DB: db, ...env },
+  });
+};
 const backups = async (directory) => (await readdir(directory)).filter((name) => name.includes(".analysis-backup."));
 async function sourceDatabase() {
   const directory = await mkdtemp("/tmp/opencode/bnpl-migration-db-");

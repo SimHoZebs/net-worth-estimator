@@ -467,6 +467,15 @@ describe("spendingBalance", () => {
 		).toBe(18250);
 		expect(spendingBalance(financialModelFixture.accounts, [])).toBe(0);
 	});
+
+	it("prefers the bank-reported available balance when present", () => {
+		const accounts = financialModelFixture.accounts.map((account) =>
+			account.id === "checking"
+				? { ...account, availableBalance: 9000 }
+				: account,
+		);
+		expect(spendingBalance(accounts, ["checking"])).toBe(9000);
+	});
 });
 
 describe("filterTransactionsById", () => {

@@ -19,6 +19,8 @@ type statusOutput struct {
 		// SyncQuotaLimit is the Bridge daily allowance.
 		SyncQuotaUsed  int `json:"syncQuotaUsed"`
 		SyncQuotaLimit int `json:"syncQuotaLimit"`
+		// SyncError is the last non-fatal or failed sync condition.
+		SyncError *store.SyncError `json:"syncError,omitempty"`
 	}
 }
 
@@ -47,6 +49,11 @@ func registerStatus(api huma.API, st store.Store, config Config) {
 			return nil, huma.Error500InternalServerError(err.Error())
 		}
 		output.Body.LastSyncAt = lastSync
+		syncError, err := st.GetSyncError()
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+		output.Body.SyncError = syncError
 		if config.SyncRunner != nil {
 			used, limit := config.SyncRunner.QuotaUsage()
 			output.Body.SyncQuotaUsed = used

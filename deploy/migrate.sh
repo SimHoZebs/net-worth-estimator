@@ -637,7 +637,33 @@ verify_same() {
   test "$changed" = 0
 }
 
-tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','postings','posting_sim','posting_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions') ORDER BY name;") \
+verify_simplefin_keys() {
+  sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT (SELECT COUNT(*) FROM main.account_links) != (SELECT COUNT(*) FROM before.account_links)
+      OR EXISTS(SELECT 1 FROM before.account_links o WHERE NOT EXISTS (
+        SELECT 1 FROM main.account_links n WHERE n.user_id = o.user_id AND n.model_account_id = o.model_account_id
+          AND n.bridge_name IS o.bridge_name AND n.currency IS o.currency AND n.origin IS o.origin AND n.last_seen_at IS o.last_seen_at))
+      OR EXISTS(SELECT 1 FROM main.account_links WHERE bridge_account_id NOT LIKE 'sf2.%');" || return 1
+  sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+    SELECT (SELECT COUNT(*) FROM main.posting_sync_keys) != (SELECT COUNT(*) FROM before.posting_sync_keys)
+      OR EXISTS(SELECT 1 FROM before.posting_sync_keys o WHERE NOT EXISTS (
+        SELECT 1 FROM main.posting_sync_keys n WHERE n.user_id = o.user_id AND n.posting_id = o.posting_id
+          AND n.provider = o.provider AND n.transaction_id = o.transaction_id))
+      OR EXISTS(SELECT 1 FROM main.posting_sync_keys WHERE provider = 'simplefin' AND bridge_account_id NOT LIKE 'sf2.%');" || return 1
+  has_before=$(sqlite3 -readonly "$before" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='suppressed_sync_keys';") || return 1
+  has_main=$(sqlite3 -readonly "$candidate" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='suppressed_sync_keys';") || return 1
+  test "$has_before" = "$has_main" || return 1
+  if [ "$has_main" = 1 ]; then
+    sqlite3 "$candidate" "ATTACH DATABASE '$(esc "$before")' AS before;
+      SELECT (SELECT COUNT(*) FROM main.suppressed_sync_keys) != (SELECT COUNT(*) FROM before.suppressed_sync_keys)
+        OR EXISTS(SELECT 1 FROM before.suppressed_sync_keys o WHERE NOT EXISTS (
+          SELECT 1 FROM main.suppressed_sync_keys n WHERE n.user_id = o.user_id AND n.provider = o.provider
+            AND n.transaction_id = o.transaction_id AND n.suppressed_at = o.suppressed_at))
+        OR EXISTS(SELECT 1 FROM main.suppressed_sync_keys WHERE provider = 'simplefin' AND bridge_account_id NOT LIKE 'sf2.%');" || return 1
+  fi
+}
+
+tables=$(sqlite3 -readonly "$before" "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('schema_migrations','checkpoints','postings','posting_sim','posting_claims','transaction_source_facts','analysis_inputs','analysis_runs','analysis_findings','analysis_feedback','analysis_promotions','account_links','posting_sync_keys','suppressed_sync_keys') ORDER BY name;") \
   || fail "Cannot list backup tables; refusing to publish."
 for table in $tables; do
   case "$table" in *[!a-z0-9_]*) fail "Unsupported application table name." ;; esac
@@ -727,6 +753,16 @@ if [ "$purchases" = purchase_policies ]; then
         WHERE n.id IS NULL OR e.kind IS NOT 'planned-purchase' OR n.name IS NOT p.name OR n.position IS NOT s.position OR n.funding_account_id IS NOT p.source_account_id OR n.cost IS NOT CAST(json_extract(p.amount_resolution_json,'$.config.expression') AS REAL) OR n.earliest_date IS NOT date(CASE WHEN p.transaction_time>0 THEN p.transaction_time ELSE p.posted_time END,'unixepoch') OR n.priority IS NOT q.priority OR n.enabled IS NOT s.enabled);")
   test "$purchase_delta" = 0 || fail "Purchase conversion changed unexpected rows. Original unchanged; backup retained at $backup."
 fi
+
+# Convert SimpleFIN bridge identity from bare v1 account IDs to
+# connection-scoped v2 keys. The tool is a no-op when no SimpleFIN rows
+# exist. A live mapping supplied through the private environment is required
+# only when rows exist; the conversion itself is offline and transactional.
+if ! simplefin-v2-keys --db "$candidate" --mapping "${SIMPLEFIN_V2_MAPPING:-}" > "$backup/simplefin-v2-keys.log" 2>&1; then
+  printf 'migrate: SimpleFIN v2 key conversion failed: %s\n' "$(cat "$backup/simplefin-v2-keys.log")" >&2
+  fail "Candidate SimpleFIN v2 key conversion failed. Original unchanged; backup retained at $backup."
+fi
+verify_simplefin_keys || fail "Candidate SimpleFIN v2 key verification failed. Original unchanged; backup retained at $backup. Keep the API stopped."
 
 # Retire completed upgrade bookkeeping only in the verified offline candidate.
 if [ "$posting_audit" = 1 ]; then

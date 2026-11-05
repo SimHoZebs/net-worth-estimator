@@ -22,4 +22,7 @@ type PositionAccount struct {
 	// ObservedAt is the observation instant (Unix). Nil with
 	// ObservedBalance.
 	ObservedAt *int64 `json:"observedAt,omitempty"`
+	// AvailableBalance is the latest observation's bank-reported
+	// available cash or credit. Nil when the bank did not report one.
+	AvailableBalance *float64 `json:"availableBalance,omitempty"`
 }

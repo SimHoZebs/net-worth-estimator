@@ -22,6 +22,9 @@ func deleteModelRows(tx *userTx) error {
 	if _, err := tx.Exec(`DELETE FROM accounts WHERE user_id = :user_id`); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM checkpoint_available_balances WHERE user_id = :user_id`); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM checkpoints WHERE user_id = :user_id`); err != nil {
 		return err
 	}
@@ -350,9 +353,11 @@ func savePaymentTerms(tx *userTx, terms []types.PaymentTerms) error {
 
 func scanCheckpointRow(rows *sql.Rows) (types.Checkpoint, error) {
 	var checkpoint types.Checkpoint
-	if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.ObservedAt); err != nil {
+	var available sql.NullFloat64
+	if err := rows.Scan(&checkpoint.AccountID, &checkpoint.Balance, &checkpoint.Source, &checkpoint.ObservedAt, &available); err != nil {
 		return types.Checkpoint{}, err
 	}
+	checkpoint.AvailableBalance = scanAvailableBalance(available)
 	return checkpoint, nil
 }
 
@@ -545,7 +550,18 @@ func loadModel(q queryer) (*types.FinancialModel, error) {
 		return nil, fmt.Errorf("close accounts: %w", err)
 	}
 
-	checkpointRows, err := q.Query(`SELECT model_account_id, balance, source, observed_at FROM checkpoints WHERE user_id = :user_id ORDER BY position`)
+	checkpointQuery := `SELECT c.model_account_id, c.balance, c.source, c.observed_at, NULL FROM checkpoints c WHERE c.user_id = :user_id ORDER BY c.position`
+	var availableTables int
+	if err := q.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'checkpoint_available_balances'`).Scan(&availableTables); err != nil {
+		return nil, err
+	}
+	if availableTables == 1 {
+		checkpointQuery = `SELECT c.model_account_id, c.balance, c.source, c.observed_at, a.available_balance
+			FROM checkpoints c LEFT JOIN checkpoint_available_balances a
+			ON a.user_id = c.user_id AND a.model_account_id = c.model_account_id AND a.observed_at = c.observed_at
+			WHERE c.user_id = :user_id ORDER BY c.position`
+	}
+	checkpointRows, err := q.Query(checkpointQuery)
 	if err != nil {
 		return nil, err
 	}

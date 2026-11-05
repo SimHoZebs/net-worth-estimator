@@ -37,12 +37,72 @@ func seedRunnerAccounts(t *testing.T, database store.Store) {
 		}
 	}
 	for _, link := range []store.AccountLink{
-		{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual},
-		{BridgeAccountID: "bridge-prime", ModelAccountID: "prime_card", Origin: store.LinkOriginManual},
+		{BridgeAccountID: testAccountKey("bridge-checking"), ModelAccountID: "checking", Origin: store.LinkOriginManual},
+		{BridgeAccountID: testAccountKey("bridge-prime"), ModelAccountID: "prime_card", Origin: store.LinkOriginManual},
 	} {
 		if _, err := database.SaveAccountLink(link); err != nil {
 			t.Fatalf("seed link %s: %v", link.BridgeAccountID, err)
 		}
+	}
+}
+
+func TestSyncRejectsBareBridgeKeys(t *testing.T) {
+	database := openRunnerStore(t)
+	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual}); err != nil {
+		t.Fatal(err)
+	}
+	runner := NewRunner(database, Config{}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		t.Fatal("fetch ran with an unmigrated store")
+		return nil, nil
+	}
+	_, err := runner.Sync(context.Background())
+	var migration *MigrationRequiredError
+	if !errors.As(err, &migration) {
+		t.Fatalf("sync error = %T (%v), want MigrationRequiredError", err, err)
+	}
+}
+
+func TestSyncRejectsBarePostingKeyWithoutLink(t *testing.T) {
+	database := openRunnerStore(t)
+	seedRunnerAccounts(t, database)
+	account := "checking"
+	posting := types.Posting{
+		Name:            "Hold",
+		Source:          store.SourceBankSync,
+		SourceAccountID: &account,
+		Amount:          types.PostingAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
+		PostedTime:      1785628800,
+		TransactionTime: 1785628800,
+		Enabled:         false,
+		Pending:         true,
+	}
+	if _, err := database.ApplySync(nil, []store.BankDirective{{
+		Upsert: &store.BankUpsert{
+			Posting: posting,
+			Keys:    []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-checking", TransactionID: "tx1"}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DeleteAccountLink(testAccountKey("bridge-checking")); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.DeleteAccountLink(testAccountKey("bridge-prime")); err != nil {
+		t.Fatal(err)
+	}
+	runner := NewRunner(database, Config{}, nil)
+	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
+		t.Fatal("fetch ran with a bare posting key")
+		return nil, nil
+	}
+	_, err := runner.Sync(context.Background())
+	var migration *MigrationRequiredError
+	if !errors.As(err, &migration) {
+		t.Fatalf("sync error = %T (%v), want MigrationRequiredError", err, err)
 	}
 }
 
@@ -52,8 +112,8 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 	runner := NewRunner(database, Config{}, nil)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{Accounts: []Account{
-			{ID: "bridge-checking", Name: "Checking", Currency: "USD", Balance: "100.00"},
-			{ID: "bridge-new", Name: "New Savings", Currency: "USD", Balance: "10.00"},
+			{ID: "bridge-checking", ConnID: testConnID, Name: "Checking", Currency: "USD", Balance: "100.00"},
+			{ID: "bridge-new", ConnID: testConnID, Name: "New Savings", Currency: "USD", Balance: "10.00"},
 		}}, nil
 	}
 	summary, err := runner.Sync(context.Background())
@@ -68,7 +128,7 @@ func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 		t.Fatalf("links = %+v, err %v", links, err)
 	}
 	for _, link := range links {
-		if link.BridgeAccountID == "bridge-new" && link.Origin != "auto" {
+		if link.BridgeAccountID == testAccountKey("bridge-new") && link.Origin != "auto" {
 			t.Fatalf("provisioned link = %+v, want auto origin", link)
 		}
 	}
@@ -80,7 +140,7 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 	if _, err := database.CreateAccount(types.Account{ID: "ghost", Name: "Ghost"}); err != nil {
 		t.Fatalf("create ghost: %v", err)
 	}
-	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "bridge-old", ModelAccountID: "ghost", BridgeName: "Old"}); err != nil {
+	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: testAccountKey("bridge-old"), ModelAccountID: "ghost", BridgeName: "Old"}); err != nil {
 		t.Fatalf("save link: %v", err)
 	}
 	if err := database.DeleteAccount("ghost"); err != nil {
@@ -90,7 +150,7 @@ func TestSyncSkipsStaleLinksWithoutWriting(t *testing.T) {
 	transacted := int64(1773129600)
 	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
 		return &AccountSet{Accounts: []Account{
-			{ID: "bridge-old", Name: "Old", Currency: "USD", Balance: "10.00", BalanceDate: 1773133200,
+			{ID: "bridge-old", ConnID: testConnID, Name: "Old", Currency: "USD", Balance: "10.00", BalanceDate: 1773133200,
 				Transactions: []Transaction{{
 					ID: "stale-tx", Posted: 1773140400, Amount: "-25.00",
 					Description: "Stale Charge", TransactedAt: &transacted,

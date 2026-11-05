@@ -45,6 +45,10 @@
 					"archived": {
 						"type": "boolean"
 					},
+					"availableBalance": {
+						"format": "double",
+						"type": "number"
+					},
 					"balance": {
 						"format": "double",
 						"type": "number"
@@ -999,6 +1003,10 @@
 						"type": "string"
 					},
 					"Balance": {
+						"format": "double",
+						"type": "number"
+					},
+					"availableBalance": {
 						"format": "double",
 						"type": "number"
 					},
@@ -2677,6 +2685,28 @@
 				},
 				"type": "object"
 			},
+			"Notice": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"code": {
+						"type": "string"
+					},
+					"connectionId": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"scope": {
+						"type": "string"
+					}
+				},
+				"required": ["code", "message", "scope"],
+				"type": "object"
+			},
 			"PatternOccurrence": {
 				"additionalProperties": false,
 				"properties": {
@@ -2973,6 +3003,10 @@
 				"properties": {
 					"accountId": {
 						"type": "string"
+					},
+					"availableBalance": {
+						"format": "double",
+						"type": "number"
 					},
 					"balance": {
 						"format": "double",
@@ -4654,6 +4688,9 @@
 					"syncConfigured": {
 						"type": "boolean"
 					},
+					"syncError": {
+						"$ref": "#/components/schemas/SyncError"
+					},
 					"syncHost": {
 						"type": "string"
 					},
@@ -4741,6 +4778,15 @@
 						"format": "int64",
 						"type": "integer"
 					},
+					"errors": {
+						"items": {
+							"$ref": "#/components/schemas/Notice"
+						},
+						"type": ["array", "null"]
+					},
+					"partial": {
+						"type": "boolean"
+					},
 					"pendingDeleted": {
 						"format": "int64",
 						"type": "integer"
@@ -4779,7 +4825,8 @@
 					"settledConverted",
 					"settledInserted",
 					"accountsProvisioned",
-					"skipped"
+					"skipped",
+					"partial"
 				],
 				"type": "object"
 			},
@@ -4924,6 +4971,31 @@
 						"type": "string"
 					}
 				},
+				"type": "object"
+			},
+			"SyncError": {
+				"additionalProperties": false,
+				"properties": {
+					"accountId": {
+						"type": "string"
+					},
+					"code": {
+						"type": "string"
+					},
+					"connectionId": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					},
+					"observedAt": {
+						"type": "string"
+					},
+					"scope": {
+						"type": "string"
+					}
+				},
+				"required": ["code", "message"],
 				"type": "object"
 			},
 			"TermsBody": {

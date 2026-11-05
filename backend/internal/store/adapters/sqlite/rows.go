@@ -250,6 +250,9 @@ func updateAccountTx(tx *userTx, account *types.Account) error {
 // upsertCheckpointTx writes one owner checkpoint by account/instant.
 // An owner write wins over a sync-owned row on the same instant key.
 func upsertCheckpointTx(tx *userTx, checkpoint types.Checkpoint) error {
+	if err := ensureAvailableBalanceSchema(tx); err != nil {
+		return fmt.Errorf("ensure available balances: %w", err)
+	}
 	position, err := nextTablePosition(tx, "checkpoints")
 	if err != nil {
 		return err
@@ -263,6 +266,11 @@ func upsertCheckpointTx(tx *userTx, checkpoint types.Checkpoint) error {
 		return fmt.Errorf("save checkpoint %s %d: %w", checkpoint.AccountID, checkpoint.ObservedAt, err)
 	}
 	_ = result
+	// An owner observation replaces the bank observation at this instant.
+	// Available balance is bank evidence and must not survive as stale data.
+	if err := upsertAvailableBalanceTx(tx, checkpoint.AccountID, checkpoint.ObservedAt, nil); err != nil {
+		return fmt.Errorf("clear available balance %s %d: %w", checkpoint.AccountID, checkpoint.ObservedAt, err)
+	}
 	return nil
 }
 
@@ -513,6 +521,9 @@ func (s *sqliteStore) DeleteCheckpointAt(accountID string, observedAt int64) err
 }
 
 func deleteCheckpoints(tx *userTx, accountID string, observedAt int64) error {
+	if _, err := tx.Exec(`DELETE FROM checkpoint_available_balances WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`, accountID, observedAt); err != nil {
+		return fmt.Errorf("delete available balance %s %d: %w", accountID, observedAt, err)
+	}
 	result, err := tx.Exec(`DELETE FROM checkpoints WHERE model_account_id = ? AND observed_at = ? AND user_id = :user_id`, accountID, observedAt)
 	if err != nil {
 		return fmt.Errorf("delete checkpoint %s %d: %w", accountID, observedAt, err)

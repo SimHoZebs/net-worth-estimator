@@ -620,7 +620,7 @@ Then select card accounts and trigger, and inspect counts:
 curl -fsS -X POST "$BASE_URL/v1/sync/simplefin" | jq .
 ```
 
-The response reports `checkpointsInserted`, `pendingInserted`, and `accountsProvisioned`. Link a bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the interval guard stamps successful runs only.
+The response reports `checkpointsInserted`, `pendingInserted`, and `accountsProvisioned`. Link a bridge account to a model account through `PUT /v1/sync/simplefin/accounts/{bridgeAccountId}` and list links with `GET` on the same path. `bridgeAccountId` is the connection-scoped key `sf2.<conn_id>.<account_id>`. Restart the server (clears the in-memory trigger stamp), trigger again, and confirm checkpoints resolve to the linked accounts. A second successful trigger inside the configured interval (default 6 hours) returns 429; the interval guard stamps successful runs only. When the Bridge reports `available-balance`, the account balance row exposes `availableBalance` separately from the posted `balance`.
 
 A guard test belongs in Go and runs with:
 

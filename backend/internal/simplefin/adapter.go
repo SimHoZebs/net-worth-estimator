@@ -22,6 +22,36 @@ func (a bridgeAdapter) Key() string {
 	return store.ProviderSimpleFIN
 }
 
+// Notices reports connection- and account-scoped errors that do not fail
+// the run. General errors already failed the fetch.
+func (a bridgeAdapter) Notices(native any) []ingest.Notice {
+	set, ok := native.(*AccountSet)
+	if !ok || set == nil {
+		return nil
+	}
+	notices := make([]ingest.Notice, 0, len(set.ErrList))
+	for _, entry := range set.ErrList {
+		if entry.isRateLimit() {
+			continue
+		}
+		scope := "general"
+		switch entry.class() {
+		case "con":
+			scope = "connection"
+		case "act":
+			scope = "account"
+		}
+		notices = append(notices, ingest.Notice{
+			Code:         entry.Code,
+			Message:      sanitizeMessage(entry.Msg),
+			Scope:        scope,
+			ConnectionID: entry.ConnID,
+			AccountID:    entry.AccountID,
+		})
+	}
+	return notices
+}
+
 func (a bridgeAdapter) Fetch(ctx context.Context, start, end time.Time) (any, error) {
 	return a.runner.fetchWithRetry(ctx, start, end)
 }
@@ -31,10 +61,14 @@ func (a bridgeAdapter) Provisions(native any) []store.SyncProvision {
 	if !ok || set == nil {
 		return nil
 	}
+	exclusions := set.Exclusions()
 	provisions := make([]store.SyncProvision, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
+		if exclusions.Excluded(account.ConnID, account.ID) {
+			continue
+		}
 		provisions = append(provisions, store.SyncProvision{
-			BridgeID: account.ID,
+			BridgeID: AccountKey(account.ConnID, account.ID),
 			Name:     account.Name,
 			Currency: account.Currency,
 			Kind:     types.AccountKind(provisionKind(account)),
@@ -54,7 +88,7 @@ func (a bridgeAdapter) WithoutStale(native any, stale []string) any {
 	}
 	kept := make([]Account, 0, len(set.Accounts))
 	for _, account := range set.Accounts {
-		if _, ok := dropped[account.ID]; !ok {
+		if _, ok := dropped[AccountKey(account.ConnID, account.ID)]; !ok {
 			kept = append(kept, account)
 		}
 	}
@@ -88,16 +122,26 @@ func (a bridgeAdapter) Translate(ctx context.Context, st store.Store, native any
 	checkpoints := make([]store.SyncCheckpoint, 0, len(translation.Checkpoints))
 	for _, checkpoint := range translation.Checkpoints {
 		checkpoints = append(checkpoints, store.SyncCheckpoint{
-			AccountID:  checkpoint.AccountID,
-			Balance:    checkpoint.Balance,
-			Source:     store.SourceBankSync,
-			Provider:   store.ProviderSimpleFIN,
-			ObservedAt: checkpoint.ObservedAt,
+			AccountID:        checkpoint.AccountID,
+			Balance:          checkpoint.Balance,
+			AvailableBalance: checkpoint.AvailableBalance,
+			Source:           store.SourceBankSync,
+			Provider:         store.ProviderSimpleFIN,
+			ObservedAt:       checkpoint.ObservedAt,
 		})
 	}
 	bank, err := st.LoadBankPostings()
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	for _, row := range bank {
+		for _, key := range row.Keys {
+			if key.Provider == store.ProviderSimpleFIN {
+				if _, _, ok := ParseAccountKey(key.AccountID); !ok {
+					return nil, nil, nil, &MigrationRequiredError{}
+				}
+			}
+		}
 	}
 	covered := make(map[string]bool, len(resolved))
 	for _, modelID := range resolved {

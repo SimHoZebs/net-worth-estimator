@@ -5,6 +5,7 @@ import { Button, TextButton } from "../../components/Button.tsx";
 import { buttonStyles } from "../../components/buttonStyles.ts";
 import { mergeStyles } from "../../components/mergeStyles.ts";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
+import { Notice } from "../../components/Notice.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import {
 	disconnectSyncKey,
@@ -239,6 +240,19 @@ export function SyncProviderPanel() {
 										action="Reload status"
 										onAction={() => void status.refetch()}
 									/>
+								)}
+								{status.data?.syncError && (
+									<Notice tone="warning" className="mb-4">
+										<p className="m-0 text-sm leading-relaxed">
+											{status.data.syncError.message}
+										</p>
+										{status.data.syncError.scope === "connection" && (
+											<p className="mt-2 mb-0 text-sm leading-relaxed">
+												Other bank logins can keep syncing. Reconnect the
+												affected login in SimpleFIN to resume it.
+											</p>
+										)}
+									</Notice>
 								)}
 								{syncUnavailable && (
 									<p className="mb-4 text-sm leading-relaxed text-warning-text">

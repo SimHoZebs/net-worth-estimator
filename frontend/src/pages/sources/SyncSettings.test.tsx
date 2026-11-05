@@ -56,6 +56,7 @@ function stubApi(state: {
 	extraProviders?: { id: string }[];
 	throttled?: boolean;
 	lastSyncAt?: string;
+	syncError?: { code: string; message: string; scope?: string };
 	syncEnabled?: boolean;
 	readOnly?: boolean;
 	holdStatus?: Promise<void>;
@@ -302,6 +303,7 @@ function stubApi(state: {
 								lastSyncAt: state.lastSyncAt,
 								syncQuotaUsed: 5,
 								syncQuotaLimit: 24,
+								...(state.syncError ? { syncError: state.syncError } : {}),
 							}
 						: {
 								readOnly: state.readOnly ?? false,
@@ -918,6 +920,21 @@ it("keeps the setup token in a single-line input", async () => {
 	expect(screen.getByLabelText("Setup token").getAttribute("type")).toBe(
 		"password",
 	);
+});
+
+it("shows the last sync condition when the connection needs attention", async () => {
+	stubApi({
+		configured: true,
+		links: [],
+		syncError: {
+			code: "con.auth",
+			message: "Reauthenticate My Bank",
+			scope: "connection",
+		},
+	});
+	render(<SyncSettings />);
+	expect(await screen.findByText("Reauthenticate My Bank")).toBeTruthy();
+	expect(screen.getByText(/Other bank logins can keep syncing/)).toBeTruthy();
 });
 
 it("shows bridge quota usage when connected", async () => {
