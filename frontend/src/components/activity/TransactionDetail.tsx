@@ -1320,7 +1320,7 @@ export function TransactionDetail({
 				title={editHeading}
 				titleSize="plain"
 				headerClassName="border-b-0 pb-0"
-				className="scroll-smooth max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
+				className="scroll-smooth max-sm:fixed max-sm:inset-0 max-sm:m-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:overflow-y-auto max-sm:rounded-none max-sm:border-0"
 				onCloseRequest={edit.requestClose}
 				actions={
 					<>
