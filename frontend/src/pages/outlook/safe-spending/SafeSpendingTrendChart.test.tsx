@@ -70,4 +70,28 @@ describe("SafeSpendingTrendChart", () => {
 				.querySelector("desc")?.textContent,
 		).toContain("limit was crossed on Jan 22, 2026");
 	});
+
+	it("shows a closed statement's pace without open-tab thresholds", () => {
+		const trend = safeSpendingTrend({
+			transactions: [charge("2026-01-21", 100), charge("2026-01-22", 400)],
+			cycleStart: "2026-01-20",
+			cycleEnd: "2026-02-19",
+			todayIso: "2026-02-19",
+			limit: 400,
+			safetyNet: 300,
+		});
+		render(<SafeSpendingTrendChart trend={trend} showThresholds={false} />);
+		expect(
+			screen.queryByText(/Over limit|Using reserve|Limit ~|Reserve ~/),
+		).toBeNull();
+		expect(screen.queryByText("Protected reserve starts $300")).toBeNull();
+		expect(screen.queryByText("Card spending limit $400")).toBeNull();
+		expect(screen.getByText("Spending so far")).toBeTruthy();
+		expect(screen.getAllByText(/\$\d+ a day/).length).toBeGreaterThan(0);
+		const description = screen
+			.getByRole("img", { name: "Card spending pace" })
+			.querySelector("desc")?.textContent;
+		expect(description).not.toContain("limit");
+		expect(description).not.toContain("protected reserve");
+	});
 });

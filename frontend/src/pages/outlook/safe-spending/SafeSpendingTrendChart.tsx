@@ -54,16 +54,19 @@ function legendSwatch(dashed: boolean, tone: string) {
 }
 
 /**
- * Card spending pace against the two safe-spending thresholds. The solid
- * line is recorded spending through today, the dashed continuation is the
- * average daily rate carried to cycle end, and the horizontal rules mark
- * the protected reserve and the spending limit. Colors match the list
- * dividers that mark the same crossings.
+ * Card spending pace. When thresholds are shown, the solid line is recorded
+ * spending through today, the dashed continuation is the average daily rate
+ * carried to cycle end, and the horizontal rules mark the protected reserve
+ * and the spending limit. Closed statements hide those open-tab thresholds.
+ * Colors match the list dividers that mark the same crossings.
  */
 export function SafeSpendingTrendChart({
 	trend,
+	showThresholds = true,
 }: {
 	trend: SafeSpendingTrend;
+	/** Closed statements compare historical spending; the open-tab limits do not apply. */
+	showThresholds?: boolean;
 }) {
 	const actual = trend.actual;
 	const projected = trend.projected;
@@ -73,11 +76,10 @@ export function SafeSpendingTrendChart({
 			0,
 			...actual.map((point) => point.spent),
 			...projected.map((point) => point.spent),
-			trend.limit,
-			trend.safetyNet,
+			...(showThresholds ? [trend.limit, trend.safetyNet] : []),
 		].filter((value) => Number.isFinite(value));
 		return Math.max(1, ...values) * 1.08;
-	}, [actual, projected, trend.limit, trend.safetyNet]);
+	}, [actual, projected, showThresholds, trend.limit, trend.safetyNet]);
 	const definition = useMemo(
 		() =>
 			defineChart({
@@ -106,7 +108,9 @@ export function SafeSpendingTrendChart({
 								}),
 							]
 						: []),
-					...(Number.isFinite(trend.safetyNet) && trend.safetyNet > 0
+					...(showThresholds &&
+					Number.isFinite(trend.safetyNet) &&
+					trend.safetyNet > 0
 						? [
 								ruleY([trend.safetyNet], {
 									stroke: "var(--warning-text)",
@@ -115,7 +119,9 @@ export function SafeSpendingTrendChart({
 								}),
 							]
 						: []),
-					...(Number.isFinite(trend.limit) && trend.limit > 0
+					...(showThresholds &&
+					Number.isFinite(trend.limit) &&
+					trend.limit > 0
 						? [
 								ruleY([trend.limit], {
 									stroke: "var(--danger-solid)",
@@ -136,7 +142,7 @@ export function SafeSpendingTrendChart({
 								}),
 							]
 						: []),
-					...(trend.limitHit
+					...(showThresholds && trend.limitHit
 						? [
 								dot([trend.limitHit], {
 									x: "date",
@@ -210,6 +216,7 @@ export function SafeSpendingTrendChart({
 		[
 			actual,
 			projected,
+			showThresholds,
 			trend.limit,
 			trend.safetyNet,
 			trend.limitHit,
@@ -219,10 +226,12 @@ export function SafeSpendingTrendChart({
 	);
 	if (!actual.length) return null;
 
-	const pace = paceLabel(trend);
+	const pace = showThresholds
+		? paceLabel(trend)
+		: { text: `${money(trend.averageDaily)} a day`, tone: "normal" as const };
 	const current = lastActual?.spent ?? 0;
-	const limitText =
-		trend.limitHit && trend.limit <= 0
+	const limitText = showThresholds
+		? trend.limitHit && trend.limit <= 0
 			? "Spending is already over the spending limit."
 			: trend.limitHit
 				? trend.limitHit.projected
@@ -230,14 +239,15 @@ export function SafeSpendingTrendChart({
 					: `The ${money(trend.limit)} limit was crossed on ${dateLabel(trend.limitHit.date, true)}.`
 				: trend.limit <= 0
 					? "The current income does not cover next month's bills."
-					: `The ${money(trend.limit)} limit is not reached this cycle.`;
+					: `The ${money(trend.limit)} limit is not reached this cycle.`
+		: "";
 	const description =
 		`Card spending reached ${money(current)} by ${dateLabel(lastActual!.date, true)}. ` +
 		(trend.averageDaily > 0
 			? `The average rate is ${money(trend.averageDaily)} a day. `
 			: "") +
 		limitText +
-		(trend.safetyNet > 0
+		(showThresholds && trend.safetyNet > 0
 			? ` The protected reserve starts at ${money(trend.safetyNet)}.`
 			: "");
 
@@ -280,13 +290,13 @@ export function SafeSpendingTrendChart({
 						{labels.projectedSpending}
 					</li>
 				)}
-				{trend.safetyNet > 0 && (
+				{showThresholds && trend.safetyNet > 0 && (
 					<li className="flex items-center gap-2">
 						{legendSwatch(true, "border-warning-text")}
 						{labels.reserveStarts} {money(trend.safetyNet)}
 					</li>
 				)}
-				{trend.limit > 0 && (
+				{showThresholds && trend.limit > 0 && (
 					<li className="flex items-center gap-2">
 						{legendSwatch(true, "border-danger-solid")}
 						{labels.spendingLimit} {money(trend.limit)}

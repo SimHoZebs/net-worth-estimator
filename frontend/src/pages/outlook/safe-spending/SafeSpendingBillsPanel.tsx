@@ -232,7 +232,10 @@ export function SafeSpendingBillsPanel({
 				</ul>
 				{trend && (
 					<div className="border-t border-line pt-3">
-						<SafeSpendingTrendChart trend={trend} />
+						<SafeSpendingTrendChart
+							trend={trend}
+							showThresholds={!closed}
+						/>
 					</div>
 				)}
 			</section>
