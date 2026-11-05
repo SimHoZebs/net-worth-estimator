@@ -79,14 +79,11 @@ export function modelOptions(scope = getUserScope()) {
 		queryKey: userResourceKey("model", scope),
 		queryFn: async ({ signal }): Promise<ServerModel> => {
 			try {
-				const [result] = await Promise.all([
-					(
-						await getFinancialModel({
-							signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
-						})
-					).data as unknown as FinancialModelResponse,
-					serverQueryClient().fetchQuery(statusOptions(scope)),
-				]);
+				const result = (
+					await getFinancialModel({
+						signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
+					})
+				).data as unknown as FinancialModelResponse;
 				current(scope, signal);
 				return {
 					...result,

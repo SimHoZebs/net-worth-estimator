@@ -135,6 +135,15 @@ it("waits for a ready scope before starting resource queries", async () => {
 	expect(server.modelFetches()).toHaveLength(1);
 });
 
+it("leaves amount presets to the amounts view", async () => {
+	const server = stubTestServer();
+	render(<ServerApp />);
+	await screen.findByText("Workspace screen");
+	expect(
+		server.calls.filter((call) => call.url.endsWith("/v1/amount-presets")),
+	).toHaveLength(0);
+});
+
 it("uses the next owner's scope for its first workspace fetch", async () => {
 	const next = `users/${"b".repeat(64)}`;
 	const server = stubTestServer();

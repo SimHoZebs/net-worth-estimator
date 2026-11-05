@@ -10,7 +10,7 @@ import {
 	useAmountResolvers,
 	useTransactionCatalog,
 } from "../../state/workspaceResources.ts";
-import { useUserReadOnly } from "../../state/useUserScope.ts";
+import { useUserReadOnly, useUserScope } from "../../state/useUserScope.ts";
 import { useSavedAccounts } from "../../state/savedState.ts";
 import {
 	createPreset,
@@ -86,8 +86,9 @@ function slugify(value: string): string {
 
 export function AmountCatalog() {
 	const id = useId();
+	const enabled = useUserScope().status === "ready";
 	const remote = useAmountResolvers().data;
-	const serverPresets = useAmountPresets().data ?? null;
+	const serverPresets = useAmountPresets({ enabled }).data ?? null;
 	const savedAccounts = useSavedAccounts();
 	const catalog = useTransactionCatalog().data;
 	const accounts = (savedAccounts ?? []).map((account) => ({

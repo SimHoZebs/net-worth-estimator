@@ -1,7 +1,6 @@
 import { useUiStore } from "../state/uiStore.ts";
 import { useUserScope } from "../state/useUserScope.ts";
 import {
-	useAmountPresets,
 	useServerModel,
 	useServerStatus,
 } from "../state/workspaceResources.ts";
@@ -17,7 +16,6 @@ export function ServerApp() {
 	const enabled = useUserScope().status === "ready";
 	const model = useServerModel({ enabled });
 	useServerStatus({ enabled });
-	useAmountPresets({ enabled });
 	useWorkspaceSyncMonitor(enabled);
 	const navigation = useWorkspaceNavigation();
 	const hasModel = model.data?.model != null;

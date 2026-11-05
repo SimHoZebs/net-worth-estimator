@@ -68,17 +68,18 @@ function useWorkspaceQueries(): void {
 	const enabled = useUserScope().status === "ready";
 	useServerModel({ enabled });
 	useServerStatus({ enabled });
-	useAmountPresets({ enabled });
 	useWorkspaceSyncMonitor(enabled);
 }
 
 // Test observations read the canonical saved state. Query owns every
-// request lifecycle.
+// request lifecycle. The presets assertion activates its query here
+// because production starts it when the amounts view mounts.
 function useRemoteWorkspace() {
 	useWorkspaceQueries();
+	const enabled = useUserScope().status === "ready";
 	const query = useServerModel();
 	const status = useServerStatus();
-	const presets = useAmountPresets();
+	const presets = useAmountPresets({ enabled });
 	const mutationError = useWorkspaceWriteError();
 	const saving = useWorkspaceSaving();
 	const savedAccounts = useSavedAccounts();
