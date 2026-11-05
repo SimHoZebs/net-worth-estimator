@@ -35,9 +35,13 @@ bundled 404 page. Fragment navigation requires no SPA catch-all rewrite.
 ## Production deployment
 
 Vercel's Git integration does not deploy production. `vercel.mjs` disables Git
-deployments for `main`, and `.github/workflows/vercel-release.yml` runs
-`vercel deploy --prod` only after the `Tests` workflow succeeds for the pushed
-`main` commit. Preview branches keep their Git deployments.
+deployments for `main`, and `.github/workflows/vercel-release.yml` creates a
+production deployment through the Vercel REST API only after the `Tests`
+workflow succeeds for the pushed `main` commit. Preview branches keep their Git
+deployments.
+
+The config pins Bun `1.4.x`. The frontend build runs `bun check`, which needs
+Bun 1.4.
 
 Set these repository settings in GitHub:
 
@@ -52,14 +56,16 @@ and a finite expiry. Vercel shows the value once. Store it with
 `gh secret set VERCEL_TOKEN`. Until `VERCEL_PROJECT_ID` is set, the workflow
 skips instead of failing.
 
-The workflow checks out the exact tested commit, requires the remote SHA to
-match, and creates a fresh production deployment. A manual dispatch requests
-the current `main` commit and requires a green `main` push Tests run for it.
+The workflow creates a deployment with `gitSource` pinned to the exact tested
+`main` commit, then polls it until `READY`. Vercel builds with the project's
+production environment variables, so the runner does not need `BACKEND_URL`,
+the public URL, or the proxy secret. A manual dispatch requests the current
+`main` commit and requires a green `main` push Tests run for it.
 
-Leave the project's Ignored Build Step empty. A skip command also cancels
-deployments created by the CLI. During a database or API-contract migration,
-disable the deploy workflow for the window and run it again after Northflank
-finishes; see [the migration SOP](MIGRATIONS.md).
+Leave the project's Ignored Build Step empty. A skip command also cancels API
+and CLI deployments. During a database or API-contract migration, disable the
+deploy workflow for the window and run it again after Northflank finishes; see
+[the migration SOP](MIGRATIONS.md).
 
 See [the deployment index](README.md) for the shared runtime and reverse-proxy contracts.
 

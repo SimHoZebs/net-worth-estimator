@@ -64,6 +64,7 @@ test("Vercel fails closed on incomplete or unsafe deployment settings", () => {
 
 test("Vercel installs with bun and builds the frontend workspace", () => {
   const config = vercelConfig(settings);
+  assert.equal(config.bunVersion, "1.4.x");
   assert.equal(config.installCommand, "bun install --frozen-lockfile");
   assert.equal(
     config.buildCommand,
@@ -83,12 +84,17 @@ test("Vercel production deploys wait for a green main Tests run", async () => {
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
   assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
   assert.match(workflow, /vars\.VERCEL_PROJECT_ID != ''/);
-  assert.match(workflow, /vercel@65\.11\.0 deploy --prod --yes --force/);
-  assert.match(workflow, /--meta githubCommitSha="\$RELEASE_SHA"/);
   assert.match(workflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/);
   assert.match(workflow, /VERCEL_ORG_ID: \$\{\{ vars\.VERCEL_ORG_ID \}\}/);
   assert.match(workflow, /VERCEL_PROJECT_ID: \$\{\{ vars\.VERCEL_PROJECT_ID \}\}/);
-  assert.match(workflow, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
+  assert.match(workflow, /v13\/deployments\?teamId=\$\{teamId\}&forceNew=1/);
+  assert.match(workflow, /gitSource: \{ type: "github", repoId, ref: "main", sha \}/);
+  assert.match(workflow, /target: "production"/);
+  assert.match(workflow, /readyState === "READY"/);
+  assert.match(workflow, /readyState === "ERROR" \|\| deployment\.readyState === "CANCELED"/);
+  assert.match(workflow, /did not finish within 40 minutes/);
+  assert.match(workflow, /project\.link\?\.repoId/);
+  assert.doesNotMatch(workflow, /vercel@\d|npx --yes vercel|git rev-parse HEAD/);
 
   const source = workflow.match(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/)[1]
     .split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n");

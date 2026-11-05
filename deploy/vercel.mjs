@@ -10,6 +10,7 @@ export function vercelConfig(env) {
   return {
     $schema: "https://openapi.vercel.sh/vercel.json",
     framework: null,
+    bunVersion: "1.4.x",
     installCommand: "bun install --frozen-lockfile",
     buildCommand: "bun --filter ./frontend api:generate && bun --filter ./frontend build",
     outputDirectory: "frontend/dist",
