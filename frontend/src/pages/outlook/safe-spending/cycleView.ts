@@ -35,6 +35,7 @@ export interface CycleViewInput {
 	directResults: TransactionResult[];
 	billResults: TransactionResult[];
 	billWindowStart: string;
+	incomeScheduleIds: string[];
 	cardTransactions: AccountTransaction[];
 	cardSpent: number | null;
 	cardSpentByCard: { id: string; name: string; amount: number | null }[];
@@ -55,6 +56,33 @@ export interface CycleViewResult {
 	trend: ReturnType<typeof safeSpendingTrend>;
 }
 
+/** Closed-cycle budget: paychecks received minus the bills shown for that cycle. */
+export function historicalBudget({
+	results,
+	incomeScheduleIds,
+	cycle,
+	bills,
+}: {
+	results: TransactionResult[];
+	incomeScheduleIds: string[];
+	cycle: { start: string; end: string };
+	bills: number;
+}): number {
+	return (
+		sum(
+			results
+				.filter(
+					(transaction) =>
+						transaction.posted === true &&
+						incomeScheduleIds.includes(transaction.transactionId) &&
+						transaction.date >= cycle.start &&
+						transaction.date <= cycle.end,
+				)
+				.map((transaction) => transaction.requested),
+		) - bills
+	);
+}
+
 /**
  * One statement tab from the shared cash, allowance, bills, and pace
  * formulas. The open and closed tabs pass different windows and balances;
@@ -72,6 +100,7 @@ export function cycleView({
 	directResults,
 	billResults,
 	billWindowStart,
+	incomeScheduleIds,
 	cardTransactions,
 	cardSpent,
 	cardSpentByCard,
@@ -158,15 +187,23 @@ export function cycleView({
 		getId: (transaction) => transaction.id,
 		order: transactionOrder,
 	});
-	const limit = funding.paycheck - fixedBills;
+	const section: SafeSpendingMandatorySection = {
+		title: closed ? labels.billsThisCycle : labels.scheduledBills,
+		subtitle: `Scheduled amounts · ${monthDay(billWindowStart)} – ${monthDay(cycle.end)}`,
+		total: sum(billTransactions.map((transaction) => transaction.requested)),
+		transactions: billTransactions,
+	};
+	const limit = closed
+		? historicalBudget({
+				results,
+				incomeScheduleIds,
+				cycle,
+				bills: section.total,
+			})
+		: funding.paycheck - fixedBills;
 	return {
 		view,
-		section: {
-			title: closed ? labels.billsThisCycle : labels.scheduledBills,
-			subtitle: `Scheduled amounts · ${monthDay(billWindowStart)} – ${monthDay(cycle.end)}`,
-			total: sum(billTransactions.map((transaction) => transaction.requested)),
-			transactions: billTransactions,
-		},
+		section,
 		trend: safeSpendingTrend({
 			transactions: cardTransactions,
 			cycleStart: cycle.start,

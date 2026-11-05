@@ -386,6 +386,7 @@ export function SafeSpendingPreview({
 		directResults: directBaseTransactions,
 		billResults: billBaseTransactions,
 		billWindowStart: billsStart,
+		incomeScheduleIds: settings.incomeScheduleIds,
 		cardTransactions: currentCardTransactions,
 		cardSpent: currentCardSpent,
 		cardSpentByCard: currentCardByCard,
@@ -414,6 +415,7 @@ export function SafeSpendingPreview({
 		directResults: directBaseTransactions,
 		billResults: billBaseTransactions,
 		billWindowStart: closedCycle.start,
+		incomeScheduleIds: settings.incomeScheduleIds,
 		cardTransactions: lastCardTransactions,
 		cardSpent: closedCycle.total,
 		cardSpentByCard: closedCycle.cards.map((card) => ({

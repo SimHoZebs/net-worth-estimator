@@ -15,16 +15,20 @@ import type { SafeSpendingTrend } from "../../../domain/safeSpendingTrend.ts";
 import { mergeStyles } from "../../../components/mergeStyles.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
-function paceLabel(trend: SafeSpendingTrend): {
+function paceLabel(
+	trend: SafeSpendingTrend,
+	historical: boolean,
+): {
 	text: string;
 	tone: "normal" | "warning" | "danger";
 } {
 	const rate = `${money(trend.averageDaily)} a day`;
+	const limitName = historical ? "historical budget" : "limit";
 	if (trend.limitHit) {
 		return {
 			text: trend.limitHit.projected
-				? `Limit ~ ${monthDay(trend.limitHit.date)} · ${rate}`
-				: `Over limit · ${rate}`,
+				? `${historical ? "Budget" : "Limit"} ~ ${monthDay(trend.limitHit.date)} · ${rate}`
+				: `Over ${limitName} · ${rate}`,
 			tone: "danger",
 		};
 	}
@@ -54,19 +58,23 @@ function legendSwatch(dashed: boolean, tone: string) {
 }
 
 /**
- * Card spending pace. When thresholds are shown, the solid line is recorded
- * spending through today, the dashed continuation is the average daily rate
- * carried to cycle end, and the horizontal rules mark the protected reserve
- * and the spending limit. Closed statements hide those open-tab thresholds.
- * Colors match the list dividers that mark the same crossings.
+ * Card spending pace. The solid line is recorded spending through today, the
+ * dashed continuation is the average daily rate carried to cycle end, and the
+ * horizontal rules mark the protected reserve and the spending threshold.
+ * Open statements call the threshold the card spending limit; closed
+ * statements call it the historical budget. Colors match the list dividers
+ * that mark the same crossings.
  */
 export function SafeSpendingTrendChart({
 	trend,
 	showThresholds = true,
+	historical = false,
 }: {
 	trend: SafeSpendingTrend;
 	/** Closed statements compare historical spending; the open-tab limits do not apply. */
 	showThresholds?: boolean;
+	/** Label the threshold as the closed cycle's historical budget. */
+	historical?: boolean;
 }) {
 	const actual = trend.actual;
 	const projected = trend.projected;
@@ -227,19 +235,24 @@ export function SafeSpendingTrendChart({
 	if (!actual.length) return null;
 
 	const pace = showThresholds
-		? paceLabel(trend)
+		? paceLabel(trend, historical)
 		: { text: `${money(trend.averageDaily)} a day`, tone: "normal" as const };
 	const current = lastActual?.spent ?? 0;
+	const limitName = historical ? "historical budget" : "limit";
 	const limitText = showThresholds
 		? trend.limitHit && trend.limit <= 0
-			? "Spending is already over the spending limit."
+			? historical
+				? "The paychecks in this cycle did not cover its bills."
+				: "Spending is already over the spending limit."
 			: trend.limitHit
 				? trend.limitHit.projected
-					? `The ${money(trend.limit)} limit is reached around ${dateLabel(trend.limitHit.date, true)}.`
-					: `The ${money(trend.limit)} limit was crossed on ${dateLabel(trend.limitHit.date, true)}.`
+					? `The ${money(trend.limit)} ${limitName} is reached around ${dateLabel(trend.limitHit.date, true)}.`
+					: `The ${money(trend.limit)} ${limitName} was crossed on ${dateLabel(trend.limitHit.date, true)}.`
 				: trend.limit <= 0
-					? "The current income does not cover next month's bills."
-					: `The ${money(trend.limit)} limit is not reached this cycle.`
+					? historical
+						? "The paychecks in this cycle did not cover its bills."
+						: "The current income does not cover next month's bills."
+					: `The ${money(trend.limit)} ${limitName} is not reached this cycle.`
 		: "";
 	const description =
 		`Card spending reached ${money(current)} by ${dateLabel(lastActual!.date, true)}. ` +
@@ -299,7 +312,8 @@ export function SafeSpendingTrendChart({
 				{showThresholds && trend.limit > 0 && (
 					<li className="flex items-center gap-2">
 						{legendSwatch(true, "border-danger-solid")}
-						{labels.spendingLimit} {money(trend.limit)}
+						{historical ? labels.historicalBudget : labels.spendingLimit}{" "}
+						{money(trend.limit)}
 					</li>
 				)}
 			</ul>

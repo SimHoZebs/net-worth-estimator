@@ -11,6 +11,7 @@ export const SAFE_SPENDING_LABELS = {
 	projectedSpending: "Projected at average rate",
 	spendingPace: "Card spending pace",
 	spendingLimit: "Card spending limit",
+	historicalBudget: "Historical budget",
 	cycleSpending: "Spending this cycle",
 	allowance: "Card spending allowance",
 	reserve: "Protected reserve",
