@@ -38,9 +38,9 @@ const KIND_LABEL: Record<SankeyFlowLane["edge"]["kind"], string> = {
 	transfer: "Transfer",
 };
 
-// Links stay slightly translucent so ribbons do not glare; the key swatches
-// share the same default paint. Selected links go opaque.
-const UNSELECTED_FLOW_OPACITY = 0.86;
+// Links stay translucent so overlapping ribbons do not glare; the key
+// swatches share the same default paint. Selected links go opaque.
+const UNSELECTED_FLOW_OPACITY = 0.65;
 
 const LABEL_LIMIT = 30;
 const LABEL_CHAR_WIDTH = 7.6;
@@ -162,7 +162,11 @@ export function FlowSankey({
 						align: "justify",
 						iterations: 32,
 						nodeWidth: ({ width }) => Math.max(10, Math.min(20, width * 0.028)),
-						nodePadding: 12,
+						// Fixed gaps pack tiny nodes until their labels collide, so
+						// the gap grows with chart height on dense graphs while a
+						// sparse graph keeps its compact rows.
+						nodePadding: ({ height }) =>
+							Math.max(12, Math.min(32, height * 0.08)),
 						inset: ({ width }) => {
 							const maxSide = Math.max(72, Math.floor((width - 120) / 2));
 							const side = Math.min(labelRoom, maxSide);
@@ -183,7 +187,7 @@ export function FlowSankey({
 											: flow.data.laneId === selectedLaneId
 												? 1
 												: 0.35,
-									strokeWidth: (flow) => Math.max(2, flow.width),
+									strokeWidth: (flow) => Math.max(1, flow.width),
 									lineCap: "butt",
 									curve: sankeyCurve,
 								}),
