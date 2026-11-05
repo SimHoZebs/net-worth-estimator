@@ -28,7 +28,7 @@ import {
 } from "react";
 import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { claimOccurrenceCandidates } from "../../domain/ruleSchedule.ts";
-import { dateLabel, money, todayIso } from "../../domain/format.ts";
+import { dateLabel, todayIso } from "../../domain/format.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { AccountIconFallback } from "./AccountIconFallback.tsx";
 import { parseUnion } from "../../domain/guards.ts";
@@ -47,7 +47,7 @@ import { ErrorNotice } from "../ErrorNotice.tsx";
 import { Modal } from "../Modal.tsx";
 import { Button, IconButton, TextButton } from "../Button.tsx";
 import { Notice } from "../Notice.tsx";
-import { Checkbox, Input, InputField, Select, SelectField } from "../Field.tsx";
+import { Checkbox, Input, InputField, Select } from "../Field.tsx";
 import { transactionIconStyles } from "./activityStyles.ts";
 import { transactionControlStyles } from "./transactionDetailStyles.ts";
 import {
@@ -554,8 +554,7 @@ function draftFromTransaction(
 		amount: String(savedTransaction.amount),
 		fromId: savedTransaction.fromId ?? "",
 		toId: savedTransaction.toId ?? "",
-		frequency:
-			savedTransaction.kind === "schedule" ? scheduleFrequency : null,
+		frequency: savedTransaction.kind === "schedule" ? scheduleFrequency : null,
 		startDate: savedTransaction.startDate,
 		endDate: savedTransaction.endDate ?? "",
 		noEndDate: savedTransaction.endDate == null,
@@ -723,10 +722,7 @@ function useTransactionEdit({
 						if (amended.data.saved === false) return amended;
 					}
 					if (Object.keys(schedule.reschedule).length) {
-						return rescheduleSchedule(
-							savedTransaction.id,
-							schedule.reschedule,
-						);
+						return rescheduleSchedule(savedTransaction.id, schedule.reschedule);
 					}
 					return { data: { saved: true, issues: [] } };
 				},
@@ -983,7 +979,6 @@ export function TransactionDetail({
 		scheduleFrequency,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
-	const [confirmingVoidRemove, setConfirmingVoidRemove] = useState(false);
 	const [confirmingEndSchedule, setConfirmingEndSchedule] = useState(false);
 	const [endingSchedule, setEndingSchedule] = useState(false);
 	const [endScheduleDate, setEndScheduleDate] = useState(
@@ -1060,21 +1055,6 @@ export function TransactionDetail({
 	);
 	const voidCandidates =
 		settleCandidates.data?.candidates ?? EMPTY_SETTLE_CANDIDATES;
-	const [postedPick, setPostedPick] = useState<string | null>(null);
-	// The closest candidate is the suggested posted version, so the
-	// confirmation states the link without an extra choice. An explicit empty
-	// pick keeps "No link", and a stale pick from another row falls back to
-	// the current candidate set.
-	const effectivePick =
-		postedPick === ""
-			? ""
-			: postedPick !== null &&
-				  voidCandidates.some((candidate) => candidate.postingId === postedPick)
-				? postedPick
-				: (voidCandidates[0]?.postingId ?? "");
-	const pickedPosted = voidCandidates.find(
-		(candidate) => candidate.postingId === effectivePick,
-	);
 	const showShortfall = transaction.shortfall > 0.01;
 	const showExcluded = transaction.excluded && !transaction.pending;
 	const postedDiffers =
@@ -1155,18 +1135,6 @@ export function TransactionDetail({
 		if (ok) onClose();
 		else setEndScheduleError("The schedule could not be ended.");
 	};
-	// A vanished hold is inert unless an evaluation names it or it supplies
-	// the projection start date. In the common case, drop the row from the
-	// narrow lists and leave the projection model untouched. A failed delete
-	// still reloads authoritative state, so the row never disappears early.
-	const removeVanishedHold = () =>
-		finishRemoval(
-			transactionRemovalNeedsProjectionRefresh(savedTransaction.id)
-				? refreshTransactions
-				: () => removeDeletedTransactionFromCache(savedTransaction.id),
-			"The vanished hold could not be removed.",
-			refreshTransactions,
-		);
 	// A void hold's suggestion merges it into the posted charge. The posted
 	// charge keeps its amount and date; an occurrence recorded on the hold
 	// moves to it when the charge records none.
@@ -1636,46 +1604,6 @@ export function TransactionDetail({
 						categoryReadOnly={Boolean(readOnly)}
 						occurrenceOptions={occurrenceOptions}
 					/>
-					{transaction.void && !readOnly && (
-						<div className="mt-4 flex min-w-0 flex-col items-start gap-2">
-							<SelectField
-								label="Posted as"
-								name="postedVersion"
-								value={effectivePick}
-								onChange={(event) => setPostedPick(event.target.value)}
-							>
-								<option value="">No link — just remove</option>
-								{voidCandidates.map((candidate) => (
-									<option key={candidate.postingId} value={candidate.postingId}>
-										{candidate.name} — {money(candidate.amount)} on{" "}
-										{dateLabel(candidate.date, true)}
-									</option>
-								))}
-							</SelectField>
-							{settleCandidates.isPending && (
-								<p className="m-0 text-[11px] text-muted" role="status">
-									Loading posted charges…
-								</p>
-							)}
-							{settleCandidates.isError && (
-								<p className="m-0 text-[11px] text-muted" role="status">
-									Posted charges could not be loaded.
-								</p>
-							)}
-							<Button
-								type="button"
-								variant="danger"
-								size="sm"
-								onClick={() => {
-									setDeleteError(null);
-									setConfirmingVoidRemove(true);
-								}}
-							>
-								<Trash2 size={16} aria-hidden="true" />
-								Remove vanished hold
-							</Button>
-						</div>
-					)}
 					{edit.error && <ErrorNotice message={edit.error} />}
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">
@@ -1853,37 +1781,6 @@ export function TransactionDetail({
 						value={endScheduleDate}
 						onChange={(event) => setEndScheduleDate(event.target.value)}
 					/>
-				</ConfirmDialog>
-			)}
-			{confirmingVoidRemove && (
-				<ConfirmDialog
-					title={`Remove ${savedTransaction.name}?`}
-					eyebrow="Changes"
-					onCancel={() => {
-						if (!deleting) {
-							setConfirmingVoidRemove(false);
-							setDeleteError(null);
-						}
-					}}
-					onConfirm={() => void removeVanishedHold()}
-					cancelLabel="Keep hold"
-					confirmLabel="Remove hold"
-					busyLabel="Removing…"
-					busy={deleting}
-					error={deleteError}
-				>
-					<p>
-						{pickedPosted ? (
-							<>
-								It posted as {pickedPosted.name} for{" "}
-								{money(pickedPosted.amount)} on{" "}
-								{dateLabel(pickedPosted.date, true)}. The posted charge is
-								untouched; this clears the vanished hold record.
-							</>
-						) : (
-							"No posted charge was picked. This clears the vanished hold record."
-						)}
-					</p>
 				</ConfirmDialog>
 			)}
 		</DetailPortal>

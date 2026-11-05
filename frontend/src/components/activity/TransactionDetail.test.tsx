@@ -560,117 +560,6 @@ it("opens and closes the sharing sheet without closing the detail", async () => 
 	expect(screen.getByRole("dialog", { name: /Home renovation/ })).toBeTruthy();
 });
 
-it("lets the owner pick the posted charge and remove the vanished hold", async () => {
-	const server = stubTestServer();
-	setServerModelOnly();
-	const scope = getUserScope();
-	const listKey = [...userResourceKey("transactions", scope), "", "all"];
-	const catalogKey = userResourceKey("catalog", scope);
-	serverQueryClient().setQueryData(listKey, {
-		transactions: [{ id: "01900000-0000-7000-8000-000000000096" } as never],
-		revision: "seed",
-	});
-	serverQueryClient().setQueryData(catalogKey, {
-		items: [
-			{
-				id: "01900000-0000-7000-8000-000000000096",
-				kind: "posting",
-				name: "Bistro",
-			},
-		],
-		revision: "seed",
-	});
-	const settled = {
-		...financialModelFixture.transactions[0]!,
-		id: "01900000-0000-7000-8000-000000000097",
-		name: "Bistro dinner",
-		amount: 58,
-		amountKnown: true,
-		fromId: "checking",
-		toId: null,
-		kind: "posting" as const,
-		startDate: "2026-10-21",
-		endDate: null,
-		annualIncrease: 0,
-		enabled: true,
-		readOnly: false,
-		claimScheduleId: null,
-		claimOccurrenceDate: null,
-		postedDate: "2026-10-21",
-		pending: false,
-		void: false,
-		syncOwned: true,
-	};
-	const voidHold = {
-		...financialModelFixture.transactions[0]!,
-		id: "01900000-0000-7000-8000-000000000096",
-		name: "Bistro",
-		amount: 50,
-		amountKnown: true,
-		fromId: "checking",
-		toId: null,
-		kind: "posting" as const,
-		startDate: "2026-10-20",
-		endDate: null,
-		annualIncrease: 0,
-		enabled: false,
-		readOnly: true,
-		claimScheduleId: null,
-		claimOccurrenceDate: null,
-		postedDate: null,
-		pending: false,
-		void: true,
-		syncOwned: true,
-	};
-	const onClose = vi.fn();
-	server.setSettleCandidates(voidHold.id, [settleCandidate(settled)]);
-	render(
-		<TransactionDetail
-			transaction={occurrence(voidHold)}
-			savedTransaction={voidHold}
-			accounts={financialModelFixture.accounts}
-			transactions={[voidHold, settled]}
-			onClose={onClose}
-		/>,
-	);
-	const picker = screen.getByLabelText("Posted as");
-	await waitFor(() => expect(picker.textContent).toContain("Bistro dinner"));
-	fireEvent.change(picker, { target: { value: settled.id } });
-	fireEvent.click(screen.getByRole("button", { name: "Remove vanished hold" }));
-	await waitFor(() =>
-		expect(
-			serverQueryClient().isFetching({
-				queryKey: userResourceKey("model", scope),
-			}),
-		).toBe(0),
-	);
-	const modelFetchesBeforeRemoval = server.modelFetches().length;
-	const confirm = screen.getByRole("dialog", {
-		name: "Remove Bistro?",
-	});
-	expect(confirm.textContent).toContain("Bistro dinner");
-	fireEvent.click(within(confirm).getByRole("button", { name: "Remove hold" }));
-	await waitFor(() =>
-		expect(
-			server.calls.some(
-				(call) =>
-					call.method === "DELETE" &&
-					call.url === "/v1/transactions/01900000-0000-7000-8000-000000000096",
-			),
-		).toBe(true),
-	);
-	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-	// The hold is inert: removal drops it from the narrow lists and leaves
-	// the financial model and its projections untouched.
-	expect(server.modelFetches()).toHaveLength(modelFetchesBeforeRemoval);
-	expect(serverQueryClient().getQueryData(listKey)).toMatchObject({
-		transactions: [],
-	});
-	expect(serverQueryClient().getQueryData(catalogKey)).toMatchObject({
-		items: [],
-	});
-});
-
 it("keeps the vanished hold in the lists when the delete fails", async () => {
 	const holdId = "01900000-0000-7000-8000-000000000094";
 	const serverModel = fixtureModel(financialModelFixture);
@@ -721,6 +610,14 @@ it("keeps the vanished hold in the lists when the delete fails", async () => {
 		syncOwned: true,
 	};
 	const onClose = vi.fn();
+	server.setSettleCandidates(holdId, [
+		settleCandidate({
+			id: "01900000-0000-7000-8000-000000000097",
+			name: "Bistro dinner",
+			amount: 58,
+			startDate: "2026-10-21",
+		}),
+	]);
 	server.writeOnce(
 		(method, path) =>
 			method === "DELETE" && path === `/v1/transactions/${holdId}`,
@@ -735,17 +632,23 @@ it("keeps the vanished hold in the lists when the delete fails", async () => {
 			onClose={onClose}
 		/>,
 	);
-	fireEvent.click(screen.getByRole("button", { name: "Remove vanished hold" }));
+	const trigger = await screen.findByRole("button", {
+		name: "Review 1 suggestion",
+	});
+	fireEvent.click(trigger);
 	fireEvent.click(
-		within(screen.getByRole("dialog", { name: "Remove Bistro?" })).getByRole(
+		within(screen.getByRole("dialog", { name: "Suggestions" })).getByRole(
 			"button",
-			{ name: "Remove hold" },
+			{ name: "Merge and remove hold" },
 		),
 	);
 	await waitFor(() =>
 		expect(
-			screen.getByText("The vanished hold could not be removed."),
-		).toBeTruthy(),
+			server.calls.some(
+				(call) =>
+					call.method === "DELETE" && call.url === `/v1/transactions/${holdId}`,
+			),
+		).toBe(true),
 	);
 	expect(onClose).not.toHaveBeenCalled();
 	await waitFor(() => {
@@ -909,70 +812,6 @@ it("moves a recorded occurrence when merging a vanished hold", async () => {
 		).toBe(true),
 	);
 	await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-});
-
-it("preselects the closest posted charge when several match", async () => {
-	const server = stubTestServer();
-	const base = financialModelFixture.transactions[0]!;
-	const hold = {
-		...base,
-		id: "01900000-0000-7000-8000-0000000000a1",
-		name: "LYFT *TEMP AUTH HOLD",
-		amount: 74.94,
-		amountKnown: true,
-		fromId: "checking",
-		toId: null,
-		kind: "posting" as const,
-		startDate: "2026-10-31",
-		endDate: null,
-		annualIncrease: 0,
-		enabled: false,
-		readOnly: true,
-		claimScheduleId: null,
-		claimOccurrenceDate: null,
-		postedDate: null,
-		pending: false,
-		void: true,
-		syncOwned: true,
-	};
-	const closer = {
-		...hold,
-		id: "01900000-0000-7000-8000-0000000000a2",
-		name: "LYFT *STANDARD 10-30",
-		amount: 81.22,
-		startDate: "2026-11-01",
-		enabled: true,
-		readOnly: false,
-		void: false,
-		postedDate: "2026-11-01",
-	};
-	const farther = {
-		...hold,
-		id: "01900000-0000-7000-8000-0000000000a3",
-		name: "LYFT *AIRPORT 10-30",
-		amount: 86.18,
-		startDate: "2026-11-01",
-		enabled: true,
-		readOnly: false,
-		void: false,
-		postedDate: "2026-11-01",
-	};
-	server.setSettleCandidates(hold.id, [
-		settleCandidate(closer),
-		settleCandidate(farther),
-	]);
-	render(
-		<TransactionDetail
-			transaction={occurrence(hold)}
-			savedTransaction={hold}
-			accounts={financialModelFixture.accounts}
-			transactions={[farther, closer, hold]}
-			onClose={() => {}}
-		/>,
-	);
-	const picker = screen.getByLabelText("Posted as") as HTMLSelectElement;
-	await waitFor(() => expect(picker.value).toBe(closer.id));
-	expect(picker.textContent).toContain("LYFT *STANDARD");
 });
 
 it("saves row edits through the posting endpoint and closes", async () => {
@@ -1404,7 +1243,9 @@ it("ends a schedule by recording one transaction", async () => {
 	);
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
 	fireEvent.click(
-		screen.getByRole("menuitem", { name: "End schedule with this transaction" }),
+		screen.getByRole("menuitem", {
+			name: "End schedule with this transaction",
+		}),
 	);
 	const confirm = screen.getByRole("dialog", {
 		name: "End Monthly investing with a transaction?",
