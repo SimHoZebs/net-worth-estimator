@@ -1,0 +1,87 @@
+name: Deploy frontend to Vercel
+
+on:
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: vercel-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.VERCEL_PROJECT_ID != '' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Verify the tested commit
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          TESTS_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          TESTS_EVENT: ${{ github.event.workflow_run.event }}
+          TESTS_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          DISPATCH_REF: ${{ github.ref }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          const sha = process.env.RELEASE_SHA;
+          if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
+
+          if (process.env.EVENT_NAME === "workflow_run") {
+            if (process.env.TESTS_CONCLUSION !== "success" ||
+                process.env.TESTS_EVENT !== "push" ||
+                process.env.TESTS_BRANCH !== "main") {
+              throw new Error("The Tests workflow run is not a green push to main");
+            }
+          } else if (process.env.EVENT_NAME === "workflow_dispatch") {
+            if (process.env.DISPATCH_REF !== "refs/heads/main") throw new Error("Manual dispatch only releases main");
+            const api = process.env.GITHUB_API_URL ?? "https://api.github.com";
+            const query = new URLSearchParams({ head_sha: sha, status: "completed", per_page: "100" });
+            const response = await fetch(`${api}/repos/${process.env.GITHUB_REPOSITORY}/actions/workflows/tests.yml/runs?${query}`, {
+              headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: "application/vnd.github+json" },
+            });
+            if (!response.ok) throw new Error(`Cannot read Tests runs (HTTP ${response.status})`);
+            const runs = (await response.json()).workflow_runs ?? [];
+            const green = runs.some((run) =>
+              run.conclusion === "success" && run.event === "push" && run.head_branch === "main");
+            if (!green) throw new Error(`No successful main Tests run for ${sha}`);
+          } else {
+            throw new Error("Unsupported release event");
+          }
+          console.log(`Tests passed for ${sha}.`);
+          JS
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Deploy the tested commit to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          npx --yes vercel@65.11.0 deploy --prod --yes --force \
+            --token "$VERCEL_TOKEN" \
+            --meta githubCommitSha="$RELEASE_SHA" \
+            --meta githubCommitRef=main

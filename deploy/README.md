@@ -82,7 +82,7 @@ Verify actual provider behavior after deployment.
 
 ## Deployment guides
 
-- [Vercel frontend](vercel.md) — project settings, env vars, preview isolation.
+- [Vercel frontend](vercel.md) — project settings, env vars, preview isolation, gated production deploy.
 - [API on Render or another container host](render.md) — service settings, disk maintenance, setupdb usage.
 - [GHCR container images](images.md) — published images, digest pins, publisher checks.
 - [Shared migration SOP](MIGRATIONS.md) — one-time `/app/migrate.sh` contract every adapter runs.

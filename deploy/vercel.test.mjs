@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { vercelConfig } from "./vercel.mjs";
@@ -69,6 +70,68 @@ test("Vercel installs with bun and builds the frontend workspace", () => {
     "bun --filter ./frontend api:generate && bun --filter ./frontend build",
   );
   assert.equal(config.devCommand, "bun --filter ./frontend dev");
+});
+
+test("Vercel production deploys wait for a green main Tests run", async () => {
+  assert.deepEqual(vercelConfig(settings).git, { deploymentEnabled: { main: false } });
+  const workflow = readFileSync(new URL("../.github/workflows/vercel-release.yml", import.meta.url), "utf8");
+  assert.match(workflow, /workflows: \["Tests"\]/);
+  assert.match(workflow, /types: \[completed\]/);
+  assert.match(workflow, /branches: \[main\]/);
+  assert.match(workflow, /actions: read/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
+  assert.match(workflow, /vars\.VERCEL_PROJECT_ID != ''/);
+  assert.match(workflow, /vercel@65\.11\.0 deploy --prod --yes --force/);
+  assert.match(workflow, /--meta githubCommitSha="\$RELEASE_SHA"/);
+  assert.match(workflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TOKEN \}\}/);
+  assert.match(workflow, /VERCEL_ORG_ID: \$\{\{ vars\.VERCEL_ORG_ID \}\}/);
+  assert.match(workflow, /VERCEL_PROJECT_ID: \$\{\{ vars\.VERCEL_PROJECT_ID \}\}/);
+  assert.match(workflow, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
+
+  const source = workflow.match(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/)[1]
+    .split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n");
+  const execute = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", source);
+  const sha = "a".repeat(40);
+  const baseEnv = {
+    EVENT_NAME: "workflow_run",
+    RELEASE_SHA: sha,
+    TESTS_CONCLUSION: "success",
+    TESTS_EVENT: "push",
+    TESTS_BRANCH: "main",
+  };
+  await execute({ env: { ...baseEnv } }, () => assert.fail("Gate used the network"), { log() {} });
+  for (const red of [{ TESTS_CONCLUSION: "failure" }, { TESTS_EVENT: "pull_request" }, { TESTS_BRANCH: "feature" }]) {
+    await assert.rejects(
+      execute({ env: { ...baseEnv, ...red } }, () => assert.fail("Released off the gate"), { log() {} }),
+      /not a green push to main/,
+    );
+  }
+
+  const dispatchEnv = {
+    EVENT_NAME: "workflow_dispatch",
+    RELEASE_SHA: sha,
+    DISPATCH_REF: "refs/heads/main",
+    GH_TOKEN: "fixture-token",
+    GITHUB_REPOSITORY: "owner/repo",
+    GITHUB_API_URL: "https://api.github.test",
+  };
+  let apiQuery;
+  const dispatchFetch = async (url) => {
+    apiQuery = new URL(url);
+    return { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "success", event: "push", head_branch: "main" }] }) };
+  };
+  await execute({ env: { ...dispatchEnv } }, dispatchFetch, { log() {} });
+  assert.equal(apiQuery.searchParams.get("head_sha"), sha);
+  await assert.rejects(
+    execute({ env: { ...dispatchEnv } }, async () => ({ ok: true, json: async () => ({ workflow_runs: [] }) }), { log() {} }),
+    /No successful main Tests run/,
+  );
+  await assert.rejects(
+    execute({ env: { ...dispatchEnv, DISPATCH_REF: "refs/heads/feature" } }, () => assert.fail("Released from a branch"), { log() {} }),
+    /only releases main/,
+  );
 });
 
 test("the root config exports the evaluated deployment configuration", () => {

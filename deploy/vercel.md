@@ -32,6 +32,35 @@ post-logout URL in Casdoor explicitly.
 Static files retain normal static-host behavior. Unknown paths return the
 bundled 404 page. Fragment navigation requires no SPA catch-all rewrite.
 
+## Production deployment
+
+Vercel's Git integration does not deploy production. `vercel.mjs` disables Git
+deployments for `main`, and `.github/workflows/vercel-release.yml` runs
+`vercel deploy --prod` only after the `Tests` workflow succeeds for the pushed
+`main` commit. Preview branches keep their Git deployments.
+
+Set these repository settings in GitHub:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `VERCEL_TOKEN` | Secret | A project-scoped Vercel access token |
+| `VERCEL_ORG_ID` | Variable | The Vercel team ID |
+| `VERCEL_PROJECT_ID` | Variable | The Vercel project ID |
+
+Create the token in Vercel account settings with project scope for this project
+and a finite expiry. Vercel shows the value once. Store it with
+`gh secret set VERCEL_TOKEN`. Until `VERCEL_PROJECT_ID` is set, the workflow
+skips instead of failing.
+
+The workflow checks out the exact tested commit, requires the remote SHA to
+match, and creates a fresh production deployment. A manual dispatch requests
+the current `main` commit and requires a green `main` push Tests run for it.
+
+Leave the project's Ignored Build Step empty. A skip command also cancels
+deployments created by the CLI. During a database or API-contract migration,
+disable the deploy workflow for the window and run it again after Northflank
+finishes; see [the migration SOP](MIGRATIONS.md).
+
 See [the deployment index](README.md) for the shared runtime and reverse-proxy contracts.
 
 ## Provider references

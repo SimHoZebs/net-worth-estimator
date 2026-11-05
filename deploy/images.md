@@ -21,7 +21,8 @@ GitHub package settings before anonymous hosts pull them. Do not use an expiring
 workflow token as a production registry credential. Production pins resolved
 image digests, and only advances after the complete publishing workflow succeeds.
 Keep the previous digest references for rollback. Databases and runtime secrets
-remain on the existing hosts. Vercel and Northflank retain their current pipelines.
+remain on the existing hosts. Vercel and Northflank each deploy from the gated
+`Tests` result for the pushed `main` commit.
 
 Validate the publisher with `actionlint .github/workflows/images.yml` and
 `node --test deploy/images.test.mjs`. The first successful Actions run verifies

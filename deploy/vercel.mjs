@@ -14,6 +14,8 @@ export function vercelConfig(env) {
     buildCommand: "bun --filter ./frontend api:generate && bun --filter ./frontend build",
     outputDirectory: "frontend/dist",
     devCommand: "bun --filter ./frontend dev",
+    // Production deploys come from the gated workflow, not a Git push.
+    git: { deploymentEnabled: { main: false } },
     routes: [
       {
         src: "^/(v1(?:/.*)?|healthz|readyz)$",

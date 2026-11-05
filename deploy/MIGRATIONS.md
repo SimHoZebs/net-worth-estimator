@@ -113,10 +113,11 @@ and sessions required for paired recovery.
 7. Compare preserved identities and private rows with the backup.
 8. Verify exact images, readiness, login/logout, permissions, isolation, and persistence.
 
-For an API contract change, hold Vercel production builds until Northflank
-passes the migration and API checks. Save the project's ignored-build command
-before the hold. Preview builds can continue. Restore the saved command only
-after the new API contract is live, then deploy the matching frontend SHA.
+For an API contract change, hold Vercel production deploys until Northflank
+passes the migration and API checks. Disable the `Deploy frontend to Vercel`
+workflow for the window; preview builds can continue. Re-enable it only after
+the new API contract is live. The workflow then deploys the matching tested
+frontend commit; Git production deployments stay disabled.
 
 Require exactly `ok` from `PRAGMA integrity_check` and no rows from
 `PRAGMA foreign_key_check`. A candidate database permits checks before
