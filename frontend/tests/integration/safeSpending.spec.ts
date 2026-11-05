@@ -94,7 +94,7 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	await expect(budget).toHaveCSS("padding", "0px");
 	await expect(budget).toHaveCSS("border-top-width", "0px");
 	await expect(budget).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-	await expect(budget).toContainText("Next paycheck · Feb 1");
+	await expect(budget).toContainText("Paid by · Feb 1");
 	await expect(
 		drawer.getByText("Dec 20, 2025 – Jan 19, 2026", { exact: true }),
 	).toHaveCount(1);
@@ -286,15 +286,17 @@ test("income sources combine independent recurrence rules and persist explicit d
 	await expect(salary).toHaveAttribute("aria-pressed", "true");
 	await expect(partner).toHaveAttribute("aria-pressed", "true");
 	await page.getByRole("tab", { name: /This cycle/ }).click();
+	// The cycle closes Feb 20 and settles from the March paychecks; the
+	// March window includes the fixture's $9,000 Home renovation.
 	await expect(
 		page
 			.getByRole("region", { name: labels.allowance, exact: true })
 			.getByTestId("metric-value"),
-	).toHaveText("$1,025");
+	).toHaveText("-$7,975");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
 	await expect(
 		page.getByRole("region", { name: labels.paycheckAllocation }),
-	).toContainText("Next paycheck · Feb 1 – Feb 10");
+	).toContainText("Paid by · Feb 1 – Feb 10");
 	await expect(
 		page
 			.getByRole("region", { name: labels.paycheckAllocation })
@@ -325,7 +327,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 		page
 			.getByRole("region", { name: labels.allowance, exact: true })
 			.getByTestId("metric-value"),
-	).toHaveText("-$5,975");
+	).toHaveText("-$14,975");
 });
 
 test("marks the spending-limit and protected-reserve crossings and projects the pace", async ({
@@ -411,7 +413,7 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	const chart = drawer.getByRole("img", { name: labels.spendingPace });
 	await expect(chart).toBeVisible();
 	expect(chart.locator("desc")).toContainText(
-		"limit was crossed on Jan 27, 2026",
+		"Spending is already over the spending limit.",
 	);
 	await expect(
 		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
@@ -419,16 +421,17 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	await expect(
 		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
 	).toContainText("Projected at average rate");
+	// The statement closes Feb 20 and settles from the March paychecks
+	// (salary Mar 1 + partner Mar 10). March's committed outflows include
+	// the fixture's $9,000 Home renovation (Mar 6), so the allowance and
+	// both thresholds run negative: the chart draws no threshold rule and
+	// the legend keeps only the spending lines.
 	await expect(
 		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
-	).toContainText("Protected reserve starts $1,025");
+	).not.toContainText(labels.reserveStarts);
 	await expect(
 		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
-	).toContainText("Card spending limit $1,750");
-	const limitDivider = drawer.getByRole("separator", {
-		name: labels.spendingLimit,
-	});
-	await expect(limitDivider).toBeVisible();
+	).not.toContainText(labels.spendingLimit);
 	const charges = drawer.getByRole("table", {
 		name: new RegExp(labels.cycleSpending),
 	});
@@ -439,11 +442,10 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	const chargeA = charges.getByText("Cycle charge A");
 	const chargeB = charges.getByText("Cycle charge B");
 	const chargeC = charges.getByText("Cycle charge C");
-	const chargeCRow = charges.getByRole("row", { name: /Cycle charge C/ });
-	await expect(chargeCRow).toContainText(labels.reserveStarts);
-	await expect(chargeCRow).toHaveClass(/border-warning-text/);
-	await expect(chargeCRow).not.toHaveClass(/border-line/);
-	expect(await y(limitDivider)).toBeLessThan(await y(chargeC));
+	const chargeBRow = charges.getByRole("row", { name: /Cycle charge B/ });
+	await expect(chargeBRow).toContainText(labels.spendingLimit);
+	await expect(chargeBRow).toHaveClass(/border-danger-text/);
+	await expect(chargeBRow).not.toHaveClass(/border-line/);
 	expect(await y(chargeC)).toBeLessThan(await y(chargeB));
 	expect(await y(chargeB)).toBeLessThan(await y(chargeA));
 	await drawer
@@ -451,13 +453,12 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 		.last()
 		.click();
 	await expect(charges.getByText("Cycle charge A")).toBeVisible();
-	const chargeBRow = charges.getByRole("row", { name: /Cycle charge B/ });
-	await expect(chargeBRow).toContainText(labels.reserveStarts);
-	await expect(chargeBRow).toHaveClass(/border-warning-text/);
-	await expect(chargeBRow).not.toHaveClass(/border-line/);
+	const chargeARow = charges.getByRole("row", { name: /Cycle charge A/ });
+	await expect(chargeARow).toContainText(labels.spendingLimit);
+	await expect(chargeARow).toHaveClass(/border-danger-text/);
+	await expect(chargeARow).not.toHaveClass(/border-line/);
 	expect(await y(chargeA)).toBeLessThan(await y(chargeB));
 	expect(await y(chargeB)).toBeLessThan(await y(chargeC));
-	expect(await y(chargeC)).toBeLessThan(await y(limitDivider));
 });
 
 test("highlights recurring bills that cannot be fulfilled", async ({

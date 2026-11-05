@@ -31,7 +31,10 @@ import {
 	spendingBalance,
 } from "@/domain/safeSpending.ts";
 
-import { safeSpendingIncome } from "@/domain/safeSpendingIncome.ts";
+import {
+	safeSpendingIncome,
+	incomeBundleAfter,
+} from "@/domain/safeSpendingIncome.ts";
 import { safeSpendingTrend } from "@/domain/safeSpendingTrend.ts";
 import { visibleAccounts } from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
@@ -53,6 +56,7 @@ import {
 	type SafeSpendingChargeCycle,
 	type SafeSpendingCycleTab,
 	type SafeSpendingDetailTab,
+	type StatementFunding,
 } from "@/pages/outlook/safe-spending/safeSpendingDetailModel.ts";
 import {
 	resolveEffectiveIds,
@@ -192,15 +196,19 @@ export function SafeSpendingPreview({
 			todayIso: displayToday,
 		});
 	}, [obligationTransactions, spendingIds, displayToday]);
+	// Bills the settling paycheck covers: the calendar month after the
+	// statement's close month — December's bills for the Nov 20 statement,
+	// November's for the Oct 20 statement. Anchored to the cycle, never to
+	// the viewing day, so the figure does not drift between month-ends.
 	const fixedDerived = useMemo(() => {
 		if (!spendingIds.length)
-			return { total: 0, start: displayToday, end: displayToday };
+			return { total: 0, start: cycle.cycleEnd, end: cycle.cycleEnd };
 		return nextMonthObligations({
 			transactions: obligationTransactions,
 			checkingIds: spendingIds,
-			todayIso: displayToday,
+			todayIso: cycle.cycleEnd,
 		});
-	}, [obligationTransactions, spendingIds, displayToday]);
+	}, [obligationTransactions, spendingIds, cycle.cycleEnd]);
 	const income = useMemo(
 		() =>
 			safeSpendingIncome({
@@ -220,7 +228,59 @@ export function SafeSpendingPreview({
 			displayToday,
 		],
 	);
-	const paycheckDerived = income.paycheck;
+	// Each statement names the payday that settles it: the earliest selected
+	// income after the statement closes. The closed statement is settled by
+	// its own bundle (already arrived), not the upcoming one.
+	const closedFixedDerived = useMemo(() => {
+		if (!spendingIds.length) return 0;
+		return nextMonthObligations({
+			transactions: obligationTransactions,
+			checkingIds: spendingIds,
+			todayIso: closedCycle.end,
+		}).total;
+	}, [obligationTransactions, spendingIds, closedCycle.end]);
+	const currentFunding = useMemo(
+		() =>
+			incomeBundleAfter({
+				accounts: accounts ?? [],
+				rules,
+				transactions: projectionTransactions,
+				incomeAccountIds: incomeIds,
+				incomeScheduleIds: settings.incomeScheduleIds,
+				afterIso: cycle.cycleEnd,
+				todayIso: displayToday,
+			}),
+		[
+			accounts,
+			rules,
+			projectionTransactions,
+			incomeIds,
+			settings.incomeScheduleIds,
+			cycle.cycleEnd,
+			displayToday,
+		],
+	);
+	const closedFunding = useMemo(
+		() =>
+			incomeBundleAfter({
+				accounts: accounts ?? [],
+				rules,
+				transactions: projectionTransactions,
+				incomeAccountIds: incomeIds,
+				incomeScheduleIds: settings.incomeScheduleIds,
+				afterIso: closedCycle.end,
+				todayIso: displayToday,
+			}),
+		[
+			accounts,
+			rules,
+			projectionTransactions,
+			incomeIds,
+			settings.incomeScheduleIds,
+			closedCycle.end,
+			displayToday,
+		],
+	);
 	// Past cash outflow stays filter-proof: bill toggles shape the bills
 	// list only, never the cushion. Direct checking spend always counts here.
 	const spentSinceStart = useMemo(
@@ -253,7 +313,7 @@ export function SafeSpendingPreview({
 		],
 	);
 	const spendingTrend = useMemo(() => {
-		const limit = (paycheckDerived?.amount ?? 0) - fixedDerived.total;
+		const limit = (currentFunding?.amount ?? 0) - fixedDerived.total;
 		return safeSpendingTrend({
 			transactions: perAccount.flatMap((item) => item.inCycle),
 			cycleStart: cycle.cycleStart,
@@ -267,7 +327,7 @@ export function SafeSpendingPreview({
 		cycle.cycleStart,
 		cycle.cycleEnd,
 		displayToday,
-		paycheckDerived,
+		currentFunding,
 		fixedDerived.total,
 		settings.reserve,
 	]);
@@ -455,7 +515,7 @@ export function SafeSpendingPreview({
 		remainingObligations,
 	});
 
-	const paycheck = paycheckDerived?.amount ?? 0;
+	const paycheck = currentFunding?.amount ?? 0;
 	const fixedObligations = fixedDerived.total;
 	const spent = derivedSpent;
 	const allowance = cycleAllowance({
@@ -495,17 +555,23 @@ export function SafeSpendingPreview({
 			name: item.name,
 			amount: item.derived,
 		})),
-		paycheckAmount: paycheck,
-		paycheckDate: paycheckDerived?.date ?? null,
-		paycheckEndDate: paycheckDerived?.endDate ?? null,
-		fixedAmount: fixedObligations,
-		reserveAmount: settings.reserve,
 	};
-	const paycheckDetails = {
-		paycheck,
-		fixed: fixedObligations,
+	const statementFunding: Record<SafeSpendingCycleTab, StatementFunding> = {
+		cycle: {
+			paycheck,
+			date: currentFunding?.date ?? null,
+			endDate: currentFunding?.endDate ?? null,
+			fixedBills: fixedObligations,
+		},
+		"last-cycle": {
+			paycheck: closedFunding?.amount ?? 0,
+			date: closedFunding?.date ?? null,
+			endDate: closedFunding?.endDate ?? null,
+			fixedBills: closedFixedDerived,
+		},
+	};
+	const cycleAllocation = {
 		reserve: settings.reserve,
-		spent,
 		allowance,
 	};
 
@@ -701,7 +767,8 @@ export function SafeSpendingPreview({
 										short: shortWindow.total,
 										firstShort: shortWindow.firstDate,
 									}}
-									paycheck={paycheckDetails}
+									allocation={cycleAllocation}
+									funding={statementFunding.cycle}
 									trend={spendingTrend}
 									section={billsSection}
 									accounts={accounts}
@@ -713,7 +780,8 @@ export function SafeSpendingPreview({
 							) : (
 								<HouseholdBudgetSummary
 									heroes={heroes}
-									paycheck={paycheckDetails}
+									reserve={settings.reserve}
+									funding={statementFunding["last-cycle"]}
 								/>
 							)}
 							<SafeSpendingCyclePanel

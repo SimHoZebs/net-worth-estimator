@@ -7,6 +7,13 @@ export interface IncomePayment {
 	amount: number;
 }
 
+export interface IncomeBundle {
+	/** Bundle start and end: the first selected payment after the boundary, per source. */
+	date: string;
+	endDate: string;
+	amount: number;
+}
+
 export interface SafeSpendingIncome {
 	candidates: {
 		id: string;
@@ -15,7 +22,12 @@ export interface SafeSpendingIncome {
 		nextPayment: IncomePayment | null;
 	}[];
 	selectedScheduleIds: string[];
-	paycheck: (IncomePayment & { endDate: string }) | null;
+	paycheck: IncomeBundle | null;
+}
+
+interface IncomeSelection {
+	eligible: Transaction[];
+	selectedScheduleIds: string[];
 }
 
 /**
@@ -24,21 +36,19 @@ export interface SafeSpendingIncome {
  * source contributes its next server-projected requested payment, once per
  * rule.
  */
-export function safeSpendingIncome({
+function selectIncome({
 	accounts,
 	rules,
-	transactions,
 	incomeAccountIds,
 	incomeScheduleIds,
 	todayIso,
 }: {
 	accounts: Account[];
 	rules: Transaction[];
-	transactions: TransactionResult[];
 	incomeAccountIds: string[];
 	incomeScheduleIds: string[];
 	todayIso: string;
-}): SafeSpendingIncome {
+}): IncomeSelection {
 	const today = todayIso.slice(0, 10);
 	const availableAccounts = new Set(
 		accounts
@@ -59,19 +69,54 @@ export function safeSpendingIncome({
 			(rule.fromId === null ||
 				(availableAccounts.has(rule.fromId) && !destinations.has(rule.fromId))),
 	);
-	const nextPayments = nextProjectedPayments({
-		transactions,
-		rules: eligible,
-		todayIso,
-	});
 	const selected = new Set(incomeScheduleIds);
 	const selectedScheduleIds = eligible
 		.filter((rule) => selected.has(rule.id))
 		.map((rule) => rule.id);
+	return { eligible, selectedScheduleIds };
+}
+
+/**
+ * The first bundle of selected income after `afterIso`: the earliest
+ * occurrence per selected source, summed. Mirrors the "next paycheck"
+ * bundle, re-anchored per statement so each statement can name the payday
+ * that settles it.
+ */
+function bundleAfter({
+	selectedScheduleIds,
+	nextPayments,
+}: {
+	selectedScheduleIds: string[];
+	nextPayments: Map<string, IncomePayment>;
+}): IncomeBundle | null {
 	const payments = selectedScheduleIds.flatMap(
 		(id) => nextPayments.get(id) ?? [],
 	);
 	const dates = payments.map((payment) => payment.date).sort();
+	return dates.length
+		? {
+				date: dates[0]!,
+				endDate: dates.at(-1)!,
+				amount: payments.reduce((total, payment) => total + payment.amount, 0),
+			}
+		: null;
+}
+
+export function safeSpendingIncome(input: {
+	accounts: Account[];
+	rules: Transaction[];
+	transactions: TransactionResult[];
+	incomeAccountIds: string[];
+	incomeScheduleIds: string[];
+	todayIso: string;
+}): SafeSpendingIncome {
+	const { eligible, selectedScheduleIds } = selectIncome(input);
+	const today = input.todayIso.slice(0, 10);
+	const nextPayments = nextProjectedPayments({
+		transactions: input.transactions,
+		rules: eligible,
+		todayIso: today,
+	});
 	return {
 		candidates: eligible.map((rule) => ({
 			id: rule.id,
@@ -80,15 +125,31 @@ export function safeSpendingIncome({
 			nextPayment: nextPayments.get(rule.id) ?? null,
 		})),
 		selectedScheduleIds,
-		paycheck: dates.length
-			? {
-					date: dates[0]!,
-					endDate: dates.at(-1)!,
-					amount: payments.reduce(
-						(total, payment) => total + payment.amount,
-						0,
-					),
-				}
-			: null,
+		paycheck: bundleAfter({ selectedScheduleIds, nextPayments }),
 	};
+}
+
+/**
+ * The statement-settlement bundle: the earliest payment per selected source
+ * arriving after `afterIso`. Eligibility stays anchored to today; only the
+ * occurrence window moves, so each statement names the payday that settles
+ * it.
+ */
+export function incomeBundleAfter(input: {
+	accounts: Account[];
+	rules: Transaction[];
+	transactions: TransactionResult[];
+	incomeAccountIds: string[];
+	incomeScheduleIds: string[];
+	/** Statement anchor: the bundle starts strictly after this date. */
+	afterIso: string;
+	todayIso: string;
+}): IncomeBundle | null {
+	const { eligible, selectedScheduleIds } = selectIncome(input);
+	const nextPayments = nextProjectedPayments({
+		transactions: input.transactions,
+		rules: eligible,
+		todayIso: input.afterIso.slice(0, 10),
+	});
+	return bundleAfter({ selectedScheduleIds, nextPayments });
 }
