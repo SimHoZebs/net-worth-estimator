@@ -8,9 +8,7 @@
 
 ## Subagent model
 
-- Set `model: "opencode-go/muse-spark-1.3-contributor"` explicitly on every subagent call.
-- Never rely on model inheritance or the default model.
-- Verify each child with `opencode api get /api/session/SESSION_ID` before using its work. Check `data.model.providerID` and `data.model.id`.
+- ONLY if you are an OpenAI model, set `model: "opencode-go/muse-spark-1.3-contributor"` explicitly on every subagent call. Otherwise, leave it empty.
 
 ## Latest state only
 
@@ -69,8 +67,8 @@ gh run watch "$run" --exit-status
 
 - `viz/` holds the backlog landing map (`nwe-landing-map.html`, Mermaid diagrams) and `viz/captures/` (Playwright screenshots/clips). Gitignored; never commit.
 - Serve from `viz/`: `python3 -m http.server 8123 --bind 127.0.0.1` (LAN: `--bind 0.0.0.0`). Map at `/nwe-landing-map.html`, captures at `/captures/<area>/<file>`.
-- Capture against TESTING.md browser harnesses on isolated ports; place media under `viz/captures/<area>/` with descriptive names.
-- Keep worktrees out of `/tmp` (tmpfs pressure, reboot loss). Use the standard worktree dir; relocate with remove plus re-add at the same ref when a move must cross devices.
+- Capture against TESTING.md browser harnesses on isolated ports; place media under `viz/captures/<area>/` with descriptive names and display it in chat through markdown formatting.
+- Keep worktrees out of `/tmp`. Use the standard worktree dir; relocate with remove plus re-add at the same ref when a move must cross devices.
 
 ## Production deployment
 
