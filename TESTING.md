@@ -198,18 +198,19 @@ TEST_PRODUCTION=1 bun --filter ./frontend test:integration
 
 ## Completion Gate
 
-Agents run the completion gates locally before pushing. GitHub Actions repeats them:
-the `Tests` workflow runs `scripts/test --gate --no-browser` and
-`scripts/test --integration` on every push to `main` and every pull request. The
-`End-to-end tests` workflow runs `E2E_TEST_MUTATIONS=1 scripts/test --e2e` nightly,
-on manual dispatch, and on pull requests carrying the `e2e` label. Per-push work stays in the
-first two jobs because the e2e gate carries the [30-minute
+GitHub Actions is the full completion gate. Agents run the narrowest local check
+for their change, push the branch, and watch the `Tests` workflow. It runs
+`scripts/test --gate --no-browser` and `scripts/test --integration` on every
+branch push and every pull request. The `End-to-end tests` workflow runs
+`E2E_TEST_MUTATIONS=1 scripts/test --e2e` nightly, on manual dispatch, and on
+pull requests carrying the `e2e` label. Per-branch work stays in the first two
+jobs because the e2e gate carries the [30-minute
 budget](docs/e2e-gate.md#cadence-and-budget); add the label to gate a risky change.
 The Northflank GitHub workflow only requests a gated deployment for the pushed SHA.
 The image publisher does not replace the test gates either. Validate the workflows
 with `actionlint .github/workflows/*.yml` and `node --test deploy/images.test.mjs`.
 
-Run the whole gate with one command:
+To repeat the `Tests` workflow locally when CI is unavailable:
 
 ```bash
 scripts/test --gate

@@ -1,14 +1,17 @@
 # Release gates
 
 Nothing ships until every gate below passes on the release commit. Hosted
-CI repeats the automated tiers on every push to `main` and every pull
-request (`.github/workflows/tests.yml`) and runs the disposable e2e gate
-nightly (`.github/workflows/e2e.yml`). The Northflank workflow only
+CI runs the automated tiers on every branch push and every pull request
+(`.github/workflows/tests.yml`), so the run for the exact `main` SHA is the
+gate of record. A branch run covers the pre-landing content only; after a
+squash or rebase, watch the new `main` run. It also runs the disposable e2e
+gate nightly (`.github/workflows/e2e.yml`). The Northflank workflow only
 requests a gated deployment for the pushed SHA.
 
 ## 1. Automated test gates
 
-Run the whole gate with one command:
+The hosted `Tests` workflow runs the whole gate. To repeat it locally when
+CI is unavailable:
 
 ```bash
 scripts/test --gate
