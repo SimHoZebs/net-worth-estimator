@@ -81,8 +81,8 @@ still stamp a successful sync. That is the safety problem v2 lets us fix.
 ## Target protocol contract
 
 Every `/accounts` request sends `version=2`. A response without both `errlist`
-and `connections` is rejected as `UnsupportedVersionError`; it is never treated
-as v1.
+and `connections` is invalid protocol input and fails the sync. It is never
+treated as a successful empty set.
 
 `Connection` carries `conn_id`, `name`, `org_id`, `org_name`, `org_url`, and
 `sfin_url`. `Account` carries `conn_id`. The deprecated `errors` field is

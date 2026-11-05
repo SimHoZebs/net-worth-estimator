@@ -406,10 +406,6 @@ func syncErrorFromError(err error, now time.Time) store.SyncError {
 	if errors.As(err, &payment) {
 		return store.SyncError{Code: "gen.payment", Message: payment.Error(), ObservedAt: observedAt}
 	}
-	var unsupported *UnsupportedVersionError
-	if errors.As(err, &unsupported) {
-		return store.SyncError{Code: "gen.version", Message: unsupported.Error(), ObservedAt: observedAt}
-	}
 	var protocol *ProtocolErrorsError
 	if errors.As(err, &protocol) {
 		code := "gen."

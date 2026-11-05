@@ -45,12 +45,25 @@ func TestFetchParsesV2ConnectionsAndConnID(t *testing.T) {
 	}
 }
 
-func TestFetchRejectsV1Shape(t *testing.T) {
+func TestFetchRejectsInvalidShape(t *testing.T) {
 	client := v2Bridge(t, `{"errors": [], "accounts": []}`, http.StatusOK)
 	_, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
-	var unsupported *UnsupportedVersionError
-	if !errors.As(err, &unsupported) {
-		t.Fatalf("error = %T (%v), want UnsupportedVersionError", err, err)
+	var protocol *ProtocolErrorsError
+	if !errors.As(err, &protocol) {
+		t.Fatalf("error = %T (%v), want ProtocolErrorsError", err, err)
+	}
+}
+
+func TestFetchRejectsWrongTypedAccountIdentity(t *testing.T) {
+	client := v2Bridge(t, `{
+		"errlist": [],
+		"connections": [{"conn_id": "CON-1", "name": "My Bank"}],
+		"accounts": [{"id": "checking", "conn_id": 5, "name": "Checking", "currency": "USD", "balance": "10", "balance-date": 10, "transactions": []}]
+	}`, http.StatusOK)
+	_, err := client.Fetch(context.Background(), time.Now().Add(-time.Hour), time.Now())
+	var protocol *ProtocolErrorsError
+	if !errors.As(err, &protocol) {
+		t.Fatalf("error = %T (%v), want ProtocolErrorsError", err, err)
 	}
 }
 

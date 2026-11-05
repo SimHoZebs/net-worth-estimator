@@ -70,10 +70,6 @@ func (s *handler) triggerSync(ctx context.Context, _ *struct{}) (*syncOutput, er
 		if errors.As(err, &payment) {
 			return nil, huma.Error402PaymentRequired(payment.Error())
 		}
-		var unsupported *simplefin.UnsupportedVersionError
-		if errors.As(err, &unsupported) {
-			return nil, huma.Error502BadGateway(unsupported.Error())
-		}
 		var protocol *simplefin.ProtocolErrorsError
 		if errors.As(err, &protocol) {
 			return nil, huma.Error502BadGateway(protocol.Error())

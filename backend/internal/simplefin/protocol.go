@@ -143,16 +143,6 @@ func (t Transaction) ParseAmount() (float64, error) {
 	return amount, nil
 }
 
-// UnsupportedVersionError reports a server that did not return the v2
-// response shape. The host is display-safe; the access URL is never included.
-type UnsupportedVersionError struct {
-	Host string
-}
-
-func (e *UnsupportedVersionError) Error() string {
-	return fmt.Sprintf("simplefin server at %s does not support protocol version %s", e.Host, ProtocolVersion)
-}
-
 // AuthError reports a Bridge or connection authentication failure. The user
 // must reconnect or reauthenticate the named connection.
 type AuthError struct {
@@ -403,8 +393,8 @@ type Client struct {
 }
 
 // Fetch retrieves accounts with transactions in [start, end), including
-// pending transactions. It requests protocol version 2 and rejects a v1
-// response instead of silently applying the old shape.
+// pending transactions. It requests protocol version 2 and validates the
+// response contract before returning it.
 func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, error) {
 	endpoint, err := url.Parse(strings.TrimRight(c.AccessURL, "/") + "/accounts")
 	if err != nil {
@@ -482,19 +472,19 @@ func (c *Client) Fetch(ctx context.Context, start, end time.Time) (*AccountSet, 
 func decodeAccountSet(host string, body []byte) (*AccountSet, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(body, &fields); err != nil {
-		return nil, fmt.Errorf("simplefin decode from %s: %w", host, err)
+		return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "response is not a JSON object"}}}
 	}
 	errList, hasErrList := fields["errlist"]
 	connections, hasConnections := fields["connections"]
 	if !hasErrList || !hasConnections {
-		return nil, &UnsupportedVersionError{Host: host}
+		return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "response is missing errlist or connections"}}}
 	}
 	if !jsonArray(errList) || !jsonArray(connections) {
 		return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "errlist and connections must be arrays"}}}
 	}
 	var set AccountSet
 	if err := json.Unmarshal(body, &set); err != nil {
-		return nil, fmt.Errorf("simplefin decode from %s: %w", host, err)
+		return nil, &ProtocolErrorsError{Host: host, Errors: []ProtocolError{{Code: "gen.protocol", Msg: "response fields have invalid types"}}}
 	}
 	for _, connection := range set.Connections {
 		if strings.TrimSpace(connection.ConnID) == "" {
