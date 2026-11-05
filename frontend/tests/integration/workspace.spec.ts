@@ -194,8 +194,9 @@ test("a schedule ends by recording one transaction and a transaction can start a
 		.poll(async () => {
 			const model = await readSavedServerModel();
 			return (
-				model.schedules.find((schedule) => schedule.name === "Monthly investing") ??
-				null
+				model.schedules.find(
+					(schedule) => schedule.name === "Monthly investing",
+				) ?? null
 			);
 		})
 		.not.toBeNull();

@@ -28,7 +28,10 @@ import {
 	safeSpendingIncome,
 	incomeBundleAfter,
 } from "@/domain/safeSpendingIncome.ts";
-import { safeSpendingResults, selectObligationResults } from "@/domain/safeSpendingHistory.ts";
+import {
+	safeSpendingResults,
+	selectObligationResults,
+} from "@/domain/safeSpendingHistory.ts";
 import { latestCheckpointsThrough } from "@/api/checkpoints.ts";
 import { visibleAccounts } from "@/domain/model.ts";
 import type { Projection } from "@/domain/result.ts";
@@ -359,8 +362,7 @@ export function SafeSpendingPreview({
 	// split (allowance for cards, cushion for cash); only the rows merge.
 	const lastAtClose = latestCheckpointsThrough(checkpoints, closedCycle.end);
 	const lastComplete =
-		spendingIds.length > 0 &&
-		spendingIds.every((id) => lastAtClose.has(id));
+		spendingIds.length > 0 && spendingIds.every((id) => lastAtClose.has(id));
 	const lastChecking = lastComplete
 		? sum(spendingIds.map((id) => lastAtClose.get(id)?.Balance ?? 0))
 		: spendingDerived;
@@ -371,9 +373,7 @@ export function SafeSpendingPreview({
 		name: item.name,
 		amount: sum(item.inCycle.map((transaction) => transaction.amount)),
 	}));
-	const currentCardSpent = sum(
-		currentCardByCard.map((card) => card.amount),
-	);
+	const currentCardSpent = sum(currentCardByCard.map((card) => card.amount));
 	const currentView = cycleView({
 		cycle: { start: cycle.cycleStart, end: cycle.cycleEnd },
 		referenceDay: displayToday,
@@ -435,10 +435,7 @@ export function SafeSpendingPreview({
 		transactionOrder,
 		closedCycle,
 		provisional: !lastComplete,
-		fullDaysLeft: daysBetweenInclusive(
-			closedCycle.start,
-			closedCycle.end,
-		),
+		fullDaysLeft: daysBetweenInclusive(closedCycle.start, closedCycle.end),
 		closed: true,
 	});
 
@@ -465,8 +462,7 @@ export function SafeSpendingPreview({
 							? currentView.trend.safetyNetHit.date
 							: null,
 					limitDate:
-						currentView.trend.limitHit &&
-						!currentView.trend.limitHit.projected
+						currentView.trend.limitHit && !currentView.trend.limitHit.projected
 							? currentView.trend.limitHit.date
 							: null,
 				},
@@ -701,9 +697,7 @@ export function SafeSpendingPreview({
 										? currentView.view.funding
 										: lastView.view.funding
 								}
-								trend={
-									detail === "cycle" ? currentView.trend : lastView.trend
-								}
+								trend={detail === "cycle" ? currentView.trend : lastView.trend}
 								section={
 									detail === "cycle" ? currentView.section : lastView.section
 								}

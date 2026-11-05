@@ -92,9 +92,7 @@ function authoredAmount(amount: number, annualIncrease: number) {
  * Explicit new transaction body for creates. Every authored field is stated
  * outright; lifecycle state belongs to the server.
  */
-export function postingBody(
-	values: PostingFormValues,
-): TransactionRecordBody {
+export function postingBody(values: PostingFormValues): TransactionRecordBody {
 	return {
 		name: values.name,
 		amount: authoredAmount(values.amount, 0),
@@ -122,9 +120,7 @@ export function postingBody(
  * schedule owns recurrence. Priority and caps stay omitted so the server
  * appends and defaults them.
  */
-export function scheduleBody(
-	values: ScheduleFormValues,
-): ScheduleCreateBody {
+export function scheduleBody(values: ScheduleFormValues): ScheduleCreateBody {
 	return {
 		name: values.name,
 		amount: authoredAmount(values.amount, values.annualIncrease),

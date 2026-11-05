@@ -37,7 +37,11 @@ const schedule = (overrides: Partial<Schedule>): Schedule => ({
 	name: "Salary",
 	sourceAccountId: "gross_pay",
 	destinations: ["checking"],
-	amount: { resolver: "expression", config: { expression: "7000" }, inputs: {} },
+	amount: {
+		resolver: "expression",
+		config: { expression: "7000" },
+		inputs: {},
+	},
 	frequency: "monthly",
 	startDate: "2026-01-01",
 	endDate: null,
@@ -84,9 +88,7 @@ describe("safeSpendingResults", () => {
 				}),
 			],
 		});
-		expect(
-			results.find((row) => row.date === "2026-10-30"),
-		).toMatchObject({
+		expect(results.find((row) => row.date === "2026-10-30")).toMatchObject({
 			transactionId: "salary",
 			requested: 7000,
 		});
@@ -237,16 +239,15 @@ describe("safeSpendingResults", () => {
 			claimed: false,
 		});
 		expect(
-			selectObligationResults(
-				[unclaimed, distinct, claimed, projected],
-				null,
-				["bill-rule"],
-			).map((row) => row.transactionId),
+			selectObligationResults([unclaimed, distinct, claimed, projected], null, [
+				"bill-rule",
+			]).map((row) => row.transactionId),
 		).toEqual(["distinct", "claimed", "bill-rule"]);
 		expect(
-			selectObligationResults([unclaimed, claimed, projected], [
-				"unclaimed",
-			]).map((row) => row.transactionId),
+			selectObligationResults(
+				[unclaimed, claimed, projected],
+				["unclaimed"],
+			).map((row) => row.transactionId),
 		).toEqual(["unclaimed"]);
 	});
 

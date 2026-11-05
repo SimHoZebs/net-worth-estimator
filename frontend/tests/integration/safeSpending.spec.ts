@@ -98,9 +98,7 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	await expect(
 		drawer.getByText(labels.billsThisCycle, { exact: true }),
 	).toBeVisible();
-	await expect(
-		drawer.getByText("No bills due in this period."),
-	).toBeVisible();
+	await expect(drawer.getByText("No bills due in this period.")).toBeVisible();
 	await expect(
 		drawer.getByRole("region", { name: "Paycheck allocation" }),
 	).toHaveCount(0);

@@ -65,8 +65,7 @@ export function safeSpendingResults({
 		});
 		const reference = amountOf(closest);
 		if (reference === null) return null;
-		return Math.abs(row.amount - reference) <=
-			Math.max(100, reference * 0.15)
+		return Math.abs(row.amount - reference) <= Math.max(100, reference * 0.15)
 			? closest.id
 			: null;
 	};

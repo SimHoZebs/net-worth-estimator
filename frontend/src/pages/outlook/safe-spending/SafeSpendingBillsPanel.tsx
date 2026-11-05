@@ -118,10 +118,7 @@ export function SafeSpendingBillsPanel({
 	const cardLabel = closed ? labels.closedCardBalances : labels.cardSpending;
 	const amountText = (value: number | null) =>
 		value === null ? "—" : money(value);
-	const reserveUsed = Math.max(
-		0,
-		allocation.reserve - cashNow.cushion,
-	);
+	const reserveUsed = Math.max(0, allocation.reserve - cashNow.cushion);
 	const dailyFoot = !allocation.available
 		? undefined
 		: closed
@@ -261,9 +258,7 @@ export function SafeSpendingBillsPanel({
 					<strong>{exactMoney(cashNow.checking)}</strong>
 				</div>
 				{cashNow.provisional && (
-					<p className="m-0 text-xs text-muted">
-						Latest balance, not at close
-					</p>
+					<p className="m-0 text-xs text-muted">Latest balance, not at close</p>
 				)}
 				<SegmentedBar
 					showDetails={false}

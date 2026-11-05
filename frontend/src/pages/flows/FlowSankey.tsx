@@ -1,4 +1,10 @@
-import { defineChart, link, rect, text, type ChartCurve } from "@tanstack/charts";
+import {
+	defineChart,
+	link,
+	rect,
+	text,
+	type ChartCurve,
+} from "@tanstack/charts";
 import { controlledSignal } from "@tanstack/charts/interaction/signal";
 import {
 	sankeyDiagram,

@@ -150,7 +150,10 @@ describe("posting patches", () => {
 				claimScheduleId: "salary",
 				claimOccurrenceDate: "2026-02-01",
 			},
-			values: postingValues({ claimScheduleId: null, claimOccurrenceDate: null }),
+			values: postingValues({
+				claimScheduleId: null,
+				claimOccurrenceDate: null,
+			}),
 		});
 		expect(patch).toEqual({});
 	});
@@ -160,8 +163,9 @@ describe("posting patches", () => {
 		expect(body).not.toHaveProperty("frequency");
 		expect(body).not.toHaveProperty("endDate");
 		expect(body.amount).toEqual({ value: 48000 });
-		expect(postingUpdate({ baseline: baselinePosting, values: postingValues() }))
-			.not.toHaveProperty("annualIncrease");
+		expect(
+			postingUpdate({ baseline: baselinePosting, values: postingValues() }),
+		).not.toHaveProperty("annualIncrease");
 	});
 
 	it("validates the posting fields without asking for recurrence", () => {
@@ -251,9 +255,9 @@ describe("schedule patches", () => {
 
 	it("validates recurrence fields on a schedule", () => {
 		expect(validateScheduleValues(scheduleValues())).toBeNull();
-		expect(
-			validateScheduleValues(scheduleValues({ annualIncrease: 60 })),
-		).toBe("Enter a yearly increase between -50 and 50 percent.");
+		expect(validateScheduleValues(scheduleValues({ annualIncrease: 60 }))).toBe(
+			"Enter a yearly increase between -50 and 50 percent.",
+		);
 		expect(
 			validateScheduleValues(
 				scheduleValues({ startDate: "2026-10-03", endDate: "2026-09-01" }),

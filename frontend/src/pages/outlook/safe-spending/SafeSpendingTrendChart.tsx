@@ -127,9 +127,7 @@ export function SafeSpendingTrendChart({
 								}),
 							]
 						: []),
-					...(showThresholds &&
-					Number.isFinite(trend.limit) &&
-					trend.limit > 0
+					...(showThresholds && Number.isFinite(trend.limit) && trend.limit > 0
 						? [
 								ruleY([trend.limit], {
 									stroke: "var(--danger-solid)",
