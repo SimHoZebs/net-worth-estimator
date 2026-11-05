@@ -23,11 +23,10 @@ jobs:
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
-      - name: Request the gated workflow for the tested commit
+      - name: Verify the tested commit
         env:
-          RELEASE_WEBHOOK: ${{ secrets.NORTHFLANK_RELEASE_WEBHOOK }}
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           TESTS_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
@@ -35,6 +34,7 @@ jobs:
           TESTS_BRANCH: ${{ github.event.workflow_run.head_branch }}
           DISPATCH_REF: ${{ github.ref }}
           GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           node --input-type=module <<'JS'
           const sha = process.env.RELEASE_SHA;
@@ -61,6 +61,65 @@ jobs:
           } else {
             throw new Error("Unsupported release event");
           }
+          console.log(`Tests passed for ${sha}.`);
+          JS
+
+      - name: Wait for the pinned images
+        env:
+          RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'JS'
+          const sha = process.env.RELEASE_SHA;
+          if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
+          const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
+          const names = [`${repository}-backend`, `${repository}-casdoor`];
+          const tag = `sha-${sha}`;
+          const interval = Number(process.env.IMAGE_POLL_INTERVAL_MS ?? 15000);
+          const deadline = Date.now() + Number(process.env.IMAGE_POLL_TIMEOUT_MS ?? 30 * 60 * 1000);
+
+          async function manifest(name) {
+            try {
+              const tokenResponse = await fetch(`https://ghcr.io/token?scope=repository:${name}:pull&service=ghcr.io`);
+              if (!tokenResponse.ok) return { ok: false, status: tokenResponse.status };
+              const { token } = await tokenResponse.json();
+              const response = await fetch(`https://ghcr.io/v2/${name}/manifests/${tag}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json",
+                },
+              });
+              return { ok: response.ok, status: response.status };
+            } catch {
+              return { ok: false, status: 0 };
+            }
+          }
+
+          while (Date.now() < deadline) {
+            const results = await Promise.all(names.map(manifest));
+            if (results.every((result) => result.ok)) {
+              console.log(`Published images are ready for ${sha}.`);
+              process.exit(0);
+            }
+            const denied = names.find((_, index) => [401, 403].includes(results[index].status));
+            if (denied) throw new Error(`Image ${denied}:${tag} is not anonymously readable; make the package public or configure a registry credential`);
+            await new Promise((resolve) => setTimeout(resolve, interval));
+          }
+          throw new Error(`Pinned images for ${sha} were not published before the deadline`);
+          JS
+
+      - name: Request the release
+        env:
+          RELEASE_WEBHOOK: ${{ secrets.NORTHFLANK_RELEASE_WEBHOOK }}
+          RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'JS'
+          const sha = process.env.RELEASE_SHA;
+          if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
+          const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
+          const apiImage = `ghcr.io/${repository}-backend:sha-${sha}`;
+          const identityImage = `ghcr.io/${repository}-casdoor:sha-${sha}`;
 
           const raw = process.env.RELEASE_WEBHOOK;
           let url;
@@ -71,11 +130,13 @@ jobs:
             throw new Error("Unexpected release webhook target");
           }
           url.searchParams.set("RELEASE_SHA", sha);
+          url.searchParams.set("API_IMAGE", apiImage);
+          url.searchParams.set("IDENTITY_IMAGE", identityImage);
           url.searchParams.set("name", `main-${sha.slice(0, 12)}`);
           let response;
           try {
             response = await fetch(url, { method: "POST", redirect: "error", signal: AbortSignal.timeout(15000) });
           } catch { throw new Error("Northflank release request failed"); }
           if (!response.ok) throw new Error(`Northflank rejected release request (HTTP ${response.status})`);
-          console.log(`Requested Northflank workflow for ${sha} after its green Tests run. Track completion in Northflank.`);
+          console.log(`Requested Northflank workflow for ${sha} with pinned images. Track completion in Northflank.`);
           JS

@@ -1,8 +1,8 @@
 {
   "name": "waypoint-release",
-  "description": "Build exact images, stop API writers, run the shared migration on the real volume, then start the API.",
+  "description": "Deploy pinned images, stop API writers, run the shared migration on the real volume, then start the API.",
   "apiVersion": "v1.2",
-  "arguments": { "RELEASE_SHA": "" },
+  "arguments": { "RELEASE_SHA": "", "API_IMAGE": "", "IDENTITY_IMAGE": "" },
   "options": { "autorun": false, "concurrencyPolicy": "queue" },
   "triggers": [
     {
@@ -16,30 +16,6 @@
     "spec": {
       "type": "sequential",
       "steps": [
-        {
-          "kind": "Build",
-          "ref": "api-build",
-          "condition": "success",
-          "spec": {
-            "id": "nwe-api",
-            "type": "service",
-            "sha": "${args.RELEASE_SHA}",
-            "reuseExistingBuilds": true,
-            "buildRuleFallThroughHandling": "fail"
-          }
-        },
-        {
-          "kind": "Build",
-          "ref": "identity-build",
-          "condition": "success",
-          "spec": {
-            "id": "nwe-casdoor",
-            "type": "service",
-            "sha": "${args.RELEASE_SHA}",
-            "reuseExistingBuilds": true,
-            "buildRuleFallThroughHandling": "fail"
-          }
-        },
         {
           "kind": "AddonBackup",
           "ref": "identity-backup",
@@ -69,8 +45,8 @@
           "condition": "running",
           "timeoutDuration": 600,
           "spec": {
-            "type": "build",
-            "origin": { "id": "nwe-casdoor", "branch": "main", "build": "${refs.identity-build.id}" },
+            "type": "registry",
+            "origin": { "imagePath": "${args.IDENTITY_IMAGE}" },
             "target": { "id": "nwe-casdoor", "type": "service" }
           }
         },
@@ -80,8 +56,8 @@
           "condition": "running",
           "timeoutDuration": 600,
           "spec": {
-            "type": "build",
-            "origin": { "id": "nwe-api", "branch": "main", "build": "${refs.api-build.id}" },
+            "type": "registry",
+            "origin": { "imagePath": "${args.API_IMAGE}" },
             "target": { "id": "nwe-api", "type": "service" }
           }
         },

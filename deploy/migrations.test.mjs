@@ -746,8 +746,9 @@ test("shared hook stays shell plus setupdb/sqlite3 and outside server startup", 
   assert.doesNotMatch(startup, /migrate\.sh/);
 });
 
-test("Northflank serializes exact builds and gates API startup on the shared script", async () => {
+test("Northflank deploys pinned images and gates API startup on the shared script", async () => {
   const workflow = await readJSON("./northflank/release.json");
+  assert.deepEqual(workflow.arguments, { RELEASE_SHA: "", API_IMAGE: "", IDENTITY_IMAGE: "" });
   assert.equal(workflow.options.concurrencyPolicy, "queue");
   assert.equal(workflow.options.autorun, false);
   assert.equal(workflow.spec.spec.type, "sequential");
@@ -755,33 +756,38 @@ test("Northflank serializes exact builds and gates API startup on the shared scr
   assert.equal(workflow.triggers[0].spec.token, "INJECT_PRIVATE_WEBHOOK_TOKEN");
   const steps = workflow.spec.spec.steps;
   assert.deepEqual(steps.map((step) => step.ref), [
-    "api-build", "identity-build", "identity-backup", "stop-api-writers",
-    "deploy-identity-image", "deploy-maintenance-image", "migrate", "start-api",
+    "identity-backup", "stop-api-writers", "deploy-identity-image",
+    "deploy-maintenance-image", "migrate", "start-api",
   ]);
-  for (const step of steps.slice(0, 2)) {
-    assert.equal(step.condition, "success");
-    assert.equal(step.spec.sha, "${args.RELEASE_SHA}");
-    assert.equal(step.spec.buildRuleFallThroughHandling, "fail");
-  }
-  assert.equal(steps[2].condition, "success");
-  assert.equal(steps[2].spec.backupType, "dump");
-  for (const index of [3, 7]) {
-    assert.equal(steps[index].condition, "success");
-    assert.equal(steps[index].spec.templateId, "waypoint-api-command");
-  }
-  const maintenance = steps[3].spec.arguments.variables[0].value;
+  const [backup, stopApi, deployIdentity, deployApi, migrate, startApi] = steps;
+  assert.equal(backup.condition, "success");
+  assert.equal(backup.spec.backupType, "dump");
+  assert.equal(stopApi.condition, "success");
+  assert.equal(stopApi.spec.templateId, "waypoint-api-command");
+  const maintenance = stopApi.spec.arguments.variables[0].value;
   assert.match(maintenance, /httpd -f/);
   assert.match(maintenance, /-h \/tmp\/waypoint-maintenance/);
   assert.doesNotMatch(maintenance, /\/app\/server|\/data/);
-  assert.equal(steps[4].spec.origin.build, "${refs.identity-build.id}");
-  assert.equal(steps[5].spec.origin.build, "${refs.api-build.id}");
-  for (const index of [4, 5]) assert.equal(steps[index].condition, "running");
-  const migration = steps[6].spec.spec.data;
+  for (const [step, image, target] of [
+    [deployIdentity, "IDENTITY_IMAGE", "nwe-casdoor"],
+    [deployApi, "API_IMAGE", "nwe-api"],
+  ]) {
+    assert.equal(step.kind, "Release");
+    assert.equal(step.condition, "running");
+    assert.equal(step.timeoutDuration, 600);
+    assert.equal(step.spec.type, "registry");
+    assert.equal(step.spec.origin.imagePath, `\${args.${image}}`);
+    assert.equal(step.spec.origin.credentials, undefined);
+    assert.equal(step.spec.target.id, target);
+    assert.equal(step.spec.target.type, "service");
+  }
+  const migration = migrate.spec.spec.data;
   assert.equal(migration.options.dispatchOnly, false);
   assert.equal(migration.user, "10001");
   assert.equal(migration.group, "10001");
   assert.match(migration.command, /test -f.*NET_WORTH_ESTIMATOR_DB.*exec \/app\/migrate\.sh/);
-  assert.equal(steps[7].spec.arguments.variables[0].value, "/app/api-boot.sh");
+  assert.equal(startApi.condition, "success");
+  assert.equal(startApi.spec.arguments.variables[0].value, "/app/api-boot.sh");
 });
 
 test("Northflank release waits for a green main Tests run and rejects unsafe calls", async () => {
@@ -793,29 +799,37 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
   assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
+  assert.match(workflow, /tests\.yml/);
+  assert.match(workflow, /ghcr\.io\/token/);
+  assert.match(workflow, /manifests\/\$\{tag\}/);
+  assert.match(workflow, /IMAGE_POLL_INTERVAL_MS/);
+  assert.match(workflow, /IMAGE_POLL_TIMEOUT_MS/);
+  assert.match(workflow, /not anonymously readable/);
   assert.doesNotMatch(workflow, /NORTHFLANK_API_TOKEN/);
-  const source = workflow.match(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/)[1]
-    .split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n");
-  const execute = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", source);
+
+  const blocks = [...workflow.matchAll(/node --input-type=module <<'JS'\n([\s\S]*?)\n\s*JS/g)]
+    .map((match) => match[1].split("\n").map((line) => line.replace(/^ {10}/, "")).join("\n"));
+  const gateSource = blocks[0];
+  const waitSource = blocks.find((block) => block.includes("ghcr.io/token"));
+  const releaseSource = blocks.find((block) => block.includes("RELEASE_WEBHOOK"));
+  const executeGate = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", gateSource);
+  const executeWait = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", waitSource);
+  const executeRelease = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", releaseSource);
   const sha = "a".repeat(40);
-  let request;
   const webhook = "https://webhooks.northflank.com/workflows/private-fixture";
+  const fakeProcess = (env) => ({ env, exit: (code) => { throw new Error(`exit:${code}`); } });
+
   const baseEnv = {
     EVENT_NAME: "workflow_run",
     RELEASE_SHA: sha,
     TESTS_CONCLUSION: "success",
     TESTS_EVENT: "push",
     TESTS_BRANCH: "main",
-    RELEASE_WEBHOOK: webhook,
   };
-  const fetch = async (url, options) => { request = { url, options }; return { ok: true }; };
-  await execute({ env: { ...baseEnv } }, fetch, { log() {} });
-  assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
-  assert.equal(request.options.redirect, "error");
-
+  await executeGate({ env: { ...baseEnv } }, () => assert.fail("Gate used the network"), { log() {} });
   for (const red of [{ TESTS_CONCLUSION: "failure" }, { TESTS_EVENT: "pull_request" }, { TESTS_BRANCH: "feature" }]) {
     await assert.rejects(
-      execute({ env: { ...baseEnv, ...red } }, () => assert.fail("Released off the gate"), { log() {} }),
+      executeGate({ env: { ...baseEnv, ...red } }, () => assert.fail("Released off the gate"), { log() {} }),
       /not a green push to main/,
     );
   }
@@ -827,38 +841,69 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
     GH_TOKEN: "fixture-token",
     GITHUB_REPOSITORY: "owner/repo",
     GITHUB_API_URL: "https://api.github.test",
-    RELEASE_WEBHOOK: webhook,
   };
   let apiQuery;
-  const dispatchFetch = async (url, options) => {
-    if (String(url).startsWith("https://api.github.test/")) {
-      apiQuery = new URL(url);
-      return { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "success", event: "push", head_branch: "main" }] }) };
-    }
-    request = { url, options };
-    return { ok: true };
+  const gateDispatchFetch = async (url) => {
+    apiQuery = new URL(url);
+    return { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "success", event: "push", head_branch: "main" }] }) };
   };
-  await execute({ env: { ...dispatchEnv } }, dispatchFetch, { log() {} });
+  await executeGate({ env: { ...dispatchEnv } }, gateDispatchFetch, { log() {} });
   assert.equal(apiQuery.searchParams.get("head_sha"), sha);
-  assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
-
-  const redDispatchFetch = async (url) => String(url).startsWith("https://api.github.test/")
-    ? { ok: true, json: async () => ({ workflow_runs: [{ conclusion: "failure", event: "push", head_branch: "main" }] }) }
-    : assert.fail("Released without a green run");
   await assert.rejects(
-    execute({ env: { ...dispatchEnv } }, redDispatchFetch, { log() {} }),
+    executeGate({ env: { ...dispatchEnv } }, async () => ({ ok: true, json: async () => ({ workflow_runs: [] }) }), { log() {} }),
     /No successful main Tests run/,
   );
   await assert.rejects(
-    execute({ env: { ...dispatchEnv, DISPATCH_REF: "refs/heads/feature" } }, () => assert.fail("Released from a branch"), { log() {} }),
+    executeGate({ env: { ...dispatchEnv, DISPATCH_REF: "refs/heads/feature" } }, () => assert.fail("Released from a branch"), { log() {} }),
     /only releases main/,
   );
+  await assert.rejects(
+    executeGate({ env: { ...baseEnv, RELEASE_SHA: "latest" } }, () => assert.fail("Bad sha"), { log() {} }),
+    /full release SHA/,
+  );
+
+  const waitEnv = {
+    RELEASE_SHA: sha,
+    GITHUB_REPOSITORY: "owner/repo",
+    IMAGE_POLL_INTERVAL_MS: "1",
+    IMAGE_POLL_TIMEOUT_MS: "1000",
+  };
+  const readyFetch = async (url) => String(url).includes("ghcr.io/token")
+    ? { ok: true, json: async () => ({ token: "fixture" }) }
+    : { ok: true, status: 200 };
+  await assert.rejects(executeWait(fakeProcess({ ...waitEnv }), readyFetch, { log() {} }), /exit:0/);
+  const deniedFetch = async (url) => String(url).includes("ghcr.io/token")
+    ? { ok: true, json: async () => ({ token: "fixture" }) }
+    : { ok: false, status: 401 };
+  await assert.rejects(executeWait(fakeProcess({ ...waitEnv }), deniedFetch, { log() {} }), /not anonymously readable/);
+  let manifestCalls = 0;
+  const delayedFetch = async (url) => {
+    if (String(url).includes("ghcr.io/token")) return { ok: true, json: async () => ({ token: "fixture" }) };
+    manifestCalls += 1;
+    return manifestCalls <= 2 ? { ok: false, status: 404 } : { ok: true, status: 200 };
+  };
+  await assert.rejects(executeWait(fakeProcess({ ...waitEnv }), delayedFetch, { log() {} }), /exit:0/);
+  const missingFetch = async (url) => String(url).includes("ghcr.io/token")
+    ? { ok: true, json: async () => ({ token: "fixture" }) }
+    : { ok: false, status: 404 };
+  await assert.rejects(
+    executeWait(fakeProcess({ ...waitEnv, IMAGE_POLL_TIMEOUT_MS: "0" }), missingFetch, { log() {} }),
+    /were not published before the deadline/,
+  );
+
+  let request;
+  const fetch = async (url, options) => { request = { url, options }; return { ok: true }; };
+  await executeRelease({ env: { RELEASE_SHA: sha, GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, fetch, { log() {} });
+  assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
+  assert.equal(request.url.searchParams.get("API_IMAGE"), `ghcr.io/owner/repo-backend:sha-${sha}`);
+  assert.equal(request.url.searchParams.get("IDENTITY_IMAGE"), `ghcr.io/owner/repo-casdoor:sha-${sha}`);
+  assert.equal(request.options.redirect, "error");
 
   for (const badWebhook of ["", "https://attacker.invalid/workflows/private", "https://webhooks.northflank.com/workflows/private?override=1"]) {
-    await assert.rejects(execute({ env: { ...baseEnv, RELEASE_WEBHOOK: badWebhook } }, () => assert.fail("Unsafe request"), { log() {} }));
+    await assert.rejects(executeRelease({ env: { RELEASE_SHA: sha, GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: badWebhook } }, () => assert.fail("Unsafe request"), { log() {} }));
   }
-  await assert.rejects(execute({ env: { ...baseEnv } }, async () => ({ ok: false, status: 409 }), { log() {} }), /HTTP 409/);
-  await assert.rejects(execute({ env: { ...baseEnv, RELEASE_SHA: "latest" } }, fetch, { log() {} }), /full release SHA/);
+  await assert.rejects(executeRelease({ env: { RELEASE_SHA: sha, GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, async () => ({ ok: false, status: 409 }), { log() {} }), /HTTP 409/);
+  await assert.rejects(executeRelease({ env: { RELEASE_SHA: "latest", GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, fetch, { log() {} }), /full release SHA/);
 });
 
 test("Northflank command adapter patches only the single API process", async () => {

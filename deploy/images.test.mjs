@@ -5,20 +5,24 @@ import test from "node:test";
 const workflow = readFileSync(new URL("../.github/workflows/images.yml", import.meta.url), "utf8");
 const casdoor = readFileSync(new URL("../auth/casdoor/Dockerfile", import.meta.url), "utf8");
 
-test("publishes commit-addressed images only from main with a job-scoped registry token", () => {
+test("publishes commit-addressed images only after a green main Tests run", () => {
+  assert.match(workflow, /workflows: \["Tests"\]/);
+  assert.match(workflow, /types: \[completed\]/);
   assert.match(workflow, /branches: \[main\]/);
-  assert.match(workflow, /if: github.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.doesNotMatch(workflow, /pull_request|secrets\.(?!GITHUB_TOKEN)/);
   assert.match(workflow, /packages: write/);
   assert.match(workflow, /persist-credentials: false/);
-  assert.match(workflow, /tags: .*:sha-\$\{\{ github.sha \}\}/);
-  assert.match(workflow, /org.opencontainers.image.revision=\$\{\{ github.sha \}\}/);
+  assert.match(workflow, /sha-\$\{\{ github\.event_name == 'workflow_run'/);
+  assert.match(workflow, /head_sha \|\| github\.sha/);
   assert.doesNotMatch(workflow, /:latest\b/);
   for (const [, ref] of workflow.matchAll(/uses: (\S+)/g)) assert.match(ref, /@[a-f0-9]{40}$/);
 });
 
-test("publishes both app images and a mirror without changing the custom identity runtime", () => {
-  for (const image of ["backend", "frontend", "casdoor-upstream"]) {
+test("publishes both app images, the identity runtime, and the upstream mirror", () => {
+  for (const image of ["backend", "frontend", "casdoor", "casdoor-upstream"]) {
     assert.match(workflow, new RegExp(`image: ${image}\\n`));
   }
   assert.match(workflow, /target: upstream/);

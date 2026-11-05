@@ -5,9 +5,10 @@ CI runs the automated tiers on every branch push and every pull request
 (`.github/workflows/tests.yml`), so the run for the exact `main` SHA is the
 gate of record. A branch run covers the pre-landing content only; after a
 squash or rebase, watch the new `main` run. It also runs the disposable e2e
-gate nightly (`.github/workflows/e2e.yml`). The Northflank workflow requests a
-deployment only after the `Tests` run for the pushed `main` commit succeeds.
-The Vercel workflow uses the same gate for production frontend deploys.
+gate nightly (`.github/workflows/e2e.yml`). The image workflow runs after that
+`Tests` run. The Northflank workflow starts on the same `Tests` run and requests
+a deployment only after the pinned backend and Casdoor image tags exist. The
+Vercel workflow uses the `Tests` gate directly for production frontend deploys.
 
 ## 1. Automated test gates
 
@@ -110,8 +111,9 @@ the QA-03 test files' headers and in section 4 below.
 - The Vercel/Render settings stay per their guides
   ([Vercel](../deploy/vercel.md), [Render/container host](../deploy/render.md));
   the actual-provider checklist in [the deployment index](../deploy/README.md)
-  stays manual. Both application hosts deploy only after the `Tests` run for
-  the pushed `main` commit succeeds.
+  stays manual. Vercel deploys after the `Tests` run for the pushed `main`
+  commit succeeds. Northflank deploys after the pinned images for that commit
+  are published; the image workflow itself runs only after `Tests` succeeds.
 
 ## 3. Credential-gated and manual gates
 

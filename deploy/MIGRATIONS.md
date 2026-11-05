@@ -71,7 +71,7 @@ not the deployment migration hook. Keep the two separate.
 | Target | Adapter | Storage access and gate |
 | --- | --- | --- |
 | Home-server Komodo | Infrastructure `net-worth-estimator/migrate.sh` | Build target images, stop frontend/API, run `/app/migrate.sh` with `net-worth-data`; continue Compose only on exit 0. |
-| Northflank | `northflank/release.json` and `northflank/api-command.json` | Build pinned images, back up identity, replace API with a maintenance process on its existing volume, run `/app/migrate.sh`, restore API command only on success. |
+| Northflank | `northflank/release.json` and `northflank/api-command.json` | Deploy pinned GHCR images, back up identity, replace API with a maintenance process on its existing volume, run `/app/migrate.sh`, restore API command only on success. |
 | Other container hosts | Explicit stopped-API maintenance operation | Run the same image command with the real disk attached. A job without that disk does not migrate production. |
 
 Vercel contains no financial database and needs no database migration hook.
@@ -169,14 +169,17 @@ attachments, or identity settings.
 
 Use workflow concurrency `queue` so releases never overlap or drop newer commits.
 Disable per-service CI/CD bypasses: disable direct Git CI and pin both services
-to built commits, not `latest`. For a manual **Northflank UI/API** run, override
-`RELEASE_SHA` with a full reviewed commit. GitHub's manual dispatch instead
-requests the current `main` commit. Builds stay sequential: one at a time.
+to published image tags, not `latest`. For a manual **Northflank UI/API** run,
+override `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` with reviewed values.
+GitHub's manual dispatch instead requests the current `main` commit and its
+published images. Releases stay sequential: one at a time.
 
-`.github/workflows/northflank-release.yml` requests the workflow with the pushed
-commit SHA only after the `Tests` workflow for that exact `main` push completes
-successfully. A manual dispatch requests the current `main` commit and requires
-a successful `main` push run for it. The release job has read-only repository
+`.github/workflows/northflank-release.yml` triggers on the `Tests` workflow for
+the exact `main` push, waits for the pinned backend and Casdoor image manifests,
+then requests the workflow with those image references. The
+`Publish container images` workflow runs on the same `Tests` completion. A manual
+dispatch requests the current `main` commit, requires a green `Tests` push run
+for it, and waits for its images. The release job has read-only repository
 access and no Northflank API credential. Its `NORTHFLANK_RELEASE_WEBHOOK`
 repository secret can only request workflow runs. The GitHub job confirms
 dispatch, not production completion. Check the Northflank run separately. This
@@ -186,8 +189,10 @@ currently cannot access this repository through its Git link.
 At installation, replace `INJECT_PRIVATE_WEBHOOK_TOKEN` with a new private token.
 Keep that value when applying later definition updates. Save the resulting
 webhook URL as the GitHub Actions secret through standard input, never command
-arguments. Northflank accepts `RELEASE_SHA` in the URL query, not a POST body.
-Never commit the token or URL. Pause this trigger during a migration window.
+arguments. Northflank accepts `RELEASE_SHA`, `API_IMAGE`, and `IDENTITY_IMAGE` in
+the URL query, not a POST body. `RELEASE_SHA` is recorded for identification;
+the image references drive the deployment. Never commit the token or URL. Pause
+this trigger during a migration window.
 
 The ReadWriteOnce volume stays attached to its one API service. Northflank
 terminates the old pod before starting another pod with that volume. The
