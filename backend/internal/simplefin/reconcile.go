@@ -122,6 +122,13 @@ func hasSimpleFINKey(row store.BankRow) bool {
 	return false
 }
 
+// isBankSource accepts every persisted bank-owned source. New rows use
+// SourceBankSync; older rows may still carry the provider id after the
+// source rename. Owner-authored rows are the only exclusion.
+func isBankSource(source string) bool {
+	return source != "" && source != store.SourceUser
+}
+
 func candidateKey(item store.SyncPosting) store.BankKey {
 	// The provider identity is SimpleFIN knowledge: pending authorizations
 	// and posted charges from this bridge share one key namespace, which is
@@ -146,7 +153,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	byKey := map[store.BankKey]string{}
 	byID := map[string]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync {
+		if !isBankSource(row.Posting.Source) {
 			continue
 		}
 		byID[row.Posting.ID] = row
@@ -175,7 +182,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var stale []staleRow
 	for _, row := range bank {
-		if seen[row.Posting.ID] || !hasSimpleFINKey(row) {
+		if seen[row.Posting.ID] || !isBankSource(row.Posting.Source) || !hasSimpleFINKey(row) {
 			continue
 		}
 		if row.Posting.Pending || row.Posting.Void {
@@ -199,7 +206,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	settledByAccount := map[string][]store.BankRow{}
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
+		if !isBankSource(row.Posting.Source) || !hasSimpleFINKey(row) {
 			continue
 		}
 		if row.Posting.Pending || row.Posting.Void {
@@ -260,7 +267,7 @@ func Reconcile(pending, settled []store.SyncPosting, bank []store.BankRow, cover
 	}
 	var targets []convertTarget
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !hasSimpleFINKey(row) {
+		if !isBankSource(row.Posting.Source) || !hasSimpleFINKey(row) {
 			continue
 		}
 		account, ok := rowAccount(row.Posting)

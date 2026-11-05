@@ -56,7 +56,7 @@ func settleCandidate(voidRow types.Posting, candidate types.Posting) (SettleCand
 // caller still decides whether the pair is unique enough to convert.
 func SettleCandidates(hold store.BankRow, bank []store.BankRow) []SettleCandidate {
 	voidRow := hold.Posting
-	if voidRow.Source != store.SourceBankSync || !voidRow.Void || voidRow.Pending || !hasSimpleFINKey(hold) {
+	if !isBankSource(voidRow.Source) || !voidRow.Void || voidRow.Pending || !hasSimpleFINKey(hold) {
 		return nil
 	}
 	if cents, ok := postingAmountCents(voidRow); !ok || cents <= 0 {
@@ -68,7 +68,7 @@ func SettleCandidates(hold store.BankRow, bank []store.BankRow) []SettleCandidat
 		if candidate.ID == voidRow.ID {
 			continue
 		}
-		if candidate.Source != store.SourceBankSync || candidate.Pending || candidate.Void || !hasSimpleFINKey(row) {
+		if !isBankSource(candidate.Source) || candidate.Pending || candidate.Void || !hasSimpleFINKey(row) {
 			continue
 		}
 		scored, ok := settleCandidate(voidRow, candidate)

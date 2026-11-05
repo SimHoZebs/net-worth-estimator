@@ -144,3 +144,20 @@ func TestFloorProfileAcceptsAuthAsFloor(t *testing.T) {
 		t.Fatal("floor profile accepted a posted amount below the auth tolerance")
 	}
 }
+
+func TestSettleCandidatesAcceptsLegacyProviderSource(t *testing.T) {
+	// Older bank rows carry the provider id as their source. The matcher
+	// must treat them like the current banksync source.
+	hold := fixtureBankRow("hold", settleFixturePosting{
+		Name: "LYFT *TEMP AUTH HOLD", AmountCents: 7494, Day: "2026-10-31",
+	}, true)
+	hold.Posting.Source = "simplefin"
+	posted := fixtureBankRow("posted", settleFixturePosting{
+		Name: "LYFT *STANDARD 10-30", AmountCents: 8122, Day: "2026-11-01",
+	}, false)
+	posted.Posting.Source = "simplefin"
+	candidates := SettleCandidates(hold, []store.BankRow{hold, posted})
+	if len(candidates) != 1 || candidates[0].Posting.ID != posted.Posting.ID {
+		t.Fatalf("legacy source candidates = %+v, want the posted Lyft charge", candidates)
+	}
+}

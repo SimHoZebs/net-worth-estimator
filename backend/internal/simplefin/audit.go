@@ -26,7 +26,7 @@ type HistoricalVoidPair struct {
 func AuditHistoricalVoids(bank []store.BankRow, modelAccountID string) []HistoricalVoidPair {
 	var pairs []HistoricalVoidPair
 	for _, row := range bank {
-		if row.Posting.Source != store.SourceBankSync || !row.Posting.Void || !hasSimpleFINKey(row) {
+		if !isBankSource(row.Posting.Source) || !row.Posting.Void || !hasSimpleFINKey(row) {
 			continue
 		}
 		if account, ok := rowAccount(row.Posting); !ok || account != modelAccountID {
