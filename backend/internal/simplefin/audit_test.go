@@ -142,19 +142,3 @@ func TestAuditHistoricalVoidsSkipsSuggestOnlyProfiles(t *testing.T) {
 		t.Fatalf("suggest-only pairs = %+v, want none flagged", pairs)
 	}
 }
-
-func TestAuditHistoricalVoidsAcceptsLegacyProviderSource(t *testing.T) {
-	bank := []store.BankRow{
-		reconcileBankRow("uuid-void", "Bistro", "prime_card", "50.00", false, true,
-			pendingKey("prime_card", "old-auth")),
-		reconcileBankRow("uuid-settled", "Bistro", "prime_card", "58.00", false, false,
-			pendingKey("prime_card", "post-a")),
-	}
-	for index := range bank {
-		bank[index].Posting.Source = "simplefin"
-	}
-	pairs := AuditHistoricalVoids(bank, "prime_card")
-	if len(pairs) != 1 || pairs[0].VoidID != "uuid-void" {
-		t.Fatalf("legacy source pairs = %+v, want the pair flagged", pairs)
-	}
-}

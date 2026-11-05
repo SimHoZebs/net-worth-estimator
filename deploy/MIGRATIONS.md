@@ -221,7 +221,20 @@ creates every table and adds every column on the verified backup candidate.
 Complete repeats read-only. A partial group fails before mutation. `setupdb`
 then validates the complete schema on the candidate. Existing
 `projection_artifacts` tables are preserved when present but are no longer
-required. Previously stored `simplefin` row sources are preserved
-byte-identical; provider identity remains in sync keys, so no reader branch
-depends on the legacy source spelling. Fresh databases need no body work:
-`SetupDatabase` creates the complete schema.
+required. Previously stored `simplefin` row sources are normalized to `banksync` by
+the one-time bank-source script below. Provider identity remains in sync
+keys. Fresh databases need no body work: `SetupDatabase` creates the
+complete schema.
+
+## Bank source normalization (one-time)
+
+Run `backend/scripts/one-time/bank-source/run.sh` with every API writer
+stopped and the real database path. The script backs up the database with
+SQLite's backup API, rewrites `postings.source` and `checkpoints.source`
+from `simplefin` to `banksync`, and fails if any legacy value remains.
+Verify both counts are zero before starting the API. The strict settlement
+matcher requires `banksync`.
+
+Run this on every supported target before deploying the strict matcher.
+Retire the script only after every target records the migration and the
+strict matcher is live.

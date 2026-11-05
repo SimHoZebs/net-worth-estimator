@@ -386,15 +386,3 @@ func TestReconcileSuggestsButDoesNotConvertLodging(t *testing.T) {
 		t.Fatalf("lodging = %+v, want void plus insert", directives)
 	}
 }
-
-func TestReconcileAcceptsLegacyProviderSource(t *testing.T) {
-	bank := []store.BankRow{reconcileBankRow("uuid-pending", "Bistro", "prime_card", "50.00", true, false,
-		pendingKey("prime_card", "old-auth"))}
-	bank[0].Posting.Source = "simplefin"
-	settled := []store.SyncPosting{reconcilePosting("Bistro", "prime_card", "58.00", false, 1785715200)}
-	directives := Reconcile(nil, settled, bank, map[string]bool{"prime_card": true})
-	upserts, converts, voids := directivesByAction(directives)
-	if upserts != 0 || converts != 1 || len(voids) != 0 {
-		t.Fatalf("legacy source = %+v, want one convert", directives)
-	}
-}
