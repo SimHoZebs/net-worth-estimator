@@ -60,6 +60,31 @@ func (s *sqliteStore) SaveProjectionState(state types.ProjectionState) (types.Pr
 	return s.GetProjectionState()
 }
 
+// InitializeProjectionState applies the engine version and freezes the
+// canonical window with conditional updates. Concurrent first requests all
+// observe the winning values, and only the request that changes a column
+// advances the revision. Empty arguments skip that part of the update.
+func (s *sqliteStore) InitializeProjectionState(projectionStart, horizonEnd, scopeID, engineVersion string) (types.ProjectionState, error) {
+	state, err := s.GetProjectionState()
+	if err != nil {
+		return types.ProjectionState{}, err
+	}
+	if engineVersion != "" && state.EngineVersion != engineVersion {
+		if _, err := s.db.Exec(`UPDATE projection_states SET engine_version = ?, revision = revision + 1, dirty_from = ? WHERE id = ? AND user_id = :user_id AND engine_version <> ?`,
+			engineVersion, dirtyDay(state.ProjectionStart), state.ID, engineVersion); err != nil {
+			return types.ProjectionState{}, fmt.Errorf("initialize projection engine: %w", err)
+		}
+	}
+	if projectionStart != "" && state.ProjectionStart == "" {
+		start := dirtyDay(projectionStart)
+		if _, err := s.db.Exec(`UPDATE projection_states SET projection_start = ?, horizon_end = ?, scope_id = ?, revision = revision + 1, dirty_from = CASE WHEN dirty_from = 0 OR dirty_from > ? THEN ? ELSE dirty_from END WHERE id = ? AND user_id = :user_id AND projection_start = ''`,
+			projectionStart, horizonEnd, scopeID, start, start, state.ID); err != nil {
+			return types.ProjectionState{}, fmt.Errorf("initialize projection window: %w", err)
+		}
+	}
+	return s.GetProjectionState()
+}
+
 // SaveDeterministicEvaluations records the deterministic evaluation
 // fingerprint for one revision. The update is conditional: a newer model
 // write wins, and the caller skips publishing its stale build.

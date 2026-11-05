@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
@@ -8,6 +9,41 @@ import (
 
 func newProjectionSlice(fromAt, toAt string, builtRevision int64) types.ProjectionSlice {
 	return types.ProjectionSlice{ProjectionStateID: "default", FromAt: dirtyDay(fromAt), ToAt: dirtyDay(toAt), BuiltRevision: builtRevision, Status: "ready"}
+}
+
+func TestInitializeProjectionStateFreezesOnce(t *testing.T) {
+	d := openSharedTestDatabase(t)
+	s := privateTestPlan(t, d, "initialize")
+	const workers = 16
+	var wait sync.WaitGroup
+	errs := make(chan error, workers)
+	for range workers {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			if _, err := s.InitializeProjectionState("2026-01-01", "2027-01-01", "scope", "v1"); err != nil {
+				errs <- err
+			}
+		}()
+	}
+	wait.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatalf("initialize: %v", err)
+	}
+	state, err := s.GetProjectionState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ProjectionStart != "2026-01-01" || state.HorizonEnd != "2027-01-01" || state.ScopeID != "scope" {
+		t.Fatalf("window = %+v", state)
+	}
+	if state.Revision != 1 {
+		t.Fatalf("concurrent initialization advanced revision to %d", state.Revision)
+	}
+	if state.DirtyFrom != dirtyDay("2026-01-01") {
+		t.Fatalf("dirty from = %d", state.DirtyFrom)
+	}
 }
 
 func TestProjectionStateIsolation(t *testing.T) {

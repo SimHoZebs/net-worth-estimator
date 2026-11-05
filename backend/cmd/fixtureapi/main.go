@@ -146,7 +146,9 @@ func main() {
 		log.Fatalf("configure fixture receipt source: %v", err)
 	}
 	// A reset must not interleave with an in-flight request holding the store.
-	var mu sync.Mutex
+	// Normal requests share the read side; reset and social seeds take the
+	// write side so they never clear rows under a projection build.
+	var mu sync.RWMutex
 	live := &switcher{}
 
 	restore := func(nextReadOnly bool, bankTransactions []simplefin.Transaction, bulkOverride *string) error {
@@ -377,7 +379,11 @@ func main() {
 			"model": modelPath,
 		})
 	}))
-	mux.Handle("/", fixtureHandler(live))
+	mux.Handle("/", fixtureHandler(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		mu.RLock()
+		defer mu.RUnlock()
+		live.ServeHTTP(writer, request)
+	})))
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),

@@ -106,14 +106,7 @@ func (s *handler) ensureCanonicalState(settings *types.ProjectionRuntimeSettings
 		return state, false, err
 	}
 	if state.EngineVersion != unifiedEngineVersion {
-		state.EngineVersion = unifiedEngineVersion
-		if _, err := s.store.SaveProjectionState(state); err != nil {
-			return state, false, err
-		}
-		if _, err := s.store.MarkProjectionDirty(0); err != nil {
-			return state, false, err
-		}
-		state, err = s.store.GetProjectionState()
+		state, err = s.store.InitializeProjectionState("", "", "", unifiedEngineVersion)
 		if err != nil {
 			return state, false, err
 		}
@@ -122,16 +115,9 @@ func (s *handler) ensureCanonicalState(settings *types.ProjectionRuntimeSettings
 		if settings.FallbackProjectionStartDate == "" {
 			return state, false, fmt.Errorf("canonical state needs a fallback projection start date")
 		}
-		state.ProjectionStart = string(settings.FallbackProjectionStartDate)
-		state.HorizonEnd = domain.AddYearsClamped(state.ProjectionStart, settings.HorizonYears)
-		state.ScopeID = s.resourceID
-		if _, err := s.store.SaveProjectionState(state); err != nil {
-			return state, false, err
-		}
-		if _, err := s.store.MarkProjectionDirty(0); err != nil {
-			return state, false, err
-		}
-		state, err = s.store.GetProjectionState()
+		start := string(settings.FallbackProjectionStartDate)
+		horizonEnd := domain.AddYearsClamped(start, settings.HorizonYears)
+		state, err = s.store.InitializeProjectionState(start, horizonEnd, s.resourceID, unifiedEngineVersion)
 		if err != nil {
 			return state, false, err
 		}

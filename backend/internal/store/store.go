@@ -161,6 +161,10 @@ type Store interface {
 	// Unified projection state: single dirty date plus slice manifest.
 	GetProjectionState() (types.ProjectionState, error)
 	SaveProjectionState(state types.ProjectionState) (types.ProjectionState, error)
+	// InitializeProjectionState version-stamps the state and freezes the
+	// canonical window once. Conditional updates make concurrent first
+	// requests idempotent.
+	InitializeProjectionState(projectionStart, horizonEnd, scopeID, engineVersion string) (types.ProjectionState, error)
 	MarkProjectionDirty(dirtyFrom int64) (types.ProjectionState, error)
 	PublishProjection(revision int64) (types.ProjectionState, error)
 	ListProjectionSlices() ([]types.ProjectionSlice, error)
