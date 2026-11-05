@@ -49,6 +49,9 @@ func TestDeploymentProxyLoginWritesStreamsAndRestart(t *testing.T) {
 			edge := httptest.NewUnstartedServer(nil)
 			publicURL := "https://" + edge.Listener.Addr().String()
 			edge.Config.Handler = &httputil.ReverseProxy{
+				// The test restarts the backend. A pooled connection to the old
+				// listener would make the next proxied POST fail with EOF.
+				Transport: &http.Transport{DisableKeepAlives: true},
 				Rewrite: func(pr *httputil.ProxyRequest) {
 					pr.SetURL(upstream.Load())
 					pr.SetXForwarded()
