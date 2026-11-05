@@ -7,8 +7,8 @@ import {
 	householdValueStyles,
 } from "./householdStyles.ts";
 import type {
-	PaycheckDecomposition,
 	SafeSpendingHeroes,
+	StatementFunding,
 } from "./safeSpendingDetailModel.ts";
 import { SAFE_SPENDING_LABELS as labels } from "./safeSpendingLabels.ts";
 
@@ -17,19 +17,22 @@ const budgetMoney = (amount: number | null) =>
 
 export function HouseholdBudgetSummary({
 	heroes,
-	paycheck,
+	reserve,
+	funding,
 }: {
 	heroes: SafeSpendingHeroes;
-	paycheck: PaycheckDecomposition;
+	reserve: number;
+	/** The payday bundle that settles the closed statement. */
+	funding: StatementFunding;
 }) {
-	// The next paycheck covers the closed statement. New-cycle charges remain
-	// separate from this allocation and from the existing cycle allowance.
+	// The closed statement is settled by the payday bundle arriving after it
+	// closed; the bills window is the following calendar month.
 	const remainder = paycheckBeforeReserve({
-		paycheck: paycheck.paycheck,
-		fixedObligations: paycheck.fixed,
+		paycheck: funding.paycheck,
+		fixedObligations: funding.fixedBills,
 		closedTotal: heroes.closedCycle.total,
 	});
-	const unallocated = remainder === null ? null : remainder - paycheck.reserve;
+	const unallocated = remainder === null ? null : remainder - reserve;
 	return (
 		<section
 			className="@container grid gap-3"
@@ -38,32 +41,28 @@ export function HouseholdBudgetSummary({
 			<div className={householdPanelStyles()}>
 				<div className="flex items-center justify-between gap-2 text-xs font-bold tracking-wide text-muted uppercase">
 					<span>
-						{labels.nextPaycheck}
-						{heroes.paycheckDate && (
+						{labels.paidBy}
+						{funding.date && (
 							<>
 								{" "}
-								·{" "}
-								<time dateTime={heroes.paycheckDate}>
-									{monthDay(heroes.paycheckDate)}
-								</time>
-								{heroes.paycheckEndDate &&
-									heroes.paycheckEndDate !== heroes.paycheckDate && (
-										<>
-											{" – "}
-											<time dateTime={heroes.paycheckEndDate}>
-												{monthDay(heroes.paycheckEndDate)}
-											</time>
-										</>
-									)}
+								· <time dateTime={funding.date}>{monthDay(funding.date)}</time>
+								{funding.endDate && funding.endDate !== funding.date && (
+									<>
+										{" – "}
+										<time dateTime={funding.endDate}>
+											{monthDay(funding.endDate)}
+										</time>
+									</>
+								)}
 							</>
 						)}
 					</span>
 					<CalendarDays size={19} aria-hidden="true" />
 				</div>
 				<strong className="text-4xl leading-tight tracking-tight tabular-nums">
-					{exactMoney(paycheck.paycheck)}
+					{exactMoney(funding.paycheck)}
 				</strong>
-				{!heroes.paycheckDate && (
+				{!funding.date && (
 					<p className="text-xs text-muted">Date not available</p>
 				)}
 				{remainder !== null && (
@@ -73,7 +72,7 @@ export function HouseholdBudgetSummary({
 						segments={[
 							{
 								label: labels.fixedBills,
-								amount: paycheck.fixed,
+								amount: funding.fixedBills,
 								tone: "blue",
 								pattern: "stripes",
 							},
@@ -90,14 +89,14 @@ export function HouseholdBudgetSummary({
 								pattern: "solid",
 							},
 						]}
-						ariaLabel={`${labels.nextPaycheck} ${exactMoney(paycheck.paycheck)}, ${labels.fixedBills} ${exactMoney(paycheck.fixed)}, ${labels.closedCards} ${budgetMoney(heroes.closedCycle.total)}, ${labels.paycheckBeforeReserve} ${exactMoney(remainder)}`}
+						ariaLabel={`${labels.paidBy} ${exactMoney(funding.paycheck)}, ${labels.fixedBills} ${exactMoney(funding.fixedBills)}, ${labels.closedCards} ${budgetMoney(heroes.closedCycle.total)}, ${labels.paycheckBeforeReserve} ${exactMoney(remainder)}`}
 					/>
 				)}
 				<dl className="m-0 grid grid-cols-3 gap-x-2 gap-y-4 @max-xs:grid-cols-2">
 					<div>
 						<dt className="mb-2 text-xs text-muted">{labels.fixedBills}</dt>
 						<dd className={householdValueStyles()}>
-							{exactMoney(paycheck.fixed)}
+							{exactMoney(funding.fixedBills)}
 						</dd>
 					</div>
 					<div>
@@ -127,9 +126,7 @@ export function HouseholdBudgetSummary({
 				<dl className="mt-1 mb-0 grid grid-cols-2 items-end gap-x-2 gap-y-4 border-t border-line pt-5">
 					<div>
 						<dt className="mb-2 text-xs text-muted">{labels.reserve}</dt>
-						<dd className={householdValueStyles()}>
-							{exactMoney(paycheck.reserve)}
-						</dd>
+						<dd className={householdValueStyles()}>{exactMoney(reserve)}</dd>
 					</div>
 					<div className="text-end">
 						<dt className="mb-2 text-xs text-muted">{labels.unallocated}</dt>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
 import { transactionFixture } from "../mocks/projection.ts";
 import type { Transaction } from "./model.ts";
-import { safeSpendingIncome } from "./safeSpendingIncome.ts";
+import { incomeBundleAfter, safeSpendingIncome } from "./safeSpendingIncome.ts";
 
 function rule(id: string, overrides: Partial<Transaction> = {}): Transaction {
 	return {
@@ -190,5 +190,59 @@ describe("safeSpendingIncome", () => {
 		const result = safeSpendingIncome({ ...input, transactions: [] });
 		expect(result.candidates).toHaveLength(3);
 		expect(result.paycheck).toBeNull();
+	});
+});
+
+describe("incomeBundleAfter", () => {
+	it("sums the earliest occurrence per selected source strictly after the boundary", () => {
+		expect(
+			incomeBundleAfter({
+				...input,
+				afterIso: "2026-09-19",
+			}),
+		).toEqual({ date: "2026-10-15", endDate: "2026-10-20", amount: 5000 });
+		expect(
+			incomeBundleAfter({
+				...input,
+				afterIso: "2026-10-19",
+			}),
+		).toEqual({ date: "2026-10-20", endDate: "2026-11-15", amount: 5300 });
+	});
+
+	it("excludes payments on the boundary day itself", () => {
+		expect(
+			incomeBundleAfter({
+				...input,
+				afterIso: "2026-10-20",
+				incomeScheduleIds: ["partner"],
+			}),
+		).toEqual({ date: "2026-11-20", endDate: "2026-11-20", amount: 2400 });
+	});
+
+	it("returns null when no selected occurrence follows the boundary", () => {
+		expect(
+			incomeBundleAfter({
+				...input,
+				afterIso: "2026-11-20",
+			}),
+		).toBeNull();
+	});
+
+	it("keeps eligibility anchored to today, not the boundary", () => {
+		// `starts-late` begins after today but before the boundary. Anchoring
+		// eligibility to the boundary would admit it and add its first
+		// occurrence to the bundle; the today anchor keeps it out.
+		expect(
+			incomeBundleAfter({
+				...input,
+				rules: [...rules, rule("starts-late", { startDate: "2026-10-15" })],
+				transactions: [
+					...input.transactions,
+					payment("starts-late", "2026-10-25", 700),
+				],
+				afterIso: "2026-10-24",
+				incomeScheduleIds: ["salary", "starts-late"],
+			}),
+		).toEqual({ date: "2026-11-15", endDate: "2026-11-15", amount: 3300 });
 	});
 });
