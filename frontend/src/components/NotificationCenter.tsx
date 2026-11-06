@@ -15,7 +15,7 @@ function ToastCard({ toast }: { toast: Toast }) {
 		<div
 			role={toast.kind === "error" ? "alert" : "status"}
 			className={mergeStyles(
-				"pointer-events-auto flex max-w-lg items-center gap-2 rounded-surface border border-solid py-3 pr-3 pl-4 text-xs shadow-lg",
+				"pointer-events-auto relative z-[9999] flex max-w-lg items-center gap-2 rounded-surface border border-solid py-3 pr-3 pl-4 text-xs shadow-lg",
 				toastToneStyles[toast.kind],
 			)}
 		>
@@ -54,10 +54,10 @@ export function NotificationCenter() {
 	const items = useNotifications((state) => state.items);
 	if (!items.length) return null;
 	return (
-		<>
+		<div className="pointer-events-auto fixed right-3 bottom-3 z-[9999] flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-3 sm:right-6 sm:bottom-5 xl:right-8 print:hidden">
 			{items.map((toast) => (
 				<ToastCard key={toast.id} toast={toast} />
 			))}
-		</>
+		</div>
 	);
 }

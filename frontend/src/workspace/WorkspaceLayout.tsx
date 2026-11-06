@@ -30,7 +30,7 @@ export function WorkspaceLayout({
 			>
 				{navigation(close)}
 			</Drawer>
-			<div className="ml-(--sidebar) flex min-h-dvh flex-col print:ml-0">
+			<div className="relative ml-(--sidebar) flex min-h-dvh flex-col print:ml-0">
 				{header(show)}
 				<main
 					id="main-content"
@@ -38,9 +38,7 @@ export function WorkspaceLayout({
 				>
 					{children}
 				</main>
-				<div className="pointer-events-none sticky bottom-3 z-50 mx-auto flex w-full max-w-7xl flex-col items-end gap-3 px-5 empty:hidden sm:bottom-5 sm:px-6 xl:px-8 print:hidden">
-					<NotificationCenter />
-				</div>
+				<NotificationCenter />
 			</div>
 		</div>
 	);
