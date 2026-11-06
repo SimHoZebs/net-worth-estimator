@@ -24,6 +24,17 @@ describe("cross-tab session signals", () => {
 				newValue: "untrusted-resource",
 			}),
 		);
+		expect(check).not.toHaveBeenCalled();
+		window.dispatchEvent(
+			new StorageEvent("storage", {
+				key: "waypoint.session-change.v1",
+				newValue: JSON.stringify({
+					type: "session-changed",
+					source: "another-document",
+				}),
+			}),
+		);
+		expect(check).toHaveBeenCalledTimes(1);
 		window.dispatchEvent(new StorageEvent("storage", { key: null }));
 		expect(check).toHaveBeenCalledTimes(2);
 		stop();
@@ -31,7 +42,7 @@ describe("cross-tab session signals", () => {
 		expect(check).toHaveBeenCalledTimes(2);
 	});
 
-	it("publishes no identity or financial data and releases broadcast channels", () => {
+	it("publishes no identity or financial data and ignores its own broadcast", () => {
 		const channels: {
 			onmessage: ((event: MessageEvent) => void) | null;
 			postMessage: ReturnType<typeof vi.fn>;
@@ -49,16 +60,22 @@ describe("cross-tab session signals", () => {
 		const check = vi.fn();
 		const stop = listenForSessionChanges(check);
 		announceSessionChange();
-		expect(channels[1]!.postMessage).toHaveBeenCalledExactlyOnceWith(
-			"session-changed",
-		);
+		const signal = channels[1]!.postMessage.mock.calls[0]![0];
+		expect(Object.keys(signal).sort()).toEqual(["source", "type"]);
+		expect(signal.type).toBe("session-changed");
 		expect(channels[1]!.close).toHaveBeenCalledOnce();
+		// The announcing document hears its own message through a second
+		// channel object; it must not schedule a redundant verification.
+		channels[0]!.onmessage?.(new MessageEvent("message", { data: signal }));
+		expect(check).not.toHaveBeenCalled();
 		channels[0]!.onmessage?.(
 			new MessageEvent("message", { data: { resource: "untrusted" } }),
 		);
 		expect(check).not.toHaveBeenCalled();
 		channels[0]!.onmessage?.(
-			new MessageEvent("message", { data: "session-changed" }),
+			new MessageEvent("message", {
+				data: { type: "session-changed", source: "another-document" },
+			}),
 		);
 		expect(check).toHaveBeenCalledOnce();
 		stop();

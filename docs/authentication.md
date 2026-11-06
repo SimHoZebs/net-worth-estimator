@@ -30,7 +30,7 @@ fields stay local to their mounted form.
 See [user-scoped authorization](authorization.md) for the resource and migration
 contract. The global read-only switch still rejects editor writes.
 
-The sidebar offers sign-in and user creation for guests. Casdoor owns signup,
+The Configs account section offers sign-in and user creation for guests. Sign-in is never an automatic startup gate. Casdoor owns signup,
 password checks, and passkeys. Built-in administrator signup stays disabled.
 The default signup form does not collect email or require a mail service.
 

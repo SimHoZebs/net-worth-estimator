@@ -65,24 +65,12 @@ const guestUser = { subject: GUEST_USER_SUBJECT, name: "Guest" };
 
 beforeEach(() => vi.stubGlobal("BroadcastChannel", undefined));
 
-let savedVisibilityState: PropertyDescriptor | undefined;
-let visibilityStateTouched = false;
-
 afterEach(() => {
 	cleanup();
 	resetServerQueryCache();
 	resetNotifications();
 	vi.unstubAllGlobals();
 	vi.clearAllMocks();
-	if (visibilityStateTouched) {
-		if (savedVisibilityState) {
-			Object.defineProperty(document, "visibilityState", savedVisibilityState);
-		} else {
-			Reflect.deleteProperty(document, "visibilityState");
-		}
-		savedVisibilityState = undefined;
-		visibilityStateTouched = false;
-	}
 });
 
 function status(body: unknown, code = 200) {
@@ -127,7 +115,7 @@ describe("provider-independent authentication boundary", () => {
 		).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("redirects denied guests to sign in when access is revoked", async () => {
+	it("shows a retry screen for a denied guest without redirecting", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -146,15 +134,21 @@ describe("provider-independent authentication boundary", () => {
 			</AuthBoundary>,
 		);
 		expect(
-			await screen.findByRole("button", { name: "Continue to sign in" }),
+			await screen.findByRole("heading", {
+				name: "Workspace access is unavailable",
+			}),
 		).toBeTruthy();
+		expect(screen.getByRole("alert").textContent).toBe(
+			"This user does not have access.",
+		);
 		expect(
-			screen.getByText("Redirecting for sign-in or account creation…"),
+			screen.getByRole("button", { name: "Retry access check" }),
 		).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
 		expect(screen.queryByText("Private workspace")).toBeNull();
-		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalled());
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("starts only one automatic sign-in across re-verification", async () => {
+	it("keeps the denied guest screen stable across re-verification", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
@@ -170,38 +164,18 @@ describe("provider-independent authentication boundary", () => {
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		await screen.findByRole("button", { name: "Continue to sign in" });
-		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
-		// Back-button restore, focus, and visibility re-verify the session.
-		// Settle each re-verification first, then assert no second login
-		// started that would orphan the first attempt.
-		const settled = async () => {
-			const calls = fetcher.mock.calls.length;
-			await waitFor(() =>
-				expect(fetcher.mock.calls.length).toBeGreaterThan(calls),
-			);
-			expect(screen.queryByText("Private workspace")).toBeNull();
-		};
-		window.dispatchEvent(new Event("focus"));
-		await settled();
-		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
-		savedVisibilityState = Object.getOwnPropertyDescriptor(
-			document,
-			"visibilityState",
-		);
-		visibilityStateTouched = true;
-		Object.defineProperty(document, "visibilityState", {
-			value: "visible",
-			configurable: true,
+		await screen.findByRole("heading", {
+			name: "Workspace access is unavailable",
 		});
-		document.dispatchEvent(new Event("visibilitychange"));
-		await settled();
-		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
-		const pageshow = new Event("pageshow");
-		Object.defineProperty(pageshow, "persisted", { value: true });
-		window.dispatchEvent(pageshow);
-		await settled();
-		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
+		const calls = fetcher.mock.calls.length;
+		window.dispatchEvent(new Event("focus"));
+		await waitFor(() =>
+			expect(fetcher.mock.calls.length).toBeGreaterThan(calls),
+		);
+		expect(
+			screen.getByRole("heading", { name: "Workspace access is unavailable" }),
+		).toBeTruthy();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 	it("keeps denied accounts closed with retry and sign-out", async () => {
 		const fetcher = vi.fn(async () =>
@@ -392,7 +366,7 @@ describe("provider-independent authentication boundary", () => {
 		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
 		expect(screen.getByText("Private workspace")).toBeTruthy();
 	});
-	it("redirects once when a later check denies a previously allowed guest", async () => {
+	it("shows the retry screen when a later check denies a previously allowed guest", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
@@ -410,8 +384,6 @@ describe("provider-independent authentication boundary", () => {
 		);
 		expect(await screen.findByText("Private workspace")).toBeTruthy();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
-		// Same resource, subject, and permissions with allowed flipped to
-		// false: the same-owner revalidation denial branch owns the redirect.
 		fetcher.mockImplementation(async () =>
 			status({
 				enabled: true,
@@ -423,23 +395,21 @@ describe("provider-independent authentication boundary", () => {
 		);
 		window.dispatchEvent(new Event("focus"));
 		expect(
-			await screen.findByRole("button", { name: "Continue to sign in" }),
+			await screen.findByRole("heading", {
+				name: "Workspace access is unavailable",
+			}),
 		).toBeTruthy();
-		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
-		// A second re-verification lands on the stable prompt.
+		expect(screen.queryByText("Private workspace")).toBeNull();
+		expect(redirectToSignIn).not.toHaveBeenCalled();
+		// A later re-verification keeps the same stable screen.
 		const calls = fetcher.mock.calls.length;
 		window.dispatchEvent(new Event("focus"));
 		await waitFor(() =>
 			expect(fetcher.mock.calls.length).toBeGreaterThan(calls),
 		);
-		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
-		// Manual sign-in retry still works after the single automatic one.
-		fireEvent.click(
-			screen.getByRole("button", { name: "Continue to sign in" }),
-		);
-		expect(redirectToSignIn).toHaveBeenCalledTimes(2);
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("redirects again after the boundary unmounts and mounts again", async () => {
+	it("shows the retry screen again after the boundary unmounts and mounts", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -457,18 +427,22 @@ describe("provider-independent authentication boundary", () => {
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		await screen.findByRole("button", { name: "Continue to sign in" });
-		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
+		await screen.findByRole("heading", {
+			name: "Workspace access is unavailable",
+		});
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 		first.unmount();
 		render(
 			<AuthBoundary>
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		await screen.findByRole("button", { name: "Continue to sign in" });
-		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(2));
+		await screen.findByRole("heading", {
+			name: "Workspace access is unavailable",
+		});
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("redirects once for a denied guest across a strict-mode remount", async () => {
+	it("keeps the denied guest screen across a strict-mode remount", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -488,13 +462,14 @@ describe("provider-independent authentication boundary", () => {
 				</AuthBoundary>
 			</StrictMode>,
 		);
-		await screen.findByRole("button", { name: "Continue to sign in" });
-		await waitFor(() => expect(redirectToSignIn).toHaveBeenCalledTimes(1));
+		await screen.findByRole("heading", {
+			name: "Workspace access is unavailable",
+		});
 		window.dispatchEvent(new Event("focus"));
-		await waitFor(() =>
-			expect(screen.queryByText("Private workspace")).toBeNull(),
-		);
-		expect(redirectToSignIn).toHaveBeenCalledTimes(1);
+		await screen.findByRole("heading", {
+			name: "Workspace access is unavailable",
+		});
+		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 	it("does not redirect on a transient outage for a verified user", async () => {
 		const fetcher = vi.fn(async () =>

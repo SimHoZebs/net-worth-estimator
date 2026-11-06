@@ -7,7 +7,6 @@ import {
 	clearResourceQueryCache,
 	serverQueryClient,
 } from "../state/serverQuery.ts";
-import { hydrateFinancialPreferences } from "../state/useSafeSpendingSettings.ts";
 import {
 	acceptUserScope,
 	userScopeKey,
@@ -21,7 +20,6 @@ import {
 } from "./sessionChanges.ts";
 import type { Session } from "./sessionContext.ts";
 import { discoverSession, sessionScopeInput } from "./sessionDiscovery.ts";
-import { redirectToSignIn } from "./navigation.ts";
 import { dismissKey, notifyError } from "../state/notifications.ts";
 
 interface SessionOwner {
@@ -59,12 +57,6 @@ export function useResourceSession() {
 	const verification = useRef<Verification | null>(null);
 	const signingOut = useRef<LogoutAttempt | null>(null);
 	const mounted = useRef(false);
-	// Automatic sign-in fires at most once per boundary mount. The denial
-	// decision owns the redirect (not a render effect), so re-verification
-	// on focus, visibility, pageshow, or a late allowed->denied transition
-	// lands on the stable prompt instead of starting a second login.
-	const signInRedirected = useRef(false);
-
 	const verify = useCallback(function verifySession(): Promise<void> {
 		verification.current?.controller.abort();
 		const check: Verification = { controller: new AbortController() };
@@ -78,10 +70,9 @@ export function useResourceSession() {
 		// Suspending upfront wiped the UI on every focus event and on
 		// transient outages, which flickered and hid usable data.
 		const pending = previous ? null : suspendUserScope();
-		// Explicit denial owns the automatic sign-in. The flag lives here
-		// in the owner transition (not a render detector or a structural
-		// owner guard) so it stays once-per-mount across owner changes,
-		// re-verification, and every denial branch below.
+		// A denial is terminal for this boundary. Guests are provisioned
+		// automatically, so sign-in stays an explicit Configs action; this
+		// path never starts an identity-provider redirect.
 		const denyAccess = (next: SessionOwner) => {
 			owner.current = next;
 			setSession(next.session);
@@ -89,10 +80,6 @@ export function useResourceSession() {
 				phase: "denied",
 				error: "This user does not have access.",
 			});
-			if (!next.session.authenticated && !signInRedirected.current) {
-				signInRedirected.current = true;
-				redirectToSignIn();
-			}
 		};
 		check.pending = (async () => {
 			try {
@@ -130,12 +117,7 @@ export function useResourceSession() {
 						return;
 					}
 					const verified = acceptUserScope(input, pending!);
-					if (
-						!verified ||
-						!(await hydrateFinancialPreferences(verified)) ||
-						signal.aborted
-					)
-						return;
+					if (!verified || signal.aborted) return;
 					owner.current = next;
 					setSession(next.session);
 					setStatus({ phase: "ready", error: "" });
@@ -181,12 +163,7 @@ export function useResourceSession() {
 					return;
 				}
 				const verified = acceptUserScope(input, hardPending);
-				if (
-					!verified ||
-					!(await hydrateFinancialPreferences(verified)) ||
-					signal.aborted
-				)
-					return;
+				if (!verified || signal.aborted) return;
 				owner.current = next;
 				setSession(next.session);
 				setStatus({ phase: "ready", error: "" });

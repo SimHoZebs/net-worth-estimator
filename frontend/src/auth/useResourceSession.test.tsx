@@ -88,7 +88,7 @@ it("restores requests when resource-change discovery returns to the same user", 
 	expect((await getServerStatus()).data).toEqual({
 		readOnly: false,
 	});
-	expect(fetcher).toHaveBeenCalledTimes(6);
+	expect(fetcher).toHaveBeenCalledTimes(4);
 });
 
 it("blocks an unverified logout redirect and recovers to the guest through an explicit check", async () => {

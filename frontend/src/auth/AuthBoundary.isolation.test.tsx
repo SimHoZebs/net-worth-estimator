@@ -26,6 +26,7 @@ import {
 import { safeSpendingSettingsObserver } from "@/mocks/safeSpendingSettings.ts";
 import { canonicalApiBaseUrl } from "@/auth/resourceScope.ts";
 import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
+import { acceptTestResource } from "@/mocks/resource.ts";
 
 const A = `users/${"a".repeat(64)}`;
 const B = `users/${"b".repeat(64)}`;
@@ -128,7 +129,7 @@ afterEach(() => {
 });
 
 describe("authentication resource isolation", () => {
-	it("waits for resource-owned financial preferences before mounting children", async () => {
+	it("hydrates resource-owned financial preferences alongside the workspace", async () => {
 		let finish: (value: Response) => void = () => {};
 		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
 			if (String(input).endsWith("/v1/safe-spending-settings"))
@@ -150,7 +151,11 @@ describe("authentication resource isolation", () => {
 				),
 			).toBe(true),
 		);
-		expect(screen.queryByTestId("financial-preferences")).toBeNull();
+		// The workspace is already interactive with defaults; the owner's
+		// stored preferences arrive without gating the shell.
+		expect(screen.getByTestId("financial-preferences").textContent).toBe(
+			`${defaultSafeSpendingSettings().reserve}:`,
+		);
 		await act(async () =>
 			finish(
 				response({
@@ -202,7 +207,10 @@ describe("authentication resource isolation", () => {
 			window.dispatchEvent(
 				new StorageEvent("storage", {
 					key: "waypoint.session-change.v1",
-					newValue: "changed",
+					newValue: JSON.stringify({
+						type: "session-changed",
+						source: "another-document",
+					}),
 				}),
 			),
 		);
@@ -236,6 +244,9 @@ describe("authentication resource isolation", () => {
 	});
 
 	it("clears live model and projection state before it first mounts a verified user", async () => {
+		// Seed a previous owner, then suspend: the boot render must not
+		// surface that owner's cached rows under the anonymous key.
+		acceptTestResource();
 		setServerRevisionFixture("previous-account-private-revision");
 		serverQueryClient().setQueryData(userResourceKey("presets"), [
 			{ id: "previous-private-recipe" },
@@ -244,13 +255,16 @@ describe("authentication resource isolation", () => {
 			["old-projection"],
 			"previous-private-result",
 		);
+		suspendUserScope();
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => response(session())),
 		);
 		renderWorkspace();
-		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
-			`${A}:empty`,
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:empty`,
+			),
 		);
 		expect(
 			serverQueryClient().getQueryData(userResourceKey("presets")),
@@ -297,7 +311,10 @@ describe("authentication resource isolation", () => {
 				window.dispatchEvent(
 					new StorageEvent("storage", {
 						key: "waypoint.session-change.v1",
-						newValue: "signal-only",
+						newValue: JSON.stringify({
+							type: "session-changed",
+							source: "another-document",
+						}),
 					}),
 				),
 			);
@@ -322,8 +339,10 @@ describe("authentication resource isolation", () => {
 			await act(async () =>
 				finish(response(session(nextId, nextId !== GUEST_USER_ID), nextId)),
 			);
-			expect((await screen.findByTestId("active-workspace")).textContent).toBe(
-				`${nextId}:empty`,
+			await waitFor(() =>
+				expect(screen.getByTestId("active-workspace").textContent).toBe(
+					`${nextId}:empty`,
+				),
 			);
 			expect(serverQueryClient().getQueryData(oldKey)).toBeUndefined();
 		},
@@ -523,8 +542,10 @@ describe("authentication resource isolation", () => {
 			vi.fn(async () => response(body, A)),
 		);
 		renderWorkspace();
-		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
-			`${A}:empty`,
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:empty`,
+			),
 		);
 		expect(getUserScope().status).toBe("ready");
 	});
@@ -570,8 +591,10 @@ describe("authentication resource isolation", () => {
 				</AuthBoundary>
 			</StrictMode>,
 		);
-		expect((await screen.findByTestId("active-workspace")).textContent).toBe(
-			`${A}:empty`,
+		await waitFor(() =>
+			expect(screen.getByTestId("active-workspace").textContent).toBe(
+				`${A}:empty`,
+			),
 		);
 		expect(getUserScope().status).toBe("ready");
 	});
