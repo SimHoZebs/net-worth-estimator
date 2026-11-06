@@ -8,7 +8,7 @@
 
 ## Subagent model
 
-- ONLY if you are an OpenAI model, set `model: "opencode-go/muse-spark-1.3-contributor"` explicitly on every subagent call. Otherwise, leave it empty.
+- ONLY if you are an OpenAI model, set `model: "openai/gpt-6.1-terra#medium"` explicitly on every subagent call. Otherwise, leave it empty.
 
 ## Latest state only
 
@@ -32,7 +32,8 @@
 - Ship is claim-by-push, not assignment: resolve mechanical conflicts yourself, re-verify, restore foreign files byte-identical. Escalate to the user only for product decisions.
 - Prune only your own worktree and branch after ship lands. Never touch another session's scope.
 - Before any merge, confirm no worktree is mid-rebase or mid-merge.
-- Run the narrowest local checks before you commit, and commit only your own scope. Split semantic commits.
+- Run the narrowest local checks before you commit, and commit only your own scope. Keep each complete semantic chunk in one commit, including fixes found during that feature's development or review. Split only independent changes.
+- A change is independent only if it functions as intended in production as-is, even if all later work stops indefinitely.
 
 ## Start and verify
 
