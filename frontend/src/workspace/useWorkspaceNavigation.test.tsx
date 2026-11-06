@@ -30,12 +30,16 @@ function Harness({ recovery = false }: { recovery?: boolean }) {
 					headingRef={navigation.headingRef}
 				/>
 			)}
-			<button onClick={() => navigation.pushUrl("/accounts?account=checking")}>
+			<button
+				onClick={() =>
+					navigation.pushUrl("/accounts?evidence=account&id=checking")
+				}
+			>
 				Evidence
 			</button>
 			<button
 				onClick={() =>
-					navigation.pushUrl("/accounts?edit-account=checking", {
+					navigation.pushUrl("/accounts?editor=account&id=checking", {
 						kind: "account",
 						id: "checking",
 					})
@@ -43,7 +47,9 @@ function Harness({ recovery = false }: { recovery?: boolean }) {
 			>
 				Edit evidence
 			</button>
-			<button onClick={() => navigation.pushUrl("/accounts?edit-account=new")}>
+			<button
+				onClick={() => navigation.pushUrl("/accounts?editor=account&id=new")}
+			>
 				New account
 			</button>
 			<button onClick={() => navigation.navigate("transactions")}>
@@ -57,17 +63,17 @@ function Harness({ recovery = false }: { recovery?: boolean }) {
 	);
 }
 
-function currentUrl(): string {
-	return `${window.location.pathname}${window.location.search}`;
-}
-
 it("renders one declarative page title and leaves focus alone on overlay navigation", async () => {
 	render(<Harness />);
 	expect(document.title).toBe("Accounts · Waypoint");
 	const evidence = screen.getByRole("button", { name: "Evidence" });
 	evidence.focus();
 	fireEvent.click(evidence);
-	await waitFor(() => expect(currentUrl()).toBe("/accounts?account=checking"));
+	await waitFor(() =>
+		expect(window.location.pathname + window.location.search).toBe(
+			"/accounts?evidence=account&id=checking",
+		),
+	);
 	expect(document.activeElement).toBe(evidence);
 	fireEvent.click(screen.getByRole("button", { name: "Transactions" }));
 	await waitFor(() => expect(document.title).toBe("Transactions · Waypoint"));
@@ -93,16 +99,16 @@ it("scopes the editor return target to its history entry and clears it in ordina
 		window.history.replaceState(
 			editorState,
 			"",
-			"/accounts?edit-account=checking",
+			"/accounts?editor=account&id=checking",
 		);
-		window.dispatchEvent(new PopStateEvent("popstate"));
+		window.dispatchEvent(new Event("popstate"));
 	});
 	expect(screen.getByTestId("return-to").textContent).toBe(
 		'{"kind":"account","id":"checking"}',
 	);
 	act(() => {
 		window.history.replaceState(editorState, "", "/transactions");
-		window.dispatchEvent(new PopStateEvent("popstate"));
+		window.dispatchEvent(new Event("popstate"));
 	});
 	expect(screen.getByTestId("return-to").textContent).toBe("null");
 });

@@ -44,8 +44,8 @@ export function useMobileNavigation() {
 	const mobile = useMediaQuery(viewportQueries.belowMd, onViewportChange);
 	useEffect(() => {
 		const close = () => setNavOpen(false);
-		window.addEventListener("hashchange", close);
-		return () => window.removeEventListener("hashchange", close);
+		window.addEventListener("popstate", close);
+		return () => window.removeEventListener("popstate", close);
 	}, []);
 	// Opening gesture only: a mostly-horizontal rightward swipe opens the
 	// drawer. Closing (leftward swipe, Escape, backdrop, focus) is owned by

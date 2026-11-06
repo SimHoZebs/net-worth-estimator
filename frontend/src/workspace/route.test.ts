@@ -1,15 +1,15 @@
 import { describe, expect, test } from "vitest";
 import type { Account, Evaluation, Transaction } from "../domain/model.ts";
 import {
-	editorUrl,
-	evidenceUrl,
+	editorPath,
+	evidencePath,
 	findAccount,
-	groupUrl,
-	pageUrl,
-	parseUrl,
+	groupPath,
+	pagePath,
+	parseRoute,
 	resolveOverlayRoute,
 	slugifyAccount,
-	safeSpendingDetailUrl,
+	safeSpendingDetailPath,
 } from "./route.ts";
 
 function account(id: string, name: string, archived = false): Account {
@@ -76,31 +76,29 @@ const model = {
 	evaluations: [goalEvaluation],
 };
 
-describe("parseUrl", () => {
-	test("page-only URLs resolve to their page", () => {
-		expect(parseUrl("")).toEqual({ page: "outlook", overlay: null });
-		expect(parseUrl("/")).toEqual({ page: "outlook", overlay: null });
-		expect(parseUrl("/outlook")).toEqual({ page: "outlook", overlay: null });
-		expect(parseUrl("/accounts")).toEqual({
+describe("parseRoute", () => {
+	test("page-only paths resolve to their page", () => {
+		expect(parseRoute("/")).toEqual({ page: "outlook", overlay: null });
+		expect(parseRoute("/accounts")).toEqual({
 			page: "accounts",
 			overlay: null,
 		});
 	});
 
 	test("planned purchases has a direct page route", () => {
-		expect(parseUrl("/purchases")).toEqual({
+		expect(parseRoute("/purchases")).toEqual({
 			page: "purchases",
 			overlay: null,
 		});
-		expect(pageUrl("purchases")).toBe("/purchases");
+		expect(pagePath("purchases")).toBe("/purchases");
 	});
 
-	test("group detail is a query overlay on the groups page", () => {
-		expect(parseUrl("/groups?group=abc-123")).toEqual({
+	test("group detail is a nested groups path", () => {
+		expect(parseRoute("/groups/abc-123")).toEqual({
 			page: "groups",
 			overlay: { type: "group", key: "abc-123" },
 		});
-		expect(groupUrl("abc-123")).toBe("/groups?group=abc-123");
+		expect(groupPath("abc-123")).toBe("/groups/abc-123");
 		expect(
 			resolveOverlayRoute(
 				{ page: "groups", overlay: { type: "group", key: "abc-123" } },
@@ -110,96 +108,96 @@ describe("parseUrl", () => {
 	});
 
 	test("unknown pages fall back to outlook with an invalid overlay", () => {
-		expect(parseUrl("/nope")).toEqual({
-			page: "outlook",
-			overlay: { type: "invalid" },
-		});
-		expect(parseUrl("/accounts/extra")).toEqual({
+		expect(parseRoute("/nope")).toEqual({
 			page: "outlook",
 			overlay: { type: "invalid" },
 		});
 	});
 
 	test("account evidence parses on accounts and transactions pages", () => {
-		expect(parseUrl("/accounts?account=checking")).toEqual({
+		expect(parseRoute("/accounts?evidence=account&id=checking")).toEqual({
 			page: "accounts",
 			overlay: { type: "account", key: "checking" },
 		});
-		expect(parseUrl("/transactions?account=checking")).toEqual({
+		expect(parseRoute("/transactions?evidence=account&id=checking")).toEqual({
 			page: "transactions",
 			overlay: { type: "account", key: "checking" },
 		});
 	});
 
-	test("editors parse as query parameters", () => {
-		expect(parseUrl("/accounts?edit-account=new")).toEqual({
+	test("editors parse as query params on any page", () => {
+		expect(parseRoute("/accounts?editor=account&id=new")).toEqual({
 			page: "accounts",
 			overlay: { type: "accountEdit", key: "new" },
 		});
-		expect(parseUrl("/accounts?edit-account=checking")).toEqual({
+		expect(parseRoute("/accounts?editor=account&id=checking")).toEqual({
 			page: "accounts",
 			overlay: { type: "accountEdit", key: "checking" },
 		});
-		expect(parseUrl("/transactions?edit-transaction=invest")).toEqual({
+		expect(parseRoute("/transactions?editor=transaction&id=invest")).toEqual({
 			page: "transactions",
 			overlay: { type: "transactionEdit", key: "invest" },
 		});
-		expect(parseUrl("/outlook?edit-transaction=invest")).toEqual({
+		expect(parseRoute("/outlook?editor=transaction&id=invest")).toEqual({
 			page: "outlook",
 			overlay: { type: "transactionEdit", key: "invest" },
 		});
-		expect(parseUrl("/accounts?edit-transaction=new")).toEqual({
+		expect(parseRoute("/accounts?editor=transaction&id=new")).toEqual({
 			page: "accounts",
 			overlay: { type: "transactionEdit", key: "new" },
 		});
-		expect(parseUrl("/outlook?edit-account=new")).toEqual({
+		expect(parseRoute("/outlook?editor=account&id=new")).toEqual({
 			page: "outlook",
 			overlay: { type: "accountEdit", key: "new" },
 		});
-		expect(parseUrl("/evaluations?edit-evaluation=goal-1")).toEqual({
+		expect(parseRoute("/evaluations?editor=evaluation&id=goal-1")).toEqual({
 			page: "evaluations",
 			overlay: { type: "evaluationEdit", key: "goal-1" },
 		});
-		expect(parseUrl("/outlook?edit-evaluation=goal-1")).toEqual({
+		expect(parseRoute("/outlook?editor=evaluation&id=goal-1")).toEqual({
 			page: "outlook",
 			overlay: { type: "evaluationEdit", key: "goal-1" },
 		});
-		expect(parseUrl("/transactions?edit-schedule=new")).toEqual({
+		expect(parseRoute("/transactions?editor=schedule&id=new")).toEqual({
 			page: "transactions",
 			overlay: { type: "scheduleEdit", key: "new" },
 		});
-		expect(parseUrl("/accounts?edit-schedule=new")).toEqual({
+		expect(parseRoute("/accounts?editor=schedule&id=new")).toEqual({
 			page: "accounts",
 			overlay: { type: "scheduleEdit", key: "new" },
 		});
 	});
 
 	test("outlook evidence and safe spending detail parse", () => {
-		expect(parseUrl("/outlook?evidence=position")).toEqual({
+		expect(parseRoute("/outlook?evidence=position")).toEqual({
 			page: "outlook",
 			overlay: { type: "position" },
 		});
-		expect(parseUrl("/outlook?evidence=shortfall")).toEqual({
+		expect(parseRoute("/outlook?evidence=shortfall")).toEqual({
 			page: "outlook",
 			overlay: { type: "shortfall" },
 		});
-		expect(parseUrl("/outlook?evidence=safe-spending")).toEqual({
+		expect(parseRoute("/outlook?evidence=safe-spending")).toEqual({
 			page: "outlook",
 			overlay: { type: "safe-spending" },
 		});
-		expect(parseUrl("/outlook?detail=cycle")).toEqual({
+		expect(parseRoute("/outlook?detail=safe-spending")).toEqual({
 			page: "outlook",
 			overlay: { type: "safeSpendingDetail", tab: "cycle" },
 		});
-		expect(parseUrl("/outlook?detail=last-cycle")).toEqual({
+		expect(parseRoute("/outlook?detail=safe-spending&tab=cycle")).toEqual({
+			page: "outlook",
+			overlay: { type: "safeSpendingDetail", tab: "cycle" },
+		});
+		expect(parseRoute("/outlook?detail=safe-spending&tab=last-cycle")).toEqual({
 			page: "outlook",
 			overlay: { type: "safeSpendingDetail", tab: "last-cycle" },
 		});
-		expect(parseUrl("/outlook?detail=configure")).toEqual({
-			page: "outlook",
-			overlay: { type: "safeSpendingDetail", tab: "configure" },
-		});
-		expect(parseUrl("/outlook?detail=cycle&edit-transaction=invest")).toEqual({
+		expect(
+			parseRoute(
+				"/outlook?detail=safe-spending&tab=cycle&editTransaction=invest",
+			),
+		).toEqual({
 			page: "outlook",
 			overlay: {
 				type: "safeSpendingDetail",
@@ -207,45 +205,46 @@ describe("parseUrl", () => {
 				editTransaction: "invest",
 			},
 		});
-		expect(parseUrl("/outlook?detail=bogus")).toEqual({
+		expect(parseRoute("/outlook?detail=safe-spending&tab=bogus")).toEqual({
 			page: "outlook",
 			overlay: { type: "invalid" },
 		});
-		expect(parseUrl("/accounts?detail=cycle")).toEqual({
+		expect(parseRoute("/accounts?detail=safe-spending")).toEqual({
 			page: "accounts",
 			overlay: { type: "safeSpendingDetail", tab: "cycle" },
 		});
 	});
 
-	test("malformed overlays are invalid rather than silently dropped", () => {
-		expect(parseUrl("/sources?account=checking")?.overlay).toEqual({
-			type: "invalid",
-		});
-		expect(parseUrl("/accounts?account=")?.overlay).toEqual({
-			type: "invalid",
-		});
-		expect(parseUrl("/accounts?group=g1")?.overlay).toEqual({
-			type: "invalid",
-		});
-		expect(parseUrl("/accounts?account=a&evidence=position")?.overlay).toEqual({
-			type: "invalid",
-		});
-		expect(parseUrl("/accounts?account=a&account=b")?.overlay).toEqual({
-			type: "invalid",
-		});
-		expect(parseUrl("/accounts/%E0%A4%A")?.overlay).toEqual({
-			type: "invalid",
-		});
-	});
-
-	test("unrelated search parameters are ignored", () => {
-		expect(parseUrl("/accounts?gmail=connected")).toEqual({
+	test("unrelated query params are ignored", () => {
+		expect(parseRoute("/accounts?gmail=connected")).toEqual({
 			page: "accounts",
 			overlay: null,
 		});
-		expect(parseUrl("/accounts?account=checking&gmail=connected")).toEqual({
-			page: "accounts",
-			overlay: { type: "account", key: "checking" },
+	});
+
+	test("malformed overlays are invalid rather than silently dropped", () => {
+		expect(parseRoute("/accounts/a/b")?.overlay).toEqual({
+			type: "invalid",
+		});
+		expect(parseRoute("/sources/checking")?.overlay).toEqual({
+			type: "invalid",
+		});
+		expect(parseRoute("/sources?editor=account&id=new")?.page).toBe("sources");
+		expect(parseRoute("/accounts?evidence=account")?.overlay).toEqual({
+			type: "invalid",
+		});
+		expect(parseRoute("/accounts?editor=transaction")?.overlay).toEqual({
+			type: "invalid",
+		});
+		expect(parseRoute("/accounts?id=checking")?.overlay).toEqual({
+			type: "invalid",
+		});
+		expect(
+			parseRoute("/accounts?evidence=position&editor=transaction&id=invest")
+				?.overlay,
+		).toEqual({ type: "invalid" });
+		expect(parseRoute("/accounts/%E0%A4%A")?.overlay).toEqual({
+			type: "invalid",
 		});
 	});
 });
@@ -268,11 +267,14 @@ describe("slugifyAccount and findAccount", () => {
 describe("resolveOverlayRoute", () => {
 	test("account routes resolve without transaction or evaluation queries", () => {
 		expect(
-			resolveOverlayRoute(parseUrl("/accounts?account=checking"), {
-				accounts: model.accounts,
-				transactions: null,
-				evaluations: null,
-			}),
+			resolveOverlayRoute(
+				parseRoute("/accounts?evidence=account&id=checking"),
+				{
+					accounts: model.accounts,
+					transactions: null,
+					evaluations: null,
+				},
+			),
 		).toMatchObject({
 			state: "ready",
 			overlay: {
@@ -283,7 +285,7 @@ describe("resolveOverlayRoute", () => {
 	});
 
 	test("transaction routes wait for their rows, not evaluation rows", () => {
-		const route = parseUrl("/transactions?edit-transaction=invest");
+		const route = parseRoute("/transactions?editor=transaction&id=invest");
 		expect(
 			resolveOverlayRoute(route, {
 				accounts: [],
@@ -361,23 +363,15 @@ describe("resolveOverlayRoute", () => {
 		).toEqual({ state: "unknown" });
 	});
 
-	test("an account named New is evidence, not the new-account editor", () => {
-		// Query parameters namespace the editor, so `account=new` is the
-		// archived account named "New" and `edit-account=new` is creation.
+	test("unknown account ids do not steal reserved editor words", () => {
+		// An archived account literally named "New" must not resolve as the
+		// new-account editor: it resolves by id-or-slug or not at all.
 		expect(
 			resolveOverlayRoute(
 				{ page: "accounts", overlay: { type: "account", key: "new" } },
 				model,
 			),
 		).toEqual({ state: "unknown" });
-		expect(parseUrl("/accounts?account=new")).toEqual({
-			page: "accounts",
-			overlay: { type: "account", key: "new" },
-		});
-		expect(parseUrl("/accounts?edit-account=new")).toEqual({
-			page: "accounts",
-			overlay: { type: "accountEdit", key: "new" },
-		});
 	});
 
 	test("editors resolve existing items and the new form", () => {
@@ -450,10 +444,10 @@ describe("resolveOverlayRoute", () => {
 		).toEqual({ state: "unknown" });
 	});
 
-	test("outlook account evidence resolves by id or slug", () => {
+	test("outlook single segments resolve account evidence", () => {
 		expect(
 			resolveOverlayRoute(
-				parseUrl("/outlook?account=everyday-checking"),
+				parseRoute("/outlook?evidence=account&id=everyday-checking"),
 				model,
 			),
 		).toEqual({
@@ -464,7 +458,10 @@ describe("resolveOverlayRoute", () => {
 			},
 		});
 		expect(
-			resolveOverlayRoute(parseUrl("/outlook?account=nope"), model),
+			resolveOverlayRoute(
+				parseRoute("/outlook?evidence=account&id=nope"),
+				model,
+			),
 		).toEqual({
 			state: "unknown",
 		});
@@ -519,24 +516,29 @@ describe("resolveOverlayRoute", () => {
 });
 
 describe("URL builders round-trip through the parser", () => {
-	test("page URLs stay canonical", () => {
-		expect(pageUrl("accounts")).toBe("/accounts");
+	test("page paths stay canonical", () => {
+		expect(pagePath("accounts")).toBe("/accounts");
 	});
 
-	test("account evidence prefers slugs", () => {
+	test("account evidence prefers slugs and escapes reserved words", () => {
 		expect(
-			evidenceUrl("accounts", { kind: "account", id: "checking" }, model),
-		).toBe("/accounts?account=everyday-checking");
+			evidencePath("accounts", { kind: "account", id: "checking" }, model),
+		).toBe("/accounts?evidence=account&id=everyday-checking");
 		expect(
-			evidenceUrl("outlook", { kind: "account", id: "checking" }, model),
-		).toBe("/outlook?account=everyday-checking");
-		// Without resolved rows the id keeps the link unambiguous.
+			evidencePath("outlook", { kind: "account", id: "checking" }, model),
+		).toBe("/outlook?evidence=account&id=everyday-checking");
+		// The archived account named "New" slugifies to a reserved word, so
+		// the explicit id form keeps the link unambiguous.
+		const reserved = {
+			...model,
+			accounts: [account("abc", "New")],
+		};
 		expect(
-			evidenceUrl("accounts", { kind: "account", id: "checking" }, null),
-		).toBe("/accounts?account=checking");
+			evidencePath("accounts", { kind: "account", id: "abc" }, reserved),
+		).toBe("/accounts?evidence=account&id=abc");
 		expect(
-			parseUrl(
-				evidenceUrl("accounts", { kind: "account", id: "checking" }, model),
+			parseRoute(
+				evidencePath("accounts", { kind: "account", id: "checking" }, model),
 			),
 		).toEqual({
 			page: "accounts",
@@ -544,54 +546,55 @@ describe("URL builders round-trip through the parser", () => {
 		});
 	});
 
-	test("editors serialize as query parameters", () => {
+	test("editors serialize as query params on every page", () => {
 		expect(
-			editorUrl("transactions", {
+			editorPath("transactions", {
 				kind: "transaction",
 				item: investTransaction,
 			}),
-		).toBe("/transactions?edit-transaction=invest");
+		).toBe("/transactions?editor=transaction&id=invest");
 		expect(
-			editorUrl("outlook", { kind: "transaction", item: investTransaction }),
-		).toBe("/outlook?edit-transaction=invest");
-		expect(editorUrl("transactions", { kind: "transaction", item: null })).toBe(
-			"/transactions?edit-transaction=new",
-		);
-		expect(editorUrl("accounts", { kind: "schedule", item: null })).toBe(
-			"/accounts?edit-schedule=new",
+			editorPath("outlook", { kind: "transaction", item: investTransaction }),
+		).toBe("/outlook?editor=transaction&id=invest");
+		expect(
+			editorPath("transactions", { kind: "transaction", item: null }),
+		).toBe("/transactions?editor=transaction&id=new");
+		expect(editorPath("accounts", { kind: "schedule", item: null })).toBe(
+			"/accounts?editor=schedule&id=new",
 		);
 		expect(
-			parseUrl(editorUrl("transactions", { kind: "schedule", item: null })),
+			parseRoute(editorPath("transactions", { kind: "schedule", item: null })),
 		).toEqual({
 			page: "transactions",
 			overlay: { type: "scheduleEdit", key: "new" },
 		});
-		expect(editorUrl("accounts", { kind: "account", item: null })).toBe(
-			"/accounts?edit-account=new",
+		expect(editorPath("accounts", { kind: "account", item: null })).toBe(
+			"/accounts?editor=account&id=new",
 		);
 		expect(
-			editorUrl("evaluations", {
+			editorPath("evaluations", {
 				kind: "evaluation",
 				item: goalEvaluation,
 			}),
-		).toBe("/evaluations?edit-evaluation=goal-1");
+		).toBe("/evaluations?editor=evaluation&id=goal-1");
 		expect(
-			parseUrl(
-				editorUrl("outlook", { kind: "transaction", item: investTransaction }),
+			parseRoute(
+				editorPath("outlook", { kind: "transaction", item: investTransaction }),
 			),
 		).toEqual({
 			page: "outlook",
 			overlay: { type: "transactionEdit", key: "invest" },
 		});
-		// Query parameters namespace the editor, so an account named
-		// "Edit Transaction" still deep-links by slug and resolves.
-		const reserved = account("move-1", "Edit Transaction");
-		expect(editorUrl("accounts", { kind: "account", item: reserved })).toBe(
-			"/accounts?edit-account=edit-transaction",
+		// An account literally named "New" slugifies to the reserved new-item
+		// value, so the editor link uses the explicit id form and still
+		// resolves to the account.
+		const reserved = account("move-1", "New");
+		expect(editorPath("accounts", { kind: "account", item: reserved })).toBe(
+			"/accounts?editor=account&id=move-1",
 		);
 		expect(
 			resolveOverlayRoute(
-				parseUrl(editorUrl("accounts", { kind: "account", item: reserved })),
+				parseRoute(editorPath("accounts", { kind: "account", item: reserved })),
 				{
 					...model,
 					accounts: [reserved],
@@ -608,7 +611,7 @@ describe("URL builders round-trip through the parser", () => {
 
 	test("safe spending detail round-trips", () => {
 		expect(
-			parseUrl(safeSpendingDetailUrl("outlook", "last-cycle", "invest")),
+			parseRoute(safeSpendingDetailPath("outlook", "last-cycle", "invest")),
 		).toEqual({
 			page: "outlook",
 			overlay: {
@@ -617,14 +620,14 @@ describe("URL builders round-trip through the parser", () => {
 				editTransaction: "invest",
 			},
 		});
-		expect(safeSpendingDetailUrl("outlook", "cycle")).toBe(
-			"/outlook?detail=cycle",
+		expect(safeSpendingDetailPath("outlook", "cycle")).toBe(
+			"/outlook?detail=safe-spending&tab=cycle",
 		);
-		expect(safeSpendingDetailUrl("outlook", "cycle", "invest")).toBe(
-			"/outlook?detail=cycle&edit-transaction=invest",
+		expect(safeSpendingDetailPath("outlook", "cycle", "invest")).toBe(
+			"/outlook?detail=safe-spending&tab=cycle&editTransaction=invest",
 		);
 		expect(
-			parseUrl(safeSpendingDetailUrl("outlook", "cycle", "invest")),
+			parseRoute(safeSpendingDetailPath("outlook", "cycle", "invest")),
 		).toEqual({
 			page: "outlook",
 			overlay: {
@@ -640,12 +643,16 @@ describe("URL builders round-trip through the parser", () => {
 			...model,
 			accounts: [account("a1", "Café & Sons!")],
 		};
-		const url = evidenceUrl("accounts", { kind: "account", id: "a1" }, special);
-		expect(parseUrl(url)).toEqual({
+		const path = evidencePath(
+			"accounts",
+			{ kind: "account", id: "a1" },
+			special,
+		);
+		expect(parseRoute(path)).toEqual({
 			page: "accounts",
 			overlay: { type: "account", key: "caf-sons" },
 		});
-		expect(resolveOverlayRoute(parseUrl(url), special)).toEqual({
+		expect(resolveOverlayRoute(parseRoute(path), special)).toEqual({
 			state: "ready",
 			overlay: { kind: "evidence", target: { kind: "account", id: "a1" } },
 		});

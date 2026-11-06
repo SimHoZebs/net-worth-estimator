@@ -10,11 +10,11 @@ import {
 } from "../state/savedState.ts";
 import { scheduleToDisplay } from "../domain/transactionRows.ts";
 import {
-	editorUrl,
-	evidenceUrl,
-	pageUrl,
+	editorPath,
+	evidencePath,
+	pagePath,
 	resolveOverlayRoute,
-	safeSpendingDetailUrl,
+	safeSpendingDetailPath,
 	type OverlayRows,
 	type WorkspaceRoute,
 } from "./route.ts";
@@ -56,7 +56,7 @@ export function useWorkspaceOverlays({
 	const resolution = resolveOverlayRoute(route, rows);
 	const page = route.page;
 	useEffect(() => {
-		if (resolution.state === "unknown") replaceUrl(pageUrl(page));
+		if (resolution.state === "unknown") replaceUrl(pagePath(page));
 	}, [resolution.state, page, replaceUrl]);
 	const ready = resolution.state === "ready" ? resolution.overlay : null;
 	const evidence = ready?.kind === "evidence" ? ready.target : null;
@@ -69,7 +69,7 @@ export function useWorkspaceOverlays({
 				? ready.edit
 				: null;
 	const openEvidence = (target: EvidenceTarget) => {
-		pushUrl(evidenceUrl(page, target, rows));
+		pushUrl(evidencePath(page, target, rows));
 	};
 	const openEditor = (target: EditorTarget) => {
 		if (
@@ -77,7 +77,7 @@ export function useWorkspaceOverlays({
 			route.overlay?.type === "safeSpendingDetail"
 		) {
 			pushUrl(
-				safeSpendingDetailUrl(
+				safeSpendingDetailPath(
 					page,
 					route.overlay.tab,
 					target.item?.id ?? "new",
@@ -85,35 +85,35 @@ export function useWorkspaceOverlays({
 			);
 			return;
 		}
-		pushUrl(editorUrl(page, target));
+		pushUrl(editorPath(page, target));
 	};
 	const editFromEvidence = (target: EditorTarget) => {
-		pushUrl(editorUrl(page, target), evidence);
+		pushUrl(editorPath(page, target), evidence);
 	};
 	const closeEditor = () => {
 		if (
 			route.overlay?.type === "safeSpendingDetail" &&
 			route.overlay.editTransaction !== undefined
 		) {
-			pushUrl(safeSpendingDetailUrl(page, route.overlay.tab));
+			pushUrl(safeSpendingDetailPath(page, route.overlay.tab));
 			return;
 		}
 		if (returnTo) {
-			pushUrl(evidenceUrl(page, returnTo, rows));
+			pushUrl(evidencePath(page, returnTo, rows));
 			return;
 		}
-		pushUrl(pageUrl(page));
+		pushUrl(pagePath(page));
 	};
-	const closeEvidence = () => pushUrl(pageUrl(page));
+	const closeEvidence = () => pushUrl(pagePath(page));
 	const openSafeSpendingDetail = (tab: SafeSpendingDetailTab) =>
-		pushUrl(safeSpendingDetailUrl(page, tab));
+		pushUrl(safeSpendingDetailPath(page, tab));
 	const switchSafeSpendingTab = (tab: SafeSpendingDetailTab) => {
 		if (route.overlay?.type === "safeSpendingDetail")
 			replaceUrl(
-				safeSpendingDetailUrl(page, tab, route.overlay.editTransaction),
+				safeSpendingDetailPath(page, tab, route.overlay.editTransaction),
 			);
 	};
-	const closeSafeSpendingDetail = () => pushUrl(pageUrl(page));
+	const closeSafeSpendingDetail = () => pushUrl(pagePath(page));
 	return {
 		editor,
 		evidence,
