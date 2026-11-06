@@ -29,7 +29,6 @@ import { IconButton } from "@/components/Button.tsx";
 import { Badge } from "@/components/Badge.tsx";
 import { Card } from "@/components/Card.tsx";
 import { mergeStyles } from "@/components/mergeStyles.ts";
-import { Skeleton } from "@/components/Skeleton.tsx";
 import { useSelectedId } from "@/components/entrySelection.ts";
 
 const FundingGapsModal = lazy(() =>
@@ -251,7 +250,7 @@ export function FundingGapsCard({
 				)}
 			</Card>
 			{selected !== null && (
-				<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+				<Suspense fallback={null}>
 					<FundingGapsModal
 						gaps={gaps}
 						selectedId={selected}

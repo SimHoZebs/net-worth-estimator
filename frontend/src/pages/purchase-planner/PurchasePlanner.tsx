@@ -17,11 +17,13 @@ export function PurchasePlanner({
 	items,
 	forecastEnd,
 	locked = false,
+	loading = false,
 	...actions
 }: {
 	items: PurchaseViewItem[];
 	forecastEnd: string;
 	locked?: boolean;
+	loading?: boolean;
 } & PurchasePlannerActions) {
 	const [view, setView] = useState<View>("priority");
 	const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -65,7 +67,9 @@ export function PurchasePlanner({
 					</Button>
 				)}
 			</div>
-			{items.length === 0 ? (
+			{loading ? (
+				<p role="status">Loading planned purchases…</p>
+			) : items.length === 0 ? (
 				<EmptyState
 					icon={ShoppingBag}
 					title="What would you like to make room for?"

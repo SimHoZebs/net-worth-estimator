@@ -1,5 +1,4 @@
 import { Suspense, lazy } from "react";
-import { Skeleton } from "../components/Skeleton.tsx";
 import type { WorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 
 const EvidenceDialog = lazy(() =>
@@ -28,12 +27,12 @@ export function WorkspaceEvidence({
 	if (!overlays.evidence) return null;
 	if (overlays.evidence.kind === "position")
 		return (
-			<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+			<Suspense fallback={null}>
 				<CurrentPositionDialog onClose={overlays.closeEvidence} />
 			</Suspense>
 		);
 	return (
-		<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+		<Suspense fallback={null}>
 			<EvidenceDialog
 				target={overlays.evidence}
 				onClose={overlays.closeEvidence}
@@ -50,7 +49,7 @@ export function WorkspaceDialogs({
 }) {
 	if (!overlays.editor) return null;
 	return (
-		<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+		<Suspense fallback={null}>
 			<WorkspaceEditor
 				target={overlays.editor}
 				onClose={overlays.closeEditor}

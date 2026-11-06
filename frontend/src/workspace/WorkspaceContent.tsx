@@ -4,7 +4,6 @@ import { useWorkspaceOverlays } from "./useWorkspaceOverlays.ts";
 import type { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
 import { WorkspaceDialogs, WorkspaceEvidence } from "./WorkspaceDialogs.tsx";
 import { WorkspacePage } from "./WorkspacePage.tsx";
-import { WorkspacePageSkeleton } from "./WorkspacePageSkeleton.tsx";
 
 // The loaded page body. Mounts only after the verified scope exists and
 // a model is present, so overlay hooks that resolve against saved rows
@@ -27,7 +26,7 @@ export function WorkspaceContent({
 	};
 	return (
 		<>
-			<Suspense fallback={<WorkspacePageSkeleton label="Loading this page" />}>
+			<Suspense fallback={null}>
 				<WorkspacePage
 					page={navigation.page}
 					onEdit={overlays.openEditor}

@@ -44,27 +44,6 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 		setMessage(`Scan complete: ${parts.join(", ")}.`);
 	}
 
-	if (receipts.isPending) {
-		return (
-			<div className="mt-6 overflow-hidden rounded-surface border border-line bg-surface">
-				<div className="p-5 sm:p-6">
-					<Skeleton className="h-6 w-48" />
-				</div>
-			</div>
-		);
-	}
-	if (receipts.isError) {
-		return (
-			<div className="mt-6">
-				<ErrorNotice
-					message="The extracted receipts could not be loaded."
-					action="Retry"
-					onAction={() => void receipts.refetch()}
-				/>
-			</div>
-		);
-	}
-
 	const items = receipts.data ?? [];
 	const pending = items.filter((item) => item.status === "needs-review");
 
@@ -77,15 +56,17 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<h3 className="m-0 text-lg">
 						Extracted receipts{" "}
-						<span className="text-sm font-normal text-muted">
-							{items.length === 0
-								? "none yet"
-								: `${items.length} found${pending.length > 0 ? `, ${pending.length} need review` : ""}`}
-						</span>
+						{!receipts.isPending && (
+							<span className="text-sm font-normal text-muted">
+								{items.length === 0
+									? "none yet"
+									: `${items.length} found${pending.length > 0 ? `, ${pending.length} need review` : ""}`}
+							</span>
+						)}
 					</h3>
 					<Button
 						variant="secondary"
-						disabled={readOnly || busy}
+						disabled={readOnly || busy || receipts.isPending}
 						onClick={() => void handleScan()}
 					>
 						{busy ? "Scanning…" : "Scan now"}
@@ -104,7 +85,19 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 						<ErrorNotice message={error} />
 					</div>
 				)}
-				{items.length === 0 ? (
+				{receipts.isPending ? (
+					<div aria-busy="true" className="mt-4">
+						<Skeleton className="h-16 w-full" />
+					</div>
+				) : receipts.isError ? (
+					<div className="mt-4">
+						<ErrorNotice
+							message="The extracted receipts could not be loaded."
+							action="Retry"
+							onAction={() => void receipts.refetch()}
+						/>
+					</div>
+				) : items.length === 0 ? (
 					<p className="mt-4 mb-0 text-sm leading-relaxed text-muted">
 						Run a scan to find purchase and refund receipts in Gmail. Shipping
 						updates and ordinary mail are left out.

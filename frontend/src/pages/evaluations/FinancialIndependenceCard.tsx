@@ -15,7 +15,6 @@ import {
 } from "@/domain/financialIndependence.ts";
 import { dateLabel, money, percent } from "@/domain/format.ts";
 import type { OtherEvaluation } from "@/domain/result.ts";
-import { Skeleton } from "@/components/Skeleton.tsx";
 import { IndependenceVerdict } from "./IndependenceVerdict.tsx";
 
 const FinancialIndependenceModal = lazy(() =>
@@ -174,7 +173,7 @@ export function FinancialIndependenceCard({
 				)}
 			</Card>
 			{item.enabled && analysis && inspector !== null && (
-				<Suspense fallback={<Skeleton className="h-32 w-full" />}>
+				<Suspense fallback={null}>
 					<FinancialIndependenceModal
 						item={item}
 						analysis={analysis}

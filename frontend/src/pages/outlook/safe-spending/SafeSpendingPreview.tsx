@@ -476,11 +476,11 @@ export function SafeSpendingPreview({
 			},
 		};
 	}, [chargeCycles, directTransactions, transactionOrder, currentView.trend]);
-	// Saved rows gate rendering, not hooks: every subscription above stays
-	// mounted while rows load.
-	if (!accounts || !transactions || savedRules === null || !startDate)
-		return <SafeSpendingSkeleton />;
-	if (settingsState.pending) return <SafeSpendingSkeleton />;
+	// Saved rows hydrate after the card header. The header renders
+	// immediately; only the computed body waits for rows, settings,
+	// and the forecast.
+	const savedRowsPending =
+		!accounts || !transactions || savedRules === null || !startDate;
 	if (settingsState.error)
 		return (
 			<Notice tone="danger" aria-label="Safe card spending settings">
@@ -489,7 +489,7 @@ export function SafeSpendingPreview({
 			</Notice>
 		);
 	if (!projection && !pending) return null;
-	if (!cards.length) {
+	if (!savedRowsPending && !settingsState.pending && !cards.length) {
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
@@ -540,7 +540,7 @@ export function SafeSpendingPreview({
 
 	const toggleSpendingAccount = (accountId: string) => {
 		const known = new Set(spendableAccounts.map((account) => account.id));
-		const fallbackId = checkingAccountId(accounts);
+		const fallbackId = checkingAccountId(accounts ?? []);
 		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
 		const explicit = settings.spendingAccountIds ?? fallback;
 		const next = explicit.includes(accountId)
@@ -551,7 +551,7 @@ export function SafeSpendingPreview({
 
 	const toggleIncomeAccount = (accountId: string) => {
 		const known = new Set(spendableAccounts.map((account) => account.id));
-		const fallbackId = checkingAccountId(accounts);
+		const fallbackId = checkingAccountId(accounts ?? []);
 		const fallback = fallbackId && known.has(fallbackId) ? [fallbackId] : [];
 		const explicit = settings.incomeAccountIds ?? fallback;
 		const next = explicit.includes(accountId)
@@ -561,8 +561,9 @@ export function SafeSpendingPreview({
 	};
 
 	// Saved-data frame (header, cycle dates) renders regardless; only the
-	// computed safe spending body skeletonizes while the projection is absent.
-	if (pending)
+	// computed safe spending body skeletonizes while rows, settings, or the
+	// projection are absent.
+	if (savedRowsPending || settingsState.pending || pending)
 		return (
 			<Card aria-label="Safe card spending" className="relative">
 				<div className="flex items-center justify-between gap-4">
@@ -578,7 +579,9 @@ export function SafeSpendingPreview({
 				<p className="m-0 text-xs">
 					{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 					{fullDaysLeft === 1 ? "day" : "days"} left
-					{staleData ? ` · balances ${dateLabel(startDate, true)}` : ""}
+					{staleData
+						? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
+						: ""}
 				</p>
 				<div aria-busy="true">
 					<Skeleton className="h-32 w-full" />
@@ -601,7 +604,9 @@ export function SafeSpendingPreview({
 			<p className="m-0 text-xs">
 				{dateLabel(cycle.cycleEnd, true)} · {fullDaysLeft}{" "}
 				{fullDaysLeft === 1 ? "day" : "days"} left
-				{staleData ? ` · balances ${dateLabel(startDate, true)}` : ""}
+				{staleData
+					? ` · balances ${dateLabel(startDate ?? displayToday, true)}`
+					: ""}
 			</p>
 			<SegmentedControl
 				className="mb-4"
@@ -625,7 +630,7 @@ export function SafeSpendingPreview({
 				trend={inlineView.trend}
 				section={inlineView.section}
 				closed={cycleViewTab === "last-cycle"}
-				accounts={accounts}
+				accounts={accounts ?? []}
 				transactions={savedState}
 				readOnly={readOnly}
 				transactionOrder={transactionOrder}
@@ -659,12 +664,13 @@ export function SafeSpendingPreview({
 						<SafeSpendingCyclePanel
 							key={detail}
 							cycle={tabChargeCycles[detail]}
-							accounts={accounts}
+							accounts={accounts ?? []}
 							transactions={savedState}
 							readOnly={readOnly}
 							transactionOrder={transactionOrder}
 							onTransactionOrderChange={setTransactionOrder}
 						/>
+
 					)}
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel
@@ -687,7 +693,7 @@ export function SafeSpendingPreview({
 							}}
 							billCandidates={billCandidates}
 							trackedBillIds={trackedBillIds}
-							accounts={accounts}
+							accounts={accounts ?? []}
 							onToggleBill={toggleBill}
 							onToggleAccount={toggleAccount}
 							onToggleSpendingAccount={toggleSpendingAccount}
@@ -698,29 +704,5 @@ export function SafeSpendingPreview({
 				</SafeSpendingDetailShell>
 			)}
 		</Card>
-	);
-}
-
-/** Reserve the summary card while saved rows or settings hydrate. */
-function SafeSpendingSkeleton() {
-	return (
-		<div
-			className="rounded-surface border border-line bg-surface p-5"
-			aria-busy="true"
-			aria-label="Loading safe card spending"
-		>
-			<div className="flex items-center gap-2">
-				<Skeleton className="size-4" />
-				<Skeleton className="h-4 w-40" />
-			</div>
-			<Skeleton className="mt-4 h-3 w-64" />
-			<Skeleton className="mt-2 h-3 w-52" />
-			<Skeleton className="mt-6 h-8 w-44" />
-			<div className="mt-6 grid grid-cols-3 gap-4 max-sm:grid-cols-1">
-				<Skeleton className="h-12 w-full" />
-				<Skeleton className="h-12 w-full" />
-				<Skeleton className="h-12 w-full" />
-			</div>
-		</div>
 	);
 }
