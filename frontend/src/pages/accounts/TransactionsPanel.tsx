@@ -145,11 +145,13 @@ export function TransactionsPanel({
 										transaction={transaction}
 										resolved={resolvedAmounts?.get(transaction.id)}
 									/>
-									{transaction.claimScheduleId && (
-										<Badge tone="neutral">
-											Records {transaction.claimOccurrenceDate}
-										</Badge>
-									)}
+									{transaction.claimScheduleId &&
+										transaction.claimOccurrenceDate && (
+											<Badge tone="neutral">
+												Records{" "}
+												{dateLabel(transaction.claimOccurrenceDate, true)}
+											</Badge>
+										)}
 								</>
 							}
 							actionLabel={`View ${transaction.name} on ${dateText}`}

@@ -6,10 +6,12 @@ import { scheduleOccurrenceDates } from "./ruleSchedule.ts";
 
 /**
  * Posted rows joined to the projection under shared rule identities.
- * Claimed postings keep their schedule id and occurrence date, posted income
- * maps to the selected source with the matching amount, and selected bills
- * with no posted or projected occurrence in the window get their scheduled
- * occurrence. The open and closed tabs read the same stream.
+ * Claimed postings keep their schedule id; the claim names the guessed
+ * occurrence it fulfills, and that guess drops out of the stream, so the
+ * row shows the day it happened. Posted income maps to the selected source
+ * with the matching amount, and selected bills with no posted or projected
+ * occurrence in the window get their scheduled occurrence. The open and
+ * closed tabs read the same stream.
  */
 export function safeSpendingResults({
 	transactions,
@@ -77,10 +79,13 @@ export function safeSpendingResults({
 			continue;
 		if (!row.startDate) continue;
 		const transactionId = row.claimScheduleId ?? incomeRuleFor(row) ?? row.id;
-		const date = row.claimOccurrenceDate ?? row.startDate;
-		if (row.claimScheduleId) claimedKeys.add(`${transactionId}|${date}`);
+		// The claim names the guessed occurrence the row fulfills; the row
+		// itself happens when it happened.
+		const claimDate = row.claimOccurrenceDate;
+		if (row.claimScheduleId && claimDate)
+			claimedKeys.add(`${transactionId}|${claimDate}`);
 		posted.push({
-			date,
+			date: row.startDate,
 			transactionId,
 			name: row.name,
 			requested: row.amount,
@@ -98,6 +103,9 @@ export function safeSpendingResults({
 	const combined: TransactionResult[] = [];
 	const seen = new Set<string>();
 	const existing = new Set<string>();
+	// A claimed guess stays taken even though the fulfilling row shows its
+	// own day: the synthetic fill must not resurrect it.
+	for (const key of claimedKeys) existing.add(key);
 	const add = (row: TransactionResult) => {
 		const occurrenceKey = `${row.transactionId}|${row.date}`;
 		const key = `${occurrenceKey}|${row.fromId}|${row.toId}|${row.requested}`;

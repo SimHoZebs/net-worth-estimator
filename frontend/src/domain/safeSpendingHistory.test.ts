@@ -94,7 +94,7 @@ describe("safeSpendingResults", () => {
 		});
 	});
 
-	it("keeps a claimed bill's occurrence date and drops its duplicate projection", () => {
+	it("shows a claimed bill on its own day and drops its duplicate projection", () => {
 		const results = safeSpendingResults({
 			transactions: [
 				posted({
@@ -136,11 +136,13 @@ describe("safeSpendingResults", () => {
 				}),
 			],
 		});
-		const housing = results.filter(
-			(row) => row.transactionId === "housing" && row.date === "2026-11-01",
-		);
+		const housing = results.filter((row) => row.transactionId === "housing");
 		expect(housing).toHaveLength(1);
-		expect(housing[0]).toMatchObject({ requested: 2970.25 });
+		expect(housing[0]).toMatchObject({
+			date: "2026-11-02",
+			requested: 2970.25,
+			claimed: true,
+		});
 	});
 
 	it("drops a projected duplicate of a posted one-time row", () => {

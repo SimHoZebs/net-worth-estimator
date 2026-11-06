@@ -50,8 +50,7 @@ export function ScheduleHistory({
 								resolved: {
 									amount: transaction.amount,
 									requested: transaction.amount,
-									date:
-										transaction.claimOccurrenceDate ?? transaction.startDate,
+									date: transaction.startDate,
 								},
 							})}
 							savedTransaction={transaction}

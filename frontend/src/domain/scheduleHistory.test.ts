@@ -14,21 +14,24 @@ function claimed(
 	id: string,
 	claimOccurrenceDate: string,
 	claimScheduleId = schedule.id,
+	startDate = claimOccurrenceDate,
 ): Transaction {
 	return {
 		...base,
 		id,
 		name: `Claim ${id}`,
 		kind: "posting",
-		startDate: claimOccurrenceDate,
+		startDate,
 		claimScheduleId,
 		claimOccurrenceDate,
 	};
 }
 
-it("returns matching postings newest occurrence first", () => {
-	const older = claimed("older", "2026-10-01");
-	const newer = claimed("newer", "2026-11-01");
+it("returns matching postings newest first, by the day the transaction happened", () => {
+	// Claim dates and own days disagree on purpose: the claim names the
+	// guess being fulfilled, so ordering must follow the own day.
+	const older = claimed("older", "2026-11-01", schedule.id, "2026-10-02");
+	const newer = claimed("newer", "2026-10-01", schedule.id, "2026-10-05");
 	const otherSchedule = claimed("other", "2026-12-01", "salary");
 	const rule = { ...schedule, claimScheduleId: schedule.id };
 	const history = scheduleHistoryTransactions({
@@ -41,7 +44,7 @@ it("returns matching postings newest occurrence first", () => {
 	]);
 });
 
-it("falls back to the transaction date when a claim has no occurrence day", () => {
+it("reads rows with a missing claim day by their own day", () => {
 	const posting = {
 		...claimed("no-occurrence", "2026-10-01"),
 		claimOccurrenceDate: null,

@@ -1269,7 +1269,7 @@ it("lists recorded transactions that claim the schedule's occurrences", () => {
 	expect(within(history).queryByText("Unrelated renovation")).toBeNull();
 	fireEvent.click(
 		within(history).getByRole("button", {
-			name: "View March renovation on Mar 1, 2026",
+			name: "View March renovation on Mar 2, 2026",
 		}),
 	);
 	expect(screen.getByRole("dialog", { name: /March renovation/ })).toBeTruthy();

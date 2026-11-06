@@ -54,9 +54,13 @@ longer lodging windows, marketplace splits, and the rejection cases.
 ## Occurrence claims survive settlement
 
 A one-time row records an occurrence of a scheduled rule through **Records
-an occurrence of** and **Replaces occurrence on**. Pending rows accept
-claims while their other values stay locked: the claim lives outside the
-synced columns, and the pending-to-posted convert keeps the same row id.
+an occurrence of** and **Replaces occurrence on**. The claim names the
+occurrence the schedule guessed; it never re-dates the row. The occurrence
+happened when the transaction happened: recorded rows display and sort by
+their own day, and the claim only suppresses the guessed occurrence in
+projections. Pending rows accept claims while their other values stay
+locked: the claim lives outside the synced columns, and the pending-to-posted
+convert keeps the same row id.
 
 Claiming clears pending, enables the row so it participates, and promotes
 the posted time from the bank's transaction instant. Pending seeds carry no

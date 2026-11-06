@@ -390,12 +390,14 @@ test("a recurring schedule lists transactions that record its occurrences", asyn
 	const history = schedule.getByRole("region", {
 		name: "Recorded transactions",
 	});
+	// The recorded row shows the day the transaction happened, not the
+	// claimed occurrence date (2026-03-05).
 	await expect(history).toContainText("Home renovation");
-	await expect(history).toContainText("Mar 5, 2026");
+	await expect(history).toContainText("Mar 6, 2026");
 	await expect(history).toContainText("−$9,000.00");
 	await history
 		.getByRole("button", {
-			name: /View Home renovation on Mar 5, 2026/,
+			name: /View Home renovation on Mar 6, 2026/,
 		})
 		.click();
 	await expect(
