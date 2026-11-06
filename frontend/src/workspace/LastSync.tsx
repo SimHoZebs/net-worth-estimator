@@ -1,8 +1,7 @@
 import { TriangleAlert } from "lucide-react";
-import { pageUrl } from "./route.ts";
-import { navigateToUrl } from "./useWorkspaceNavigation.ts";
 import type { ServerStatus } from "../api/index.ts";
 import { notifyError } from "../state/notifications.ts";
+import { pagePath } from "./route.ts";
 
 // An instant uses the viewer's time zone, not the server's UTC display.
 const syncTimeFormat = new Intl.DateTimeFormat(undefined, {
@@ -52,7 +51,8 @@ export function LastSync({
 						notifyError("sync-stale", staleSyncMessage(), {
 							label: "Open bank sync",
 							onAction: () => {
-								navigateToUrl(pageUrl("sources"));
+								window.history.pushState(null, "", pagePath("sources"));
+								window.dispatchEvent(new Event("popstate"));
 							},
 						})
 					}

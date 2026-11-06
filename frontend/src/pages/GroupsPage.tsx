@@ -21,7 +21,7 @@ import {
 	useUpdateMemberRole,
 } from "../state/groups.ts";
 import { notifyError, notifySuccess } from "../state/notifications.ts";
-import { groupUrl, pageUrl } from "../workspace/route.ts";
+import { groupPath, pagePath } from "../workspace/route.ts";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
 import { SharedFeed } from "./groups/SharedFeed.tsx";
 
@@ -74,7 +74,7 @@ export function GroupsPage() {
 			const group = await createGroupMutation.mutateAsync(name.trim());
 			setName("");
 			setShowCreate(false);
-			pushUrl(groupUrl(group.id));
+			pushUrl(groupPath(group.id));
 			notifySuccess("groups-notice", "Group created.");
 		} catch {
 			notifyError("groups", "Group could not be created.");
@@ -90,7 +90,7 @@ export function GroupsPage() {
 		try {
 			const group = await joinGroupMutation.mutateAsync(code.trim());
 			setCode("");
-			pushUrl(groupUrl(group.id));
+			pushUrl(groupPath(group.id));
 			notifySuccess("groups-notice", "Joined group.");
 		} catch {
 			notifyError("groups", "Invite could not be accepted.");
@@ -102,7 +102,7 @@ export function GroupsPage() {
 	async function onLeave(id: string) {
 		try {
 			await leaveGroupMutation.mutateAsync(id);
-			pushUrl(pageUrl("groups"));
+			pushUrl(pagePath("groups"));
 			notifySuccess("groups-notice", "Left group.");
 		} catch {
 			notifyError("groups", "Could not leave group.");
@@ -112,7 +112,7 @@ export function GroupsPage() {
 	async function onDelete(id: string) {
 		try {
 			await deleteGroupMutation.mutateAsync(id);
-			pushUrl(pageUrl("groups"));
+			pushUrl(pagePath("groups"));
 			notifySuccess("groups-notice", "Group deleted.");
 		} catch {
 			notifyError("groups", "Could not delete group.");
@@ -170,7 +170,7 @@ export function GroupsPage() {
 					<Button
 						variant="ghost"
 						size="sm"
-						onClick={() => pushUrl(pageUrl("groups"))}
+						onClick={() => pushUrl(pagePath("groups"))}
 					>
 						<ArrowLeft size={16} aria-hidden="true" />
 						All groups
@@ -181,7 +181,7 @@ export function GroupsPage() {
 					<ErrorNotice
 						message={detailError}
 						action="Back to groups"
-						onAction={() => pushUrl(pageUrl("groups"))}
+						onAction={() => pushUrl(pagePath("groups"))}
 					/>
 				) : (
 					<>
@@ -365,7 +365,7 @@ export function GroupsPage() {
 									<Button
 										variant="ghost"
 										size="sm"
-										onClick={() => pushUrl(groupUrl(group.id))}
+										onClick={() => pushUrl(groupPath(group.id))}
 									>
 										Open
 									</Button>

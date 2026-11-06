@@ -95,7 +95,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	teardownQueryScope();
-	window.history.replaceState(null, "", "/groups");
+	window.history.replaceState(null, "", "/");
 });
 
 it("shows a loading state then the group list on mount", async () => {
@@ -135,7 +135,7 @@ it("shows group detail with members and invites for an owner", async () => {
 			invites: [{ id: "i1", usedCount: 1 }],
 		},
 	);
-	window.history.replaceState(null, "", "/groups?group=g1");
+	window.history.replaceState(null, "", "/groups/g1");
 	render(<GroupsPage />, { wrapper });
 	await waitFor(() =>
 		expect(screen.getByRole("heading", { name: "Household" })).toBeTruthy(),
@@ -153,7 +153,7 @@ it("hides invites for a member without fetching them", async () => {
 		[{ id: "g1", name: "Household", role: "member", memberCount: 1 }],
 		{ members: [{ accountId: "alice", role: "member" }] },
 	);
-	window.history.replaceState(null, "", "/groups?group=g1");
+	window.history.replaceState(null, "", "/groups/g1");
 	render(<GroupsPage />, { wrapper });
 	await waitFor(() =>
 		expect(screen.getByRole("heading", { name: "Household" })).toBeTruthy(),
@@ -168,7 +168,7 @@ it("shows the detail error when the group cannot load", async () => {
 	stubGroups([{ id: "g1", name: "Household", role: "owner" }], {
 		failDetail: true,
 	});
-	window.history.replaceState(null, "", "/groups?group=g1");
+	window.history.replaceState(null, "", "/groups/g1");
 	render(<GroupsPage />, { wrapper });
 	await waitFor(() =>
 		expect(screen.getByText("Group could not be loaded.")).toBeTruthy(),
@@ -182,7 +182,7 @@ it("shows an invite error with explicit retry without hiding the loaded group", 
 		failInvites: true,
 	};
 	stubGroups([{ id: "g1", name: "Household", role: "owner" }], detail);
-	window.history.replaceState(null, "", "/groups?group=g1");
+	window.history.replaceState(null, "", "/groups/g1");
 	render(<GroupsPage />, { wrapper });
 	expect(await screen.findByText("Invites could not be loaded.")).toBeTruthy();
 	expect(
@@ -203,7 +203,7 @@ it("uses the confirmed detail role, not an old list role, to request invites", a
 			members: [{ accountId: "alice", role: "member" }],
 		},
 	);
-	window.history.replaceState(null, "", "/groups?group=g1");
+	window.history.replaceState(null, "", "/groups/g1");
 	render(<GroupsPage />, { wrapper });
 	await within(screen.getByRole("list", { name: "Members" })).findByText(
 		/alice/,

@@ -47,12 +47,12 @@ describe("sidebar sync signals", () => {
 		acceptTestResource();
 		resetServerQueryCache();
 		resetNotifications();
-		window.history.replaceState(null, "", "/outlook");
+		window.history.replaceState(null, "", "/");
 	});
 	afterEach(() => {
 		cleanup();
 		resetNotifications();
-		window.history.replaceState(null, "", "/outlook");
+		window.history.replaceState(null, "", "/");
 	});
 
 	it("shows the server's last successful sync in browser-local time, including read-only mode", () => {
