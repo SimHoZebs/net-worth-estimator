@@ -13,9 +13,13 @@ test("seeded account demo", async ({ page }) => {
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
 		await expect(page.getByText("Card spending allowance")).toBeVisible();
+		await expect(page.getByText("Card spending pace")).toBeVisible();
 		await expect(
-			page.getByRole("img", { name: "Card spending pace" }),
-		).toHaveCount(0);
+			page.getByRole("separator", { name: "Card spending limit" }),
+		).toBeVisible();
+		await expect(
+			page.getByText("Protected reserve starts", { exact: true }),
+		).toBeVisible();
 	}
 	if (process.env.DEMO_PACK === "safe-spending-shortfall") {
 		await expect(page.getByText("Retirement contribution")).toBeVisible();

@@ -622,6 +622,7 @@ export function SafeSpendingPreview({
 				cashNow={inlineView.view.cashNow}
 				allocation={inlineView.view.allocation}
 				funding={inlineView.view.funding}
+				trend={inlineView.trend}
 				section={inlineView.section}
 				closed={cycleViewTab === "last-cycle"}
 				accounts={accounts}
