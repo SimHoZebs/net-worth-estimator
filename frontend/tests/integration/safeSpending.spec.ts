@@ -20,7 +20,7 @@ test("Configure settings survive in a fresh browser context", async ({
 	browser,
 	request,
 }) => {
-	await page.goto("/outlook?detail=safe-spending&tab=cycle");
+	await page.goto("/outlook?detail=safe-spending&tab=configure");
 	await expect(
 		page
 			.getByRole("dialog", { name: "Safe card spending" })
@@ -182,7 +182,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	}
 	await page.goto("/outlook?detail=safe-spending&tab=cycle");
 	await page.getByRole("tab", { name: /Last cycle/ }).click();
-	await expect(page).toHaveURL(/safe-spending-detail\/last-cycle$/);
+	await expect(page).toHaveURL(/outlook\?detail=safe-spending&tab=last-cycle$/);
 	const last = page.getByRole("dialog", {
 		name: "Safe card spending",
 		exact: true,
@@ -196,7 +196,7 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	const currentTab = page.getByRole("tab", { name: /This cycle/ });
 	await expect(currentTab).toBeFocused();
 	await expect(currentTab).toHaveAttribute("aria-selected", "true");
-	await expect(page).toHaveURL(/safe-spending-detail\/cycle$/);
+	await expect(page).toHaveURL(/outlook\?detail=safe-spending&tab=cycle$/);
 	const currentCharges = page.getByRole("table", {
 		name: new RegExp(labels.cycleSpending),
 	});
@@ -260,7 +260,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 		},
 	});
 	expect((await response.json()).saved).toBe(true);
-	await page.goto("/outlook?detail=safe-spending&tab=cycle");
+	await page.goto("/outlook?detail=safe-spending&tab=configure");
 	const sources = page.getByRole("group", { name: "Income sources" });
 	const salary = sources.getByRole("button", { name: /^Salary/ });
 	const partner = sources.getByRole("button", {
