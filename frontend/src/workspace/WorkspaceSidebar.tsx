@@ -10,16 +10,19 @@ import { useInboxUnreadCount } from "../state/inbox.ts";
 import { LastSync } from "./LastSync.tsx";
 import { type Page, pages } from "./navigation.ts";
 import { navigationLinkClassName } from "./navigationStyles.ts";
+import { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
 
 function SidebarNavLink({
 	href,
 	active,
 	onClose,
+	onNavigate,
 	children,
 }: {
 	href: string;
 	active: boolean;
 	onClose: () => void;
+	onNavigate: () => void;
 	children: ReactNode;
 }) {
 	return (
@@ -29,7 +32,22 @@ function SidebarNavLink({
 				active ? "bg-active" : undefined,
 			)}
 			href={href}
-			onClick={onClose}
+			onClick={(event) => {
+				// Plain clicks stay in the SPA; modifier and middle clicks
+				// still open the real route in a new tab.
+				if (
+					event.metaKey ||
+					event.ctrlKey ||
+					event.shiftKey ||
+					event.altKey ||
+					event.button !== 0
+				) {
+					return;
+				}
+				event.preventDefault();
+				onClose();
+				onNavigate();
+			}}
 			aria-current={active ? "page" : undefined}
 		>
 			<span className="flex min-w-0 items-center gap-3">{children}</span>
@@ -51,6 +69,7 @@ export function WorkspaceSidebar({
 	// The inbox badge reflects persisted unread state; a failed load hides
 	// the badge instead of blocking navigation.
 	const unreadCount = useInboxUnreadCount().data ?? 0;
+	const navigation = useWorkspaceNavigation();
 	return (
 		<>
 			<div className="flex items-center justify-between px-2">
@@ -72,6 +91,7 @@ export function WorkspaceSidebar({
 									<SidebarNavLink
 										href={`/${item.id}`}
 										onClose={onClose}
+										onNavigate={() => navigation.navigate(item.id)}
 										active={page === item.id}
 									>
 										<item.icon size={19} strokeWidth={1.7} />
@@ -109,6 +129,7 @@ export function WorkspaceSidebar({
 				<SidebarNavLink
 					href="/sources"
 					onClose={onClose}
+					onNavigate={() => navigation.navigate("sources")}
 					active={page === "sources"}
 				>
 					<Settings size={19} strokeWidth={1.7} />

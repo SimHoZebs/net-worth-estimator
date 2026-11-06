@@ -82,6 +82,9 @@ export function useWorkspaceNavigation() {
 			if (next.route.page !== previousPage) {
 				requestAnimationFrame(() => headingRef.current?.focus());
 			}
+			// Sibling hook instances (sidebar, mobile drawer) sync off
+			// popstate, so notify them about the programmatic change.
+			window.dispatchEvent(new Event("popstate"));
 		},
 		[],
 	);
