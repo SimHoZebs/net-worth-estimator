@@ -61,9 +61,8 @@ Private data never becomes a fallback guest workspace.
 
 All API operations receive the store for the authorized resource. A guessed row
 ID in another user's data cannot select another user. Projection state rows
-and seeded in-flight runs also include the resource ID. Server-level SimpleFIN
-credentials remain attached only to the explicitly assigned primary owner.
-Other users never inherit that integration.
+and seeded in-flight runs also include the resource ID. SimpleFIN
+credentials stay in each user's own rows. Other users never inherit that integration.
 
 Published guest data is a snapshot, not a live alias of the owner's data.
 `./scripts/dev publish-sample --source-user SOURCE --user GUEST` explicitly
@@ -136,8 +135,6 @@ Before an existing authenticated deployment starts the new code:
 4. Set `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` to the guest's immutable subject.
    Provision its application rows through `setupdb --issuer ... --subject ...`.
 5. Verify guest, member, second-user, denial, revocation, and provider-outage cases.
-6. Set `NET_WORTH_ESTIMATOR_OWNER_SUBJECT`. The old
-   `NET_WORTH_ESTIMATOR_PLAN_OWNER_SUBJECT` variable no longer exists.
 
 See [the shared database guide](shared-database.md) for backup and rollback.
 Runtime startup never merges files or guesses an owner.

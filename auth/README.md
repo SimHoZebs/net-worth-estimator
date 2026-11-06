@@ -18,10 +18,6 @@ docker compose --env-file auth/casdoor/.env \
   -f auth/casdoor/compose.yml -p waypoint-casdoor down
 export CASDOOR_STATE_DIR="$PWD/auth/casdoor/data"
 export COMPOSE_FILE="docker-compose.yml:auth/compose.casdoor.yml"
-export NET_WORTH_ESTIMATOR_OWNER_SUBJECT="$(
-  node --input-type=module -e \
-    'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).subject)'
-)"
 export NET_WORTH_ESTIMATOR_GUEST_SUBJECT="$(
   node --input-type=module -e \
     'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).guest_subject)'

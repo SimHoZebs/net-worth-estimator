@@ -148,9 +148,10 @@ password across re-runs — it is the reusable dev credential, never
 committed anywhere.
 
 One shared application database holds every private user, the published guest
-scope, and application sessions. The verified `ownerSubject` in
-`tmp/dev/config.json` selects the user for server-level Bridge credentials,
-and `guestSubject` selects the provisioned guest for anonymous traffic. Dev
+scope, and application sessions. The verified `guestSubject` in
+`tmp/dev/config.json` selects the provisioned guest for anonymous traffic.
+SimpleFIN credentials live in each user's own rows and every user with a key
+can sync it. Dev
 keeps sync disabled.
 Fresh setup assigns the bootstrap
 user and provisions the guest destination row. Other users receive their own blank private workspace in the same database.

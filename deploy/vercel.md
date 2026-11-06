@@ -14,7 +14,6 @@ Set these variables in Vercel's Environment Variables settings:
 | `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | The Casdoor issuer origin |
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID` | The registered application client ID |
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET` | The registered application client secret |
-| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | The verified owner OIDC subject |
 | `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | The provisioned guest OIDC subject (anonymous traffic resolves to it) |
 | `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Optional; defaults to `waypoint` |
 

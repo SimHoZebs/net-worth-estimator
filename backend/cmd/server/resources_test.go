@@ -12,7 +12,6 @@ import (
 
 	"github.com/simhozebs/net-worth-estimator/backend/internal/api"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
-	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/types"
 )
@@ -41,23 +40,10 @@ func model(t *testing.T, handler http.Handler) *types.FinancialModel {
 	return out.Model
 }
 
-func TestResourceConfigurationRejectsUnsafeOwner(t *testing.T) {
+func TestResourceConfigurationRejectsUnsafeOrganization(t *testing.T) {
 	c, err := resourceConfigFromEnv(func(string) string { return "" })
-	if err != nil || c.OwnerSubject != "" || c.ModelID != "" || c.Organization != authorization.DefaultOrganization {
+	if err != nil || c.ModelID != "" || c.Organization != authorization.DefaultOrganization {
 		t.Fatalf("unexpected defaults: %+v %v", c, err)
-	}
-	for key, value := range map[string]string{
-		"NET_WORTH_ESTIMATOR_OWNER_SUBJECT": "*",
-	} {
-		_, err := resourceConfigFromEnv(func(name string) string {
-			if name == key {
-				return value
-			}
-			return ""
-		})
-		if err == nil {
-			t.Errorf("accepted unsafe %s", key)
-		}
 	}
 	if _, err := resourceConfigFromEnv(func(name string) string {
 		if name == "NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION" {
@@ -137,30 +123,48 @@ func TestUserProvisioningRequiresAuthorizedIdentity(t *testing.T) {
 	}
 }
 
-func TestOwnerSyncStoreSkipsMissingUser(t *testing.T) {
+func testSyncManager(t *testing.T, database *sqlite.Database) *syncManager {
+	t.Helper()
+	manager, err := newSyncManager(database, func(string) string { return "" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	return manager
+}
+
+func TestSyncCredentialUserIDsListOnlyConfiguredUsers(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	const issuer, subject = "https://identity.test", "owner"
-	if scoped, err := ownerSyncStore(database, issuer, ""); err != nil || scoped != nil {
-		t.Fatalf("empty subject = %v, %v; want nil, nil", scoped, err)
+	const issuer = "https://identity.test"
+	ids := map[string]bool{}
+	for _, subject := range []string{"configured-a", "configured-b"} {
+		st, err := database.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject)
+		if err != nil {
+			t.Fatal(err)
+		}
+		userID := authorization.ActorKey(issuer, subject)
+		if _, err := st.SetSyncCredential("https://bridge.test/"+subject, "bridge.test"); err != nil {
+			t.Fatal(err)
+		}
+		ids[userID] = true
 	}
-	if scoped, err := ownerSyncStore(database, issuer, subject); err != nil || scoped != nil {
-		t.Fatalf("missing user = %v, %v; want nil, nil", scoped, err)
-	}
-	if exists, err := database.HasUser(authorization.ActorKey(issuer, subject)); err != nil || exists {
-		t.Fatalf("startup provisioned an owner: %v", err)
-	}
-	if _, err := database.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject); err != nil {
+	if _, err := database.EnsureUser(authorization.ActorKey(issuer, "unconfigured"), issuer, "unconfigured"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ownerSyncStore(database, issuer, subject); err != nil {
-		t.Fatalf("existing owner rejected: %v", err)
+	got, err := database.SyncCredentialUserIDs()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if scoped, err := ownerSyncStore(database, issuer, "someone-else"); err != nil || scoped != nil {
-		t.Fatalf("unrelated subject without a user = %v, %v; want nil, nil", scoped, err)
+	if len(got) != len(ids) {
+		t.Fatalf("configured user IDs = %v, want %d", got, len(ids))
+	}
+	for _, id := range got {
+		if !ids[id] {
+			t.Fatalf("unexpected configured user ID %q", id)
+		}
 	}
 }
 
@@ -172,7 +176,6 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	defer database.Close()
 	const issuer = "https://identity.test"
 	const guestSubject = "11111111-1111-1111-1111-111111111111"
-	ownerID := authorization.ResourceFor(issuer, "a").ID
 	owner, err := database.EnsureUser(authorization.ActorKey(issuer, "a"), issuer, "a")
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +193,7 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	if err := guestStore.InitializeModel(); err != nil {
 		t.Fatal(err)
 	}
-	router, err := newUserRouter(database, userRouterConfig{PrimaryResourceID: ownerID})
+	router, err := newUserRouter(database, userRouterConfig{Sync: testSyncManager(t, database), API: api.Config{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,19 +240,17 @@ func TestUserRouterIsolatesUsersFromEachOther(t *testing.T) {
 	if err := database.PingContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	// Requests without a verified scope fail closed; unknown resources and a
-	// non-private primary never provision.
+	// Requests without a verified scope fail closed. Unknown resources and a
+	// malformed non-private resource never provision.
 	if w := post(t, router, "GET", "/v1/financial-model", ""); w.Code != 403 {
 		t.Fatalf("unverified user routing=%d", w.Code)
 	}
-	bad, err := newUserRouter(database, userRouterConfig{PrimaryResourceID: "users/not-a-private-user"})
-	if err == nil {
-		bad.Close()
-		t.Fatal("malformed ID can own server Bridge credentials")
+	if _, err := router.handlerFor(authorization.Resource{ID: "users/not-a-private-user"}); err == nil {
+		t.Fatal("malformed resource provisioned a user")
 	}
 }
 
-func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
+func TestServerBridgeCredentialsStayInTheirUser(t *testing.T) {
 	database, err := sqlite.SetupDatabase(filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -257,21 +258,25 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
 	defer database.Close()
 	const issuer = "https://identity.test"
 	const guestSubject = "11111111-1111-1111-1111-111111111111"
-	ownerID := authorization.ResourceFor(issuer, "a").ID
-	ownerStore, err := database.EnsureUser(authorization.ActorKey(issuer, "a"), issuer, "a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.EnsureUser(authorization.ActorKey(issuer, "b"), issuer, "b"); err != nil {
-		t.Fatal(err)
+	runnerBySubject := map[string]string{}
+	for _, subject := range []string{"a", "b"} {
+		st, err := database.EnsureUser(authorization.ActorKey(issuer, subject), issuer, subject)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.InitializeModel(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.SetSyncCredential("https://bridge.test/"+subject, "bridge.test"); err != nil {
+			t.Fatal(err)
+		}
+		runnerBySubject[subject] = "bridge.test"
 	}
 	if _, err := database.EnsureUser(authorization.ActorKey(issuer, guestSubject), issuer, guestSubject); err != nil {
 		t.Fatal(err)
 	}
-	router, err := newUserRouter(database, userRouterConfig{
-		PrimaryResourceID: ownerID,
-		API:               api.Config{SyncRunner: simplefin.NewRunnerWithProvider(ownerStore, simplefin.Config{}, func() (string, map[string]struct{}) { return "https://bridge.test/simplefin", nil }, nil)},
-	})
+	manager := testSyncManager(t, database)
+	router, err := newUserRouter(database, userRouterConfig{Sync: manager, API: api.Config{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +294,8 @@ func TestServerBridgeCredentialsStayInConfiguredOwnerUser(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
 			t.Fatal(err)
 		}
-		if w.Code != 200 || status.SyncConfigured != (subject == "a") || status.ReadOnly {
+		_, wants := runnerBySubject[subject]
+		if w.Code != 200 || status.SyncConfigured != wants || status.ReadOnly {
 			t.Fatalf("subject %q status=%d %+v", subject, w.Code, status)
 		}
 	}

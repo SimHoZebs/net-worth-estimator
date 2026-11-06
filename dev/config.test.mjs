@@ -22,7 +22,7 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   const env = composeEnvironment(config);
   assert.equal(env.DEV_APP_PUBLIC_URL, "http://localhost:5178");
   assert.equal(env.DEV_CASDOOR_PUBLIC_URL, "http://localhost:8000");
-  assert.equal(env.DEV_OWNER_SUBJECT, "");
+  assert.equal(env.DEV_OWNER_SUBJECT, undefined);
   assert.equal(env.DEV_GUEST_SUBJECT, "");
   assert.equal(env.DEV_AUTH_CLIENT_SECRET, config.identity.AUTH_CLIENT_SECRET);
   assert.equal(env.CASDOOR_ADMIN_PASSWORD, undefined);
@@ -33,18 +33,8 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   assert.ok(args.some((item) => item.endsWith("/docker-compose.dev.yml")));
   assert.equal(args.at(-1), "up");
   assert.throws(() => settings({ ...config, source: {} }), /snapshot source/);
-  assert.throws(() => settings({ ...config, ownerSubject: "*" }), /verified/);
-  assert.throws(() => settings({ ...config, ownerSubject: " " }), /verified/);
   assert.throws(() => settings({ ...config, guestSubject: "*" }), /provisioned guest/);
   assert.throws(() => settings({ ...config, guestSubject: " " }), /provisioned guest/);
-  assert.throws(
-    () => settings({ ...config, ownerSubject: "same-subject", guestSubject: "same-subject" }),
-    /distinct from the owner/,
-  );
-  assert.equal(
-    composeEnvironment({ ...config, ownerSubject: "verified-user" }).DEV_OWNER_SUBJECT,
-    "verified-user",
-  );
   assert.equal(
     composeEnvironment({ ...config, guestSubject: "verified-guest" }).DEV_GUEST_SUBJECT,
     "verified-guest",
@@ -54,7 +44,7 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
 test("runtime environment export is private, repeatable, and preserves existing edits", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "waypoint-dev-env-"));
   const path = resolve(dir, ".env.dev");
-  const config = { ...newConfig(), ownerSubject: "verified-owner" };
+  const config = newConfig();
   try {
     await writeComposeEnv(config, path);
     const contents = await readFile(path, "utf8");
@@ -77,7 +67,6 @@ test("native Compose consumes the exported environment and isolates dev from pro
   const path = resolve(dir, ".env.dev");
   const config = {
     ...newConfig(undefined, "test-node.example.ts.net"),
-    ownerSubject: "opaque'${NOT_A_SECRET}",
     guestSubject: "guest-opaque'${NOT_A_SECRET}",
   };
   try {
@@ -121,18 +110,11 @@ test("native Compose consumes the exported environment and isolates dev from pro
     );
     // Compose escapes dollars when it serializes a reusable Compose document.
     assert.equal(
-      backend.environment.NET_WORTH_ESTIMATOR_OWNER_SUBJECT,
-      config.ownerSubject.replaceAll("$", () => "$$"),
-    );
-    assert.equal(
       backend.environment.NET_WORTH_ESTIMATOR_GUEST_SUBJECT,
       config.guestSubject.replaceAll("$", () => "$$"),
     );
     const interpolation = spawnSync("docker", [...args, "--environment"], options);
     assert.equal(interpolation.status, 0, interpolation.stderr);
-    assert.ok(
-      interpolation.stdout.split("\n").includes(`DEV_OWNER_SUBJECT=${config.ownerSubject}`),
-    );
     assert.ok(
       interpolation.stdout.split("\n").includes(`DEV_GUEST_SUBJECT=${config.guestSubject}`),
     );

@@ -142,6 +142,26 @@ func (d *Database) HasUser(userID string) (bool, error) {
 	return count == 1, err
 }
 
+// SyncCredentialUserIDs lists the users with a non-empty SimpleFIN Bridge
+// credential. The scheduler consumes this to discover connections connected
+// after boot. Empty rows are never synced.
+func (d *Database) SyncCredentialUserIDs() ([]string, error) {
+	rows, err := d.db.Query(`SELECT user_id FROM sync_credentials WHERE id = 1 AND access_url <> '' ORDER BY user_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // LookupUser returns the issuer and verified subject for a user ID. It is a
 // read-only lookup for the admin observation branch; it never provisions.
 func (d *Database) LookupUser(userID string) (issuer, subject string, found bool, err error) {

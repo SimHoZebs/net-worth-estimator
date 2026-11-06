@@ -17,7 +17,7 @@ type SimpleFIN struct {
 }
 
 // NewSimpleFIN builds the SimpleFIN provider adapter. The runner may be nil
-// (non-owner scopes, tests); sync then reports unconfigured, matching
+// (tests, scopes without sync); sync then reports unconfigured, matching
 // server status behavior.
 func NewSimpleFIN(st store.Store, runner *simplefin.Runner) *SimpleFIN {
 	return &SimpleFIN{store: st, runner: runner}

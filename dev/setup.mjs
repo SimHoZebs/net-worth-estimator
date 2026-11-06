@@ -148,21 +148,13 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
       "Dev identity metadata requires a provisioned guest subject.",
     );
   }
-  if (config.ownerSubject === null) {
-    config.ownerSubject = bootstrap.subject;
-    await saveConfig(stateDir, config);
-  }
-  if (!config.ownerSubject)
-    throw new Error(
-      `Set the verified Bridge ownerSubject in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. User ownership comes from the application database.`,
-    );
   if (config.guestSubject === null) {
     config.guestSubject = bootstrap.guest_subject;
     await saveConfig(stateDir, config);
   }
-  if (!config.guestSubject || config.guestSubject === config.ownerSubject)
+  if (!config.guestSubject || config.guestSubject === bootstrap.subject)
     throw new Error(
-      `Set a verified provisioned guestSubject distinct from the owner in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. Anonymous traffic resolves to it.`,
+      `Set a verified provisioned guestSubject distinct from the bootstrap user in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. Anonymous traffic resolves to it.`,
     );
   if (fresh) {
     const incoming = await snapshot(config, stateDir);
@@ -203,7 +195,6 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     appUrl: config.identity.APP_PUBLIC_URL,
     casdoorUrl: config.identity.CASDOOR_PUBLIC_URL,
     ports: portsFor(config),
-    ownerSubject: config.ownerSubject ?? null,
     guestSubject: config.guestSubject ?? null,
     pid: process.pid,
     createdAt: new Date().toISOString(),

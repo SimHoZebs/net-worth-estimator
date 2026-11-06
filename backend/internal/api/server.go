@@ -33,9 +33,9 @@ type Config struct {
 	Actor          func(context.Context) string
 	AllowedOrigins []string
 	ReadOnly       bool
-	// SyncRunner runs the SimpleFIN sync on trigger. It may be nil (public
-	// probes, non-owner scopes, tests) or unconfigured (no Bridge credential);
-	// triggers then return 503.
+	// SyncRunner runs the SimpleFIN sync on trigger for the calling user.
+	// It may be nil (public probes, tests) or unconfigured (no Bridge
+	// credential); triggers then return 503.
 	SyncRunner *simplefin.Runner
 	// GmailService owns the Gmail OAuth connection. It may be nil
 	// (tests, scopes without Gmail); Gmail endpoints then report the

@@ -4,82 +4,113 @@ import (
 	"context"
 	"log/slog"
 	"math/rand/v2"
-	"os"
+	"sync"
 	"time"
 
-	"github.com/simhozebs/net-worth-estimator/backend/internal/authorization"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/simplefin"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store"
 	"github.com/simhozebs/net-worth-estimator/backend/internal/store/adapters/sqlite"
 )
 
-// ownerSyncStore returns the owner user's store when it exists, or nil when
-// the user has not been provisioned yet (before first login). It never fails
-// for a missing user and never provisions one, so a fresh deployment
-// starts unconfigured and picks up a stored key once the owner connects.
-// The Bridge credential lives only in that user's database rows, never in
-// the environment.
-func ownerSyncStore(database *sqlite.Database, issuer, subject string) (store.Store, error) {
-	if subject == "" {
-		return nil, nil
-	}
-	userID := authorization.ActorKey(issuer, subject)
-	exists, err := database.HasUser(userID)
-	if err != nil || !exists {
-		return nil, err
-	}
-	return database.User(userID)
+// syncManager is the one place that owns SimpleFIN runners. Each user
+// connection gets a runner bound to that user's scoped store. Runners share
+// the process-wide in-flight guard and blackout behavior per user.
+type syncManager struct {
+	database *sqlite.Database
+	config   simplefin.Config
+	mu       sync.Mutex
+	runners  map[string]*simplefin.Runner
 }
 
-// configureSync builds the SimpleFIN runner on the owner user's scoped
-// store. The credential and card selection come only from that user's
-// database rows: an empty credential leaves the runner unconfigured and
-// the trigger returns 503. A nil store (no owner user provisioned yet at
-// boot) disables the sync the same way. After first login provisions the
-// user and the key is connected, restart once so startup can scope the
-// runner.
-//
-// Throttling matches the Bridge daily-update quota (24 requests or fewer
-// per day, replenished throughout the day): the scheduler runs every 6
-// hours (four runs per day), successful manual triggers are spaced by
-// MIN_TRIGGER_INTERVAL (default 6h), concurrent scheduler and
-// trigger runs share one singleflight guard, and an upstream 429 arms a
-// RATE_LIMIT_COOLDOWN blackout (default 1h) so frontend bursts degrade to
-// local 429s with Retry-After instead of further Bridge hits.
-func configureSync(database store.Store) (*simplefin.Runner, func()) {
+// newSyncManager builds the SimpleFIN manager. Invalid throttle settings
+// fail closed before the server starts.
+func newSyncManager(database *sqlite.Database, getenv func(string) string) (*syncManager, error) {
 	triggerInterval, err := simplefin.ParsePositiveDuration(
-		os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL"),
+		getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_MIN_TRIGGER_INTERVAL"),
 		simplefin.MinTriggerInterval,
 	)
 	if err != nil {
-		bootFatalf("invalid simplefin trigger interval", err)
+		return nil, err
 	}
 	rateLimitCooldown, err := simplefin.ParsePositiveDuration(
-		os.Getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN"),
+		getenv("NET_WORTH_ESTIMATOR_SIMPLEFIN_RATE_LIMIT_COOLDOWN"),
 		simplefin.DefaultRateLimitCooldown,
 	)
 	if err != nil {
-		bootFatalf("invalid simplefin rate-limit cooldown", err)
+		return nil, err
 	}
-	if database == nil {
-		slog.Info("simplefin sync is not configured: no owner user provisioned yet", "component", "simplefin")
-		return nil, func() {}
+	return &syncManager{
+		database: database,
+		config: simplefin.Config{
+			MinTriggerInterval: triggerInterval,
+			RateLimitCooldown:  rateLimitCooldown,
+		},
+		runners: map[string]*simplefin.Runner{},
+	}, nil
+}
+
+// RunnerFor returns the runner for one user's scoped store, creating it on
+// first use. The credential and card selection stay in that user's database
+// rows; the provider can be rotated without rebuilding the runner.
+func (m *syncManager) RunnerFor(userID string, scoped store.Store) *simplefin.Runner {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if runner, ok := m.runners[userID]; ok {
+		return runner
 	}
-	config := simplefin.Config{
-		MinTriggerInterval: triggerInterval,
-		RateLimitCooldown:  rateLimitCooldown,
+	runner := newDynamicRunner(scoped, m.config)
+	m.runners[userID] = runner
+	return runner
+}
+
+// SyncConfigured runs every user connection with a non-empty Bridge
+// credential. A deleted or invalid user is logged and skipped without
+// stopping the others.
+func (m *syncManager) SyncConfigured(ctx context.Context) {
+	ids, err := m.database.SyncCredentialUserIDs()
+	if err != nil {
+		slog.Error("simplefin scheduled sync could not list credentials", "component", "simplefin", "error", err)
+		return
 	}
-	runner := newDynamicRunner(database, config)
-	stop := startSyncScheduler(runner)
-	return runner, stop
+	for _, userID := range ids {
+		m.syncUser(ctx, userID)
+	}
+}
+
+func (m *syncManager) syncUser(ctx context.Context, userID string) {
+	scoped, err := m.database.User(userID)
+	if err != nil {
+		slog.Warn("simplefin scheduled sync skipped an unavailable user", "component", "simplefin", "user_id", userID, "error", err)
+		return
+	}
+	runner := m.RunnerFor(userID, scoped)
+	if !runner.IsConfigured() {
+		return
+	}
+	summary, err := runner.Sync(ctx)
+	if err != nil {
+		slog.Error("simplefin scheduled sync failed", "component", "simplefin", "user_id", userID, "error", err)
+		return
+	}
+	slog.Info("simplefin scheduled sync", "component", "simplefin", "user_id", userID,
+		"checkpoints_inserted", summary.CheckpointsInserted,
+		"checkpoints_updated", summary.CheckpointsUpdated,
+		"checkpoints_skipped", summary.CheckpointsSkipped,
+		"pending_deleted", summary.PendingDeleted,
+		"pending_inserted", summary.PendingInserted,
+		"pending_updated", summary.PendingUpdated,
+		"settled_converted", summary.SettledConverted,
+		"settled_inserted", summary.SettledInserted,
+		"accounts_provisioned", summary.AccountsProvisioned,
+		"skipped", summary.Skipped)
 }
 
 // newDynamicRunner builds a runner whose credential and card selection
 // resolve per run from the user's stored BYOK rows, so connecting,
 // rotating, or disconnecting a key takes effect without a restart.
-func newDynamicRunner(database store.Store, config simplefin.Config) *simplefin.Runner {
+func newDynamicRunner(scoped store.Store, config simplefin.Config) *simplefin.Runner {
 	provider := func() (string, map[string]struct{}) {
-		stored, err := database.GetSyncCredential()
+		stored, err := scoped.GetSyncCredential()
 		if err != nil {
 			// A transient store failure must not trigger a Bridge fetch
 			// with an empty key; report unconfigured until the next run.
@@ -97,11 +128,11 @@ func newDynamicRunner(database store.Store, config simplefin.Config) *simplefin.
 		}
 		return stored.AccessURL, cards
 	}
-	return simplefin.NewRunnerWithProvider(database, config, provider, nil)
+	return simplefin.NewRunnerWithProvider(scoped, config, provider, nil)
 }
 
-// syncInterval is the fixed scheduler cadence: four Bridge hits per day,
-// well under the Bridge daily-update quota (24 requests or fewer per day).
+// syncInterval is the fixed scheduler cadence: four Bridge attempts per day,
+// within the Bridge daily-update quota.
 const syncInterval = 6 * time.Hour
 
 // nextSyncDelay returns the wait until the next 6-hour boundary (00, 06,
@@ -119,7 +150,7 @@ func nextSyncDelay(now time.Time, randMinute int) time.Duration {
 	return syncInterval + time.Duration(randMinute)*time.Minute
 }
 
-func startSyncScheduler(runner *simplefin.Runner) func() {
+func startSyncScheduler(manager *syncManager) func() {
 	stop := make(chan struct{})
 	go func() {
 		timer := time.NewTimer(nextSyncDelay(time.Now(), rand.N(60)))
@@ -129,26 +160,7 @@ func startSyncScheduler(runner *simplefin.Runner) func() {
 			case <-stop:
 				return
 			case <-timer.C:
-				if !runner.IsConfigured() {
-					timer.Reset(syncInterval)
-					continue
-				}
-				summary, err := runner.Sync(context.Background())
-				if err != nil {
-					slog.Error("simplefin scheduled sync failed", "component", "simplefin", "error", err)
-				} else {
-					slog.Info("simplefin scheduled sync", "component", "simplefin",
-						"checkpoints_inserted", summary.CheckpointsInserted,
-						"checkpoints_updated", summary.CheckpointsUpdated,
-						"checkpoints_skipped", summary.CheckpointsSkipped,
-						"pending_deleted", summary.PendingDeleted,
-						"pending_inserted", summary.PendingInserted,
-						"pending_updated", summary.PendingUpdated,
-						"settled_converted", summary.SettledConverted,
-						"settled_inserted", summary.SettledInserted,
-						"accounts_provisioned", summary.AccountsProvisioned,
-						"skipped", summary.Skipped)
-				}
+				manager.SyncConfigured(context.Background())
 				timer.Reset(syncInterval)
 			}
 		}

@@ -20,7 +20,7 @@ type Gmail struct {
 }
 
 // NewGmail builds the Gmail provider adapter. The service may be nil
-// (non-owner scopes, tests); sync then reports unconfigured, matching the
+// (tests); the connections then report unconfigured, matching the
 // SimpleFIN adapter behavior.
 func NewGmail(st store.Store, service *gmail.Service) *Gmail {
 	return &Gmail{store: st, service: service}

@@ -62,9 +62,9 @@ export async function run(values, positionals) {
       throw new Error("Dev identity bootstrap is missing its issuer.");
     let target = values.user;
     if (!target) {
-      if (!config.ownerSubject)
-        throw new Error("Dev state has no verified owner. Run setup first or pass --user.");
-      target = actorResource(bootstrap.issuer, config.ownerSubject);
+      if (!bootstrap.subject || typeof bootstrap.subject !== "string")
+        throw new Error("Dev state has no verified bootstrap user. Run setup first or pass --user.");
+      target = actorResource(bootstrap.issuer, bootstrap.subject);
     }
     const destination = resolve(stateDir, "data", databaseName);
     if (!(await exists(destination))) throw new Error("Dev data is missing. Run setup first.");

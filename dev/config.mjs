@@ -102,7 +102,6 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
   return {
     version: 1,
     source,
-    ownerSubject: null,
     guestSubject: null,
     slot,
     ports: {
@@ -130,25 +129,14 @@ export function settings(config) {
   if (config.version !== 1) throw new Error("Unsupported dev configuration version");
   sanitizeSlot(config.slot ?? "");
   if (
-    config.ownerSubject !== undefined &&
-    config.ownerSubject !== null &&
-    (typeof config.ownerSubject !== "string" ||
-      !config.ownerSubject ||
-      config.ownerSubject !== config.ownerSubject.trim() ||
-      /[*,\r\n]/.test(config.ownerSubject))
-  ) {
-    throw new Error("The primary owner must be one verified OIDC subject");
-  }
-  if (
     config.guestSubject !== undefined &&
     config.guestSubject !== null &&
     (typeof config.guestSubject !== "string" ||
       !config.guestSubject ||
       config.guestSubject !== config.guestSubject.trim() ||
-      /[*,\r\n]/.test(config.guestSubject) ||
-      config.guestSubject === config.ownerSubject)
+      /[*,\r\n]/.test(config.guestSubject))
   ) {
-    throw new Error("The provisioned guest must be one verified OIDC subject distinct from the owner");
+    throw new Error("The provisioned guest must be one verified OIDC subject");
   }
   if (
     !config.source ||
@@ -208,7 +196,6 @@ export function composeEnvironment(config) {
     DEV_CASDOOR_PUBLIC_URL: config.identity.CASDOOR_PUBLIC_URL,
     DEV_AUTH_CLIENT_ID: config.identity.AUTH_CLIENT_ID,
     DEV_AUTH_CLIENT_SECRET: config.identity.AUTH_CLIENT_SECRET,
-    DEV_OWNER_SUBJECT: config.ownerSubject ?? "",
     DEV_GUEST_SUBJECT: config.guestSubject ?? "",
   };
 }

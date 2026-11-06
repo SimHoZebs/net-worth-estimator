@@ -112,22 +112,21 @@ func main() {
 	if err != nil {
 		bootFatalf("configure user resources", err)
 	}
-	syncStore, err := ownerSyncStore(database, identityConfig.Issuer, resources.OwnerSubject)
+	syncManager, err := newSyncManager(database, os.Getenv)
 	if err != nil {
-		bootFatalf("configure SimpleFIN user", err)
+		bootFatalf("configure SimpleFIN manager", err)
 	}
-	syncRunner, syncStop := configureSync(syncStore)
+	syncStop := startSyncScheduler(syncManager)
 	defer syncStop()
 
 	apiConfig := api.Config{
 		ReceiptSource:        receiptSource,
 		AllowedOrigins:       allowedOrigins,
 		ReadOnly:             readOnly,
-		SyncRunner:           syncRunner,
 		GmailService:         configureGmail(),
 		GmailFrontendBaseURL: strings.TrimRight(os.Getenv("NET_WORTH_ESTIMATOR_PUBLIC_URL"), "/"),
 	}
-	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig)
+	handler, closeResources, err := resourceHandler(context.Background(), database, resources, identityConfig, apiConfig, syncManager)
 	if err != nil {
 		bootFatalf("configure resource access", err)
 	}

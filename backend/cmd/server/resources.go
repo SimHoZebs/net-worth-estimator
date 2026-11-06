@@ -21,12 +21,11 @@ import (
 )
 
 type resourceConfig struct {
-	OwnerSubject, ModelID, Organization string
+	ModelID, Organization string
 }
 
 func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	c := resourceConfig{
-		OwnerSubject: getenv("NET_WORTH_ESTIMATOR_OWNER_SUBJECT"),
 		ModelID:      getenv("NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL"),
 		Organization: getenv("NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION"),
 	}
@@ -36,13 +35,10 @@ func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	if !orgName.MatchString(c.Organization) {
 		return c, errors.New("AUTH_ORGANIZATION must be a name without an owner prefix")
 	}
-	if c.OwnerSubject != strings.TrimSpace(c.OwnerSubject) || strings.ContainsAny(c.OwnerSubject, "*\x00\r\n") {
-		return c, errors.New("OWNER_SUBJECT must be one verified OIDC subject")
-	}
 	return c, nil
 }
 
-func resourceHandler(ctx context.Context, database *sqlite.Database, config resourceConfig, loginConfig identity.Config, apiConfig api.Config) (http.Handler, func() error, error) {
+func resourceHandler(ctx context.Context, database *sqlite.Database, config resourceConfig, loginConfig identity.Config, apiConfig api.Config, syncMgr *syncManager) (http.Handler, func() error, error) {
 	permissions, err := authorization.New(authorization.Config{
 		Issuer: loginConfig.Issuer, InternalURL: loginConfig.InternalURL,
 		ClientID: loginConfig.ClientID, ClientSecret: loginConfig.ClientSecret, ModelID: config.ModelID,
@@ -52,18 +48,11 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	if err != nil {
 		return nil, nil, err
 	}
-	primaryID := ""
-	if config.OwnerSubject != "" {
-		primary := authorization.ResourceFor(loginConfig.Issuer, config.OwnerSubject)
-		if primary.ID == "" {
-			return nil, nil, errors.New("primary user requires an explicit private user resource ID")
-		}
-		primaryID = primary.ID
-	}
 	apiConfig.CanWrite = identity.CanWrite
 	apiConfig.Actor = identity.Subject
 	router, err := newUserRouter(database, userRouterConfig{
-		PrimaryResourceID: primaryID, API: apiConfig,
+		Sync: syncMgr,
+		API:  apiConfig,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -178,9 +167,10 @@ var userResource = regexp.MustCompile(`^users/[a-f0-9]{64}$`)
 var orgName = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
 
 type userRouterConfig struct {
-	// PrimaryResourceID assigns server Bridge credentials, not data ownership.
-	PrimaryResourceID string
-	API               api.Config
+	// Sync assigns the per-user SimpleFIN runner. It must be configured for
+	// every private user with a stored Bridge key.
+	Sync *syncManager
+	API  api.Config
 }
 
 // userRouter isolates each user's model, artifacts, presets, and sync
@@ -201,8 +191,8 @@ func newUserRouter(database store.Database, config userRouterConfig) (*userRoute
 	if database == nil {
 		return nil, errors.New("user routing requires the application database")
 	}
-	if config.PrimaryResourceID != "" && !userResource.MatchString(config.PrimaryResourceID) {
-		return nil, errors.New("primary user requires an explicit private user resource ID")
+	if config.Sync == nil {
+		return nil, errors.New("user routing requires the SimpleFIN sync manager")
 	}
 	// Health and status probes do not access financial state.
 	publicConfig := config.API
@@ -249,15 +239,14 @@ func (p *userRouter) handlerFor(resource authorization.Resource) (http.Handler, 
 		return existing, nil
 	}
 	// Provisioning belongs to the verified authorization boundary, not routing.
-	scoped, err := p.database.User(storeUserID(resource.ID))
+	userID := storeUserID(resource.ID)
+	scoped, err := p.database.User(userID)
 	if err != nil {
 		return nil, err
 	}
 	config := p.config.API
 	config.ResourceID = resource.ID
-	if resource.ID != p.config.PrimaryResourceID {
-		config.SyncRunner = nil
-	}
+	config.SyncRunner = p.config.Sync.RunnerFor(userID, scoped)
 	// The global operator read-only kill switch stays in config.ReadOnly;
 	// there is no per-identity forced read-only.
 	handler := api.New(scoped, config)

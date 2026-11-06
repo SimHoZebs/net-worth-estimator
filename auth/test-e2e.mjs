@@ -368,10 +368,9 @@ try {
     const t = Date.now();
     await imageRun(apiTag, ["/app/setupdb", "--db", containerDB]);
     await imageRun(apiTag, ["/app/setupdb", "--db", containerDB, "--issuer", issuer, "--subject", guestSubject]);
-    process.env.NET_WORTH_ESTIMATOR_OWNER_SUBJECT = ownerSubject;
     process.env.NET_WORTH_ESTIMATOR_GUEST_SUBJECT = guestSubject;
     await writeFile(resolve(workRoot, "e2e.env"),
-      `${await readFile(resolve(workRoot, "e2e.env"), "utf8")}NET_WORTH_ESTIMATOR_OWNER_SUBJECT=${ownerSubject}\nNET_WORTH_ESTIMATOR_GUEST_SUBJECT=${guestSubject}\n`,
+      `${await readFile(resolve(workRoot, "e2e.env"), "utf8")}NET_WORTH_ESTIMATOR_GUEST_SUBJECT=${guestSubject}\n`,
       { mode: 0o600 });
     await bootStack();
     record("stack", "PASS", "schema + guest row from image binaries, stack healthy", (Date.now() - t) / 1000);

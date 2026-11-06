@@ -131,9 +131,8 @@ func (s *handler) getSyncCredential(_ context.Context, _ *struct{}) (*syncCreden
 }
 
 // connectSyncCredential stores a user-scoped Bridge key. Like account links,
-// the credential belongs to the calling user; only the primary owner's
-// runner consumes it, so a non-primary user reports configured here while
-// its own trigger stays 503.
+// the credential belongs to the calling user and that user's own runner
+// consumes it.
 func (s *handler) connectSyncCredential(ctx context.Context, input *syncCredentialInput) (*syncCredentialOutput, error) {
 	setupToken := strings.TrimSpace(input.Body.SetupToken)
 	accessURL := strings.TrimSpace(input.Body.AccessURL)
@@ -173,8 +172,7 @@ func (s *handler) connectSyncCredential(ctx context.Context, input *syncCredenti
 	// the manual interval: it still honors the in-flight guard and the
 	// post-429 blackout, and it leaves lastTrigger untouched so the manual
 	// throttle is not overridden. Best-effort: a throttled or failed sync
-	// never fails the connect itself. Only the primary user has a runner;
-	// other plans just store their key.
+	// never fails the connect itself. The calling user's runner runs it.
 	if wasInitial && s.runner != nil {
 		if summary, err := s.runner.Sync(ctx); err != nil {
 			log.Printf("simplefin initial sync failed: %v", err)

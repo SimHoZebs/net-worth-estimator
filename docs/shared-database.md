@@ -135,7 +135,7 @@ and all identity state. Sample publication creates an approved snapshot, not a
 live alias. It removes private upstream identities, links, sync times, source
 paths, migration history, and projection history from the published content.
 
-Server-level SimpleFIN credentials remain bound to the configured owner.
+SimpleFIN credentials stay in each user's own rows.
 Other users never inherit those credentials. The global
 read-only switch still blocks editor writes.
 

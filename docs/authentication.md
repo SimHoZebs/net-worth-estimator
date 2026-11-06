@@ -48,7 +48,6 @@ The default signup form does not collect email or require a mail service.
 | `NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL` | Casdoor model ID, default `waypoint/user-access`                                     |
 | `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Provider organization for immutable-subject lookups, default `waypoint` |
 | `NET_WORTH_ESTIMATOR_DB`                    | Shared application database for private users and application identity state    |
-| `NET_WORTH_ESTIMATOR_OWNER_SUBJECT` | Verified user whose scope may use server-level SimpleFIN credentials       |
 | `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | Required provisioned user subject used for anonymous visits; permissions remain provider-owned |
 | `NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME` | Absolute application lifetime, default `168h`                                   |
 | `NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL` | Provider recheck interval, default `30s`, range `1s`–`5m`                       |
