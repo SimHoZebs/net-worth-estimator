@@ -44,6 +44,9 @@ function renderPage(
 		<SessionContext
 			value={{
 				session: next,
+				phase: "ready",
+				error: "",
+				refresh: vi.fn(async () => {}),
 				logout: vi.fn(),
 				logoutPending: false,
 			}}
@@ -181,7 +184,16 @@ describe("account page", () => {
 		);
 		acceptUserScope(sessionScopeInput(session), suspendUserScope());
 		render(
-			<SessionContext value={{ session, logout, logoutPending: false }}>
+			<SessionContext
+				value={{
+					session,
+					phase: "ready",
+					error: "",
+					refresh: vi.fn(async () => {}),
+					logout,
+					logoutPending: false,
+				}}
+			>
 				<AccountPage />
 				<NotificationCenter />
 			</SessionContext>,

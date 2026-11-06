@@ -202,6 +202,9 @@ describe("sidebar user placement", () => {
 			<SessionContext
 				value={{
 					session,
+					phase: "ready",
+					error: "",
+					refresh: vi.fn(async () => {}),
 					logout: vi.fn(async () => {}),
 					logoutPending: false,
 				}}

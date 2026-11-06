@@ -176,7 +176,7 @@ export function useResourceSession() {
 						? cause.message
 						: "Authentication status is unavailable.";
 				setStatus({ phase: "unavailable", error: check.error });
-				// First-load outages use the full-screen fallback; only a
+				// First-load outages render in the layout body; only a
 				// revalidation floats, since a verified account is mounted.
 				if (previous)
 					notifyError("session", check.error, {
@@ -193,9 +193,9 @@ export function useResourceSession() {
 	}, []);
 	const refresh = useCallback(() => {
 		// Background revalidation keeps the verified account mounted.
-		// Only the first check (no owner yet) uses the full-screen
-		// checking state; later checks stay silent until discovery proves
-		// a new owner, a denial, or an outage that keeps stale data visible.
+		// Only the first check (no owner yet) uses the checking state; later
+		// checks stay silent until discovery proves a new owner, a denial,
+		// or an outage that keeps stale data visible.
 		if (!owner.current) setStatus({ phase: "checking", error: "" });
 		return verify();
 	}, [verify]);

@@ -15,8 +15,13 @@ export interface Session {
 	user: { subject: string; name: string };
 }
 
+export type SessionPhase = "checking" | "ready" | "denied" | "unavailable";
+
 interface SessionContextValue {
-	session: Session;
+	session: Session | null;
+	phase: SessionPhase;
+	error: string;
+	refresh: () => Promise<void>;
 	logout: () => Promise<void>;
 	logoutPending: boolean;
 }

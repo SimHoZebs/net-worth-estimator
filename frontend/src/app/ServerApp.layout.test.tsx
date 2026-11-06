@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { SessionContext } from "../auth/sessionContext.ts";
 import { suspendUserScope } from "../auth/resourceScope.ts";
 import { resetNotifications } from "../state/notifications.ts";
 import {
@@ -83,4 +84,78 @@ it("keeps the same sidebar node across workspace and recovery bodies", async () 
 	expect(
 		screen.getByRole("complementary", { name: "Workspace navigation" }),
 	).toBe(sidebar);
+});
+
+it("shows an unavailable error in the layout body without replacing the shell", async () => {
+	stubTestServer();
+	render(
+		<SessionContext
+			value={{
+				session: null,
+				phase: "unavailable",
+				error:
+					"The Waypoint server is unavailable (HTTP 503). It may be restarting; retry shortly.",
+				refresh: vi.fn(async () => {}),
+				logout: vi.fn(async () => {}),
+				logoutPending: false,
+			}}
+		>
+			<ServerApp />
+		</SessionContext>,
+	);
+	expect(
+		await screen.findByRole("heading", { name: "Cannot reach your data." }),
+	).toBeTruthy();
+	expect(
+		screen.getByText(
+			"The Waypoint server is unavailable (HTTP 503). It may be restarting; retry shortly.",
+		),
+	).toBeTruthy();
+	expect(
+		screen.getByRole("button", { name: "Retry access check" }),
+	).toBeTruthy();
+	// The layout stays: sidebar navigation is still present and interactive.
+	expect(
+		screen.getByRole("complementary", { name: "Workspace navigation" }),
+	).toBeTruthy();
+	expect(
+		screen.getByRole("navigation", { name: "Main navigation" }),
+	).toBeTruthy();
+	expect(screen.queryByText("Workspace body")).toBeNull();
+});
+
+it("shows a denial in the layout body without replacing the shell", async () => {
+	stubTestServer();
+	render(
+		<SessionContext
+			value={{
+				session: {
+					enabled: true,
+					authenticated: false,
+					allowed: false,
+					resource: {
+						id: `users/${"a".repeat(64)}`,
+						permissions: [],
+					},
+					user: { subject: "guest", name: "Guest" },
+				},
+				phase: "denied",
+				error: "This user does not have access.",
+				refresh: vi.fn(async () => {}),
+				logout: vi.fn(async () => {}),
+				logoutPending: false,
+			}}
+		>
+			<ServerApp />
+		</SessionContext>,
+	);
+	expect(
+		await screen.findByRole("heading", {
+			name: "Workspace access is unavailable",
+		}),
+	).toBeTruthy();
+	expect(
+		screen.getByRole("complementary", { name: "Workspace navigation" }),
+	).toBeTruthy();
+	expect(screen.queryByText("Workspace body")).toBeNull();
 });

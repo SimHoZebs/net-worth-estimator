@@ -40,6 +40,9 @@ it("keeps account controls out of recovery while the model is empty", () => {
 						name: "New account owner",
 					},
 				},
+				phase: "ready",
+				error: "",
+				refresh: vi.fn(async () => {}),
 				logout,
 				logoutPending: false,
 			}}

@@ -1,3 +1,5 @@
+import { Button } from "../components/Button.tsx";
+import { useSession, type Session } from "../auth/sessionContext.ts";
 import { useUserScope } from "../state/useUserScope.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
 import { useWorkspaceSyncMonitor } from "../state/useWorkspaceSyncMonitor.ts";
@@ -20,14 +22,24 @@ export function ServerApp() {
 	const status = useServerStatus({ enabled });
 	useWorkspaceSyncMonitor(enabled);
 	const navigation = useWorkspaceNavigation();
+	const sessionState = useSession();
+	const session = sessionState?.session ?? null;
+	const phase = sessionState?.phase ?? "checking";
+	const sessionError = sessionState?.error ?? "";
+	const refresh = sessionState?.refresh ?? (async () => {});
+	const logout = sessionState?.logout ?? (async () => {});
+	const logoutPending = sessionState?.logoutPending ?? false;
 
-	// The layout stays mounted once. Only the body switches: recovery when
-	// the server holds no model, otherwise the workspace body. No state
-	// shows a whole-app skeleton; each page and sidebar slot shows its own
-	// skeleton while its own query is pending. A pending status is not a
-	// reason to withhold navigation, and the sidebar, topbar, and heading
-	// keep their identity across loading and workspace states.
-	const recovery = status.data?.hasModel === false;
+	// The layout stays mounted once. Only the body switches: session
+	// denial or outage, recovery when the server holds no model, otherwise
+	// the workspace body. No state shows a whole-app skeleton; each page
+	// and sidebar slot shows its own skeleton while its own query is
+	// pending. A pending status is not a reason to withhold navigation, and
+	// the sidebar, topbar, and heading keep their identity across loading
+	// and workspace states.
+	const blocked =
+		!session?.allowed && (phase === "denied" || phase === "unavailable");
+	const recovery = !blocked && status.data?.hasModel === false;
 	return (
 		<WorkspaceLayout
 			navigation={(close) => (
@@ -44,17 +56,79 @@ export function ServerApp() {
 				/>
 			)}
 		>
-			{!recovery && (
+			{!recovery && !blocked && (
 				<WorkspaceHeading
 					page={navigation.currentPage}
 					headingRef={navigation.headingRef}
 				/>
 			)}
-			{recovery ? (
+			{blocked ? (
+				<SessionErrorBody
+					session={session}
+					error={sessionError}
+					logoutPending={logoutPending}
+					onRetry={() => {
+						void refresh();
+					}}
+					onLogout={() => {
+						void logout();
+					}}
+				/>
+			) : recovery ? (
 				<ServerWorkspaceRecovery />
 			) : (
 				<WorkspaceContent navigation={navigation} />
 			)}
 		</WorkspaceLayout>
+	);
+}
+
+// A denial is terminal for this boundary. Guests are provisioned
+// automatically, so a denied guest means the guest identity is missing or
+// its grants are broken. Sign-in stays an explicit Configs action; this
+// body offers retry instead of an automatic identity-provider redirect.
+function SessionErrorBody({
+	session,
+	error,
+	logoutPending,
+	onRetry,
+	onLogout,
+}: {
+	session: Session | null;
+	error: string;
+	logoutPending: boolean;
+	onRetry: () => void;
+	onLogout: () => void;
+}) {
+	return (
+		<div className="mx-auto my-[12vh] max-w-2xl p-6 [&_p]:mb-6">
+			<h1 className="mb-6">
+				{session
+					? session.authenticated
+						? "Session access is unavailable"
+						: "Workspace access is unavailable"
+					: "Cannot reach your data."}
+			</h1>
+			<p>
+				{session
+					? session.authenticated
+						? "Retry the access check, or sign out and sign in again."
+						: "Retry the access check. If the problem continues, the workspace owner must restore guest access."
+					: "Retry the access check below."}
+			</p>
+			{error && (
+				<p role="alert" className="text-danger-text">
+					{error}
+				</p>
+			)}
+			<div className="flex flex-wrap gap-3">
+				{session?.authenticated && (
+					<Button disabled={logoutPending} onClick={onLogout}>
+						{logoutPending ? "Signing out…" : "Sign out"}
+					</Button>
+				)}
+				<Button onClick={onRetry}>Retry access check</Button>
+			</div>
+		</div>
 	);
 }

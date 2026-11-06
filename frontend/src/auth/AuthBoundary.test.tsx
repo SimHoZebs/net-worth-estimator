@@ -17,10 +17,21 @@ import { GUEST_USER_ID, GUEST_USER_SUBJECT } from "@/mocks/resource.ts";
 
 vi.mock("./navigation.ts", () => ({ redirectToSignIn: vi.fn() }));
 
+function StatusProbe() {
+	const account = useSession();
+	return (
+		<p data-testid="session-status">
+			{`${account?.phase ?? "none"}:${account?.error ?? ""}`}
+		</p>
+	);
+}
+
 function SessionProbe() {
 	const account = useSession();
-	if (!account?.session.allowed) return null;
-	const { session, logout, logoutPending } = account;
+	const session = account?.session ?? null;
+	if (!session?.allowed) return null;
+	const logout = account?.logout ?? (async () => {});
+	const logoutPending = account?.logoutPending ?? false;
 	if (!session.authenticated)
 		return (
 			<div>
@@ -115,7 +126,7 @@ describe("provider-independent authentication boundary", () => {
 		).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("shows a retry screen for a denied guest without redirecting", async () => {
+	it("keeps children mounted on denial and exposes the denied phase without redirecting", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -130,25 +141,22 @@ describe("provider-independent authentication boundary", () => {
 		);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		expect(
-			await screen.findByRole("heading", {
-				name: "Workspace access is unavailable",
-			}),
-		).toBeTruthy();
-		expect(screen.getByRole("alert").textContent).toBe(
-			"This user does not have access.",
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		expect(screen.getByTestId("session-status").textContent).toBe(
+			"denied:This user does not have access.",
 		);
 		expect(
-			screen.getByRole("button", { name: "Retry access check" }),
-		).toBeTruthy();
-		expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
-		expect(screen.queryByText("Private workspace")).toBeNull();
+			screen.queryByRole("heading", {
+				name: "Workspace access is unavailable",
+			}),
+		).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("keeps the denied guest screen stable across re-verification", async () => {
+	it("keeps the denied guest phase stable across re-verification", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
@@ -161,23 +169,27 @@ describe("provider-independent authentication boundary", () => {
 		vi.stubGlobal("fetch", fetcher);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		await screen.findByRole("heading", {
-			name: "Workspace access is unavailable",
-		});
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe(
+				"denied:This user does not have access.",
+			),
+		);
 		const calls = fetcher.mock.calls.length;
 		window.dispatchEvent(new Event("focus"));
 		await waitFor(() =>
 			expect(fetcher.mock.calls.length).toBeGreaterThan(calls),
 		);
-		expect(
-			screen.getByRole("heading", { name: "Workspace access is unavailable" }),
-		).toBeTruthy();
+		expect(screen.getByTestId("session-status").textContent).toBe(
+			"denied:This user does not have access.",
+		);
+		expect(screen.getByText("Private workspace")).toBeTruthy();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("keeps denied accounts closed with retry and sign-out", async () => {
+	it("keeps denied accounts phase exposed while children stay mounted", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
@@ -190,22 +202,17 @@ describe("provider-independent authentication boundary", () => {
 		vi.stubGlobal("fetch", fetcher);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Public workspace</p>
 			</AuthBoundary>,
 		);
-		expect(
-			await screen.findByRole("heading", {
-				name: "Session access is unavailable",
-			}),
-		).toBeTruthy();
-		expect(screen.getByRole("alert").textContent).toBe(
-			"This user does not have access.",
+		expect(await screen.findByText("Public workspace")).toBeTruthy();
+		expect(screen.getByTestId("session-status").textContent).toBe(
+			"denied:This user does not have access.",
 		);
-		expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
 		expect(
 			screen.queryByText(/server owner|grant.*access|OIDC subject/i),
 		).toBeNull();
-		expect(screen.queryByText("Public workspace")).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 		fetcher.mockImplementation(async () =>
 			status({
@@ -216,8 +223,11 @@ describe("provider-independent authentication boundary", () => {
 				user: { subject: "known-account", name: "User" },
 			}),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
-		expect(await screen.findByText("Public workspace")).toBeTruthy();
+		fireEvent(window, new Event("focus"));
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe("ready:"),
+		);
+		expect(screen.getByText("Public workspace")).toBeTruthy();
 	});
 	it("retains guest workspace access when a verified editor's session expires", async () => {
 		const fetcher = vi.fn(async () =>
@@ -254,16 +264,18 @@ describe("provider-independent authentication boundary", () => {
 		expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("fails closed on unavailable or malformed discovery", async () => {
+	it("exposes unavailable phase while keeping children mounted", async () => {
 		const fetcher = vi.fn(async () => status({}, 503));
 		vi.stubGlobal("fetch", fetcher);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		expect(await screen.findByRole("alert")).toBeTruthy();
-		expect(screen.queryByText("Private workspace")).toBeNull();
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		const text = screen.getByTestId("session-status").textContent ?? "";
+		expect(text.startsWith("unavailable:")).toBe(true);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 		fetcher.mockImplementation(async () =>
 			status({
@@ -274,38 +286,33 @@ describe("provider-independent authentication boundary", () => {
 				user: guestUser,
 			}),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Retry access check" }));
+		fireEvent(window, new Event("focus"));
 		await waitFor(() =>
-			expect(screen.getByText("Private workspace")).toBeTruthy(),
+			expect(screen.getByTestId("session-status").textContent).toBe("ready:"),
 		);
+		expect(screen.getByText("Private workspace")).toBeTruthy();
 	});
-	it("names a down server with a retry action instead of idling on the loading state", async () => {
+	it("exposes a down server phase instead of idling on the loading state", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => status({ error: "Bad Gateway" }, 502)),
 		);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your data." }),
-		).toBeTruthy();
-		expect(screen.getByRole("alert").textContent).toBe(
-			"The Waypoint server is unavailable (HTTP 502). It may be restarting; retry shortly.",
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		expect(screen.getByTestId("session-status").textContent).toBe(
+			"unavailable:The Waypoint server is unavailable (HTTP 502). It may be restarting; retry shortly.",
 		);
-		expect(screen.getByText("Retry the access check below.")).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: "Retry access check" }),
-		).toBeTruthy();
 		expect(
 			screen.queryByRole("button", { name: "Continue to sign in" }),
 		).toBeNull();
-		expect(screen.queryByText("Private workspace")).toBeNull();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("names a refused connection the same way", async () => {
+	it("exposes a refused connection the same way", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () => {
@@ -314,14 +321,13 @@ describe("provider-independent authentication boundary", () => {
 		);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		expect(
-			await screen.findByRole("heading", { name: "Cannot reach your data." }),
-		).toBeTruthy();
-		expect(screen.getByRole("alert").textContent).toBe(
-			"Cannot reach the Waypoint server. It may be down or restarting.",
+		expect(await screen.findByText("Private workspace")).toBeTruthy();
+		expect(screen.getByTestId("session-status").textContent).toBe(
+			"unavailable:Cannot reach the Waypoint server. It may be down or restarting.",
 		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
@@ -366,7 +372,7 @@ describe("provider-independent authentication boundary", () => {
 		await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
 		expect(screen.getByText("Private workspace")).toBeTruthy();
 	});
-	it("shows the retry screen when a later check denies a previously allowed guest", async () => {
+	it("exposes denied phase when a later check denies a previously allowed guest while children stay", async () => {
 		const fetcher = vi.fn(async () =>
 			status({
 				enabled: true,
@@ -379,6 +385,7 @@ describe("provider-independent authentication boundary", () => {
 		vi.stubGlobal("fetch", fetcher);
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
@@ -394,14 +401,14 @@ describe("provider-independent authentication boundary", () => {
 			}),
 		);
 		window.dispatchEvent(new Event("focus"));
-		expect(
-			await screen.findByRole("heading", {
-				name: "Workspace access is unavailable",
-			}),
-		).toBeTruthy();
-		expect(screen.queryByText("Private workspace")).toBeNull();
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe(
+				"denied:This user does not have access.",
+			),
+		);
+		expect(screen.getByText("Private workspace")).toBeTruthy();
 		expect(redirectToSignIn).not.toHaveBeenCalled();
-		// A later re-verification keeps the same stable screen.
+		// A later re-verification keeps the same stable phase.
 		const calls = fetcher.mock.calls.length;
 		window.dispatchEvent(new Event("focus"));
 		await waitFor(() =>
@@ -409,7 +416,7 @@ describe("provider-independent authentication boundary", () => {
 		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("shows the retry screen again after the boundary unmounts and mounts", async () => {
+	it("exposes denied phase again after the boundary unmounts and mounts", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -424,25 +431,31 @@ describe("provider-independent authentication boundary", () => {
 		);
 		const first = render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		await screen.findByRole("heading", {
-			name: "Workspace access is unavailable",
-		});
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe(
+				"denied:This user does not have access.",
+			),
+		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 		first.unmount();
 		render(
 			<AuthBoundary>
+				<StatusProbe />
 				<p>Private workspace</p>
 			</AuthBoundary>,
 		);
-		await screen.findByRole("heading", {
-			name: "Workspace access is unavailable",
-		});
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe(
+				"denied:This user does not have access.",
+			),
+		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
-	it("keeps the denied guest screen across a strict-mode remount", async () => {
+	it("keeps the denied guest phase across a strict-mode remount", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn(async () =>
@@ -458,17 +471,22 @@ describe("provider-independent authentication boundary", () => {
 		render(
 			<StrictMode>
 				<AuthBoundary>
+					<StatusProbe />
 					<p>Private workspace</p>
 				</AuthBoundary>
 			</StrictMode>,
 		);
-		await screen.findByRole("heading", {
-			name: "Workspace access is unavailable",
-		});
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe(
+				"denied:This user does not have access.",
+			),
+		);
 		window.dispatchEvent(new Event("focus"));
-		await screen.findByRole("heading", {
-			name: "Workspace access is unavailable",
-		});
+		await waitFor(() =>
+			expect(screen.getByTestId("session-status").textContent).toBe(
+				"denied:This user does not have access.",
+			),
+		);
 		expect(redirectToSignIn).not.toHaveBeenCalled();
 	});
 	it("does not redirect on a transient outage for a verified user", async () => {

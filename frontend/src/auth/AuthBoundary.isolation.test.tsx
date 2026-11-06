@@ -89,7 +89,16 @@ function WorkspaceProbe() {
 	const revision = useServerModel().data?.revision;
 	return (
 		<p data-testid="active-workspace">
-			{account?.session.resource?.id}:{revision ?? "empty"}
+			{account?.session?.resource?.id}:{revision ?? "empty"}
+		</p>
+	);
+}
+
+function StatusProbe() {
+	const account = useSession();
+	return (
+		<p data-testid="session-status">
+			{`${account?.phase ?? "none"}:${account?.error ?? ""}`}
 		</p>
 	);
 }
@@ -107,6 +116,7 @@ function renderWorkspace() {
 	return render(
 		<AuthBoundary>
 			<WorkspaceProbe />
+			<StatusProbe />
 			<NotificationCenter />
 		</AuthBoundary>,
 	);
@@ -525,10 +535,11 @@ describe("authentication resource isolation", () => {
 		await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
 		window.__WAYPOINT_CONFIG__ = { apiBaseUrl: "/second-api" };
 		await act(async () => finish(response(session())));
-		expect((await screen.findByRole("alert")).textContent).toBe(
-			"The API address changed. Retry the session check.",
+		expect(screen.getByTestId("session-status").textContent).toBe(
+			"unavailable:The API address changed. Retry the session check.",
 		);
-		expect(screen.queryByTestId("active-workspace")).toBeNull();
+		// The shell stays mounted; only the scope stays pending.
+		expect(screen.getByTestId("active-workspace").textContent).toBe(":empty");
 		expect(getUserScope().status).toBe("pending");
 	});
 
@@ -574,8 +585,14 @@ describe("authentication resource isolation", () => {
 			vi.fn(async () => response(body, header as string | null)),
 		);
 		renderWorkspace();
-		await screen.findByRole("alert");
-		expect(screen.queryByTestId("active-workspace")).toBeNull();
+		await waitFor(() =>
+			expect(
+				screen.getByTestId("session-status").textContent?.startsWith(
+					"unavailable:",
+				),
+			).toBe(true),
+		);
+		expect(screen.getByTestId("active-workspace").textContent).toBe(":empty");
 		expect(getUserScope().status).toBe("pending");
 	});
 
