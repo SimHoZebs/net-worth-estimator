@@ -1,6 +1,7 @@
 import { CalendarDays } from "lucide-react";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { BackendCheckpoint } from "@/api/contracts.ts";
+import { SegmentedControl } from "@/components/SegmentedControl.tsx";
 import { TextButton } from "@/components/Button.tsx";
 import { Notice } from "@/components/Notice.tsx";
 import {
@@ -11,7 +12,6 @@ import {
 import {
 	dateLabel,
 	daysBetweenInclusive,
-	money,
 	shiftDate,
 	sum,
 	todayIso,
@@ -50,6 +50,7 @@ import { SafeSpendingConfigurePanel } from "@/pages/outlook/safe-spending/SafeSp
 import { SafeSpendingCyclePanel } from "@/pages/outlook/safe-spending/SafeSpendingCyclePanel.tsx";
 import { SafeSpendingDetailShell } from "@/pages/outlook/safe-spending/SafeSpendingDetailShell.tsx";
 import {
+	SAFE_SPENDING_DETAIL_TABS,
 	isSafeSpendingCycleTab,
 	type SafeSpendingChargeCycle,
 	type SafeSpendingCycleTab,
@@ -63,14 +64,6 @@ import {
 import { useCardCycleActivity } from "@/pages/outlook/safe-spending/useCardCycleActivity.ts";
 import { useOutlookProjection } from "@/pages/outlook/useOutlookProjection.ts";
 import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
-
-// The trend chart pulls the chart engine, so it loads lazily like the
-// drawer's copy; the summary numbers render without waiting for it.
-const SafeSpendingTrendChart = lazy(() =>
-	import("./SafeSpendingTrendChart.tsx").then((module) => ({
-		default: module.SafeSpendingTrendChart,
-	})),
-);
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -122,6 +115,11 @@ export function SafeSpendingPreview({
 	const [transactionOrder, setTransactionOrder] = useState<TransactionOrder>(
 		DEFAULT_TRANSACTION_ORDER,
 	);
+	// The cycle views render inline on the page; the drawer keeps the
+	// per-cycle transaction lists and Configure. This tab switches cycles
+	// inline only and never opens the drawer.
+	const [cycleViewTab, setCycleViewTab] =
+		useState<SafeSpendingCycleTab>("cycle");
 
 	// Safe spending display follows the real calendar day so due dates read
 	// correctly, while the projection math stays on startDate (the
@@ -511,12 +509,8 @@ export function SafeSpendingPreview({
 		);
 	}
 
-	const checking = currentView.view.cashNow.checking;
-	const remainingObligations = currentView.view.cashNow.bills;
-	const cushion = currentView.view.cashNow.cushion;
-	const allowance = currentView.view.allocation.allowance;
-	const heroes = currentView.view.heroes;
-	const { fullDaysLeft, dailySafe } = heroes;
+	const { fullDaysLeft } = currentView.view.heroes;
+	const inlineView = cycleViewTab === "cycle" ? currentView : lastView;
 
 	const toggleAccount = (accountId: string) => {
 		const cardLike = cards
@@ -594,13 +588,6 @@ export function SafeSpendingPreview({
 
 	return (
 		<Card aria-label="Safe card spending" className="relative">
-			<button
-				type="button"
-				className="absolute inset-0 cursor-pointer rounded-surface border-0 bg-transparent p-0"
-				onClick={() => onDetail("cycle")}
-			>
-				<span className="sr-only">Open safe spending details</span>
-			</button>
 			<div className="flex items-center justify-between gap-4">
 				<h2 className="m-0 flex min-h-8 items-center gap-2 text-sm font-semibold leading-[1.5] [overflow-wrap:anywhere]">
 					<CalendarDays
@@ -616,76 +603,42 @@ export function SafeSpendingPreview({
 				{fullDaysLeft === 1 ? "day" : "days"} left
 				{staleData ? ` · balances ${dateLabel(startDate, true)}` : ""}
 			</p>
-			<div className="flex flex-col">
-				<span className="text-xs text-muted">{labels.allowance}</span>
-				<strong className="mt-2 text-4xl leading-tight font-medium tracking-tight tabular-nums">
-					{money(allowance)}
-				</strong>
-				<span className="mt-2 text-xs text-muted">
-					{allowance >= 0
-						? `${money(dailySafe)} a day`
-						: `${money(-dailySafe)} a day over`}
-				</span>
-			</div>
-			<div className="grid grid-cols-3 gap-x-4 gap-y-0 border-t border-line pt-4 max-sm:gap-x-3">
-				<div className="flex min-w-0 flex-col">
-					<span className="mb-2 text-xs text-muted">{labels.cashBalance}</span>
-					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
-						{money(checking)}
-					</strong>
-				</div>
-				<div className="flex min-w-0 flex-col border-l border-line pl-4 max-sm:pl-3">
-					<span className="mb-2 text-xs text-muted">
-						{labels.remainingBills}
-					</span>
-					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
-						{money(remainingObligations)}
-					</strong>
-				</div>
-				<div className="flex min-w-0 flex-col border-l border-line pl-4 max-sm:pl-3">
-					<span className="mb-2 text-xs text-muted">
-						{currentView.view.cashNow.short > 0
-							? labels.billShortfall
-							: labels.cashAfterBills}
-					</span>
-					<strong className="text-xl font-medium tracking-tight whitespace-nowrap tabular-nums max-sm:text-lg">
-						{money(
-							currentView.view.cashNow.short > 0
-								? -currentView.view.cashNow.short
-								: cushion,
-						)}
-					</strong>
-				</div>
-			</div>
-			<Suspense
-				fallback={
-					<div aria-busy="true">
-						<Skeleton className="h-48 w-full" />
-					</div>
-				}
-			>
-				<div className="relative z-1 border-t border-line pt-4">
-					<SafeSpendingTrendChart trend={currentView.trend} />
-				</div>
-			</Suspense>
-			<div className="relative z-1 flex flex-wrap items-center gap-4 border-t border-line pt-4">
-				<TextButton
-					onClick={(event) => {
-						event.stopPropagation();
-						onDetail("cycle");
-					}}
-				>
-					This cycle
+			<SegmentedControl
+				className="mb-4"
+				ariaLabel="Safe card spending cycle view"
+				value={cycleViewTab}
+				onChange={setCycleViewTab}
+				items={SAFE_SPENDING_DETAIL_TABS.filter(
+					(
+						item,
+					): item is Extract<
+						(typeof SAFE_SPENDING_DETAIL_TABS)[number],
+						{ view: "charges" }
+					> => isSafeSpendingCycleTab(item.id),
+				).map((item) => ({ value: item.id, label: item.label }))}
+			/>
+			<SafeSpendingBillsPanel
+				heroes={inlineView.view.heroes}
+				cashNow={inlineView.view.cashNow}
+				allocation={inlineView.view.allocation}
+				funding={inlineView.view.funding}
+				trend={inlineView.trend}
+				section={inlineView.section}
+				closed={cycleViewTab === "last-cycle"}
+				accounts={accounts}
+				transactions={savedState}
+				readOnly={readOnly}
+				transactionOrder={transactionOrder}
+				onTransactionOrderChange={setTransactionOrder}
+			/>
+			<div className="flex flex-wrap items-center gap-4 border-t border-line pt-4">
+				<TextButton onClick={() => onDetail("cycle")}>
+					This cycle transactions
 				</TextButton>
-				<TextButton
-					className="ml-auto"
-					onClick={(event) => {
-						event.stopPropagation();
-						onDetail("last-cycle");
-					}}
-				>
-					Last cycle
+				<TextButton className="ml-auto" onClick={() => onDetail("last-cycle")}>
+					Last cycle transactions
 				</TextButton>
+				<TextButton onClick={() => onDetail("configure")}>Configure</TextButton>
 			</div>
 			{detail && (
 				<SafeSpendingDetailShell
@@ -703,49 +656,15 @@ export function SafeSpendingPreview({
 					onClose={() => onDetail(null)}
 				>
 					{isSafeSpendingCycleTab(detail) && (
-						<div className="grid content-start gap-4">
-							<SafeSpendingBillsPanel
-								heroes={
-									detail === "cycle"
-										? currentView.view.heroes
-										: lastView.view.heroes
-								}
-								cashNow={
-									detail === "cycle"
-										? currentView.view.cashNow
-										: lastView.view.cashNow
-								}
-								allocation={
-									detail === "cycle"
-										? currentView.view.allocation
-										: lastView.view.allocation
-								}
-								funding={
-									detail === "cycle"
-										? currentView.view.funding
-										: lastView.view.funding
-								}
-								trend={detail === "cycle" ? currentView.trend : lastView.trend}
-								section={
-									detail === "cycle" ? currentView.section : lastView.section
-								}
-								closed={detail === "last-cycle"}
-								accounts={accounts}
-								transactions={savedState}
-								readOnly={readOnly}
-								transactionOrder={transactionOrder}
-								onTransactionOrderChange={setTransactionOrder}
-							/>
-							<SafeSpendingCyclePanel
-								key={detail}
-								cycle={tabChargeCycles[detail]}
-								accounts={accounts}
-								transactions={savedState}
-								readOnly={readOnly}
-								transactionOrder={transactionOrder}
-								onTransactionOrderChange={setTransactionOrder}
-							/>
-						</div>
+						<SafeSpendingCyclePanel
+							key={detail}
+							cycle={tabChargeCycles[detail]}
+							accounts={accounts}
+							transactions={savedState}
+							readOnly={readOnly}
+							transactionOrder={transactionOrder}
+							onTransactionOrderChange={setTransactionOrder}
+						/>
 					)}
 					{detail === "configure" && (
 						<SafeSpendingConfigurePanel

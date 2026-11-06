@@ -7,25 +7,30 @@ const anchor = process.env.DEMO_ANCHOR ?? new Date().toISOString().slice(0, 10);
 
 test("seeded account demo", async ({ page }) => {
 	await page.clock.setFixedTime(new Date(`${anchor}T12:00:00Z`));
-	await page.goto("/#outlook/safe-spending-detail/cycle");
+	await page.goto("/#outlook");
 	await expect(
-		page.getByRole("heading", { name: "Safe card spending" }).first(),
+		page.getByRole("heading", { name: "Safe card spending" }),
 	).toBeVisible();
 	if (process.env.DEMO_PACK === "safe-spending") {
-		const drawer = page.getByRole("dialog", { name: "Safe card spending" });
-		await expect(drawer.getByText("Card spending pace")).toBeVisible();
+		await expect(page.getByText("Card spending pace")).toBeVisible();
 		await expect(
-			drawer.getByRole("separator", { name: "Card spending limit" }),
+			page.getByRole("separator", { name: "Card spending limit" }),
 		).toBeVisible();
 		await expect(
-			drawer.getByText("Protected reserve starts", { exact: true }),
+			page.getByText("Protected reserve starts", { exact: true }),
 		).toBeVisible();
 	}
 	if (process.env.DEMO_PACK === "safe-spending-shortfall") {
-		const drawer = page.getByRole("dialog", { name: "Safe card spending" });
-		await expect(drawer.getByText("Retirement contribution")).toBeVisible();
-		await expect(drawer.getByText("Unfulfilled")).toBeVisible();
+		await expect(page.getByText("Retirement contribution")).toBeVisible();
+		await expect(page.getByText("Unfulfilled")).toBeVisible();
 	}
+	// The drawer keeps the per-cycle transaction list.
+	await page.getByRole("button", { name: "This cycle transactions" }).click();
+	await expect(
+		page
+			.getByRole("dialog", { name: "Safe card spending" })
+			.getByRole("heading", { name: "Spending this cycle" }),
+	).toBeVisible();
 	// Keep the headed browser open until the developer stops the command.
 	const exitAfter = Number(process.env.DEMO_EXIT_AFTER_MS ?? 0);
 	if (exitAfter > 0) await page.waitForTimeout(exitAfter);

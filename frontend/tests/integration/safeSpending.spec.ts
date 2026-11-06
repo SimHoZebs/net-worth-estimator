@@ -82,52 +82,50 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 	await expect(
 		page.getByRole("tab", { name: "Bills", exact: true }),
 	).toHaveCount(0);
-	await page.getByRole("tab", { name: /Last cycle/ }).click();
+	// The drawer keeps the per-cycle transaction lists; the cycle views
+	// live on the page, so close the drawer to read them there.
+	await page.keyboard.press("Escape");
+	await expect(drawer).toHaveCount(0);
+	await page.getByRole("button", { name: "Last cycle", exact: true }).click();
 	await expect(
-		drawer.getByText("Dec 20, 2025 – Jan 19, 2026", { exact: true }),
-	).toHaveCount(1);
-	await expect(
-		drawer.getByRole("region", { name: labels.cashAfterBills }),
+		page.getByRole("region", { name: labels.cashAfterBills }),
 	).toContainText("The Feb 1 paycheck paid this statement");
 	await expect(
-		drawer.getByRole("region", { name: labels.allowance, exact: true }),
+		page.getByRole("region", { name: labels.allowance, exact: true }),
 	).toContainText("-$4,696");
 	await expect(
-		drawer.getByRole("list", { name: labels.closedCardBalances }),
+		page.getByRole("list", { name: labels.closedCardBalances }),
 	).toContainText("$4,321");
 	await expect(
-		drawer.getByText(labels.billsThisCycle, { exact: true }),
+		page.getByText(labels.billsThisCycle, { exact: true }),
 	).toBeVisible();
-	await expect(drawer.getByText("No bills due in this period.")).toBeVisible();
+	await expect(page.getByText("No bills due in this period.")).toBeVisible();
 	await expect(
-		drawer.getByRole("region", { name: "Paycheck allocation" }),
+		page.getByRole("region", { name: "Paycheck allocation" }),
 	).toHaveCount(0);
-	await page.getByRole("tab", { name: /This cycle/ }).click();
+	await page.getByRole("button", { name: "This cycle", exact: true }).click();
 	await expect(
-		drawer.getByText("Jan 20, 2026 – Feb 19, 2026", { exact: true }),
-	).toHaveCount(1);
-	await expect(drawer.getByRole("list", { name: / details$/ })).toHaveCount(0);
-	await expect(
-		drawer.getByRole("list", { name: labels.closedCardBalances }),
+		page.getByRole("list", { name: labels.closedCardBalances }),
 	).toHaveCount(0);
+	await expect(page.getByRole("list", { name: / details$/ })).toHaveCount(0);
+	await expect(page.getByRole("toolbar", { name: "Bills window" })).toHaveCount(
+		0,
+	);
 	await expect(
-		drawer.getByRole("toolbar", { name: "Bills window" }),
+		page.getByRole("button", { name: "Calendar month" }),
 	).toHaveCount(0);
-	await expect(
-		drawer.getByRole("button", { name: "Calendar month" }),
-	).toHaveCount(0);
-	const bills = drawer.getByRole("table", {
+	const bills = page.getByRole("table", {
 		name: new RegExp(labels.scheduledBills),
 	});
 	await expect(bills.locator("tbody tr")).toHaveCount(3);
 	await expect(
-		drawer.getByText("Housing and living", { exact: true }),
+		page.getByText("Housing and living", { exact: true }),
 	).toHaveCount(1);
 	await expect(bills).not.toContainText("Student loan payment");
 	await expect(bills.locator("tbody tr").first()).toContainText(
 		"Retirement contribution",
 	);
-	await drawer
+	await page
 		.getByRole("button", { name: /Sort transactions:/ })
 		.first()
 		.click();
@@ -139,7 +137,10 @@ test("household budget shows paycheck allocation and one sortable cycle bill lis
 		"Housing and living",
 	);
 	await page.keyboard.press("Escape");
-	await expect(drawer).toBeVisible();
+	await expect(
+		page.getByRole("region", { name: "Safe card spending" }),
+	).toBeVisible();
+	await expect(drawer).toHaveCount(0);
 	expect(errors).toEqual([]);
 });
 
@@ -186,9 +187,6 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		name: "Safe card spending",
 		exact: true,
 	});
-	await expect(
-		last.getByRole("list", { name: labels.closedCardBalances }),
-	).toContainText("$4,321");
 	const lastCharges = last.getByRole("table", {
 		name: new RegExp(labels.recordedCharges),
 	});
@@ -198,12 +196,6 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 	const currentTab = page.getByRole("tab", { name: /This cycle/ });
 	await expect(currentTab).toBeFocused();
 	await expect(currentTab).toHaveAttribute("aria-selected", "true");
-	await expect(
-		page.getByRole("list", { name: labels.closedCardBalances }),
-	).toHaveCount(0);
-	await expect(
-		page.getByRole("dialog").getByText(labels.allowance, { exact: true }),
-	).toBeVisible();
 	await expect(page).toHaveURL(/safe-spending-detail\/cycle$/);
 	const currentCharges = page.getByRole("table", {
 		name: new RegExp(labels.cycleSpending),
@@ -227,6 +219,21 @@ test("last-cycle and this-cycle tabs keep histories separate and support keyboar
 		.include("dialog")
 		.analyze();
 	expect(accessibility.violations).toEqual([]);
+	// The inline cycle views stay separate from the drawer lists: the
+	// closed balance list belongs to the Last cycle view on the page.
+	await page.keyboard.press("Escape");
+	await expect(last).toHaveCount(0);
+	await page.getByRole("button", { name: "Last cycle", exact: true }).click();
+	await expect(
+		page.getByRole("list", { name: labels.closedCardBalances }),
+	).toContainText("$4,321");
+	await page.getByRole("button", { name: "This cycle", exact: true }).click();
+	await expect(
+		page.getByRole("list", { name: labels.closedCardBalances }),
+	).toHaveCount(0);
+	await expect(
+		page.getByRole("region", { name: labels.allowance, exact: true }),
+	).toBeVisible();
 });
 
 test("income sources combine independent recurrence rules and persist explicit deselection", async ({
@@ -275,7 +282,12 @@ test("income sources combine independent recurrence rules and persist explicit d
 	await page.reload();
 	await expect(salary).toHaveAttribute("aria-pressed", "true");
 	await expect(partner).toHaveAttribute("aria-pressed", "true");
-	await page.getByRole("tab", { name: /This cycle/ }).click();
+	await page.keyboard.press("Escape");
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	await page.getByRole("button", { name: "This cycle", exact: true }).click();
+	await expect(
+		page.getByRole("button", { name: "This cycle", exact: true }).first(),
+	).toHaveAttribute("aria-pressed", "true");
 	// The cycle closes Feb 20 and settles from the March paychecks; the
 	// March window includes the fixture's $9,000 Home renovation.
 	await expect(
@@ -283,17 +295,19 @@ test("income sources combine independent recurrence rules and persist explicit d
 			.getByRole("region", { name: labels.allowance, exact: true })
 			.getByTestId("metric-value"),
 	).toHaveText("-$7,975");
-	await page.getByRole("tab", { name: /Last cycle/ }).click();
+	await page.getByRole("button", { name: "Last cycle", exact: true }).click();
 	await expect(
 		page.getByRole("region", { name: labels.cashAfterBills }),
 	).toContainText("The Jan 29 – Feb 1 paychecks paid this statement");
-	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	await page.getByRole("button", { name: "Configure" }).click();
 	await salary.click();
-	await page.getByRole("tab", { name: /Last cycle/ }).click();
+	await page.keyboard.press("Escape");
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	await page.getByRole("button", { name: "Last cycle", exact: true }).click();
 	await expect(
 		page.getByRole("region", { name: labels.cashAfterBills }),
 	).toContainText("The Jan 29 paycheck paid this statement");
-	await page.getByRole("tab", { name: "Configure", exact: true }).click();
+	await page.getByRole("button", { name: "Configure" }).click();
 	const deselectionSaved = page.waitForResponse(
 		(response) =>
 			response.url().endsWith("/v1/safe-spending-settings") &&
@@ -305,7 +319,9 @@ test("income sources combine independent recurrence rules and persist explicit d
 	await page.reload();
 	await expect(salary).toHaveAttribute("aria-pressed", "false");
 	await expect(partner).toHaveAttribute("aria-pressed", "false");
-	await page.getByRole("tab", { name: /This cycle/ }).click();
+	await page.keyboard.press("Escape");
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	await page.getByRole("button", { name: "This cycle", exact: true }).click();
 	await expect(
 		page
 			.getByRole("region", { name: labels.allowance, exact: true })
@@ -387,22 +403,22 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 		expect(response.ok()).toBe(true);
 		expect((await response.json()).saved).toBe(true);
 	}
-	await page.goto("/#outlook/safe-spending-detail/cycle");
-	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
+	await page.goto("/#outlook");
+	const card = page.getByRole("region", { name: "Safe card spending" });
 	await expect(
-		drawer.getByRole("heading", { name: labels.spendingPace }),
+		card.getByRole("heading", { name: labels.spendingPace }),
 	).toBeVisible();
-	await expect(drawer.getByText("Over limit · $158 a day")).toBeVisible();
-	const chart = drawer.getByRole("img", { name: labels.spendingPace });
+	await expect(page.getByText("Over limit · $158 a day")).toBeVisible();
+	const chart = page.getByRole("img", { name: labels.spendingPace });
 	await expect(chart).toBeVisible();
 	expect(chart.locator("desc")).toContainText(
 		"Spending is already over the spending limit.",
 	);
 	await expect(
-		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
 	).toContainText("Spending so far");
 	await expect(
-		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
 	).toContainText("Projected at average rate");
 	// The statement closes Feb 20 and settles from the March paychecks
 	// (salary Mar 1 + partner Mar 10). March's committed outflows include
@@ -410,11 +426,14 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 	// both thresholds run negative: the chart draws no threshold rule and
 	// the legend keeps only the spending lines.
 	await expect(
-		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
 	).not.toContainText(labels.reserveStarts);
 	await expect(
-		drawer.getByRole("list", { name: `${labels.spendingPace} legend` }),
+		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
 	).not.toContainText(labels.spendingLimit);
+	// The per-cycle transaction list stays in the drawer.
+	await page.getByRole("button", { name: "This cycle transactions" }).click();
+	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
 	const charges = drawer.getByRole("table", {
 		name: new RegExp(labels.cycleSpending),
 	});
@@ -478,9 +497,8 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 			statementDaySet: false,
 		},
 	});
-	await page.goto("/#outlook/safe-spending-detail/cycle");
-	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
-	const bills = drawer.getByRole("table", {
+	await page.goto("/#outlook");
+	const bills = page.getByRole("table", {
 		name: new RegExp(labels.scheduledBills),
 	});
 	await expect(bills).toContainText("Retirement contribution");
@@ -496,7 +514,7 @@ test("outlook shows the spending pace graph above the net worth graph", async ({
 }) => {
 	// The Safe card spending card is the main card on Outlook: its
 	// spending pace graph renders on the page, above the net worth
-	// graph. The details drawer keeps its own copy of the same graph.
+	// graph. The drawer keeps the per-cycle transaction lists.
 	await page.goto("/#outlook");
 	const pace = page.getByRole("img", { name: labels.spendingPace });
 	await expect(pace).toBeVisible();
@@ -506,10 +524,10 @@ test("outlook shows the spending pace graph above the net worth graph", async ({
 	await expect(netWorth).toBeVisible();
 	const y = async (locator: Locator) => (await locator.boundingBox())?.y ?? 0;
 	expect(await y(pace)).toBeLessThan(await y(netWorth));
-	await page.getByRole("button", { name: "This cycle" }).click();
+	await page.getByRole("button", { name: "This cycle transactions" }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
 	await expect(
-		drawer.getByRole("img", { name: labels.spendingPace }),
+		drawer.getByRole("heading", { name: labels.cycleSpending }),
 	).toBeVisible();
 });
 
