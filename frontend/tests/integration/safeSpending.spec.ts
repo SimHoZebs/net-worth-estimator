@@ -403,8 +403,8 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 		expect(response.ok()).toBe(true);
 		expect((await response.json()).saved).toBe(true);
 	}
-	await page.goto("/outlook?detail=safe-spending&tab=cycle");
-	const card = page.getByRole("dialog", { name: "Safe card spending" });
+	await page.goto("/outlook");
+	const card = page.getByRole("region", { name: "Safe card spending" });
 	await expect(
 		card.getByRole("heading", { name: labels.spendingPace }),
 	).toBeVisible();
@@ -497,9 +497,8 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 			statementDaySet: false,
 		},
 	});
-	await page.goto("/outlook?detail=safe-spending&tab=cycle");
-	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
-	const bills = drawer.getByRole("table", {
+	await page.goto("/outlook");
+	const bills = page.getByRole("table", {
 		name: new RegExp(labels.scheduledBills),
 	});
 	await expect(bills).toContainText("Retirement contribution");
