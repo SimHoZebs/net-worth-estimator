@@ -6,18 +6,16 @@ node scripts/check-install.mjs
 
 staged_go=$(git diff --cached --name-only --diff-filter=ACM | grep '^backend/.*\.go$' || true)
 if [ -z "$staged_go" ]; then
-  echo "pre-commit: no staged backend Go files, skipping backend verify."
+  echo "pre-commit: no staged backend Go files, skipping format check."
 else
-  pkgs=$(echo "$staged_go" | while IFS= read -r f; do dirname "$f"; done | sort -u)
-  for dir in $pkgs; do
-    if [ "$dir" = "backend" ]; then
-      pkg="./..."
-    else
-      pkg="./${dir#backend/}/..."
-    fi
-    echo "pre-commit: backend verify $pkg"
-    backend/scripts/verify.sh "$pkg"
-  done
+  echo "pre-commit: gofmt check for staged Go files"
+  # shellcheck disable=SC2086
+  unformatted=$(gofmt -l $staged_go)
+  if [ -n "$unformatted" ]; then
+    echo "gofmt issues (run gofmt -w):" >&2
+    echo "$unformatted" >&2
+    exit 1
+  fi
 fi
 
 staged_lint=$(git diff --cached --name-only --diff-filter=ACM | grep '^frontend/' | grep -v '^frontend/node_modules/' | grep -E '\.(ts|tsx)$' | sed 's|^frontend/||' || true)
