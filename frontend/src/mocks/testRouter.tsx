@@ -120,6 +120,7 @@ export async function renderServerAppShell(
 	const outlookRoute = createRoute({
 		getParentRoute: () => rootRoute,
 		path: "/outlook",
+		staticData: { page: "outlook" },
 		component: () => body,
 	});
 	const router = createRouter({

@@ -1,17 +1,37 @@
 import {
 	createRootRoute,
 	redirect,
+	Link,
+	ErrorComponent,
 	retainSearchParams,
-	useNavigate,
-	useSearch,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { ServerApp } from "../app/ServerApp.tsx";
-import { validateWorkspaceSearch } from "../workspace/overlaySearch.ts";
+import {
+	hasInvalidOverlaySearch,
+	validateWorkspaceSearch,
+	InvalidWorkspaceLinkError,
+	isInvalidWorkspaceLink,
+} from "../workspace/overlaySearch.ts";
 
 export const Route = createRootRoute({
 	component: ServerApp,
-	validateSearch: validateWorkspaceSearch,
+	search: {
+		// Navigation stays available during session verification. Preserve
+		// the callback only until the workspace can consume it safely.
+		middlewares: [retainSearchParams(["gmail"])],
+	},
+	validateSearch: (search) => {
+		// Use Router's search-error boundary. Returning an empty shape would
+		// silently erase invalid input during initial canonicalization.
+		if (hasInvalidOverlaySearch(search)) throw new InvalidWorkspaceLinkError();
+		return validateWorkspaceSearch(search);
+	},
+	errorComponent: ({ error }) =>
+		isInvalidWorkspaceLink(error) ? (
+			<ServerApp invalidLink />
+		) : (
+			<ErrorComponent error={error} />
+		),
 	beforeLoad: ({ location }) => {
 		const canonicalSearch = validateWorkspaceSearch(location.search);
 		// Validation owns both the rendered state and the canonical URL.
@@ -29,25 +49,23 @@ export const Route = createRootRoute({
 			});
 		}
 	},
-	search: {
-		// The OAuth callback flag rides every navigation until the Gmail
-		// panel consumes it.
-		middlewares: [retainSearchParams(["gmail"])],
-	},
-	notFoundComponent: NotFoundRedirect,
+	notFoundComponent: WorkspaceNotFound,
 });
 
-// Unknown pages fall back to outlook instead of a blank screen; overlay
-// params normalize away there through validated search.
-function NotFoundRedirect() {
-	const navigate = useNavigate();
-	const gmail = useSearch({ strict: false, select: (search) => search.gmail });
-	useEffect(() => {
-		void navigate({
-			to: "/outlook",
-			search: { gmail },
-			replace: true,
-		});
-	}, [navigate, gmail]);
-	return null;
+function WorkspaceNotFound() {
+	return (
+		<section
+			aria-label="Page not found"
+			className="grid justify-items-start gap-4 p-6"
+		>
+			<h2 className="text-2xl">Page not found</h2>
+			<p>
+				This link does not point to a workspace page. Check the address or
+				choose a page from navigation.
+			</p>
+			<Link to="/outlook" className="text-primary underline">
+				Go to Outlook
+			</Link>
+		</section>
+	);
 }

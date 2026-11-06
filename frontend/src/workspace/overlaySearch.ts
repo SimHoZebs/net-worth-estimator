@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SearchParamError } from "@tanstack/react-router";
 import {
 	SAFE_SPENDING_DETAIL_TABS,
 	type SafeSpendingDetailTab,
@@ -7,9 +8,7 @@ import {
 // Every page shares one overlay search shape: the pathname names the page
 // (`/accounts`) and dialogs live in query params instead of pseudo nested
 // paths (`?evidence=account&id=…`). Group detail is the one path segment
-// (`/groups/<id>`). The `gmail` flag is the post-OAuth callback outcome: it
-// rides along on every navigation until the Gmail panel consumes it, so it
-// is validated here and retained by Router search middleware.
+// (`/groups/<id>`). The workspace consumes the post-OAuth `gmail` flag once.
 
 const evidenceKind = z.enum([
 	"position",
@@ -30,16 +29,33 @@ export const workspaceSearchSchema = z.object({
 	evidence: evidenceKind.optional(),
 	editor: editorKind.optional(),
 	detail: safeSpendingDetailKind.optional(),
-	id: z.string().optional(),
+	id: z.string().min(1).optional(),
 	tab: safeSpendingTab.optional(),
-	editTransaction: z.string().optional(),
-	gmail: gmailOutcome.optional(),
+	editTransaction: z.string().min(1).optional(),
+	returnEvidence: evidenceKind.optional(),
+	returnId: z.string().min(1).optional(),
+	gmail: gmailOutcome.optional().catch(undefined),
 });
 
 export type WorkspaceSearch = z.infer<typeof workspaceSearchSchema>;
 
+export class InvalidWorkspaceLinkError extends Error {
+	constructor() {
+		super("Invalid workspace link");
+		this.name = "InvalidWorkspaceLinkError";
+	}
+}
+
+/** User input has a rendered recovery state and is not an application crash. */
+export function isInvalidWorkspaceLink(error: unknown): boolean {
+	return (
+		error instanceof SearchParamError &&
+		error.cause instanceof InvalidWorkspaceLinkError
+	);
+}
+
 // Overlay parameters are strings, including numeric or boolean-like account
-// slugs. Preserve duplicates as arrays so validation rejects ambiguity instead
+// IDs. Preserve duplicates as arrays so validation rejects ambiguity instead
 // of selecting one value. TanStack's default parser coerces primitives.
 export function parseWorkspaceSearch(
 	queryString: string,
@@ -52,6 +68,21 @@ export function parseWorkspaceSearch(
 		else result[key] = [previous, value];
 	}
 	return result;
+}
+
+// Match the plain-string parser and retain repeated keys while an invalid
+// link is shown. JSON encoding would turn ambiguity into a different ID.
+export function stringifyWorkspaceSearch(
+	search: Record<string, unknown>,
+): string {
+	const parameters = new URLSearchParams();
+	for (const [key, value] of Object.entries(search)) {
+		if (value === undefined) continue;
+		for (const item of Array.isArray(value) ? value : [value])
+			parameters.append(key, String(item));
+	}
+	const query = parameters.toString();
+	return query ? `?${query}` : "";
 }
 
 /**
@@ -79,6 +110,8 @@ export function validateWorkspaceSearch(
 				id: value.id,
 				tab: value.tab,
 				editTransaction: value.editTransaction,
+				returnEvidence: value.returnEvidence,
+				returnId: value.returnId,
 				gmail: value.gmail,
 			}
 		: GmailOnly(value.gmail);
@@ -98,6 +131,8 @@ function GmailOnly(gmail: WorkspaceSearch["gmail"]): WorkspaceSearch {
 		id: undefined,
 		tab: undefined,
 		editTransaction: undefined,
+		returnEvidence: undefined,
+		returnId: undefined,
 		gmail,
 	};
 }
@@ -105,10 +140,30 @@ function GmailOnly(gmail: WorkspaceSearch["gmail"]): WorkspaceSearch {
 // Each overlay kind may carry the params; exactly one kind or none is valid,
 // and kind-specific params never stand alone.
 function isConsistent(value: Exclude<WorkspaceSearch, undefined>): boolean {
+	if (value.returnEvidence !== undefined || value.returnId !== undefined) {
+		if (!value.editor || !value.returnEvidence) return false;
+		if (
+			value.returnEvidence === "account"
+				? !value.returnId
+				: value.returnId !== undefined
+		)
+			return false;
+	}
 	const kinds = [value.evidence, value.editor, value.detail].filter(
 		(kind) => kind !== undefined,
 	);
 	if (kinds.length > 1) return false;
+	if (value.evidence !== undefined) {
+		if (value.tab !== undefined || value.editTransaction !== undefined)
+			return false;
+		if (value.evidence !== "account" && value.id !== undefined) return false;
+	}
+	if (
+		value.editor !== undefined &&
+		(value.tab !== undefined || value.editTransaction !== undefined)
+	)
+		return false;
+	if (value.detail !== undefined && value.id !== undefined) return false;
 	if (value.evidence === "account" && value.id === undefined) return false;
 	if (value.editor !== undefined && value.id === undefined) return false;
 	if (
@@ -119,4 +174,12 @@ function isConsistent(value: Exclude<WorkspaceSearch, undefined>): boolean {
 	)
 		return false;
 	return true;
+}
+
+/** Invalid overlay input stays visible in the address bar until dismissed. */
+export function hasInvalidOverlaySearch(
+	search: Record<string, unknown>,
+): boolean {
+	const parsed = workspaceSearchSchema.safeParse(search);
+	return !parsed.success || !isConsistent(parsed.data);
 }

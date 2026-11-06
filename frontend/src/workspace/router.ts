@@ -1,27 +1,27 @@
-import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
-import {
-	createRouter,
-	stringifySearchWith,
-	type RouterHistory,
-} from "@tanstack/react-router";
+import { createRouter, type RouterHistory } from "@tanstack/react-router";
 import { routeTree } from "../routeTree.gen.ts";
-import { parseWorkspaceSearch } from "./overlaySearch.ts";
+import {
+	parseWorkspaceSearch,
+	stringifyWorkspaceSearch,
+} from "./overlaySearch.ts";
+import { WorkspaceCallbacks } from "./useGmailCallback.ts";
 
-// Per-navigation history state: the editor's return target. Ordinary
-// navigations start without it; Back/Forward restore the entry's value.
+// History carries navigation provenance only. Shareable return destinations
+// live in validated search parameters.
 declare module "@tanstack/react-router" {
 	interface HistoryState {
-		returnTo?: EvidenceTarget;
+		overlayParent?: { index: number };
 	}
 }
 
 export function createWorkspaceRouter(history?: RouterHistory) {
 	const router = createRouter({
 		routeTree,
+		InnerWrap: WorkspaceCallbacks,
 		parseSearch: parseWorkspaceSearch,
 		// No JSON quoting for strings: copied links and generated links use
 		// the same plain-string query contract.
-		stringifySearch: stringifySearchWith(JSON.stringify),
+		stringifySearch: stringifyWorkspaceSearch,
 		// Explicit so tests can pass a memory history. The production app
 		// uses the default browser history.
 		...(history ? { history } : {}),

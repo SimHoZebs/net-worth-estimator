@@ -6,7 +6,6 @@ import {
 	createRouter,
 	Outlet,
 	RouterProvider,
-	retainSearchParams,
 } from "@tanstack/react-router";
 import { createElement, type ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -46,7 +45,6 @@ vi.mock("../state/savedState.ts", () => ({
 const rootRoute = createRootRoute({
 	component: () => createElement(Outlet),
 	validateSearch: validateWorkspaceSearch,
-	search: { middlewares: [retainSearchParams(["gmail"])] },
 });
 const stub = createRoute({
 	getParentRoute: () => rootRoute,
@@ -69,10 +67,15 @@ const routeTree = rootRoute.addChildren([
 	stub,
 ]);
 
-async function useHarness(initialEntry = "/accounts") {
+async function useHarness(initialEntry = "/accounts", previousEntry?: string) {
 	const router = createRouter({
 		routeTree,
-		history: createMemoryHistory({ initialEntries: [initialEntry] }),
+		history: createMemoryHistory({
+			initialEntries: previousEntry
+				? [previousEntry, initialEntry]
+				: [initialEntry],
+			initialIndex: previousEntry ? 1 : 0,
+		}),
 	});
 	await router.load();
 	const wrapper = ({ children }: { children: ReactNode }) => {
@@ -106,10 +109,9 @@ it("returns to the owning evidence after edit and clears context on an ordinary 
 		}),
 	);
 	expect(result.current.editor?.kind).toBe("account");
-	const state = router.state.location.state as { returnTo?: unknown };
-	expect(state.returnTo).toEqual({
-		kind: "account",
-		id: account.id,
+	expect(router.state.location.search).toMatchObject({
+		returnEvidence: "account",
+		returnId: account.id,
 	});
 	await act(async () => result.current.closeEditor());
 	expect(result.current.evidence).toEqual({
@@ -117,12 +119,46 @@ it("returns to the owning evidence after edit and clears context on an ordinary 
 		id: account.id,
 	});
 	expect(router.state.location.search).toMatchObject({ evidence: "account" });
+	await act(async () => result.current.closeEvidence());
 	await act(async () =>
 		result.current.openEditor({ kind: "account", item: null }),
 	);
 	await act(async () => result.current.closeEditor());
 	expect(result.current.evidence).toBeNull();
 	expect(router.state.location.pathname).toBe("/accounts");
+	expect(router.state.location.search).toEqual({});
+});
+
+it("close undoes an in-app open without leaving a duplicate page in history", async () => {
+	const { router, result } = await useHarness("/accounts", "/transactions");
+	await act(async () =>
+		result.current.openEditor({ kind: "account", item: null }),
+	);
+	await act(async () => result.current.closeEditor());
+	expect(router.state.location.pathname).toBe("/accounts");
+	await act(async () => router.history.back());
+	expect(router.state.location.pathname).toBe("/transactions");
+});
+
+it("a directly loaded editor replaces its entry with the shared return destination", async () => {
+	const account = financialModelFixture.accounts[0]!;
+	const { router, result } = await useHarness(
+		`/accounts?editor=account&id=new&returnEvidence=account&returnId=${account.id}`,
+		"/transactions",
+	);
+	await act(async () => result.current.closeEditor());
+	expect(result.current.evidence).toEqual({ kind: "account", id: account.id });
+	await act(async () => router.history.back());
+	expect(router.state.location.pathname).toBe("/transactions");
+});
+
+it("unknown item links remain available for an explicit error until dismissed", async () => {
+	const { router, result } = await useHarness(
+		"/accounts?evidence=account&id=missing",
+	);
+	expect(result.current.unavailable).toBe(true);
+	expect(router.state.location.search.id).toBe("missing");
+	await act(async () => result.current.closeUnavailable());
 	expect(router.state.location.search).toEqual({});
 });
 

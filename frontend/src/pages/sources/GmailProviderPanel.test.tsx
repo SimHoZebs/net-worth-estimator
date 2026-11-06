@@ -5,18 +5,9 @@ import { setupQueryScope, teardownQueryScope } from "../../mocks/testScope.tsx";
 import { serverQueryClient } from "../../state/serverQuery.ts";
 import { resetGmailClient } from "../../state/gmail.ts";
 import { GmailProviderPanel } from "./GmailProviderPanel.tsx";
-import { RouterProvider } from "@tanstack/react-router";
-import { createSubjectTestRouter } from "../../mocks/testRouter.tsx";
 
-function renderPanel(gmailFlag: string | null = null) {
-	const initialEntry = gmailFlag ? `/sources?gmail=${gmailFlag}` : "/sources";
-	const router = createSubjectTestRouter({
-		subjectRoute: "/sources",
-		subject: <GmailProviderPanel />,
-		initialEntry,
-	});
-	const view = render(<RouterProvider router={router} />);
-	return { router, ...view };
+function renderPanel() {
+	return render(<GmailProviderPanel />);
 }
 
 function stubGmailApi(state: {
@@ -338,15 +329,6 @@ it("shows an error instead of onboarding when the credential fails", async () =>
 			name: "Connect Gmail for receipt discovery",
 		}),
 	).toBeTruthy();
-});
-
-it("announces the OAuth return outcome once and clears the flag", async () => {
-	stubGmailApi({ connected: true });
-	const { router } = renderPanel("connected");
-	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
-	await waitFor(() =>
-		expect(router.state.location.search.gmail).toBeUndefined(),
-	);
 });
 
 const sampleReceipt = {

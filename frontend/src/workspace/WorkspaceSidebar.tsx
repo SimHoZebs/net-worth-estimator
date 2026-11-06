@@ -57,7 +57,7 @@ export function WorkspaceSidebar({
 	onClose,
 	pending = false,
 }: {
-	page: Page;
+	page: Page | null;
 	onClose: () => void;
 	pending?: boolean;
 }) {

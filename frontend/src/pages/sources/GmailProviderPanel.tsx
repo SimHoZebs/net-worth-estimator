@@ -1,6 +1,5 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Check, ExternalLink, Mail } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ApiError } from "../../api/http.ts";
 import { Badge } from "../../components/Badge.tsx";
 import { Button, TextButton } from "../../components/Button.tsx";
@@ -9,7 +8,6 @@ import { InputField } from "../../components/Field.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import {
 	disconnectGmail,
-	refreshGmailSettings,
 	setGmailLookbackDays,
 	startGmailConsent,
 	useGmailCredential,
@@ -23,37 +21,11 @@ import { GmailReceiptsSection } from "./GmailReceiptsSection.tsx";
 export function GmailProviderPanel() {
 	const credential = useGmailCredential();
 	const readOnly = useUserReadOnly();
-	const search = useSearch({ strict: false });
-	const navigate = useNavigate({ from: "/sources" });
-	// The OAuth return lands back on the app with ?gmail=connected|error.
-	// The outcome derives during render; the effect below only clears the
-	// consumed flag from the address bar and refreshes Gmail state.
-	const outcome =
-		search.gmail === "connected" || search.gmail === "error"
-			? search.gmail
-			: null;
-	const [callbackOutcome] = useState(() => outcome);
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(
-		callbackOutcome === "error"
-			? "Gmail connection failed. Try connecting again."
-			: null,
-	);
-	const [message, setMessage] = useState(
-		callbackOutcome === "connected" ? "Gmail connected." : "",
-	);
+	const [error, setError] = useState<string | null>(null);
+	const [message, setMessage] = useState("");
 	const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 	const [lookback, setLookback] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (!callbackOutcome) return;
-		void navigate({
-			to: ".",
-			search: (prev) => ({ ...prev, gmail: undefined }),
-			replace: true,
-		});
-		void refreshGmailSettings(true);
-	}, [callbackOutcome, navigate]);
 
 	if (credential.isPending) {
 		return (

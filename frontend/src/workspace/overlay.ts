@@ -6,7 +6,7 @@ import type { WorkspaceSearch } from "./overlaySearch.ts";
 
 // Overlay resolution needs only the saved rows used by its lookups. Validated
 // search carries the raw key (`id`); the resolver turns it into a dialog
-// target, waiting for rows (`pending`) or normalizing unknown keys (`unknown`)
+// target, waiting for rows (`pending`) or reporting unavailable IDs (`unknown`)
 // so deep links never flash a wrong dialog.
 
 export type OverlayRows = {
@@ -30,35 +30,13 @@ export type OverlayResolution =
 	| { state: "unknown" }
 	| { state: "ready"; overlay: ResolvedOverlay };
 
-// The only slug that collides in search form: `id=new` means the new-item
-// editor, so an account literally named "New" deep-links by exact id instead
-// (builders fall back to the id form).
-const RESERVED_SLUGS = new Set(["new"]);
-
-export function slugifyAccount(name: string): string {
-	const slug = name
-		.toLowerCase()
-		.trim()
-		.replace(/[\s_]+/g, "-")
-		.replace(/[^a-z0-9-]/g, "")
-		.replace(/-+/g, "-")
-		.replace(/^-|-$/g, "");
-	return slug || "account";
-}
-
-/** Exact id first, then a human-readable slug of the name. Archived accounts
- *  stay hidden: linking one resolves to unknown and the URL normalizes. */
+/** Links identify saved accounts by stable ID. Archived accounts stay hidden. */
 export function findAccount(
 	rows: Pick<OverlayRows, "accounts">,
 	key: string,
 ): Account | undefined {
-	const exact = rows.accounts?.find(
-		(account) => !account.archived && account.id === key,
-	);
-	if (exact) return exact;
-	const slug = key.toLowerCase();
 	return rows.accounts?.find(
-		(account) => !account.archived && slugifyAccount(account.name) === slug,
+		(account) => !account.archived && account.id === key,
 	);
 }
 
@@ -188,17 +166,8 @@ export function resolveOverlay(
 	return { state: "none" };
 }
 
-function accountKey(account: Account): string {
-	const slug = slugifyAccount(account.name);
-	return RESERVED_SLUGS.has(slug) ? account.id : slug;
-}
-
-/** Search that opens an evidence dialog. Gmail rides along via Router search
- *  middleware; builders carry overlay keys only. */
-export function evidenceSearch(
-	target: EvidenceTarget,
-	rows: Pick<OverlayRows, "accounts"> | null,
-): WorkspaceSearch {
+/** Search that opens an evidence dialog. */
+export function evidenceSearch(target: EvidenceTarget): WorkspaceSearch {
 	switch (target.kind) {
 		case "position":
 			return { evidence: "position" };
@@ -206,27 +175,48 @@ export function evidenceSearch(
 			return { evidence: "shortfall" };
 		case "safe-spending":
 			return { evidence: "safe-spending" };
-		case "account": {
-			const account = rows ? findAccount(rows, target.id) : undefined;
-			const key = account ? accountKey(account) : target.id;
-			return { evidence: "account", id: key };
-		}
+		case "account":
+			return { evidence: "account", id: target.id };
 	}
 }
 
 /** Search that opens an editor dialog. */
 export function editorSearch(target: EditorTarget): WorkspaceSearch {
 	switch (target.kind) {
-		case "account": {
-			const key = target.item ? accountKey(target.item) : "new";
-			return { editor: "account", id: key };
-		}
+		case "account":
+			return { editor: "account", id: target.item?.id ?? "new" };
 		case "transaction":
 			return { editor: "transaction", id: target.item?.id ?? "new" };
 		case "schedule":
 			return { editor: "schedule", id: "new" };
 		case "evaluation":
 			return { editor: "evaluation", id: target.item?.id ?? "new" };
+	}
+}
+
+/** The owning evidence is part of a shareable editor URL. */
+export function editorReturnSearch(
+	target: EvidenceTarget | null,
+): WorkspaceSearch {
+	if (!target) return {};
+	const search = evidenceSearch(target);
+	return { returnEvidence: search.evidence, returnId: search.id };
+}
+
+export function editorReturnTarget(
+	search: WorkspaceSearch,
+): EvidenceTarget | null {
+	switch (search.returnEvidence) {
+		case "account":
+			return search.returnId ? { kind: "account", id: search.returnId } : null;
+		case "position":
+			return { kind: "position" };
+		case "shortfall":
+			return { kind: "failure" };
+		case "safe-spending":
+			return { kind: "safe-spending" };
+		default:
+			return null;
 	}
 }
 

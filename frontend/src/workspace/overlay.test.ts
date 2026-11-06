@@ -6,7 +6,6 @@ import {
 	findAccount,
 	resolveOverlay,
 	safeSpendingDetailSearch,
-	slugifyAccount,
 } from "./overlay.ts";
 import {
 	validateWorkspaceSearch,
@@ -89,20 +88,15 @@ function emptySearch(): WorkspaceSearch {
 		id: undefined,
 		tab: undefined,
 		editTransaction: undefined,
+		returnEvidence: undefined,
+		returnId: undefined,
 		gmail: undefined,
 	};
 }
 
-describe("slugifyAccount and findAccount", () => {
-	test("names slugify to URL-safe segments", () => {
-		expect(slugifyAccount("Everyday checking")).toBe("everyday-checking");
-		expect(slugifyAccount("  Travel_savings!! ")).toBe("travel-savings");
-	});
-
-	test("exact ids win over slugs and archived accounts hide", () => {
+describe("findAccount", () => {
+	test("stable ids select the intended account and archived accounts hide", () => {
 		expect(findAccount(model, "checking")?.id).toBe("checking");
-		expect(findAccount(model, "everyday-checking")?.id).toBe("checking");
-		expect(findAccount(model, "Everyday-Checking")?.id).toBe("checking");
 		expect(findAccount(model, "old")).toBeUndefined();
 		expect(findAccount(model, "nope")).toBeUndefined();
 	});
@@ -153,12 +147,9 @@ describe("resolveOverlay", () => {
 		).toEqual({ state: "pending" });
 	});
 
-	test("account evidence resolves by id or slug", () => {
+	test("account evidence resolves by stable ID", () => {
 		expect(
-			resolveOverlay(
-				validate({ evidence: "account", id: "everyday-checking" }),
-				model,
-			),
+			resolveOverlay(validate({ evidence: "account", id: "checking" }), model),
 		).toEqual({
 			state: "ready",
 			overlay: {
@@ -171,14 +162,6 @@ describe("resolveOverlay", () => {
 		).toEqual({ state: "unknown" });
 		expect(
 			resolveOverlay(validate({ evidence: "account", id: "old" }), model),
-		).toEqual({ state: "unknown" });
-	});
-
-	test("unknown account ids do not steal reserved editor words", () => {
-		// An archived account literally named "New" must not resolve as the
-		// new-account editor: it resolves by id-or-slug or not at all.
-		expect(
-			resolveOverlay(validate({ evidence: "account", id: "new" }), model),
 		).toEqual({ state: "unknown" });
 	});
 
@@ -320,29 +303,36 @@ describe("resolveOverlay", () => {
 });
 
 describe("search builders", () => {
-	test("evidence search prefers slugs and escapes reserved words", () => {
-		expect(evidenceSearch({ kind: "account", id: "checking" }, model)).toEqual({
-			evidence: "account",
-			id: "everyday-checking",
+	test("account links survive renames and duplicate names", () => {
+		const search = evidenceSearch({ kind: "account", id: "checking" });
+		const renamed = {
+			...model,
+			accounts: [
+				account("savings", "Shared name"),
+				account("checking", "Shared name"),
+			],
+		};
+		expect(resolveOverlay(search, renamed)).toMatchObject({
+			state: "ready",
+			overlay: { target: { id: "checking" } },
 		});
-		expect(evidenceSearch({ kind: "position" }, model)).toEqual({
+		expect(
+			editorSearch({ kind: "account", item: renamed.accounts[1]! }),
+		).toEqual({ editor: "account", id: "checking" });
+	});
+	test("evidence search uses stable IDs", () => {
+		expect(evidenceSearch({ kind: "account", id: "checking" })).toEqual({
+			evidence: "account",
+			id: "checking",
+		});
+		expect(evidenceSearch({ kind: "position" })).toEqual({
 			evidence: "position",
 		});
-		expect(evidenceSearch({ kind: "failure" }, model)).toEqual({
+		expect(evidenceSearch({ kind: "failure" })).toEqual({
 			evidence: "shortfall",
 		});
-		expect(evidenceSearch({ kind: "safe-spending" }, model)).toEqual({
+		expect(evidenceSearch({ kind: "safe-spending" })).toEqual({
 			evidence: "safe-spending",
-		});
-		// The archived account named "New" slugifies to a reserved word, so
-		// the explicit id form keeps the link unambiguous.
-		const reserved = {
-			...model,
-			accounts: [account("abc", "New")],
-		};
-		expect(evidenceSearch({ kind: "account", id: "abc" }, reserved)).toEqual({
-			evidence: "account",
-			id: "abc",
 		});
 	});
 
@@ -366,7 +356,7 @@ describe("search builders", () => {
 			editor: "evaluation",
 			id: "goal-1",
 		});
-		// An account literally named "New" uses the explicit id form.
+		// Account names do not affect editor identity.
 		const reserved = account("move-1", "New");
 		expect(editorSearch({ kind: "account", item: reserved })).toEqual({
 			editor: "account",
@@ -409,11 +399,11 @@ describe("search builders", () => {
 	});
 
 	test("built search validates and resolves back", () => {
-		const search = evidenceSearch({ kind: "account", id: "checking" }, model);
+		const search = evidenceSearch({ kind: "account", id: "checking" });
 		expect(validate(search)).toEqual({
 			...emptySearch(),
 			evidence: "account",
-			id: "everyday-checking",
+			id: "checking",
 		});
 		expect(resolveOverlay(validate(search), model)).toEqual({
 			state: "ready",
@@ -429,11 +419,11 @@ describe("search builders", () => {
 			...model,
 			accounts: [account("a1", "Café & Sons!")],
 		};
-		const search = evidenceSearch({ kind: "account", id: "a1" }, special);
+		const search = evidenceSearch({ kind: "account", id: "a1" });
 		expect(validate(search)).toEqual({
 			...emptySearch(),
 			evidence: "account",
-			id: "caf-sons",
+			id: "a1",
 		});
 		expect(resolveOverlay(validate(search), special)).toEqual({
 			state: "ready",

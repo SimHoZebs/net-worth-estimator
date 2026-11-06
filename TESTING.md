@@ -121,11 +121,21 @@ the generated tree so unit tests and type checks work before the first build.
 Route metadata owns the current page. Root search validation owns overlay query
 parameters and canonical URLs. Page query hooks retain resource-scope gating and
 data freshness. Route preloads fetch code, not financial data.
-The search parser preserves string values and duplicate keys for validation,
-including numeric and boolean-like account slugs.
+The search parser preserves string values and duplicate keys for validation.
+Account links use stable IDs, independent of names. An in-app dialog close
+undoes its open in history. A direct dialog link closes by replacement to its
+explicit destination. Editor evidence return destinations live in validated
+search so copied links retain them. Invalid and unavailable links keep their
+addresses and show an explicit error until dismissed. Unknown pages show a
+not-found state. The workspace consumes Gmail callback flags once the resource
+scope is ready and reports the outcome through notifications on any page.
+The flag survives navigation only while verification is pending, not until a
+provider panel opens.
+Callback ownership outlives route and error boundaries. Back removes stale flag
+copies without repeating the notification or provider-cache invalidation.
 
 Routing regression checks cover nested group parameters, root redirects,
-validated search, OAuth flag retention, editor return context, and browser
+validated search, OAuth callback consumption, editor return context, and browser
 Back/Forward. Run the browser scenarios with:
 
 ```bash

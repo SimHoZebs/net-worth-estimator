@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
+import { SearchParamError } from "@tanstack/react-router";
 import {
 	validateWorkspaceSearch,
+	hasInvalidOverlaySearch,
+	parseWorkspaceSearch,
+	stringifyWorkspaceSearch,
+	InvalidWorkspaceLinkError,
+	isInvalidWorkspaceLink,
 	type WorkspaceSearch,
 } from "./overlaySearch.ts";
 
@@ -11,10 +17,57 @@ const empty: WorkspaceSearch = {
 	id: undefined,
 	tab: undefined,
 	editTransaction: undefined,
+	returnEvidence: undefined,
+	returnId: undefined,
 	gmail: undefined,
 };
 
 describe("validateWorkspaceSearch", () => {
+	test("expected invalid-link errors are distinct from application failures", () => {
+		expect(
+			isInvalidWorkspaceLink(
+				new SearchParamError("Invalid workspace link", {
+					cause: new InvalidWorkspaceLinkError(),
+				}),
+			),
+		).toBe(true);
+		expect(isInvalidWorkspaceLink(new Error("Invalid workspace link"))).toBe(
+			false,
+		);
+		expect(
+			isInvalidWorkspaceLink(
+				new SearchParamError("Unexpected validator failure"),
+			),
+		).toBe(false);
+	});
+	test("editor return destinations are shareable, typed and limited to evidence", () => {
+		expect(
+			validateWorkspaceSearch({
+				editor: "transaction",
+				id: "new",
+				returnEvidence: "account",
+				returnId: "checking",
+			}),
+		).toEqual({
+			...empty,
+			editor: "transaction",
+			id: "new",
+			returnEvidence: "account",
+			returnId: "checking",
+		});
+		for (const search of [
+			{ returnEvidence: "position" },
+			{ editor: "account", id: "new", returnEvidence: "account" },
+			{ editor: "account", id: "new", returnId: "checking" },
+			{
+				editor: "account",
+				id: "new",
+				returnEvidence: "position",
+				returnId: "checking",
+			},
+		])
+			expect(validateWorkspaceSearch(search)).toEqual(empty);
+	});
 	test("empty search validates to no overlay", () => {
 		expect(validateWorkspaceSearch({})).toEqual(empty);
 	});
@@ -109,7 +162,7 @@ describe("validateWorkspaceSearch", () => {
 	test("an unknown gmail value cannot poison the overlay", () => {
 		expect(
 			validateWorkspaceSearch({ editor: "account", id: "new", gmail: "bogus" }),
-		).toEqual({ ...empty });
+		).toEqual({ ...empty, editor: "account", id: "new" });
 	});
 
 	test("duplicate params (arrays) drop the overlay and keep gmail", () => {
@@ -145,7 +198,7 @@ describe("validateWorkspaceSearch", () => {
 		}
 	});
 
-	test("malformed overlays keep the gmail flag so normalization preserves it", () => {
+	test("invalid overlay input does not hide a callback result from the workspace", () => {
 		expect(
 			validateWorkspaceSearch({
 				evidence: "position",
@@ -156,11 +209,24 @@ describe("validateWorkspaceSearch", () => {
 		).toEqual({ ...empty, gmail: "connected" });
 	});
 
-	test("a stray id beside a no-id evidence kind is inert, never invalid", () => {
-		// Evidence position/shortfall/safe-spending carry no id; a stray id
-		// beside them is ignored by the resolver, matching the old parser.
-		expect(
-			validateWorkspaceSearch({ evidence: "position", id: "checking" }),
-		).toEqual({ ...empty, evidence: "position", id: "checking" });
+	test("parameters must belong to the selected overlay", () => {
+		for (const search of [
+			{ evidence: "position", id: "checking" },
+			{ evidence: "account", id: "checking", tab: "cycle" },
+			{ editor: "account", id: "new", editTransaction: "invest" },
+			{ detail: "safe-spending", id: "checking" },
+			{ editor: "account", id: "" },
+			{ detail: "safe-spending", editTransaction: "" },
+		]) {
+			expect(validateWorkspaceSearch(search)).toEqual(empty);
+			expect(hasInvalidOverlaySearch(search)).toBe(true);
+		}
+	});
+
+	test("query serialization preserves duplicate input for an explicit link error", () => {
+		const raw = "?evidence=account&id=a&id=b&gmail=error";
+		const parsed = parseWorkspaceSearch(raw);
+		expect(stringifyWorkspaceSearch(parsed)).toBe(raw);
+		expect(hasInvalidOverlaySearch(parsed)).toBe(true);
 	});
 });

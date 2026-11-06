@@ -1,0 +1,154 @@
+import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	RouterProvider,
+	retainSearchParams,
+} from "@tanstack/react-router";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { NotificationCenter } from "../components/NotificationCenter.tsx";
+import { setupQueryScope, teardownQueryScope } from "../mocks/testScope.tsx";
+import { acceptTestResource } from "../mocks/resource.ts";
+import { suspendUserScope } from "../auth/resourceScope.ts";
+import { gmailCredentialKey } from "../state/gmail.ts";
+import { integrationsKey } from "../state/integrations.ts";
+import { serverQueryClient } from "../state/serverQuery.ts";
+import {
+	resetNotifications,
+	useNotifications,
+} from "../state/notifications.ts";
+import {
+	parseWorkspaceSearch,
+	stringifyWorkspaceSearch,
+	validateWorkspaceSearch,
+} from "./overlaySearch.ts";
+import { WorkspaceCallbacks } from "./useGmailCallback.ts";
+
+beforeEach(() => {
+	setupQueryScope();
+	resetNotifications();
+});
+afterEach(() => {
+	teardownQueryScope();
+	resetNotifications();
+});
+
+async function renderCallback(entry: string) {
+	function Workspace() {
+		return <NotificationCenter />;
+	}
+	const root = createRootRoute({
+		component: Workspace,
+		validateSearch: validateWorkspaceSearch,
+		search: { middlewares: [retainSearchParams(["gmail"])] },
+	});
+	const pages = ["/accounts", "/transactions"].map((path) =>
+		createRoute({ getParentRoute: () => root, path, component: () => null }),
+	);
+	const router = createRouter({
+		InnerWrap: WorkspaceCallbacks,
+		routeTree: root.addChildren(pages),
+		history: createMemoryHistory({ initialEntries: [entry] }),
+		parseSearch: parseWorkspaceSearch,
+		stringifySearch: stringifyWorkspaceSearch,
+	});
+	await router.load();
+	render(<RouterProvider router={router} />);
+	return router;
+}
+
+it("consumes a successful callback on Accounts and invalidates inactive caches without fetching them", async () => {
+	const fetcher = vi.fn();
+	vi.stubGlobal("fetch", fetcher);
+	const cache = serverQueryClient();
+	cache.setQueryData(gmailCredentialKey(), { connected: false });
+	cache.setQueryData(integrationsKey(), []);
+	const router = await renderCallback(
+		"/accounts?editor=account&id=new&returnEvidence=position&gmail=connected",
+	);
+	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
+	await waitFor(() =>
+		expect(router.state.location.search.gmail).toBeUndefined(),
+	);
+	expect(router.state.location.search).toMatchObject({
+		editor: "account",
+		id: "new",
+		returnEvidence: "position",
+	});
+	expect(cache.getQueryState(gmailCredentialKey())?.isInvalidated).toBe(true);
+	expect(cache.getQueryState(integrationsKey())?.isInvalidated).toBe(true);
+	expect(fetcher).not.toHaveBeenCalled();
+	await act(async () => {
+		await router.navigate({ to: "/transactions" });
+	});
+	expect(
+		useNotifications
+			.getState()
+			.items.filter((item) => item.key === "gmail-callback"),
+	).toHaveLength(1);
+});
+
+it("reports a failed callback once and preserves invalid dialog input for its error state", async () => {
+	const router = await renderCallback(
+		"/accounts?evidence=account&id=a&id=b&gmail=error",
+	);
+	expect(await screen.findByRole("alert")).toHaveProperty(
+		"textContent",
+		expect.stringContaining("Gmail connection failed"),
+	);
+	await waitFor(() =>
+		expect(router.state.location.search.gmail).toBeUndefined(),
+	);
+	expect(router.state.location.search.id).toEqual(["a", "b"]);
+	expect(useNotifications.getState().items).toHaveLength(1);
+});
+
+it("retains the callback through navigation during scope verification, then consumes it once", async () => {
+	suspendUserScope();
+	const router = await renderCallback("/accounts?gmail=connected");
+	expect(useNotifications.getState().items).toHaveLength(0);
+	expect(router.state.location.search.gmail).toBe("connected");
+	await act(async () => {
+		await router.navigate({ to: "/transactions" });
+	});
+	expect(router.state.location.search.gmail).toBe("connected");
+	expect(useNotifications.getState().items).toHaveLength(0);
+	await act(async () => {
+		acceptTestResource();
+		serverQueryClient().setQueryData(gmailCredentialKey(), {
+			connected: false,
+		});
+		serverQueryClient().setQueryData(integrationsKey(), []);
+	});
+	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
+	await waitFor(() =>
+		expect(router.state.location.search.gmail).toBeUndefined(),
+	);
+	expect(router.state.location.pathname).toBe("/transactions");
+	expect(useNotifications.getState().items).toHaveLength(1);
+	expect(
+		serverQueryClient().getQueryState(gmailCredentialKey())?.isInvalidated,
+	).toBe(true);
+	expect(
+		serverQueryClient().getQueryState(integrationsKey())?.isInvalidated,
+	).toBe(true);
+	resetNotifications();
+	serverQueryClient().setQueryData(gmailCredentialKey(), { connected: true });
+	serverQueryClient().setQueryData(integrationsKey(), []);
+	await act(async () => {
+		router.history.back();
+	});
+	await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
+	await waitFor(() =>
+		expect(router.state.location.search.gmail).toBeUndefined(),
+	);
+	expect(useNotifications.getState().items).toHaveLength(0);
+	expect(
+		serverQueryClient().getQueryState(gmailCredentialKey())?.isInvalidated,
+	).toBe(false);
+	expect(
+		serverQueryClient().getQueryState(integrationsKey())?.isInvalidated,
+	).toBe(false);
+});

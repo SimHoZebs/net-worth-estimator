@@ -14,12 +14,12 @@ async function load(entry: string) {
 
 describe("workspace router", () => {
 	it.each(["401", "0", "true", "false", "null"])(
-		"preserves the account slug %s in direct and generated links",
+		"preserves the account ID %s in direct and generated links",
 		async (name) => {
 			const account = {
 				...financialModelFixture.accounts[0]!,
-				id: "account-id",
-				name,
+				id: name,
+				name: "Account with a stable ID",
 			};
 			const rows = { accounts: [account], transactions: [], evaluations: [] };
 			const router = await load(`/accounts?evidence=account&id=${name}`);
@@ -36,7 +36,7 @@ describe("workspace router", () => {
 			);
 			const link = router.buildLocation({
 				to: "/accounts",
-				search: evidenceSearch({ kind: "account", id: account.id }, rows),
+				search: evidenceSearch({ kind: "account", id: account.id }),
 			});
 			const reloaded = await load(link.href);
 			expect(reloaded.state.location.search.id).toBe(name);
@@ -65,11 +65,15 @@ describe("workspace router", () => {
 		});
 	});
 
-	it("removes duplicate overlay parameters before rendering", async () => {
+	it("retains malformed overlay links for an explicit error", async () => {
 		const router = await load(
 			"/accounts?evidence=account&id=a&id=b&gmail=connected",
 		);
-		expect(router.state.location.search).toEqual({ gmail: "connected" });
+		expect(router.state.location.search).toEqual({
+			evidence: "account",
+			id: ["a", "b"],
+			gmail: "connected",
+		});
 	});
 
 	it("removes unrelated search without discarding a valid overlay", async () => {
@@ -82,22 +86,15 @@ describe("workspace router", () => {
 		});
 	});
 
-	it("retains Gmail until explicitly consumed and starts ordinary navigation without return context", async () => {
-		const router = await load("/accounts?gmail=error");
+	it("ordinary page navigation clears editor return context", async () => {
+		const router = await load("/accounts");
 		await router.navigate({
 			to: "/accounts",
-			search: { editor: "account", id: "new" },
-			state: { returnTo: { kind: "position" } },
-		});
-		expect(router.state.location.search.gmail).toBe("error");
-		await router.navigate({ to: "/transactions" });
-		expect(router.state.location.search.gmail).toBe("error");
-		expect(router.state.location.state.returnTo).toBeUndefined();
-		await router.navigate({
-			to: "/sources",
-			search: { gmail: undefined },
-			replace: true,
+			search: { editor: "account", id: "new", returnEvidence: "position" },
 		});
 		expect(router.state.location.search.gmail).toBeUndefined();
+		await router.navigate({ to: "/transactions" });
+		expect(router.state.location.search.gmail).toBeUndefined();
+		expect(router.state.location.search.returnEvidence).toBeUndefined();
 	});
 });

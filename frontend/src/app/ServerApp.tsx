@@ -16,10 +16,11 @@ import { useWorkspaceOverlays } from "../workspace/useWorkspaceOverlays.ts";
 import {
 	WorkspaceDialogs,
 	WorkspaceEvidence,
+	WorkspaceInvalidLink,
 } from "../workspace/WorkspaceDialogs.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
-export function ServerApp() {
+export function ServerApp({ invalidLink = false }: { invalidLink?: boolean }) {
 	// Startup enables resource queries. Screens subscribe to their own data.
 	// No fetched data travels as props anywhere in this tree.
 	const enabled = useUserScope().status === "ready";
@@ -31,10 +32,18 @@ export function ServerApp() {
 
 	const page = useMatches({
 		select: (matches) =>
-			matches.find((match) => match.staticData.page)?.staticData.page ??
-			"outlook",
+			matches.some((match) => match.status === "notFound" || match._notFound)
+				? null
+				: (matches.find((match) => match.staticData.page)?.staticData.page ??
+					null),
 	});
-	const currentPage = pageDefinition(page);
+	const currentPage = page
+		? pageDefinition(page)
+		: {
+				...pageDefinition("outlook"),
+				label: "Page not found",
+				title: "Page not found",
+			};
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const pageRef = useRef(page);
 	useEffect(() => {
@@ -95,11 +104,13 @@ export function ServerApp() {
 				/>
 			) : recovery ? (
 				<ServerWorkspaceRecovery />
+			) : invalidLink ? (
+				<WorkspaceInvalidLink onClose={overlays.closeUnavailable} />
 			) : (
 				<>
 					<Outlet />
-					<WorkspaceEvidence overlays={overlays} />
-					<WorkspaceDialogs overlays={overlays} />
+					{page && <WorkspaceEvidence overlays={overlays} />}
+					{page && <WorkspaceDialogs overlays={overlays} />}
 				</>
 			)}
 		</WorkspaceLayout>
