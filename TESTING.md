@@ -246,7 +246,7 @@ bun --filter ./frontend test:integration
 
 For a backend change, it is the Go gate below.
 
-The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. There is no pre-push hook. The Tests workflow is the full gate and runs on every branch push, and a green run for the exact commit is required before landing. To repeat it locally when CI is unavailable use `scripts/test --gate`.
+The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The Tests workflow is the full gate and runs on every branch push, and a green run for the exact commit is required before landing. To repeat it locally when CI is unavailable use `scripts/test --gate`.
 
 ## Shared Database Isolation
 
