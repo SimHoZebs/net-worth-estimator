@@ -1,6 +1,5 @@
 import { Flag, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Skeleton } from "@/components/Skeleton.tsx";
 import { Button } from "@/components/Button.tsx";
 import { EmptyState } from "@/components/EmptyState.tsx";
 import { ErrorNotice } from "@/components/ErrorNotice.tsx";
@@ -17,11 +16,6 @@ import { usePinnedEvaluations } from "@/state/pinnedEvaluations.ts";
 import { useRemoteProjection } from "@/state/useRemoteProjection.ts";
 
 import {
-	useSavedAccounts,
-	useSavedStartDate,
-	useSavedTransactions,
-} from "@/state/savedState.ts";
-import {
 	refreshEvaluations,
 	useAccountBalances,
 	useServerStatus,
@@ -35,10 +29,8 @@ export function EvaluationsPage({
 	onEdit: (evaluation: Evaluation | null) => void;
 }) {
 	// The grid subscribes to its own queries; only UI callbacks arrive as
-	// props. Saved rows arrive through the row hooks; null means not loaded.
-	const accounts = useSavedAccounts();
-	const transactions = useSavedTransactions();
-	const startDate = useSavedStartDate();
+	// props. Saved-row gates would hide the static add action behind the
+	// async rows, so the page renders immediately.
 	const summary = useEvaluationSummary();
 	const savedIds = useMemo(
 		() => summaryInstanceIds(summary.data),
@@ -103,7 +95,6 @@ export function EvaluationsPage({
 				);
 		});
 	};
-	if (!accounts || !transactions || !startDate) return <EvaluationsSkeleton />;
 	return (
 		<>
 			{projectionQuery.loading && projection && <ProjectionUpdating />}
@@ -162,32 +153,5 @@ export function EvaluationsPage({
 				))}
 			</div>
 		</>
-	);
-}
-
-/** Keep the add action and card grid stable while rows hydrate. */
-function EvaluationsSkeleton() {
-	return (
-		<section
-			className="grid gap-6"
-			aria-busy="true"
-			aria-label="Loading evaluations"
-		>
-			<div className="flex items-center justify-between gap-4">
-				<Skeleton className="h-9 w-40" />
-			</div>
-			<div className="grid grid-cols-2 gap-6 max-lg:gap-4 max-sm:grid-cols-1">
-				<div className="rounded-surface border border-line bg-surface p-5">
-					<Skeleton className="h-4 w-32" />
-					<Skeleton className="mt-4 h-8 w-44" />
-					<Skeleton className="mt-4 h-24 w-full" />
-				</div>
-				<div className="rounded-surface border border-line bg-surface p-5">
-					<Skeleton className="h-4 w-32" />
-					<Skeleton className="mt-4 h-8 w-44" />
-					<Skeleton className="mt-4 h-24 w-full" />
-				</div>
-			</div>
-		</section>
 	);
 }

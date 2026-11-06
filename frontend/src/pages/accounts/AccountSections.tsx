@@ -1,6 +1,5 @@
 import { Plus } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import { Skeleton } from "../../components/Skeleton.tsx";
 import { TransactionSortButton } from "../../components/activity/TransactionSortButton.tsx";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { TablePagination } from "../../components/DataTable.tsx";
@@ -224,7 +223,7 @@ function TransactionsView({
 	// Finance-first: rows render from saved query rows alone. Literal
 	// amounts show directly; formula-derived amounts stay Varies without
 	// a forecast request. Memos stay mounted while rows load, so inputs
-	// are null-safe; the null gate below only skips rendering.
+	// are null-safe; the saved rows gate only the list.
 	const rows = useMemo(
 		() =>
 			(transactionsQuery.data?.transactions ?? []).map((row) =>
@@ -258,13 +257,20 @@ function TransactionsView({
 	const transactionsCount = visible.filter(
 		(transaction) => transaction.kind === "transaction",
 	).length;
+	// Saved accounts hydrate after the controls. Hide counts until then
+	// instead of showing false zeros.
+	const savedRowsPending = !accounts || !startDate;
 	const tabs: TabItem<ScheduleFilter>[] = [
 		{
 			id: "all",
 			label: "All transactions",
-			count: transactionsCount,
+			count: savedRowsPending ? null : transactionsCount,
 		},
-		{ id: "recurring", label: "Recurring", count: recurringCount },
+		{
+			id: "recurring",
+			label: "Recurring",
+			count: savedRowsPending ? null : recurringCount,
+		},
 	];
 	const sortedTransactions = useMemo(
 		() =>
@@ -282,7 +288,6 @@ function TransactionsView({
 			}),
 		[visible, query, schedule, order],
 	);
-	if (!accounts || !startDate) return <AccountSectionsSkeleton />;
 	const pageCount = Math.max(
 		1,
 		Math.ceil(sortedTransactions.length / TRANSACTIONS_PAGE_SIZE),
@@ -350,7 +355,9 @@ function TransactionsView({
 				</div>
 			</div>
 			<div id={listId}>
-				{transactionsQuery.isPending || rulesQuery.isPending ? (
+				{savedRowsPending ||
+				transactionsQuery.isPending ||
+				rulesQuery.isPending ? (
 					<p role="status">Loading transactions…</p>
 				) : transactionsQuery.isError || rulesQuery.isError ? (
 					<p role="alert">
@@ -370,8 +377,8 @@ function TransactionsView({
 				) : (
 					<TransactionsPanel
 						transactions={pagedTransactions}
-						accounts={visibleAccounts(accounts)}
-						startDate={startDate}
+						accounts={visibleAccounts(accounts ?? [])}
+						startDate={startDate ?? ""}
 						readOnly={readOnly}
 						ruleCadence={ruleCadence}
 					/>
@@ -389,27 +396,5 @@ function TransactionsView({
 				/>
 			)}
 		</Tabs>
-	);
-}
-
-/** Reserve the row table while saved accounts hydrate. */
-function AccountSectionsSkeleton() {
-	return (
-		<section
-			className="grid gap-4"
-			aria-busy="true"
-			aria-label="Loading accounts"
-		>
-			<div className="flex min-w-0 items-center justify-between gap-4">
-				<Skeleton className="h-9 w-[60%] max-w-56" />
-				<Skeleton className="h-9 w-[30%] max-w-32" />
-			</div>
-			<div className="grid gap-3 rounded-surface border border-line bg-surface p-5">
-				<Skeleton className="h-4 w-40" />
-				<Skeleton className="h-14 w-full" />
-				<Skeleton className="h-14 w-full" />
-				<Skeleton className="h-14 w-full" />
-			</div>
-		</section>
 	);
 }

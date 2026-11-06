@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
 import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { ProjectionUpdating } from "../../components/ProjectionUpdating.tsx";
-import { Skeleton } from "../../components/Skeleton.tsx";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
 import {
@@ -49,12 +48,20 @@ export function PlannedPurchasePanel() {
 	const [removeError, setRemoveError] = useState<string | null>(null);
 	const [moveError, setMoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
-	if (!accounts || !purchases || !startDate) return <PurchasesSkeleton />;
-	const items = toPurchaseViewItems({ purchases, accounts, schedule });
-	const end = horizonDate({ start: startDate, years });
+	// Saved rows hydrate after the header. Render the header with a
+	// loading slot instead of hiding the whole planner behind a
+	// skeleton. Empty arrays while loading would read as a false
+	// empty state, so pass loading through.
+	const savedPending = !accounts || !purchases || !startDate;
+	const items = toPurchaseViewItems({
+		purchases: purchases ?? [],
+		accounts: accounts ?? [],
+		schedule,
+	});
+	const end = startDate ? horizonDate({ start: startDate, years }) : "";
 
 	const moveItem = (purchase: PlannedPurchase, direction: -1 | 1) => {
-		if (locked || purchase.readOnly) return;
+		if (locked || purchase.readOnly || !purchases) return;
 		setMoveError(null);
 		void moveSavedPurchase(purchases, purchase.id, direction).then(
 			({ ok, next }) => {
@@ -82,8 +89,8 @@ export function PlannedPurchasePanel() {
 	};
 
 	const editorPriority = editor?.item
-		? purchases.findIndex((item) => item.id === editor.item!.id)
-		: purchases.length;
+		? (purchases ?? []).findIndex((item) => item.id === editor.item!.id)
+		: (purchases ?? []).length;
 
 	return (
 		<>
@@ -91,7 +98,8 @@ export function PlannedPurchasePanel() {
 			<PurchasePlanner
 				items={items}
 				forecastEnd={end}
-				locked={locked}
+				locked={locked || savedPending}
+				loading={savedPending}
 				onAdd={() => setEditor({ item: null })}
 				onEdit={(purchase) => setEditor({ item: purchase })}
 				onRemove={setRemove}
@@ -101,7 +109,7 @@ export function PlannedPurchasePanel() {
 			<p className="sr-only" role="status">
 				{announcement}
 			</p>
-			{editor && (
+			{editor && accounts && startDate && (
 				<PlannedPurchaseEditor
 					accounts={accounts}
 					startDate={startDate}
@@ -130,26 +138,5 @@ export function PlannedPurchasePanel() {
 				</ConfirmDialog>
 			)}
 		</>
-	);
-}
-
-/** Reserve the planner while saved purchases and the model hydrate. */
-function PurchasesSkeleton() {
-	return (
-		<section
-			className="grid gap-6"
-			aria-busy="true"
-			aria-label="Loading planned purchases"
-		>
-			<div className="flex items-center justify-between gap-4">
-				<Skeleton className="h-9 w-48" />
-			</div>
-			<div className="grid gap-4 rounded-surface border border-line bg-surface p-5">
-				<Skeleton className="h-4 w-40" />
-				<Skeleton className="h-20 w-full" />
-				<Skeleton className="h-20 w-full" />
-				<Skeleton className="h-20 w-full" />
-			</div>
-		</section>
 	);
 }
