@@ -46,66 +46,6 @@ func seedRunnerAccounts(t *testing.T, database store.Store) {
 	}
 }
 
-func TestSyncRejectsBareBridgeKeys(t *testing.T) {
-	database := openRunnerStore(t)
-	if _, err := database.CreateAccount(types.Account{ID: "checking", Name: "Checking"}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.SaveAccountLink(store.AccountLink{BridgeAccountID: "bridge-checking", ModelAccountID: "checking", Origin: store.LinkOriginManual}); err != nil {
-		t.Fatal(err)
-	}
-	runner := NewRunner(database, Config{}, nil)
-	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
-		t.Fatal("fetch ran with an unmigrated store")
-		return nil, nil
-	}
-	_, err := runner.Sync(context.Background())
-	var migration *MigrationRequiredError
-	if !errors.As(err, &migration) {
-		t.Fatalf("sync error = %T (%v), want MigrationRequiredError", err, err)
-	}
-}
-
-func TestSyncRejectsBareTransactionKeyWithoutLink(t *testing.T) {
-	database := openRunnerStore(t)
-	seedRunnerAccounts(t, database)
-	account := "checking"
-	transaction := types.Transaction{
-		Name:            "Hold",
-		Source:          store.SourceBankSync,
-		SourceAccountID: &account,
-		Amount:          types.TransactionAmountResolution{Resolver: "expression", Config: map[string]any{"expression": "10"}, Inputs: map[string]types.AmountInputBinding{}},
-		PostedTime:      1785628800,
-		TransactionTime: 1785628800,
-		Enabled:         false,
-		Pending:         true,
-	}
-	if _, err := database.ApplySync(nil, []store.BankDirective{{
-		Upsert: &store.BankUpsert{
-			Transaction: transaction,
-			Keys:        []store.BankKey{{Provider: store.ProviderSimpleFIN, AccountID: "bridge-checking", TransactionID: "tx1"}},
-		},
-	}}); err != nil {
-		t.Fatal(err)
-	}
-	if err := database.DeleteAccountLink(testAccountKey("bridge-checking")); err != nil {
-		t.Fatal(err)
-	}
-	if err := database.DeleteAccountLink(testAccountKey("bridge-prime")); err != nil {
-		t.Fatal(err)
-	}
-	runner := NewRunner(database, Config{}, nil)
-	runner.fetch = func(context.Context, time.Time, time.Time) (*AccountSet, error) {
-		t.Fatal("fetch ran with a bare transaction key")
-		return nil, nil
-	}
-	_, err := runner.Sync(context.Background())
-	var migration *MigrationRequiredError
-	if !errors.As(err, &migration) {
-		t.Fatalf("sync error = %T (%v), want MigrationRequiredError", err, err)
-	}
-}
-
 func TestSyncProvisionsUnmappedBridgeAccounts(t *testing.T) {
 	database := openRunnerStore(t)
 	seedRunnerAccounts(t, database)

@@ -775,7 +775,7 @@ the user correction overlay.
 `internal/simplefin` is configured once in `cmd/server`:
 
 - The Bridge key is connected per user through `POST /v1/sync/simplefin/credential` and stored in `sync_credentials`.
-- Account links live in the `account_links` table. Bridge identity is the connection-scoped key `sf2.<conn_id>.<account_id>`, not a bare account ID. A stored bare key fails the sync until the one-time `simplefin-v2-keys` conversion runs.
+- Account links live in the `account_links` table. Bridge identity is the connection-scoped key `sf2.<conn_id>.<account_id>`, not a bare account ID. Sync uses current keys without a runtime migration check. Offline key conversion remains available through `simplefin-v2-keys`.
 - The client sends SimpleFIN protocol version 2 and rejects a response without both `errlist` and `connections`. General and authentication errors fail the run. Connection and account errors exclude only the affected rows, so an incomplete snapshot never voids healthy pending holds. The last condition is stored on the provider connection row and exposed as `syncError` on `/v1/status`; a clean success clears it.
 - Card selection is stored per user in `sync_credentials` for safe-spending math; bank mirroring covers every mapped account regardless of cards.
 - Bridge accounts with no link are auto-provisioned as model accounts (investment when holdings are reported, cash otherwise) with an `auto` link; `GET /v1/sync/simplefin/accounts` lists links and snapshots for user relinking, `PUT`/`DELETE` manage them. Disaster recovery is a database backup: links live in `account_links` beside the data.

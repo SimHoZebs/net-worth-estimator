@@ -134,15 +134,6 @@ func (a bridgeAdapter) Translate(ctx context.Context, st store.Store, native any
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	for _, row := range bank {
-		for _, key := range row.Keys {
-			if key.Provider == store.ProviderSimpleFIN {
-				if _, _, ok := ParseAccountKey(key.AccountID); !ok {
-					return nil, nil, nil, &MigrationRequiredError{}
-				}
-			}
-		}
-	}
 	covered := make(map[string]bool, len(resolved))
 	for _, modelID := range resolved {
 		covered[modelID] = true

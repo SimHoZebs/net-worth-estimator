@@ -97,9 +97,6 @@ type Store interface {
 	ListAccountLinks() ([]AccountLink, error)
 	SaveAccountLink(link AccountLink) (AccountLink, error)
 	DeleteAccountLink(bridgeAccountID string) error
-	// ListSyncAccountKeys reports every distinct provider account key stored
-	// in sync rows, including rows whose account link was removed.
-	ListSyncAccountKeys(provider string) ([]string, error)
 	ProvisionSyncAccounts(items []SyncProvision) (map[string]string, int, []string, error)
 	GetSyncCredential() (SyncCredential, error)
 	SetSyncCredential(accessURL, bridgeHost string) (SyncCredential, error)

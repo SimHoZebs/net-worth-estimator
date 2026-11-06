@@ -74,15 +74,6 @@ func (e *NotConfiguredError) Error() string {
 	return "simplefin sync is not configured"
 }
 
-// MigrationRequiredError reports stored bare-account keys from before the
-// connection-scoped key upgrade. The sync fails closed instead of silently
-// provisioning duplicate accounts.
-type MigrationRequiredError struct{}
-
-func (e *MigrationRequiredError) Error() string {
-	return "simplefin sync keys require the one-time simplefin-v2-keys migration"
-}
-
 // CredentialProvider resolves the current per-plan Bridge credential from
 // the database: the access URL plus the card selection. Connecting,
 // rotating, or disconnecting a key takes effect on the next run with no
@@ -204,33 +195,6 @@ func (r *Runner) IsConfigured() bool {
 	return accessURL != "" && r.store != nil
 }
 
-// validateStoredKeys rejects bare v1 bridge account links. A skipped key
-// conversion would otherwise auto-provision duplicate model accounts.
-func (r *Runner) validateStoredKeys() error {
-	if r == nil || r.store == nil {
-		return nil
-	}
-	links, err := r.store.ListAccountLinks()
-	if err != nil {
-		return fmt.Errorf("read simplefin account links: %w", err)
-	}
-	for _, link := range links {
-		if _, _, ok := ParseAccountKey(link.BridgeAccountID); !ok {
-			return &MigrationRequiredError{}
-		}
-	}
-	keys, err := r.store.ListSyncAccountKeys(store.ProviderSimpleFIN)
-	if err != nil {
-		return fmt.Errorf("read simplefin sync keys: %w", err)
-	}
-	for _, key := range keys {
-		if _, _, ok := ParseAccountKey(key); !ok {
-			return &MigrationRequiredError{}
-		}
-	}
-	return nil
-}
-
 // BridgeHost reports the host of the current access URL for display.
 func (r *Runner) BridgeHost() string {
 	if r == nil {
@@ -289,10 +253,6 @@ func (r *Runner) Sync(ctx context.Context) (*Summary, error) {
 // orchestrator with no guard checks. Callers own singleflight and blackout
 // handling.
 func (r *Runner) fetchAndApply(ctx context.Context) (*Summary, error) {
-	if err := r.validateStoredKeys(); err != nil {
-		r.recordSyncError(syncErrorFromError(err, r.now()))
-		return nil, err
-	}
 	out, err := ingest.Sync(ctx, r.store, bridgeAdapter{runner: r}, r.now())
 	if err != nil {
 		r.recordSyncError(syncErrorFromError(err, r.now()))
@@ -425,10 +385,6 @@ func syncErrorFromError(err error, now time.Time) store.SyncError {
 			Message:    fmt.Sprintf("simplefin bridge returned status %d from %s", status.StatusCode, status.Host),
 			ObservedAt: observedAt,
 		}
-	}
-	var migration *MigrationRequiredError
-	if errors.As(err, &migration) {
-		return store.SyncError{Code: "gen.migration", Message: migration.Error(), ObservedAt: observedAt}
 	}
 	return store.SyncError{Code: "gen.sync", Message: "simplefin sync failed", ObservedAt: observedAt}
 }

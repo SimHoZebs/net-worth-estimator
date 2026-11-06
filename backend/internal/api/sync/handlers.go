@@ -74,10 +74,6 @@ func (s *handler) triggerSync(ctx context.Context, _ *struct{}) (*syncOutput, er
 		if errors.As(err, &protocol) {
 			return nil, huma.Error502BadGateway(protocol.Error())
 		}
-		var migration *simplefin.MigrationRequiredError
-		if errors.As(err, &migration) {
-			return nil, huma.Error500InternalServerError(migration.Error())
-		}
 		return nil, huma.Error500InternalServerError(err.Error())
 	}
 	return &syncOutput{Body: *summary}, nil
