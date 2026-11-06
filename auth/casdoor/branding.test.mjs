@@ -50,7 +50,7 @@ test("bundles local Manrope and script-free SVG assets without external requests
     assert.match(fields[field], /^data:image\/svg\+xml;base64,/);
     const svg = Buffer.from(fields[field].split(",")[1], "base64").toString();
     assert.match(svg, /<svg /);
-    assert.doesNotMatch(svg, /<script|<text|<image|https?:\/\/(?!www.w3.org\/2000\/svg)/i);
+    assert.doesNotMatch(svg, /<script|<text|<image|https?:\/\/(?!www\.w3\.org\/2000\/svg)/i);
   }
   for (const field of ["headerHtml", "footerHtml", "formSideHtml"]) {
     assert.doesNotMatch(fields[field], /<script|<form|<input|on[a-z]+\s*=|https?:\/\//i);

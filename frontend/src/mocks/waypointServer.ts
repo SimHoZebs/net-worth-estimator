@@ -411,7 +411,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				...structuredClone(body),
 				id:
 					(body as { id?: string }).id ||
-					`generated-${Math.random().toString(36).slice(2, 10)}`,
+					`generated-${(globalThis.crypto.getRandomValues(new Uint32Array(1))[0]! / 4294967296).toString(36).slice(2, 10)}`,
 			};
 			return write(() => {
 				(current.accounts as unknown[]).push(structuredClone(row));

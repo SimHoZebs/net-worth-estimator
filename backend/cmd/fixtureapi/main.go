@@ -294,8 +294,7 @@ func main() {
 			return
 		}
 		if err := seedFixtureSharing(application, body.GroupName, body.OwnerDisplay, body.Postings, writer); err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(writer, err)
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}))
@@ -326,8 +325,7 @@ func main() {
 			return
 		}
 		if err := seedFixtureInbox(application, body.Postings, body.Revoked, writer); err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(writer, err)
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}))
@@ -356,8 +354,7 @@ func main() {
 			next = *body.ReadOnly
 		}
 		if err := restore(next, body.BankTransactions, body.Bulk); err != nil {
-			writer.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintln(writer, err)
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if body.SyncLink != nil {
@@ -368,8 +365,7 @@ func main() {
 				Currency:        body.SyncLink.Currency,
 				Origin:          store.LinkOriginAuto,
 			}); err != nil {
-				writer.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintln(writer, err)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}

@@ -54,10 +54,14 @@ func replaceSharingPolicyAccount(tx *userTx, oldID, newID string) error {
 		if err := rebuildVisibilityForOwnerGroupScoped(tx, item.group); err != nil {
 			return err
 		}
-		beforeJSON, _ := json.Marshal(map[string]any{"accounts": item.before})
-		afterJSON, _ := json.Marshal(map[string]any{"accounts": item.after, "version": item.version})
-		if err := auditSharingScoped(tx, tx.userID, "policy-set", "", "", "", item.group,
-			fmt.Sprintf(`{"reason":"account-superseded","before":%s,"after":%s,"replaced_account":%q,"replacement_account":%q}`, beforeJSON, afterJSON, oldID, newID)); err != nil {
+		detail, _ := json.Marshal(map[string]any{
+			"reason":              "account-superseded",
+			"before":              map[string]any{"accounts": item.before},
+			"after":               map[string]any{"accounts": item.after, "version": item.version},
+			"replaced_account":    oldID,
+			"replacement_account": newID,
+		})
+		if err := auditSharingScoped(tx, tx.userID, "policy-set", "", "", "", item.group, string(detail)); err != nil {
 			return err
 		}
 	}

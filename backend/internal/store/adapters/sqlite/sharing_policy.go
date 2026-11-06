@@ -446,10 +446,12 @@ func stripSharingPolicyAccount(tx *userTx, accountID string) error {
 		if after == nil {
 			after = []string{}
 		}
-		beforeJSON, _ := json.Marshal(map[string]any{"accounts": before})
-		afterJSON, _ := json.Marshal(map[string]any{"accounts": after, "version": item.version})
-		if err := auditSharingScoped(tx, tx.userID, "policy-strip", "", "", "", item.group,
-			fmt.Sprintf(`{"before":%s,"after":%s,"stripped_account":%q}`, beforeJSON, afterJSON, accountID)); err != nil {
+		detail, _ := json.Marshal(map[string]any{
+			"before":           map[string]any{"accounts": before},
+			"after":            map[string]any{"accounts": after, "version": item.version},
+			"stripped_account": accountID,
+		})
+		if err := auditSharingScoped(tx, tx.userID, "policy-strip", "", "", "", item.group, string(detail)); err != nil {
 			return err
 		}
 	}
