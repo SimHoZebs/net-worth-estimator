@@ -329,7 +329,7 @@ test("income sources combine independent recurrence rules and persist explicit d
 	).toHaveText("-$14,975");
 });
 
-test("marks the spending-limit and protected-reserve crossings and projects the pace", async ({
+test("marks the spending-limit and protected-reserve crossings in the cycle list", async ({
 	page,
 	request,
 }) => {
@@ -404,33 +404,12 @@ test("marks the spending-limit and protected-reserve crossings and projects the 
 		expect((await response.json()).saved).toBe(true);
 	}
 	await page.goto("/#outlook");
-	const card = page.getByRole("region", { name: "Safe card spending" });
+	// The pace graph is removed: the cycle view shows no Card spending
+	// pace chart, while the crossing dividers still mark the drawer list.
 	await expect(
-		card.getByRole("heading", { name: labels.spendingPace }),
-	).toBeVisible();
-	await expect(page.getByText("Over limit · $158 a day")).toBeVisible();
-	const chart = page.getByRole("img", { name: labels.spendingPace });
-	await expect(chart).toBeVisible();
-	expect(chart.locator("desc")).toContainText(
-		"Spending is already over the spending limit.",
-	);
-	await expect(
-		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
-	).toContainText("Spending so far");
-	await expect(
-		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
-	).toContainText("Projected at average rate");
-	// The statement closes Feb 20 and settles from the March paychecks
-	// (salary Mar 1 + partner Mar 10). March's committed outflows include
-	// the fixture's $9,000 Home renovation (Mar 6), so the allowance and
-	// both thresholds run negative: the chart draws no threshold rule and
-	// the legend keeps only the spending lines.
-	await expect(
-		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
-	).not.toContainText(labels.reserveStarts);
-	await expect(
-		page.getByRole("list", { name: `${labels.spendingPace} legend` }),
-	).not.toContainText(labels.spendingLimit);
+		page.getByRole("img", { name: labels.spendingPace }),
+	).toHaveCount(0);
+	await expect(page.getByText(labels.spendingPace)).toHaveCount(0);
 	// The per-cycle transaction list stays in the drawer.
 	await page.getByRole("button", { name: "This cycle transactions" }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
@@ -509,21 +488,24 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 	await expect(row).toHaveClass(/border-warning-text/);
 });
 
-test("outlook shows the spending pace graph above the net worth graph", async ({
+test("outlook shows the cycle view above the net worth graph", async ({
 	page,
 }) => {
-	// The Safe card spending card is the main card on Outlook: its
-	// spending pace graph renders on the page, above the net worth
-	// graph. The drawer keeps the per-cycle transaction lists.
+	// The Safe card spending card is the main card on Outlook: the cycle
+	// view renders on the page, above the net worth graph. The drawer
+	// keeps the per-cycle transaction lists.
 	await page.goto("/#outlook");
-	const pace = page.getByRole("img", { name: labels.spendingPace });
-	await expect(pace).toBeVisible();
+	const switcher = page.getByRole("button", {
+		name: "This cycle",
+		exact: true,
+	});
+	await expect(switcher).toBeVisible();
 	const netWorth = page.getByRole("img", {
 		name: /Net worth over the trailing/,
 	});
 	await expect(netWorth).toBeVisible();
 	const y = async (locator: Locator) => (await locator.boundingBox())?.y ?? 0;
-	expect(await y(pace)).toBeLessThan(await y(netWorth));
+	expect(await y(switcher)).toBeLessThan(await y(netWorth));
 	await page.getByRole("button", { name: "This cycle transactions" }).click();
 	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
 	await expect(
