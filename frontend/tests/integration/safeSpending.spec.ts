@@ -491,6 +491,28 @@ test("highlights recurring bills that cannot be fulfilled", async ({
 	await expect(row).toHaveClass(/border-warning-text/);
 });
 
+test("outlook shows the spending pace graph above the net worth graph", async ({
+	page,
+}) => {
+	// The Safe card spending card is the main card on Outlook: its
+	// spending pace graph renders on the page, above the net worth
+	// graph. The details drawer keeps its own copy of the same graph.
+	await page.goto("/#outlook");
+	const pace = page.getByRole("img", { name: labels.spendingPace });
+	await expect(pace).toBeVisible();
+	const netWorth = page.getByRole("img", {
+		name: /Net worth over the trailing/,
+	});
+	await expect(netWorth).toBeVisible();
+	const y = async (locator: Locator) => (await locator.boundingBox())?.y ?? 0;
+	expect(await y(pace)).toBeLessThan(await y(netWorth));
+	await page.getByRole("button", { name: "This cycle" }).click();
+	const drawer = page.getByRole("dialog", { name: "Safe card spending" });
+	await expect(
+		drawer.getByRole("img", { name: labels.spendingPace }),
+	).toBeVisible();
+});
+
 for (const theme of ["light", "dark"] as const) {
 	test(`household budget fits a narrow ${theme} drawer and passes accessibility checks`, async ({
 		page,

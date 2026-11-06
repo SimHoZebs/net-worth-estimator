@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import type { BackendCheckpoint } from "@/api/contracts.ts";
 import { TextButton } from "@/components/Button.tsx";
 import { Notice } from "@/components/Notice.tsx";
@@ -63,6 +63,14 @@ import {
 import { useCardCycleActivity } from "@/pages/outlook/safe-spending/useCardCycleActivity.ts";
 import { useOutlookProjection } from "@/pages/outlook/useOutlookProjection.ts";
 import { SAFE_SPENDING_LABELS as labels } from "@/pages/outlook/safe-spending/safeSpendingLabels.ts";
+
+// The trend chart pulls the chart engine, so it loads lazily like the
+// drawer's copy; the summary numbers render without waiting for it.
+const SafeSpendingTrendChart = lazy(() =>
+	import("./SafeSpendingTrendChart.tsx").then((module) => ({
+		default: module.SafeSpendingTrendChart,
+	})),
+);
 
 // Stable empty input so pending derivations stay null-safe without
 // re-running memos on identity churn.
@@ -649,6 +657,17 @@ export function SafeSpendingPreview({
 					</strong>
 				</div>
 			</div>
+			<Suspense
+				fallback={
+					<div aria-busy="true">
+						<Skeleton className="h-48 w-full" />
+					</div>
+				}
+			>
+				<div className="relative z-1 border-t border-line pt-4">
+					<SafeSpendingTrendChart trend={currentView.trend} />
+				</div>
+			</Suspense>
 			<div className="relative z-1 flex flex-wrap items-center gap-4 border-t border-line pt-4">
 				<TextButton
 					onClick={(event) => {

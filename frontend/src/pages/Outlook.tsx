@@ -72,15 +72,15 @@ function OutlookContent({
 	}
 	return (
 		<>
-			<ProjectionChart onEvidence={onEvidence} />
-			<PinnedEvaluations />
+			<SafeSpendingPreview
+				detail={safeSpendingDetail}
+				onDetail={onSafeSpendingDetail}
+				onTabChange={onSafeSpendingTab}
+			/>
 			<div className="mt-6 max-sm:mt-5">
-				<SafeSpendingPreview
-					detail={safeSpendingDetail}
-					onDetail={onSafeSpendingDetail}
-					onTabChange={onSafeSpendingTab}
-				/>
+				<ProjectionChart onEvidence={onEvidence} />
 			</div>
+			<PinnedEvaluations />
 		</>
 	);
 }
