@@ -229,7 +229,7 @@ a fast run and `--shards=N` to control the browser fan-out. `KEEP_GATE_LOGS=1`
 keeps the per-group logs for forensics instead of deleting them.
 
 `node scripts/check-install.mjs` compares each workspace `package.json` against
-the root `bun.lock` and the installed `node_modules`. It runs in both hooks
+the root `bun.lock` and the installed `node_modules`. It runs in the pre-commit hook
 and in `scripts/test --unit`. A missing or stale dependency fails here instead
 of surfacing later as a typecheck or import error. Install or refresh everything
 with `bun install` from the repository root.
@@ -246,7 +246,7 @@ bun --filter ./frontend test:integration
 
 For a backend change, it is the Go gate below.
 
-The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. The pre-push hook verifies `./internal/...` and `./cmd/...`, plus frontend `lint`, `typecheck`, and unit tests, and extension unit tests and lint. Remaining gates (`build`, `test:integration`) run in `scripts/test --gate`.
+The pre-commit hook verifies the backend packages containing staged Go files, plus `oxlint` and `oxfmt --check` on staged frontend files. There is no pre-push hook. The Tests workflow is the full gate and runs on every branch push, and a green run for the exact commit is required before landing. To repeat it locally when CI is unavailable use `scripts/test --gate`.
 
 ## Shared Database Isolation
 
