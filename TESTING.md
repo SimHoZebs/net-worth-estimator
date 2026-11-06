@@ -25,7 +25,14 @@ The root aliases are `bun run test:unit`, `bun run test:integration`, and
 `E2E_TEST_MUTATIONS=1 bun run test:e2e`. The e2e alias keeps the deliberate
 disposable-run confirmation.
 
-Unit is `backend/scripts/verify.sh` (`CGO_ENABLED=0` gofmt+vet+test), `bun --filter ./frontend test:unit` (vitest over `src/**` and `scripts/**`, jsdom), `node --test dev/*.test.mjs auth/casdoor/*.test.mjs` (Compose CLI, no daemon), and `node --test auth/e2e-gate.test.mjs` (e2e budget/flake/fixture contract, no daemon). The vitest suite runs with `isolate: false`: all files share one worker, and `frontend/tests/setup.ts` clears DOM, storage, timers, and module state between files. A test that depends on fresh module singletons or leftover DOM will fail only when run with the suite, so run the whole file list, not just the new test. Integration boots servers or Docker images. The end-to-end gate covers the previously manual credential-gated tier (real-provider journeys, smoke scripts, proxy-header and deployment-image regressions, migration-on-image verification) against a disposable environment; physical passkeys, phone recovery, live external delivery, and any production mutation stay manual. `--all` covers tests only, not the `lint`/`typecheck`/`build` completion gates below. See `scripts/test --help` for the exact matrix.
+Unit includes the Go verify script, frontend Vitest, dev configuration tests,
+Better Auth provider tests with disposable databases, and e2e gate-contract tests.
+Vitest uses `isolate: false`. Its setup clears DOM, storage, timers, and module
+state between files. Run its whole file list, not only a new test. Integration
+boots real HTTP servers. End-to-end tests exercise real provider and deployment
+images against disposable state. Physical passkeys, external recovery delivery,
+and production mutations remain manual. `--all` covers tests, not the lint,
+typecheck, and build gates below.
 
 The purchase-capture extension adds `bun --filter ./extension test` to unit and
 `bun --filter ./extension test:browser` to integration. Install its dependencies
@@ -54,7 +61,7 @@ browser-test harness. `./scripts/dev refresh-db` replaces only the dev financial
 database from a consistent production snapshot.
 See [dev/README.md](dev/README.md).
 
-Dev setup checks: `node --test dev/*.test.mjs auth/casdoor/*.test.mjs`.
+Dev setup checks: `node --test dev/*.test.mjs`. Provider checks: `bun --filter @waypoint/auth test`.
 Configuration checks require the Docker Compose CLI, but no running daemon.
 
 Parallel agents use isolated slots instead of stopping the canonical stack or
@@ -298,7 +305,7 @@ Cases cover missing receipt/void fields, inline images,
 and missing blob lifecycle objects. Repeated setup preserves receipt
 links without a backfill.
 
-## Casdoor Authentication
+## Better Auth and Casbin
 
 Unit checks need no identity container:
 
@@ -306,7 +313,8 @@ Unit checks need no identity container:
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/authorization
 backend/scripts/verify.sh ./internal/api/...
-node --test auth/casdoor/*.test.mjs
+bun --filter @waypoint/auth typecheck
+bun --filter @waypoint/auth test
 ```
 
 `scripts/smoke-compose.sh` checks the provisioned guest user on the authenticated stack.
@@ -319,10 +327,9 @@ inside the container and checks both the corrected buffer and default-buffer 502
 Without `NGINX_TEST_IMAGE`, it skips the Docker-only test.
 Authenticated requests use the user's private data and assert its resource ID.
 
-Use the [Casdoor test guide](auth/casdoor/README.md#verification) for real-provider
-passkey, restart, revocation, refresh, and administrator recovery checks. The
-lifecycle stack uses private disposable state under `tmp/`, not the live financial
-volume. Do not create or restart Docker networks during a browser gate. Chromium
+Use the [authentication guide](auth/README.md) for provider setup and offline
+recovery. The lifecycle stack uses private disposable state under `tmp/`, not the
+live financial volume. Do not create or restart Docker networks during a browser gate. Chromium
 can abort module requests with `ERR_NETWORK_CHANGED` when host interfaces change.
 
 Physical passkeys and phone recovery require the separate
@@ -332,18 +339,18 @@ Physical passkeys and phone recovery require the separate
 checks browser-origin redirects, callback binding, provider cookie isolation,
 proxy transport, and sibling-origin denial. Additional browser aliases keep the
 same issuer and user-owned resource IDs. See
-[browser address configuration](docs/authentication.md#lan-and-tailnet-browser-addresses).
+[browser address configuration](docs/authentication.md#browser-addresses).
 
-`auth/test-integration.mjs` checks owner, provisioned guest, and second-user isolation
-against a marked disposable Casdoor fixture. `CASDOOR_TEST_MUTATIONS=1` is required.
-Its `fixture.json` must identify isolated state under repository `tmp/` or
-`/tmp/opencode/`, never live `tmp/dev/`. The script verifies the real permission
-API, OIDC, CSRF, restart persistence, private writes, guest projection/SSE,
-cross-user rejection, stale resource headers, and logout.
+`auth/test-e2e.mjs` checks owner, provisioned guest, and second-user isolation
+against disposable Better Auth and the embedded Casbin boundary.
+`E2E_TEST_MUTATIONS=1` is required. Its fixture identifies isolated state under
+repository `tmp/`, never live `tmp/dev/`. The script verifies OIDC, CSRF, restart
+persistence, private writes, guest projection/SSE, cross-user rejection, stale
+resource headers, and logout.
 Signup checks include immediate blank-workspace access without administrator
 approval or import, first-account editing, page reload, and saved restart persistence.
-The provider gate also checks creation-time member/viewer assignment,
-application-credential UUID lookup, provider-granted anonymous writes, and
+The provider gate also checks persistent member/viewer assignment,
+immutable-subject ownership, policy-granted anonymous writes, and
 immediate revocation. Unit checks also cover the same path for group-data routes.
 `E2E_TEST_MUTATIONS=1 scripts/test --e2e` automates this tier end to end
 (disposable provider, real images, real browser, plus share/inbox, group
@@ -452,7 +459,7 @@ The actual benchmark run uses the checked-in fixture and the Go toolchain.
 
 ## Real-Data Server
 
-Use a disposable database restored from a backup. Configure Casdoor and its verified primary-data owner through [the auth guide](auth/README.md). The server requires the same session configuration in dev and production. Copy a backup only while its database is stopped.
+Use a disposable database restored from a backup. Configure Better Auth, Casbin, and the verified primary-data owner through [the auth guide](auth/README.md). The server requires the same session configuration in dev and production. Use a SQLite-safe snapshot or stop the source before a file copy.
 
 Direct API snippets below require a valid session cookie file, the discovered resource ID, and the configured public origin. Use only disposable credentials:
 

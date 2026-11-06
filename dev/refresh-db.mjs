@@ -20,7 +20,7 @@ export function validateRefresh(values, positionals = []) {
   if (values.tailnet) throw new Error("--tailnet applies only to setup");
   if (
     values["app-port"] !== undefined ||
-    values["casdoor-port"] !== undefined ||
+    values["auth-port"] !== undefined ||
     values["backend-port"] !== undefined
   ) {
     throw new Error("Ports are fixed at slot creation. Pick a new --slot name for new ports.");

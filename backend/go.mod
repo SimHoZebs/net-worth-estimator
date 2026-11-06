@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/alexedwards/scs/v2 v2.9.0
+	github.com/casbin/casbin/v2 v2.135.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/danielgtaylor/huma/v2 v2.40.0
 	github.com/go-chi/chi/v5 v5.5.0
@@ -16,6 +17,8 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
+	github.com/casbin/govaluate v1.3.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect

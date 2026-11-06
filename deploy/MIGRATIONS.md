@@ -1,5 +1,19 @@
 # Migration SOP for every deployment
 
+## Better Auth and Casbin cutover
+
+The identity replacement uses the separate
+[offline identity and policy import](../auth/better-auth/one-time/README.md).
+It does not run through API startup, normal setup, or `deploy/migrate.sh`.
+The API image includes `/app/import-casdoor-authz`; the Bun image includes the
+identity importer. Preserve the exact issuer and subjects on every target.
+Keep both one-time tools until Compose, dev, and Northflank verify the upgrade.
+
+Northflank release requires `AUTH_CUTOVER_READY=true` and the prepared resource IDs
+in `NORTHFLANK_IDENTITY_SERVICE_ID` and `NORTHFLANK_IDENTITY_DATABASE_ADDON_ID`.
+Leave the gate closed until identity import, policy import, and real-provider
+checks pass on the target. No source push performs a live identity conversion.
+
 ## One contract
 
 `deploy/migrate.sh` is the single replaceable migration body. The API image
@@ -178,7 +192,7 @@ GitHub's manual dispatch instead requests the current `main` commit and its
 published images. Releases stay sequential: one at a time.
 
 `.github/workflows/northflank-release.yml` triggers on the `Tests` workflow for
-the exact `main` push, waits for the pinned backend and Casdoor image manifests,
+the exact `main` push, waits for the pinned backend and Better Auth image manifests,
 then requests the workflow with those image references. The
 `Publish container images` workflow runs on the same `Tests` completion. A manual
 dispatch requests the current `main` commit, requires a green `Tests` push run

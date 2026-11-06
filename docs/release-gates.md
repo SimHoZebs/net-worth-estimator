@@ -120,11 +120,9 @@ the QA-03 test files' headers and in section 4 below.
 These need real credentials, devices, or providers and stay manual.
 A release notes each outcome; a skip names its reason.
 
-- Real-provider identity checks: the [Casdoor test
-  guide](../auth/casdoor/README.md#verification) (passkey, restart,
-  revocation, refresh, administrator recovery) and
-  `auth/test-integration.mjs` against a marked disposable fixture
-  (`CASDOOR_TEST_MUTATIONS=1` required).
+- Real-provider identity checks use [the authentication guide](../auth/README.md)
+  and `E2E_TEST_MUTATIONS=1 scripts/test --e2e` against disposable state.
+  Live target conversion and offline recovery remain operator checks.
 - Physical passkeys and phone recovery: the [manual checklist](authentication.md#manual-physical-device-and-recovery-checklist).
 - Live bank verification: the SimpleFIN direct checks in
   [TESTING.md](../TESTING.md#simplefin-checks) with a writable owner

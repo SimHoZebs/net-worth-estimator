@@ -37,8 +37,8 @@ import { promisify } from "node:util";
 import { chromium } from "../frontend/node_modules/@playwright/test/index.mjs";
 import { snapshotFile } from "../dev/database.mjs";
 import { pickFreePorts, usedSlotPorts } from "../dev/lib/slots.mjs";
-import { generate, settingsFromEnv } from "./casdoor/generate.mjs";
-import { writeBootstrap } from "./casdoor/provision.mjs";
+import { settingsFromEnv } from "./better-auth/settings.mjs";
+import { passkeyJourneys } from "./passkey-journeys.mjs";
 import {
   E2E_BUDGET_SECONDS,
   E2E_DISPOSABLE_MARKER,
@@ -94,7 +94,7 @@ const stamp = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15);
 const runId = `${stamp}-${process.pid}`.toLowerCase();
 const project = `nwe-e2e-${runId}`;
 const workRoot = resolve(root, `tmp/e2e-${runId}`);
-const casdoorDir = resolve(workRoot, "casdoor");
+const identityDir = resolve(workRoot, "auth");
 const dataDir = resolve(workRoot, "appdata");
 const logDir = resolve(workRoot, "logs");
 const primaryDB = resolve(dataDir, "net-worth-estimator.db");
@@ -103,6 +103,7 @@ const primaryDB = resolve(dataDir, "net-worth-estimator.db");
 process.env.E2E_TRACE_DIR ??= resolve(root, "frontend/test-results/e2e", runId);
 const apiTag = `nwe-e2e-api:${runId}`;
 const frontTag = `nwe-e2e-front:${runId}`;
+const authTag = `nwe-e2e-auth:${runId}`;
 
 const report = [];
 function record(step, status, detail = "", seconds = 0) {
@@ -126,7 +127,7 @@ async function sh(cmd, argv, { env = {}, timeout = 120_000, log = null } = {}) {
 async function compose(env, ...argv) {
   return sh("docker", ["compose", "--env-file", resolve(workRoot, "e2e.env"),
     "-f", resolve(root, "docker-compose.yml"),
-    "-f", resolve(root, "auth/casdoor/compose.yml"),
+    "-f", resolve(root, "auth/compose.auth.yml"),
     "-f", resolve(root, "auth/compose.e2e.yml"),
     "-p", project, ...argv], { env, timeout: 600_000 });
 }
@@ -169,26 +170,9 @@ async function teardown(keep) {
     composeLeft = (await run("docker", ["compose", "-p", project, "ps", "-q"])).stdout.trim();
   } catch { /* project gone is the goal */ }
   if (composeLeft) failures.push(`compose project still lists: ${composeLeft}`);
-  // Prune this gate's image tags from older runs so nightly runs do not
-  // accumulate gigabytes. Only nwe-e2e-* tags are ever removed, never the
-  // current run's, and never tags backing a running container. The whole
-  // pass is skipped while any sibling gate container exists: a sibling may
-  // still pull its freshly built image into a container.
-  try {
-    const siblings = await run("docker", ["ps", "--filter", "name=nwe-e2e-", "--format", "{{.Names}}"]);
-    if (!siblings.stdout.trim()) {
-      const { stdout } = await run("docker", ["image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]);
-      const running = await run("docker", ["ps", "--format", "{{.Image}}"]).catch(() => ({ stdout: "" }));
-      const inUse = new Set(running.stdout.split("\n").map((line) => line.trim()).filter(Boolean));
-      const stale = stdout.split("\n").map((line) => line.trim()).filter((tag) =>
-        /^nwe-e2e-(api|front):/.test(tag) && tag !== apiTag && tag !== frontTag && !inUse.has(tag));
-      await Promise.allSettled(stale.map((tag) => run("docker", ["rmi", tag])));
-    } else {
-      console.log(`e2e [teardown] sibling run active (${siblings.stdout.trim().split("\n").length} containers); skipping image prune`);
-    }
-  } catch (error) {
-    failures.push(`image prune failed: ${error.message}`);
-  }
+  // Never prune another session's images. Keep this run's images on failure
+  // for inspection, and remove only its exact tags after a successful run.
+  if (!keep) await Promise.allSettled([apiTag, frontTag, authTag].map((tag) => run("docker", ["rmi", tag])));
   if (!keep) await rm(workRoot, { recursive: true, force: true }).catch(() => {});
   else console.log(`e2e [teardown] disposable root kept at ${workRoot}`);
   return failures;
@@ -206,7 +190,7 @@ let teardownFailures = [];
 try {
   process.umask(0o077);
   await sh("docker", ["info"], { timeout: 30_000 });
-  await mkdir(casdoorDir, { recursive: true, mode: 0o700 });
+  await mkdir(identityDir, { recursive: true, mode: 0o700 });
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
   await mkdir(logDir, { recursive: true, mode: 0o700 });
 
@@ -221,13 +205,13 @@ try {
       for (const entry of await readdir(resolve(root, "tmp"))) {
         if (!entry.startsWith("e2e-")) continue;
         const envText = await readFile(resolve(root, "tmp", entry, "e2e.env"), "utf8").catch(() => "");
-        for (const match of envText.matchAll(/^E2E_(?:CASDOOR|APP|GATEWAY|BACKEND)_PORT=(\d+)$/gm)) {
+        for (const match of envText.matchAll(/^E2E_(?:AUTH|APP|GATEWAY|BACKEND)_PORT=(\d+)$/gm)) {
           used.add(Number(match[1]));
         }
       }
     } catch { /* a missing tmp dir means no siblings */ }
-    const [casdoorPort, appPort, gatewayPort, backendPort] = await pickFreePorts(4, [...used, 8080, 8787, 8000]);
-    for (const [label, port] of [["provider", casdoorPort], ["app", appPort], ["gateway", gatewayPort], ["backend", backendPort]]) {
+    const [authPort, appPort, gatewayPort, backendPort] = await pickFreePorts(4, [...used, 8080, 8787, 8000]);
+    for (const [label, port] of [["provider", authPort], ["app", appPort], ["gateway", gatewayPort], ["backend", backendPort]]) {
       try {
         await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(2000) });
         throw new Error(`e2e ${label} port ${port} answered; refusing to attach to a live listener`);
@@ -237,40 +221,36 @@ try {
     }
     const secret = (bytes = 24) => randomBytes(bytes).toString("hex");
     const providerEnv = {
-      CASDOOR_PUBLIC_URL: `http://127.0.0.1:${casdoorPort}`,
-      APP_PUBLIC_URL: `http://127.0.0.1:${appPort}`,
+      AUTH_PUBLIC_URL: `http://localhost:${authPort}`,
+      APP_PUBLIC_URL: `http://localhost:${appPort}`,
       AUTH_CLIENT_ID: "e2e-waypoint-client",
       AUTH_CLIENT_SECRET: secret(),
-      CASDOOR_ADMIN_PASSWORD: secret(),
-      CASDOOR_USER_NAME: E2E_SEED.ownerName,
-      CASDOOR_USER_PASSWORD: secret(),
-      CASDOOR_GUEST_NAME: E2E_SEED.guestName,
-      CASDOOR_BACKCHANNEL_LOGOUT_URL: "http://backend:8787/v1/auth/backchannel-logout",
-      CASDOOR_STATE_DIR: casdoorDir,
-      CASDOOR_PROJECT: project,
-      CASDOOR_PORT: String(casdoorPort),
-      CASDOOR_UID: String(uid),
-      CASDOOR_GID: String(gid),
+      BETTER_AUTH_SECRET: secret(),
+      AUTH_USER_NAME: E2E_SEED.ownerName,
+      AUTH_USER_PASSWORD: secret(),
+      AUTH_STATE_DIR: identityDir,
+      AUTH_DATABASE: resolve(identityDir, "identity.db"),
     };
     const settings = settingsFromEnv(providerEnv);
-    await generate(settings, await realpath(casdoorDir));
-    const ownerPass = providerEnv.CASDOOR_USER_PASSWORD;
+    await sh("bun", ["run", "auth/better-auth/src/setup.ts"], { env: providerEnv });
+    const ownerPass = providerEnv.AUTH_USER_PASSWORD;
     const secondPass = secret();
     const envFile = [
       "# E2E TEST-ONLY credentials. Disposable run; never production, never shared.",
       `E2E_RUN_ID=${runId}`,
       `E2E_API_IMAGE=${apiTag}`,
       `E2E_FRONT_IMAGE=${frontTag}`,
-      `E2E_CASDOOR_PORT=${casdoorPort}`,
+      `E2E_AUTH_PORT=${authPort}`,
       `E2E_APP_PORT=${appPort}`,
       `E2E_GATEWAY_PORT=${gatewayPort}`,
       `E2E_BACKEND_PORT=${backendPort}`,
       `E2E_DATA_DIR=${dataDir}`,
-      `CASDOOR_STATE_DIR=${casdoorDir}`,
-      `CASDOOR_PROJECT=${project}`,
-      `CASDOOR_PORT=${casdoorPort}`,
-      `CASDOOR_UID=${uid}`,
-      `CASDOOR_GID=${gid}`,
+      `AUTH_STATE_DIR=${identityDir}`,
+      `AUTH_PUBLIC_URL=${settings.publicUrl}`,
+      `APP_PUBLIC_URL=${settings.appUrl}`,
+      `AUTH_CLIENT_ID=${settings.clientId}`,
+      `AUTH_CLIENT_SECRET=${settings.clientSecret}`,
+      `BETTER_AUTH_SECRET=${settings.secret}`,
       `E2E_UID=${uid}`,
       `E2E_GID=${gid}`,
       `NET_WORTH_ESTIMATOR_AUTH_ISSUER=${settings.publicUrl}`,
@@ -282,7 +262,6 @@ try {
       `BACKEND_URL=http://backend:8787`,
       `E2E_OWNER_PASS=${ownerPass}`,
       `E2E_SECOND_PASS=${secondPass}`,
-      `E2E_ADMIN_PASS=${settings.adminPassword}`,
     ].join("\n") + "\n";
     await writeFile(resolve(workRoot, "e2e.env"), envFile, { mode: 0o600 });
     const dotenv = Object.fromEntries(
@@ -292,23 +271,21 @@ try {
       }),
     );
     Object.assign(process.env, dotenv);
-    await compose(dotenv, "up", "-d", "--no-build", "--wait", "casdoor");
-    await waitFor(`${settings.publicUrl}/api/health`, { label: "disposable provider" });
-    const bootstrap = await writeBootstrap(settings, await realpath(casdoorDir));
+    const bootstrap = JSON.parse(await readFile(`${providerEnv.AUTH_DATABASE}.bootstrap.json`, "utf8"));
     const fixture = {
       testOnly: true,
       disposable: E2E_DISPOSABLE_MARKER,
       runId,
-      stateDir: await realpath(casdoorDir),
+      stateDir: await realpath(identityDir),
       settings: { publicUrl: settings.publicUrl, appUrl: settings.appUrl },
       subject: bootstrap.subject,
       guestSubject: bootstrap.guest_subject,
       username: settings.username,
       created: new Date().toISOString(),
     };
-    const problems = validateFixtureContract(fixture, { stateDir: await realpath(casdoorDir), issuer: settings.publicUrl });
+    const problems = validateFixtureContract(fixture, { stateDir: await realpath(identityDir), issuer: settings.publicUrl });
     assert.deepEqual(problems, [], `fixture contract violated: ${problems.join("; ")}`);
-    await writeFile(resolve(casdoorDir, "fixture.json"), `${JSON.stringify(fixture, null, 2)}\n`, { mode: 0o600 });
+    await writeFile(resolve(identityDir, "fixture.json"), `${JSON.stringify(fixture, null, 2)}\n`, { mode: 0o600 });
     // Persist runtime secrets beside the fixture for forensics (0600, disposable root only).
     await writeFile(resolve(workRoot, "credentials.json"), JSON.stringify({
       note: "E2E TEST-ONLY credentials for disposable run; the root is removed or kept only for forensics",
@@ -316,17 +293,16 @@ try {
       ownerPass,
       secondName: E2E_SEED.secondName,
       secondPass,
-      adminPass: settings.adminPassword,
       subject: bootstrap.subject,
       guestSubject: bootstrap.guest_subject,
     }, null, 2), { mode: 0o600 });
-    record("fixture", "PASS", `provider + fixture at ${casdoorDir}`, (Date.now() - t) / 1000);
+    record("fixture", "PASS", `provider + fixture at ${identityDir}`, (Date.now() - t) / 1000);
   }
 
   const issuer = process.env.NET_WORTH_ESTIMATOR_AUTH_ISSUER;
   const appOrigin = process.env.NET_WORTH_ESTIMATOR_PUBLIC_URL;
-  const ownerSubject = JSON.parse(await readFile(resolve(casdoorDir, "bootstrap.json"), "utf8")).subject;
-  const guestSubject = JSON.parse(await readFile(resolve(casdoorDir, "bootstrap.json"), "utf8")).guest_subject;
+  const ownerSubject = JSON.parse(await readFile(resolve(identityDir, "identity.db.bootstrap.json"), "utf8")).subject;
+  const guestSubject = JSON.parse(await readFile(resolve(identityDir, "identity.db.bootstrap.json"), "utf8")).guest_subject;
   const ownerResource = actorResource(issuer, ownerSubject);
   const guestResource = actorResource(issuer, guestSubject);
 
@@ -336,6 +312,7 @@ try {
     if (args["skip-build"]) {
       await run("docker", ["image", "inspect", apiTag]).catch(() => { throw new Error(`--skip-build needs image ${apiTag}`); });
       await run("docker", ["image", "inspect", frontTag]).catch(() => { throw new Error(`--skip-build needs image ${frontTag}`); });
+      await run("docker", ["image", "inspect", authTag]).catch(() => { throw new Error(`--skip-build needs image ${authTag}`); });
       record("images", "PASS", "reused warm images", (Date.now() - t) / 1000);
     } else {
       const buildArgs = args["cold-build"] ? ["--no-cache"] : [];
@@ -345,6 +322,9 @@ try {
       await sh("docker", ["build", ...buildArgs, "-f", "frontend/Dockerfile", "-t", frontTag, "."], {
         timeout: 1_200_000, log: resolve(logDir, "build-front.log"),
       }).catch((error) => { throw new Error(`frontend image build failed (see logs/build-front.log): ${error.message}`); });
+      await sh("docker", ["build", ...buildArgs, "-f", "auth/better-auth/Dockerfile", "-t", authTag, "."], {
+        timeout: 600_000, log: resolve(logDir, "build-auth.log"),
+      });
       record("images", "PASS", args["cold-build"] ? "builds of both images (no cache)" : "builds of both images (layer cache)", (Date.now() - t) / 1000);
     }
   }
@@ -368,6 +348,7 @@ try {
     const t = Date.now();
     await imageRun(apiTag, ["/app/setupdb", "--db", containerDB]);
     await imageRun(apiTag, ["/app/setupdb", "--db", containerDB, "--issuer", issuer, "--subject", guestSubject]);
+    await imageRun(apiTag, ["/app/authzctl", "--setup", "--db", "/data/authorization.db", "--issuer", issuer, "--guest", guestSubject]);
     process.env.NET_WORTH_ESTIMATOR_GUEST_SUBJECT = guestSubject;
     await writeFile(resolve(workRoot, "e2e.env"),
       `${await readFile(resolve(workRoot, "e2e.env"), "utf8")}NET_WORTH_ESTIMATOR_GUEST_SUBJECT=${guestSubject}\n`,
@@ -388,7 +369,7 @@ try {
     guestSubject,
     secondName: E2E_SEED.secondName,
     secondPass: process.env.E2E_SECOND_PASS,
-    adminPassword: process.env.E2E_ADMIN_PASS,
+    setGuestRole: (role) => imageRun(apiTag, ["/app/authzctl", "--db", "/data/authorization.db", "--issuer", issuer, "--guest", guestSubject, "--subject", guestSubject, "--role", role]),
   };
   async function journey(step, fn) {
     if (!stepFilter(step)) {
@@ -412,6 +393,7 @@ try {
   }
 
   const ownerBundle = await journey("isolation", () => ownerSignIn(journeyCtx));
+  if (ownerBundle) await journey("isolation", () => passkeyJourneys(journeyCtx, ownerBundle));
   if (onlyStep && onlyStep !== "isolation" && !ownerBundle) {
     throw new Error(`--step=${onlyStep} needs the isolation leg first (omit --step for a full run)`);
   }

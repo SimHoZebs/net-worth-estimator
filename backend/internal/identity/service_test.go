@@ -102,7 +102,7 @@ func newIDP(t *testing.T) *testIDP {
 			}
 			refresh := r.Form.Get("grant_type") == "refresh_token"
 			if refresh {
-				// Casdoor accepts the application secret by header or by
+				// The provider accepts the application secret by header or by
 				// body; the OAuth client retries a rejection in the other
 				// style, so either one proves the caller authenticated.
 				client, secret, ok := r.BasicAuth()
@@ -163,9 +163,22 @@ func newIDP(t *testing.T) *testIDP {
 				audience = []string{"other"}
 			}
 			respond(w, map[string]any{"active": p.active.Load() && known[r.Form.Get("token")], "sub": p.subject, "client_id": "waypoint", "iss": p.server.URL, "aud": audience})
-		case "/api/get-account":
+		case "/waypoint/account", "/waypoint/account/password":
+			if r.Method == "POST" {
+				p.lastUpdateID = "waypoint/editor"
+				if p.accountWriteError != "" {
+					w.WriteHeader(400)
+					respond(w, map[string]any{"error": p.accountWriteError})
+					return
+				}
+				if r.URL.Path == "/waypoint/account/password" {
+					respond(w, map[string]any{"reauth": true})
+					return
+				}
+			}
 			if p.getAccountError != "" {
-				respond(w, map[string]any{"status": "error", "msg": p.getAccountError})
+				w.WriteHeader(401)
+				respond(w, map[string]any{"error": p.getAccountError})
 				return
 			}
 			sub := p.subject
@@ -178,22 +191,9 @@ func newIDP(t *testing.T) *testIDP {
 				_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "sub": sub})
 				return
 			}
-			respond(w, map[string]any{"status": "ok", "sub": sub, "data": map[string]any{
+			respond(w, map[string]any{"subject": sub,
 				"owner": "waypoint", "name": "editor", "displayName": "Sam Lee", "avatar": "",
-			}})
-		case "/api/update-user":
-			p.lastUpdateID = r.URL.Query().Get("id")
-			if p.accountWriteError != "" {
-				respond(w, map[string]any{"status": "error", "msg": p.accountWriteError})
-				return
-			}
-			respond(w, map[string]any{"status": "ok"})
-		case "/api/set-password":
-			if p.accountWriteError != "" {
-				respond(w, map[string]any{"status": "error", "msg": p.accountWriteError})
-				return
-			}
-			respond(w, map[string]any{"status": "ok"})
+			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -205,7 +205,7 @@ func newIDP(t *testing.T) *testIDP {
 func newService(t *testing.T, p *testIDP, path string, options ...func(*Config)) *Service {
 	t.Helper()
 	const guestSubject = "11111111-1111-1111-1111-111111111111"
-	config := Config{Provider: "casdoor", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour, GuestSubject: guestSubject,
+	config := Config{Provider: "better-auth", Issuer: p.server.URL, PublicURL: "http://localhost:8080", ClientID: "waypoint", ClientSecret: "secret", Store: nil, Lifetime: time.Hour, GuestSubject: guestSubject,
 		ResolveAccess: func(_ context.Context, subject string) (authorization.Scope, error) {
 			if subject == "" {
 				return authorization.Scope{}, context.Canceled

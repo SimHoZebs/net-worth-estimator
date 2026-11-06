@@ -21,13 +21,13 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   const config = newConfig();
   const env = composeEnvironment(config);
   assert.equal(env.DEV_APP_PUBLIC_URL, "http://localhost:5178");
-  assert.equal(env.DEV_CASDOOR_PUBLIC_URL, "http://localhost:8000");
+  assert.equal(env.DEV_AUTH_PUBLIC_URL, "http://localhost:8000");
   assert.equal(env.DEV_OWNER_SUBJECT, undefined);
   assert.equal(env.DEV_GUEST_SUBJECT, "");
   assert.equal(env.DEV_AUTH_CLIENT_SECRET, config.identity.AUTH_CLIENT_SECRET);
-  assert.equal(env.CASDOOR_ADMIN_PASSWORD, undefined);
-  assert.equal(env.CASDOOR_USER_PASSWORD, undefined);
-  assert.equal(env.CASDOOR_STATE_DIR, undefined);
+  assert.equal(env.AUTH_USER_PASSWORD, undefined);
+  assert.equal(env.AUTH_STATE_DIR, undefined);
+  assert.equal(env.DEV_BETTER_AUTH_SECRET, config.identity.BETTER_AUTH_SECRET);
   const args = composeArgs(["up"]);
   assert.equal(args.filter((item) => item === "-f").length, 1);
   assert.ok(args.some((item) => item.endsWith("/docker-compose.dev.yml")));
@@ -41,6 +41,43 @@ test("dev has one dedicated Compose file and exports only its runtime settings",
   );
 });
 
+test("production Compose forwards an explicitly trusted ingress IP header", () => {
+  const result = spawnSync(
+    "docker",
+    [
+      "compose",
+      "--env-file",
+      "/dev/null",
+      "-f",
+      "docker-compose.yml",
+      "-f",
+      "auth/compose.auth.yml",
+      "config",
+      "--format",
+      "json",
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        AUTH_PUBLIC_URL: "https://identity.test",
+        APP_PUBLIC_URL: "https://app.test",
+        AUTH_STATE_DIR: "/private/identity",
+        AUTH_CLIENT_ID: "waypoint",
+        AUTH_CLIENT_SECRET: "client-secret-fixture",
+        BETTER_AUTH_SECRET: "auth-secret-fixture",
+        AUTH_CLIENT_IP_HEADER: "x-envoy-external-address",
+      },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    JSON.parse(result.stdout).services.auth.environment.AUTH_CLIENT_IP_HEADER,
+    "x-envoy-external-address",
+  );
+});
+
 test("runtime environment export is private, repeatable, and preserves existing edits", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "waypoint-dev-env-"));
   const path = resolve(dir, ".env.dev");
@@ -49,8 +86,7 @@ test("runtime environment export is private, repeatable, and preserves existing 
     await writeComposeEnv(config, path);
     const contents = await readFile(path, "utf8");
     assert.equal((await stat(path)).mode & 0o777, 0o600);
-    assert.ok(!contents.includes(config.identity.CASDOOR_ADMIN_PASSWORD));
-    assert.ok(!contents.includes(config.identity.CASDOOR_USER_PASSWORD));
+    assert.ok(!contents.includes(config.identity.AUTH_USER_PASSWORD));
     const modified = (await stat(path)).mtimeMs;
     await writeComposeEnv(config, path);
     assert.equal((await stat(path)).mtimeMs, modified);
@@ -82,27 +118,24 @@ test("native Compose consumes the exported environment and isolates dev from pro
         COMPOSE_FILE: "/nonexistent/production-compose.yml",
         COMPOSE_PROFILES: "unused-production-profile",
         DEV_STATE_DIR: "/production",
-        CASDOOR_STATE_DIR: "/production",
+        AUTH_STATE_DIR: "/production",
       },
     };
     const result = spawnSync("docker", [...args, "--format", "json"], options);
     assert.equal(result.status, 0, result.stderr);
     const model = JSON.parse(result.stdout);
     assert.equal(model.name, "waypoint-dev");
-    assert.deepEqual(Object.keys(model.services).sort(), ["backend", "casdoor", "frontend"]);
+    assert.deepEqual(Object.keys(model.services).sort(), ["auth", "backend", "frontend"]);
     assert.equal(model.volumes, undefined);
-    const { backend, casdoor, frontend } = model.services;
+    const { backend, auth, frontend } = model.services;
     assert.equal(backend.build.dockerfile, "backend/Dockerfile");
     assert.equal(frontend.build.dockerfile, "frontend/Dockerfile");
     assert.equal(backend.image, "waypoint-dev-backend");
     assert.equal(frontend.image, "waypoint-dev-frontend");
-    assert.equal(
-      casdoor.image,
-      "casbin/casdoor:v4.23.0@sha256:e13c9aada231f7338a03ab0ae7054d0a9480e77283338ab9fc319d88fe2b3ce0",
-    );
+    assert.equal(auth.image, "waypoint-dev-auth");
     assert.equal(
       backend.environment.NET_WORTH_ESTIMATOR_AUTH_ISSUER,
-      config.identity.CASDOOR_PUBLIC_URL,
+      config.identity.AUTH_PUBLIC_URL,
     );
     assert.equal(
       backend.environment.NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET,
@@ -118,18 +151,18 @@ test("native Compose consumes the exported environment and isolates dev from pro
     assert.ok(
       interpolation.stdout.split("\n").includes(`DEV_GUEST_SUBJECT=${config.guestSubject}`),
     );
-    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, "casdoor");
+    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTH_PROVIDER, "better-auth");
+    assert.equal(backend.environment.NET_WORTH_ESTIMATOR_AUTHZ_DB, "/data/authorization.db");
     assert.equal(backend.environment.NET_WORTH_ESTIMATOR_DB, "/data/net-worth-estimator.db");
     assert.equal(backend.user, `${process.getuid()}:${process.getgid()}`);
     assert.equal(backend.volumes[0].source, resolve("tmp/dev/data"));
     assert.deepEqual(
-      casdoor.volumes.map((v) => v.source),
-      ["conf", "db", "sessions"].map((p) => resolve("tmp/dev/casdoor", p)),
+      auth.volumes.map((v) => v.source),
+      [resolve("tmp/dev/auth")],
     );
-    assert.equal(casdoor.volumes[0].read_only, true);
     for (const service of Object.values(model.services))
       assert.equal(service.ports[0].host_ip, "127.0.0.1");
-    assert.equal(backend.depends_on.casdoor.condition, "service_healthy");
+    assert.equal(backend.depends_on.auth.condition, "service_healthy");
     assert.equal(frontend.depends_on.backend.condition, "service_healthy");
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -147,8 +180,8 @@ test("generated configuration persists without replacing credentials", async () 
     await saveConfig(dir, config);
     assert.deepEqual((await loadConfig(dir, false)).source, config.source);
     assert.ok(
-      (await loadConfig(dir, false)).identity.CASDOOR_USER_PASSWORD ===
-        again.identity.CASDOOR_USER_PASSWORD,
+      (await loadConfig(dir, false)).identity.AUTH_USER_PASSWORD ===
+        again.identity.AUTH_USER_PASSWORD,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -159,9 +192,9 @@ test("tailnet origins require HTTPS, the same full DNS name, and the fixed publi
   const host = "test-node.example.ts.net";
   const config = newConfig(undefined, host);
   assert.equal(config.identity.APP_PUBLIC_URL, `https://${host}:5178`);
-  assert.equal(config.identity.CASDOOR_PUBLIC_URL, `https://${host}:8000`);
+  assert.equal(config.identity.AUTH_PUBLIC_URL, `https://${host}:8000`);
   assert.equal(
-    originProfile(config.identity.APP_PUBLIC_URL, config.identity.CASDOOR_PUBLIC_URL),
+    originProfile(config.identity.APP_PUBLIC_URL, config.identity.AUTH_PUBLIC_URL),
     host,
   );
   assert.equal(settings(config).appUrl, config.identity.APP_PUBLIC_URL);
@@ -173,7 +206,7 @@ test("tailnet origins require HTTPS, the same full DNS name, and the fixed publi
     `https://${host}:9000`,
   ]) {
     assert.throws(() =>
-      settings({ ...config, identity: { ...config.identity, CASDOOR_PUBLIC_URL: issuer } }),
+      settings({ ...config, identity: { ...config.identity, AUTH_PUBLIC_URL: issuer } }),
     );
   }
 });

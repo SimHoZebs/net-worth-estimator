@@ -1,4 +1,4 @@
-# Disposable end-to-end overlay only. Merge last, after the base, Casdoor,
+# Disposable end-to-end overlay only. Merge last, after the base, Better Auth,
 # and test files. The e2e gate (auth/test-e2e.mjs) selects every value below
 # from verified-free loopback ports and a private root under repository tmp/.
 # It never touches the canonical stack, its ports, or its named volumes.
@@ -15,7 +15,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://casdoor:8000
+      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://auth:8000
       NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
       NET_WORTH_ESTIMATOR_READ_ONLY: ""
       NET_WORTH_ESTIMATOR_RECEIPT_SOURCE: disabled
@@ -29,6 +29,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  casdoor:
+  auth:
+    image: nwe-e2e-auth:${E2E_RUN_ID:?Set run ID}
+    user: "${E2E_UID:-1000}:${E2E_GID:-1000}"
     ports: !override
-      - "127.0.0.1:${E2E_CASDOOR_PORT:?Set the disposable provider port}:8000"
+      - "127.0.0.1:${E2E_AUTH_PORT:?Set the disposable provider port}:8000"

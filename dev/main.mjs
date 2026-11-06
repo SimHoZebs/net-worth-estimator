@@ -26,14 +26,14 @@ export async function main(args) {
   const { values, positionals } = parseMainArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | seed (--bulk NxM[:seed] | --clear) [--user USER_ID] [--slot NAME] | demo [--pack NAME] | ps-all",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--auth-port N] [--backend-port N] | refresh-db --user USER_ID --source-user SOURCE_ID [--from migrated-app.db] [--slot NAME] | publish-sample --user users/<guest-hash> --source-user SOURCE_ID [--from approved-app.db] [--slot NAME] | seed (--bulk NxM[:seed] | --clear) [--user USER_ID] [--slot NAME] | demo [--pack NAME] | ps-all",
     );
     return;
   }
   const [command, ...rest] = positionals;
   if (command === "grant")
     throw new Error(
-      "Access is automatic for each user's own data. Casdoor manages resource permissions; no global editor grant is needed.",
+      "Access is automatic for each user's own data. Go Casbin manages resource permissions; no global editor grant is needed.",
     );
   const run = commands[command];
   if (!run)

@@ -42,7 +42,7 @@ func TestServerRequiresDeploymentDatabaseWithoutCreatingFiles(t *testing.T) {
 			}
 			command.Env = append(command.Env,
 				"NET_WORTH_ESTIMATOR_DB="+path,
-				"NET_WORTH_ESTIMATOR_AUTH_PROVIDER=casdoor",
+				"NET_WORTH_ESTIMATOR_AUTH_PROVIDER=better-auth",
 				"NET_WORTH_ESTIMATOR_AUTH_ISSUER=http://127.0.0.1:1",
 				"NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID=startup-test",
 				"NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET=startup-test-secret",

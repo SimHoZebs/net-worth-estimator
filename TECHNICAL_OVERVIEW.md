@@ -67,7 +67,7 @@ with SQLite and filesystem adapters, private references, and durable cleanup
 in `backend/internal/store/adapters/sqlite/blob_storage.go`).
 
 `store.Database` owns the shared connection. Each financial store holds one
-immutable user ID. The user router creates that scope only after Casdoor verifies
+immutable user ID. The user router creates that scope only after Casbin verifies
 access. `users` identifies users by immutable issuer and subject. Financial
 `accounts` remain model entities.
 
@@ -78,7 +78,8 @@ sync state, default presets, and projection caches operate within one user.
 
 Application sessions, provider grants, and logout records use global identity
 tables in the same database. Financial operations never clear those tables.
-Casdoor retains its own external provider database.
+Better Auth retains its own external provider database. Embedded Casbin reads
+the separate application-owned policy database for every decision.
 
 ## 2. HTTP Contracts
 
@@ -92,7 +93,7 @@ stay within `projections`, with the shared-run registry separate from transport.
 Whole-router HTTP contracts live in `api/integration`; private helper tests
 stay with their feature package.
 
-`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, and optional `simplefin.Runner`. The server always wraps user APIs with Casdoor-backed session and resource authorization. Only the isolated fixture API omits that boundary. The frontend image serves the SPA and proxies `/v1` to the backend.
+`api.New(store.Store, api.Config)` constructs the router. `api.Config` contains the normalized origin allowlist, read-only flag, and optional `simplefin.Runner`. The server wraps user APIs with Better Auth OIDC sessions and embedded Casbin authorization. Only the isolated fixture API omits that boundary. The frontend image serves the SPA and proxies `/v1` to the backend.
 
 The container boundary is split. `backend/Dockerfile` produces an API-only image. `frontend/Dockerfile` produces a static Nginx image whose `BACKEND_URL` runtime setting controls the `/v1` proxy. The proxy preserves the browser `Origin` header and keeps stochastic SSE unbuffered. `docker-compose.yml` is the local full-stack composition.
 

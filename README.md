@@ -54,7 +54,7 @@ docker compose --env-file .env.dev -f docker-compose.dev.yml down
 ```
 
 Use **http://localhost:5178**, or the HTTPS URL printed by setup for tailnet access.
-The dedicated dev Compose file uses the production Dockerfiles and pinned Casdoor
+The dedicated dev Compose file uses the production Dockerfiles and Better Auth on Bun
 image with isolated dev storage. Setup takes the initial SQLite-safe, read-only
 production snapshot. Daily Compose commands retain data and logins without a
 custom lifecycle wrapper. External sync stays disabled.
@@ -103,7 +103,7 @@ The split deployment has two images:
 - `backend/Dockerfile` builds the Go API. Local state comes from a database backup restored to the volume, never from files baked into the image.
 - `frontend/Dockerfile` builds the Waypoint bundle and serves it from Nginx. The image proxies `/v1` to the backend named by `BACKEND_URL` and keeps stochastic SSE streaming unbuffered.
 
-Initialize Casdoor and run the split stack through the [authentication guide](auth/README.md).
+Initialize Better Auth and Casbin, then run the split stack through the [authentication guide](auth/README.md).
 For normal development, use the [dedicated dev stack](dev/README.md).
 For independent frontend/API hosts, use the [host-portable deployment guide](deploy/README.md).
 It covers Vercel's same-origin API proxy, Render, configurable ports, authenticated
@@ -113,7 +113,7 @@ The frontend is available at `http://localhost:8080` and the API at `http://loca
 
 The split images do not embed or build one another.
 
-Casdoor authentication is required in dev and production. The Go API verifies OIDC identity and calls Casdoor's built-in Casbin permission API. Each user owns separate financial data. The guest is an ordinary provisioned user with limited grants assigned at creation. Normal signup assigns member access without a role-choice step. Every request uses the same authorization path. Identities and financial data stay in local SQLite. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API must share one public origin. There are no shared bearer tokens or unauthenticated server modes. See [authentication](docs/authentication.md) and [user authorization](docs/authorization.md) for boundaries and migration.
+Better Auth on Bun authenticates users in dev and production. The Go API verifies OIDC and embeds Casbin for application-owned authorization. Each user owns separate financial data. The provisioned guest receives viewer permissions. New signups receive a persistent member assignment. Identity storage supports SQLite and PostgreSQL. Financial and policy storage use private SQLite databases. Signed logout notifications and periodic token checks enforce provider revocation. The frontend and API share one public origin. See [authentication](docs/authentication.md) and [authorization](docs/authorization.md) for boundaries and migration.
 
 Any frontend host must proxy `/v1` to the backend under the same public origin for session cookies and CSRF protection. A proxy cut during a seeded stochastic run detaches the client without an error event; repeat the same request to attach or read the saved result.
 
@@ -129,7 +129,7 @@ Configure a backend service with this durable contract:
 | Database               | `NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`              |
 | Public exposure        | only behind suitable access control                                |
 | Optional origin policy | exact origins in `NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS`             |
-| Authentication         | Casdoor OIDC, durable sessions, and user-scoped permissions |
+| Authentication         | Better Auth on Bun, OIDC, durable sessions, and Go Casbin |
 | Optional write policy  | `NET_WORTH_ESTIMATOR_READ_ONLY=1`                                  |
 
 Keep one backend instance because the deployment contract uses one SQLite writer. Back up through SQLite-aware procedures and preserve the persistent volume across deploys.

@@ -40,6 +40,12 @@ type introspectionResult struct {
 // audienceMatches accepts the provider's string-or-array audience encoding
 // and reports whether it names this application client.
 func audienceMatches(raw json.RawMessage, clientID string) bool {
+	// RFC 7662 makes aud optional. Better Auth's opaque tokens bind to the
+	// authenticated client_id instead. Every caller checks that binding and
+	// issuer independently. If aud is present it must also match.
+	if len(raw) == 0 {
+		return true
+	}
 	var audiences []string
 	if json.Unmarshal(raw, &audiences) != nil {
 		var audience string

@@ -102,7 +102,7 @@ func TestIdentityStartupFailureDoesNotCloseSharedDatabase(t *testing.T) {
 	}))
 	defer provider.Close()
 	_, err = New(context.Background(), Config{
-		Provider: "casdoor", Issuer: provider.URL, PublicURL: "http://localhost:8080",
+		Provider: "better-auth", Issuer: provider.URL, PublicURL: "http://localhost:8080",
 		ClientID: "waypoint", ClientSecret: "secret", Store: database,
 		GuestSubject: "11111111-1111-1111-1111-111111111111",
 	})

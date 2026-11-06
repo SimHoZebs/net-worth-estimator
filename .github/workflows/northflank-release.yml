@@ -18,10 +18,11 @@ concurrency:
 jobs:
   request-release:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      vars.AUTH_CUTOVER_READY == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.conclusion == 'success')
+      github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -73,7 +74,7 @@ jobs:
           const sha = process.env.RELEASE_SHA;
           if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
           const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
-          const names = [`${repository}-backend`, `${repository}-casdoor`];
+          const names = [`${repository}-backend`, `${repository}-auth`];
           const tag = `sha-${sha}`;
           const interval = Number(process.env.IMAGE_POLL_INTERVAL_MS ?? 5000);
           const deadline = Date.now() + Number(process.env.IMAGE_POLL_TIMEOUT_MS ?? 30 * 60 * 1000);
@@ -113,13 +114,18 @@ jobs:
           RELEASE_WEBHOOK: ${{ secrets.NORTHFLANK_RELEASE_WEBHOOK }}
           RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          IDENTITY_SERVICE_ID: ${{ vars.NORTHFLANK_IDENTITY_SERVICE_ID }}
+          IDENTITY_DATABASE_ADDON_ID: ${{ vars.NORTHFLANK_IDENTITY_DATABASE_ADDON_ID }}
         run: |
           node --input-type=module <<'JS'
           const sha = process.env.RELEASE_SHA;
           if (!/^[a-f0-9]{40}$/.test(sha || "")) throw new Error("A full release SHA is required");
           const repository = process.env.GITHUB_REPOSITORY.toLowerCase();
           const apiImage = `ghcr.io/${repository}-backend:sha-${sha}`;
-          const identityImage = `ghcr.io/${repository}-casdoor:sha-${sha}`;
+          const identityImage = `ghcr.io/${repository}-auth:sha-${sha}`;
+          const identityService = process.env.IDENTITY_SERVICE_ID;
+          const identityDatabase = process.env.IDENTITY_DATABASE_ADDON_ID;
+          if (!identityService || !identityDatabase) throw new Error("Prepared identity service and database IDs are required");
 
           const raw = process.env.RELEASE_WEBHOOK;
           let url;
@@ -132,6 +138,8 @@ jobs:
           url.searchParams.set("RELEASE_SHA", sha);
           url.searchParams.set("API_IMAGE", apiImage);
           url.searchParams.set("IDENTITY_IMAGE", identityImage);
+          url.searchParams.set("IDENTITY_SERVICE_ID", identityService);
+          url.searchParams.set("IDENTITY_DATABASE_ADDON_ID", identityDatabase);
           url.searchParams.set("name", `main-${sha.slice(0, 12)}`);
           let response;
           try {

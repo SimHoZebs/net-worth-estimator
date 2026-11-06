@@ -9,6 +9,7 @@ WORKDIR /build
 COPY package.json bun.lock ./
 COPY frontend/package.json ./frontend/package.json
 COPY extension/package.json ./extension/package.json
+COPY auth/better-auth/package.json ./auth/better-auth/package.json
 RUN bun install --frozen-lockfile --no-progress
 
 COPY frontend/ ./frontend/

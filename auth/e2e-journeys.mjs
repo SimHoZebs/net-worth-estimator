@@ -20,7 +20,6 @@ import { fileURLToPath } from "node:url";
 import { expect } from "../frontend/node_modules/@playwright/test/index.mjs";
 import { DatabaseSync } from "node:sqlite";
 import { E2E_SEED, E2E_TRANSPORT_ATTEMPTS } from "./e2e-lib.mjs";
-import { casdoorSession } from "./casdoor/provision.mjs";
 
 export function actorResource(issuer, subject) {
   return `users/${createHash("sha256").update(`${issuer}\x00${subject}`, "utf8").digest("hex")}`;
@@ -118,12 +117,11 @@ async function signInPage(context, origin, { username, password, signup }) {
   const page = await context.newPage();
   await withTransport(() => page.goto(`${origin}/v1/auth/login`), "login redirect");
   if (signup) {
-    await page.getByRole("link", { name: /sign up now/i }).click();
+    await page.getByRole("link", { name: /create an account/i }).click();
     await page.locator("#username").fill(username);
     await page.locator("#name").fill(E2E_SEED.secondDisplay);
     await page.locator("#password").fill(password);
-    await page.locator("#confirm").fill(password);
-    await page.getByRole("button", { name: /^sign up$/i }).click();
+    await page.getByRole("button", { name: /^create account$/i }).click();
   } else {
     await page.locator("#username").fill(username);
     await page.locator('input[type="password"]').first().fill(password);
@@ -158,7 +156,7 @@ export async function ownerSignIn(ctx) {
   assert.equal((await created.json()).saved, true);
 
   await page.reload();
-  await page.goto(`${origin}/#sources`);
+  await page.goto(`${origin}/sources`);
   await page.getByRole("tab", { name: "Account", exact: true }).click();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   assert.equal(
@@ -188,7 +186,7 @@ export async function guestReads(ctx, ownerBundle) {
   assert.ok(!published.resource.permissions.includes("user:write"));
 
   const guestPage = await guest.newPage();
-  await guestPage.goto(`${origin}/#sources`);
+  await guestPage.goto(`${origin}/sources`);
   await guestPage.getByRole("tab", { name: "Account", exact: true }).click();
   await expect(guestPage.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   await expect(guestPage.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
@@ -233,29 +231,11 @@ export async function guestReads(ctx, ownerBundle) {
 // enables guest writes, and revocation is observed on the next request —
 // with no user-kind branch in the runtime path.
 export async function guestGrantRevoke(ctx, guestBundle) {
-  const { origin, issuer, adminPassword } = ctx;
+  const { origin, issuer } = ctx;
   const { guest, published } = guestBundle;
   const guestResource = actorResource(issuer, ctx.guestSubject);
-  const admin = casdoorSession(issuer);
-  await admin("/api/login", {
-    method: "POST",
-    body: {
-      type: "login",
-      signinMethod: "Password",
-      application: "app-built-in",
-      organization: "built-in",
-      username: "admin",
-      password: adminPassword,
-    },
-  });
-  const permissionPath = `?id=${encodeURIComponent("waypoint/viewer-guest-user")}`;
-  const original = (await admin(`/api/get-permission${permissionPath}`)).data;
-  assert.ok(original, "the disposable viewer permission must exist");
   try {
-    await admin(`/api/update-permission${permissionPath}`, {
-      method: "POST",
-      body: { ...original, actions: ["user:read", "user:project", "user:write"] },
-    });
+    await ctx.setGuestRole("member");
     const writable = await session(guest, origin);
     assert.ok(writable.resource.permissions.includes("user:write"));
     const probe = await api(guest, origin, writable, "POST", "/v1/accounts", {
@@ -268,8 +248,7 @@ export async function guestGrantRevoke(ctx, guestBundle) {
     assert.equal((await probe.json()).saved, true);
     assert.equal((await api(guest, origin, writable, "DELETE", "/v1/accounts/e2e-policy-probe")).status(), 200);
   } finally {
-    await admin(`/api/update-permission${permissionPath}`, { method: "POST", body: original });
-    await admin("/api/logout", { method: "POST" });
+    await ctx.setGuestRole("viewer");
   }
   const restored = await session(guest, origin);
   assert.deepEqual(restored.resource.permissions, ["user:read", "user:project"]);
@@ -278,7 +257,7 @@ export async function guestGrantRevoke(ctx, guestBundle) {
     401,
     "the next request must observe provider write revocation",
   );
-  console.log("e2e: guest provider grant, write, and immediate revocation PASS");
+  console.log("e2e: guest Casbin grant, write, and immediate revocation PASS");
 }
 
 // Second user arrives through native signup: immediate blank workspace, no
@@ -301,7 +280,7 @@ export async function secondUserSignup(ctx, hooks) {
   assert.deepEqual(blank.transactions, []);
   await expect(page.getByRole("heading", { name: "Your workspace is ready" })).toBeVisible();
   for (const route of ["accounts", "transactions", "purchases", "evaluations", "sources", "outlook"]) {
-    await page.goto(`${origin}/#${route}`);
+    await page.goto(`${origin}/${route}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: /No financial model/ })).toHaveCount(0);
   }
@@ -315,7 +294,7 @@ export async function secondUserSignup(ctx, hooks) {
   await expect(dialog).not.toBeVisible();
 
   await hooks.restartStack();
-  await page.goto(`${origin}/#accounts`);
+  await page.goto(`${origin}/accounts`);
   await page.reload();
   await expect(
     page.getByRole("button", { name: "Open Second checking transactions", exact: true }),
@@ -327,7 +306,7 @@ export async function secondUserSignup(ctx, hooks) {
   return { second, page, other };
 }
 
-function transactionPayload(row) {
+function rowTransactionPayload(row) {
   const transaction = new Date((row.transactionTime ?? row.postedTime) * 1000).toISOString();
   const posted = new Date(row.postedTime * 1000).toISOString();
   return {
@@ -346,7 +325,7 @@ function transactionPayload(row) {
 }
 
 function transactionPayload(name, sourceAccountId) {
-  return transactionPayload({
+  return rowTransactionPayload({
     name,
     sourceAccountId,
     destinations: [],
@@ -705,7 +684,7 @@ export async function seedExtraData(ctx, ownerBundle, { pack, bulk }) {
   }
 
   async function createTransaction(row) {
-    const response = await api(owner, origin, own, "POST", "/v1/transactions", transactionPayload(row));
+    const response = await api(owner, origin, own, "POST", "/v1/transactions", rowTransactionPayload(row));
     assert.equal(response.status(), 200, `seed transaction ${row.id}: ${await response.text()}`);
     assert.equal((await response.json()).saved, true);
     addedTransactions += 1;

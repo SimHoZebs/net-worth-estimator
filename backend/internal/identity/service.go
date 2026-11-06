@@ -46,7 +46,7 @@ type Service struct {
 	validation       singleflight.Group
 }
 
-// New uses standard OIDC discovery and verification for Casdoor.
+// New uses standard OIDC discovery and verification for Better Auth.
 func New(ctx context.Context, c Config) (*Service, error) {
 	if c.GuestSubject == "" {
 		return nil, fmt.Errorf("guest subject is required")
@@ -185,7 +185,7 @@ func (s *Service) sessionPrincipal(r *http.Request) (Principal, error) {
 	return Principal{Subject: g.Subject, Name: g.Name, Authenticated: true}, nil
 }
 
-// Wrap verifies sessions and enforces Casdoor decisions for the selected user.
+// Wrap verifies sessions and enforces Casbin decisions for the selected user.
 func (s *Service) Wrap(next http.Handler) http.Handler {
 	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w = flushWriter{w}

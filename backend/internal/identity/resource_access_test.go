@@ -100,7 +100,7 @@ func TestOrdinaryConflictDoesNotReportResourceChange(t *testing.T) {
 	}
 }
 
-func TestCasdoorDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
+func TestAuthorizationDecisionsAndOutagesAreNeverBypassed(t *testing.T) {
 	p := newIDP(t)
 	s := newService(t, p, filepath.Join(t.TempDir(), "sessions.db"))
 	server := httptest.NewServer(s.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) })))

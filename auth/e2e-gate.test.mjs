@@ -73,14 +73,14 @@ test("fixture contract rejects shared or production-like state", () => {
   const good = {
     testOnly: true,
     disposable: E2E_DISPOSABLE_MARKER,
-    stateDir: "/tmp/opencode/e2e-x/casdoor",
+    stateDir: "/tmp/opencode/e2e-x/auth",
     settings: { publicUrl: "http://127.0.0.1:1" },
     subject: "owner-sub",
     guestSubject: "guest-sub",
     username: "e2e-owner",
   };
   assert.deepEqual(validateFixtureContract(good, {
-    stateDir: "/tmp/opencode/e2e-x/casdoor",
+    stateDir: "/tmp/opencode/e2e-x/auth",
     issuer: "http://127.0.0.1:1",
   }), []);
   assert.ok(validateFixtureContract({ ...good, testOnly: false }).length > 0);

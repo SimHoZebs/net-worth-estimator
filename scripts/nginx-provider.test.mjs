@@ -6,7 +6,7 @@ import test from "node:test";
 const image = process.env.NGINX_TEST_IMAGE;
 
 test(
-  "provider gateway accepts Casdoor-sized headers that fail with the default buffer",
+  "provider gateway accepts bounded large headers that fail with the default buffer",
   { skip: !image },
   async () => {
     const directory = await mkdtemp("/tmp/opencode/nginx-provider-headers-");

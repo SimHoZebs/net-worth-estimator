@@ -2,7 +2,7 @@
 
 The frontend and API can use different providers. They share one public browser
 origin through a reverse proxy. Neither application contains provider addresses.
-SQLite and Casdoor remain separate stateful dependencies. Database-engine and
+SQLite and Better Auth remain separate stateful dependencies. Database-engine and
 identity-provider migrations are outside this contract.
 
 Application/data migrations use [the shared migration SOP](MIGRATIONS.md).
@@ -16,7 +16,7 @@ with the API stopped. It is not part of server startup.
 | Frontend | Static `frontend/dist` assets, built with Node.js 24 or newer |
 | API | `backend/Dockerfile` with repository-root context, or the Go server binary |
 | Browser API | `/v1/*` on the frontend's HTTPS origin, including `/v1/auth/*` |
-| Process | One always-on API instance, with outbound access to Casdoor and enabled integrations |
+| Process | One always-on API instance, with outbound access to Better Auth and enabled integrations |
 | Listener | `HOST=0.0.0.0`, configurable `PORT` (default `8787`) |
 | Storage | Existing compatible SQLite file on durable, writable local storage |
 | Schema | Explicit `setupdb` operation with the API stopped |
@@ -26,7 +26,7 @@ with the API stopped. It is not part of server startup.
 | Shutdown | Deliver `SIGTERM`; allow at least 15 seconds for HTTP shutdown |
 
 Startup validates schema compatibility and OIDC discovery before it listens.
-Readiness does not continuously test Casdoor. Identity outages fail closed on
+Readiness does not continuously test Better Auth. Identity outages fail closed on
 authenticated requests when verification is due. Monitor those failures too.
 
 The scheduler, sync exclusion, token-refresh coordination, and active seeded
@@ -68,7 +68,7 @@ The proxy must enforce its configured public hostname before it assigns that
 origin. It must preserve browser `Origin`. Vercel's configuration enforces the
 hostname match and replaces both ingress headers. Direct API requests fail
 with 403 in authenticated-proxy mode, except the two infrastructure probes.
-Use the frontend URL for CLI requests and Casdoor's signed back-channel logout
+Use the frontend URL for CLI requests and the provider's signed back-channel logout
 callback. The API accepts one secret; coordinate proxy/API secret rotation.
 
 ### Streaming
@@ -89,11 +89,11 @@ Verify actual provider behavior after deployment.
 
 ## Switch hosts without application changes
 
-1. Keep stable custom application and Casdoor hostnames where possible.
+1. Keep stable custom application and identity hostnames where possible.
 2. Prepare destination runtime settings and durable storage.
 3. If storage must move, stop all API writers and take a SQLite-safe backup.
 4. Restore and validate the complete application database on the destination.
-5. Preserve Casdoor state, issuer, subjects, signing keys, and client settings.
+5. Preserve identity state, issuer, subjects, signing keys, and client settings.
 6. Update the proxy upstream and route the stable application hostname.
 7. Verify login, private access, writes, streaming, and restart persistence.
 
@@ -124,7 +124,7 @@ FRONTEND_URL=https://app.example.com sh scripts/smoke-compose.sh
 
 This smoke checks public proxy access, readiness, origin rejection, guest-scope
 resolution without a session kind, and final SSE completion. Also verify real
-Casdoor login/logout, user isolation, private writes, passkeys, signed logout
+Better Auth login/logout, user isolation, private writes, passkeys, signed logout
 delivery, incremental streaming, and restarts with disposable users. Never use
 production financial data as a fixture. The published `source_path` value
 `sample` is a content-only label; it implies no permissions.

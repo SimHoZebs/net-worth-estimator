@@ -40,18 +40,18 @@ func model(t *testing.T, handler http.Handler) *types.FinancialModel {
 	return out.Model
 }
 
-func TestResourceConfigurationRejectsUnsafeOrganization(t *testing.T) {
+func TestResourceConfigurationRequiresPolicyDatabase(t *testing.T) {
 	c, err := resourceConfigFromEnv(func(string) string { return "" })
-	if err != nil || c.ModelID != "" || c.Organization != authorization.DefaultOrganization {
-		t.Fatalf("unexpected defaults: %+v %v", c, err)
+	if err == nil || c.PolicyDB != "" {
+		t.Fatalf("accepted missing policy database: %+v %v", c, err)
 	}
-	if _, err := resourceConfigFromEnv(func(name string) string {
-		if name == "NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION" {
-			return "owner/org"
+	if c, err := resourceConfigFromEnv(func(name string) string {
+		if name == "NET_WORTH_ESTIMATOR_AUTHZ_DB" {
+			return "/data/authorization.db"
 		}
 		return ""
-	}); err == nil {
-		t.Error("accepted organization with an owner prefix")
+	}); err != nil || c.PolicyDB != "/data/authorization.db" {
+		t.Errorf("policy database configuration: %+v %v", c, err)
 	}
 }
 

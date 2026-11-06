@@ -1,8 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { generate } from "../auth/casdoor/generate.mjs";
-import { writeBootstrap } from "../auth/casdoor/provision.mjs";
 import { databaseName, validateSnapshot } from "./database.mjs";
 import {
   envFileFor,
@@ -36,15 +34,14 @@ export function validateSetup(values, positionals = []) {
   const slot = slotFromOptions(values);
   if (values.bulk !== undefined || values.clear !== undefined)
     throw new Error("--bulk and --clear apply only to seed.");
-  if (values.pack !== undefined)
-    throw new Error("--pack applies only to demo.");
+  if (values.pack !== undefined) throw new Error("--pack applies only to demo.");
   if (values.user)
     throw new Error(
       "--user applies only to refresh-db; setup binds a user to its verified dev identity",
     );
   if (
     (values["app-port"] !== undefined ||
-      values["casdoor-port"] !== undefined ||
+      values["auth-port"] !== undefined ||
       values["backend-port"] !== undefined) &&
     slot === ""
   ) {
@@ -61,12 +58,12 @@ export async function resolveSetupScope(values) {
   let source = values.from ? { file: resolve(values.from) } : undefined;
   const explicitPorts = {
     appPort: values["app-port"],
-    casdoorPort: values["casdoor-port"],
+    authPort: values["auth-port"],
     backendPort: values["backend-port"],
   };
   const wantsExplicitPorts =
     explicitPorts.appPort !== undefined ||
-    explicitPorts.casdoorPort !== undefined ||
+    explicitPorts.authPort !== undefined ||
     explicitPorts.backendPort !== undefined;
   // Resolve ports before the lock so validation failures leave no empty state dir.
   let slotOptions = { slot };
@@ -82,21 +79,21 @@ export async function resolveSetupScope(values) {
       return port;
     };
     let appPort = parsePort(explicitPorts.appPort, "--app-port");
-    let casdoorPort = parsePort(explicitPorts.casdoorPort, "--casdoor-port");
+    let authPort = parsePort(explicitPorts.authPort, "--auth-port");
     let backendPort = parsePort(explicitPorts.backendPort, "--backend-port");
     const missing =
       (appPort === undefined ? 1 : 0) +
-      (casdoorPort === undefined ? 1 : 0) +
+      (authPort === undefined ? 1 : 0) +
       (backendPort === undefined ? 1 : 0);
     if (missing > 0) {
       const free = await pickFreePorts(missing, [...used]);
       let cursor = 0;
       if (appPort === undefined) appPort = free[cursor++];
-      if (casdoorPort === undefined) casdoorPort = free[cursor++];
+      if (authPort === undefined) authPort = free[cursor++];
       if (backendPort === undefined) backendPort = free[cursor++];
     }
-    if (appPort === casdoorPort) throw new Error("App and Casdoor slot ports must differ");
-    slotOptions = { slot, appPort, casdoorPort, backendPort };
+    if (appPort === authPort) throw new Error("App and auth slot ports must differ");
+    slotOptions = { slot, appPort, authPort, backendPort };
     // Clone the canonical database when the slot has no explicit source.
     if (!source) {
       const canonicalDb = resolve(canonicalStateDir, "data", databaseName);
@@ -106,8 +103,7 @@ export async function resolveSetupScope(values) {
     slotOptions = {
       slot,
       appPort: explicitPorts.appPort === undefined ? undefined : Number(explicitPorts.appPort),
-      casdoorPort:
-        explicitPorts.casdoorPort === undefined ? undefined : Number(explicitPorts.casdoorPort),
+      authPort: explicitPorts.authPort === undefined ? undefined : Number(explicitPorts.authPort),
       backendPort:
         explicitPorts.backendPort === undefined ? undefined : Number(explicitPorts.backendPort),
     };
@@ -115,38 +111,49 @@ export async function resolveSetupScope(values) {
   return { slot, stateDir, envFile, source, slotOptions };
 }
 
-async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
-  if (originProfile(config.identity.APP_PUBLIC_URL, config.identity.CASDOOR_PUBLIC_URL)) {
+export async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
+  if (originProfile(config.identity.APP_PUBLIC_URL, config.identity.AUTH_PUBLIC_URL)) {
     checkServe(
       config,
       JSON.parse(runCommand("tailscale", ["status", "--json"], { capture: true })),
       JSON.parse(runCommand("tailscale", ["serve", "status", "--json"], { capture: true })),
     );
   }
-  const identityDir = resolve(stateDir, "casdoor");
-  if (!(await exists(resolve(identityDir, "conf/app.conf"))))
-    await generate(settings(config), identityDir);
+  const identityDir = resolve(stateDir, "auth");
+  await mkdir(identityDir, { recursive: true, mode: 0o700 });
+  await mkdir(resolve(stateDir, "data"), { recursive: true, mode: 0o700 });
   const destination = resolve(stateDir, "data", databaseName);
   const fresh = !(await exists(destination));
   if (!fresh) validateSnapshot(destination);
-  const bootstrapPath = resolve(identityDir, "bootstrap.json");
-  if (!(await exists(bootstrapPath))) {
-    compose(config, ["up", "-d", "--wait", "casdoor"]);
-    await writeBootstrap(settings(config), identityDir);
+  const authDatabase = resolve(identityDir, "identity.db");
+  const bootstrapPath = `${authDatabase}.bootstrap.json`;
+  const bootstrapExists = await exists(bootstrapPath);
+  const policyDatabase = resolve(stateDir, "data", "authorization.db");
+  const policyExists = await exists(policyDatabase);
+  if (!policyExists && (!fresh || bootstrapExists)) {
+    throw new Error(
+      "Dev authorization database is missing. Restore its backup or perform an explicit policy import. Setup will not recreate grants for an existing identity.",
+    );
+  }
+  if (!bootstrapExists) {
+    runCommand("bun", ["run", "auth/better-auth/src/setup.ts"], {
+      env: {
+        ...process.env,
+        ...config.identity,
+        AUTH_DATABASE: authDatabase,
+      },
+    });
   }
   const bootstrap = JSON.parse(await readFile(bootstrapPath, "utf8"));
   if (
-    bootstrap.issuer !== config.identity.CASDOOR_PUBLIC_URL ||
+    bootstrap.issuer !== config.identity.AUTH_PUBLIC_URL ||
     bootstrap.client_id !== config.identity.AUTH_CLIENT_ID ||
-    bootstrap.redirect_uri !== `${config.identity.APP_PUBLIC_URL}/v1/auth/callback` ||
-    bootstrap.username !== config.identity.CASDOOR_USER_NAME
+    bootstrap.username !== config.identity.AUTH_USER_NAME
   ) {
     throw new Error("Dev identity metadata does not match its saved configuration");
   }
   if (!bootstrap.guest_subject || typeof bootstrap.guest_subject !== "string") {
-    throw new Error(
-      "Dev identity metadata requires a provisioned guest subject.",
-    );
+    throw new Error("Dev identity metadata requires a provisioned guest subject.");
   }
   if (config.guestSubject === null) {
     config.guestSubject = bootstrap.guest_subject;
@@ -156,6 +163,21 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     throw new Error(
       `Set a verified provisioned guestSubject distinct from the bootstrap user in ${slot ? `tmp/dev-${slot}` : "tmp/dev"}/config.json. Anonymous traffic resolves to it.`,
     );
+  if (!policyExists) {
+    runCommand("go", [
+      "-C",
+      "backend",
+      "run",
+      "./cmd/authzctl",
+      "--setup",
+      "--db",
+      policyDatabase,
+      "--issuer",
+      bootstrap.issuer,
+      "--guest",
+      bootstrap.guest_subject,
+    ]);
+  }
   if (fresh) {
     const incoming = await snapshot(config, stateDir);
     validateSnapshot(incoming);
@@ -173,7 +195,7 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
       ...(sourceUser ? ["--source-user", sourceUser] : []),
     ]);
     // Provision the guest destination row after owner initialization. The
-    // guest must already exist in Casdoor (seed + provision.mjs discovery);
+    // guest must already exist in Better Auth after explicit provisioning;
     // setupdb only records the ordinary user row and its blank document.
     // Anonymous traffic resolves to bootstrap.guest_subject; publish-sample
     // copies reviewed content into that existing row with --financial-only.
@@ -193,14 +215,14 @@ async function setupFlow(config, sourceUser, { stateDir, envFile, slot }) {
     slot,
     project: projectFor(slot),
     appUrl: config.identity.APP_PUBLIC_URL,
-    casdoorUrl: config.identity.CASDOOR_PUBLIC_URL,
+    authUrl: config.identity.AUTH_PUBLIC_URL,
     ports: portsFor(config),
     guestSubject: config.guestSubject ?? null,
     pid: process.pid,
     createdAt: new Date().toISOString(),
   });
   console.log(
-    `Dev setup ready: ${config.identity.APP_PUBLIC_URL} (Casdoor: ${config.identity.CASDOOR_PUBLIC_URL})`,
+    `Dev setup ready: ${config.identity.APP_PUBLIC_URL} (Auth: ${config.identity.AUTH_PUBLIC_URL})`,
   );
   console.log(`Start with: ${composeCommandFor(slot)}`);
 }
@@ -235,7 +257,7 @@ export async function main(args) {
   const { values, positionals } = parseSetupArgs(args);
   if (values.help) {
     console.log(
-      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--casdoor-port N] [--backend-port N]",
+      "Usage: scripts/dev setup [--tailnet] [--from migrated-app.db] [--source-user SOURCE_ID] [--slot NAME] [--app-port N] [--auth-port N] [--backend-port N]",
     );
     return;
   }

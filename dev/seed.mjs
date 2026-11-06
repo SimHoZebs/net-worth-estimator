@@ -26,7 +26,7 @@ export function validateSeed(values, positionals = []) {
     throw new Error("--pack applies only to demo.");
   if (
     values["app-port"] !== undefined ||
-    values["casdoor-port"] !== undefined ||
+    values["auth-port"] !== undefined ||
     values["backend-port"] !== undefined
   ) {
     throw new Error("Ports are fixed at slot creation. Pick a new --slot name for new ports.");
@@ -56,7 +56,7 @@ export async function run(values, positionals) {
   await withLock(stateDir, async () => {
     const config = await loadConfig(stateDir, false, undefined, undefined, { slot });
     const bootstrap = JSON.parse(
-      await readFile(resolve(stateDir, "casdoor", "bootstrap.json"), "utf8"),
+      await readFile(resolve(stateDir, "auth", "identity.db.bootstrap.json"), "utf8"),
     );
     if (!bootstrap.issuer || typeof bootstrap.issuer !== "string")
       throw new Error("Dev identity bootstrap is missing its issuer.");

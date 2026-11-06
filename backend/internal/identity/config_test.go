@@ -7,7 +7,7 @@ import (
 
 func TestProviderConfiguration(t *testing.T) {
 	base := map[string]string{
-		"NET_WORTH_ESTIMATOR_AUTH_PROVIDER":      "casdoor",
+		"NET_WORTH_ESTIMATOR_AUTH_PROVIDER":      "better-auth",
 		"NET_WORTH_ESTIMATOR_AUTH_ISSUER":        "http://localhost:8000",
 		"NET_WORTH_ESTIMATOR_PUBLIC_URL":         "http://localhost:8080",
 		"NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID":     "client",
@@ -18,10 +18,9 @@ func TestProviderConfiguration(t *testing.T) {
 		name, key, value string
 		fail             bool
 	}{
-		{"valid", "", "", false}, {"casdoor", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "casdoor", false},
+		{"valid", "", "", false}, {"better auth", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "better-auth", false},
 		{"default provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "", false},
 		{"unknown provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "typo", true},
-		{"archived provider", "NET_WORTH_ESTIMATOR_AUTH_PROVIDER", "better-auth", true},
 		{"empty issuer", "NET_WORTH_ESTIMATOR_AUTH_ISSUER", "", true},
 		{"missing guest subject", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "", true},
 		{"blank guest subject", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT", "   ", true},
@@ -32,7 +31,7 @@ func TestProviderConfiguration(t *testing.T) {
 		{"invalid TTL", "NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME", "-1h", true},
 		{"invalid revocation window", "NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL", "6m", true},
 		{"disabled revocation checks", "NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL", "0s", true},
-		{"internal HTTP", "NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL", "http://casdoor:8000", false},
+		{"internal HTTP", "NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL", "http://auth:8000", false},
 		{"wrong account origin", "NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL", "https://elsewhere.test", true},
 		{"browser alias", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `{"http://localhost:8081":"http://localhost:8001"}`, false},
 		{"invalid browser mapping", "NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS", `[]`, true},
@@ -63,14 +62,14 @@ func TestProviderConfiguration(t *testing.T) {
 		})
 	}
 	c, err := FromEnv(func(string) string { return "" })
-	if err == nil || c.Provider != "casdoor" {
+	if err == nil || c.Provider != "better-auth" {
 		t.Fatalf("missing identity configuration must fail closed: %+v %v", c, err)
 	}
 }
 
 func TestPrivateLANHTTPRequiresFlag(t *testing.T) {
 	base := map[string]string{
-		"NET_WORTH_ESTIMATOR_AUTH_PROVIDER":      "casdoor",
+		"NET_WORTH_ESTIMATOR_AUTH_PROVIDER":      "better-auth",
 		"NET_WORTH_ESTIMATOR_AUTH_ISSUER":        "http://192.168.1.50:8000",
 		"NET_WORTH_ESTIMATOR_PUBLIC_URL":         "http://192.168.1.50:8080",
 		"NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID":     "client",

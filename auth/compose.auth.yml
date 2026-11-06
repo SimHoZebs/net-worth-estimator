@@ -1,0 +1,29 @@
+# Merge after docker-compose.yml. Provision both databases explicitly first.
+services:
+  auth:
+    build:
+      context: .
+      dockerfile: auth/better-auth/Dockerfile
+    environment:
+      AUTH_DATABASE: /data/identity.db
+      AUTH_PUBLIC_URL: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:?Set APP_PUBLIC_URL}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:?Set AUTH_CLIENT_ID}
+      AUTH_CLIENT_SECRET: ${AUTH_CLIENT_SECRET:?Set AUTH_CLIENT_SECRET}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      AUTH_CLIENT_IP_HEADER: ${AUTH_CLIENT_IP_HEADER:-}
+    volumes:
+      - ${AUTH_STATE_DIR:?Set absolute AUTH_STATE_DIR}:/data
+    ports:
+      - "127.0.0.1:${AUTH_PORT:-8000}:8000"
+  backend:
+    environment:
+      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL}
+      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://auth:8000
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:?Set AUTH_CLIENT_ID}
+      NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET: ${AUTH_CLIENT_SECRET:?Set AUTH_CLIENT_SECRET}
+      NET_WORTH_ESTIMATOR_PUBLIC_URL: ${APP_PUBLIC_URL:?Set APP_PUBLIC_URL}
+      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${AUTH_PUBLIC_URL:?Set AUTH_PUBLIC_URL}/account
+    depends_on:
+      auth:
+        condition: service_healthy

@@ -22,19 +22,14 @@ func TestProviderAliasIsolatesCookiesAndPreservesIssuerTransport(t *testing.T) {
 		if r.Host != issuer.Host || r.URL.Path != "/api/login" || r.URL.Query().Get("probe") != "1" || r.Header.Get("Origin") != p.server.URL {
 			t.Errorf("unexpected provider request: host=%s path=%s origin=%s", r.Host, r.URL.String(), r.Header.Get("Origin"))
 		}
-		if cookie := r.Header.Get("Cookie"); cookie != "casdoor_session_id=production" {
+		if cookie := r.Header.Get("Cookie"); cookie != "provider_session=production" {
 			t.Errorf("unexpected provider cookies (%d bytes)", len(cookie))
 		}
 		if r.Header.Get("Authorization") != "" {
-			t.Error("browser authorization header reached Casdoor")
+			t.Error("browser authorization header reached the provider")
 		}
-		http.SetCookie(w, &http.Cookie{Name: "casdoor_session_id", Value: "new-production", HttpOnly: true, Path: "/", SameSite: http.SameSiteLaxMode})
+		http.SetCookie(w, &http.Cookie{Name: "provider_session", Value: "new-production", HttpOnly: true, Path: "/", SameSite: http.SameSiteLaxMode})
 		http.SetCookie(w, &http.Cookie{Name: "language", Value: "en", Path: "/"})
-		// Casdoor copies inline SVG logo URLs into optional theme-cache cookies.
-		// These reproduce the production response's roughly 10 KiB headers.
-		for _, name := range []string{"organizationLogo", "organizationLogoDark"} {
-			http.SetCookie(w, &http.Cookie{Name: name, Value: strings.Repeat("x", 4792), Path: "/"})
-		}
 		w.Header().Set("Location", p.server.URL+"/account")
 		w.WriteHeader(302)
 	}))
@@ -45,11 +40,9 @@ func TestProviderAliasIsolatesCookiesAndPreservesIssuerTransport(t *testing.T) {
 	h := s.Wrap(http.NotFoundHandler())
 	namespace := browserCookieNamespace(s.config) + "provider_"
 	cookies := []*http.Cookie{
-		{Name: "casdoor_session_id", Value: "dev-session"},
+		{Name: "provider_session", Value: "dev-session"},
 		{Name: "__Host-waypoint_session", Value: "dev-app"},
-		{Name: namespace + "casdoor_session_id", Value: "production"},
-		{Name: namespace + "organizationLogo", Value: strings.Repeat("x", 4792)},
-		{Name: namespace + "organizationLogoDark", Value: strings.Repeat("x", 4792)},
+		{Name: namespace + "provider_session", Value: "production"},
 	}
 	w := browserRequest(h, "POST", tailProvider, prefix+"provider/api/login?probe=1", cookies,
 		map[string]string{"Origin": tailProvider, "Authorization": "Bearer untrusted"})

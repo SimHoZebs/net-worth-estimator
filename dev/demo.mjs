@@ -37,7 +37,7 @@ export function validateDemo(values, positionals = []) {
     "slot",
     "tailnet",
     "app-port",
-    "casdoor-port",
+    "auth-port",
     "backend-port",
   ]) {
     if (values[key] !== undefined) throw new Error(`--${key} does not apply to demo.`);

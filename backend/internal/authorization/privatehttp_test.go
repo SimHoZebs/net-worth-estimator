@@ -27,18 +27,3 @@ func TestAllowPrivateHTTPFlag(t *testing.T) {
 		}
 	}
 }
-
-func TestInsecureHTTPIssuerRequiresFlag(t *testing.T) {
-	base := Config{ClientID: "id", ClientSecret: "secret"}
-	withFlag := base
-	withFlag.Issuer = "http://192.168.1.50:8000"
-	withFlag.AllowPrivateHTTP = true
-	if _, err := New(withFlag); err != nil {
-		t.Fatalf("HTTP issuer with flag rejected: %v", err)
-	}
-	withoutFlag := base
-	withoutFlag.Issuer = "http://192.168.1.50:8000"
-	if _, err := New(withoutFlag); err == nil {
-		t.Fatal("HTTP issuer without flag accepted")
-	}
-}

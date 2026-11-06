@@ -23,7 +23,7 @@ func WriteResourceChanged(w http.ResponseWriter) {
 
 type scopeKey struct{}
 
-// Scope is set only after identity verification and Casdoor authorization.
+// Scope is set only after identity verification and Casbin authorization.
 func Scope(ctx context.Context) (authorization.Scope, bool) {
 	scope, ok := ctx.Value(scopeKey{}).(authorization.Scope)
 	return scope, ok
@@ -65,7 +65,7 @@ func IsClientErrorBeacon(r *http.Request) bool {
 	return r.Method == http.MethodPost && r.URL.Path == clientErrorsPath
 }
 
-// Action strings are user:* under the Casdoor model waypoint/user-access.
+// Action strings are user:* under the application Casbin model.
 func requestAction(r *http.Request) string {
 	// The browser error beacon writes nothing to the store. It requires
 	// only read access so anonymous and guest viewers can report errors.

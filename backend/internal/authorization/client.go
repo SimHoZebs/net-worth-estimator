@@ -1,341 +1,174 @@
 package authorization
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"database/sql"
 	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"regexp"
+	"os"
 	"strings"
-	"time"
-	"unicode/utf8"
+	"sync"
 
-	"golang.org/x/sync/singleflight"
+	"github.com/casbin/casbin/v2"
+	"github.com/casbin/casbin/v2/model"
+	_ "modernc.org/sqlite"
 )
 
-const (
-	DefaultModelID      = "waypoint/user-access"
-	DefaultAdapter      = "user-policy-store"
-	DefaultOrganization = "waypoint"
-	maxResponse         = 32 << 10
-)
+// Policies belong to the application, not the identity provider. The stable
+// actor is issuer+subject. Mutable usernames never enter policy decisions.
+const userModel = `[request_definition]
+r = sub, obj, act, owner
+[policy_definition]
+p = sub, obj, act, eft
+[role_definition]
+g = _, _
+[policy_effect]
+e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
+[matchers]
+m = g(r.sub, p.sub) && r.sub == r.owner && keyMatch(r.obj, p.obj) && r.act == p.act
+`
 
 type Config struct {
-	Issuer, InternalURL, ClientID, ClientSecret string
-	ModelID, Adapter, Organization              string
-	// AllowPrivateHTTP opts into plain-HTTP issuers. The operator owns the
-	// network boundary and must expose plain HTTP only on a trusted LAN.
-	AllowPrivateHTTP bool
+	Issuer, Path, GuestSubject string
 }
 
 type Client struct {
-	config   Config
-	endpoint string
-	client   *http.Client
-	// inFlight shares one provider call between concurrent Resolve calls
-	// for one subject. Only overlapping calls share; sequential calls
-	// always recheck, so revoked permissions still fail closed on the
-	// next request.
-	inFlight singleflight.Group
+	config Config
+	db     *sql.DB
+	mu     sync.Mutex
 }
 
-var identifier = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
-
-// validProviderName accepts Casdoor account names, which may be dotted,
-// email-style, or unicode. The model/adapter identifier regexp must not
-// apply here. Reject empty, overlong, invalid UTF-8, NUL/controls, '/'
-// (owner/name separator ambiguity), and leading/trailing whitespace.
-func validProviderName(name string) bool {
-	if name == "" || len(name) > 255 || !utf8.ValidString(name) {
-		return false
-	}
-	if strings.Contains(name, "/") || strings.ContainsRune(name, '\x00') {
-		return false
-	}
-	if strings.TrimSpace(name) != name {
-		return false
-	}
-	for _, r := range name {
-		if r < 0x20 || r == 0x7f {
-			return false
-		}
-	}
-	return true
-}
-
-// New constructs a bounded, redirect-free client. It sends no network requests.
+// New opens only an explicitly provisioned policy database. Missing or
+// incompatible state fails closed. Every decision loads fresh persisted policy.
 func New(config Config) (*Client, error) {
-	issuer, err := providerURL(config.Issuer, false)
+	if config.Issuer == "" || config.Path == "" || config.GuestSubject == "" {
+		return nil, errors.New("authorization issuer, policy database and guest subject are required")
+	}
+	if _, err := os.Stat(config.Path); err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("sqlite", config.Path+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)")
 	if err != nil {
-		return nil, fmt.Errorf("authorization issuer: %w", err)
+		return nil, err
 	}
-	if issuer.Scheme == "http" && !IsLoopbackHost(issuer.Hostname()) && !config.AllowPrivateHTTP {
-		return nil, errors.New("authorization issuer requires HTTPS outside loopback (set NET_WORTH_ESTIMATOR_ALLOW_PRIVATE_HTTP=1 to allow plain HTTP on a trusted LAN)")
+	db.SetMaxOpenConns(1)
+	c := &Client{config: config, db: db}
+	var issuer, guest string
+	if err := db.QueryRow("SELECT issuer, guest_subject FROM authorization_config WHERE id = 1").Scan(&issuer, &guest); err != nil || issuer != config.Issuer || guest != config.GuestSubject {
+		db.Close()
+		return nil, errors.New("authorization database identity does not match configuration")
 	}
-	if config.ClientID == "" || strings.Contains(config.ClientID, ":") || config.ClientSecret == "" {
-		return nil, errors.New("authorization client credentials are required; client ID cannot contain a colon")
+	if _, err := c.load(context.Background()); err != nil {
+		db.Close()
+		return nil, err
 	}
-	if config.ModelID == "" {
-		config.ModelID = DefaultModelID
+	return c, nil
+}
+
+func (c *Client) Close() error { return c.db.Close() }
+
+func (c *Client) load(ctx context.Context) (*casbin.Enforcer, error) {
+	m, err := model.NewModelFromString(userModel)
+	if err != nil {
+		return nil, err
 	}
-	parts := strings.Split(config.ModelID, "/")
-	if len(parts) != 2 || !identifier.MatchString(parts[0]) || !identifier.MatchString(parts[1]) {
-		return nil, errors.New("authorization model ID must be owner/name")
+	e, err := casbin.NewEnforcer(m)
+	if err != nil {
+		return nil, err
 	}
-	if config.Adapter == "" {
-		config.Adapter = DefaultAdapter
+	rows, err := c.db.QueryContext(ctx, "SELECT subject, object, action, effect FROM authorization_policies ORDER BY subject, object, action, effect")
+	if err != nil {
+		return nil, err
 	}
-	if !identifier.MatchString(config.Adapter) {
-		return nil, errors.New("authorization adapter must be a name without an owner prefix")
-	}
-	if config.Organization == "" {
-		config.Organization = DefaultOrganization
-	}
-	if !identifier.MatchString(config.Organization) {
-		return nil, errors.New("authorization organization must be a name without an owner prefix")
-	}
-	endpoint := *issuer
-	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + "/api/batch-enforce"
-	endpoint.RawQuery = url.Values{"modelId": {config.ModelID}}.Encode()
-	transport := http.DefaultTransport
-	if config.InternalURL != "" {
-		internal, err := providerURL(config.InternalURL, true)
-		if err != nil {
-			return nil, fmt.Errorf("authorization internal URL: %w", err)
+	for rows.Next() {
+		var sub, obj, act, effect string
+		if err := rows.Scan(&sub, &obj, &act, &effect); err != nil {
+			rows.Close()
+			return nil, err
 		}
-		transport = &privateTransport{base: transport, internal: internal, publicHost: issuer.Host}
+		if _, err := e.AddPolicy(sub, obj, act, effect); err != nil {
+			rows.Close()
+			return nil, err
+		}
 	}
-	return &Client{config: config, endpoint: endpoint.String(), client: &http.Client{
-		Transport: transport, Timeout: 10 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-	}}, nil
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	rows, err = c.db.QueryContext(ctx, "SELECT actor, role FROM authorization_subjects WHERE role IN (SELECT name FROM authorization_roles) ORDER BY actor")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var actor, role string
+		if err := rows.Scan(&actor, &role); err != nil {
+			return nil, err
+		}
+		if _, err := e.AddGroupingPolicy(actor, role); err != nil {
+			return nil, err
+		}
+	}
+	return e, rows.Err()
 }
 
-func providerURL(raw string, origin bool) (*url.URL, error) {
-	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || u.RawPath != "" {
-		return nil, errors.New("expected an HTTP/S URL without credentials, query, fragment, or encoded path")
-	}
-	if origin && u.Path != "" && u.Path != "/" {
-		return nil, errors.New("expected an origin without a path")
-	}
-	return u, nil
+func validSubject(subject string) bool {
+	return subject != "" && strings.TrimSpace(subject) == subject && !strings.ContainsAny(subject, "\x00\r\n/")
 }
 
-// Resolve checks all user actions for the caller's single server-selected
-// user. The subject must be nonempty: anonymous callers use the configured
-// guest subject. Sequential invocations always contact Casdoor (identity
-// lookup plus enforce), including denied invocations. Overlapping invocations
-// for one subject share one provider call and receive the same fresh
-// decision, so revocation still fails closed on the next sequential request.
+// Resolve receives only a verified identity (or the configured guest). First
+// access records member assignment once. An explicit none/viewer assignment
+// remains authoritative on every later login, so revocation never regrants.
 func (c *Client) Resolve(ctx context.Context, subject string) (Scope, error) {
-	if subject == "" {
-		return Scope{}, errors.New("invalid authorization request")
-	}
-	value, err, _ := c.inFlight.Do(subject, func() (any, error) {
-		return c.resolveUnshared(ctx, subject)
-	})
-	if err != nil {
-		return Scope{}, err
-	}
-	return value.(Scope), nil
-}
-
-func (c *Client) resolveUnshared(ctx context.Context, subject string) (Scope, error) {
 	resource := ResourceFor(c.config.Issuer, subject)
-	if !resource.valid() {
-		return Scope{}, errors.New("invalid authorization request")
+	if !validSubject(subject) {
+		return Scope{}, errors.New("invalid authorization subject")
 	}
-	actions := []string{Read, Project, Write}
-	providerName, err := c.lookupProviderName(ctx, subject)
-	if err != nil {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	role := "member"
+	if subject == c.config.GuestSubject {
+		role = "viewer"
+	}
+	if _, err := c.db.ExecContext(ctx, "INSERT INTO authorization_subjects(actor, role) VALUES (?, ?) ON CONFLICT(actor) DO NOTHING", ActorKey(c.config.Issuer, subject), role); err != nil {
 		return Scope{}, err
 	}
-	decisions, err := c.enforce(ctx, providerName, subject, resource, actions)
+	e, err := c.load(ctx)
 	if err != nil {
 		return Scope{}, err
 	}
 	scope := Scope{Resource: resource, Permissions: []string{}}
-	for i, allowed := range decisions {
+	for _, action := range []string{Read, Project, Write} {
+		allowed, err := e.Enforce(resource.Owner, resource.ID, action, resource.Owner)
+		if err != nil {
+			return Scope{}, err
+		}
 		if allowed {
-			scope.Permissions = append(scope.Permissions, actions[i])
+			scope.Permissions = append(scope.Permissions, action)
 		}
 	}
 	return scope, nil
 }
 
-// lookupProviderName resolves the mutable provider owner/name for a stable
-// immutable subject via an authenticated get-user call. Casdoor returns the
-// immutable UUID in data.id, the organization in data.owner, and the mutable
-// username in data.name. Verification checks data.id==subject and
-// data.owner==organization, then constructs owner/name from data.name. The
-// mutable name is used only as the request's grouping subject; storage keys
-// and the stable owner/actor fields keep using ActorKey(issuer, subject).
-// Forbidden or deleted users fail closed.
-func (c *Client) lookupProviderName(ctx context.Context, subject string) (string, error) {
-	if !utf8.ValidString(subject) || strings.ContainsRune(subject, '\x00') || subject == "" {
-		return "", errors.New("invalid authorization request")
-	}
-	base, err := url.Parse(c.config.Issuer)
-	if err != nil || base.Hostname() == "" {
-		return "", errors.New("invalid authorization request")
-	}
-	u := *base
-	u.Path = strings.TrimRight(u.Path, "/") + "/api/get-user"
-	u.RawQuery = url.Values{"owner": {c.config.Organization}, "userId": {subject}}.Encode()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return "", errors.New("cannot construct authorization request")
-	}
-	request.SetBasicAuth(c.config.ClientID, c.config.ClientSecret)
-	request.Header.Set("Accept", "application/json")
-	response, err := c.client.Do(request)
-	if err != nil {
-		return "", errors.New("authorization provider unavailable")
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return "", errors.New("authorization provider rejected request")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponse+1))
-	if err != nil || len(data) > maxResponse {
-		return "", errors.New("invalid authorization response size")
-	}
-	return decodeProviderName(data, c.config.Organization, subject)
-}
-
-func decodeProviderName(data []byte, organization, subject string) (string, error) {
-	var response struct {
-		Status string         `json:"status"`
-		Data   map[string]any `json:"data"`
-	}
-	if err := json.Unmarshal(data, &response); err != nil || response.Status != "ok" || response.Data == nil {
-		return "", errors.New("invalid authorization response")
-	}
-	owner, _ := response.Data["owner"].(string)
-	name, _ := response.Data["name"].(string)
-	id, _ := response.Data["id"].(string)
-	if owner == "" || owner != organization || id == "" || id != subject {
-		return "", errors.New("authorization provider rejected request")
-	}
-	if !validProviderName(name) {
-		return "", errors.New("authorization provider rejected request")
-	}
-	for key, value := range response.Data {
-		switch strings.ToLower(key) {
-		case "isforbidden", "forbidden", "isdeleted", "deleted":
-			if forbidden, ok := value.(bool); ok && forbidden {
-				return "", errors.New("authorization provider rejected request")
-			}
-		}
-	}
-	return owner + "/" + name, nil
-}
-
-// Check submits server-owned resource metadata without changing its owner to
-// match the caller. The generic RBAC request is
-// [provider owner/name, resource.ID, action, resource.Owner, ActorKey]:
-// grouping uses the mutable provider name resolved from the immutable
-// subject, while stable owner/actor remain ActorKey(issuer, subject).
-// Decisions are positional and remain entirely provider-owned.
 func (c *Client) Check(ctx context.Context, subject string, resource Resource, actions []string) ([]bool, error) {
-	if !utf8.ValidString(subject) || strings.ContainsRune(subject, '\x00') || subject == "" || !resource.valid() || len(actions) == 0 || len(actions) > 3 {
+	if !validSubject(subject) || !resource.valid() || len(actions) == 0 {
 		return nil, errors.New("invalid authorization request")
 	}
-	for _, action := range actions {
-		if action != Read && action != Project && action != Write {
-			return nil, errors.New("unknown user action")
-		}
-	}
-	providerName, err := c.lookupProviderName(ctx, subject)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, err := c.load(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return c.enforce(ctx, providerName, subject, resource, actions)
-}
-
-func (c *Client) enforce(ctx context.Context, providerName, subject string, resource Resource, actions []string) ([]bool, error) {
-	actor := ActorKey(c.config.Issuer, subject)
-	if actor == "" || resource.Owner == "" {
-		return nil, errors.New("invalid authorization request")
-	}
-	// Cross-owner resources are passed through: the generic model denies
-	// them via r.actor==r.owner, and the caller must never rewrite the
-	// resource owner to match.
-	requests := make([][]string, 0, len(actions))
-	for _, action := range actions {
+	decisions := make([]bool, len(actions))
+	for i, action := range actions {
 		if action != Read && action != Project && action != Write {
-			return nil, errors.New("unknown user action")
+			return nil, errors.New("unknown authorization action")
 		}
-		requests = append(requests, []string{providerName, resource.ID, action, resource.Owner, actor})
-	}
-	body, err := json.Marshal(requests)
-	if err != nil {
-		return nil, err
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, errors.New("cannot construct authorization request")
-	}
-	request.SetBasicAuth(c.config.ClientID, c.config.ClientSecret)
-	request.Header.Set("Content-Type", "application/json")
-	response, err := c.client.Do(request)
-	if err != nil {
-		return nil, errors.New("authorization provider unavailable")
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return nil, errors.New("authorization provider rejected request")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponse+1))
-	if err != nil || len(data) > maxResponse {
-		return nil, errors.New("invalid authorization response size")
-	}
-	return decodeDecisions(data, len(actions), c.config.ModelID+"/"+c.config.Adapter)
-}
-
-func decodeDecisions(data []byte, count int, expectedGroup string) ([]bool, error) {
-	var response struct {
-		Status string    `json:"status"`
-		Data   [][]*bool `json:"data"`
-		Groups []string  `json:"data2"`
-	}
-	// Pointer booleans reject JSON null instead of treating it as a valid deny.
-	if err := json.Unmarshal(data, &response); err != nil || response.Status != "ok" || response.Data == nil || response.Groups == nil {
-		return nil, errors.New("invalid authorization response")
-	}
-	if len(response.Data) == 0 && len(response.Groups) == 0 {
-		return make([]bool, count), nil
-	}
-	// Seeded permissions share one model/adapter. Never OR independent groups:
-	// a second group's allow could otherwise bypass a deny in the first group.
-	if len(response.Data) != 1 || len(response.Groups) != 1 || response.Groups[0] != expectedGroup || len(response.Data[0]) != count {
-		return nil, errors.New("unexpected authorization result group")
-	}
-	decisions := make([]bool, count)
-	for i, decision := range response.Data[0] {
-		if decision == nil {
-			return nil, errors.New("invalid authorization decision")
+		decisions[i], err = e.Enforce(ActorKey(c.config.Issuer, subject), resource.ID, action, resource.Owner)
+		if err != nil {
+			return nil, err
 		}
-		decisions[i] = *decision
 	}
 	return decisions, nil
-}
-
-type privateTransport struct {
-	base       http.RoundTripper
-	internal   *url.URL
-	publicHost string
-}
-
-func (t *privateTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	clone := request.Clone(request.Context())
-	u := *request.URL
-	u.Scheme, u.Host = t.internal.Scheme, t.internal.Host
-	clone.URL, clone.Host = &u, t.publicHost
-	return t.base.RoundTrip(clone)
 }

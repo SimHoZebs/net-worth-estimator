@@ -1,31 +1,28 @@
-# Daily use: docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait
-# Slots: docker compose --env-file .env.dev.<slot> -f docker-compose.dev.yml up -d --build --wait
-# The slot env file sets DEV_PROJECT and DEV_SLOT_STATE_DIR plus free loopback ports.
+# Daily use: docker compose --env-file .env.dev.<slot> -f docker-compose.dev.yml up -d --build --wait
 name: ${DEV_PROJECT:-waypoint-dev}
-
 services:
-  casdoor:
-    image: casbin/casdoor:v4.23.0@sha256:e13c9aada231f7338a03ab0ae7054d0a9480e77283338ab9fc319d88fe2b3ce0
+  auth:
+    image: waypoint-dev-auth
+    build:
+      context: .
+      dockerfile: auth/better-auth/Dockerfile
     user: "${DEV_UID:?Run scripts/dev setup}:${DEV_GID:?Run scripts/dev setup}"
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${DEV_CASDOOR_PORT:-8000}:8000"
+      - "127.0.0.1:${DEV_AUTH_PORT:-8000}:8000"
     volumes:
-      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/casdoor/conf:/conf:ro
-      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/casdoor/db:/data
-      # Casdoor stores its file sessions in ./tmp.
-      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/casdoor/sessions:/tmp
+      - ${DEV_SLOT_STATE_DIR:-./tmp/dev}/auth:/data
+    environment:
+      AUTH_DATABASE: /data/identity.db
+      AUTH_PUBLIC_URL: ${DEV_AUTH_PUBLIC_URL:?Run scripts/dev setup}
+      APP_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
+      BETTER_AUTH_SECRET: ${DEV_BETTER_AUTH_SECRET:?Run scripts/dev setup}
+      AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run scripts/dev setup}
+      AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run scripts/dev setup}
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
-      interval: 5s
-      timeout: 3s
-      start_period: 30s
-      retries: 12
-
   backend:
     image: waypoint-dev-backend
     build:
@@ -40,27 +37,24 @@ services:
       HOST: 0.0.0.0
       PORT: 8787
       NET_WORTH_ESTIMATOR_DB: /data/net-worth-estimator.db
+      NET_WORTH_ESTIMATOR_AUTHZ_DB: /data/authorization.db
       NET_WORTH_ESTIMATOR_RECEIPT_SOURCE: mock
       NET_WORTH_ESTIMATOR_ALLOWED_ORIGINS: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
-      NET_WORTH_ESTIMATOR_AUTH_PROVIDER: casdoor
-      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${DEV_CASDOOR_PUBLIC_URL:?Run scripts/dev setup}
-      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://casdoor:8000
+      NET_WORTH_ESTIMATOR_AUTH_PROVIDER: better-auth
+      NET_WORTH_ESTIMATOR_AUTH_ISSUER: ${DEV_AUTH_PUBLIC_URL:?Run scripts/dev setup}
+      NET_WORTH_ESTIMATOR_AUTH_INTERNAL_URL: http://auth:8000
       NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID: ${DEV_AUTH_CLIENT_ID:?Run scripts/dev setup}
       NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET: ${DEV_AUTH_CLIENT_SECRET:?Run scripts/dev setup}
       NET_WORTH_ESTIMATOR_PUBLIC_URL: ${DEV_APP_PUBLIC_URL:?Run scripts/dev setup}
-      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${DEV_CASDOOR_PUBLIC_URL:?Run scripts/dev setup}/account
+      NET_WORTH_ESTIMATOR_AUTH_ACCOUNT_URL: ${DEV_AUTH_PUBLIC_URL:?Run scripts/dev setup}/account
       NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME: 168h
       NET_WORTH_ESTIMATOR_AUTH_RECHECK_INTERVAL: 30s
-      NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL: waypoint/user-access
-      # Optional development-only admin observation branch; disabled when empty.
       NET_WORTH_ESTIMATOR_ADMIN_SUBJECT: ${DEV_ADMIN_SUBJECT:-}
-      # Anonymous traffic resolves to this provisioned guest subject (bootstrap.guest_subject).
-      NET_WORTH_ESTIMATOR_GUEST_SUBJECT: ${DEV_GUEST_SUBJECT:-}
+      NET_WORTH_ESTIMATOR_GUEST_SUBJECT: ${DEV_GUEST_SUBJECT:?Run scripts/dev setup}
       NET_WORTH_ESTIMATOR_READ_ONLY: ""
     depends_on:
-      casdoor:
+      auth:
         condition: service_healthy
-
   frontend:
     image: waypoint-dev-frontend
     build:

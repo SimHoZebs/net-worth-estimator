@@ -11,11 +11,11 @@ Set these variables in Vercel's Environment Variables settings:
 | `BACKEND_URL` | `https://your-api.onrender.com` |
 | `NET_WORTH_ESTIMATOR_PUBLIC_URL` | `https://app.example.com` |
 | `NET_WORTH_ESTIMATOR_PROXY_SECRET` | The same private secret as the API |
-| `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | The Casdoor issuer origin |
+| `NET_WORTH_ESTIMATOR_AUTH_ISSUER` | The canonical Better Auth issuer origin |
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_ID` | The registered application client ID |
 | `NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET` | The registered application client secret |
 | `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` | The provisioned guest OIDC subject (anonymous traffic resolves to it) |
-| `NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION` | Optional; defaults to `waypoint` |
+| `NET_WORTH_ESTIMATOR_AUTHZ_DB` | Private provisioned Casbin policy database path |
 
 Both URLs must be HTTPS origins without paths or credentials. Configuration
 fails on missing settings or unsafe secrets.
@@ -26,7 +26,7 @@ Only the configured frontend hostname matches the API proxy route. Alternate
 Vercel hostnames serve static files but do not proxy API requests. Give previews
 their own exact hostname, isolated backend, identity client, database, and secret.
 Never give untrusted preview code production access. Register each callback and
-post-logout URL in Casdoor explicitly.
+post-logout URL during Better Auth provisioning explicitly.
 
 Static files retain normal static-host behavior. Pages are real routes
 served through an SPA catch-all rewrite to `index.html`; in-page interactions

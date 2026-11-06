@@ -12,11 +12,11 @@ The same image works on any host that meets the runtime contract. On Render:
 | Normal Docker Command | Leave empty to use `/app/server` |
 
 Set `HOST=0.0.0.0`, the provider's `PORT`, and
-`NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`. Supply Casdoor settings
+`NET_WORTH_ESTIMATOR_DB=/data/net-worth-estimator.db`. Supply Better Auth settings
 from [the authentication guide](../docs/authentication.md). Set
 `NET_WORTH_ESTIMATOR_PUBLIC_URL` to the frontend origin, not the API hostname.
 For Vercel, also set the shared `NET_WORTH_ESTIMATOR_PROXY_SECRET`. Keep identity
-and database credentials only on the API. Casdoor needs browser and API access.
+and database credentials only on their owning service. Better Auth needs browser and API access.
 
 The image runs as UID/GID `10001`. Its data mount must support that identity.
 If permissions differ, ask the platform administrator to prepare disk ownership.
@@ -56,7 +56,8 @@ Repeat setup preserves existing database and user rows:
 
 Hosts configured to use `/app/api-boot.sh` run schema setup only before
 the server. That wrapper never provisions guest or other user workspaces.
-Casdoor's initial deployment seed still creates the guest identity.
+Explicit Better Auth setup creates the guest identity. Explicit Casbin setup
+creates the viewer assignment in `NET_WORTH_ESTIMATOR_AUTHZ_DB`.
 
 For existing data, restore a verified current-schema SQLite-safe backup or run a
 separate one-time operator upgrade. `setupdb` only validates an existing schema,

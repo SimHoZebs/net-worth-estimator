@@ -16,10 +16,10 @@ import (
 type Config struct {
 	Provider, Issuer, InternalURL, ClientID, ClientSecret string
 	PublicURL, AccountURL                                 string
-	// GuestSubject is the normal immutable Casdoor subject used for anonymous
+	// GuestSubject is the normal immutable provider subject used for anonymous
 	// requests. It is an ordinary preprovisioned account with the same
-	// users/<64hex> data path; grants are assigned at creation by Casdoor
-	// groups. It must be configured; there is no literal fallback.
+	// users/<64hex> data path. Casbin owns its persistent assignment.
+	// It must be configured; there is no literal fallback.
 	GuestSubject string
 	// Store is the application-owned identity storage. The composition root
 	// provides the adapter.
@@ -41,7 +41,7 @@ type Config struct {
 	// operator owns the network boundary and must expose plain HTTP only on
 	// a trusted LAN.
 	AllowPrivateHTTP bool
-	// BrowserOrigins maps additional app origins to browser-facing Casdoor origins.
+	// BrowserOrigins maps additional app origins to browser-facing provider origins.
 	// Issuer and InternalURL remain the server-side identity and transport boundary.
 	BrowserOrigins map[string]string
 }
@@ -62,10 +62,10 @@ func FromEnv(getenv func(string) string) (Config, error) {
 		AllowPrivateHTTP:      authorization.AllowPrivateHTTP(getenv),
 	}
 	if c.Provider == "" {
-		c.Provider = "casdoor"
+		c.Provider = "better-auth"
 	}
-	if c.Provider != "casdoor" {
-		return c, fmt.Errorf("AUTH_PROVIDER must be casdoor")
+	if c.Provider != "better-auth" {
+		return c, fmt.Errorf("AUTH_PROVIDER must be better-auth")
 	}
 	if v := getenv("NET_WORTH_ESTIMATOR_AUTH_SESSION_LIFETIME"); v != "" {
 		d, err := time.ParseDuration(v)
@@ -119,7 +119,7 @@ func FromEnv(getenv func(string) string) (Config, error) {
 	}
 	if raw := getenv("NET_WORTH_ESTIMATOR_AUTH_BROWSER_ORIGINS"); raw != "" {
 		if err := json.Unmarshal([]byte(raw), &c.BrowserOrigins); err != nil || c.BrowserOrigins == nil {
-			return c, fmt.Errorf("AUTH_BROWSER_ORIGINS must be a JSON object mapping app origins to Casdoor origins")
+			return c, fmt.Errorf("AUTH_BROWSER_ORIGINS must be a JSON object mapping app origins to provider origins")
 		}
 	}
 	if _, err := browserEndpoints(c); err != nil {

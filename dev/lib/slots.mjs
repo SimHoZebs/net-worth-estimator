@@ -48,7 +48,7 @@ export async function writeOwner(stateDir, owner) {
 }
 
 export async function usedSlotPorts(excludeSlot = "") {
-  const used = new Set([defaultPorts.app, defaultPorts.casdoor, defaultPorts.backend]);
+  const used = new Set([defaultPorts.app, defaultPorts.auth, defaultPorts.backend]);
   let tmpEntries = [];
   try {
     tmpEntries = await readdir(resolve(root, "tmp"));
@@ -69,7 +69,7 @@ export async function usedSlotPorts(excludeSlot = "") {
     if (slotName === sanitizeSlot(excludeSlot)) continue;
     const owner = await readOwner(resolve(root, `tmp/${name}`));
     if (!owner) continue;
-    for (const url of [owner.appUrl, owner.casdoorUrl]) {
+    for (const url of [owner.appUrl, owner.authUrl]) {
       if (typeof url !== "string") continue;
       try {
         const port = Number(new URL(url).port);

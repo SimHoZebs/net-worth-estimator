@@ -9,9 +9,9 @@ import (
 	"strings"
 )
 
-// deviceGrantType is the RFC 8628 grant this server enables on its Casdoor
+// deviceGrantType is the RFC 8628 grant this server enables on its Better Auth
 // application. The client secret never leaves the server: CLIs talk only to
-// these endpoints, and the server performs every Casdoor exchange.
+// these endpoints, and the server performs every provider exchange.
 const deviceGrantType = "urn:ietf:params:oauth:grant-type:device_code"
 
 // deviceScopes requests a verifiable identity plus a refresh token. The

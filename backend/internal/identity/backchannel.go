@@ -28,7 +28,7 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 		failure(w, 400, "Invalid logout notification.")
 		return
 	}
-	// OIDC logout tokens require iat, not exp. Casdoor omits exp. The OIDC
+	// OIDC logout tokens require iat, not exp. The OIDC
 	// library verifies signature, issuer, and audience. Bound iat and any
 	// supplied exp separately, without weakening normal ID-token verification.
 	identity, err := s.provider.Verifier(&oidc.Config{ClientID: s.config.ClientID, SkipExpiryCheck: true}).Verify(

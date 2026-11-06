@@ -11,7 +11,7 @@ export function nodeHostname(status) {
 }
 
 export function checkServe(config, nodeStatus, serveStatus) {
-  const host = originProfile(config.identity.APP_PUBLIC_URL, config.identity.CASDOOR_PUBLIC_URL);
+  const host = originProfile(config.identity.APP_PUBLIC_URL, config.identity.AUTH_PUBLIC_URL);
   if (!host) return;
   if (host !== nodeHostname(nodeStatus))
     throw new Error("Saved dev origins belong to a different Tailscale node");

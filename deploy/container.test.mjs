@@ -28,6 +28,7 @@ JSON
 busybox-extras httpd -p 18000 -h /tmp/provider
 /app/setupdb --db /tmp/explicit-setup.db
 /app/setupdb --db /tmp/explicit-setup.db
+/app/authzctl --setup --db "$NET_WORTH_ESTIMATOR_AUTHZ_DB" --issuer "$NET_WORTH_ESTIMATOR_AUTH_ISSUER" --guest "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
 test ! -f "$NET_WORTH_ESTIMATOR_DB"
 exec /app/api-boot.sh
 `;
@@ -39,6 +40,7 @@ exec /app/api-boot.sh
     "--env", "NET_WORTH_ESTIMATOR_AUTH_CLIENT_SECRET=fixture-secret",
     "--env", "NET_WORTH_ESTIMATOR_PUBLIC_URL=http://localhost:8080",
     "--env", "NET_WORTH_ESTIMATOR_GUEST_SUBJECT=disposable-guest",
+    "--env", "NET_WORTH_ESTIMATOR_AUTHZ_DB=/tmp/authorization.db",
     "--env", "NET_WORTH_ESTIMATOR_PROXY_SECRET=0123456789abcdef0123456789abcdef",
     image, "/bin/sh", "-c", fixture,
   ]);

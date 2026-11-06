@@ -235,7 +235,7 @@ func TestBackchannelScopeReplayAndPersistence(t *testing.T) {
 				delete(claims, "sub")
 				claims["sid"] = p.sid
 			} else {
-				// Casdoor includes a sid in logout but omits it from its ID token.
+				// A provider may include sid in logout but omit it from its ID token.
 				claims["sid"] = "unknown-provider-session"
 			}
 			raw := logoutToken(t, p, claims)

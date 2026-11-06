@@ -1,125 +1,93 @@
-# Authentication with Casdoor
+# Authentication and authorization
 
-Casdoor owns passwords, passkeys, and local SQLite identities. The Go API owns
-OpenID Connect (OIDC) verification, persistent application sessions, and user-scoped financial model access.
+Waypoint uses Better Auth on Bun for authentication and embedded Go Casbin for
+authorization. No Casdoor runtime, SDK, permission endpoint, or admin UI remains.
 
-## Start the split stack
+Better Auth owns passwords, passkeys, OAuth grants, and provider sessions. The Go
+API verifies OIDC and maintains durable application sessions. Casbin evaluates
+user-resource policies from the separate application-owned authorization database.
+Financial ownership still derives from the exact issuer and immutable subject.
 
-Follow [the Casdoor initializer](casdoor/README.md) to create a private environment
-file and initialize one normal user. Select the final public hostnames before
-passkey enrollment. Use `APP_PUBLIC_URL=http://localhost:8080` for local Compose.
-Set `CASDOOR_BACKCHANNEL_LOGOUT_URL=http://backend:8787/v1/auth/backchannel-logout`
-for signed logout notifications through the private container network.
+## Fresh installation
 
-Run these commands from the repository root after initialization:
+Use Bun 1.4.4 and install dependencies from the repository root:
 
 ```bash
-docker compose --env-file auth/casdoor/.env \
-  -f auth/casdoor/compose.yml -p waypoint-casdoor down
-export CASDOOR_STATE_DIR="$PWD/auth/casdoor/data"
-export COMPOSE_FILE="docker-compose.yml:auth/compose.casdoor.yml"
-export NET_WORTH_ESTIMATOR_GUEST_SUBJECT="$(
-  node --input-type=module -e \
-    'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).guest_subject)'
-)"
-docker compose --env-file auth/casdoor/.env build backend
-# Provision the guest destination row before the API serves anonymous traffic.
-# setupdb is idempotent: repeat runs preserve the existing database and user rows.
-docker compose --env-file auth/casdoor/.env run --rm --no-deps \
-  --entrypoint /app/setupdb backend --db /data/net-worth-estimator.db
-docker compose --env-file auth/casdoor/.env run --rm --no-deps \
-  --entrypoint /app/setupdb backend --db /data/net-worth-estimator.db \
-  --issuer "$(node --input-type=module -e 'import {readFileSync} from "node:fs"; process.stdout.write(JSON.parse(readFileSync(process.env.CASDOOR_STATE_DIR + "/bootstrap.json", "utf8")).issuer)')" \
-  --subject "$NET_WORTH_ESTIMATOR_GUEST_SUBJECT"
-docker compose --env-file auth/casdoor/.env up -d --build
+bun install --frozen-lockfile
 ```
 
-If initialization uses another project or state directory, use those same values.
-Never run two Casdoor processes against one SQLite directory. Keep the verified
-primary-data owner in private deployment configuration. Both dev and production require Casdoor;
-the server rejects token-only and unauthenticated configurations.
+Set private environment values. Generate distinct random secrets of at least
+32 characters for `BETTER_AUTH_SECRET` and `AUTH_CLIENT_SECRET`.
 
-`setupdb` is an explicit deployment step.
-The API never creates or repairs its application database. Repeat setup preserves current data.
+```text
+AUTH_PUBLIC_URL=https://identity.example.com
+APP_PUBLIC_URL=https://app.example.com
+AUTH_DATABASE=/private/identity.db
+BETTER_AUTH_SECRET=<private-random-secret>
+AUTH_CLIENT_ID=waypoint
+AUTH_CLIENT_SECRET=<different-private-random-secret>
+AUTH_USER_NAME=owner
+AUTH_USER_PASSWORD=<private-owner-password>
+```
 
-The overlay routes server requests to `http://casdoor:8000` while preserving the
-public issuer and Host. The browser uses the public Casdoor URL. The frontend and
-API must share one public browser origin, but their hosts can differ. See
-[host-portable deployment](../deploy/README.md) for independent providers.
-Set `FRONTEND_PORT` to match `APP_PUBLIC_URL` for Compose.
+`AUTH_DATABASE` also accepts a PostgreSQL connection URI. Use a fresh database or
+an isolated, explicitly created schema selected through PostgreSQL `search_path`.
+Never reuse the old identity tables. Set `AUTH_BOOTSTRAP_FILE` to a private output
+path for PostgreSQL provisioning. Preserve the auth secret across restarts because
+it protects signing keys and cookies.
 
-The base stack retains the existing `net-worth-estimator-data` financial volume.
-A different project name alone does **not** isolate that explicitly named volume.
-Override its name or use a separate bind mount for disposable tests.
+```bash
+bun run auth/better-auth/src/setup.ts
+```
 
-## Session and access contract
+The bootstrap file contains the verified owner and guest subjects. Provision the
+application and policy databases before startup:
 
-- Anonymous visitors use a provisioned user with viewer permissions assigned at creation.
-- Each verified user automatically owns its own private data. Signup has no
-  role choice or subject-grant step. Existing primary data needs an explicit owner.
-- Casdoor's built-in Casbin API checks roles, actions, and user resources.
-- Normal signup assigns member-group access. The guest receives viewer-group access. The API uses one enforcement path for both.
-- One application SQLite database holds all users' financial data and application sessions.
-- User data, artifacts, and sync state remain user-scoped. Unsubmitted fields stay in their forms.
-- Provider administrator status never grants access to another user's data.
-- Application sessions persist across browser and API restarts, with a seven-day
-  absolute limit by default. Managed refresh grants renew short-lived tokens.
-- Signed back-channel logout deletes application grants. Token introspection
-  checks administrator revocation on the next request after 30 seconds by default.
-- Provider outages fail closed with 503 when a check is due. A later retry can
-  recover without a new login if the grant remains active.
+```bash
+go -C backend run ./cmd/setupdb --db /private/application.db
+go -C backend run ./cmd/setupdb --db /private/application.db --issuer "$AUTH_PUBLIC_URL" --subject "$GUEST_SUBJECT"
+go -C backend run ./cmd/authzctl --setup --db /private/authorization.db --issuer "$AUTH_PUBLIC_URL" --guest "$GUEST_SUBJECT"
+```
 
-See [the authentication contract](../docs/authentication.md) for configuration,
-revocation bounds, recovery, backups, and current scope.
+Configure the Go API with the same issuer/client credentials, its public app URL,
+`NET_WORTH_ESTIMATOR_GUEST_SUBJECT`, and `NET_WORTH_ESTIMATOR_AUTHZ_DB`.
+`NET_WORTH_ESTIMATOR_AUTH_PROVIDER` is `better-auth`. An optional internal URL
+changes transport only, never the verified issuer.
 
-## Normal local development
+Public identity and application callbacks require HTTPS except on loopback.
+The OAuth 2.1 provider does not permit plain-HTTP LAN callback addresses. Use
+the existing HTTPS tailnet routes instead. Internal container transport can use HTTP.
 
-Run `./scripts/dev setup` once, then use
-`docker compose --env-file .env.dev -f docker-compose.dev.yml up -d --build --wait`.
-The dedicated dev stack uses the production Dockerfiles, pinned Casdoor image, and
-private-network OIDC routing. `.env.dev` and `tmp/dev/` retain private settings and
-data. Compose `down` retains them. `./scripts/dev refresh-db` replaces only financial
-data from a safe production snapshot. See [the dev guide](../dev/README.md).
+For a public Northflank identity port, set
+`AUTH_CLIENT_IP_HEADER=x-envoy-external-address`. Northflank replaces that header
+with the connecting client's address. Enable this only where every public request
+uses that ingress. Internal and VPC paths do not provide that guarantee.
+Direct deployments leave the setting unset and use Bun's socket address. Never
+trust browser-supplied `X-Forwarded-For` or an unverified client-IP header.
 
-Automated tests below use isolated data because they reset passwords, revoke
-sessions, and change client settings. They do not replace the normal dev setup.
+Build the provider browser bundle, then start Bun:
+
+```bash
+bun build auth/better-auth/src/client.ts --target browser --outfile auth/better-auth/public/client.js --minify
+bun run auth/better-auth/src/server.ts
+```
+
+For Compose, merge `docker-compose.yml` and `auth/compose.auth.yml`. Set
+`AUTH_STATE_DIR` to the private identity directory. Neither server creates or
+repairs its schema. Use `scripts/dev setup --slot NAME` for isolated development.
+
+## Existing installations
+
+Follow the [one-time cutover](better-auth/one-time/README.md). It preserves the
+issuer and every immutable subject. It imports bcrypt credentials and reviewed
+effective permissions. Old sessions end. Users enroll fresh passkeys.
 
 ## Verification
 
 ```bash
-node --test auth/casdoor/*.test.mjs
-node --env-file=auth/casdoor/.env auth/casdoor/smoke.mjs
+bun --filter @waypoint/auth typecheck
+bun --filter @waypoint/auth test
+CGO_ENABLED=0 go -C backend test ./internal/authorization ./internal/identity ./cmd/server
+node --test dev/*.test.mjs
+E2E_TEST_MUTATIONS=1 scripts/test --e2e
 ```
-
-Use disposable identity state for browser tests. The smoke test adds a virtual
-passkey and verifies real Casdoor UI login, OIDC claims, remembered sessions,
-logout, and PKCE rejection. Set `CASDOOR_RESTART_CONTAINER` to the explicit test
-container name to verify restart persistence. The smoke test owns an unused
-loopback HTTP application callback port. Stop the app before that test.
-
-For the Go/browser contract, register an unused loopback application port in
-`APP_PUBLIC_URL`. Leave that port free. Build the frontend, set the backend OIDC
-environment from the contract, then supply:
-
-```text
-AUTH_TEST_SUBJECT=<subject from private bootstrap.json>
-AUTH_TEST_GUEST_SUBJECT=<guest_subject from private bootstrap.json>
-AUTH_TEST_USERNAME=<CASDOOR_USER_NAME>
-AUTH_TEST_PASSWORD=<CASDOOR_USER_PASSWORD>
-```
-
-```bash
-node auth/test-integration.mjs
-```
-
-The script requires `CASDOOR_TEST_MUTATIONS=1` and a marked disposable identity
-fixture. It owns one temporary database with owner, provisioned-guest, and
-second-user scopes. It verifies the UUID profile lookup, signup default-group
-access, member-write and viewer-write-denied permissions, CSRF, restart
-persistence, projections, cross-user isolation, logout, and captured-cookie
-rejection. It refuses an occupied application port. Retained browser profiles contain credentials.
-
-Physical phone passkeys and security keys require the manual checklist in the
-contract. A virtual authenticator does not verify physical-device behavior.
-For administrator revocation, token refresh, recovery, and private-network
-signed logout, use [the disposable lifecycle stack](casdoor/README.md#revocation-and-recovery-integration).

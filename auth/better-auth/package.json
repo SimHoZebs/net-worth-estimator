@@ -1,0 +1,23 @@
+{
+  "name": "@waypoint/auth",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "setup": "bun run src/setup.ts",
+    "typecheck": "bun check -p tsconfig.json",
+    "lint": "../../frontend/node_modules/.bin/oxlint src one-time && ../../frontend/node_modules/.bin/oxfmt --check src one-time public/auth.css",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@better-auth/oauth-provider": "1.7.18",
+    "@better-auth/passkey": "1.7.18",
+    "better-auth": "1.7.18",
+    "pg": "8.16.3",
+    "webauthn-polyfills": "0.1.7"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.11",
+    "@types/pg": "8.15.6"
+  }
+}

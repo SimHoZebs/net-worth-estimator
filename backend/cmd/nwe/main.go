@@ -1,5 +1,5 @@
 // Command nwe is the user CLI for the net-worth-estimator API. Sign-in runs
-// an RFC 8628 device flow against the server's Casdoor application: the
+// an RFC 8628 device flow against the server's Better Auth application: the
 // CLI never sees a password or the application secret. Cached credentials
 // live owner-only on disk and refresh without browser interaction.
 package main

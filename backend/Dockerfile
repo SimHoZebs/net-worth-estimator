@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/ \
-    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel ./cmd/syncaudit
+    ./cmd/server ./cmd/setupdb ./cmd/importcsv ./cmd/refreshmodel ./cmd/syncaudit ./cmd/authzctl
 
 # Independent one-time operator tools. Neither server nor setupdb imports them.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
@@ -21,6 +21,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/simplefin-v2-keys ./scripts/one-time/simplefin-v2-keys
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
     -o /out/upgrade-transaction-rename ./scripts/one-time/transaction-rename
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/import-casdoor-authz ./scripts/one-time/casdoor-authz
 
 FROM alpine:3.22
 

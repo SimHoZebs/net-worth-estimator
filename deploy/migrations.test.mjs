@@ -748,7 +748,7 @@ test("shared hook stays shell plus setupdb/sqlite3 and outside server startup", 
 
 test("Northflank deploys pinned images and gates API startup on the shared script", async () => {
   const workflow = await readJSON("./northflank/release.json");
-  assert.deepEqual(workflow.arguments, { RELEASE_SHA: "", API_IMAGE: "", IDENTITY_IMAGE: "" });
+  assert.deepEqual(workflow.arguments, { RELEASE_SHA: "", API_IMAGE: "", IDENTITY_IMAGE: "", IDENTITY_SERVICE_ID: "", IDENTITY_DATABASE_ADDON_ID: "" });
   assert.equal(workflow.options.concurrencyPolicy, "queue");
   assert.equal(workflow.options.autorun, false);
   assert.equal(workflow.spec.spec.type, "sequential");
@@ -769,7 +769,7 @@ test("Northflank deploys pinned images and gates API startup on the shared scrip
   assert.match(maintenance, /-h \/tmp\/waypoint-maintenance/);
   assert.doesNotMatch(maintenance, /\/app\/server|\/data/);
   for (const [step, image, target] of [
-    [deployIdentity, "IDENTITY_IMAGE", "nwe-casdoor"],
+    [deployIdentity, "IDENTITY_IMAGE", "${args.IDENTITY_SERVICE_ID}"],
     [deployApi, "API_IMAGE", "nwe-api"],
   ]) {
     assert.equal(step.kind, "Release");
@@ -796,6 +796,7 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   assert.match(workflow, /types: \[completed\]/);
   assert.match(workflow, /branches: \[main\]/);
   assert.match(workflow, /actions: read/);
+  assert.match(workflow, /vars\.AUTH_CUTOVER_READY == 'true'/);
   assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
   assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
@@ -814,7 +815,8 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   const releaseSource = blocks.find((block) => block.includes("RELEASE_WEBHOOK"));
   const executeGate = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", gateSource);
   const executeWait = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", waitSource);
-  const executeRelease = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", releaseSource);
+  const executeReleaseSource = new (Object.getPrototypeOf(async function () {}).constructor)("process", "fetch", "console", releaseSource);
+  const executeRelease = (process, fetch, console) => executeReleaseSource({ ...process, env: { IDENTITY_SERVICE_ID: "prepared-identity", IDENTITY_DATABASE_ADDON_ID: "prepared-identity-db", ...process.env } }, fetch, console);
   const sha = "a".repeat(40);
   const webhook = "https://webhooks.northflank.com/workflows/private-fixture";
   const fakeProcess = (env) => ({ env, exit: (code) => { throw new Error(`exit:${code}`); } });
@@ -896,7 +898,8 @@ test("Northflank release waits for a green main Tests run and rejects unsafe cal
   await executeRelease({ env: { RELEASE_SHA: sha, GITHUB_REPOSITORY: "Owner/Repo", RELEASE_WEBHOOK: webhook } }, fetch, { log() {} });
   assert.equal(request.url.searchParams.get("RELEASE_SHA"), sha);
   assert.equal(request.url.searchParams.get("API_IMAGE"), `ghcr.io/owner/repo-backend:sha-${sha}`);
-  assert.equal(request.url.searchParams.get("IDENTITY_IMAGE"), `ghcr.io/owner/repo-casdoor:sha-${sha}`);
+  assert.equal(request.url.searchParams.get("IDENTITY_IMAGE"), `ghcr.io/owner/repo-auth:sha-${sha}`);
+  assert.equal(request.url.searchParams.get("IDENTITY_SERVICE_ID"), "prepared-identity");
   assert.equal(request.options.redirect, "error");
 
   for (const badWebhook of ["", "https://attacker.invalid/workflows/private", "https://webhooks.northflank.com/workflows/private?override=1"]) {

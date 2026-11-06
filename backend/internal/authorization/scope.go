@@ -1,13 +1,11 @@
-// Package authorization obtains user permissions from Casdoor's built-in Casbin API.
-// It never evaluates or caches authorization policies in the application process.
+// Package authorization evaluates application-owned policies with Go Casbin.
+// Each decision reads persisted policy without a positive decision cache.
 //
 // User scope: a verified identity owns one user resource. The resource ID
 // derives from the exact OIDC issuer and immutable subject, not the display
-// name, username, or browser input. Action strings are user:* under the
-// Casdoor model waypoint/user-access; permission resource values are
+// name, username, or browser input. Action strings are user:*; resource values are
 // users/<64hex>. Every identity, including the preprovisioned guest, uses
-// the same users/<64hex> data path; grants are assigned at creation by
-// Casdoor groups and enforced at request time.
+// the same users/<64hex> data path. Persistent assignments are enforced at request time.
 package authorization
 
 import (
@@ -42,7 +40,7 @@ func (s Scope) Allows(action string) bool {
 }
 
 // ActorKey uses the exact verified OIDC issuer and immutable subject, not a
-// display name or a Casdoor username. An empty subject fails closed with an
+// display name or a mutable username. An empty subject fails closed with an
 // empty key; callers must supply the configured guest subject for anonymous
 // requests instead of relying on a literal fallback.
 func ActorKey(issuer, subject string) string {

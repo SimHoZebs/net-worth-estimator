@@ -21,29 +21,22 @@ import (
 )
 
 type resourceConfig struct {
-	ModelID, Organization string
+	PolicyDB string
 }
 
 func resourceConfigFromEnv(getenv func(string) string) (resourceConfig, error) {
 	c := resourceConfig{
-		ModelID:      getenv("NET_WORTH_ESTIMATOR_AUTH_PERMISSION_MODEL"),
-		Organization: getenv("NET_WORTH_ESTIMATOR_AUTH_ORGANIZATION"),
+		PolicyDB: getenv("NET_WORTH_ESTIMATOR_AUTHZ_DB"),
 	}
-	if c.Organization == "" {
-		c.Organization = authorization.DefaultOrganization
-	}
-	if !orgName.MatchString(c.Organization) {
-		return c, errors.New("AUTH_ORGANIZATION must be a name without an owner prefix")
+	if c.PolicyDB == "" {
+		return c, errors.New("AUTHZ_DB is required")
 	}
 	return c, nil
 }
 
 func resourceHandler(ctx context.Context, database *sqlite.Database, config resourceConfig, loginConfig identity.Config, apiConfig api.Config, syncMgr *syncManager) (http.Handler, func() error, error) {
 	permissions, err := authorization.New(authorization.Config{
-		Issuer: loginConfig.Issuer, InternalURL: loginConfig.InternalURL,
-		ClientID: loginConfig.ClientID, ClientSecret: loginConfig.ClientSecret, ModelID: config.ModelID,
-		Organization:     config.Organization,
-		AllowPrivateHTTP: loginConfig.AllowPrivateHTTP,
+		Issuer: loginConfig.Issuer, Path: config.PolicyDB, GuestSubject: loginConfig.GuestSubject,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -55,6 +48,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		API:  apiConfig,
 	})
 	if err != nil {
+		permissions.Close()
 		return nil, nil, err
 	}
 	loginConfig.Store = database
@@ -62,6 +56,8 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	loginConfig.RequireResourceHeader = true
 	admin, err := adminImpersonator(database, permissions.Check, os.Getenv)
 	if err != nil {
+		permissions.Close()
+		router.Close()
 		return nil, nil, err
 	}
 	if admin != nil {
@@ -70,6 +66,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 	login, err := identity.New(ctx, loginConfig)
 	if err != nil {
 		router.Close()
+		permissions.Close()
 		return nil, nil, err
 	}
 	// Social routes carry the same own-user permission checks and resource
@@ -121,10 +118,10 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 		}
 		router.ServeHTTP(w, r)
 	})
-	return login.Wrap(combined), func() error { return errors.Join(login.Close(), router.Close()) }, nil
+	return login.Wrap(combined), func() error { return errors.Join(login.Close(), router.Close(), permissions.Close()) }, nil
 }
 
-// The subject comes only from a verified identity grant. Casdoor must authorize
+// The subject comes only from a verified identity grant. Casbin must authorize
 // the derived resource before this boundary provisions any private state.
 //
 // Depends on user scope: the store keys financial rows by user ID, so
@@ -132,7 +129,7 @@ func resourceHandler(ctx context.Context, database *sqlite.Database, config reso
 // user record via EnsureGroupUser (both derive from ActorKey, so one
 // verified identity never splits). The guest follows the exact same path:
 // it is an ordinary preprovisioned account, and provisioning happens only
-// when Casdoor grants at least one user action.
+// when Casbin grants at least one user action.
 func userAccessResolver(database *sqlite.Database, issuer string, resolve func(context.Context, string) (authorization.Scope, error)) func(context.Context, string) (authorization.Scope, error) {
 	return func(ctx context.Context, subject string) (authorization.Scope, error) {
 		if subject == "" {
@@ -164,8 +161,6 @@ func userAccessResolver(database *sqlite.Database, issuer string, resolve func(c
 
 var userResource = regexp.MustCompile(`^users/[a-f0-9]{64}$`)
 
-var orgName = regexp.MustCompile(`^[A-Za-z0-9_-]{1,100}$`)
-
 type userRouterConfig struct {
 	// Sync assigns the per-user SimpleFIN runner. It must be configured for
 	// every private user with a stored Bridge key.
@@ -174,7 +169,7 @@ type userRouterConfig struct {
 }
 
 // userRouter isolates each user's model, artifacts, presets, and sync
-// state. Casdoor decides permissions. This router selects only the authorized
+// state. Casbin decides permissions. This router selects only the authorized
 // store. It replaces the retired backend/internal/plans package: the routing
 // boundary now lives in the composition root and keys handlers by user
 // resource, not by plan file.

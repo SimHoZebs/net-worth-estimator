@@ -11,7 +11,7 @@ export const devOptions = {
   pack: { type: "string" },
   slot: { type: "string" },
   "app-port": { type: "string" },
-  "casdoor-port": { type: "string" },
+  "auth-port": { type: "string" },
   "backend-port": { type: "string" },
   tailnet: { type: "boolean" },
   help: { type: "boolean", short: "h" },

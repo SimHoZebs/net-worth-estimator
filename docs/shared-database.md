@@ -4,7 +4,8 @@
 
 `NET_WORTH_ESTIMATOR_DB` names one application SQLite database. It contains all
 users, including the provisioned guest, and application sessions and grants.
-Casdoor remains the external identity provider with its own state directory.
+Better Auth remains the external identity provider with separate SQLite or PostgreSQL state.
+Application-owned Casbin policies live in a separate private SQLite database.
 
 An application user owns a data scope, with or without an interactive sign-in. It differs from a financial account
 in the model's `accounts` table. `users` records immutable OIDC identities;
@@ -146,7 +147,8 @@ backend/scripts/verify.sh ./internal/store
 backend/scripts/verify.sh ./internal/identity
 backend/scripts/verify.sh ./internal/api/...
 backend/scripts/verify.sh
-node --test dev/*.test.mjs auth/casdoor/*.test.mjs
+node --test dev/*.test.mjs
+bun --filter @waypoint/auth test
 ```
 
 Use identical entity IDs, preset names, sync identities, and projection inputs

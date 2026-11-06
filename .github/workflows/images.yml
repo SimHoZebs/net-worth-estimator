@@ -38,14 +38,10 @@ jobs:
             context: .
             file: frontend/Dockerfile
             target: ''
-          - image: casdoor
-            context: auth/casdoor
-            file: auth/casdoor/Dockerfile
+          - image: auth
+            context: .
+            file: auth/better-auth/Dockerfile
             target: ''
-          - image: casdoor-upstream
-            context: auth/casdoor
-            file: auth/casdoor/Dockerfile
-            target: upstream
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,8 +77,8 @@ jobs:
             frontend)
               paths=(frontend package.json bun.lock extension/package.json)
               ;;
-            casdoor|casdoor-upstream)
-              paths=(auth/casdoor)
+            auth)
+              paths=(auth/better-auth package.json bun.lock frontend/package.json extension/package.json)
               ;;
             *)
               echo "unknown image component: $COMPONENT" >&2

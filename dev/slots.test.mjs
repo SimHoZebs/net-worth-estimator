@@ -42,21 +42,24 @@ test("slot configs use free loopback ports and refuse tailnet", () => {
   const config = newConfig(undefined, undefined, {
     slot: "shots",
     appPort: 5180,
-    casdoorPort: 8100,
+    authPort: 8100,
     backendPort: 8888,
   });
   assert.equal(config.slot, "shots");
   assert.equal(config.identity.APP_PUBLIC_URL, "http://localhost:5180");
-  assert.equal(config.identity.CASDOOR_PUBLIC_URL, "http://localhost:8100");
-  assert.deepEqual(config.ports, { app: 5180, casdoor: 8100, backend: 8888 });
-  assert.equal(originProfile(config.identity.APP_PUBLIC_URL, config.identity.CASDOOR_PUBLIC_URL), null);
+  assert.equal(config.identity.AUTH_PUBLIC_URL, "http://localhost:8100");
+  assert.deepEqual(config.ports, { app: 5180, auth: 8100, backend: 8888 });
+  assert.equal(
+    originProfile(config.identity.APP_PUBLIC_URL, config.identity.AUTH_PUBLIC_URL),
+    null,
+  );
   assert.throws(
     () => newConfig(undefined, "test-node.example.ts.net", { slot: "shots" }),
     /canonical stack/,
   );
   assert.throws(() => newConfig(undefined, undefined, { slot: "bad name" }), /Slot names/);
   assert.throws(
-    () => newConfig(undefined, undefined, { slot: "x", appPort: 8100, casdoorPort: 8100 }),
+    () => newConfig(undefined, undefined, { slot: "x", appPort: 8100, authPort: 8100 }),
     /differ/,
   );
 });
@@ -72,9 +75,7 @@ test("slot compose args isolate the project without touching the canonical defau
 test("ps-all and slot options validate before any service operation", () => {
   assert.doesNotThrow(() => validateStatus({}, []));
   assert.throws(() => validateStatus({ slot: "shots" }, []), /bare/);
-  assert.doesNotThrow(() =>
-    validateSetup({ slot: "shots", "source-user": "users/owner" }, []),
-  );
+  assert.doesNotThrow(() => validateSetup({ slot: "shots", "source-user": "users/owner" }, []));
   assert.throws(() => validateSetup({ slot: "Bad Name" }, []), /Slot names/);
 });
 
@@ -84,15 +85,21 @@ test("slot state rejects another slot name and fixed-port changes", async () => 
     await loadConfig(dir, true, undefined, undefined, {
       slot: "shots",
       appPort: 5181,
-      casdoorPort: 8101,
+      authPort: 8101,
       backendPort: 8889,
     });
-    await assert.rejects(() => loadConfig(dir, false, undefined, undefined, { slot: "other" }), /another slot/);
+    await assert.rejects(
+      () => loadConfig(dir, false, undefined, undefined, { slot: "other" }),
+      /another slot/,
+    );
     await assert.rejects(
       () => loadConfig(dir, false, undefined, undefined, { slot: "shots", appPort: 9999 }),
       /fixed at creation/,
     );
-    const same = await loadConfig(dir, false, undefined, undefined, { slot: "shots", appPort: 5181 });
+    const same = await loadConfig(dir, false, undefined, undefined, {
+      slot: "shots",
+      appPort: 5181,
+    });
     assert.equal(same.slot, "shots");
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -115,10 +122,11 @@ test("slot compose file isolates project, ports, and state", async () => {
   const config = newConfig(undefined, undefined, {
     slot: "shots",
     appPort: 5182,
-    casdoorPort: 8102,
+    authPort: 8102,
     backendPort: 8890,
   });
   const { writeComposeEnv } = await import("./config.mjs");
+  config.guestSubject = "verified-guest";
   const stateDir = resolve(dir, "tmp/dev-shots");
   await writeComposeEnv(config, path, stateDir);
   const contents = await readFile(path, "utf8");
@@ -134,7 +142,7 @@ test("slot compose file isolates project, ports, and state", async () => {
   const model = JSON.parse(result.stdout);
   assert.equal(model.name, "waypoint-dev-shots");
   assert.equal(model.services.frontend.ports[0].published, "5182");
-  assert.equal(model.services.casdoor.ports[0].published, "8102");
+  assert.equal(model.services.auth.ports[0].published, "8102");
   assert.equal(model.services.backend.ports[0].published, "8890");
   assert.ok(model.services.backend.volumes[0].source.startsWith(stateDir));
 });

@@ -121,7 +121,7 @@ func (d *Database) DeleteGrant(id, issuer string) error {
 }
 
 // DeleteSubjectGrants ends every app session for a subject, for example after
-// a password change. Provider tokens are already expired by Casdoor at that
+// a password change. Provider tokens are already expired by Better Auth at that
 // point; this keeps the local session list honest immediately instead of
 // waiting for the next recheck to discard each grant lazily.
 func (d *Database) DeleteSubjectGrants(issuer, subject string) error {
@@ -185,7 +185,7 @@ func (d *Database) RevokeGrants(issuer, subject, sid, jti string, lifetime time.
 	if subject != "" {
 		kind := "subject"
 		if sid != "" {
-			// Casdoor 4.23 omits sid from its ID token. Revoke that user's
+			// A provider may omit sid from its ID token. Revoke that user's
 			// grants conservatively when the precise provider session is unknown.
 			kind = "fallback"
 		}

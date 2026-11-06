@@ -17,7 +17,7 @@ then save directly to Waypoint. No Gemini Nano dependency.
 
 Device sign-in must be enabled in the deployed Casdoor application. Existing
 instances may need the manual grant-type step in
-[the Casdoor guide](../auth/casdoor/README.md#command-line-access). This extension
+[the device sign-in guide](../docs/authentication.md#device-clients). This extension
 does not modify the identity issuer or deployment routes.
 
 The side panel stays alongside the merchant page. A separate extension window is

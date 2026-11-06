@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Provisioned guest on the normal Casdoor stack. Owner checks live under auth/.
+# Provisioned guest on the normal authenticated stack. Owner checks live under auth/.
 
 frontend_url=${FRONTEND_URL:-http://localhost:8080}
 backend_url=${BACKEND_URL:-$frontend_url}

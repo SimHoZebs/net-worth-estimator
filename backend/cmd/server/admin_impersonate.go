@@ -28,13 +28,13 @@ func (e impersonateError) StatusCode() int { return e.status }
 var resourceHeaderPattern = regexp.MustCompile(`^users/[a-f0-9]{64}$`)
 
 // adminImpersonator builds the development-scoped admin observation branch.
-// A dedicated Casdoor account signs in with this subject; every request must
+// A dedicated provider account signs in with this subject; every request must
 // then name the target user via the Waypoint-Resource header and receives
-// exactly the target's own verified permissions, enforced live by Casdoor
+// exactly the target's own verified permissions, enforced live by Casbin
 // for the target's identity. The administrator never borrows authority the
 // target does not have: a viewer guest yields read and project only.
 //
-// The check delegates to Casdoor's exposed permission API with the target's
+// The check delegates to embedded Casbin with the target's
 // subject, so the target's own group grants decide; removing the admin
 // account from every privileged role leaves only the target's grants. Audit
 // evidence is one structured line per request naming the admin actor and the

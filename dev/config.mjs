@@ -1,11 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { settingsFromEnv } from "../auth/casdoor/generate.mjs";
+import { settingsFromEnv } from "../auth/better-auth/settings.mjs";
 
 export const project = "waypoint-dev";
 
-export const defaultPorts = { app: 5178, casdoor: 8000, backend: 8788 };
+export const defaultPorts = { app: 5178, auth: 8000, backend: 8788 };
 
 export function sanitizeSlot(slot) {
   if (slot === undefined || slot === null || slot === "") return "";
@@ -60,7 +60,7 @@ export function tailnetOrigins(hostname) {
   if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net$/.test(host)) {
     throw new Error("Tailnet HTTPS requires this node's full ts.net DNS name");
   }
-  return { APP_PUBLIC_URL: `https://${host}:5178`, CASDOOR_PUBLIC_URL: `https://${host}:8000` };
+  return { APP_PUBLIC_URL: `https://${host}:5178`, AUTH_PUBLIC_URL: `https://${host}:8000` };
 }
 
 export function originProfile(appUrl, issuerUrl) {
@@ -68,13 +68,13 @@ export function originProfile(appUrl, issuerUrl) {
     const appPort = Number(new URL(appUrl).port);
     const issuerPort = Number(new URL(issuerUrl).port);
     validPort(appPort, "App port");
-    validPort(issuerPort, "Casdoor port");
-    if (appPort === issuerPort) throw new Error("App and Casdoor loopback ports must differ");
+    validPort(issuerPort, "Auth port");
+    if (appPort === issuerPort) throw new Error("App and auth loopback ports must differ");
     return null;
   }
   const app = new URL(appUrl);
   const expected = tailnetOrigins(app.hostname);
-  if (appUrl !== expected.APP_PUBLIC_URL || issuerUrl !== expected.CASDOOR_PUBLIC_URL) {
+  if (appUrl !== expected.APP_PUBLIC_URL || issuerUrl !== expected.AUTH_PUBLIC_URL) {
     throw new Error(
       "Dev origins must use localhost HTTP or matching tailnet HTTPS on ports 5178/8000",
     );
@@ -86,47 +86,48 @@ export function newConfig(source = { container: "net-worth-estimator" }, hostnam
   const secret = () => randomBytes(24).toString("hex");
   const slot = sanitizeSlot(options.slot ?? "");
   const appPort = options.appPort ?? defaultPorts.app;
-  const casdoorPort = options.casdoorPort ?? defaultPorts.casdoor;
+  const authPort = options.authPort ?? defaultPorts.auth;
   const backendPort = options.backendPort ?? defaultPorts.backend;
-  if (hostname && (slot !== "" || appPort !== defaultPorts.app || casdoorPort !== defaultPorts.casdoor)) {
+  if (hostname && (slot !== "" || appPort !== defaultPorts.app || authPort !== defaultPorts.auth)) {
     throw new Error("Tailnet HTTPS stays on the canonical stack. Slots use loopback HTTP only.");
   }
   const app = hostname
     ? tailnetOrigins(hostname).APP_PUBLIC_URL
     : `http://localhost:${validPort(appPort, "App port")}`;
   const issuer = hostname
-    ? tailnetOrigins(hostname).CASDOOR_PUBLIC_URL
-    : `http://localhost:${validPort(casdoorPort, "Casdoor port")}`;
+    ? tailnetOrigins(hostname).AUTH_PUBLIC_URL
+    : `http://localhost:${validPort(authPort, "Auth port")}`;
   validPort(backendPort, "Backend port");
-  if (!hostname && app === issuer) throw new Error("App and Casdoor loopback ports must differ");
+  if (!hostname && app === issuer) throw new Error("App and auth loopback ports must differ");
   return {
-    version: 1,
+    version: 2,
     source,
     guestSubject: null,
     slot,
     ports: {
       app: hostname ? defaultPorts.app : Number(new URL(app).port),
-      casdoor: hostname ? defaultPorts.casdoor : Number(new URL(issuer).port),
+      auth: hostname ? defaultPorts.auth : Number(new URL(issuer).port),
       backend: Number(backendPort),
     },
     identity: {
-      CASDOOR_PUBLIC_URL: issuer,
+      AUTH_PUBLIC_URL: issuer,
       APP_PUBLIC_URL: app,
       AUTH_CLIENT_ID: "waypoint-dev",
       AUTH_CLIENT_SECRET: secret(),
-      CASDOOR_ADMIN_PASSWORD: secret(),
-      CASDOOR_USER_NAME: "household",
-      CASDOOR_USER_PASSWORD: secret(),
-      CASDOOR_GUEST_NAME: "guest",
-      CASDOOR_USER_DISPLAY_NAME: "Development owner",
-      CASDOOR_BACKCHANNEL_LOGOUT_URL: "http://backend:8787/v1/auth/backchannel-logout",
+      BETTER_AUTH_SECRET: secret(),
+      AUTH_USER_NAME: "household",
+      AUTH_USER_PASSWORD: secret(),
+      AUTH_USER_DISPLAY_NAME: "Development owner",
       ...(hostname ? tailnetOrigins(hostname) : {}),
     },
   };
 }
 
 export function settings(config) {
-  if (config.version !== 1) throw new Error("Unsupported dev configuration version");
+  if (config.version !== 2)
+    throw new Error(
+      "Unsupported dev configuration version. Use the explicit identity migration before this stack.",
+    );
   sanitizeSlot(config.slot ?? "");
   if (
     config.guestSubject !== undefined &&
@@ -156,18 +157,18 @@ export function settings(config) {
   const result = settingsFromEnv(config.identity);
   originProfile(result.appUrl, result.publicUrl);
   if (typeof config.ports !== "object" || config.ports === null) {
-    throw new Error("Dev ports must map app, casdoor, and backend to loopback ports");
+    throw new Error("Dev ports must map app, auth, and backend to loopback ports");
   }
   const app = validPort(config.ports.app, "App port");
-  const casdoor = validPort(config.ports.casdoor, "Casdoor port");
+  const auth = validPort(config.ports.auth, "Auth port");
   validPort(config.ports.backend, "Backend port");
-  if (app === casdoor) throw new Error("App and Casdoor loopback ports must differ");
+  if (app === auth) throw new Error("App and auth loopback ports must differ");
   if (config.slot) {
     const parsedApp = isLoopbackOrigin(result.appUrl) ? Number(new URL(result.appUrl).port) : null;
     const parsedIssuer = isLoopbackOrigin(result.publicUrl)
       ? Number(new URL(result.publicUrl).port)
       : null;
-    if (parsedApp !== app || parsedIssuer !== casdoor) {
+    if (parsedApp !== app || parsedIssuer !== auth) {
       throw new Error("Slot ports must match the slot identity URLs");
     }
   }
@@ -177,7 +178,7 @@ export function settings(config) {
 export function portsFor(config) {
   return {
     app: validPort(config.ports.app, "App port"),
-    casdoor: validPort(config.ports.casdoor, "Casdoor port"),
+    auth: validPort(config.ports.auth, "Auth port"),
     backend: validPort(config.ports.backend, "Backend port"),
   };
 }
@@ -190,10 +191,11 @@ export function composeEnvironment(config) {
     DEV_GID: String(process.getgid()),
     DEV_PROJECT: projectFor(config.slot ?? ""),
     DEV_FRONTEND_PORT: String(ports.app),
-    DEV_CASDOOR_PORT: String(ports.casdoor),
+    DEV_AUTH_PORT: String(ports.auth),
     DEV_BACKEND_DEBUG_PORT: String(ports.backend),
     DEV_APP_PUBLIC_URL: config.identity.APP_PUBLIC_URL,
-    DEV_CASDOOR_PUBLIC_URL: config.identity.CASDOOR_PUBLIC_URL,
+    DEV_AUTH_PUBLIC_URL: config.identity.AUTH_PUBLIC_URL,
+    DEV_BETTER_AUTH_SECRET: config.identity.BETTER_AUTH_SECRET,
     DEV_AUTH_CLIENT_ID: config.identity.AUTH_CLIENT_ID,
     DEV_AUTH_CLIENT_SECRET: config.identity.AUTH_CLIENT_SECRET,
     DEV_GUEST_SUBJECT: config.guestSubject ?? "",
@@ -248,10 +250,11 @@ export async function loadConfig(stateDir, create, source, hostname, options = {
     if (sanitizeSlot(config.slot ?? "") !== wantSlot) {
       throw new Error("Slot state belongs to another slot. Use its own --slot name.");
     }
-    for (const key of ["appPort", "casdoorPort", "backendPort"]) {
+    for (const key of ["appPort", "authPort", "backendPort"]) {
       if (options[key] !== undefined) {
         const ports = portsFor(config);
-        const current = key === "appPort" ? ports.app : key === "casdoorPort" ? ports.casdoor : ports.backend;
+        const current =
+          key === "appPort" ? ports.app : key === "authPort" ? ports.auth : ports.backend;
         if (Number(options[key]) !== current) {
           throw new Error(
             "Slot ports are fixed at creation. Delete the slot state or pick a new --slot name.",

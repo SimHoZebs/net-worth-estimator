@@ -1,8 +1,8 @@
 # User-scoped authorization
 
-Casdoor authenticates users and hosts the Casbin authorization model. The Go
-API calls Casdoor's permission API with private application credentials. It does
-not embed a second Casbin engine or evaluate a custom policy language.
+Better Auth authenticates users. The Go API embeds Casbin and owns its policy
+database. Casbin makes user-resource policy decisions. API handlers and scoped
+storage enforce them. The identity provider holds no financial permissions.
 
 ## Resources, actions, and roles
 
@@ -17,14 +17,14 @@ projection caches stay inside that boundary.
 | Any other combination | Another user                   | Denied                                          |
 
 Guest and signed-in users use the same resource and storage shape. Account
-creation assigns a Casdoor group. Normal signup receives the members group;
-the provisioned guest receives the viewers group. Roles bind those groups to
+creation records a persistent Casbin role assignment on first verified access.
+Normal signup receives member; explicit setup assigns viewer to the guest. Roles bind identities to
 permitted actions. The owner relationship limits access to the user's own
 resource; it does not grant actions. The global server read-only flag still
 overrides write permission.
 
-Actions are `user:*` under the Casdoor model (`waypoint/user-access`)
-with adapter `user-policy-store`. Permission resources are `users/*`.
+Actions are `user:read`, `user:project`, and `user:write` under the embedded
+Casbin model. Permission resources are `users/*`.
 There is no sample resource kind or guest-specific permission matcher.
 
 The resource ID derives from the exact OIDC issuer and immutable subject, not
@@ -34,13 +34,22 @@ The user router activates the empty model on first access. Initialization never
 replaces existing financial rows. Existing data stays with its
 verified owner. There is no first-login claim of existing data.
 
-Casdoor stores the model, roles, and action/resource rules in its SQLite state.
-The backend resolves the immutable subject to its current provider username
-through Casdoor's bounded user lookup, then submits that provider identity,
-resource, action, immutable owner, and immutable actor to the permission API.
-The lookup must match the configured organization and exact subject. Deleted,
-forbidden, missing, or mismatched users fail closed. Browser fields never supply an owner or a trusted role. Permission errors
-fail closed. Positive permission decisions do not have an application cache.
+The application stores role assignments and action/resource rules in
+`NET_WORTH_ESTIMATOR_AUTHZ_DB`. Subjects use the stable issuer/subject actor key,
+never mutable usernames. Each decision loads persisted policy without a positive
+decision cache. Explicit denial overrides allows. An explicit none assignment
+blocks automatic re-enrollment after revocation. Identity verification rejects
+inactive users before authorization. Browser fields never supply an owner or role.
+Missing or incompatible policy state stops startup without schema repair.
+
+`authzctl --db PATH --issuer ISSUER --guest GUEST --subject SUBJECT --role ROLE`
+changes an assignment to member, viewer, or none. Revocation takes effect on the
+next request, including across API processes. Already admitted streams can finish.
+The policy database belongs to the application and needs its own safe backup.
+
+Sharing, exclusions, and current social-group membership remain transactional
+authorization rules beside the data they protect. This migration preserves their
+existing behavior. They do not grant access to another user's full workspace.
 
 ## Data isolation
 
@@ -56,7 +65,7 @@ No scope-facing operation has an unscoped fallback.
 The guest has an ordinary provider identity and an ordinary `users` row in
 that same database. `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` selects that provisioned
 identity for anonymous requests. It does not assign permissions. Guest grants
-can change through the same provider policy mechanism as any user's grants.
+can change through the same Casbin policy mechanism as any user's grants.
 Private data never becomes a fallback guest workspace.
 
 All API operations receive the store for the authorized resource. A guessed row
@@ -122,24 +131,20 @@ without a verified session takes over the full screen.
 
 ## Deployment and migration
 
-The rule is the same in dev and production. Casdoor is required. Without it
-the server fails closed at startup.
+The rule is the same in dev and production. Better Auth and a provisioned Casbin
+policy database are required. Missing state fails closed at startup.
 
 Before an existing authenticated deployment starts the new code:
 
-1. Stop API writes and sync. Back up the application database and Casdoor state.
-2. Retain existing issuer and subjects. Provision the guest provider user and
-   assign viewer membership. Assign member membership to approved existing users.
-3. Install the approved generic group-based model and role permissions.
-   Set the application's default signup group to `waypoint/members`.
-4. Set `NET_WORTH_ESTIMATOR_GUEST_SUBJECT` to the guest's immutable subject.
-   Provision its application rows through `setupdb --issuer ... --subject ...`.
-5. Verify guest, member, second-user, denial, revocation, and provider-outage cases.
+Follow the [one-time identity and policy cutover](../auth/better-auth/one-time/README.md).
+Retain the exact issuer and subjects. Import reviewed effective action decisions,
+not inferred username ownership. Verify guest, member, second-user, denial,
+revocation, and provider-outage cases before release.
 
 See [the shared database guide](shared-database.md) for backup and rollback.
 Runtime startup never merges files or guesses an owner.
 
-No source update automatically publishes private data or changes live Casdoor
+No source update automatically publishes private data or changes live identity
 permissions. The owner assignment is a one-time data migration, not signup role selection.
 
 ## Scope limits
@@ -150,7 +155,7 @@ widening that boundary: a shared read returns one owner-scoped transaction in
 the existing transaction shape only, never accounts, balances, models,
 secrets, or receipts. A user picker, an IAM management screen, and
 cross-user collaboration beyond explicit transaction grants remain out of
-scope. New action/resource policies belong in Casdoor. New resource
+scope. New action/resource policies belong in the application Casbin model. New resource
 visibility must also pass the API's resource-resolution and
 storage-isolation boundary.
 
@@ -425,8 +430,8 @@ Split authorization rules:
 - Model replacement and scope clears drop splits touching the cleared
   user, so a split never attaches to an unrelated new row.
 
-Casdoor's external permission API evaluates the model and stored policy rows.
-Use the model's deny rules or remove the relevant policy/binding to revoke
+Embedded Go Casbin evaluates the model and stored policy rows.
+Use explicit permissions or `authzctl --role none` to revoke
 access. Do not treat application-sign-in approval or UI enable flags as an
 additional resource-security boundary.
 
@@ -436,27 +441,29 @@ People who share a browser profile can inspect that profile's local data.
 
 ## Development admin observation branch
 
-`NET_WORTH_ESTIMATOR_ADMIN_SUBJECT` names one verified Casdoor subject allowed
+`NET_WORTH_ESTIMATOR_ADMIN_SUBJECT` names one verified Better Auth subject allowed
 to observe and act on every user resource. Unset (the default) disables the
 branch; the boundary then behaves as if the code were absent. Never set the
 variable in production without completing the SOP at the end of this section.
 
 The branch exists so a debugging agent can reproduce what the user sees. It is
-not a backdoor credential: requests still authenticate through Casdoor
+not a backdoor credential: requests still authenticate through Better Auth
 (browser session or device flow) as the dedicated admin account, and every
 request carries the usual `Waypoint-Resource: users/<64hex>` header.
 
 Semantics:
 
-- The admin account is an ordinary Casdoor user. It receives no policy grant
-  of its own in Casdoor; the backend env var names which verified subject the
+- The admin account is an ordinary Better Auth user. The branch needs no extra
+  Casbin grant for that account; the backend env var names which verified subject the
   branch applies to.
 - When the verified principal matches the configured subject, the boundary
   looks up the target resource in `users` (never provisions it), asks
-  Casdoor's permission API for `user:read`, `user:project`, and `user:write`
+  embedded Casbin for `user:read`, `user:project`, and `user:write`
   on the target resource as the target's identity, and grants exactly the
   actions the target's own grants allow. A member target yields all three
   actions; a viewer guest target yields read and project only.
+- Provider login disablement and policy revocation are separate operations.
+  To exclude a target from this branch too, persist a none assignment in Casbin.
 - The synthesized principal is the target, so every handler serves the
   target's own partition; resource headers, model ownership, and SimpleFIN
   credential attachment all follow the target.
@@ -496,7 +503,7 @@ files with private data on shared hosts.
 Production enablement SOP (do not skip):
 
 1. Decide with the operator; this is a product decision, not a config tweak.
-2. Create the dedicated admin account in hosted Casdoor; complete device flow
+2. Create the dedicated admin account in Better Auth; complete device flow
    as it from a trusted machine; confirm it resolves to the expected verified
    subject (issue a `/v1/status` call with and without the target header).
 3. Patch the Northflank service env to set `NET_WORTH_ESTIMATOR_ADMIN_SUBJECT`.
@@ -507,15 +514,14 @@ Production enablement SOP (do not skip):
    mismatch` / fall-through behavior). Confirm `/readyz` and a real user
    journey still work.
 5. Record removal: to disable, remove the variable and redeploy; delete the
-   admin account or revoke its sessions in Casdoor; confirm with a non-admin
+   admin account or revoke its sessions in Better Auth; confirm with a non-admin
    probe.
 
 Literal every-action-on-every-resource semantics (including writes with a
-viewer guest target) is not available today: the Casdoor matcher confines each
-request to the caller's own resource, and changing the model text is a manual
-one-time replacement of the five-field model (the same class of operation as
-the five-field migration). If ever approved, do it as
-its own reviewed migration with a backup first, then re-verify guest and
+viewer guest target) is not available today. The application Casbin matcher
+confines each evaluated identity to its own resource. Any broader model change
+needs its own reviewed release and explicit policy conversion with a backup.
+Then re-verify guest and
 member isolation end to end. The branch above never borrows that guarantee;
 it only ever yields what the target itself holds.
 
@@ -525,6 +531,5 @@ the variable. No data migration is involved.
 
 Controlling sources:
 
-- [Casdoor permission API](https://casdoor.ai/docs/permission/exposed-casbin-apis/)
-- [Permission configuration](https://casdoor.ai/docs/permission/permission-configuration/)
-- [Pinned permission model and role policy handling](https://github.com/casdoor/casdoor/blob/v4.23.0/object/permission_enforcer.go)
+- [Casbin authorization model](https://casbin.org/docs/model-storage/)
+- The embedded model and persisted policy implementation in `backend/internal/authorization/`.

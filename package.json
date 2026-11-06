@@ -9,6 +9,7 @@
 		"test:e2e": "scripts/test --e2e"
 	},
 	"workspaces": [
+		"auth/better-auth",
 		"frontend",
 		"extension"
 	]

@@ -2,7 +2,7 @@
   "name": "waypoint-release",
   "description": "Deploy pinned images, stop API writers, run the shared migration on the real volume, then start the API.",
   "apiVersion": "v1.2",
-  "arguments": { "RELEASE_SHA": "", "API_IMAGE": "", "IDENTITY_IMAGE": "" },
+  "arguments": { "RELEASE_SHA": "", "API_IMAGE": "", "IDENTITY_IMAGE": "", "IDENTITY_SERVICE_ID": "", "IDENTITY_DATABASE_ADDON_ID": "" },
   "options": { "autorun": false, "concurrencyPolicy": "queue" },
   "triggers": [
     {
@@ -20,7 +20,7 @@
           "kind": "AddonBackup",
           "ref": "identity-backup",
           "condition": "success",
-          "spec": { "addonId": "nwe-casdoor-db", "backupType": "dump" }
+          "spec": { "addonId": "${args.IDENTITY_DATABASE_ADDON_ID}", "backupType": "dump" }
         },
         {
           "kind": "RunTemplate",
@@ -47,7 +47,7 @@
           "spec": {
             "type": "registry",
             "origin": { "imagePath": "${args.IDENTITY_IMAGE}" },
-            "target": { "id": "nwe-casdoor", "type": "service" }
+            "target": { "id": "${args.IDENTITY_SERVICE_ID}", "type": "service" }
           }
         },
         {
