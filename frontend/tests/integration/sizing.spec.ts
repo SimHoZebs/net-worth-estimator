@@ -29,6 +29,10 @@ test("navigation remains usable after a phone-to-desktop resize", async ({
 		page.getByRole("dialog", { name: "Workspace navigation" }),
 	).toHaveCount(0);
 	await page.getByRole("img", { name: /Net worth over the trailing/ }).hover();
+	// The net worth chart sits below the safe card now, so hovering it
+	// scrolls to the page bottom and leaves the wheel nowhere to go.
+	// Return to the top so the wheel check proves the page scrolls.
+	await page.evaluate(() => window.scrollTo(0, 0));
 	const initialScroll = await page.evaluate(() => window.scrollY);
 	await page.mouse.wheel(0, 400);
 	await expect
