@@ -107,13 +107,12 @@ export function ReceiptPanel({
 						Loading receipts…
 					</p>
 				)}
-				{collection.error && (
 					<ErrorNotice
-						message={collection.error.message}
-						action="Retry receipts"
+						reserve
+						message={collection.error?.message ?? actions.attach.error?.message}
+						action={collection.error ? "Retry receipts" : undefined}
 						onAction={() => void collection.refetch()}
 					/>
-				)}
 				{receipts.map((receipt) => (
 					<button
 						key={receipt.id}
@@ -150,9 +149,6 @@ export function ReceiptPanel({
 					<p role="status" className="text-sm text-muted">
 						Saving private receipt…
 					</p>
-				)}
-				{actions.attach.error && (
-					<ErrorNotice message={actions.attach.error.message} />
 				)}
 				{!eligible && receipts.length === 0 && (
 					<p className="text-sm text-muted">

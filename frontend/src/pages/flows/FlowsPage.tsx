@@ -206,16 +206,17 @@ export function FlowsPage() {
 					description="Money flows need a start and an end date before the calculation runs."
 				/>
 			)}
-			{query.isError && (
-				<ErrorNotice
-					message={
-						query.error?.message ??
-						"Money flows could not be loaded. Retry the request."
-					}
-					action="Retry"
-					onAction={() => void query.refetch()}
-				/>
-			)}
+			<ErrorNotice
+				reserve
+				message={
+					query.isError
+						? (query.error?.message ??
+							"Money flows could not be loaded. Retry the request.")
+						: null
+				}
+				action="Retry"
+				onAction={() => void query.refetch()}
+			/>
 			{graph && (
 				<>
 					<TotalsSummary graph={graph} />

@@ -127,7 +127,6 @@ export function PlannedPurchaseEditor({
 			onCloseRequest={requestClose}
 		>
 			{readOnly && <Notice>These planned purchases are read-only.</Notice>}
-			{error && <ErrorNotice message={error} />}
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}
@@ -190,6 +189,7 @@ export function PlannedPurchaseEditor({
 						Include in purchase queue
 					</label>
 				</fieldset>
+				<ErrorNotice reserve message={error} />
 				{confirmCancel ? (
 					<div
 						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"

@@ -144,15 +144,14 @@ export function AccountPage() {
 				</Button>
 			</div>
 
-			{detailsError && (
-				<ErrorNotice
-					message={detailsError}
-					action="Retry"
-					onAction={() => {
-						void resources.details.refetch();
-					}}
-				/>
-			)}
+			<ErrorNotice
+				reserve
+				message={detailsError}
+				action="Retry"
+				onAction={() => {
+					void resources.details.refetch();
+				}}
+			/>
 
 			<form onSubmit={onSaveProfile} className="grid gap-3">
 				<h3 className="m-0 text-base">Profile</h3>

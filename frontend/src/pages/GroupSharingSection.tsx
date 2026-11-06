@@ -282,7 +282,7 @@ export function GroupSharingSection({ groupId }: { groupId: string }) {
 				</p>
 			</div>
 
-			{formError && <ErrorNotice message={formError} />}
+			<ErrorNotice reserve message={formError} />
 
 			<fieldset className="grid gap-2 border-0 p-0">
 				<legend className="px-0 text-sm font-medium">Accounts to share</legend>

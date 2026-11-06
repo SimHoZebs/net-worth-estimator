@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../../components/ConfirmDialog.tsx";
-import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { ProjectionUpdating } from "../../components/ProjectionUpdating.tsx";
 import type { PlannedPurchase } from "../../domain/model.ts";
 import { horizonDate } from "../../domain/result.ts";
@@ -46,7 +45,6 @@ export function PlannedPurchasePanel() {
 	const [remove, setRemove] = useState<PlannedPurchase | null>(null);
 	const [removing, setRemoving] = useState(false);
 	const [removeError, setRemoveError] = useState<string | null>(null);
-	const [moveError, setMoveError] = useState<string | null>(null);
 	const [announcement, setAnnouncement] = useState("");
 	// Saved rows hydrate after the header. Render the header with a
 	// loading slot instead of hiding the whole planner behind a
@@ -62,15 +60,9 @@ export function PlannedPurchasePanel() {
 
 	const moveItem = (purchase: PlannedPurchase, direction: -1 | 1) => {
 		if (locked || purchase.readOnly || !purchases) return;
-		setMoveError(null);
 		void moveSavedPurchase(purchases, purchase.id, direction).then(
 			({ ok, next }) => {
-				if (!ok) {
-					setMoveError(
-						"The purchase could not be moved. Review the workspace notice and try again.",
-					);
-					return;
-				}
+				if (!ok) return;
 				if (!next) return;
 				const index = next.findIndex((item) => item.id === purchase.id);
 				setAnnouncement(`${purchase.name} is now priority ${index + 1}.`);
@@ -105,7 +97,6 @@ export function PlannedPurchasePanel() {
 				onRemove={setRemove}
 				onMove={moveItem}
 			/>
-			{moveError && <ErrorNotice message={moveError} />}
 			<p className="sr-only" role="status">
 				{announcement}
 			</p>

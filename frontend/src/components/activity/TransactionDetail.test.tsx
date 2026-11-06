@@ -1041,6 +1041,15 @@ it("retries a failed schedule start with the same identity", async () => {
 				call.url === "/v1/transactions/renovation/schedule",
 		);
 	expect(starts()).toHaveLength(1);
+	// A later edit failure must remain visible beside the subscription failure.
+	await runInteractions([
+		{ type: ["Transaction name", "   "] },
+		{ click: ["button", "Save changes"] },
+	]);
+	const editFailure = await screen.findByText(/Give the transaction a name\./);
+	expect(editFailure.closest("[role='alert']")?.textContent).toContain(
+		"could not be created",
+	);
 	// Retry reuses the pinned identity; the failed attempt saved nothing.
 	fireEvent.click(screen.getByRole("button", { name: "More options" }));
 	fireEvent.click(

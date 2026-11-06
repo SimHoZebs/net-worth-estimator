@@ -155,7 +155,6 @@ export function AddTransactionDialog({
 
 	return (
 		<Modal title="Add planned transaction" onClose={onClose}>
-			{error && <ErrorNotice message={error} />}
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}
@@ -267,6 +266,7 @@ export function AddTransactionDialog({
 						Include in projections
 					</label>
 				</fieldset>
+				<ErrorNotice reserve message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

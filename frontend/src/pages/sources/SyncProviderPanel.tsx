@@ -189,7 +189,7 @@ export function SyncProviderPanel() {
 			>
 				{message}
 			</p>
-			{error && <ErrorNotice message={error} />}
+			<ErrorNotice reserve message={error} />
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{configured ? (
@@ -234,13 +234,16 @@ export function SyncProviderPanel() {
 										.
 									</p>
 								</div>
-								{status.isError && (
-									<ErrorNotice
-										message="The sync status could not be loaded."
-										action="Reload status"
-										onAction={() => void status.refetch()}
-									/>
-								)}
+								<ErrorNotice
+									reserve
+									message={
+										status.isError
+											? "The sync status could not be loaded."
+											: null
+									}
+									action="Reload status"
+									onAction={() => void status.refetch()}
+								/>
 								{status.data?.syncError && (
 									<Notice tone="warning" className="mb-4">
 										<p className="m-0 text-sm leading-relaxed">

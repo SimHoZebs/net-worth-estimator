@@ -126,9 +126,14 @@ export function NewScheduleDialog({
 					{!plan.creatable && (
 						<p className="m-0 text-sm text-muted">{plan.reason}</p>
 					)}
-					{failed && (
-						<ErrorNotice message="The schedule could not be created. The plan above is current; review it and try again." />
-					)}
+					<ErrorNotice
+						reserve
+						message={
+							failed
+								? "The schedule could not be created. The plan above is current; review it and try again."
+								: null
+						}
+					/>
 					<div className="flex gap-2">
 						<Button type="button" variant="secondary" onClick={onClose}>
 							Cancel
@@ -262,9 +267,14 @@ export function ExistingScheduleDialog({
 						{!plan.claimable && (
 							<p className="m-0 text-sm text-muted">{plan.reason}</p>
 						)}
-						{failed && (
-							<ErrorNotice message="The payments could not be added. The preview above is current; review it and try again." />
-						)}
+						<ErrorNotice
+							reserve
+							message={
+								failed
+									? "The payments could not be added. The preview above is current; review it and try again."
+									: null
+							}
+						/>
 						<div className="flex gap-2">
 							<Button type="button" variant="secondary" onClick={onClose}>
 								Cancel
@@ -328,9 +338,14 @@ function PatternCard({
 				{cadenceLabel(pattern.cadence)} · {directionLabel(pattern.anchor.role)}{" "}
 				· {pattern.findings.length} recorded
 			</p>
-			{(feedback.isError || dismiss.isError) && (
-				<ErrorNotice message="The answer could not be saved. Try again." />
-			)}
+			<ErrorNotice
+				reserve
+				message={
+					feedback.isError || dismiss.isError
+						? "The answer could not be saved. Try again."
+						: null
+				}
+			/>
 			<div className="flex flex-wrap gap-2">
 				{!readOnly && !confirmed && !rejected && (
 					<>

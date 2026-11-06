@@ -42,6 +42,58 @@ async function openExpense(page: Page) {
 	return page.getByRole("dialog", { name: /Receipt purchase/ });
 }
 
+for (const width of [390, 1440]) {
+	test(`long receipt image errors preserve placeholder geometry at ${width}px`, async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width, height: 1080 });
+		await seedExpense(page);
+		let release!: () => void;
+		const failure = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		await page.route("**/v1/receipts/*/image*", async (route) => {
+			await failure;
+			await route.fulfill({
+				status: 503,
+				contentType: "application/json",
+				headers: {
+					"Waypoint-Resource": route.request().headers()["waypoint-resource"]!,
+				},
+				json: {
+					error: "The receipt image service is unavailable. ".repeat(50),
+				},
+			});
+		});
+		const detail = await openExpense(page);
+		await detail.getByLabel("Upload receipt image").setInputFiles(sample);
+		const receipt = page.getByRole("dialog", {
+			name: "Receipt details",
+			exact: true,
+		});
+		await expect(receipt.getByText("Loading private image…")).toBeVisible();
+		// Even the 1ms reduced-motion animation can span a browser frame.
+		await receipt.locator(".waypoint-modal-panel").evaluate(async (panel) => {
+			await Promise.all(
+				panel.getAnimations().map((animation) => animation.finished),
+			);
+		});
+		const preview = receipt.locator("figure > div").first();
+		const before = await preview.boundingBox();
+		release();
+		await expect(
+			receipt.getByRole("button", { name: "Retry image" }),
+		).toBeAttached();
+		expect(await preview.boundingBox()).toEqual(before);
+		const errorScroll = preview.locator("[tabindex='0']");
+		await errorScroll.focus();
+		await page.keyboard.press("End");
+		await expect(
+			receipt.getByRole("button", { name: "Retry image" }),
+		).toBeVisible();
+	});
+}
+
 test("private receipt upload, extraction, corrections, and reload preserve the saved model", async ({
 	page,
 }) => {

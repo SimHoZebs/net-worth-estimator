@@ -255,9 +255,12 @@ export function GroupsPage({
 							/>
 						)}
 
-						{canManageInvites && invitesQuery.isError && (
+						{canManageInvites && (
 							<ErrorNotice
-								message="Invites could not be loaded."
+								reserve
+								message={
+									invitesQuery.isError ? "Invites could not be loaded." : null
+								}
 								action="Retry invites"
 								onAction={() => void invitesQuery.refetch()}
 							/>
@@ -325,13 +328,12 @@ export function GroupsPage({
 				</Button>
 			</div>
 
-			{groupsQuery.isError && (
-				<ErrorNotice
-					message="Groups could not be loaded."
-					action="Retry"
-					onAction={() => void groupsQuery.refetch()}
-				/>
-			)}
+			<ErrorNotice
+				reserve
+				message={groupsQuery.isError ? "Groups could not be loaded." : null}
+				action="Retry"
+				onAction={() => void groupsQuery.refetch()}
+			/>
 
 			<div className="grid gap-2">
 				{groups === null ? (

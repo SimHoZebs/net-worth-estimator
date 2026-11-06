@@ -40,19 +40,19 @@ export function ReceiptPreview({
 						alt={`Receipt: ${filename}`}
 						className="max-h-[60dvh] w-full object-contain"
 					/>
+				) : image.error ? (
+					<ErrorNotice
+						reserve
+						message={image.error.message}
+						action="Retry image"
+						onAction={() => void image.refetch()}
+					/>
 				) : (
 					<p className="p-4 text-sm text-muted" role="status">
 						{image.isError ? "Image unavailable" : "Loading private image…"}
 					</p>
 				)}
 			</div>
-			{image.error && (
-				<ErrorNotice
-					message={image.error.message}
-					action="Retry image"
-					onAction={() => void image.refetch()}
-				/>
-			)}
 			<div className="flex flex-wrap gap-2">
 				{url && (
 					<Button

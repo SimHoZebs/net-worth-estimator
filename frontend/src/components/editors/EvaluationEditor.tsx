@@ -132,7 +132,6 @@ export function EvaluationEditor({
 
 	return (
 		<Modal title={`${item ? "Edit" : "Add"} evaluation`} onClose={onClose}>
-			{error && <ErrorNotice message={error} />}
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}
@@ -193,6 +192,7 @@ export function EvaluationEditor({
 						</SelectField>
 					)}
 				</fieldset>
+				<ErrorNotice reserve message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

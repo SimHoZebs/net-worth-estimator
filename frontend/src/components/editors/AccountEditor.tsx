@@ -119,7 +119,6 @@ export function AccountEditor({
 					This account is synced from your bank and cannot be edited here.
 				</Notice>
 			)}
-			{error && <ErrorNotice message={error} />}
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}
@@ -209,6 +208,7 @@ export function AccountEditor({
 						</div>
 					</div>
 				</fieldset>
+				<ErrorNotice reserve message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

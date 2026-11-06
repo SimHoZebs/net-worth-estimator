@@ -31,6 +31,7 @@ import {
 	type KeyboardEvent,
 } from "react";
 import { categorizeTransaction } from "@/api/generated/endpoints.ts";
+import { FieldError } from "../ErrorNotice.tsx";
 import {
 	transactionCategoryLabel,
 	transactionCategoryOptions,
@@ -371,11 +372,7 @@ export function TransactionCategory({
 					)}
 				</div>
 			</div>
-			{error && (
-				<p className="mt-1 text-xs text-danger-text" role="alert">
-					{error}
-				</p>
-			)}
+			<FieldError message={error} />
 		</>
 	);
 }

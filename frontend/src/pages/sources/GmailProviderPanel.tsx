@@ -138,7 +138,7 @@ export function GmailProviderPanel() {
 			>
 				{message}
 			</p>
-			{error && <ErrorNotice message={error} />}
+			<ErrorNotice reserve message={error} />
 			<div className="grid items-start gap-6 xl:grid-cols-3">
 				<div className="min-w-0 xl:col-span-2">
 					{connected ? (

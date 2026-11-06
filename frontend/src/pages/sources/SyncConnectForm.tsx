@@ -2,6 +2,7 @@ import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useId, useState, type Ref } from "react";
 import { Button, TextButton } from "../../components/Button.tsx";
 import { InputField } from "../../components/Field.tsx";
+import { FieldError } from "../../components/ErrorNotice.tsx";
 import { connectSyncKey } from "../../state/syncSettings.ts";
 import { useUserReadOnly } from "../../state/useUserScope.ts";
 
@@ -88,26 +89,16 @@ export function SyncConnectForm({
 					{visible ? "Hide token" : "Show token"}
 				</TextButton>
 			</div>
-			{error && (
-				<p
-					id={errorId}
-					role="alert"
-					className="mt-2 mb-3 text-sm leading-relaxed text-danger-text"
-				>
-					{error}
-				</p>
-			)}
+			<FieldError id={errorId} message={error} />
 			<div className="mt-3 flex flex-wrap items-center gap-3">
 				<Button type="submit" variant="primary" disabled={readOnly || busy}>
 					{busy ? "Connecting…" : "Connect SimpleFIN"}
 					{!busy && <ArrowRight size={16} aria-hidden="true" />}
 				</Button>
 			</div>
-			{busy && (
-				<p className="mt-3 mb-0 text-xs leading-relaxed text-muted">
-					Keep this page open while Waypoint connects to SimpleFIN.
-				</p>
-			)}
+			<p className="mt-3 mb-0 min-h-[2lh] text-xs leading-relaxed text-muted">
+				{busy ? "Keep this page open while Waypoint connects to SimpleFIN." : null}
+			</p>
 		</form>
 	);
 }

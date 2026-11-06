@@ -183,7 +183,7 @@ export function TransactionSharing({
 				<h3 className="m-0 text-sm font-medium">Sharing</h3>
 			</div>
 
-			{error && <ErrorNotice message={error} />}
+			<ErrorNotice reserve message={error} />
 
 			{intents.length > 0 && (
 				<ul className="grid list-none gap-2 p-0">

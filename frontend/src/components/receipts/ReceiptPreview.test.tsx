@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ReceiptPreview } from "./ReceiptPreview.tsx";
+import { runInteractions } from "../../mocks/interactions.ts";
 
 const image = vi.hoisted(() => ({
 	data: undefined as Blob | undefined,
-	error: null,
+	error: null as Error | null,
 	isError: false,
 	refetch: vi.fn(),
 }));
@@ -15,12 +16,26 @@ const revokeObjectURL = vi.fn();
 
 beforeEach(() => {
 	image.data = undefined;
+	image.error = null;
+	image.isError = false;
 	createObjectURL.mockReset();
 	revokeObjectURL.mockReset();
 	createObjectURL.mockImplementation(
 		() => `blob:receipt-${createObjectURL.mock.calls.length}`,
 	);
 	vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+});
+
+it("contains long image errors in reserved feedback and retains retry", async () => {
+	image.error = new Error("A long receipt failure. ".repeat(100));
+	image.isError = true;
+	render(<ReceiptPreview id="receipt" digest="one" filename="shop.png" />);
+	const alert = screen.getByRole("alert");
+	expect(alert.textContent).toContain(image.error.message);
+	expect(alert.parentElement?.classList.contains("h-24")).toBe(true);
+	expect(alert.parentElement?.classList.contains("overflow-auto")).toBe(true);
+	await runInteractions([{ click: ["button", "Retry image"] }]);
+	expect(image.refetch).toHaveBeenCalledOnce();
 });
 
 afterEach(() => {

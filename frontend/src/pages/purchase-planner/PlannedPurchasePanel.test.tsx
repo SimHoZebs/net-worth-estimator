@@ -129,14 +129,12 @@ describe("PlannedPurchasePanel", () => {
 		);
 	});
 
-	it("keeps a move failure visible instead of announcing", async () => {
+	it("leaves move failure feedback to the write toast without a duplicate banner or success announcement", async () => {
 		mockedMove.mockResolvedValue({ ok: false, next: null });
 		renderPanel();
 		fireEvent.click(screen.getByRole("button", { name: "Move chair up" }));
 		await waitFor(() => expect(mockedMove).toHaveBeenCalledOnce());
-		expect(screen.getByRole("alert").textContent).toMatch(
-			/could not be moved/i,
-		);
+		expect(screen.queryByRole("alert")).toBeNull();
 		expect(screen.getByRole("status").textContent).toBe("");
 	});
 

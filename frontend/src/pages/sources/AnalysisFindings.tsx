@@ -61,15 +61,18 @@ export function AnalysisFindings() {
 						analysis.
 					</p>
 				)}
-				{state === "failed" && (
-					<ErrorNotice message="Analysis could not finish. The background worker will retry. Account sync is unaffected." />
-				)}
-				{(query.isError || analyses.isError) && (
-					<ErrorNotice message="Analysis results could not be loaded." />
-				)}
-				{review.isError && (
-					<ErrorNotice message="The finding could not be updated. Try again." />
-				)}
+				<ErrorNotice
+					reserve
+					message={
+						review.isError
+							? "The finding could not be updated. Try again."
+							: query.isError || analyses.isError
+								? "Analysis results could not be loaded."
+								: state === "failed"
+									? "Analysis could not finish. The background worker will retry. Account sync is unaffected."
+									: null
+					}
+				/>
 				{query.isPending ? (
 					<p className="text-sm text-muted">Loading findings…</p>
 				) : findings.length ? (

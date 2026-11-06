@@ -111,7 +111,6 @@ export function AddScheduleDialog({
 
 	return (
 		<Modal title="Add schedule" onClose={onClose}>
-			{error && <ErrorNotice message={error} />}
 			<form
 				className="flex flex-col gap-4"
 				onSubmit={(event) => void submit(event)}
@@ -246,6 +245,7 @@ export function AddScheduleDialog({
 						Include in projections
 					</label>
 				</fieldset>
+				<ErrorNotice reserve message={error} />
 				<div className={dialogActionsStyles}>
 					<Button type="button" variant="secondary" onClick={onClose}>
 						Cancel

@@ -106,7 +106,7 @@ export function SyncLinkAccountDialog({
 					synced account, including its imported bank history.
 				</p>
 			</Notice>
-			{error && <ErrorNotice message={error} />}
+			<ErrorNotice reserve message={error} />
 			<div className={dialogActionsStyles}>
 				<Button
 					type="button"

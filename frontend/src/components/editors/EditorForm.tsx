@@ -76,7 +76,7 @@ export function EditorForm({
 				>
 					{children}
 				</fieldset>
-				{error && <ErrorNotice message={error} />}
+				<ErrorNotice reserve message={error} />
 				{confirmCancel ? (
 					<div
 						className="mt-6 rounded-surface border border-solid border-danger-border bg-danger-bg p-4"

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { JsonValue } from "@/api/contracts.ts";
 import { AccountToggle } from "@/components/AccountToggle.tsx";
 import { InputField } from "@/components/Field.tsx";
+import { FieldError } from "@/components/ErrorNotice.tsx";
 import { finite, isRecord, parseUnion } from "@/domain/guards.ts";
 import { TogglePill } from "@/pages/outlook/safe-spending/TogglePill.tsx";
 import { updateEvaluation } from "@/api/generated/endpoints.ts";
@@ -351,17 +352,13 @@ function IndependenceForm({
 						Saved. Updating projection…
 					</p>
 				)}
-				{error && (
-					<p className="m-0 text-xs text-danger-text" role="alert">
-						{error}
-					</p>
-				)}
 				{readOnly && (
 					<p className="m-0 text-xs text-muted">
 						Read-only mode blocks configuration changes.
 					</p>
 				)}
 			</div>
+			<FieldError message={error} />
 		</div>
 	);
 }

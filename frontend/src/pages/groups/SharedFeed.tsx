@@ -190,13 +190,14 @@ export function SharedFeed({
 				</SelectField>
 			</form>
 
-			{feedQuery.isError && (
-				<ErrorNotice
-					message="Shared transactions could not be loaded."
-					action="Retry"
-					onAction={() => void feedQuery.refetch()}
-				/>
-			)}
+			<ErrorNotice
+				reserve
+				message={
+					feedQuery.isError ? "Shared transactions could not be loaded." : null
+				}
+				action="Retry"
+				onAction={() => void feedQuery.refetch()}
+			/>
 
 			{!feedQuery.isError && items.length === 0 && !feedQuery.isPending && (
 				<EmptyState

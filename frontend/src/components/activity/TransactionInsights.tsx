@@ -567,13 +567,16 @@ export function TransactionInsightsPanel({
 				</div>
 			)}
 
-			{(error || voidError || review.isError || dismiss.isError) && (
-				<ErrorNotice
-					message={
-						error ?? voidError ?? "Your answer could not be saved. Try again."
-					}
-				/>
-			)}
+			<ErrorNotice
+				reserve
+				message={
+					error ??
+					voidError ??
+					(review.isError || dismiss.isError
+						? "Your answer could not be saved. Try again."
+						: null)
+				}
+			/>
 
 			<div className="sticky bottom-0 z-10 -mx-8 -mb-8 mt-8 flex items-center justify-between gap-3 border-t border-line bg-surface px-8 pt-4 pb-1 max-sm:-mx-5 max-sm:-mb-5 max-sm:px-5">
 				{shown.kind === "void" ? (

@@ -38,7 +38,7 @@ export function ConfirmDialog({
 			onCloseRequest={() => !busy}
 		>
 			{children}
-			{error && <ErrorNotice message={error} />}
+			<ErrorNotice reserve message={error} />
 			<div className={dialogActionsStyles}>
 				<Button
 					type="button"

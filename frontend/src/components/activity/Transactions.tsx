@@ -112,17 +112,21 @@ export function Transactions({
 				totalCount={occurrences.length}
 				onChange={update}
 			/>
-			{showsProjected && projected?.loading ? (
-				<p role="status">Loading projected activity…</p>
-			) : null}
-			{showsProjected && projected?.error ? (
-				<p role="alert">
-					{projected.error}{" "}
-					<button type="button" onClick={projected.retry}>
-						Retry forecast
-					</button>
-				</p>
-			) : null}
+			{showsProjected && (
+				<div className="h-24 overflow-auto">
+					{projected?.loading ? (
+						<p role="status">Loading projected activity…</p>
+					) : null}
+					{projected?.error ? (
+						<p role="alert">
+							{projected.error}{" "}
+							<button type="button" onClick={projected.retry}>
+								Retry forecast
+							</button>
+						</p>
+					) : null}
+				</div>
+			)}
 			{filtered.length ? (
 				<>
 					<TransactionAnalysisProvider

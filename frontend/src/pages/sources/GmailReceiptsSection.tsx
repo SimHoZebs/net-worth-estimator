@@ -80,11 +80,7 @@ export function GmailReceiptsSection({ readOnly }: { readOnly: boolean }) {
 				>
 					{message}
 				</p>
-				{error && (
-					<div className="mt-3">
-						<ErrorNotice message={error} />
-					</div>
-				)}
+				<ErrorNotice reserve message={error} />
 				{receipts.isPending ? (
 					<div aria-busy="true" className="mt-4">
 						<Skeleton className="h-16 w-full" />
@@ -297,7 +293,7 @@ function CorrectionForm({
 				value={reference}
 				onChange={(event) => setReference(event.target.value)}
 			/>
-			{error && <ErrorNotice message={error} />}
+			<ErrorNotice reserve message={error} />
 			<div>
 				<Button variant="secondary" type="submit" disabled={disabled || busy}>
 					{busy ? "Saving…" : "Save correction"}

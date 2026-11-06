@@ -153,13 +153,6 @@ function ReceiptEditor({
 					</div>
 				</Notice>
 			)}
-			{mutationError && (
-				<ErrorNotice
-					message={mutationError}
-					action="Reload receipt"
-					onAction={reload}
-				/>
-			)}
 			{receipt.problem && (
 				<Notice tone="warning" className="p-4" role="status">
 					<p>{receipt.problem.message}</p>
@@ -178,13 +171,16 @@ function ReceiptEditor({
 					</p>
 				</Notice>
 			)}
-			{conflict && (
-				<ErrorNotice
-					message="This receipt changed during your edit. Discard your edits before you use the latest saved details."
-					action="Discard edits"
-					onAction={() => setEdit(null)}
-				/>
-			)}
+			<ErrorNotice
+				reserve
+				message={
+					conflict
+						? "This receipt changed during your edit. Discard your edits before you use the latest saved details."
+						: mutationError
+				}
+				action={conflict ? "Discard edits" : "Reload receipt"}
+				onAction={conflict ? () => setEdit(null) : reload}
+			/>
 			<div className="grid gap-6 md:grid-cols-2">
 				<ReceiptPreview
 					id={receipt.id}

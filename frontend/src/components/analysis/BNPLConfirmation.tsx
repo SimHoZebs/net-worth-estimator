@@ -133,15 +133,16 @@ export function BNPLConfirmation({
 					}}
 				/>
 			)}
-			{feedback.isError && (
-				<ErrorNotice
-					message={
-						"status" in feedback.error && feedback.error.status === 409
+			<ErrorNotice
+				reserve
+				message={
+					!feedback.isError
+						? null
+						: "status" in feedback.error && feedback.error.status === 409
 							? "This finding changed. Check your answer and try again."
 							: "Your answer could not be saved. Try again."
-					}
-				/>
-			)}
+				}
+			/>
 		</div>
 	);
 }

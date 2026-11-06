@@ -1359,7 +1359,6 @@ export function TransactionDetail({
 				focusPanelOnOpen
 			>
 				<form id={edit.formId} onSubmit={(event) => void edit.submit(event)}>
-					{subscription.error && <ErrorNotice message={subscription.error} />}
 					<div className="flex flex-col gap-3 pt-1 pb-2">
 						<div className="flex min-w-0 flex-col gap-2">
 							{showAmount && (
@@ -1631,7 +1630,12 @@ export function TransactionDetail({
 							onSelect={setHistorySelection}
 						/>
 					)}
-					{edit.error && <ErrorNotice message={edit.error} />}
+					<ErrorNotice
+						reserve
+						message={[subscription.error, edit.error]
+							.filter(Boolean)
+							.join("\n\n")}
+					/>
 					{edit.saving && (
 						<p className="mt-2 text-xs text-muted" role="status">
 							Saving…

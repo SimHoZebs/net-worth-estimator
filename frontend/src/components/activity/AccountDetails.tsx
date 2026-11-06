@@ -208,7 +208,6 @@ export function AccountDetails({
 					</button>
 				</Notice>
 			)}
-			{error && <ErrorNotice message={error} />}
 			<fieldset
 				disabled={readOnly || saving}
 				className="m-0 grid grid-cols-2 gap-5 border-0 p-0 max-sm:grid-cols-1 max-sm:gap-x-3 max-sm:gap-y-4"
@@ -362,29 +361,32 @@ export function AccountDetails({
 			</fieldset>
 			<DetailList className="m-0">
 				<DetailRow label="Projection at horizon">
-					{endingBalance !== null ? (
-						money(endingBalance)
-					) : projected?.loading ? (
-						<span role="status">Loading forecast…</span>
-					) : projected?.error ? (
-						<span role="alert">
-							{projected.error}{" "}
-							<button type="button" onClick={projected.retry}>
-								Retry forecast
+					<div className="h-24 overflow-auto font-normal">
+						{endingBalance !== null ? (
+							money(endingBalance)
+						) : projected?.loading ? (
+							<span role="status">Loading forecast…</span>
+						) : projected?.error ? (
+							<span role="alert">
+								{projected.error}{" "}
+								<button type="button" onClick={projected.retry}>
+									Retry forecast
+								</button>
+							</span>
+						) : projected?.requested ? (
+							// Forecast resolved but the account is absent from its balances (e.g. disabled): pre-split `?? 0` behavior, never a no-op Load button.
+							money(0)
+						) : projected?.request ? (
+							<button type="button" onClick={projected.request}>
+								Load forecast
 							</button>
-						</span>
-					) : projected?.requested ? (
-						// Forecast resolved but the account is absent from its balances (e.g. disabled): pre-split `?? 0` behavior, never a no-op Load button.
-						money(0)
-					) : projected?.request ? (
-						<button type="button" onClick={projected.request}>
-							Load forecast
-						</button>
-					) : (
-						<span role="status">Forecast unavailable.</span>
-					)}
+						) : (
+							<span role="status">Forecast unavailable.</span>
+						)}
+					</div>
 				</DetailRow>
 			</DetailList>
+			<ErrorNotice reserve message={error} />
 			{!readOnly && (
 				<div className={mergeStyles(dialogActionsStyles, "mt-0")}>
 					<Button type="submit" variant="primary" disabled={!dirty || saving}>

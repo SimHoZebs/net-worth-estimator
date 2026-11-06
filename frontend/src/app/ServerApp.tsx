@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useMatches } from "@tanstack/react-router";
 import { Button } from "../components/Button.tsx";
+import { FieldError } from "../components/ErrorNotice.tsx";
 import { useSession, type Session } from "../auth/sessionContext.ts";
 import { useUserScope } from "../state/useUserScope.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
@@ -150,11 +151,7 @@ function SessionErrorBody({
 						: "Retry the access check. If the problem continues, the workspace owner must restore guest access."
 					: "Retry the access check below."}
 			</p>
-			{error && (
-				<p role="alert" className="text-danger-text">
-					{error}
-				</p>
-			)}
+			<FieldError message={error} />
 			<div className="flex flex-wrap gap-3">
 				{session?.authenticated && (
 					<Button disabled={logoutPending} onClick={onLogout}>

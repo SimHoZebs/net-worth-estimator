@@ -1,8 +1,7 @@
 import { Flag, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Button } from "@/components/Button.tsx";
 import { EmptyState } from "@/components/EmptyState.tsx";
-import { ErrorNotice } from "@/components/ErrorNotice.tsx";
 import { ProjectionUpdating } from "@/components/ProjectionUpdating.tsx";
 import type { Evaluation } from "@/domain/model.ts";
 import { deleteEvaluation } from "@/api/generated/endpoints.ts";
@@ -64,7 +63,6 @@ export function EvaluationsPage({
 	const balances = useAccountBalances();
 	const status = useServerStatus().data;
 	const { ids: pinnedIds, toggle: togglePin } = usePinnedEvaluations();
-	const [removeError, setRemoveError] = useState<string | null>(null);
 	// Pins name persisted server instances: every grid row is a saved row,
 	// so the pin control stays enabled once outcomes arrive.
 	const pinsBlocked = (status?.readOnly ?? false) || pending;
@@ -83,16 +81,10 @@ export function EvaluationsPage({
 			!evaluation.accountId || !archivedIds.has(evaluation.accountId),
 	);
 	const onRemove = (evaluation: Evaluation) => {
-		setRemoveError(null);
 		void performSave({
 			call: () => deleteEvaluation(evaluation.id),
 			refresh: refreshEvaluations,
 			failureMessage: "The evaluation could not be removed.",
-		}).then((ok) => {
-			if (!ok)
-				setRemoveError(
-					"The evaluation could not be removed. Review the workspace notice and try again.",
-				);
 		});
 	};
 	return (
@@ -104,7 +96,6 @@ export function EvaluationsPage({
 					Add evaluation
 				</Button>
 			</div>
-			{removeError && <ErrorNotice message={removeError} />}
 			{!pending && !visible.length && !others.length && (
 				<EmptyState icon={Flag} title="What are you working toward?" />
 			)}
