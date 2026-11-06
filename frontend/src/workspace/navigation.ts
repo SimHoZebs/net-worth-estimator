@@ -84,3 +84,26 @@ export const pages: PageDefinition[] = [
 		title: "How your data is configured",
 	},
 ];
+
+declare module "@tanstack/react-router" {
+	interface StaticDataRouteOption {
+		page?: Page;
+	}
+}
+
+/** Typed route path for each page, for Link bindings. */
+export const pagePaths = {
+	outlook: "/outlook",
+	accounts: "/accounts",
+	transactions: "/transactions",
+	flows: "/flows",
+	purchases: "/purchases",
+	evaluations: "/evaluations",
+	groups: "/groups",
+	inbox: "/inbox",
+	sources: "/sources",
+} as const;
+
+export function pageDefinition(page: Page): PageDefinition {
+	return pages.find((item) => item.id === page) ?? pages[0]!;
+}

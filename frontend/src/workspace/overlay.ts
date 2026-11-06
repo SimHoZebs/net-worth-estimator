@@ -1,0 +1,241 @@
+import type { EvidenceTarget } from "../components/EvidenceDialog.tsx";
+import type { Account, Evaluation, Transaction } from "../domain/model.ts";
+import type { EditorTarget } from "../domain/accountEdits.ts";
+import type { SafeSpendingDetailTab } from "../pages/outlook/safe-spending/safeSpendingDetailModel.ts";
+import type { WorkspaceSearch } from "./overlaySearch.ts";
+
+// Overlay resolution needs only the saved rows used by its lookups. Validated
+// search carries the raw key (`id`); the resolver turns it into a dialog
+// target, waiting for rows (`pending`) or normalizing unknown keys (`unknown`)
+// so deep links never flash a wrong dialog.
+
+export type OverlayRows = {
+	accounts: Account[] | null;
+	transactions: Transaction[] | null;
+	evaluations: Evaluation[] | null;
+};
+
+export type ResolvedOverlay =
+	| { kind: "evidence"; target: EvidenceTarget }
+	| { kind: "editor"; target: EditorTarget }
+	| {
+			kind: "safeSpendingDetail";
+			tab: SafeSpendingDetailTab;
+			edit: EditorTarget | null;
+	  };
+
+export type OverlayResolution =
+	| { state: "none" }
+	| { state: "pending" }
+	| { state: "unknown" }
+	| { state: "ready"; overlay: ResolvedOverlay };
+
+// The only slug that collides in search form: `id=new` means the new-item
+// editor, so an account literally named "New" deep-links by exact id instead
+// (builders fall back to the id form).
+const RESERVED_SLUGS = new Set(["new"]);
+
+export function slugifyAccount(name: string): string {
+	const slug = name
+		.toLowerCase()
+		.trim()
+		.replace(/[\s_]+/g, "-")
+		.replace(/[^a-z0-9-]/g, "")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+	return slug || "account";
+}
+
+/** Exact id first, then a human-readable slug of the name. Archived accounts
+ *  stay hidden: linking one resolves to unknown and the URL normalizes. */
+export function findAccount(
+	rows: Pick<OverlayRows, "accounts">,
+	key: string,
+): Account | undefined {
+	const exact = rows.accounts?.find(
+		(account) => !account.archived && account.id === key,
+	);
+	if (exact) return exact;
+	const slug = key.toLowerCase();
+	return rows.accounts?.find(
+		(account) => !account.archived && slugifyAccount(account.name) === slug,
+	);
+}
+
+function unknown(): OverlayResolution {
+	return { state: "unknown" };
+}
+
+function ready(overlay: ResolvedOverlay): OverlayResolution {
+	return { state: "ready", overlay };
+}
+
+export function resolveOverlay(
+	search: WorkspaceSearch,
+	rows: OverlayRows | null,
+): OverlayResolution {
+	// Validated search guarantees one kind or none, with required keys
+	// present; the guards below keep the resolver total for hand-built
+	// search (tests, optimistic navigation).
+	if (search.evidence !== undefined) {
+		switch (search.evidence) {
+			case "position":
+				return ready({ kind: "evidence", target: { kind: "position" } });
+			case "shortfall":
+				return ready({ kind: "evidence", target: { kind: "failure" } });
+			case "safe-spending":
+				return ready({
+					kind: "evidence",
+					target: { kind: "safe-spending" },
+				});
+			case "account": {
+				if (!rows) return { state: "pending" };
+				if (!search.id) return unknown();
+				if (!rows.accounts) return { state: "pending" };
+				const account = findAccount(rows, search.id);
+				return account
+					? ready({
+							kind: "evidence",
+							target: { kind: "account", id: account.id },
+						})
+					: unknown();
+			}
+		}
+	}
+	if (search.editor !== undefined) {
+		const key = search.id;
+		if (!key) return unknown();
+		switch (search.editor) {
+			case "account": {
+				if (key === "new")
+					return ready({
+						kind: "editor",
+						target: { kind: "account", item: null },
+					});
+				if (!rows) return { state: "pending" };
+				if (!rows.accounts) return { state: "pending" };
+				const account = findAccount(rows, key);
+				return account
+					? ready({
+							kind: "editor",
+							target: { kind: "account", item: account },
+						})
+					: unknown();
+			}
+			case "transaction": {
+				if (key === "new")
+					return ready({
+						kind: "editor",
+						target: { kind: "transaction", item: null },
+					});
+				if (!rows) return { state: "pending" };
+				if (!rows.transactions) return { state: "pending" };
+				const transaction = rows.transactions.find((item) => item.id === key);
+				return transaction
+					? ready({
+							kind: "editor",
+							target: { kind: "transaction", item: transaction },
+						})
+					: unknown();
+			}
+			case "schedule": {
+				if (key !== "new") return unknown();
+				return ready({
+					kind: "editor",
+					target: { kind: "schedule", item: null },
+				});
+			}
+			case "evaluation": {
+				if (key === "new")
+					return ready({
+						kind: "editor",
+						target: { kind: "evaluation", item: null },
+					});
+				if (!rows) return { state: "pending" };
+				if (!rows.evaluations) return { state: "pending" };
+				const evaluation = rows.evaluations.find((item) => item.id === key);
+				return evaluation
+					? ready({
+							kind: "editor",
+							target: { kind: "evaluation", item: evaluation },
+						})
+					: unknown();
+			}
+		}
+	}
+	if (search.detail !== undefined) {
+		const tab = search.tab ?? "cycle";
+		const editKey = search.editTransaction;
+		if (editKey === undefined)
+			return ready({ kind: "safeSpendingDetail", tab, edit: null });
+		if (editKey === "new")
+			return ready({
+				kind: "safeSpendingDetail",
+				tab,
+				edit: { kind: "transaction", item: null },
+			});
+		if (!rows) return { state: "pending" };
+		if (!rows.transactions) return { state: "pending" };
+		const transaction = rows.transactions.find((item) => item.id === editKey);
+		return transaction
+			? ready({
+					kind: "safeSpendingDetail",
+					tab,
+					edit: { kind: "transaction", item: transaction },
+				})
+			: unknown();
+	}
+	return { state: "none" };
+}
+
+function accountKey(account: Account): string {
+	const slug = slugifyAccount(account.name);
+	return RESERVED_SLUGS.has(slug) ? account.id : slug;
+}
+
+/** Search that opens an evidence dialog. Gmail rides along via Router search
+ *  middleware; builders carry overlay keys only. */
+export function evidenceSearch(
+	target: EvidenceTarget,
+	rows: Pick<OverlayRows, "accounts"> | null,
+): WorkspaceSearch {
+	switch (target.kind) {
+		case "position":
+			return { evidence: "position" };
+		case "failure":
+			return { evidence: "shortfall" };
+		case "safe-spending":
+			return { evidence: "safe-spending" };
+		case "account": {
+			const account = rows ? findAccount(rows, target.id) : undefined;
+			const key = account ? accountKey(account) : target.id;
+			return { evidence: "account", id: key };
+		}
+	}
+}
+
+/** Search that opens an editor dialog. */
+export function editorSearch(target: EditorTarget): WorkspaceSearch {
+	switch (target.kind) {
+		case "account": {
+			const key = target.item ? accountKey(target.item) : "new";
+			return { editor: "account", id: key };
+		}
+		case "transaction":
+			return { editor: "transaction", id: target.item?.id ?? "new" };
+		case "schedule":
+			return { editor: "schedule", id: "new" };
+		case "evaluation":
+			return { editor: "evaluation", id: target.item?.id ?? "new" };
+	}
+}
+
+/** Search that opens safe-spending detail, optionally with a stacked editor. */
+export function safeSpendingDetailSearch(
+	tab: SafeSpendingDetailTab,
+	editKey?: string,
+): WorkspaceSearch {
+	return editKey
+		? { detail: "safe-spending", tab, editTransaction: editKey }
+		: { detail: "safe-spending", tab };
+}

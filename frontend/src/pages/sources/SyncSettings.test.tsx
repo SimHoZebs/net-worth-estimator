@@ -1,7 +1,7 @@
 import {
 	act,
 	fireEvent,
-	render,
+	render as renderComponent,
 	screen,
 	waitFor,
 	within,
@@ -24,6 +24,18 @@ import {
 	resetSyncWorkspaceRefresh,
 } from "../../state/syncWorkspaceRefresh.ts";
 import { SyncSettings } from "./SyncSettings.tsx";
+import { createSubjectTestRouter } from "../../mocks/testRouter.tsx";
+import { RouterProvider } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+
+function render(subject: ReactNode) {
+	const router = createSubjectTestRouter({
+		subjectRoute: "/sources",
+		subject,
+		initialEntry: "/sources",
+	});
+	return renderComponent(<RouterProvider router={router} />);
+}
 
 const accounts = [
 	{ id: "checking", name: "Checking", kind: "cash" as const, color: null },

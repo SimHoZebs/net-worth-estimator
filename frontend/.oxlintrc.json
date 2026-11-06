@@ -19,7 +19,7 @@
 		"browser": true,
 		"builtin": true
 	},
-	"ignorePatterns": ["src/api/generated/**"],
+	"ignorePatterns": ["src/api/generated/**", "src/routeTree.gen.ts"],
 	"categories": {
 		"correctness": "error"
 	},

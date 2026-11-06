@@ -5,6 +5,19 @@ import { setupQueryScope, teardownQueryScope } from "../../mocks/testScope.tsx";
 import { serverQueryClient } from "../../state/serverQuery.ts";
 import { resetGmailClient } from "../../state/gmail.ts";
 import { GmailProviderPanel } from "./GmailProviderPanel.tsx";
+import { RouterProvider } from "@tanstack/react-router";
+import { createSubjectTestRouter } from "../../mocks/testRouter.tsx";
+
+function renderPanel(gmailFlag: string | null = null) {
+	const initialEntry = gmailFlag ? `/sources?gmail=${gmailFlag}` : "/sources";
+	const router = createSubjectTestRouter({
+		subjectRoute: "/sources",
+		subject: <GmailProviderPanel />,
+		initialEntry,
+	});
+	const view = render(<RouterProvider router={router} />);
+	return { router, ...view };
+}
 
 function stubGmailApi(state: {
 	connected: boolean;
@@ -192,7 +205,7 @@ afterEach(() => {
 
 it("renders disconnected state with the read-only scope notice", async () => {
 	stubGmailApi({ connected: false });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	expect(
 		await screen.findByRole("heading", {
 			name: "Connect Gmail for receipt discovery",
@@ -212,7 +225,7 @@ it("starts consent through the server-built URL without rendering it", async () 
 		writable: true,
 	});
 	try {
-		render(<GmailProviderPanel />);
+		renderPanel();
 		fireEvent.click(
 			await screen.findByRole("button", { name: /Connect Gmail/ }),
 		);
@@ -237,7 +250,7 @@ it("starts consent through the server-built URL without rendering it", async () 
 
 it("shows the connected account and saves the scan window", async () => {
 	const requests = stubGmailApi({ connected: true, lookbackDays: 90 });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	expect(await screen.findByText(/reader@example\.com/)).toBeTruthy();
 	const input = screen.getByLabelText(
 		"Initial scan window (days)",
@@ -262,7 +275,7 @@ it("shows the connected account and saves the scan window", async () => {
 
 it("rejects an out-of-range scan window without a request", async () => {
 	const requests = stubGmailApi({ connected: true });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	const input = await screen.findByLabelText("Initial scan window (days)");
 	fireEvent.change(input, { target: { value: "400" } });
 	expect(
@@ -281,7 +294,7 @@ it("rejects an out-of-range scan window without a request", async () => {
 
 it("disconnects after confirmation and keeps the lookback", async () => {
 	const requests = stubGmailApi({ connected: true, lookbackDays: 45 });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	await screen.findByText(/reader@example\.com/);
 	fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
 	fireEvent.click(screen.getByRole("button", { name: "Yes, disconnect" }));
@@ -304,7 +317,7 @@ it("disconnects after confirmation and keeps the lookback", async () => {
 
 it("shows the unavailable state when the server has no OAuth client", async () => {
 	stubGmailApi({ connected: false, unavailable: true });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	expect(await screen.findByText("Unavailable")).toBeTruthy();
 	expect(screen.getByText(/has not configured Gmail/)).toBeTruthy();
 	expect(screen.queryByRole("button", { name: /Connect Gmail/ })).toBeNull();
@@ -313,7 +326,7 @@ it("shows the unavailable state when the server has no OAuth client", async () =
 it("shows an error instead of onboarding when the credential fails", async () => {
 	const state = { connected: false, failCredential: true };
 	stubGmailApi(state);
-	render(<GmailProviderPanel />);
+	renderPanel();
 	expect(
 		await screen.findByText("The Gmail connection could not be loaded."),
 	).toBeTruthy();
@@ -329,14 +342,11 @@ it("shows an error instead of onboarding when the credential fails", async () =>
 
 it("announces the OAuth return outcome once and clears the flag", async () => {
 	stubGmailApi({ connected: true });
-	// Spy, so the shared jsdom history is restored for later test files.
-	const replaceState = vi.spyOn(window.history, "replaceState");
-	window.history.pushState(null, "", "/?gmail=connected");
-	render(<GmailProviderPanel />);
+	const { router } = renderPanel("connected");
 	expect(await screen.findByText("Gmail connected.")).toBeTruthy();
-	expect(replaceState).toHaveBeenCalled();
-	const cleaned = String(replaceState.mock.calls[0]?.[2] ?? "");
-	expect(cleaned).not.toContain("gmail=connected");
+	await waitFor(() =>
+		expect(router.state.location.search.gmail).toBeUndefined(),
+	);
 });
 
 const sampleReceipt = {
@@ -357,7 +367,7 @@ const sampleReceipt = {
 
 it("scans and lists extracted receipts with review standing", async () => {
 	const requests = stubGmailApi({ connected: true, receipts: [sampleReceipt] });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	expect(await screen.findByText("Example Store")).toBeTruthy();
 	expect(screen.getByText("Needs review")).toBeTruthy();
 	expect(screen.getByText(/2026-10-20/)).toBeTruthy();
@@ -376,7 +386,7 @@ it("scans and lists extracted receipts with review standing", async () => {
 
 it("confirms a low-confidence extraction without rewriting the original", async () => {
 	stubGmailApi({ connected: true, receipts: [{ ...sampleReceipt }] });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
 	expect(await screen.findByText("Reviewed")).toBeTruthy();
 	expect(screen.queryByText("Needs review")).toBeNull();
@@ -384,7 +394,7 @@ it("confirms a low-confidence extraction without rewriting the original", async 
 
 it("saves a correction over a low-confidence extraction", async () => {
 	stubGmailApi({ connected: true, receipts: [{ ...sampleReceipt }] });
-	render(<GmailProviderPanel />);
+	renderPanel();
 	await screen.findByText("Example Store");
 	fireEvent.click(screen.getByRole("button", { name: "Correct" }));
 	fireEvent.change(screen.getByLabelText("Merchant"), {

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { Outlet, useMatches } from "@tanstack/react-router";
 import { Button } from "../components/Button.tsx";
 import { useSession, type Session } from "../auth/sessionContext.ts";
 import { useUserScope } from "../state/useUserScope.ts";
@@ -8,9 +10,13 @@ import {
 	WorkspaceTopbar,
 } from "../workspace/WorkspaceHeader.tsx";
 import { WorkspaceLayout } from "../workspace/WorkspaceLayout.tsx";
-import { WorkspaceContent } from "../workspace/WorkspaceContent.tsx";
 import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar.tsx";
-import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
+import { pageDefinition } from "../workspace/navigation.ts";
+import { useWorkspaceOverlays } from "../workspace/useWorkspaceOverlays.ts";
+import {
+	WorkspaceDialogs,
+	WorkspaceEvidence,
+} from "../workspace/WorkspaceDialogs.tsx";
 import { ServerWorkspaceRecovery } from "./ServerWorkspaceRecovery.tsx";
 
 export function ServerApp() {
@@ -21,7 +27,26 @@ export function ServerApp() {
 	// detail views that need the document fetch it.
 	const status = useServerStatus({ enabled });
 	useWorkspaceSyncMonitor(enabled);
-	const navigation = useWorkspaceNavigation();
+	const overlays = useWorkspaceOverlays();
+
+	const page = useMatches({
+		select: (matches) =>
+			matches.find((match) => match.staticData.page)?.staticData.page ??
+			"outlook",
+	});
+	const currentPage = pageDefinition(page);
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	const pageRef = useRef(page);
+	useEffect(() => {
+		// Only a page switch moves focus to the heading. Search-only changes
+		// (opening or closing an overlay) leave it alone: the dialog owns
+		// focus while open and restores it on close.
+		if (pageRef.current !== page) {
+			pageRef.current = page;
+			requestAnimationFrame(() => headingRef.current?.focus());
+		}
+	}, [page]);
+
 	const sessionState = useSession();
 	const session = sessionState?.session ?? null;
 	const phase = sessionState?.phase ?? "checking";
@@ -32,7 +57,7 @@ export function ServerApp() {
 
 	// The layout stays mounted once. Only the body switches: session
 	// denial or outage, recovery when the server holds no model, otherwise
-	// the workspace body. No state shows a whole-app skeleton; each page
+	// the matched route. No state shows a whole-app skeleton; each page
 	// and sidebar slot shows its own skeleton while its own query is
 	// pending. A pending status is not a reason to withhold navigation, and
 	// the sidebar, topbar, and heading keep their identity across loading
@@ -44,23 +69,17 @@ export function ServerApp() {
 		<WorkspaceLayout
 			navigation={(close) => (
 				<WorkspaceSidebar
-					page={navigation.page}
+					page={page}
 					onClose={close}
 					pending={status.isPending}
 				/>
 			)}
 			header={(open) => (
-				<WorkspaceTopbar
-					page={navigation.currentPage}
-					onOpenNavigation={open}
-				/>
+				<WorkspaceTopbar page={currentPage} onOpenNavigation={open} />
 			)}
 		>
 			{!recovery && !blocked && (
-				<WorkspaceHeading
-					page={navigation.currentPage}
-					headingRef={navigation.headingRef}
-				/>
+				<WorkspaceHeading page={currentPage} headingRef={headingRef} />
 			)}
 			{blocked ? (
 				<SessionErrorBody
@@ -77,7 +96,11 @@ export function ServerApp() {
 			) : recovery ? (
 				<ServerWorkspaceRecovery />
 			) : (
-				<WorkspaceContent navigation={navigation} />
+				<>
+					<Outlet />
+					<WorkspaceEvidence overlays={overlays} />
+					<WorkspaceDialogs overlays={overlays} />
+				</>
 			)}
 		</WorkspaceLayout>
 	);

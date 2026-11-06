@@ -14,11 +14,16 @@ import { stubTestServer } from "../mocks/waypointServer.ts";
 import { resetUiStore } from "../state/uiStore.ts";
 import type { ServerStatus } from "../api/contracts.ts";
 import { userResourceKey } from "../state/workspaceResources.ts";
-import { ServerApp } from "./ServerApp.tsx";
+import {
+	renderServerAppShell,
+	createWorkspaceTestRouter,
+} from "../mocks/testRouter.tsx";
+import { RouterProvider } from "@tanstack/react-router";
 
 vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
-vi.mock("../workspace/WorkspaceContent.tsx", () => ({
-	WorkspaceContent: () => <p>Workspace body</p>,
+vi.mock("../workspace/WorkspaceDialogs.tsx", () => ({
+	WorkspaceDialogs: () => null,
+	WorkspaceEvidence: () => null,
 }));
 vi.mock("./ServerWorkspaceRecovery.tsx", () => ({
 	ServerWorkspaceRecovery: () => <p>Recovery body</p>,
@@ -61,7 +66,7 @@ async function refetchStatus() {
 it("keeps the same sidebar node across workspace and recovery bodies", async () => {
 	const server = stubTestServer();
 	act(() => suspendUserScope());
-	render(<ServerApp />);
+	await renderServerAppShell(<p>Workspace body</p>);
 	// The workspace body mounts without waiting for the scope; its own
 	// slots wait on their queries. The sidebar is already present.
 	expect(screen.getByText("Workspace body")).toBeTruthy();
@@ -100,7 +105,7 @@ it("shows an unavailable error in the layout body without replacing the shell", 
 				logoutPending: false,
 			}}
 		>
-			<ServerApp />
+			<RouterProvider router={createWorkspaceTestRouter("/outlook")} />
 		</SessionContext>,
 	);
 	expect(
@@ -146,7 +151,7 @@ it("shows a denial in the layout body without replacing the shell", async () => 
 				logoutPending: false,
 			}}
 		>
-			<ServerApp />
+			<RouterProvider router={createWorkspaceTestRouter("/outlook")} />
 		</SessionContext>,
 	);
 	expect(

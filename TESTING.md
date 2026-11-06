@@ -115,6 +115,23 @@ checks design-system contracts only; no script enforces font-ownership warnings.
 
 ### Component interactions
 
+Workspace navigation uses TanStack Router file routes and the generated route
+tree. Vite generates the tree and splits page components automatically. Commit
+the generated tree so unit tests and type checks work before the first build.
+Route metadata owns the current page. Root search validation owns overlay query
+parameters and canonical URLs. Page query hooks retain resource-scope gating and
+data freshness. Route preloads fetch code, not financial data.
+The search parser preserves string values and duplicate keys for validation,
+including numeric and boolean-like account slugs.
+
+Routing regression checks cover nested group parameters, root redirects,
+validated search, OAuth flag retention, editor return context, and browser
+Back/Forward. Run the browser scenarios with:
+
+```bash
+bun --filter ./frontend test:integration -- modalUrls.spec.ts workspace.spec.ts groupSharing.spec.ts safeSpending.spec.ts
+```
+
 Component behavior is tested as a scenario, not as isolated clicks.
 `frontend/src/mocks/interactions.ts` provides a data-driven runner over
 Testing Library and `user-event`:

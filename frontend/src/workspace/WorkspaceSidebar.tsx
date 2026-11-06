@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { PanelLeftClose, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { Brand } from "../components/Brand.tsx";
@@ -8,33 +9,31 @@ import { mergeStyles } from "../components/mergeStyles.ts";
 import { useServerStatus } from "../state/workspaceResources.ts";
 import { useInboxUnreadCount } from "../state/inbox.ts";
 import { LastSync } from "./LastSync.tsx";
-import { type Page, pages } from "./navigation.ts";
+import { pagePaths, pages, type Page } from "./navigation.ts";
 import { navigationLinkClassName } from "./navigationStyles.ts";
-import { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
 
 function SidebarNavLink({
-	href,
+	to,
 	active,
 	onClose,
-	onNavigate,
 	children,
 }: {
-	href: string;
+	to: (typeof pagePaths)[Page];
 	active: boolean;
 	onClose: () => void;
-	onNavigate: () => void;
 	children: ReactNode;
 }) {
 	return (
-		<a
+		<Link
+			to={to}
+			preload="intent"
 			className={mergeStyles(
 				navigationLinkClassName,
 				active ? "bg-active" : undefined,
 			)}
-			href={href}
 			onClick={(event) => {
-				// Plain clicks stay in the SPA; modifier and middle clicks
-				// still open the real route in a new tab.
+				// Plain clicks close the mobile drawer; modifier and middle
+				// clicks keep the native new-tab behavior.
 				if (
 					event.metaKey ||
 					event.ctrlKey ||
@@ -44,14 +43,12 @@ function SidebarNavLink({
 				) {
 					return;
 				}
-				event.preventDefault();
 				onClose();
-				onNavigate();
 			}}
 			aria-current={active ? "page" : undefined}
 		>
 			<span className="flex min-w-0 items-center gap-3">{children}</span>
-		</a>
+		</Link>
 	);
 }
 
@@ -69,7 +66,6 @@ export function WorkspaceSidebar({
 	// The inbox badge reflects persisted unread state; a failed load hides
 	// the badge instead of blocking navigation.
 	const unreadCount = useInboxUnreadCount().data ?? 0;
-	const navigation = useWorkspaceNavigation();
 	return (
 		<>
 			<div className="flex items-center justify-between px-2">
@@ -89,9 +85,8 @@ export function WorkspaceSidebar({
 							.map((item) => (
 								<li key={item.id}>
 									<SidebarNavLink
-										href={`/${item.id}`}
+										to={pagePaths[item.id]}
 										onClose={onClose}
-										onNavigate={() => navigation.navigate(item.id)}
 										active={page === item.id}
 									>
 										<item.icon size={19} strokeWidth={1.7} />
@@ -127,9 +122,8 @@ export function WorkspaceSidebar({
 			</div>
 			<div className="mt-auto pt-12 max-md:pt-8">
 				<SidebarNavLink
-					href="/sources"
+					to={pagePaths.sources}
 					onClose={onClose}
-					onNavigate={() => navigation.navigate("sources")}
 					active={page === "sources"}
 				>
 					<Settings size={19} strokeWidth={1.7} />

@@ -1,8 +1,7 @@
 import { TriangleAlert } from "lucide-react";
+import { useRouter } from "@tanstack/react-router";
 import type { ServerStatus } from "../api/index.ts";
 import { notifyError } from "../state/notifications.ts";
-import { pagePath } from "./route.ts";
-import { preserveCallbackFlag } from "./useWorkspaceNavigation.ts";
 
 // An instant uses the viewer's time zone, not the server's UTC display.
 const syncTimeFormat = new Intl.DateTimeFormat(undefined, {
@@ -36,6 +35,7 @@ export function LastSync({
 	status: ServerStatus | null;
 	now?: number;
 }) {
+	const router = useRouter();
 	// Freshness is wall-clock age against a fixed server instant: it flips
 	// fresh→stale exactly once, so reading the clock here cannot oscillate.
 	// oxlint-disable-next-line react/purity
@@ -52,12 +52,7 @@ export function LastSync({
 						notifyError("sync-stale", staleSyncMessage(), {
 							label: "Open bank sync",
 							onAction: () => {
-								window.history.pushState(
-									null,
-									"",
-									preserveCallbackFlag(pagePath("sources")),
-								);
-								window.dispatchEvent(new Event("popstate"));
+								void router.navigate({ to: "/sources" });
 							},
 						})
 					}

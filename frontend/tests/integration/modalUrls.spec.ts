@@ -5,6 +5,75 @@ test.beforeEach(async () => {
 	await resetFixture();
 });
 
+for (const name of ["401", "true"]) {
+	test(`account ${name} opens through generated and direct deep links`, async ({
+		page,
+	}) => {
+		await page.goto("/accounts?editor=account&id=everyday-checking");
+		await page.getByLabel("Account name").fill(name);
+		await page
+			.getByRole("button", { name: "Save account", exact: true })
+			.click();
+		await expect(page.getByRole("dialog")).not.toBeVisible();
+		await page
+			.getByRole("button", { name: `Open ${name} transactions`, exact: true })
+			.click();
+		await expect(page).toHaveURL(
+			new RegExp(`/accounts\\?evidence=account&id=${name}$`),
+		);
+		await expect(page.getByRole("dialog", { name, exact: true })).toBeVisible();
+		await page.goto(`/accounts?evidence=account&id=${name}`);
+		await expect(page.getByRole("dialog", { name, exact: true })).toBeVisible();
+	});
+}
+
+test("validated search canonicalizes malformed deep links and retains the OAuth outcome", async ({
+	page,
+}) => {
+	await page.goto("/accounts?evidence=account&id=a&id=b&gmail=connected");
+	await expect(page).toHaveURL(/\/accounts\?gmail=connected$/);
+	await expect(page.getByRole("dialog")).not.toBeVisible();
+	await page.getByRole("link", { name: "Transactions", exact: true }).click();
+	await expect(page).toHaveURL(/\/transactions\?gmail=connected$/);
+	await page.goto("/accounts?editor=account&id=new&unrelated=value");
+	await expect(page).toHaveURL(/\/accounts\?editor=account&id=new$/);
+	await expect(
+		page.getByRole("dialog", { name: "Add account", exact: true }),
+	).toBeVisible();
+});
+
+test("root and unknown routes redirect to outlook without adding a history entry", async ({
+	page,
+}) => {
+	await page.goto("/accounts");
+	await page.getByRole("link", { name: "Transactions", exact: true }).click();
+	await page.goto("/not-a-page?gmail=error");
+	await expect(page).toHaveURL(/\/outlook\?gmail=error$/);
+	await expect(
+		page.getByRole("heading", { name: "Your financial outlook" }),
+	).toBeVisible();
+	await page.goBack();
+	await expect(page).toHaveURL(/\/transactions$/);
+	await page.goto("/?gmail=connected");
+	await expect(page).toHaveURL(/\/outlook\?gmail=connected$/);
+});
+
+test("page navigation moves focus and preserves the native link target", async ({
+	page,
+}) => {
+	await page.goto("/accounts");
+	const transactions = page.getByRole("link", {
+		name: "Transactions",
+		exact: true,
+	});
+	await expect(transactions).toHaveAttribute("href", "/transactions");
+	await transactions.click();
+	await expect(
+		page.getByRole("heading", { name: "Planned transactions", exact: true }),
+	).toBeFocused();
+	await expect(page).toHaveTitle("Transactions · Waypoint");
+});
+
 test("account modals have URLs, restore on back, and deep-link", async ({
 	page,
 }) => {
@@ -21,6 +90,10 @@ test("account modals have URLs, restore on back, and deep-link", async ({
 		/\/accounts\?evidence=account&id=everyday-checking$/,
 	);
 	await expect(page.getByRole("dialog")).toContainText("Everyday checking");
+	await page.screenshot({
+		path: "test-results/router-account-evidence.png",
+		fullPage: true,
+	});
 
 	// The back button closes the modal back onto the accounts page.
 	await page.goBack();

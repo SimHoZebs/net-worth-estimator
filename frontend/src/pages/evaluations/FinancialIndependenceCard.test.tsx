@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	within,
+	waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -9,6 +15,7 @@ import {
 	independenceRow,
 } from "@/mocks/financialIndependence.ts";
 import { FinancialIndependenceCard } from "./FinancialIndependenceCard.tsx";
+import { renderRouterSubject } from "../../mocks/testRouter.tsx";
 import { stubMatchMedia } from "@/mocks/testScope.tsx";
 
 // Focus, dismissal, and responsive framing use the real shared Drawer in browser tests.
@@ -54,6 +61,15 @@ async function openInspector(view: ReturnType<typeof render>) {
 	);
 }
 
+function renderCard(
+	item: Parameters<typeof FinancialIndependenceCard>[0]["item"],
+	range?: Parameters<typeof FinancialIndependenceCard>[0]["range"],
+) {
+	return renderRouterSubject(
+		<FinancialIndependenceCard item={item} range={range} />,
+		"/evaluations",
+	);
+}
 describe("FinancialIndependenceCard", () => {
 	it("presents financial outcomes without exposing engine screening gates", async () => {
 		const item = independenceItem(
@@ -61,7 +77,7 @@ describe("FinancialIndependenceCard", () => {
 				rows: [independenceRow("2036-02-01", { minimumNetWorth: 0 })],
 			}),
 		);
-		const view = render(<FinancialIndependenceCard item={item} />);
+		const view = await renderCard(item);
 		expect(view.getByText("Not reached")).toBeTruthy();
 		expect(view.queryByRole("button", { name: /Inspect evidence/ })).toBeNull();
 		const dialog = await openInspector(view);
@@ -99,9 +115,7 @@ describe("FinancialIndependenceCard", () => {
 	});
 
 	it("keeps the card compact and opens financial evidence without expanding it", async () => {
-		const view = render(
-			<FinancialIndependenceCard item={independenceItem()} />,
-		);
+		const view = await renderCard(independenceItem());
 		const card = view.getByRole("region", { name: "Financial independence" });
 		expect(
 			view.getByRole("img", { name: /Spending coverage at Feb 2036/ }),
@@ -126,19 +140,20 @@ describe("FinancialIndependenceCard", () => {
 		expect(dialog.getByRole("rowheader", { name: "Cash" })).toBeTruthy();
 		const cashAccount = dialog.getByRole("button", { name: "Cash" });
 		fireEvent.click(cashAccount);
-		expect(window.location.pathname + window.location.search).toContain(
-			"/accounts?evidence=account&id=cash",
+		await waitFor(() =>
+			expect(view.router.state.location.pathname).toBe("/accounts"),
 		);
-		window.history.replaceState(null, "", "/evaluations");
+		expect(view.router.state.location.search).toMatchObject({
+			evidence: "account",
+			id: "cash",
+		});
 		fireEvent.click(dialog.getByRole("button", { name: "Close dialog" }));
 		expect(view.queryByRole("dialog")).toBeNull();
 		expect(view.queryByRole("table")).toBeNull();
 	});
 
 	it("keeps the automatic evidence date without date controls", async () => {
-		const view = render(
-			<FinancialIndependenceCard item={independenceItem()} />,
-		);
+		const view = await renderCard(independenceItem());
 		const dialog = await openInspector(view);
 		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
 		expect(dialog.queryByRole("combobox")).toBeNull();
@@ -176,7 +191,7 @@ describe("FinancialIndependenceCard", () => {
 				],
 			}),
 		);
-		const view = render(<FinancialIndependenceCard item={item} />);
+		const view = await renderCard(item);
 		const dialog = await openInspector(view);
 		expect(dialog.getByText("Funding as of Feb 2026")).toBeTruthy();
 		expect(
@@ -202,13 +217,11 @@ describe("FinancialIndependenceCard", () => {
 				firstSelfSustainingDate: null,
 			},
 		});
-		const view = render(
-			<FinancialIndependenceCard
-				item={independenceItem(
-					envelope,
-					independenceConfig({ annualExpenseTarget: 50000 }),
-				)}
-			/>,
+		const view = await renderCard(
+			independenceItem(
+				envelope,
+				independenceConfig({ annualExpenseTarget: 50000 }),
+			),
 		);
 		expect(view.getByText("Not reached")).toBeTruthy();
 		const dialog = await openInspector(view);
@@ -236,7 +249,7 @@ describe("FinancialIndependenceCard", () => {
 			independenceEnvelope({ rows: [], runOutcomes: [], milestones: {} }),
 			independenceConfig({ evaluationYears: 30 }),
 		);
-		const view = render(<FinancialIndependenceCard item={item} />);
+		const view = await renderCard(item);
 		expect(view.getByText("More horizon needed")).toBeTruthy();
 		expect(
 			view
@@ -265,7 +278,7 @@ describe("FinancialIndependenceCard", () => {
 			},
 		];
 		const item = independenceItem(envelope);
-		const view = render(<FinancialIndependenceCard item={item} />);
+		const view = await renderCard(item);
 		expect(view.getByText("Not calculated")).toBeTruthy();
 		fireEvent.click(
 			view.getByRole("button", { name: "1 source or configuration issue" }),
@@ -292,17 +305,12 @@ describe("FinancialIndependenceCard", () => {
 			runOutcomes: [],
 			milestones: { firstSelfSustainingDate: "2036-02-01" },
 		});
-		const view = render(
-			<FinancialIndependenceCard
-				item={independenceItem(envelope)}
-				range={{
-					probability: 0.65,
-					date: null,
-					dateProbability: null,
-					count: 400,
-				}}
-			/>,
-		);
+		const view = await renderCard(independenceItem(envelope), {
+			probability: 0.65,
+			date: null,
+			dateProbability: null,
+			count: 400,
+		});
 		expect(view.getByText("Projection")).toBeTruthy();
 		expect(view.queryByText("65%")).toBeNull();
 		expect(view.queryByText(/90% required/)).toBeNull();
@@ -313,9 +321,7 @@ describe("FinancialIndependenceCard", () => {
 	});
 
 	it("keeps the inspector open across a recalculation and only closes it explicitly", async () => {
-		const view = render(
-			<FinancialIndependenceCard item={independenceItem()} />,
-		);
+		const view = await renderCard(independenceItem());
 		const dialog = await openInspector(view);
 		expect(dialog.getByText("Funding as of Feb 2036")).toBeTruthy();
 		// A recalculation arrives as a new analysis identity for the same

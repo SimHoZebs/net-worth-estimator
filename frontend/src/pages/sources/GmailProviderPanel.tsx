@@ -1,3 +1,4 @@
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Check, ExternalLink, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/http.ts";
@@ -7,9 +8,8 @@ import { ErrorNotice } from "../../components/ErrorNotice.tsx";
 import { InputField } from "../../components/Field.tsx";
 import { Skeleton } from "../../components/Skeleton.tsx";
 import {
-	clearGmailCallbackFlag,
 	disconnectGmail,
-	readGmailCallbackOutcome,
+	refreshGmailSettings,
 	setGmailLookbackDays,
 	startGmailConsent,
 	useGmailCredential,
@@ -23,10 +23,16 @@ import { GmailReceiptsSection } from "./GmailReceiptsSection.tsx";
 export function GmailProviderPanel() {
 	const credential = useGmailCredential();
 	const readOnly = useUserReadOnly();
+	const search = useSearch({ strict: false });
+	const navigate = useNavigate({ from: "/sources" });
 	// The OAuth return lands back on the app with ?gmail=connected|error.
 	// The outcome derives during render; the effect below only clears the
 	// consumed flag from the address bar and refreshes Gmail state.
-	const [callbackOutcome] = useState(readGmailCallbackOutcome);
+	const outcome =
+		search.gmail === "connected" || search.gmail === "error"
+			? search.gmail
+			: null;
+	const [callbackOutcome] = useState(() => outcome);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(
 		callbackOutcome === "error"
@@ -40,8 +46,14 @@ export function GmailProviderPanel() {
 	const [lookback, setLookback] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (callbackOutcome) clearGmailCallbackFlag();
-	}, [callbackOutcome]);
+		if (!callbackOutcome) return;
+		void navigate({
+			to: ".",
+			search: (prev) => ({ ...prev, gmail: undefined }),
+			replace: true,
+		});
+		void refreshGmailSettings(true);
+	}, [callbackOutcome, navigate]);
 
 	if (credential.isPending) {
 		return (

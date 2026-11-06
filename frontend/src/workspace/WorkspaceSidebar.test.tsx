@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ServerStatus } from "../api/index.ts";
 import { SessionContext, type Session } from "../auth/sessionContext.ts";
@@ -8,6 +8,7 @@ import {
 	useNotifications,
 } from "../state/notifications.ts";
 import { WorkspaceSidebar } from "./WorkspaceSidebar.tsx";
+import { renderRouterSubject } from "../mocks/testRouter.tsx";
 import { isSyncStale, LastSync, SYNC_STALE_AFTER_MS } from "./LastSync.tsx";
 import { acceptTestResource } from "../mocks/resource.ts";
 import { setServerStatusFixture } from "../mocks/workspace.ts";
@@ -28,7 +29,7 @@ const staleSyncAt = () =>
 	new Date(Date.now() - SYNC_STALE_AFTER_MS - 60_000).toISOString();
 
 function renderSidebar(pending = false) {
-	return render(
+	return renderRouterSubject(
 		<WorkspaceSidebar page="outlook" onClose={() => {}} pending={pending} />,
 	);
 }
@@ -47,15 +48,13 @@ describe("sidebar sync signals", () => {
 		acceptTestResource();
 		resetServerQueryCache();
 		resetNotifications();
-		window.history.replaceState(null, "", "/");
 	});
 	afterEach(() => {
 		cleanup();
 		resetNotifications();
-		window.history.replaceState(null, "", "/");
 	});
 
-	it("shows the server's last successful sync in browser-local time, including read-only mode", () => {
+	it("shows the server's last successful sync in browser-local time, including read-only mode", async () => {
 		const freshAt = freshSyncAt();
 		setServerStatusFixture({
 			...baseStatus,
@@ -63,7 +62,7 @@ describe("sidebar sync signals", () => {
 			syncConfigured: true,
 			lastSyncAt: freshAt,
 		});
-		const view = renderSidebar();
+		const view = await renderSidebar();
 		expect(
 			view.getByText(`Last synced ${localSyncTime(freshAt)}`),
 		).toBeTruthy();
@@ -82,28 +81,28 @@ describe("sidebar sync signals", () => {
 		],
 	] satisfies [ServerStatus | null, string][])(
 		"renders honest sync state for %j",
-		(status, label) => {
+		async (status, label) => {
 			if (status) setServerStatusFixture(status);
-			const view = renderSidebar();
+			const view = await renderSidebar();
 			expect(view.getByText(label)).toBeTruthy();
 			expect(view.container.querySelector("time")).toBeNull();
 		},
 	);
 
-	it("preserves a recorded sync time when sync is no longer configured", () => {
+	it("preserves a recorded sync time when sync is no longer configured", async () => {
 		setServerStatusFixture({
 			...baseStatus,
 			syncConfigured: false,
 			lastSyncAt,
 		});
-		const view = renderSidebar();
+		const view = await renderSidebar();
 		expect(
 			view.getByText(`Last synced ${localSyncTime(lastSyncAt)}`),
 		).toBeTruthy();
 		expect(view.queryByRole("button", { name: /sync/i })).toBeNull();
 	});
 
-	it("flags a configured sync older than six hours with a warning", () => {
+	it("flags a configured sync older than six hours with a warning", async () => {
 		const staleAt = staleSyncAt();
 		setServerStatusFixture({
 			...baseStatus,
@@ -111,7 +110,7 @@ describe("sidebar sync signals", () => {
 			lastSyncAt: staleAt,
 			syncHost: "bridge.example",
 		});
-		const view = renderSidebar();
+		const view = await renderSidebar();
 		const warning = view.getByRole("button", { name: /sync stale/i });
 		expect(warning).toBeTruthy();
 		expect(
@@ -122,7 +121,7 @@ describe("sidebar sync signals", () => {
 		expect(view.container.querySelector("time")?.dateTime).toBe(staleAt);
 	});
 
-	it("explains a stale sync and routes to bank sync on click", () => {
+	it("explains a stale sync and routes to bank sync on click", async () => {
 		const staleAt = staleSyncAt();
 		setServerStatusFixture({
 			...baseStatus,
@@ -130,7 +129,7 @@ describe("sidebar sync signals", () => {
 			lastSyncAt: staleAt,
 			syncHost: "bridge.example",
 		});
-		const view = renderSidebar();
+		const view = await renderSidebar();
 		fireEvent.click(view.getByRole("button", { name: /sync stale/i }));
 		const toast = useNotifications
 			.getState()
@@ -139,10 +138,12 @@ describe("sidebar sync signals", () => {
 		expect(toast?.message).toBe("Bank sync is stale.");
 		expect(toast?.action?.label).toBe("Open bank sync");
 		toast?.action?.onAction();
-		expect(window.location.pathname).toBe("/sources");
+		await waitFor(() =>
+			expect(view.router.state.location.pathname).toBe("/sources"),
+		);
 	});
 
-	it("flips fresh to stale as the clock passes six hours", () => {
+	it("flips fresh to stale as the clock passes six hours", async () => {
 		vi.useFakeTimers();
 		try {
 			vi.setSystemTime(new Date("2026-10-18T14:30:00Z"));
@@ -152,7 +153,7 @@ describe("sidebar sync signals", () => {
 				syncConfigured: true,
 				lastSyncAt: at.toISOString(),
 			};
-			const view = render(<LastSync status={status} />);
+			const view = await renderRouterSubject(<LastSync status={status} />);
 			expect(view.queryByRole("button", { name: /sync stale/i })).toBeNull();
 			vi.setSystemTime(new Date(Date.now() + 120_000));
 			view.rerender(<LastSync status={status} />);
@@ -172,7 +173,7 @@ describe("sidebar sync signals", () => {
 
 	it("updates the timestamp when server status changes", async () => {
 		setServerStatusFixture({ ...baseStatus, syncConfigured: true });
-		const view = renderSidebar();
+		const view = await renderSidebar();
 		expect(view.getByText("Never synced")).toBeTruthy();
 		const freshAt = freshSyncAt();
 		await act(async () => {
@@ -188,8 +189,8 @@ describe("sidebar sync signals", () => {
 		expect(view.queryByText("Never synced")).toBeNull();
 	});
 
-	it("defers sync copy until the sidebar finishes loading", () => {
-		const view = renderSidebar(true);
+	it("defers sync copy until the sidebar finishes loading", async () => {
+		const view = await renderSidebar(true);
 		expect(view.queryByText(/synced|sync status/i)).toBeNull();
 	});
 });
@@ -198,7 +199,7 @@ describe("sidebar user placement", () => {
 	afterEach(cleanup);
 
 	function renderSession(session: Session) {
-		return render(
+		return renderRouterSubject(
 			<SessionContext
 				value={{
 					session,
@@ -216,8 +217,8 @@ describe("sidebar user placement", () => {
 		);
 	}
 
-	it("keeps session user content out of the navigation sidebar", () => {
-		const view = renderSession({
+	it("keeps session user content out of the navigation sidebar", async () => {
+		const view = await renderSession({
 			enabled: true,
 			authenticated: true,
 			allowed: true,

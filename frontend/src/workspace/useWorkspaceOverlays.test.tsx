@@ -1,8 +1,18 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	Outlet,
+	RouterProvider,
+	retainSearchParams,
+} from "@tanstack/react-router";
+import { createElement, type ReactNode } from "react";
+import { afterEach, expect, it, vi } from "vitest";
 import { financialModelFixture } from "../mocks/financialModel.ts";
-import { useWorkspaceNavigation } from "./useWorkspaceNavigation.ts";
 import { useWorkspaceOverlays } from "./useWorkspaceOverlays.ts";
+import { validateWorkspaceSearch } from "./overlaySearch.ts";
 
 vi.mock("../state/savedState.ts", () => ({
 	useSavedAccounts: () => financialModelFixture.accounts,
@@ -33,75 +43,115 @@ vi.mock("../state/savedState.ts", () => ({
 	useSavedEvaluations: () => [],
 }));
 
-beforeEach(() => window.history.replaceState(null, "", "/accounts"));
-afterEach(() => {
-	cleanup();
-	window.history.replaceState(null, "", "/accounts");
+const rootRoute = createRootRoute({
+	component: () => createElement(Outlet),
+	validateSearch: validateWorkspaceSearch,
+	search: { middlewares: [retainSearchParams(["gmail"])] },
 });
+const stub = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/$slug",
+	component: () => null,
+});
+const accountsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/accounts",
+	component: () => null,
+});
+const transactionsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/transactions",
+	component: () => null,
+});
+const routeTree = rootRoute.addChildren([
+	accountsRoute,
+	transactionsRoute,
+	stub,
+]);
 
-function useHarness() {
-	const navigation = useWorkspaceNavigation();
-	return { navigation, overlays: useWorkspaceOverlays(navigation) };
+async function useHarness(initialEntry = "/accounts") {
+	const router = createRouter({
+		routeTree,
+		history: createMemoryHistory({ initialEntries: [initialEntry] }),
+	});
+	await router.load();
+	const wrapper = ({ children }: { children: ReactNode }) => {
+		rootRoute.update({ component: () => children });
+		return createElement(RouterProvider, { router });
+	};
+	const hook = renderHook(() => useWorkspaceOverlays(), { wrapper });
+	return { router, ...hook };
 }
 
-it("returns to the owning evidence after edit and clears context on an ordinary editor open", () => {
-	const account = financialModelFixture.accounts[0]!;
-	const hook = renderHook(useHarness);
-	act(() =>
-		hook.result.current.overlays.openEvidence({
-			kind: "account",
-			id: account.id,
-		}),
-	);
-	act(() =>
-		hook.result.current.overlays.editFromEvidence({
-			kind: "account",
-			item: account,
-		}),
-	);
-	expect(hook.result.current.overlays.editor?.kind).toBe("account");
-	expect(hook.result.current.navigation.returnTo).toEqual({
-		kind: "account",
-		id: account.id,
-	});
-	act(() => hook.result.current.overlays.closeEditor());
-	expect(hook.result.current.overlays.evidence).toEqual({
-		kind: "account",
-		id: account.id,
-	});
-	expect(hook.result.current.navigation.returnTo).toBeNull();
-	act(() =>
-		hook.result.current.overlays.openEditor({ kind: "account", item: null }),
-	);
-	act(() => hook.result.current.overlays.closeEditor());
-	expect(hook.result.current.overlays.evidence).toBeNull();
-	expect(window.location.pathname).toBe("/accounts");
+afterEach(() => {
+	cleanup();
 });
 
-it("a page navigation cannot leak a previous editor's return target", () => {
+it("returns to the owning evidence after edit and clears context on an ordinary editor open", async () => {
 	const account = financialModelFixture.accounts[0]!;
-	const hook = renderHook(useHarness);
-	act(() =>
-		hook.result.current.overlays.openEvidence({
+	const { router, result } = await useHarness();
+	await act(async () =>
+		result.current.openEvidence({
 			kind: "account",
 			id: account.id,
 		}),
 	);
-	act(() =>
-		hook.result.current.overlays.editFromEvidence({
+	expect(router.state.location.search).toMatchObject({
+		evidence: "account",
+	});
+	await act(async () =>
+		result.current.editFromEvidence({
 			kind: "account",
 			item: account,
 		}),
 	);
-	act(() => hook.result.current.navigation.navigate("transactions"));
-	expect(hook.result.current.navigation.returnTo).toBeNull();
-	act(() =>
-		hook.result.current.overlays.openEditor({
+	expect(result.current.editor?.kind).toBe("account");
+	const state = router.state.location.state as { returnTo?: unknown };
+	expect(state.returnTo).toEqual({
+		kind: "account",
+		id: account.id,
+	});
+	await act(async () => result.current.closeEditor());
+	expect(result.current.evidence).toEqual({
+		kind: "account",
+		id: account.id,
+	});
+	expect(router.state.location.search).toMatchObject({ evidence: "account" });
+	await act(async () =>
+		result.current.openEditor({ kind: "account", item: null }),
+	);
+	await act(async () => result.current.closeEditor());
+	expect(result.current.evidence).toBeNull();
+	expect(router.state.location.pathname).toBe("/accounts");
+	expect(router.state.location.search).toEqual({});
+});
+
+it("a page navigation cannot leak a previous editor's return target", async () => {
+	const account = financialModelFixture.accounts[0]!;
+	const { router, result } = await useHarness();
+	await act(async () =>
+		result.current.openEvidence({
+			kind: "account",
+			id: account.id,
+		}),
+	);
+	await act(async () =>
+		result.current.editFromEvidence({
+			kind: "account",
+			item: account,
+		}),
+	);
+	await act(async () => {
+		await router.navigate({ to: "/transactions" });
+	});
+	await act(async () =>
+		result.current.openEditor({
 			kind: "transaction",
 			item: null,
 		}),
 	);
-	act(() => hook.result.current.overlays.closeEditor());
-	expect(hook.result.current.overlays.evidence).toBeNull();
-	expect(window.location.pathname).toBe("/transactions");
+	await act(async () => result.current.closeEditor());
+	expect(result.current.evidence).toBeNull();
+	expect(router.state.location.pathname).toBe("/transactions");
+	expect(router.state.location.search).toEqual({});
 });

@@ -1,10 +1,17 @@
 import react from "@vitejs/plugin-react";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-	plugins: [react(), tailwindcss()],
+	plugins: [
+		// The router plugin must come before the React plugin: it generates
+		// the route tree and splits route chunks.
+		tanstackRouter({ target: "react", autoCodeSplitting: true }),
+		react(),
+		tailwindcss(),
+	],
 	resolve: {
 		alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
 	},

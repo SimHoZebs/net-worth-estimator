@@ -156,28 +156,6 @@ export async function setGmailLookbackDays(
 	return true;
 }
 
-// readGmailCallbackOutcome peeks at the post-OAuth redirect flag
-// (?gmail=connected or ?gmail=error) without side effects, so panels can
-// derive their initial notice during render.
-export function readGmailCallbackOutcome(): "connected" | "error" | null {
-	if (typeof window === "undefined") return null;
-	const outcome = new URLSearchParams(window.location.search).get("gmail");
-	if (outcome !== "connected" && outcome !== "error") return null;
-	return outcome;
-}
-
-// clearGmailCallbackFlag removes the consumed OAuth flag from the address
-// bar and refreshes Gmail state. It touches external systems only.
-export function clearGmailCallbackFlag(): void {
-	if (typeof window === "undefined") return;
-	const params = new URLSearchParams(window.location.search);
-	if (!params.has("gmail")) return;
-	params.delete("gmail");
-	const next = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}${window.location.hash}`;
-	window.history.replaceState(null, "", next);
-	void refreshGmailSettings(true);
-}
-
 export function resetGmailClient(): void {
 	serverQueryClient().removeQueries({ queryKey: ["gmail-credential"] });
 	serverQueryClient().removeQueries({ queryKey: ["gmail-receipts"] });

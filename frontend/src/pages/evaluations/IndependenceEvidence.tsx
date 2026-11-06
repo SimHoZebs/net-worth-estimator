@@ -9,8 +9,8 @@ import type {
 	IndependenceCandidate,
 } from "@/domain/financialIndependence.ts";
 import { dateLabel, exactMoney, money, percent } from "@/domain/format.ts";
-import { evidencePath } from "@/workspace/route.ts";
-import { useWorkspaceNavigation } from "@/workspace/useWorkspaceNavigation.ts";
+import { useRouter } from "@tanstack/react-router";
+import { evidenceSearch } from "@/workspace/overlay.ts";
 import { IndependenceBranchChart } from "./IndependenceBranchChart.tsx";
 
 const amount = (value: number | null) => (value === null ? "—" : money(value));
@@ -31,9 +31,12 @@ export function IndependenceEvidence({
 	candidate: IndependenceCandidate;
 	analysis: FinancialIndependenceAnalysis;
 }) {
-	const { pushUrl } = useWorkspaceNavigation();
+	const router = useRouter();
 	const openAccount = (accountId: string) => {
-		pushUrl(evidencePath("accounts", { kind: "account", id: accountId }, null));
+		void router.navigate({
+			to: "/accounts",
+			search: evidenceSearch({ kind: "account", id: accountId }, null),
+		});
 	};
 	const outcome = candidate.outcome;
 	const failure = outcome?.attempted ? outcome.firstShortfall : null;
