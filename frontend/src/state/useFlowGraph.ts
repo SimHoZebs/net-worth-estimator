@@ -38,7 +38,8 @@ function flowGraphQueryKey(
  * backend queries: callers pass committed window state. */
 export function useFlowGraph(window: FlowWindow | null) {
 	const scope = useUserScope();
-	const storeModel = useServerModel().data?.model ?? null;
+	const storeModel =
+		useServerModel({ enabled: scope.status === "ready" }).data?.model ?? null;
 	const baseModel = scope.status === "ready" ? storeModel : null;
 	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
 	const startDate = window?.startDate;

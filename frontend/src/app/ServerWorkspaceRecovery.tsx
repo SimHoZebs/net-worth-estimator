@@ -11,7 +11,6 @@ import { useServerModelImport } from "../state/useServerModelImport.ts";
 import { useUserReadOnly } from "../state/useUserScope.ts";
 import {
 	reloadWorkspace,
-	useServerModel,
 	useServerStatus,
 } from "../state/workspaceResources.ts";
 import { importServerModel } from "../state/workspaceWrites.ts";
@@ -24,7 +23,6 @@ export function ServerWorkspaceRecovery() {
 	// Terminal load states subscribe everything they display, including the
 	// model import flow and access control.
 	const status = useServerStatus().data;
-	const serverModel = useServerModel().data?.model;
 	const readOnly = useUserReadOnly();
 	const retry = reloadWorkspace;
 	const { importModel } = useServerModelImport({
@@ -53,7 +51,7 @@ export function ServerWorkspaceRecovery() {
 	const failImport = (message: string) => {
 		notifyError("model-import", message);
 	};
-	const missingModel = status !== undefined && serverModel === null;
+	const missingModel = status !== undefined && status.hasModel === false;
 	const importCandidate = async () => {
 		if (!candidate || readOnly) return;
 		clearCandidate();

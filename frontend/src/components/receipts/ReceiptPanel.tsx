@@ -1,7 +1,8 @@
 import { Camera, ImageUp, Paperclip, ReceiptText } from "lucide-react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { receiptReviewLabel } from "@/domain/receipt.ts";
-import { useServerModel, useServerStatus } from "@/state/workspaceResources.ts";
+import type { Transaction } from "@/domain/model.ts";
+import { useServerStatus } from "@/state/workspaceResources.ts";
 import { useReceiptActions, useReceipts } from "@/state/receipts.ts";
 import { useUserScope } from "@/state/useUserScope.ts";
 import { Badge } from "../Badge.tsx";
@@ -11,18 +12,16 @@ import { ReceiptReviewDialog } from "./ReceiptReviewDialog.tsx";
 
 export function ReceiptPanel({
 	postingId,
+	posting,
 	readOnly,
 }: {
 	postingId: string;
+	posting: Transaction;
 	readOnly: boolean;
 }) {
 	const scope = useUserScope();
-	const model = useServerModel({ enabled: false });
 	const status = useServerStatus({ enabled: false });
-	const saved = model.data?.model?.postings.find(
-		(posting) => posting.id === postingId,
-	);
-	const collection = useReceipts(postingId, Boolean(saved));
+	const collection = useReceipts(postingId, true);
 	const actions = useReceiptActions(postingId);
 	const camera = useRef<HTMLInputElement>(null);
 	const upload = useRef<HTMLInputElement>(null);
@@ -32,10 +31,7 @@ export function ReceiptPanel({
 	} | null>(null);
 	const locked = readOnly || status.data?.readOnly !== false;
 	const eligible = Boolean(
-		saved &&
-		(saved.sourceAccountId || saved.destinations?.length) &&
-		!saved.pending &&
-		!saved.void,
+		(posting.fromId || posting.toId) && !posting.pending && !posting.void,
 	);
 	const attach = (event: ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
@@ -59,7 +55,7 @@ export function ReceiptPanel({
 						<Badge tone="neutral">{receipts.length}</Badge>
 					)}
 				</div>
-				{saved && !locked && eligible && (
+				{!locked && eligible && (
 					<div className="flex items-center gap-2">
 						<Button
 							variant="secondary"
@@ -103,72 +99,66 @@ export function ReceiptPanel({
 					</div>
 				)}
 			</div>
-			{!saved ? (
-				<p className="text-sm text-muted">
-					Save this transaction before you attach a receipt.
-				</p>
-			) : (
-				<>
-					{collection.isPending && (
-						<p role="status" className="text-sm text-muted">
-							Loading receipts…
-						</p>
-					)}
-					{collection.error && (
-						<ErrorNotice
-							message={collection.error.message}
-							action="Retry receipts"
-							onAction={() => void collection.refetch()}
+			<>
+				{collection.isPending && (
+					<p role="status" className="text-sm text-muted">
+						Loading receipts…
+					</p>
+				)}
+				{collection.error && (
+					<ErrorNotice
+						message={collection.error.message}
+						action="Retry receipts"
+						onAction={() => void collection.refetch()}
+					/>
+				)}
+				{receipts.map((receipt) => (
+					<button
+						key={receipt.id}
+						type="button"
+						className="flex w-full items-start gap-3 rounded-surface border border-line bg-surface-2 p-4 text-left hover:border-line-strong"
+						onClick={() => setSelection({ scope: scope.key, id: receipt.id })}
+					>
+						<Paperclip
+							size={16}
+							aria-hidden="true"
+							className="mt-1 flex-none text-muted"
 						/>
-					)}
-					{receipts.map((receipt) => (
-						<button
-							key={receipt.id}
-							type="button"
-							className="flex w-full items-start gap-3 rounded-surface border border-line bg-surface-2 p-4 text-left hover:border-line-strong"
-							onClick={() => setSelection({ scope: scope.key, id: receipt.id })}
-						>
-							<Paperclip
-								size={16}
-								aria-hidden="true"
-								className="mt-1 flex-none text-muted"
-							/>
-							<span className="flex min-w-0 flex-1 flex-col gap-1">
-								<span className="text-sm font-semibold break-words">
-									{receipt.draft?.merchant ||
-										receipt.confirmed?.merchant ||
-										receipt.extraction?.details.merchant ||
-										receipt.filename}
-								</span>
-								<span className="text-xs text-muted">
-									{receiptReviewLabel(receipt)}
-									{receipt.stale ? " · Transaction changed" : ""}
-								</span>
+						<span className="flex min-w-0 flex-1 flex-col gap-1">
+							<span className="text-sm font-semibold break-words">
+								{receipt.draft?.merchant ||
+									receipt.confirmed?.merchant ||
+									receipt.extraction?.details.merchant ||
+									receipt.filename}
 							</span>
-						</button>
-					))}
-					{!locked && eligible && (
-						<p id="receipt-size-hint" className="text-xs text-muted">
-							JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB
-							after normalization.
-						</p>
-					)}
-					{actions.attach.isPending && (
-						<p role="status" className="text-sm text-muted">
-							Saving private receipt…
-						</p>
-					)}
-					{actions.attach.error && (
-						<ErrorNotice message={actions.attach.error.message} />
-					)}
-					{!eligible && receipts.length === 0 && (
-						<p className="text-sm text-muted">
-							Receipts attach to saved owner transactions, not pending or void
-							bank rows.
-						</p>
-					)}
-				</>
-			)}
+							<span className="text-xs text-muted">
+								{receiptReviewLabel(receipt)}
+								{receipt.stale ? " · Transaction changed" : ""}
+							</span>
+						</span>
+					</button>
+				))}
+				{!locked && eligible && (
+					<p id="receipt-size-hint" className="text-xs text-muted">
+						JPEG or PNG, up to 10 MiB. Large images must fit within 3 MiB after
+						normalization.
+					</p>
+				)}
+				{actions.attach.isPending && (
+					<p role="status" className="text-sm text-muted">
+						Saving private receipt…
+					</p>
+				)}
+				{actions.attach.error && (
+					<ErrorNotice message={actions.attach.error.message} />
+				)}
+				{!eligible && receipts.length === 0 && (
+					<p className="text-sm text-muted">
+						Receipts attach to saved owner transactions, not pending or void
+						bank rows.
+					</p>
+				)}
+			</>
 			{selection?.scope === scope.key && (
 				<ReceiptReviewDialog
 					key={`${scope.key}:${selection.id}`}

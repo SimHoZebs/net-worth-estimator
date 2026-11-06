@@ -495,6 +495,8 @@ export type StochasticResponse = StochasticProjectionResponse;
 
 export interface ServerStatus extends HumaMetadata {
 	readOnly: boolean;
+	/** Whether this user has canonical financial rows. Cheap presence check. */
+	hasModel: boolean;
 	/** Whether the server has a sync runner. */
 	syncConfigured: boolean;
 	/** Bridge host for display. Omitted when unconfigured. Never the secret. */

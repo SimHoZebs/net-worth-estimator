@@ -48,15 +48,17 @@ it("loads the pending inbox on mount with the verified user assertion", async ()
 	});
 });
 
-it("reads the unread badge from the all-status list", async () => {
-	const fetcher = vi.fn(async () => ok({ items: [], unreadCount: 4 }));
+it("reads the unread badge from the count-only endpoint", async () => {
+	const fetcher = vi.fn(async () => ok({ unreadCount: 4 }));
 	vi.stubGlobal("fetch", fetcher);
 	const hook = renderHook(() => useInboxUnreadCount(), { wrapper });
 	await waitFor(() => expect(hook.result.current.status).toBe("success"));
 	expect(hook.result.current.data).toBe(4);
 	const requests = recordedRequests(fetcher);
 	expect(requests).toHaveLength(1);
-	expect(requests[0]).toMatchObject({ url: "/v1/inbox?status=all" });
+	expect(requests[0]).toMatchObject({
+		url: "/v1/inbox?status=all&countOnly=1",
+	});
 });
 
 it("accepts once and refreshes every inbox entry", async () => {

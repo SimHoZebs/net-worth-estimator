@@ -17,6 +17,7 @@ vi.mock("../components/ThemeToggle.tsx", () => ({ ThemeToggle: () => null }));
 
 const baseStatus: ServerStatus = {
 	readOnly: false,
+	hasModel: true,
 	syncConfigured: false,
 	syncQuotaUsed: 0,
 	syncQuotaLimit: 0,

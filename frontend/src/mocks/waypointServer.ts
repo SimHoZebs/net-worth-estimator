@@ -89,6 +89,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 	const presetsQueue: Array<Error | { presets: unknown[] }> = [];
 	let statusValue: ServerStatus = {
 		readOnly: false,
+		hasModel: true,
 		syncConfigured: true,
 		syncQuotaUsed: 0,
 		syncQuotaLimit: 24,
@@ -591,6 +592,11 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 				}) as typeof current.postings;
 			}, body);
 		}
+		if (path === "/v1/planned-purchases" && method === "GET")
+			return ok({
+				plannedPurchases: structuredClone(current.plannedPurchases ?? []),
+				revision: revisionValue,
+			});
 		if (path === "/v1/planned-purchases" && method === "POST")
 			return write(() => {
 				const rows = (current.plannedPurchases ??= []);
@@ -846,6 +852,7 @@ export function stubTestServer(put?: PutCallback, model = modelFixture()) {
 		},
 		setModel: (model: FinancialModel | null) => {
 			(current as { model?: unknown }).model = model;
+			statusValue = { ...statusValue, hasModel: model !== null };
 			if (model === null) {
 				// Serve a null model until replaced; keep tables for writes.
 				(modelQueue as Array<Error | FinancialModelResponse>).unshift({

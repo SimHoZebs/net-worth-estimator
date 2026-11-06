@@ -4679,6 +4679,9 @@
 						"readOnly": true,
 						"type": "string"
 					},
+					"hasModel": {
+						"type": "boolean"
+					},
 					"lastSyncAt": {
 						"type": "string"
 					},
@@ -4705,6 +4708,7 @@
 				},
 				"required": [
 					"readOnly",
+					"hasModel",
 					"syncConfigured",
 					"syncQuotaUsed",
 					"syncQuotaLimit"
@@ -5443,6 +5447,12 @@
 					},
 					"readOnly": {
 						"type": "boolean"
+					},
+					"receiptIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": ["array", "null"]
 					},
 					"sourceAccountId": {
 						"type": ["string", "null"]

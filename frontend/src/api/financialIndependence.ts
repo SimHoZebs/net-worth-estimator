@@ -1,6 +1,5 @@
 import type {
 	EvaluationResultEnvelope,
-	FinancialModel,
 	FinancialIndependenceEvaluation,
 } from "./contracts.ts";
 import type {
@@ -25,6 +24,14 @@ const boolean = (value: unknown): boolean | null =>
 	typeof value === "boolean" ? value : null;
 const date = (value: unknown): string | null =>
 	typeof value === "string" && isIsoDate(value) ? value : null;
+
+/** Display names the analysis needs, shared by the model and row sources. */
+type ProjectionNaming = {
+	accounts?: { id: string; name: string }[];
+	postings?: { id: string; name: string }[];
+	schedules?: { id: string; name: string }[];
+	plannedPurchases?: { id: string; name: string }[];
+};
 
 function mapOutcome(raw: Record<string, unknown>): IndependenceOutcome | null {
 	const kind = parseUnion(raw.status, [
@@ -140,7 +147,7 @@ function mapCandidate(
 function mapAnalysis(
 	evaluation: FinancialIndependenceEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
-	model: FinancialModel | null,
+	model: ProjectionNaming | null,
 	startDate: string,
 	endDate: string | null,
 ): FinancialIndependenceAnalysis | null {
@@ -221,7 +228,7 @@ function mapAnalysis(
 export function financialIndependenceEvaluation(
 	evaluation: FinancialIndependenceEvaluation,
 	envelope: EvaluationResultEnvelope | undefined,
-	model: FinancialModel | null,
+	model: ProjectionNaming | null,
 	startDate: string,
 	endDate: string | null,
 ): OtherEvaluation {

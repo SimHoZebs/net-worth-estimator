@@ -182,6 +182,7 @@ func (h *Handler) serveInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	showDismissed := r.URL.Query().Get("showDismissed") == "1" || strings.EqualFold(r.URL.Query().Get("showDismissed"), "true")
+	countOnly := r.URL.Query().Get("countOnly") == "1" || strings.EqualFold(r.URL.Query().Get("countOnly"), "true")
 	items, err := h.db.ListInboxItems(recipient)
 	if err != nil {
 		writeStoreError(w, err, "Inbox not found.")
@@ -200,6 +201,11 @@ func (h *Handler) serveInbox(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		filtered = append(filtered, item)
+	}
+	if countOnly {
+		// The badge asks one question. Do not serialize the item list for it.
+		writeJSON(w, http.StatusOK, map[string]any{"unreadCount": unread})
+		return
 	}
 	sort.SliceStable(filtered, func(i, j int) bool { return filtered[i].ReceivedAt > filtered[j].ReceivedAt })
 	writeJSON(w, http.StatusOK, map[string]any{"items": filtered, "unreadCount": unread})

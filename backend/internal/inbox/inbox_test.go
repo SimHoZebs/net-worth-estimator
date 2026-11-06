@@ -201,6 +201,9 @@ func TestInboxHTTPListFilters(t *testing.T) {
 	if code, list := getList(t, h, "/v1/inbox?status=all", "bob"); code != http.StatusOK || len(list.Items) != 2 {
 		t.Fatalf("all list = %d items, want 2", len(list.Items))
 	}
+	if code, list := getList(t, h, "/v1/inbox?status=all&countOnly=1", "bob"); code != http.StatusOK || len(list.Items) != 0 || list.Count != 2 {
+		t.Fatalf("count-only list = %d items unread %d, want no items and unread 2", len(list.Items), list.Count)
+	}
 	if code, _ := getList(t, h, "/v1/inbox?status=bogus", "bob"); code != http.StatusBadRequest {
 		t.Fatalf("bogus filter = %d, want 400", code)
 	}

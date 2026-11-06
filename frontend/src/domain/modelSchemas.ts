@@ -101,6 +101,9 @@ export const transactionSchema = z.object({
 	// Exact Unix transaction time. Day display stays on startDate; the
 	// instant orders intraday execution.
 	transactionTime: z.number().int().nullable().optional(),
+	// Receipt IDs attached to this posting. Read with the row list so a
+	// receipt badge does not need the full model document.
+	receiptIds: z.array(z.string()).optional(),
 });
 
 export const evaluationSchema = z.object({

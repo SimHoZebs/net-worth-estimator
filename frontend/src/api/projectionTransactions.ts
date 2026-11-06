@@ -1,6 +1,6 @@
 import { finite, isRecord, stringValue } from "../domain/guards.ts";
 import type { TransactionResult } from "../domain/result.ts";
-import type { FinancialModel, ProjectionResult } from "./contracts.ts";
+import type { ProjectionResult } from "./contracts.ts";
 
 type TransactionSource = {
 	name: string;
@@ -8,9 +8,31 @@ type TransactionSource = {
 	destinations: string[] | null;
 };
 
+/** Structural rows shared by the model document and the projection source. */
+export type TransactionNaming = {
+	postings: {
+		id: string;
+		name: string;
+		sourceAccountId: string | null;
+		destinations: string[] | null;
+	}[];
+	schedules?: {
+		id: string;
+		name: string;
+		sourceAccountId: string | null;
+		destinations: string[] | null;
+	}[];
+	plannedPurchases?: {
+		id: string;
+		name: string;
+		fundingAccountId?: string | null;
+	}[];
+	checkpoints?: { observedAt: number }[];
+};
+
 /** Index sources once per call so per-event lookup stays O(1). */
 function transactionSourceIndex(
-	model: FinancialModel | null,
+	model: TransactionNaming | null,
 ): Map<string, TransactionSource> {
 	const index = new Map<string, TransactionSource>();
 	if (!model) return index;
@@ -34,7 +56,7 @@ function transactionSourceIndex(
 		if (!index.has(item.id))
 			index.set(item.id, {
 				name: item.name,
-				sourceAccountId: item.fundingAccountId,
+				sourceAccountId: item.fundingAccountId ?? null,
 				destinations: null,
 			});
 	}
@@ -62,18 +84,19 @@ function transactionConstraintLabel(type: string): string {
 /** Adapt engine evidence without selecting a configured evaluation's scope. */
 export function projectionTransactions(
 	result: ProjectionResult,
-	model: FinancialModel | null,
+	model: TransactionNaming | null,
 	options?: { startCheckpoint?: boolean },
 ): TransactionResult[] {
 	const start = result.milestones.projectionStartDate;
 	const startCheckpoint =
 		options?.startCheckpoint ??
-		model?.checkpoints.some((checkpoint) => {
+		model?.checkpoints?.some((checkpoint) => {
 			const day = new Date(checkpoint.observedAt * 1000)
 				.toISOString()
 				.slice(0, 10);
 			return day === start;
-		});
+		}) ??
+		false;
 	const sources = transactionSourceIndex(model);
 	return (result.transactionEvents ?? [])
 		.filter(

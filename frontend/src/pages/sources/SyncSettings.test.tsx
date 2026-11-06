@@ -378,6 +378,7 @@ function stubApi(state: {
 	const cache = serverQueryClient();
 	cache.setQueryData(statusOptions().queryKey, {
 		readOnly: state.readOnly ?? false,
+		hasModel: true,
 		syncConfigured: state.configured ? (state.syncEnabled ?? true) : false,
 		lastSyncAt: state.lastSyncAt,
 		syncQuotaUsed: 5,

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import {
 	balanceRowToDisplay,
-	savedPurchasesToDisplay,
+	plannedPurchaseRowToDisplay,
 } from "../api/adapter.ts";
 import { transactionToDisplay } from "../domain/transactionRows.ts";
 import type { Schedule } from "@/api/generated/model/schedule.ts";
@@ -12,13 +12,13 @@ import type {
 	Transaction,
 } from "../domain/model.ts";
 import { summaryEvaluations } from "./evaluationQueries.ts";
-import { projectionStartDate } from "./projectionStartDate.ts";
-import { useUserScope } from "./useUserScope.ts";
+import { projectionStartDateFromRows } from "./projectionSource.ts";
 import {
 	useAccountBalances,
+	useCheckpoints,
 	useEvaluationSummary,
+	usePlannedPurchases,
 	useSchedules,
-	useServerModel,
 	useTransactions,
 } from "./workspaceResources.ts";
 
@@ -74,17 +74,27 @@ export function useSavedEvaluations(): Evaluation[] | null {
 
 /** Saved purchases as display rows. */
 export function useSavedPurchases(): PlannedPurchase[] | null {
-	const enabled = useUserScope().status === "ready";
-	const model = useServerModel({ enabled }).data?.model;
+	const list = usePlannedPurchases().data;
 	return useMemo(() => {
-		if (model === undefined) return null;
-		return savedPurchasesToDisplay(model);
-	}, [model]);
+		if (!list) return null;
+		return [...list.plannedPurchases]
+			.sort((left, right) => left.priority - right.priority)
+			.map(plannedPurchaseRowToDisplay);
+	}, [list]);
 }
 
-/** Saved projection start date from the financial model. */
+/** Saved projection start date from the narrow row queries. */
 export function useSavedStartDate(): string | null {
-	const enabled = useUserScope().status === "ready";
-	const model = useServerModel({ enabled }).data?.model;
-	return useMemo(() => (model ? projectionStartDate(model) : null), [model]);
+	const checkpoints = useCheckpoints().data?.checkpoints ?? null;
+	const schedules = useSavedSchedules();
+	const transactions = useSavedTransactions();
+	return useMemo(() => {
+		if (checkpoints === null || schedules === null || transactions === null)
+			return null;
+		return projectionStartDateFromRows({
+			checkpoints,
+			schedules,
+			transactions,
+		});
+	}, [checkpoints, schedules, transactions]);
 }

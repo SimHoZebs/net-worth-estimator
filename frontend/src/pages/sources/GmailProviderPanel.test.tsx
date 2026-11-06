@@ -172,6 +172,7 @@ function stubGmailApi(state: {
 	const cache = serverQueryClient();
 	cache.setQueryData(statusOptions().queryKey, {
 		readOnly: false,
+		hasModel: true,
 		syncConfigured: false,
 		syncQuotaUsed: 0,
 		syncQuotaLimit: 24,

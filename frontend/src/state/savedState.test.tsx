@@ -151,12 +151,14 @@ describe("saved rows", () => {
 			cost: 150,
 			priority: 0,
 		};
-		stubTestServer(undefined, {
+		const server = stubTestServer(undefined, {
 			...emptyModel(),
 			plannedPurchases: [laptop, chair],
 		});
 		const purchases = renderHook(() => useSavedPurchases());
 		await waitFor(() => expect(purchases.result.current).not.toBeNull());
+		// The queue's own endpoint answers; the model document is not read.
+		expect(server.modelFetches()).toHaveLength(0);
 		// Queue priority does not depend on model order.
 		expect(purchases.result.current).toEqual([
 			{

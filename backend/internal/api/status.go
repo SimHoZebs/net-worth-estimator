@@ -9,7 +9,10 @@ import (
 
 type statusOutput struct {
 	Body struct {
-		ReadOnly       bool   `json:"readOnly"`
+		ReadOnly bool `json:"readOnly"`
+		// HasModel reports whether this user has canonical rows. It is a cheap
+		// presence check, not a model read.
+		HasModel       bool   `json:"hasModel"`
 		SyncConfigured bool   `json:"syncConfigured"`
 		SyncHost       string `json:"syncHost,omitempty"`
 		// LastSyncAt is the last successful sync completion time (RFC3339
@@ -36,6 +39,11 @@ func registerStatus(api huma.API, st store.Store, config Config) {
 		if config.CanWrite != nil && !config.CanWrite(ctx) {
 			output.Body.ReadOnly = true
 		}
+		hasModel, err := st.ModelExists()
+		if err != nil {
+			return nil, huma.Error500InternalServerError(err.Error())
+		}
+		output.Body.HasModel = hasModel
 		output.Body.SyncConfigured = config.SyncRunner.IsConfigured()
 		if output.Body.SyncConfigured {
 			if host := config.SyncRunner.BridgeHost(); host != "" {

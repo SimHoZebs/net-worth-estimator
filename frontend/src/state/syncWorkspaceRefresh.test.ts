@@ -15,6 +15,7 @@ import { setupQueryScope, teardownQueryScope } from "../mocks/testScope.tsx";
 
 const status: ServerStatus = {
 	readOnly: false,
+	hasModel: true,
 	syncConfigured: true,
 	syncQuotaUsed: 5,
 	syncQuotaLimit: 24,

@@ -62,6 +62,7 @@ type TransactionQueryExtras = {
 	postedTime?: unknown;
 	transactionTime?: unknown;
 	annualCap?: unknown;
+	receiptIds?: unknown;
 };
 
 function dayFromStamps(
@@ -137,6 +138,11 @@ export function transactionToDisplay(
 			typeof extra.transactionTime === "number" && extra.transactionTime > 0
 				? extra.transactionTime
 				: null,
+		receiptIds: Array.isArray(extra.receiptIds)
+			? extra.receiptIds.filter(
+					(id): id is string => typeof id === "string" && id !== "",
+				)
+			: [],
 	};
 }
 

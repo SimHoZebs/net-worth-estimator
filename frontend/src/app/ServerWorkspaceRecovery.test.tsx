@@ -35,6 +35,7 @@ afterEach(() => {
 it("keeps navigation usable without account controls when saved data is empty", () => {
 	setServerStatusFixture({
 		readOnly: false,
+		hasModel: false,
 		syncConfigured: false,
 		syncQuotaUsed: 0,
 		syncQuotaLimit: 0,

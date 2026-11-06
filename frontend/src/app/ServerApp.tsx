@@ -1,9 +1,6 @@
 import { useUiStore } from "../state/uiStore.ts";
 import { useUserScope } from "../state/useUserScope.ts";
-import {
-	useServerModel,
-	useServerStatus,
-} from "../state/workspaceResources.ts";
+import { useServerStatus } from "../state/workspaceResources.ts";
 import { useWorkspaceSyncMonitor } from "../state/useWorkspaceSyncMonitor.ts";
 import { WorkspaceShell } from "../WorkspaceShell.tsx";
 import { useWorkspaceNavigation } from "../workspace/useWorkspaceNavigation.ts";
@@ -14,21 +11,22 @@ export function ServerApp() {
 	// Startup enables resource queries. Screens subscribe to their own data.
 	// No fetched data travels as props anywhere in this tree.
 	const enabled = useUserScope().status === "ready";
-	const model = useServerModel({ enabled });
-	useServerStatus({ enabled });
+	// Presence is a status flag, not a model read. Only the projection and
+	// detail views that need the document fetch it.
+	const status = useServerStatus({ enabled });
 	useWorkspaceSyncMonitor(enabled);
 	const navigation = useWorkspaceNavigation();
-	const hasModel = model.data?.model != null;
-	const loading = model.isPending;
 	const importing = useUiStore((state) => state.importing);
 
-	// Transient waits render the shell chrome with a loading panel so
-	// navigation stays usable. Only terminal load failures reach the
-	// dedicated recovery screen.
-	if (!hasModel) {
-		if (loading || importing)
-			return <ServerLoadingShell navigation={navigation} />;
-		return <ServerWorkspaceRecovery />;
+	// Identity is the only gate: until the verified scope exists no request
+	// can carry its resource assertion, so the boot chrome stands in. Once
+	// the scope is ready the shell mounts immediately and the pages
+	// skeletonize their own data slots.
+	if (!enabled || importing) {
+		return <ServerLoadingShell navigation={navigation} />;
 	}
+	// Terminal absence takes the dedicated recovery screen. A pending status
+	// is a shell flag, not a reason to withhold navigation.
+	if (status.data?.hasModel === false) return <ServerWorkspaceRecovery />;
 	return <WorkspaceShell />;
 }

@@ -20,9 +20,13 @@ export function useCurrentPosition({
 	// Position is backend-owned historical replay: it keys on the saved
 	// model only, never on forecast evaluation preferences.
 	const scope = useUserScope();
-	const storeModel = useServerModel().data?.model ?? null;
+	const modelQuery = useServerModel({
+		enabled: model === undefined && enabled && scope.status === "ready",
+	});
+	const storeModel = modelQuery.data?.model ?? null;
 	const saved = model !== undefined ? model : storeModel;
 	const baseModel = scope.status === "ready" ? (saved ?? null) : null;
+	const modelPending = model === undefined && modelQuery.isPending;
 	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
 	const asOfDate = baseModel ? projectionStartDate(baseModel) : "";
 	const query = useQuery({
@@ -57,12 +61,20 @@ export function useCurrentPosition({
 		status: !enabled
 			? ("disabled" as const)
 			: !baseModel
-				? ("error" as const)
+				? modelPending
+					? ("pending" as const)
+					: ("error" as const)
 				: query.status,
 		error: !baseModel
-			? "No financial model is available."
+			? modelPending
+				? null
+				: "No financial model is available."
 			: (query.error?.message ?? null),
 		retry: () => {
+			if (!baseModel && model === undefined) {
+				void modelQuery.refetch();
+				return;
+			}
 			void query.refetch();
 		},
 	};

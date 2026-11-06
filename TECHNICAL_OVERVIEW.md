@@ -132,7 +132,7 @@ Row writes apply one change per request. Each `POST`, `PATCH`, or `DELETE` under
 
 ### Status
 
-`GET /v1/status` returns `readOnly`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed). Session and resource discovery use `/v1/auth/session`.
+`GET /v1/status` returns `readOnly`, `hasModel`, `syncConfigured`, and `lastSyncAt` (omitted when no sync completed). `hasModel` is a cheap presence check, not a model read. Session and resource discovery use `/v1/auth/session`.
 
 The frontend displays these provider-neutral sync signals. Provider setup and raw account-link management remain server concerns. Sync execution also stays server-side. The only user-facing mapping action retires one manual account in favor of the synced account already linked to a bridge account. The sidebar shows the last successful sync in the viewer's time zone, including read-only mode. Missing status fields mean unknown sync status, not "never synced."
 

@@ -9,7 +9,6 @@ import type { AccountTransaction } from "../../domain/accountActivity.ts";
 import { externalCounterpartyName } from "../../domain/accountActivity.ts";
 import { dateLabel, exactMoney } from "../../domain/format.ts";
 import type { Transaction } from "../../domain/model.ts";
-import { useReceiptLinks } from "../../state/receipts.ts";
 import { Badge } from "../Badge.tsx";
 import { TransactionItemRow } from "./TransactionItem.tsx";
 import { useTransactionBNPL } from "../analysis/TransactionAnalysis.tsx";
@@ -57,7 +56,7 @@ export function TransactionRow({
 		transaction.counterparty === externalCounterpartyName("out")
 			? null
 			: transaction.counterparty;
-	const receipts = useReceiptLinks(savedTransaction?.id ?? "");
+	const receipts = savedTransaction?.receiptIds ?? [];
 	const finding = useTransactionBNPL(savedTransaction?.id ?? "");
 	const analysisBadge =
 		finding &&

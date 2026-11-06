@@ -21,6 +21,7 @@ import { useWorkspaceSyncMonitor } from "./useWorkspaceSyncMonitor.ts";
 
 const status = {
 	readOnly: false,
+	hasModel: true,
 	syncConfigured: true,
 	syncQuotaUsed: 0,
 	syncQuotaLimit: 24,

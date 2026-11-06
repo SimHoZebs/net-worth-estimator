@@ -16,7 +16,7 @@ import type {
 import { UserScopeError } from "@/api/scopedRequest.ts";
 import { getUserScope } from "@/auth/resourceScope.ts";
 import { serverQueryClient } from "./serverQuery.ts";
-import { useServerModel, userResourceKey } from "./workspaceResources.ts";
+import { userResourceKey } from "./workspaceResources.ts";
 import { useUserScope } from "./useUserScope.ts";
 
 export const receiptCollectionKey = (
@@ -37,12 +37,6 @@ export function useReceipts(postingId: string, enabled: boolean) {
 		},
 		serverQueryClient(),
 	);
-}
-
-/** Stored reverse lookup: receipt IDs attached to a posting, from the loaded model. */
-export function useReceiptLinks(postingId: string): string[] {
-	const model = useServerModel({ enabled: false });
-	return model.data?.receiptLinks?.[postingId] ?? [];
 }
 
 export function useReceipt(id: string) {
@@ -101,8 +95,12 @@ function useReceiptWrite<T>(
 				await cache.invalidateQueries({
 					queryKey: receiptCollectionKey(postingId, scope),
 				});
-				// Reverse lookup lives on the financial-model envelope, outside
-				// the model. Refresh it so posting badges follow mutations.
+				// Row badges read receiptIds from the transaction list. The
+				// model envelope also carries the reverse lookup for any
+				// remaining reader, so refresh both.
+				await cache.invalidateQueries({
+					queryKey: userResourceKey("transactions", scope),
+				});
 				await cache.invalidateQueries({
 					queryKey: userResourceKey("model", scope),
 				});

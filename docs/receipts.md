@@ -185,10 +185,12 @@ leave it untouched, posting deletion removes it with the row, and CSV
 replacement resets it with the new rows.
 
 The financial-model response exposes it as `receiptLinks`, mapping each
-posting ID to its receipt IDs. The transaction list renders its receipt badge
-from that map; opening a receipt still fetches full details through
-`GET /v1/transactions/{id}/receipts`. Receipt mutations invalidate the cached
-model so badges follow attach, replace, review, extraction, and delete.
+posting ID to its receipt IDs. Transaction rows also carry `receiptIds`, so
+the list badge reads the row it already fetched instead of the model document.
+Opening a receipt still fetches full details through
+`GET /v1/transactions/{id}/receipts`. Receipt mutations invalidate the
+transaction list and the cached model so badges follow attach, replace, review,
+extraction, and delete.
 
 SQLite free pages, WAL files, and backups can contain deleted data. Receipt
 deletion does not promise secure erasure from those locations.

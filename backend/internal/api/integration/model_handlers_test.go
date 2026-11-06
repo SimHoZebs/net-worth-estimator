@@ -60,12 +60,17 @@ func TestStatusReflectsReadOnlyFlag(t *testing.T) {
 		}
 		var payload struct {
 			ReadOnly bool `json:"readOnly"`
+			HasModel bool `json:"hasModel"`
 		}
 		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("decode status response: %v", err)
 		}
 		if payload.ReadOnly != readOnly {
 			t.Fatalf("readOnly=%v status = %+v", readOnly, payload)
+		}
+		// Presence is reported without loading the model document.
+		if payload.HasModel {
+			t.Fatalf("readOnly=%v status = %+v, want no model in an empty store", readOnly, payload)
 		}
 	}
 }

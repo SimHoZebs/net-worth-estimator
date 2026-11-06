@@ -35,12 +35,23 @@ import {
 } from "./serverQuery.ts";
 import { dismissKey, notifyError } from "./notifications.ts";
 import { useUiStore } from "./uiStore.ts";
-import {
-	projectionEvaluationKey,
-	projectionModelKey,
-} from "./projectionKeys.ts";
+import { projectionEvaluationKey } from "./projectionKeys.ts";
 import { projectionStartDate } from "./projectionStartDate.ts";
-import { useServerModel } from "./workspaceResources.ts";
+import {
+	normalizedEvaluations,
+	projectionSourceFromModel,
+	projectionStartDateFromRows,
+	type ProjectionSource,
+} from "./projectionSource.ts";
+import {
+	balancesOptions,
+	checkpointsOptions,
+	evalSummaryOptions,
+	purchasesOptions,
+	schedulesOptions,
+	statusOptions,
+	transactionsOptions,
+} from "./workspaceResources.ts";
 import { useUserScope } from "./useUserScope.ts";
 export { projectionStartDate } from "./projectionStartDate.ts";
 import { purchaseEvaluationResult } from "./purchaseEvaluation.ts";
@@ -49,6 +60,45 @@ import { stochasticProjectionOptions } from "./stochasticProjectionQuery.ts";
 export interface ProjectionDateRange {
 	startDate?: string;
 	endDate?: string;
+}
+
+/** Rows the projection layer needs. Model and row sources both satisfy it. */
+type ProjectionRows = {
+	evaluations: EvaluationTables;
+	checkpoints: { observedAt: number }[];
+	postings: {
+		id: string;
+		name: string;
+		sourceAccountId: string | null;
+		destinations: string[] | null;
+	}[];
+	schedules: {
+		id: string;
+		name: string;
+		sourceAccountId: string | null;
+		destinations: string[] | null;
+		startDate: string;
+	}[];
+	plannedPurchases?: {
+		id: string;
+		name: string;
+		fundingAccountId?: string | null;
+	}[];
+};
+
+type ProjectionInput = ProjectionRows & {
+	startDate?: string;
+	revision?: string;
+};
+
+function projectionStartOf(input: ProjectionInput): string {
+	if (input.startDate) return input.startDate;
+	return projectionStartDate(input as FinancialModel);
+}
+
+function projectionKeyOf(input: ProjectionInput): string {
+	if (input.revision) return input.revision;
+	return JSON.stringify(input);
 }
 
 export interface UseRemoteProjectionOptions {
@@ -68,18 +118,19 @@ const MISSING_MODEL_MESSAGE =
 	"No server financial model is available for projection. Load or replace a model before calculating.";
 
 async function fetchDeterministicResult(
-	model: FinancialModel,
+	input: ProjectionInput,
 	years: number,
 	range: ProjectionDateRange,
 	signal: AbortSignal,
-	pinModel = false,
+	pinModel?: FinancialModel | null,
 ): Promise<ProjectionResult> {
 	const request: DeterministicProjectionRequest = {
-		...projectionRequest(model, years),
+		...projectionRequest(input, years),
 		// A request-local overlay must describe the same model the UI
-		// rendered. Without the pinned model, a concurrent row write can
-		// answer with a different queue and stale dates.
-		...(pinModel ? { model } : {}),
+		// rendered. Without a pinned model, a concurrent row write can
+		// answer with a different queue and stale dates. Row sources have no
+		// document to pin, so they rely on the server snapshot.
+		...(pinModel ? { model: pinModel } : {}),
 		range,
 	};
 	const response = (await projectDeterministic(request as never, { signal }))
@@ -94,7 +145,7 @@ async function fetchDeterministicResult(
 }
 
 export function projectionRequest(
-	model: FinancialModel,
+	model: ProjectionInput,
 	years: number,
 ): Omit<DeterministicProjectionRequest, "model"> {
 	const horizonYears = Number.isFinite(years)
@@ -102,9 +153,9 @@ export function projectionRequest(
 		: 1;
 	return {
 		settings: {
-			fallbackProjectionStartDate: projectionStartDate(model),
+			fallbackProjectionStartDate: projectionStartOf(model),
 			horizonYears,
-			evaluations: model.evaluations,
+			evaluations: normalizedEvaluations(model.evaluations),
 		},
 	};
 }
@@ -116,7 +167,7 @@ export function projectionRequest(
 // start date still sends a request (with an empty range the server rejects
 // as data) instead of throwing during render.
 export function resolveProjectionRange(
-	model: FinancialModel,
+	model: ProjectionInput,
 	years: number,
 	override?: ProjectionDateRange,
 ): ProjectionDateRange {
@@ -127,7 +178,7 @@ export function resolveProjectionRange(
 	try {
 		return {
 			endDate: horizonDate({
-				start: projectionStartDate(model),
+				start: projectionStartOf(model),
 				years: horizonYears,
 			}),
 		};
@@ -170,7 +221,7 @@ function rowBalances(
 
 export function projectionResultToLocal(
 	result: ProjectionResult,
-	model: FinancialModel | null,
+	model: ProjectionRows | null,
 	horizonYears?: number,
 ): Projection {
 	const rows = result.timeline.rows;
@@ -483,6 +534,109 @@ function isAbortError(cause: unknown): boolean {
 	return false;
 }
 
+function useProjectionSource(enabled: boolean): {
+	source: ProjectionSource | null;
+	hasModel: boolean;
+	pending: boolean;
+	error: string | null;
+} {
+	const scope = useUserScope();
+	const active = enabled && scope.status === "ready";
+	const client = serverQueryClient();
+	const status = useQuery({ ...statusOptions(scope), enabled: active }, client);
+	const balances = useQuery(
+		{ ...balancesOptions(scope), enabled: active },
+		client,
+	);
+	const transactions = useQuery(
+		{ ...transactionsOptions(scope), enabled: active },
+		client,
+	);
+	const schedules = useQuery(
+		{ ...schedulesOptions(scope), enabled: active },
+		client,
+	);
+	const purchases = useQuery(
+		{ ...purchasesOptions(scope), enabled: active },
+		client,
+	);
+	const checkpoints = useQuery(
+		{ ...checkpointsOptions(scope), enabled: active },
+		client,
+	);
+	const summary = useQuery(
+		{ ...evalSummaryOptions(scope), enabled: active },
+		client,
+	);
+	if (!active)
+		return { source: null, hasModel: false, pending: false, error: null };
+	if (status.error)
+		return {
+			source: null,
+			hasModel: false,
+			pending: false,
+			error: status.error.message,
+		};
+	if (status.data?.hasModel !== true)
+		return {
+			source: null,
+			hasModel: false,
+			pending: status.isPending,
+			error: null,
+		};
+	const rows = [
+		balances,
+		transactions,
+		schedules,
+		purchases,
+		checkpoints,
+		summary,
+	];
+	const rowError = rows.find((row) => row.error)?.error;
+	if (rowError)
+		return {
+			source: null,
+			hasModel: true,
+			pending: false,
+			error: rowError.message,
+		};
+	if (rows.some((row) => row.data === undefined))
+		return { source: null, hasModel: true, pending: true, error: null };
+	const transactionRows = transactions.data!.transactions;
+	const scheduleRows = schedules.data!.schedules;
+	const checkpointRows = checkpoints.data!.checkpoints;
+	const revisions = [
+		balances.data!.revision,
+		transactions.data!.revision,
+		schedules.data!.revision,
+		purchases.data!.revision,
+		checkpoints.data!.revision,
+		summary.data!.revision,
+	].filter((revision): revision is string => Boolean(revision));
+	return {
+		source: {
+			revision: [...new Set(revisions)].sort().join("|"),
+			startDate: projectionStartDateFromRows({
+				checkpoints: checkpointRows,
+				schedules: scheduleRows,
+				transactions: transactionRows,
+			}),
+			accounts: balances.data!.accounts.map((account) => ({
+				id: account.id,
+				name: account.name,
+			})),
+			postings: transactionRows,
+			schedules: scheduleRows,
+			plannedPurchases: purchases.data!.plannedPurchases,
+			checkpoints: checkpointRows,
+			evaluations: normalizedEvaluations(summary.data!.evaluations),
+		},
+		hasModel: true,
+		pending: false,
+		error: null,
+	};
+}
+
 export function useRemoteProjection({
 	model: modelOverride,
 	years: yearsOverride,
@@ -492,17 +646,28 @@ export function useRemoteProjection({
 	enabled = true,
 }: UseRemoteProjectionOptions = {}) {
 	const scope = useUserScope();
-	const storeModel = useServerModel().data?.model ?? null;
-	const savedModel = modelOverride !== undefined ? modelOverride : storeModel;
-	const baseModel = scope.status === "ready" ? (savedModel ?? null) : null;
-	const activeModel = useMemo(
+	const rowSource = useProjectionSource(enabled && modelOverride === undefined);
+	const source =
+		modelOverride !== undefined
+			? projectionSourceFromModel(modelOverride)
+			: rowSource.source;
+	const hasModel =
+		modelOverride !== undefined ? modelOverride !== null : rowSource.hasModel;
+	const baseSource = scope.status === "ready" ? source : null;
+	const activeSource = useMemo(
 		() =>
-			baseModel && evaluationsOverride
-				? { ...baseModel, evaluations: evaluationsOverride }
-				: baseModel,
-		[baseModel, evaluationsOverride],
+			baseSource && evaluationsOverride
+				? {
+						...baseSource,
+						evaluations: normalizedEvaluations(evaluationsOverride),
+					}
+				: baseSource,
+		[baseSource, evaluationsOverride],
 	);
-	const baseKey = useMemo(() => projectionModelKey(baseModel), [baseModel]);
+	const baseKey = useMemo(
+		() => (baseSource ? projectionKeyOf(baseSource) : "pending"),
+		[baseSource],
+	);
 	const evalKey = useMemo(
 		() => projectionEvaluationKey(evaluationsOverride),
 		[evaluationsOverride],
@@ -511,24 +676,18 @@ export function useRemoteProjection({
 	const storeRanges = useUiStore((state) => state.ranges);
 	const years = yearsOverride ?? storeYears;
 	const ranges = rangesOverride ?? storeRanges;
-	// The eval/view scope layers onto the saved model, so the
-	// base simulation keys on model data alone. Eval/view changes (toggles,
-	// statement day, account selection) only move the overlay key below.
 	const overlayNeeded =
 		evaluationsOverride !== undefined &&
-		baseModel !== null &&
-		activeModel !== null;
-	// The requested slice participates in cache identity alongside the
-	// model: different ranges hold different payloads.
+		baseSource !== null &&
+		activeSource !== null;
 	const effectiveRange = useMemo(
 		() =>
-			baseModel
-				? resolveProjectionRange(baseModel, years, dateRangeOverride)
+			baseSource
+				? resolveProjectionRange(baseSource, years, dateRangeOverride)
 				: null,
-		[baseModel, years, dateRangeOverride],
+		[baseSource, years, dateRangeOverride],
 	);
 	const rangeKey = effectiveRange ? projectionRangeKey(effectiveRange) : "";
-	const hasModel = baseModel !== null;
 	const queryClient = useQueryClient();
 	const queryClientRef = useRef(queryClient);
 	// oxlint-disable-next-line react/refs
@@ -552,12 +711,10 @@ export function useRemoteProjection({
 				reportDeterministicError(queryKey),
 			);
 	};
-	// Base path: model data only. Eval/view preference changes never move
-	// this key, so the cached simulation (and its mapped path) is reused.
 	const deterministic = useQuery({
 		queryKey: deterministicQueryKey(baseKey, years, rangeKey),
 		queryFn: ({ signal, queryKey }) => {
-			const current = baseModel;
+			const current = baseSource;
 			if (!current) throw new Error(MISSING_MODEL_MESSAGE);
 			const range = effectiveRange ?? resolveProjectionRange(current, years);
 			return fetchDeterministicResult(current, years, range, signal)
@@ -570,16 +727,14 @@ export function useRemoteProjection({
 					throw cause;
 				});
 		},
-		enabled: enabled && hasModel,
+		enabled: enabled && baseSource !== null,
 		placeholderData: keepPreviousData,
 		retry: false,
 	});
-	// Eval overlay: request-local evaluations layered onto the cached base
-	// path. Shares the base timeline; only envelope identity changes.
 	const overlay = useQuery({
 		queryKey: evalOverlayQueryKey(baseKey, evalKey, years, rangeKey),
 		queryFn: ({ signal, queryKey }) => {
-			const current = activeModel;
+			const current = activeSource;
 			if (!current) throw new Error(MISSING_MODEL_MESSAGE);
 			const range = effectiveRange ?? resolveProjectionRange(current, years);
 			return fetchDeterministicResult(
@@ -587,47 +742,47 @@ export function useRemoteProjection({
 				years,
 				range,
 				signal,
-				true,
+				modelOverride,
 			).catch((cause: unknown) => {
 				notifyDeterministicError(queryKey, cause);
 				throw cause;
 			});
 		},
-		enabled: enabled && hasModel && overlayNeeded,
+		enabled: enabled && baseSource !== null && overlayNeeded,
 		placeholderData: keepPreviousData,
 		retry: false,
 	});
-	const missingModel = enabled && !hasModel;
+	const sourcePending =
+		modelOverride === undefined && enabled && rowSource.pending;
+	const missingModel =
+		enabled && !hasModel && !sourcePending && rowSource.error === null;
 	const missingError = useMemo(() => new Error(MISSING_MODEL_MESSAGE), []);
-	// Map the cached path locally: without an overlay the base model
-	// carries its own evaluations; with one, the base path renders instantly
-	// while the overlay envelopes arrive progressively underneath.
 	const mapped = useMemo((): {
 		projection: Projection | null;
 		error: string | null;
 	} => {
 		const raw = deterministic.data ?? null;
-		if (!raw || !baseModel) return { projection: null, error: null };
-		const horizonYears = projectionRequest(baseModel, years).settings
+		if (!raw || !baseSource) return { projection: null, error: null };
+		const horizonYears = projectionRequest(baseSource, years).settings
 			.horizonYears;
 		try {
-			if (!overlayNeeded || !activeModel) {
+			if (!overlayNeeded || !activeSource) {
 				return {
-					projection: projectionResultToLocal(raw, baseModel, horizonYears),
+					projection: projectionResultToLocal(raw, baseSource, horizonYears),
 					error: null,
 				};
 			}
 			const overlaid = overlay.data ?? null;
 			if (!overlaid) {
 				return {
-					projection: projectionResultToLocal(raw, baseModel, horizonYears),
+					projection: projectionResultToLocal(raw, baseSource, horizonYears),
 					error: null,
 				};
 			}
 			return {
 				projection: projectionResultToLocal(
 					mergeEvaluationResults(raw, overlaid),
-					activeModel,
+					activeSource,
 					horizonYears,
 				),
 				error: null,
@@ -644,16 +799,17 @@ export function useRemoteProjection({
 	}, [
 		deterministic.data,
 		overlay.data,
-		baseModel,
-		activeModel,
+		baseSource,
+		activeSource,
 		overlayNeeded,
 		years,
 	]);
-	// Failures resolve with fetching false, so an error under load is
-	// superseded by the pending skeletons instead of flashing stale errors.
+	const sourceError = rowSource.error;
 	const base: Projection | Error | null = missingModel
 		? missingError
-		: (mapped.projection ?? null);
+		: sourceError
+			? new Error(sourceError)
+			: (mapped.projection ?? null);
 	const overlayErrorMessage =
 		overlayNeeded && overlay.error
 			? (overlay.error.message ??
@@ -661,32 +817,30 @@ export function useRemoteProjection({
 			: null;
 	const mappingErrorMessage = mapped.error;
 	const baseError =
-		missingModel ||
-		(deterministic.error === null &&
-			!overlayErrorMessage &&
-			!mappingErrorMessage)
+		missingModel || sourceError
 			? missingModel
 				? MISSING_MODEL_MESSAGE
-				: null
-			: (deterministic.error?.message ??
-				overlayErrorMessage ??
-				mappingErrorMessage ??
-				"The deterministic projection request failed. Retry the connection.");
-	const loading = deterministic.isFetching || overlay.isFetching;
+				: sourceError
+			: deterministic.error === null &&
+				  !overlayErrorMessage &&
+				  !mappingErrorMessage
+				? null
+				: (deterministic.error?.message ??
+					overlayErrorMessage ??
+					mappingErrorMessage ??
+					"The deterministic projection request failed. Retry the connection.");
+	const loading =
+		sourcePending || deterministic.isFetching || overlay.isFetching;
 	const runCount = randomRunCount();
 	const seed = 42;
-	// Ranges derive from the base path. Eval/view preferences never move this
-	// key: overlay envelopes describe single-path outcomes, not bands.
-	const rangeEnabled = enabled && ranges && baseModel !== null;
-	// A disabled observer must detach from the active stream, so the last
-	// real subscriber leaving lets Query cancel its signal.
+	const rangeEnabled = enabled && ranges && baseSource !== null;
 	const rangeQueryKey = rangeEnabled
 		? stochasticQueryKey(baseKey, years, runCount, seed, 0)
 		: ["stochastic-projection-disabled"];
 	const rangeRequest: StochasticProjectionRequest | null =
-		rangeEnabled && baseModel
+		rangeEnabled && baseSource
 			? {
-					...projectionRequest(baseModel, years),
+					...projectionRequest(baseSource, years),
 					config: { runCount, seed },
 				}
 			: null;
@@ -703,9 +857,14 @@ export function useRemoteProjection({
 		base,
 		status: !enabled
 			? ("disabled" as const)
-			: missingModel || deterministic.isError || mappingErrorMessage !== null
+			: missingModel ||
+				  sourceError !== null ||
+				  deterministic.isError ||
+				  mappingErrorMessage !== null
 				? ("error" as const)
-				: deterministic.isPending || (overlayNeeded && overlay.isPending)
+				: sourcePending ||
+					  deterministic.isPending ||
+					  (overlayNeeded && overlay.isPending)
 					? ("pending" as const)
 					: ("success" as const),
 		isPlaceholderData:

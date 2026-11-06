@@ -12,6 +12,7 @@ import {
 	listAmountPresets,
 	listCheckpoints,
 	listEvaluationSummary,
+	listPlannedPurchases,
 	listSchedules,
 	listTransactionCatalog,
 	listTransactions,
@@ -24,6 +25,7 @@ import type { TransactionRow } from "@/api/generated/model/transactionRow.ts";
 import { ApiHttpError } from "@/api/http.ts";
 import {
 	type AmountPreset,
+	type BackendPlannedPurchase,
 	type EvaluationTables,
 	type FinancialModelResponse,
 	type ServerStatus,
@@ -42,6 +44,7 @@ export function userResourceKey(
 		| "balances"
 		| "transactions"
 		| "rules"
+		| "purchases"
 		| "catalog"
 		| "eval-summary"
 		| "checkpoints",
@@ -284,6 +287,11 @@ export interface ScheduleList {
 	revision: string | null;
 }
 
+export interface PurchaseList {
+	plannedPurchases: BackendPlannedPurchase[];
+	revision: string | null;
+}
+
 export interface TransactionCatalog {
 	items: { id: string; kind: string; name: string }[];
 	revision: string | null;
@@ -365,6 +373,25 @@ export function schedulesOptions(
 			current(scope, signal);
 			return {
 				schedules: result.schedules ?? [],
+				revision: result.revision ?? null,
+			};
+		},
+	});
+}
+
+export function purchasesOptions(scope = getUserScope()) {
+	return queryOptions({
+		...defaults,
+		queryKey: userResourceKey("purchases", scope),
+		queryFn: async ({ signal }): Promise<PurchaseList> => {
+			const result = (await listPlannedPurchases({ signal }))
+				.data as unknown as {
+				plannedPurchases?: BackendPlannedPurchase[] | null;
+				revision?: string;
+			};
+			current(scope, signal);
+			return {
+				plannedPurchases: result.plannedPurchases ?? [],
 				revision: result.revision ?? null,
 			};
 		},
@@ -462,6 +489,18 @@ export function useSchedules(filters: { accountId?: string } = {}) {
 			...schedulesOptions(scope, filters),
 			refetchOnMount: "always",
 			enabled: scope.status === "ready",
+		},
+		serverQueryClient(),
+	);
+}
+
+export function usePlannedPurchases(options: { enabled?: boolean } = {}) {
+	const scope = useUserScope();
+	return useQuery(
+		{
+			...purchasesOptions(scope),
+			refetchOnMount: "always",
+			enabled: options.enabled ?? scope.status === "ready",
 		},
 		serverQueryClient(),
 	);

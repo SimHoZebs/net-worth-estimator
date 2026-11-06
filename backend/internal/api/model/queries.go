@@ -198,6 +198,9 @@ type transactionRow struct {
 	TransactionTime int64                         `json:"transactionTime,omitempty"`
 	Category        string                        `json:"category,omitempty"`
 	CategorySource  string                        `json:"categorySource,omitempty"`
+	// ReceiptIDs is the reverse lookup this row displays, read once for the
+	// whole list instead of loading the model document.
+	ReceiptIDs []string `json:"receiptIds,omitempty"`
 }
 
 // transactionDay renders a unix stamp as a UTC calendar day for display rows.
@@ -285,6 +288,15 @@ func (s *handler) listTransactions(_ context.Context, input *struct {
 			if item, ok := categories[transactions[index].ID]; ok {
 				transactions[index].Category = item.Category
 				transactions[index].CategorySource = item.Source
+			}
+		}
+		if s.receipts != nil {
+			links, err := s.receipts.ListLinks()
+			if err != nil {
+				return nil, huma.Error500InternalServerError(err.Error())
+			}
+			for index := range transactions {
+				transactions[index].ReceiptIDs = links[transactions[index].ID]
 			}
 		}
 	}

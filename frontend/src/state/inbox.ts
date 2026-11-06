@@ -8,6 +8,7 @@ import {
 	dismissInboxShare,
 	listInbox,
 	markInboxShareRead,
+	readInboxUnreadCount,
 	type InboxFilter,
 } from "@/pages/inboxApi.ts";
 import { serverQueryClient } from "./serverQuery.ts";
@@ -25,6 +26,10 @@ export const inboxKey = (
 	showDismissed: boolean,
 	scope = getUserScope(),
 ) => ["user-resources", scope.key, "inbox", status, showDismissed] as const;
+
+/** Count-only key stays under the inbox prefix so mutations invalidate it. */
+export const inboxUnreadKey = (scope = getUserScope()) =>
+	["user-resources", scope.key, "inbox", "unread-count"] as const;
 
 function useInboxScope() {
 	return useSyncExternalStore(subscribeUserScope, getUserScope);
@@ -56,12 +61,12 @@ export function useInboxUnreadCount() {
 	const scope = useInboxScope();
 	return useQuery(
 		{
-			queryKey: inboxKey("all", false, scope),
+			queryKey: inboxUnreadKey(scope),
 			enabled: scope.status === "ready",
 			queryFn: async ({ signal }) => {
-				const result = await listInbox("all", false, signal);
+				const count = await readInboxUnreadCount(signal);
 				currentScope(scope);
-				return result.unreadCount;
+				return count;
 			},
 		},
 		serverQueryClient(),

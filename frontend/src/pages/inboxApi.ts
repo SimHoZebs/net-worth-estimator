@@ -50,6 +50,16 @@ export async function listInbox(
 	};
 }
 
+/** The badge needs one number, not the item list. */
+export async function readInboxUnreadCount(
+	signal?: AbortSignal,
+): Promise<number> {
+	const response = await waypointFetch<{
+		data: { unreadCount: number };
+	}>("/v1/inbox?status=all&countOnly=1", { signal });
+	return response.data.unreadCount ?? 0;
+}
+
 async function mutateShare(
 	action: "accept" | "decline" | "dismiss" | "read",
 	ownerUserId: string,

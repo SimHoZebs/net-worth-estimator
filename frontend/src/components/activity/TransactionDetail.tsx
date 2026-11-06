@@ -72,10 +72,9 @@ import {
 import type { SettleCandidateRow } from "@/api/generated/model/settleCandidateRow.ts";
 import { frequencyLabel } from "../../domain/recurringPatterns.ts";
 import {
-	getServerModel,
-	modelOptions,
 	refreshTransactions,
-	useServerModel,
+	schedulesOptions,
+	useSchedules,
 } from "../../state/workspaceResources.ts";
 import { AccountOptions } from "../editors/AccountOptions.tsx";
 import {
@@ -591,11 +590,13 @@ function useTransactionEdit({
 	readOnly: readOnlyProp,
 	onClose,
 	scheduleFrequency,
+	storedFrequency: storedScheduleFrequency,
 }: {
 	savedTransaction: Transaction;
 	readOnly?: boolean;
 	onClose: () => void;
 	scheduleFrequency: Frequency;
+	storedFrequency?: Frequency;
 }) {
 	// Only the clicked value is editable; null renders the pure read view.
 	const [activeField, setActiveField] = useState<EditField | null>(null);
@@ -699,9 +700,7 @@ function useTransactionEdit({
 				setError(values.message);
 				return;
 			}
-			const storedFrequency = getServerModel()?.model?.schedules.find(
-				(row) => row.id === savedTransaction.id,
-			)?.frequency;
+			const storedFrequency = storedScheduleFrequency;
 			if (storedFrequency === undefined) {
 				// A cadence edit needs the stored value to tell an untouched
 				// choice from a changed one; refuse instead of saving a blind
@@ -775,6 +774,8 @@ function useTransactionEdit({
 	// Pending claimable rows save schedule-claim edits while locked.
 	const saveBlocked =
 		saving ||
+		(savedTransaction.kind === "schedule" &&
+			storedScheduleFrequency === undefined) ||
 		(Boolean(readOnlyReason) && !(claimEditable && activeField === "schedule"));
 	const actions =
 		activeField === null ? undefined : (
@@ -820,17 +821,16 @@ function useTransactionEdit({
 async function scheduleExistsAuthoritative(
 	scheduleId: string,
 ): Promise<boolean> {
-	const model = getServerModel()?.model;
-	if (model?.schedules.some((schedule) => schedule.id === scheduleId))
+	const cached = serverQueryClient().getQueryData(
+		schedulesOptions(getUserScope()).queryKey,
+	) as { schedules?: { id: string }[] } | undefined;
+	if (cached?.schedules?.some((schedule) => schedule.id === scheduleId))
 		return true;
 	try {
 		const fresh = await serverQueryClient().fetchQuery(
-			modelOptions(getUserScope()),
+			schedulesOptions(getUserScope()),
 		);
-		return (
-			fresh.model?.schedules.some((schedule) => schedule.id === scheduleId) ??
-			false
-		);
+		return fresh.schedules.some((schedule) => schedule.id === scheduleId);
 	} catch {
 		return false;
 	}
@@ -959,8 +959,8 @@ export function TransactionDetail({
 	// endpoint. The editor follows the stored cadence; only a schedule
 	// carries one.
 	const savedRules = useSavedSchedules();
-	const serverModel = useServerModel({ enabled: false });
-	const modelRevision = serverModel.data?.revision;
+	const schedulesQuery = useSchedules();
+	const modelRevision = schedulesQuery.data?.revision;
 	const rawSchedules = savedRules ?? undefined;
 	const rawSchedule =
 		savedTransaction.kind === "schedule"
@@ -982,6 +982,7 @@ export function TransactionDetail({
 		readOnly,
 		onClose,
 		scheduleFrequency,
+		storedFrequency: rawSchedule?.frequency as Frequency | undefined,
 	});
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [confirmingEndSchedule, setConfirmingEndSchedule] = useState(false);
@@ -1651,6 +1652,7 @@ export function TransactionDetail({
 					<div id={`${edit.formId}-receipts`} className="scroll-mt-4">
 						<ReceiptPanel
 							postingId={savedTransaction.id}
+							posting={savedTransaction}
 							readOnly={Boolean(readOnly ?? savedTransaction.readOnly)}
 						/>
 					</div>

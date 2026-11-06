@@ -87,6 +87,24 @@ export function setServerModelFixture(
 		evaluations: model.evaluations,
 		revision: response.revision,
 	});
+	serverQueryClient().setQueryData(
+		[...userResourceKey("checkpoints"), "", "", ""],
+		{ checkpoints: model.checkpoints, revision: response.revision },
+	);
+	serverQueryClient().setQueryData(userResourceKey("purchases"), {
+		plannedPurchases: model.plannedPurchases ?? [],
+		revision: response.revision,
+	});
+	// Presence is a status flag. Keep an explicit fixture when a test has
+	// already set one (for example, a read-only workspace).
+	if (!serverQueryClient().getQueryData(userResourceKey("status")))
+		serverQueryClient().setQueryData(userResourceKey("status"), {
+			readOnly: false,
+			hasModel: true,
+			syncConfigured: false,
+			syncQuotaUsed: 0,
+			syncQuotaLimit: 0,
+		});
 	return response;
 }
 export function setServerRevisionFixture(revision: string) {

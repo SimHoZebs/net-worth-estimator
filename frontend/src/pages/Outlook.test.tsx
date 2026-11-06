@@ -29,6 +29,7 @@ beforeEach(() => {
 	setServerModelFixture(blankData);
 	setServerStatusFixture({
 		readOnly: false,
+		hasModel: true,
 		syncConfigured: false,
 		syncQuotaUsed: 0,
 		syncQuotaLimit: 0,
@@ -54,6 +55,7 @@ it("opens the first-account editor from an active blank workspace", () => {
 it("honors the server write restriction on a blank workspace", () => {
 	setServerStatusFixture({
 		readOnly: true,
+		hasModel: true,
 		syncConfigured: false,
 		syncQuotaUsed: 0,
 		syncQuotaLimit: 0,
