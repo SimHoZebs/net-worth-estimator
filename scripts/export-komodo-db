@@ -1,0 +1,129 @@
+#!/bin/sh
+# Export the Komodo-hosted application database to a private host backup.
+# Online path uses SQLite's backup API through the running container, so no
+# downtime is needed. The --stop path stops the container for a file copy.
+# Output is mode 0600 under a timestamped directory and is validated before
+# it is renamed to its final name. The script only restarts a container it
+# stopped itself, and a failed restart fails the export.
+set -eu
+
+container=${KOMODO_API_CONTAINER:-net-worth-estimator}
+db=${KOMODO_API_DB:-/data/net-worth-estimator.db}
+dest=
+stop=0
+
+usage() {
+  echo "Usage: scripts/export-komodo-db [--container NAME] [--db /container/path.db] [--dest /host/dir] [--stop]"
+  echo "  Defaults: container=net-worth-estimator db=/data/net-worth-estimator.db"
+  echo "  dest=<waypoint-production>/backups/pre-northflank-YYYYMMDDTHHMMSSZ (host-specific)"
+  echo "  --stop stops the container, copies, then restarts it"
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --container) container=${2:?--container needs a value}; shift 2 ;;
+    --db) db=${2:?--db needs a value}; shift 2 ;;
+    --dest) dest=${2:?--dest needs a value}; shift 2 ;;
+    --stop) stop=1; shift ;;
+    --help|-h) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+case "$container" in ''|*/*|*' '*|-*) echo "Invalid container name" >&2; exit 2 ;; esac
+case "$db" in /*) ;; *) echo "Database path must be absolute inside the container" >&2; exit 2 ;; esac
+case "$dest" in ''|-*) if [ -z "$dest" ]; then :; else echo "Invalid destination" >&2; exit 2; fi ;; esac
+
+# Resolve the repo root from this script so Node imports work from any cwd.
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ROOT=$(dirname -- "$SCRIPT_DIR")
+cd "$ROOT"
+
+if [ -z "$dest" ]; then
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  dest="/home/simho/.local/share/waypoint-production/backups/pre-northflank-$stamp"
+fi
+
+umask 077
+install -d -m 700 "$dest"
+target="$dest/net-worth-estimator.db"
+staging="$dest/.net-worth-estimator.db.staging"
+[ ! -e "$target" ] && [ ! -e "$staging" ] || { echo "Destination exists: $target" >&2; exit 1; }
+
+running=$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true)
+[ -n "$running" ] || { echo "Container not found: $container" >&2; exit 1; }
+
+tmp_inside=""
+stopped_by_script=0
+cleanup() {
+  status=$?
+  if [ -n "$tmp_inside" ]; then
+    docker exec "$container" rm -f "$tmp_inside" 2>/dev/null || true
+  fi
+  # Never leave an unvalidated staging file that looks like a backup.
+  rm -f "$staging" 2>/dev/null || true
+  if [ "$stopped_by_script" = 1 ]; then
+    if ! docker start "$container" >/dev/null 2>&1; then
+      echo "Export failed and container restart failed: $container is stopped" >&2
+      [ "$status" = 0 ] && status=1
+    else
+      now=$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || echo false)
+      if [ "$now" != true ]; then
+        echo "Export failed and container is not running after restart: $container" >&2
+        [ "$status" = 0 ] && status=1
+      fi
+    fi
+  fi
+  return "$status"
+}
+trap cleanup EXIT
+
+if [ "$stop" = 1 ]; then
+  started_before=""
+  # Record identity before copy; abort if the orchestrator restarted it.
+  started_before=$(docker inspect -f '{{.State.StartedAt}}' "$container" 2>/dev/null || echo "")
+  if [ "$running" = true ]; then
+    docker stop "$container" >/dev/null
+    stopped_by_script=1
+  fi
+  docker cp "$container:$db" "$staging"
+  docker cp "$container:${db}-wal" "${staging}-wal" 2>/dev/null || true
+  chmod 600 "$staging" "${staging}-wal" 2>/dev/null || chmod 600 "$staging"
+  started_after=$(docker inspect -f '{{.State.StartedAt}}' "$container" 2>/dev/null || echo "")
+  if [ -n "$started_before" ] && [ "$started_before" != "$started_after" ]; then
+    echo "Container changed during the copy; backup aborted" >&2
+    rm -f "${staging}-wal" 2>/dev/null || true
+    exit 1
+  fi
+  # Checkpoint WAL into the main file with a validated snapshot.
+  node --input-type=module -e \
+    'import { snapshotFile } from "./dev/database.mjs"; await snapshotFile(process.argv[1], process.argv[2]);' \
+    "$staging" "$dest/net-worth-estimator.db"
+  rm -f "${staging}-wal" 2>/dev/null || true
+else
+  [ "$running" = true ] || { echo "Container is not running; use --stop for a stopped-source copy" >&2; exit 1; }
+  tmp_inside="/data/.export-$$.db"
+  docker exec "$container" sqlite3 "$db" ".backup $tmp_inside"
+  docker cp "$container:$tmp_inside" "$staging"
+  chmod 600 "$staging"
+fi
+
+if [ "$stop" = 1 ]; then
+  node --input-type=module -e \
+    'import { validateSnapshot } from "./dev/database.mjs"; validateSnapshot(process.argv[1]);' \
+    "$dest/net-worth-estimator.db"
+else
+  # Online path: validate the staging copy, then publish it.
+  node --input-type=module -e \
+    'import { validateSnapshot } from "./dev/database.mjs"; validateSnapshot(process.argv[1]);' \
+    "$staging"
+  mv "$staging" "$dest/net-worth-estimator.db"
+fi
+
+hash=$(sha256sum "$dest/net-worth-estimator.db" | cut -d' ' -f1)
+[ -n "$hash" ] || { echo "Checksum failed" >&2; exit 1; }
+printf '%s\n' "$hash" > "$dest/net-worth-estimator.db.sha256"
+chmod 600 "$dest/net-worth-estimator.db.sha256"
+ls -lh "$dest/net-worth-estimator.db"
+echo "Backup: $dest/net-worth-estimator.db"
+echo "SHA256: $hash"

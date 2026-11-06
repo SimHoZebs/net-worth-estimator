@@ -57,6 +57,7 @@ Matrix:
                bun --filter ./frontend test:unit (vitest: src/** and scripts/**, jsdom)
                bun --filter ./extension test (node:test, no external APIs)
                node --test dev/*.test.mjs auth/casdoor/*.test.mjs (Compose CLI, no daemon)
+               node --test scripts/*.test.mjs
                node --test auth/e2e-gate.test.mjs (e2e budget/flake/fixture contract)
   integration  bun --filter ./frontend test:integration (tests/integration/*.spec.ts, sharded)
                bun --filter ./extension test:browser (disposable browser profile)
@@ -85,6 +86,7 @@ run_unit() {
   bun --filter ./extension test
   # shellcheck disable=SC2086
   node --test dev/*.test.mjs auth/casdoor/*.test.mjs
+  node --test scripts/*.test.mjs
   node --test auth/e2e-gate.test.mjs
 }
 
