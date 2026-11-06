@@ -269,7 +269,9 @@ test("failed saves retain the intended edit", async ({ page }) => {
 	});
 	await page.getByRole("button", { name: "Save changes" }).click();
 	await expect(
-		page.getByRole("alert").filter({ hasText: "HTTP 500" }),
+		page
+			.getByRole("alert")
+			.filter({ hasText: "The server failed to complete the request" }),
 	).toBeVisible();
 	await expect(page.getByLabel("Amount (USD)")).toHaveValue("900");
 	await expect(
@@ -472,7 +474,7 @@ test("scenario failures expose a recovery action without inventing a range", asy
 	await resetFixture({ pinnedEvaluationIds: [evaluation.instanceId] });
 	await page.route("**/v1/projections/stochastic", (route) => route.abort());
 	await page.goto("/");
-	await expect(page.getByRole("alert")).toContainText("The API request failed");
+	await expect(page.getByRole("alert")).toContainText("Check your connection");
 	await expect(
 		page.getByRole("button", { name: "Retry scenario calculation" }),
 	).toBeVisible();

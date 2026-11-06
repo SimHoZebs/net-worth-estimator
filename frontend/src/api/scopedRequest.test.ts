@@ -290,7 +290,7 @@ describe("resource assertion at the API boundary", () => {
 			expect(failure).toBeInstanceOf(ApiHttpError);
 			expect(failure).toMatchObject({ status: 409, problem });
 			expect((failure as ApiHttpError).message).toBe(
-				"The request conflicts with the current server data. That account already exists.",
+				"The request conflicts with the current server data. Refresh the view and retry. That account already exists.",
 			);
 			expect(getUserScope()).toBe(scope);
 		},
