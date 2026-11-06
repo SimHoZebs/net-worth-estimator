@@ -222,6 +222,20 @@ describe("parseRoute", () => {
 		});
 	});
 
+	test("duplicated overlay params are invalid", () => {
+		expect(
+			parseRoute("/accounts?evidence=account&id=checking&evidence=position")
+				?.overlay,
+		).toEqual({ type: "invalid" });
+		expect(parseRoute("/accounts?evidence=account&id=a&id=b")?.overlay).toEqual(
+			{ type: "invalid" },
+		);
+		expect(
+			parseRoute("/outlook?detail=safe-spending&tab=cycle&tab=last-cycle")
+				?.overlay,
+		).toEqual({ type: "invalid" });
+	});
+
 	test("malformed overlays are invalid rather than silently dropped", () => {
 		expect(parseRoute("/accounts/a/b")?.overlay).toEqual({
 			type: "invalid",

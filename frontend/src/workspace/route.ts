@@ -116,13 +116,36 @@ function invalidOverlay(): OverlayRoute {
 	return { type: "invalid" };
 }
 
+// Each overlay parameter may appear at most once; a duplicate is invalid
+// rather than silently keeping the first.
+function singleParam(
+	params: URLSearchParams,
+	name: string,
+): string | null | undefined {
+	const values = params.getAll(name);
+	if (values.length === 0) return undefined;
+	if (values.length > 1) return null;
+	return values[0] ?? null;
+}
+
+const OVERLAY_PARAMS = [
+	"evidence",
+	"editor",
+	"detail",
+	"id",
+	"tab",
+	"editTransaction",
+] as const;
+
 function parseOverlayQuery(params: URLSearchParams): OverlayRoute | null {
-	const evidence = params.get("evidence");
-	const editor = params.get("editor");
-	const detail = params.get("detail");
-	const kinds = [evidence, editor, detail].filter((value) => value !== null);
+	const singles = OVERLAY_PARAMS.map((name) => singleParam(params, name));
+	if (singles.some((value) => value === null)) return invalidOverlay();
+	const [evidence, editor, detail, id, tab, editTransaction] = singles;
+	const kinds = [evidence, editor, detail].filter(
+		(value) => value !== undefined,
+	);
 	if (kinds.length > 1) return invalidOverlay();
-	if (evidence !== null) {
+	if (evidence !== undefined) {
 		switch (evidence) {
 			case "position":
 				return { type: "position" };
@@ -131,40 +154,37 @@ function parseOverlayQuery(params: URLSearchParams): OverlayRoute | null {
 			case "safe-spending":
 				return { type: "safe-spending" };
 			case "account": {
-				const key = params.get("id");
-				return key ? { type: "account", key } : invalidOverlay();
+				return id ? { type: "account", key: id } : invalidOverlay();
 			}
 			default:
 				return invalidOverlay();
 		}
 	}
-	if (editor !== null) {
-		const key = params.get("id");
-		if (!key) return invalidOverlay();
+	if (editor !== undefined) {
+		if (!id) return invalidOverlay();
 		switch (editor) {
 			case "account":
-				return { type: "accountEdit", key };
+				return { type: "accountEdit", key: id };
 			case "transaction":
-				return { type: "transactionEdit", key };
+				return { type: "transactionEdit", key: id };
 			case "schedule":
-				return { type: "scheduleEdit", key };
+				return { type: "scheduleEdit", key: id };
 			case "evaluation":
-				return { type: "evaluationEdit", key };
+				return { type: "evaluationEdit", key: id };
 			default:
 				return invalidOverlay();
 		}
 	}
-	if (detail !== null) {
+	if (detail !== undefined) {
 		if (detail !== "safe-spending") return invalidOverlay();
-		const requestedTab = params.get("tab") ?? "cycle";
+		const requestedTab = tab ?? "cycle";
 		if (!isSafeSpendingTab(requestedTab)) return invalidOverlay();
-		const editTransaction = params.get("editTransaction");
 		return editTransaction
 			? { type: "safeSpendingDetail", tab: requestedTab, editTransaction }
 			: { type: "safeSpendingDetail", tab: requestedTab };
 	}
 	// A lone id, tab, or stacked-editor param has no overlay to belong to.
-	if (params.has("id") || params.has("tab") || params.has("editTransaction")) {
+	if (id !== undefined || tab !== undefined || editTransaction !== undefined) {
 		return invalidOverlay();
 	}
 	return null;

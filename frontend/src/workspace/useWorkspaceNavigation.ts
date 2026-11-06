@@ -8,6 +8,21 @@ function currentUrl(): string {
 	return `${window.location.pathname}${window.location.search}`;
 }
 
+// Preserve the transient Gmail callback flag across workspace navigation
+// until the Gmail flow consumes it. Without this merge an overlay open
+// would drop `?gmail=connected` before its panel can read it.
+export function preserveCallbackFlag(url: string): string {
+	const current = new URLSearchParams(window.location.search);
+	const flag = current.get("gmail");
+	if (flag === null) return url;
+	const next = new URLSearchParams(
+		url.includes("?") ? url.slice(url.indexOf("?") + 1) : "",
+	);
+	if (next.has("gmail")) return url;
+	const separator = url.includes("?") ? "&" : "?";
+	return `${url}${separator}gmail=${encodeURIComponent(flag)}`;
+}
+
 function readReturnTarget(url: string): EvidenceTarget | null {
 	const state: unknown = window.history.state;
 	if (!isRecord(state) || !isRecord(state.waypointOverlay)) return null;
@@ -44,6 +59,20 @@ export function useWorkspaceNavigation() {
 	const page = route.page;
 	const currentPage = pages.find((item) => item.id === page) ?? pages[0]!;
 	useEffect(() => {
+		// The root path is the outlook landing page. Canonicalize it
+		// once so bookmarks and direct loads share the `/outlook` URL.
+		const pathname = window.location.pathname;
+		if (pathname === "/" || pathname === "/index.html") {
+			const search = window.location.search;
+			window.history.replaceState(
+				window.history.state,
+				"",
+				search ? `/outlook${search}` : "/outlook",
+			);
+			// The initial state already parses the root as outlook, so
+			// only the URL changed; notify sibling instances of it.
+			window.dispatchEvent(new Event("popstate"));
+		}
 		const onPopState = () => {
 			const next = readLocation();
 			const previous = pageRef.current;
@@ -64,15 +93,16 @@ export function useWorkspaceNavigation() {
 			const state: unknown = window.history.state;
 			// Return context belongs to this history entry. Every ordinary navigation
 			// explicitly starts without it, and Back/Forward restore the entry's value.
+			const nextUrl = preserveCallbackFlag(url);
 			const nextState = {
 				...(isRecord(state) ? state : {}),
-				waypointOverlay: { url, returnTo: returnTarget },
+				waypointOverlay: { url: nextUrl, returnTo: returnTarget },
 			};
 			const previousPage = pageRef.current;
-			if (replace || currentUrl() === url) {
-				window.history.replaceState(nextState, "", url);
+			if (replace || currentUrl() === nextUrl) {
+				window.history.replaceState(nextState, "", nextUrl);
 			} else {
-				window.history.pushState(nextState, "", url);
+				window.history.pushState(nextState, "", nextUrl);
 			}
 			const next = readLocation();
 			pageRef.current = next.route.page;

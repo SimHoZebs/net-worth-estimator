@@ -113,6 +113,23 @@ it("scopes the editor return target to its history entry and clears it in ordina
 	expect(screen.getByTestId("return-to").textContent).toBe("null");
 });
 
+it("preserves the Gmail callback flag across navigation", async () => {
+	window.history.replaceState(null, "", "/accounts?gmail=connected");
+	render(<Harness />);
+	fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
+	await waitFor(() =>
+		expect(window.location.pathname + window.location.search).toBe(
+			"/accounts?evidence=account&id=checking&gmail=connected",
+		),
+	);
+});
+
+it("canonicalizes the root path to /outlook on mount", async () => {
+	window.history.replaceState(null, "", "/");
+	render(<Harness />);
+	await waitFor(() => expect(window.location.pathname).toBe("/outlook"));
+});
+
 it("updates the title in recovery layout without the normal page heading", async () => {
 	render(<Harness recovery />);
 	expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
